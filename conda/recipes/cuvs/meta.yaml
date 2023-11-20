@@ -1,0 +1,76 @@
+# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+
+# Usage:
+#   conda build . -c conda-forge -c numba -c rapidsai -c pytorch
+{% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
+{% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
+{% set py_version = environ['CONDA_PY'] %}
+{% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
+{% set cuda_major = cuda_version.split('.')[0] %}
+{% set date_string = environ['RAPIDS_DATE_STRING'] %}
+
+package:
+  name: cuvs
+  version: {{ version }}
+
+source:
+  path: ../../..
+
+build:
+  number: {{ GIT_DESCRIBE_NUMBER }}
+  string: cuda{{ cuda_major }}_py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
+  ignore_run_exports_from:
+    {% if cuda_major == "11" %}
+    - {{ compiler('cuda11') }}
+    {% endif %}
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    {% if cuda_major == "11" %}
+    - {{ compiler('cuda11') }} ={{ cuda_version }}
+    {% else %}
+    - {{ compiler('cuda') }}
+    {% endif %}
+    - cuda-version ={{ cuda_version }}
+    - cmake {{ cmake_version }}
+    - ninja
+    - sysroot_{{ target_platform }} {{ sysroot_version }}
+  host:
+    {% if cuda_major == "11" %}
+    - cuda-python >=11.7.1,<12.0a0
+    - cudatoolkit
+    {% else %}
+    - cuda-python >=12.0,<13.0a0
+    {% endif %}
+    - cuda-version ={{ cuda_version }}
+    - cython >=3.0.0
+    - pylibraft {{ version }}
+    - libcuvs {{ version }}
+    - numpy >=1.21
+    - python x.x
+    - rmm ={{ minor_version }}
+    - scikit-build >=0.13.1
+    - setuptools
+  run:
+    - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
+    {% if cuda_major == "11" %}
+    - cudatoolkit
+    {% endif %}
+    - pylibraft {{ version }}
+    - libcuvs {{ version }}
+    - python x.x
+    - rmm ={{ minor_version }}
+
+tests:
+  requirements:
+    - cuda-version ={{ cuda_version }}
+  imports:
+    - cuvs
+
+about:
+  home: https://rapids.ai/
+  license: Apache-2.0
+  # license_file: LICENSE
+  summary: cuvs python library

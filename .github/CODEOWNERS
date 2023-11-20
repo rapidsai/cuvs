@@ -1,0 +1,21 @@
+#cpp code owners
+cpp/               @rapidsai/cuvs-cpp-codeowners
+
+#python code owners
+python/            @rapidsai/cuvs-python-codeowners
+
+#cmake code owners
+**/CMakeLists.txt  @rapidsai/cuvs-cmake-codeowners
+**/cmake/          @rapidsai/cuvs-cmake-codeowners
+python/setup.py    @rapidsai/cuvs-cmake-codeowners
+build.sh           @rapidsai/cuvs-cmake-codeowners
+**/build.sh        @rapidsai/cuvs-cmake-codeowners
+
+#build/ops code owners
+.github/           @rapidsai/ops-codeowners
+ci/                @rapidsai/ops-codeowners
+conda/             @rapidsai/ops-codeowners
+**/Dockerfile      @rapidsai/ops-codeowners
+**/.dockerignore   @rapidsai/ops-codeowners
+docker/            @rapidsai/ops-codeowners
+dependencies.yaml  @rapidsai/ops-codeowners
