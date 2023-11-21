@@ -40,7 +40,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --compile-static-lib        - compile static library for all components
    --cpu-only                  - build CPU only components without CUDA. Applies to bench-ann only currently.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
-   --limit-bench-prims         - semicolon-separated list of prims benchmark executables to compute (e.g. NEIGHBORS_PRIMS_BENCH;CLUSTER_PRIMS_BENCH)
+   --limit-bench-prims         - semicolon-separated list of prims benchmark executables to compute (e.g. NEIGHBORS_MICRO_BENCH;CLUSTER_MICRO_BENCH)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;CUVS_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
@@ -69,7 +69,7 @@ VERBOSE_FLAG=""
 BUILD_ALL_GPU_ARCH=0
 BUILD_TESTS=OFF
 BUILD_TYPE=Release
-BUILD_PRIMS_BENCH=OFF
+BUILD_MICRO_BENCH=OFF
 BUILD_ANN_BENCH=OFF
 BUILD_CPU_ONLY=OFF
 COMPILE_LIBRARY=OFF
@@ -77,8 +77,8 @@ INSTALL_TARGET=install
 BUILD_REPORT_METRICS=""
 BUILD_REPORT_INCL_CACHE_STATS=OFF
 
-TEST_TARGETS="CLUSTER_TEST;CORE_TEST;DISTANCE_TEST;LABEL_TEST;LINALG_TEST;MATRIX_TEST;NEIGHBORS_TEST;NEIGHBORS_ANN_CAGRA_TEST;NEIGHBORS_ANN_NN_DESCENT_TEST;NEIGHBORS_ANN_IVF_TEST;RANDOM_TEST;SOLVERS_TEST;SPARSE_TEST;SPARSE_DIST_TEST;SPARSE_NEIGHBORS_TEST;STATS_TEST;UTILS_TEST"
-BENCH_TARGETS="CLUSTER_BENCH;CORE_BENCH;NEIGHBORS_BENCH;DISTANCE_BENCH;LINALG_BENCH;MATRIX_BENCH;SPARSE_BENCH;RANDOM_BENCH"
+TEST_TARGETS="CLUSTER_TEST;DISTANCE_TEST;NEIGHBORS_TEST;NEIGHBORS_ANN_CAGRA_TEST;NEIGHBORS_ANN_NN_DESCENT_TEST;NEIGHBORS_ANN_IVF_TEST"
+BENCH_TARGETS="CLUSTER_BENCH;NEIGHBORS_BENCH;DISTANCE_BENCH"
 
 CACHE_ARGS=""
 NVTX=ON
@@ -164,11 +164,11 @@ function limitBench {
         # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
         # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
         # on the invalid option error
-        LIMIT_PRIMS_BENCH_TARGETS=$(echo $ARGS | sed -e 's/.*--limit-bench-prims=//' -e 's/ .*//')
-        if [[ -n ${LIMIT_PRIMS_BENCH_TARGETS} ]]; then
-            # Remove the full LIMIT_PRIMS_BENCH_TARGETS argument from list of args so that it passes validArgs function
-            ARGS=${ARGS//--limit-bench-prims=$LIMIT_PRIMS_BENCH_TARGETS/}
-            PRIMS_BENCH_TARGETS=${LIMIT_PRIMS_BENCH_TARGETS}
+        LIMIT_MICRO_BENCH_TARGETS=$(echo $ARGS | sed -e 's/.*--limit-bench-prims=//' -e 's/ .*//')
+        if [[ -n ${LIMIT_MICRO_BENCH_TARGETS} ]]; then
+            # Remove the full LIMIT_MICRO_BENCH_TARGETS argument from list of args so that it passes validArgs function
+            ARGS=${ARGS//--limit-bench-prims=$LIMIT_MICRO_BENCH_TARGETS/}
+            MICRO_BENCH_TARGETS=${LIMIT_MICRO_BENCH_TARGETS}
         fi
     fi
 }
@@ -306,13 +306,13 @@ fi
 
 if hasArg --compile-lib || (( ${NUMARGS} == 0 )); then
     COMPILE_LIBRARY=ON
-    CMAKE_TARGET="${CMAKE_TARGET};cuvs_lib"
+    CMAKE_TARGET="${CMAKE_TARGET};cuvs"
 fi
 
-if hasArg --compile-static-lib || (( ${NUMARGS} == 0 )); then
-    COMPILE_LIBRARY=ON
-    CMAKE_TARGET="${CMAKE_TARGET};cuvs_lib_static"
-fi
+#if hasArg --compile-static-lib || (( ${NUMARGS} == 0 )); then
+#    COMPILE_LIBRARY=ON
+#    CMAKE_TARGET="${CMAKE_TARGET};cuvs_lib_static"
+#fi
 
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
@@ -321,13 +321,10 @@ if hasArg tests || (( ${NUMARGS} == 0 )); then
     # Force compile library when needed test targets are specified
     if [[ $CMAKE_TARGET == *"CLUSTER_TEST"* || \
           $CMAKE_TARGET == *"DISTANCE_TEST"* || \
-          $CMAKE_TARGET == *"MATRIX_TEST"* || \
           $CMAKE_TARGET == *"NEIGHBORS_ANN_CAGRA_TEST"* || \
           $CMAKE_TARGET == *"NEIGHBORS_ANN_IVF_TEST"* || \
           $CMAKE_TARGET == *"NEIGHBORS_ANN_NN_DESCENT_TEST"* || \
           $CMAKE_TARGET == *"NEIGHBORS_TEST"* || \
-          $CMAKE_TARGET == *"SPARSE_DIST_TEST" || \
-          $CMAKE_TARGET == *"SPARSE_NEIGHBORS_TEST"* || \
           $CMAKE_TARGET == *"STATS_TEST"* ]]; then
       echo "-- Enabling compiled lib for gtests"
       COMPILE_LIBRARY=ON
@@ -335,13 +332,12 @@ if hasArg tests || (( ${NUMARGS} == 0 )); then
 fi
 
 if hasArg bench-prims || (( ${NUMARGS} == 0 )); then
-    BUILD_PRIMS_BENCH=ON
-    CMAKE_TARGET="${CMAKE_TARGET};${PRIMS_BENCH_TARGETS}"
+    BUILD_MICRO_BENCH=ON
+    CMAKE_TARGET="${CMAKE_TARGET};${MICRO_BENCH_TARGETS}"
 
     # Force compile library when needed benchmark targets are specified
-    if [[ $CMAKE_TARGET == *"CLUSTER_PRIMS_BENCH"* || \
-          $CMAKE_TARGET == *"MATRIX_PRIMS_BENCH"* || \
-          $CMAKE_TARGET == *"NEIGHBORS_PRIMS_BENCH"* ]]; then
+    if [[ $CMAKE_TARGET == *"CLUSTER_MICRO_BENCH"* || \
+          $CMAKE_TARGET == *"NEIGHBORS_MICRO_BENCH"* ]]; then
       echo "-- Enabling compiled lib for benchmarks"
       COMPILE_LIBRARY=ON
     fi
@@ -427,7 +423,7 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           -DCUDA_LOG_COMPILE_TIME=${LOG_COMPILE_TIME} \
           -DDISABLE_DEPRECATION_WARNINGS=${DISABLE_DEPRECATION_WARNINGS} \
           -DBUILD_TESTS=${BUILD_TESTS} \
-          -DBUILD_PRIMS_BENCH=${BUILD_PRIMS_BENCH} \
+          -DBUILD_MICRO_BENCH=${BUILD_MICRO_BENCH} \
           -DBUILD_ANN_BENCH=${BUILD_ANN_BENCH} \
           -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \

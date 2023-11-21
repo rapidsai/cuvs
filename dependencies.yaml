@@ -81,16 +81,16 @@ files:
       - test_python_common
       - test_cuvs
       - cupy
-  py_build_cuda_ann_bench:
+  py_build_cuvs_bench:
     output: pyproject
-    pyproject_dir: python/cuda-ann-bench
+    pyproject_dir: python/cuvs-bench
     extras:
       table: build-system
     includes:
       - build_wheels
-  py_run_cuda_ann_bench:
+  py_run_cuvs_bench:
     output: pyproject
-    pyproject_dir: python/cuda-ann-bench
+    pyproject_dir: python/cuvs-bench
     extras:
       table: project
     includes:

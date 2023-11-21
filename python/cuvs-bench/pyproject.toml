@@ -10,7 +10,7 @@ requires = [
 [project]
 name = "cuvs-ann-bench"
 version = "24.02.00"
-description = "CUDA ANN benchmarks"
+description = "cuVS benchmarks"
 authors = [
     { name = "NVIDIA Corporation" },
 ]

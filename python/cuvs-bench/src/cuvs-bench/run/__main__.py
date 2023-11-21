@@ -325,7 +325,7 @@ def main():
     parser.add_argument(
         "--algo-groups",
         help='add comma separated <algorithm>.<group> to run. \
-              Example usage: "--algo-groups=raft_cagra.large,hnswlib.large"',
+              Example usage: "--algo-groups=cuvs_cagra.large,hnswlib.large"',
     )
     parser.add_argument(
         "-f",

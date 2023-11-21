@@ -22,8 +22,9 @@ import cupy as cp
 import numpy as np
 import rmm
 from pylibraft.common import DeviceResources
-from pylibraft.neighbors.brute_force import knn
 from rmm.allocators.cupy import rmm_cupy_allocator
+
+from cuvs.neighbors.brute_force import knn
 
 from .utils import memmap_bin_file, suffix_from_dtype, write_bin
 

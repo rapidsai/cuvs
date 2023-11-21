@@ -16,7 +16,7 @@
 
 #include <raft/matrix/detail/select_k-inl.cuh>
 
-#define instantiate_raft_matrix_detail_select_k(T, IdxT)                            \
+#define instantiate_cuvs_matrix_detail_select_k(T, IdxT)                            \
   template void raft::matrix::detail::select_k(raft::resources const& handle,       \
                                                const T* in_val,                     \
                                                const IdxT* in_idx,                  \
@@ -29,6 +29,6 @@
                                                rmm::mr::device_memory_resource* mr, \
                                                bool sorted)
 
-instantiate_raft_matrix_detail_select_k(double, int64_t);
+instantiate_cuvs_matrix_detail_select_k(double, int64_t);
 
-#undef instantiate_raft_matrix_detail_select_k
+#undef instantiate_cuvs_matrix_detail_select_k

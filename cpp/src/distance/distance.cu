@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <raft/distance/detail/kernels/rbf_fin_op.cuh>  // rbf_fin_op
-#include <raft/distance/distance-inl.cuh>
+#include <cuvs/distance/detail/kernels/rbf_fin_op.cuh>  // rbf_fin_op
+#include <cuvs/distance/distance-inl.cuh>
 
 /*
  * Hierarchy of instantiations:

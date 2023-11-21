@@ -19,10 +19,10 @@
 The content of this header is governed by two preprocessor definitions:
 
   - BUILD_CPU_ONLY - whether none of the CUDA functions are used.
-  - ANN_BENCH_LINK_CUDART - dynamically link against this string if defined.
+  - CUVS_BENCH_LINK_CUDART - dynamically link against this string if defined.
 
 ______________________________________________________________________________
-|BUILD_CPU_ONLY | ANN_BENCH_LINK_CUDART |         cudart      | cuda_runtime_api.h |
+|BUILD_CPU_ONLY | CUVS_BENCH_LINK_CUDART |         cudart      | cuda_runtime_api.h |
 |         |                       |  found    |  needed |      included      |
 |---------|-----------------------|-----------|---------|--------------------|
 |   ON    |    <not defined>      |  false    |  false  |       NO           |
@@ -34,7 +34,7 @@ ______________________________________________________________________________
 
 #ifndef BUILD_CPU_ONLY
 #include <cuda_runtime_api.h>
-#ifdef ANN_BENCH_LINK_CUDART
+#ifdef CUVS_BENCH_LINK_CUDART
 #include <cstring>
 #include <dlfcn.h>
 #endif
@@ -49,11 +49,11 @@ struct cuda_lib_handle {
   void* handle{nullptr};
   explicit cuda_lib_handle()
   {
-#ifdef ANN_BENCH_LINK_CUDART
+#ifdef CUVS_BENCH_LINK_CUDART
     constexpr int kFlags = RTLD_NOW | RTLD_GLOBAL | RTLD_DEEPBIND | RTLD_NODELETE;
     // The full name of the linked cudart library 'cudart.so.MAJOR.MINOR.PATCH'
-    char libname[] = ANN_BENCH_LINK_CUDART;  // NOLINT
-    handle         = dlopen(ANN_BENCH_LINK_CUDART, kFlags);
+    char libname[] = CUVS_BENCH_LINK_CUDART;  // NOLINT
+    handle         = dlopen(CUVS_BENCH_LINK_CUDART, kFlags);
     if (handle != nullptr) { return; }
     // try strip the PATCH
     auto p = strrchr(libname, '.');
@@ -78,7 +78,7 @@ struct cuda_lib_handle {
   }
   ~cuda_lib_handle() noexcept
   {
-#ifdef ANN_BENCH_LINK_CUDART
+#ifdef CUVS_BENCH_LINK_CUDART
     if (handle != nullptr) { dlclose(handle); }
 #endif
   }
@@ -86,7 +86,7 @@ struct cuda_lib_handle {
   template <typename Symbol>
   auto sym(const char* name) -> Symbol
   {
-#ifdef ANN_BENCH_LINK_CUDART
+#ifdef CUVS_BENCH_LINK_CUDART
     return reinterpret_cast<Symbol>(dlsym(handle, name));
 #else
     return nullptr;
@@ -108,7 +108,7 @@ struct cuda_lib_handle {
   {
 #if defined(BUILD_CPU_ONLY)
     return false;
-#elif defined(ANN_BENCH_LINK_CUDART)
+#elif defined(CUVS_BENCH_LINK_CUDART)
     return handle != nullptr;
 #else
     return true;
@@ -118,7 +118,7 @@ struct cuda_lib_handle {
 
 static inline cuda_lib_handle cudart{};
 
-#ifdef ANN_BENCH_LINK_CUDART
+#ifdef CUVS_BENCH_LINK_CUDART
 namespace stub {
 
 [[gnu::weak, gnu::noinline]] cudaError_t cudaMemcpy(void* dst,

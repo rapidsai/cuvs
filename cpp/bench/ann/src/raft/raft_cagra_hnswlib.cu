@@ -79,7 +79,7 @@ REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
 REGISTER_ALGO_INSTANCE(std::uint8_t);
 
-#ifdef ANN_BENCH_BUILD_MAIN
+#ifdef CUVS_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
 int main(int argc, char** argv)
 {

@@ -20,34 +20,34 @@
 #include <nlohmann/json.hpp>
 
 #undef WARP_SIZE
-#ifdef RAFT_ANN_BENCH_USE_RAFT_BFKNN
+#ifdef CUVS_BENCH_USE_RAFT_BFKNN
 #include "raft_wrapper.h"
 #endif
-#ifdef RAFT_ANN_BENCH_USE_RAFT_IVF_FLAT
+#ifdef CUVS_BENCH_USE_RAFT_IVF_FLAT
 #include "raft_ivf_flat_wrapper.h"
 extern template class raft::bench::ann::RaftIvfFlatGpu<float, int64_t>;
 extern template class raft::bench::ann::RaftIvfFlatGpu<uint8_t, int64_t>;
 extern template class raft::bench::ann::RaftIvfFlatGpu<int8_t, int64_t>;
 #endif
-#if defined(RAFT_ANN_BENCH_USE_RAFT_IVF_PQ) || defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA) || \
-  defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA_HNSWLIB)
+#if defined(CUVS_BENCH_USE_RAFT_IVF_PQ) || defined(CUVS_BENCH_USE_RAFT_CAGRA) || \
+  defined(CUVS_BENCH_USE_RAFT_CAGRA_HNSWLIB)
 #include "raft_ivf_pq_wrapper.h"
 #endif
-#ifdef RAFT_ANN_BENCH_USE_RAFT_IVF_PQ
+#ifdef CUVS_BENCH_USE_RAFT_IVF_PQ
 extern template class raft::bench::ann::RaftIvfPQ<float, int64_t>;
 extern template class raft::bench::ann::RaftIvfPQ<uint8_t, int64_t>;
 extern template class raft::bench::ann::RaftIvfPQ<int8_t, int64_t>;
 #endif
-#if defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA) || defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA_HNSWLIB)
+#if defined(CUVS_BENCH_USE_RAFT_CAGRA) || defined(CUVS_BENCH_USE_RAFT_CAGRA_HNSWLIB)
 #include "raft_cagra_wrapper.h"
 #endif
-#ifdef RAFT_ANN_BENCH_USE_RAFT_CAGRA
+#ifdef CUVS_BENCH_USE_RAFT_CAGRA
 extern template class raft::bench::ann::RaftCagra<float, uint32_t>;
 extern template class raft::bench::ann::RaftCagra<uint8_t, uint32_t>;
 extern template class raft::bench::ann::RaftCagra<int8_t, uint32_t>;
 #endif
 
-#ifdef RAFT_ANN_BENCH_USE_RAFT_IVF_FLAT
+#ifdef CUVS_BENCH_USE_RAFT_IVF_FLAT
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename raft::bench::ann::RaftIvfFlatGpu<T, IdxT>::BuildParam& param)
@@ -65,8 +65,8 @@ void parse_search_param(const nlohmann::json& conf,
 }
 #endif
 
-#if defined(RAFT_ANN_BENCH_USE_RAFT_IVF_PQ) || defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA) || \
-  defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA_HNSWLIB)
+#if defined(CUVS_BENCH_USE_RAFT_IVF_PQ) || defined(CUVS_BENCH_USE_RAFT_CAGRA) || \
+  defined(CUVS_BENCH_USE_RAFT_CAGRA_HNSWLIB)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename raft::bench::ann::RaftIvfPQ<T, IdxT>::BuildParam& param)
@@ -132,7 +132,7 @@ void parse_search_param(const nlohmann::json& conf,
 }
 #endif
 
-#if defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA) || defined(RAFT_ANN_BENCH_USE_RAFT_CAGRA_HNSWLIB)
+#if defined(CUVS_BENCH_USE_RAFT_CAGRA) || defined(CUVS_BENCH_USE_RAFT_CAGRA_HNSWLIB)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        raft::neighbors::experimental::nn_descent::index_params& param)
