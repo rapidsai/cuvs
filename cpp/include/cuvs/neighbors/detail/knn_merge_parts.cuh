@@ -68,7 +68,7 @@ RAFT_KERNEL knn_merge_parts_kernel(const value_t* inK,
   const value_t* inKStart   = inK + (row_idx + col);
   const value_idx* inVStart = inV + (row_idx + col);
 
-  int limit             = Pow2<WarpSize>::roundDown(total_k);
+  int limit             = raft::Pow2<raft::WarpSize>::roundDown(total_k);
   value_idx translation = 0;
 
   for (; i < limit; i += tpb) {

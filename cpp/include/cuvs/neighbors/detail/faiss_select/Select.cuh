@@ -191,7 +191,7 @@ struct BlockSelect {
     warpSortAnyRegisters<K, V, NumThreadQ, !Dir, Comp>(threadK, threadV);
 
     constexpr int kNumWarpQRegisters = NumWarpQ / raft::WarpSize;
-    K raft::warpKRegisters[kNumWarpQRegisters];
+    K warpKRegisters[kNumWarpQRegisters];
     V warpVRegisters[kNumWarpQRegisters];
 
 #pragma unroll
@@ -200,18 +200,18 @@ struct BlockSelect {
       warpVRegisters[i] = warpV[i * raft::WarpSize + laneId];
     }
 
-    warpFence();
+    raft::warpFence();
 
     // The warp queue is already sorted, and now that we've sorted the
     // per-thread queue, merge both sorted lists together, producing
     // one sorted list
     warpMergeAnyRegisters<K, V, kNumWarpQRegisters, NumThreadQ, !Dir, Comp, false>(
-      raft::warpKRegisters, warpVRegisters, threadK, threadV);
+      warpKRegisters, warpVRegisters, threadK, threadV);
 
     // Write back out the warp queue
 #pragma unroll
     for (int i = 0; i < kNumWarpQRegisters; ++i) {
-      warpK[i * raft::WarpSize + laneId] = raft::warpKRegisters[i];
+      warpK[i * raft::WarpSize + laneId] = warpKRegisters[i];
       warpV[i * raft::WarpSize + laneId] = warpVRegisters[i];
     }
 

@@ -91,7 +91,7 @@ struct search_plan_impl : public search_plan_impl_base {
                    uint32_t topk)
     : search_plan_impl_base(params, dim, graph_degree, topk),
       hashmap(0, raft::resource::get_cuda_stream(res)),
-      num_executed_iterations(0, resource::get_cuda_stream(res)),
+      num_executed_iterations(0, raft::resource::get_cuda_stream(res)),
       dev_seed(0, raft::resource::get_cuda_stream(res)),
       num_seeds(0)
   {

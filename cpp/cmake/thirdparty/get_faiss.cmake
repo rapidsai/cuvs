@@ -77,14 +77,14 @@ function(find_and_configure_faiss)
         endif()
 
     # We generate the faiss-config files when we built faiss locally, so always do `find_dependency`
-    rapids_export_package(BUILD OpenMP raft-ann-bench-exports) # faiss uses openMP but doesn't export a need for it
-    rapids_export_package(BUILD faiss raft-ann-bench-exports GLOBAL_TARGETS ${RAFT_FAISS_GLOBAL_TARGETS} ${RAFT_FAISS_EXPORT_GLOBAL_TARGETS})
-    rapids_export_package(INSTALL faiss raft-ann-bench-exports GLOBAL_TARGETS ${RAFT_FAISS_GLOBAL_TARGETS} ${RAFT_FAISS_EXPORT_GLOBAL_TARGETS})
+    rapids_export_package(BUILD OpenMP cuvs-ann-bench-exports) # faiss uses openMP but doesn't export a need for it
+    rapids_export_package(BUILD faiss cuvs-ann-bench-exports GLOBAL_TARGETS ${RAFT_FAISS_GLOBAL_TARGETS} ${RAFT_FAISS_EXPORT_GLOBAL_TARGETS})
+    rapids_export_package(INSTALL faiss cuvs-ann-bench-exports GLOBAL_TARGETS ${RAFT_FAISS_GLOBAL_TARGETS} ${RAFT_FAISS_EXPORT_GLOBAL_TARGETS})
 
     # Tell cmake where it can find the generated faiss-config.cmake we wrote.
     include("${rapids-cmake-dir}/export/find_package_root.cmake")
     rapids_export_find_package_root(BUILD faiss [=[${CMAKE_CURRENT_LIST_DIR}]=]
-                                    EXPORT_SET raft-ann-bench-exports)
+                                    EXPORT_SET cuvs-ann-bench-exports)
 endfunction()
 
 if(NOT RAFT_FAISS_GIT_TAG)

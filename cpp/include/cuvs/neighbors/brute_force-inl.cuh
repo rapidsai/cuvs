@@ -303,7 +303,7 @@ index<T> build(
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time
-  std::optional<device_vector<T, int64_t>> norms;
+  std::optional<raft::device_vector<T, int64_t>> norms;
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {

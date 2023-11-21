@@ -37,7 +37,7 @@ endfunction()
 
 # Change pinned tag here to test a commit in CI
 # To use a different RAFT locally, set the CMake variable
-# CPM_raft_SOURCE=/path/to/local/raft
+# CPM_cuvs_SOURCE=/path/to/local/cuvs
 find_and_configure_ggnn(VERSION          0.5
         FORK             cgtuebingen
         PINNED_TAG       release_0.5

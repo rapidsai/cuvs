@@ -184,6 +184,8 @@ if(BUILD_MICRO_BENCH OR BUILD_ANN_BENCH)
   rapids_cpm_gbench()
 endif()
 
+include(cmake/thirdparty/get_cutlass.cmake)
+
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 
@@ -368,7 +370,7 @@ target_include_directories(
 
 if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
-  target_link_libraries(cuvs PUBLIC raft::raft)
+  target_link_libraries(cuvs PUBLIC raft::raft nvidia::cutlass::cutlass)
 endif()
 
 # Endian detection

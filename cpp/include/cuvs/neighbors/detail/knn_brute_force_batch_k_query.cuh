@@ -86,9 +86,9 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
 
     if (!num_queries || !batch_size) { return; }
 
-    matrix::slice_coordinates<int64_t> coords{0, offset, num_queries, offset + batch_size};
-    matrix::slice(this->res, input.indices(), output->indices(), coords);
-    matrix::slice(this->res, input.distances(), output->distances(), coords);
+    raft::matrix::slice_coordinates<int64_t> coords{0, offset, num_queries, offset + batch_size};
+    raft::matrix::slice(this->res, input.indices(), output->indices(), coords);
+    raft::matrix::slice(this->res, input.distances(), output->distances(), coords);
   }
 
   const cuvs::neighbors::brute_force::index<T>& index;

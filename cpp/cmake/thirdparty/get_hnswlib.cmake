@@ -47,7 +47,7 @@ endfunction()
 
 # Change pinned tag here to test a commit in CI
 # To use a different RAFT locally, set the CMake variable
-# CPM_raft_SOURCE=/path/to/local/raft
+# CPM_cuvs_SOURCE=/path/to/local/cuvs
 find_and_configure_hnswlib(VERSION  0.6.2
         FORK             nmslib
         PINNED_TAG       v0.6.2

@@ -106,7 +106,7 @@ struct index : ann::index {
   {
     if (norms_) { norms_view_ = raft::make_const_mdspan(norms_.value().view()); }
     update_dataset(res, dataset);
-    resource::sync_stream(res);
+    raft::resource::sync_stream(res);
   }
 
   /** Construct a brute force index from dataset
@@ -121,7 +121,7 @@ struct index : ann::index {
         T metric_arg = 0.0)
     : ann::index(),
       metric_(metric),
-      dataset_(make_device_matrix<T, int64_t>(res, 0, 0)),
+      dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
       dataset_view_(dataset_view),
       norms_view_(norms_view),
       metric_arg_(metric_arg)

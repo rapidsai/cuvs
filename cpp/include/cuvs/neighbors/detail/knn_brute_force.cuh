@@ -76,8 +76,8 @@ void tiled_brute_force_knn(const raft::resources& handle,
   // Figure out the number of rows/cols to tile for
   size_t tile_rows   = 0;
   size_t tile_cols   = 0;
-  auto stream        = resource::get_cuda_stream(handle);
-  auto device_memory = resource::get_workspace_resource(handle);
+  auto stream        = raft::resource::get_cuda_stream(handle);
+  auto device_memory = raft::resource::get_workspace_resource(handle);
   auto total_mem     = device_memory->get_mem_info(stream).second;
   faiss_select::chooseTileSize(m, n, d, sizeof(ElementType), total_mem, tile_rows, tile_cols);
 
@@ -236,7 +236,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         }
       }
 
-      matrix::select_k<ElementType, IndexType>(
+      raft::matrix::select_k<ElementType, IndexType>(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_distances.data(), current_query_size, current_centroid_size),
@@ -263,7 +263,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
         IndexType* out_indices          = temp_out_indices.data();
 
         auto count = thrust::make_counting_iterator<IndexType>(0);
-        thrust::for_each(resource::get_thrust_policy(handle),
+        thrust::for_each(raft::resource::get_thrust_policy(handle),
                          count,
                          count + current_query_size * current_k,
                          [=] __device__(IndexType i) {
@@ -278,7 +278,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
 
     if (tile_cols != n) {
       // select the actual top-k items here from the temporary output
-      matrix::select_k<ElementType, IndexType>(
+      raft::matrix::select_k<ElementType, IndexType>(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_out_distances.data(), current_query_size, temp_out_cols),

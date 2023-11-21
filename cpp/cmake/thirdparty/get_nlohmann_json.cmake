@@ -21,8 +21,8 @@ function(find_and_configure_nlohmann_json)
 
     rapids_cpm_find(nlohmann_json ${PKG_VERSION}
             GLOBAL_TARGETS      nlohmann_json::nlohmann_json
-            BUILD_EXPORT_SET    raft-bench-ann-exports
-            INSTALL_EXPORT_SET  raft-bench-ann-exports
+            BUILD_EXPORT_SET    cuvs-bench-exports
+            INSTALL_EXPORT_SET  cuvs-bench-exports
             CPM_ARGS
             GIT_REPOSITORY         https://github.com/${PKG_FORK}/json.git
             GIT_TAG                ${PKG_PINNED_TAG}
@@ -32,7 +32,7 @@ endfunction()
 
 # Change pinned tag here to test a commit in CI
 # To use a different RAFT locally, set the CMake variable
-# CPM_raft_SOURCE=/path/to/local/raft
+# CPM_cuvs_SOURCE=/path/to/local/cuvs
 find_and_configure_nlohmann_json(VERSION  3.11.2
         FORK             nlohmann
         PINNED_TAG       v3.11.2

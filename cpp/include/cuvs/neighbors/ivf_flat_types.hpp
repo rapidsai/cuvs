@@ -204,7 +204,7 @@ struct index : ann::index {
    * NB: this may be empty if the index is empty or if the metric does not require the center norms
    * calculation.
    */
-  inline auto center_norms() noexcept -> std::optional<device_vector_view<float, uint32_t>>
+  inline auto center_norms() noexcept -> std::optional<raft::device_vector_view<float, uint32_t>>
   {
     if (center_norms_.has_value()) {
       return std::make_optional<device_vector_view<float, uint32_t>>(center_norms_->view());
@@ -213,10 +213,11 @@ struct index : ann::index {
     }
   }
   [[nodiscard]] inline auto center_norms() const noexcept
-    -> std::optional<device_vector_view<const float, uint32_t>>
+    -> std::optional<raft::device_vector_view<const float, uint32_t>>
   {
     if (center_norms_.has_value()) {
-      return std::make_optional<device_vector_view<const float, uint32_t>>(center_norms_->view());
+      return std::make_optional<raft::device_vector_view<const float, uint32_t>>(
+        center_norms_->view());
     } else {
       return std::nullopt;
     }
@@ -251,12 +252,12 @@ struct index : ann::index {
       metric_(metric),
       adaptive_centers_(adaptive_centers),
       conservative_memory_allocation_{conservative_memory_allocation},
-      centers_(make_device_matrix<float, uint32_t>(res, n_lists, dim)),
+      centers_(raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)),
       center_norms_(std::nullopt),
       lists_{n_lists},
-      list_sizes_{make_device_vector<uint32_t, uint32_t>(res, n_lists)},
-      data_ptrs_{make_device_vector<T*, uint32_t>(res, n_lists)},
-      inds_ptrs_{make_device_vector<IdxT*, uint32_t>(res, n_lists)},
+      list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(res, n_lists)},
+      data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
+      inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
       total_size_{0}
   {
     check_consistency();
@@ -366,7 +367,7 @@ struct index : ann::index {
   std::vector<std::shared_ptr<list_data<T, IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t> list_sizes_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
-  std::optional<device_vector<float, uint32_t>> center_norms_;
+  std::optional<raft::device_vector<float, uint32_t>> center_norms_;
 
   // Computed members
   raft::device_vector<T*, uint32_t> data_ptrs_;

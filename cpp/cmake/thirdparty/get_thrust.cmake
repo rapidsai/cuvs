@@ -16,9 +16,9 @@
 function(find_and_configure_thrust)
         include(${rapids-cmake-dir}/cpm/thrust.cmake)
 
-        rapids_cpm_thrust( NAMESPACE raft
-                           BUILD_EXPORT_SET raft-exports
-                           INSTALL_EXPORT_SET raft-exports)
+        rapids_cpm_thrust( NAMESPACE cuvs
+                           BUILD_EXPORT_SET cuvs-exports
+                           INSTALL_EXPORT_SET cuvs-exports)
 endfunction()
 
 find_and_configure_thrust()
