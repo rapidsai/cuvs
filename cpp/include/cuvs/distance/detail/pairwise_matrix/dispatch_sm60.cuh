@@ -16,11 +16,11 @@
 #pragma once
 
 #include <algorithm>                                                 // std::min
-#include <raft/distance/detail/pairwise_matrix/dispatch_layout.cuh>  // dispatch_layout
-#include <raft/distance/detail/pairwise_matrix/kernel_sm60.cuh>      // pairwise_matrix_sm60_wrapper
+#include <cuvs/distance/detail/pairwise_matrix/dispatch_layout.cuh>  // dispatch_layout
+#include <cuvs/distance/detail/pairwise_matrix/kernel_sm60.cuh>      // pairwise_matrix_sm60_wrapper
 #include <raft/linalg/contractions.cuh>                              // raft::linalg::Policy4x4
 
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 template <typename OpT,
           typename IdxT,
@@ -81,4 +81,4 @@ void pairwise_matrix_sm60_dispatch(OpT distance_op,
   wrapper.launch(distance_op, params, stream);
 }
 
-}  // namespace raft::distance::detail
+}  // namespace cuvs::distance::detail

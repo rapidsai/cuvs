@@ -43,7 +43,7 @@ typedef void* cudaStream_t;
 typedef void* cudaEvent_t;
 #endif
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 struct cuda_lib_handle {
   void* handle{nullptr};
@@ -231,4 +231,4 @@ RAFT_DECLARE_CUDART(cudaGetDeviceProperties);
 #undef RAFT_DECLARE_CUDART
 #endif
 
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench

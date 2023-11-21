@@ -23,14 +23,14 @@
 
 #include <cuvs_internal/neighbors/naive_knn.cuh>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/cagra.cuh>
+#include <cuvs/neighbors/cagra_serialize.cuh>
+#include <cuvs/neighbors/sample_filter.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
-#include <raft/neighbors/cagra.cuh>
-#include <raft/neighbors/cagra_serialize.cuh>
-#include <raft/neighbors/sample_filter.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -45,7 +45,7 @@
 #include <string>
 #include <vector>
 
-namespace raft::neighbors::cagra {
+namespace cuvs::neighbors::cagra {
 namespace {
 
 /* A filter that excludes all indices below `offset`. */
@@ -70,9 +70,9 @@ void RandomSuffle(raft::host_matrix_view<IdxT, int64_t> index)
     IdxT* const row_ptr = index.data_handle() + i * index.extent(1);
     for (unsigned j = 0; j < index.extent(1); j++) {
       // Swap two indices at random
-      rand          = raft::neighbors::cagra::detail::device::xorshift64(rand);
+      rand          = cuvs::neighbors::cagra::detail::device::xorshift64(rand);
       const auto i0 = rand % index.extent(1);
-      rand          = raft::neighbors::cagra::detail::device::xorshift64(rand);
+      rand          = cuvs::neighbors::cagra::detail::device::xorshift64(rand);
       const auto i1 = rand % index.extent(1);
 
       const auto tmp = row_ptr[i0];
@@ -155,7 +155,7 @@ struct AnnCagraInputs {
   int team_size;
   int itopk_size;
   int search_width;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   bool host_dataset;
   bool include_serialized_dataset;
   // std::optional<double>
@@ -617,7 +617,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
           search_queries_view,
           indices_out_view,
           dists_out_view,
-          raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+          cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
         update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         resource::sync_stream(handle_);
@@ -693,7 +693,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {raft::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
     {0.995});
@@ -709,7 +709,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {raft::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
     {0.995});
@@ -725,7 +725,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0, 4, 8, 16, 32},  // team_size
     {64},
     {1},
-    {raft::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {false},
     {0.995});
@@ -742,7 +742,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {32, 64, 128, 256, 512, 768},
     {1},
-    {raft::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
     {0.995});
@@ -759,7 +759,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {64},
     {1},
-    {raft::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false, true},
     {false},
     {0.995});
@@ -770,4 +770,4 @@ inline std::vector<AnnCagraInputs> generate_inputs()
 
 const std::vector<AnnCagraInputs> inputs = generate_inputs();
 
-}  // namespace raft::neighbors::cagra
+}  // namespace cuvs::neighbors::cagra

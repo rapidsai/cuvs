@@ -38,7 +38,7 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 std::mutex init_mutex;
 std::condition_variable cond_var;
@@ -711,4 +711,4 @@ inline auto run_main(int argc, char** argv) -> int
   current_algo.reset();
   return 0;
 }
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench

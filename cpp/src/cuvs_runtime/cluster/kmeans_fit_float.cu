@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
 #include <raft/core/resources.hpp>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 
 void fit(raft::resources const& handle,
-         const raft::cluster::kmeans::KMeansParams& params,
+         const cuvs::cluster::kmeans::KMeansParams& params,
          raft::device_matrix_view<const float, int> X,
          std::optional<raft::device_vector_view<const float, int>> sample_weight,
          raft::device_matrix_view<float, int> centroids,
          raft::host_scalar_view<float, int> inertia,
          raft::host_scalar_view<int, int> n_iter)
 {
-  raft::cluster::kmeans::fit<float, int>(
+  cuvs::cluster::kmeans::fit<float, int>(
     handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

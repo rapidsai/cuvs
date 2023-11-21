@@ -19,6 +19,8 @@
 #include "ann_types.hpp"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_list_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -26,8 +28,6 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/ivf_list_types.hpp>
 #include <raft/util/integer_utils.hpp>
 
 #include <thrust/reduce.h>
@@ -37,7 +37,7 @@
 #include <optional>
 #include <type_traits>
 
-namespace raft::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat {
 /**
  * @addtogroup ivf_flat
  * @{
@@ -141,7 +141,7 @@ struct index : ann::index {
    */
   [[nodiscard]] constexpr inline auto veclen() const noexcept -> uint32_t { return veclen_; }
   /** Distance metric used for clustering. */
-  [[nodiscard]] constexpr inline auto metric() const noexcept -> raft::distance::DistanceType
+  [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
   {
     return metric_;
   }
@@ -241,7 +241,7 @@ struct index : ann::index {
 
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& res,
-        raft::distance::DistanceType metric,
+        cuvs::distance::DistanceType metric,
         uint32_t n_lists,
         bool adaptive_centers,
         bool conservative_memory_allocation,
@@ -328,10 +328,10 @@ struct index : ann::index {
   void allocate_center_norms(raft::resources const& res)
   {
     switch (metric_) {
-      case raft::distance::DistanceType::L2Expanded:
-      case raft::distance::DistanceType::L2SqrtExpanded:
-      case raft::distance::DistanceType::L2Unexpanded:
-      case raft::distance::DistanceType::L2SqrtUnexpanded:
+      case cuvs::distance::DistanceType::L2Expanded:
+      case cuvs::distance::DistanceType::L2SqrtExpanded:
+      case cuvs::distance::DistanceType::L2Unexpanded:
+      case cuvs::distance::DistanceType::L2SqrtUnexpanded:
         center_norms_ = make_device_vector<float, uint32_t>(res, n_lists());
         break;
       default: center_norms_ = std::nullopt;
@@ -355,7 +355,7 @@ struct index : ann::index {
    * possible value by padding the `dim` of the data https://github.com/rapidsai/raft/issues/711
    */
   uint32_t veclen_;
-  raft::distance::DistanceType metric_;
+  cuvs::distance::DistanceType metric_;
   bool adaptive_centers_;
   bool conservative_memory_allocation_;
   std::vector<std::shared_ptr<list_data<T, IdxT>>> lists_;
@@ -397,4 +397,4 @@ struct index : ann::index {
 
 /** @} */
 
-}  // namespace raft::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

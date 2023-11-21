@@ -15,10 +15,10 @@
  */
 
 #include "../test_utils.cuh"
+#include <cuvs/distance/distance.cuh>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <raft/stats/trustworthiness_score.cuh>
@@ -325,7 +325,7 @@ class TrustworthinessScoreTest : public ::testing::Test {
     auto n_features_embedded = 8;
 
     // euclidean test
-    score = trustworthiness_score<raft::distance::DistanceType::L2SqrtUnexpanded, float>(
+    score = trustworthiness_score<cuvs::distance::DistanceType::L2SqrtUnexpanded, float>(
       handle,
       raft::make_device_matrix_view<const float>(d_X.data(), n_sample, n_features_origin),
       raft::make_device_matrix_view<const float>(

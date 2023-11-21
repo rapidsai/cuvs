@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/refine.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/refine.cuh>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 /**
  * @defgroup ann_refine Approximate Nearest Neighbors Refinement
@@ -41,7 +41,7 @@ namespace raft::neighbors {
  *
  * Example usage
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -101,4 +101,4 @@ void refine(raft::resources const& handle,
 }
 
 /** @} */  // end group ann_refine
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

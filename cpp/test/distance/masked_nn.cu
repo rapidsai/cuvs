@@ -15,21 +15,21 @@
  */
 
 #include "../test_utils.h"
+#include <cuvs/distance/detail/masked_nn.cuh>
+#include <cuvs/distance/masked_nn.cuh>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/detail/masked_nn.cuh>
-#include <raft/distance/masked_nn.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/itertools.hpp>
 
-namespace raft::distance::masked_nn {
+namespace cuvs::distance::masked_nn {
 
 // The adjacency pattern determines what distances get computed.
 enum AdjacencyPattern {
@@ -131,7 +131,7 @@ __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL referenceKernel(raft::KeyValuePair
       raft::KeyValuePair<int, DataT> tmp;
       tmp.key   = include_dist ? nidx : -1;
       tmp.value = include_dist ? acc : maxVal;
-      tmp       = WarpReduce(temp[warpId]).Reduce(tmp, raft::distance::KVPMinReduce<int, DataT>{});
+      tmp       = WarpReduce(temp[warpId]).Reduce(tmp, cuvs::distance::KVPMinReduce<int, DataT>{});
       if (threadIdx.x % raft::WarpSize == 0 && midx < m) {
         while (atomicCAS(workspace + midx, 0, 1) == 1)
           ;
@@ -214,7 +214,7 @@ auto reference(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
   auto out  = raft::make_device_vector<OutT, int>(handle, m);
   auto blks = raft::ceildiv(m, 256);
   MinAndDistanceReduceOp<int, DataT> op;
-  raft::distance::detail::initKernel<DataT, raft::KeyValuePair<int, DataT>, int>
+  cuvs::distance::detail::initKernel<DataT, raft::KeyValuePair<int, DataT>, int>
     <<<blks, 256, 0, stream>>>(out.data_handle(), m, std::numeric_limits<DataT>::max(), op);
   RAFT_CUDA_TRY(cudaGetLastError());
 
@@ -262,8 +262,8 @@ auto run_masked_nn(const raft::handle_t& handle, Inputs<DataT> inp, const Params
   // Create parameters for masked_l2_nn
   using IdxT       = int;
   using RedOpT     = MinAndDistanceReduceOp<int, DataT>;
-  using PairRedOpT = raft::distance::KVPMinReduce<int, DataT>;
-  using ParamT     = raft::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
+  using PairRedOpT = cuvs::distance::KVPMinReduce<int, DataT>;
+  using ParamT     = cuvs::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
 
   bool init_out = true;
   ParamT masked_l2_params{RedOpT{}, PairRedOpT{}, p.sqrt, init_out};
@@ -272,7 +272,7 @@ auto run_masked_nn(const raft::handle_t& handle, Inputs<DataT> inp, const Params
   auto out = raft::make_device_vector<OutT, IdxT, raft::layout_c_contiguous>(handle, p.m);
 
   // Launch kernel
-  raft::distance::masked_l2_nn<DataT, OutT, IdxT>(handle,
+  cuvs::distance::masked_l2_nn<DataT, OutT, IdxT>(handle,
                                                   masked_l2_params,
                                                   inp.x.view(),
                                                   inp.y.view(),
@@ -432,4 +432,4 @@ TEST_P(MaskedL2NNTest, ReferenceCheckDouble)
 
 INSTANTIATE_TEST_CASE_P(MaskedL2NNTests, MaskedL2NNTest, ::testing::ValuesIn(gen_params()));
 
-}  // end namespace raft::distance::masked_nn
+}  // end namespace cuvs::distance::masked_nn

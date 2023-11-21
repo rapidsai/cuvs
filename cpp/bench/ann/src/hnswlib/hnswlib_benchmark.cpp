@@ -28,11 +28,11 @@
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::HnswLib<T>::BuildParam& param)
+                       typename cuvs::bench::HnswLib<T>::BuildParam& param)
 {
   param.ef_construction = conf.at("efConstruction");
   param.M               = conf.at("M");
@@ -41,16 +41,16 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::HnswLib<T>::SearchParam& param)
+                        typename cuvs::bench::HnswLib<T>::SearchParam& param)
 {
   param.ef = conf.at("ef");
   if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric metric,
-                                                    int dim,
-                                                    const nlohmann::json& conf)
+std::unique_ptr<cuvs::bench::ANN<T>> make_algo(cuvs::bench::Metric metric,
+                                               int dim,
+                                               const nlohmann::json& conf)
 {
   typename Algo<T>::BuildParam param;
   parse_build_param<T>(conf, param);
@@ -58,10 +58,10 @@ std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric met
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric metric,
-                                                    int dim,
-                                                    const nlohmann::json& conf,
-                                                    const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::ANN<T>> make_algo(cuvs::bench::Metric metric,
+                                               int dim,
+                                               const nlohmann::json& conf,
+                                               const std::vector<int>& dev_list)
 {
   typename Algo<T>::BuildParam param;
   parse_build_param<T>(conf, param);
@@ -71,24 +71,24 @@ std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric met
 }
 
 template <typename T>
-std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
-                                                      const std::string& distance,
-                                                      int dim,
-                                                      const nlohmann::json& conf,
-                                                      const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::ANN<T>> create_algo(const std::string& algo,
+                                                 const std::string& distance,
+                                                 int dim,
+                                                 const nlohmann::json& conf,
+                                                 const std::vector<int>& dev_list)
 {
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  raft::bench::ann::Metric metric = parse_metric(distance);
-  std::unique_ptr<raft::bench::ann::ANN<T>> ann;
+  cuvs::bench::Metric metric = parse_metric(distance);
+  std::unique_ptr<cuvs::bench::ANN<T>> ann;
 
   if constexpr (std::is_same_v<T, float>) {
-    if (algo == "hnswlib") { ann = make_algo<T, raft::bench::ann::HnswLib>(metric, dim, conf); }
+    if (algo == "hnswlib") { ann = make_algo<T, cuvs::bench::HnswLib>(metric, dim, conf); }
   }
 
   if constexpr (std::is_same_v<T, uint8_t>) {
-    if (algo == "hnswlib") { ann = make_algo<T, raft::bench::ann::HnswLib>(metric, dim, conf); }
+    if (algo == "hnswlib") { ann = make_algo<T, cuvs::bench::HnswLib>(metric, dim, conf); }
   }
 
   if (!ann) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
@@ -96,11 +96,11 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::ANN<T>::AnnSearchParam> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   if (algo == "hnswlib") {
-    auto param = std::make_unique<typename raft::bench::ann::HnswLib<T>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::HnswLib<T>::SearchParam>();
     parse_search_param<T>(conf, *param);
     return param;
   }
@@ -108,7 +108,7 @@ std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -116,5 +116,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef CUVS_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv) { return raft::bench::ann::run_main(argc, argv); }
+int main(int argc, char** argv) { return cuvs::bench::run_main(argc, argv); }
 #endif

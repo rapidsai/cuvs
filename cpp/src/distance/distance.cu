@@ -21,13 +21,13 @@
  * Hierarchy of instantiations:
  *
  * This file defines the template instantiations for the public API of
- * raft::distance. To improve compile times, the compilation of the distance
+ * cuvs::distance. To improve compile times, the compilation of the distance
  * kernels is handled in distance/detail/pairwise_matrix/dispatch_*.cu.
  *
  */
 
 #define instantiate_raft_distance_distance(DT, DataT, AccT, OutT, FinalLambda, IdxT) \
-  template void raft::distance::distance<DT, DataT, AccT, OutT, FinalLambda, IdxT>(  \
+  template void cuvs::distance::distance<DT, DataT, AccT, OutT, FinalLambda, IdxT>(  \
     raft::resources const& handle,                                                   \
     const DataT* x,                                                                  \
     const DataT* y,                                                                  \
@@ -43,93 +43,93 @@
 
 // The following two instances are used in test/distance/gram.cu. Note the use
 // of int64_t for the index type.
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2Unexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2Unexpanded,
                                    float,
                                    float,
                                    float,
-                                   raft::distance::kernels::detail::rbf_fin_op<float>,
+                                   cuvs::distance::kernels::detail::rbf_fin_op<float>,
                                    int64_t);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2Unexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2Unexpanded,
                                    double,
                                    double,
                                    double,
-                                   raft::distance::kernels::detail::rbf_fin_op<double>,
+                                   cuvs::distance::kernels::detail::rbf_fin_op<double>,
                                    int64_t);
 
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::Canberra, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::Canberra, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CorrelationExpanded, float, float, float, raft::identity_op, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CorrelationExpanded,
+  cuvs::distance::DistanceType::CorrelationExpanded, float, float, float, raft::identity_op, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CorrelationExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::identity_op,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CosineExpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::CosineExpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CosineExpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::CosineExpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HammingUnexpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HammingUnexpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HellingerExpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::HellingerExpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HellingerExpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::HellingerExpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::InnerProduct, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::JensenShannon, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::KLDivergence, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L1, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::L1, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L1, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::L1, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtExpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtExpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtUnexpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtUnexpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::L2Unexpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Linf, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::Linf, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Linf, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::Linf, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::LpUnexpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::LpUnexpanded, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::RusselRaoExpanded, float, float, float, raft::identity_op, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::RusselRaoExpanded, double, double, double, raft::identity_op, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, double, double, double, raft::identity_op, int);
 
 #undef instantiate_raft_distance_distance
 
 // Same, but without raft::identity_op
 #define instantiate_raft_distance_distance(DT, DataT, AccT, OutT, IdxT) \
-  template void raft::distance::distance<DT, DataT, AccT, OutT, IdxT>(  \
+  template void cuvs::distance::distance<DT, DataT, AccT, OutT, IdxT>(  \
     raft::resources const& handle,                                      \
     const DataT* x,                                                     \
     const DataT* y,                                                     \
@@ -143,71 +143,71 @@ instantiate_raft_distance_distance(
     DataT metric_arg)
 
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, float, float, float, int);
+  cuvs::distance::DistanceType::Canberra, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, double, double, double, int);
+  cuvs::distance::DistanceType::Canberra, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CorrelationExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::CorrelationExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CorrelationExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::CorrelationExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CosineExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::CosineExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CosineExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::CosineExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HammingUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HammingUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HellingerExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::HellingerExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HellingerExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::HellingerExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, float, float, float, int);
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, double, double, double, int);
+  cuvs::distance::DistanceType::InnerProduct, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, float, float, float, int);
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, double, double, double, int);
+  cuvs::distance::DistanceType::JensenShannon, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, float, float, float, int);
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, double, double, double, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L1, float, float, float, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L1, double, double, double, int);
+  cuvs::distance::DistanceType::KLDivergence, double, double, double, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L1, float, float, float, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L1, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, double, double, double, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::Linf, float, float, float, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::Linf, double, double, double, int);
+  cuvs::distance::DistanceType::L2Unexpanded, double, double, double, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::Linf, float, float, float, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::Linf, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::LpUnexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::LpUnexpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::RusselRaoExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::RusselRaoExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, double, double, double, int);
 
 #undef instantiate_raft_distance_distance
 
 // Same, but without workspace
 #define instantiate_raft_distance_distance(DT, DataT, AccT, OutT, IdxT) \
-  template void raft::distance::distance<DT, DataT, AccT, OutT, IdxT>(  \
+  template void cuvs::distance::distance<DT, DataT, AccT, OutT, IdxT>(  \
     raft::resources const& handle,                                      \
     const DataT* x,                                                     \
     const DataT* y,                                                     \
@@ -219,377 +219,377 @@ instantiate_raft_distance_distance(
     DataT metric_arg)
 
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, float, float, float, int);
+  cuvs::distance::DistanceType::Canberra, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, double, double, double, int);
+  cuvs::distance::DistanceType::Canberra, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CorrelationExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::CorrelationExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CorrelationExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::CorrelationExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CosineExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::CosineExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::CosineExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::CosineExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HammingUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HammingUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HellingerExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::HellingerExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::HellingerExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::HellingerExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, float, float, float, int);
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, double, double, double, int);
+  cuvs::distance::DistanceType::InnerProduct, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, float, float, float, int);
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, double, double, double, int);
+  cuvs::distance::DistanceType::JensenShannon, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, float, float, float, int);
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, double, double, double, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L1, float, float, float, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L1, double, double, double, int);
+  cuvs::distance::DistanceType::KLDivergence, double, double, double, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L1, float, float, float, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L1, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2SqrtUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, double, double, double, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::Linf, float, float, float, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::Linf, double, double, double, int);
+  cuvs::distance::DistanceType::L2Unexpanded, double, double, double, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::Linf, float, float, float, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::Linf, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::LpUnexpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::LpUnexpanded, double, double, double, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::RusselRaoExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, float, float, float, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::RusselRaoExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, double, double, double, int);
 
 #undef instantiate_raft_distance_distance
 
 #define instantiate_raft_distance_getWorkspaceSize(DistT, DataT, AccT, OutT, IdxT)  \
-  template size_t raft::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>( \
+  template size_t cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>( \
     const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k)
 
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Canberra, float, float, float, int);
+  cuvs::distance::DistanceType::Canberra, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Canberra, double, double, double, int);
+  cuvs::distance::DistanceType::Canberra, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::CorrelationExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::CorrelationExpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::CorrelationExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::CorrelationExpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::CosineExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::CosineExpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::CosineExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::CosineExpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::HammingUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::HammingUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::HammingUnexpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::HellingerExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::HellingerExpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::HellingerExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::HellingerExpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::InnerProduct, float, float, float, int);
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::InnerProduct, double, double, double, int);
+  cuvs::distance::DistanceType::InnerProduct, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::JensenShannon, float, float, float, int);
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::JensenShannon, double, double, double, int);
+  cuvs::distance::DistanceType::JensenShannon, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::KLDivergence, float, float, float, int);
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::KLDivergence, double, double, double, int);
+  cuvs::distance::DistanceType::KLDivergence, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L1, float, float, float, int);
+  cuvs::distance::DistanceType::L1, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L1, double, double, double, int);
+  cuvs::distance::DistanceType::L1, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2SqrtExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2SqrtExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2SqrtExpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2SqrtUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2SqrtUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2SqrtUnexpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Unexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::L2Unexpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Linf, float, float, float, int);
+  cuvs::distance::DistanceType::Linf, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Linf, double, double, double, int);
+  cuvs::distance::DistanceType::Linf, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::LpUnexpanded, float, float, float, int);
+  cuvs::distance::DistanceType::LpUnexpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::LpUnexpanded, double, double, double, int);
+  cuvs::distance::DistanceType::LpUnexpanded, double, double, double, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::RusselRaoExpanded, float, float, float, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, float, float, float, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::RusselRaoExpanded, double, double, double, int);
+  cuvs::distance::DistanceType::RusselRaoExpanded, double, double, double, int);
 
 #undef instantiate_raft_distance_getWorkspaceSize
 
 #define instantiate_raft_distance_getWorkspaceSize(DistT, DataT, AccT, OutT, IdxT, layout)  \
-  template size_t raft::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT, layout>( \
+  template size_t cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT, layout>( \
     raft::device_matrix_view<DataT, IdxT, layout> const& x,                                 \
     raft::device_matrix_view<DataT, IdxT, layout> const& y)
 
 // We could consider not taking template parameters for this function. The
 // number of instantiations seems a bit excessive..
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Canberra, float, float, float, int, raft::layout_c_contiguous);
+  cuvs::distance::DistanceType::Canberra, float, float, float, int, raft::layout_c_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Canberra, double, double, double, int, raft::layout_c_contiguous);
+  cuvs::distance::DistanceType::Canberra, double, double, double, int, raft::layout_c_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Canberra, float, float, float, int, raft::layout_f_contiguous);
+  cuvs::distance::DistanceType::Canberra, float, float, float, int, raft::layout_f_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::Canberra, double, double, double, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CorrelationExpanded,
+  cuvs::distance::DistanceType::Canberra, double, double, double, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CorrelationExpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CorrelationExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CorrelationExpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CorrelationExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CorrelationExpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CorrelationExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CorrelationExpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CosineExpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CosineExpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CosineExpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::CosineExpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HammingUnexpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HammingUnexpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HammingUnexpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HammingUnexpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HellingerExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HellingerExpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HellingerExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HellingerExpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HellingerExpanded,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HellingerExpanded,
                                            float,
                                            float,
                                            float,
                                            int,
                                            raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::HellingerExpanded,
-                                           double,
-                                           double,
-                                           double,
-                                           int,
-                                           raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::InnerProduct, float, float, float, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::InnerProduct,
-                                           double,
-                                           double,
-                                           double,
-                                           int,
-                                           raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::InnerProduct, float, float, float, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::InnerProduct,
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::HellingerExpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::JensenShannon, float, float, float, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::JensenShannon,
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::InnerProduct,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::JensenShannon, float, float, float, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::JensenShannon,
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::InnerProduct,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::KLDivergence, float, float, float, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::KLDivergence,
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::JensenShannon,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::KLDivergence, float, float, float, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::KLDivergence,
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::JensenShannon,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L1, float, float, float, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L1, double, double, double, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L1, float, float, float, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L1, double, double, double, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, float, float, float, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, double, double, double, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, float, float, float, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, double, double, double, int, raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtExpanded,
-                                           float,
-                                           float,
-                                           float,
-                                           int,
-                                           raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtExpanded,
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::KLDivergence,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtExpanded,
-                                           float,
-                                           float,
-                                           float,
-                                           int,
-                                           raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtExpanded,
-                                           double,
-                                           double,
-                                           double,
-                                           int,
-                                           raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtUnexpanded,
-                                           float,
-                                           float,
-                                           float,
-                                           int,
-                                           raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtUnexpanded,
-                                           double,
-                                           double,
-                                           double,
-                                           int,
-                                           raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtUnexpanded,
-                                           float,
-                                           float,
-                                           float,
-                                           int,
-                                           raft::layout_f_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2SqrtUnexpanded,
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::KLDivergence,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_f_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, int, raft::layout_c_contiguous);
-instantiate_raft_distance_getWorkspaceSize(raft::distance::DistanceType::L2Unexpanded,
+  cuvs::distance::DistanceType::L1, float, float, float, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L1, double, double, double, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L1, float, float, float, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L1, double, double, double, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int, raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                           float,
+                                           float,
+                                           float,
+                                           int,
+                                           raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                           double,
+                                           double,
+                                           double,
+                                           int,
+                                           raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                           float,
+                                           float,
+                                           float,
+                                           int,
+                                           raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                           double,
+                                           double,
+                                           double,
+                                           int,
+                                           raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                           float,
+                                           float,
+                                           float,
+                                           int,
+                                           raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                           double,
+                                           double,
+                                           double,
+                                           int,
+                                           raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                           float,
+                                           float,
+                                           float,
+                                           int,
+                                           raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                           double,
+                                           double,
+                                           double,
+                                           int,
+                                           raft::layout_f_contiguous);
+instantiate_raft_distance_getWorkspaceSize(
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, int, raft::layout_c_contiguous);
+instantiate_raft_distance_getWorkspaceSize(cuvs::distance::DistanceType::L2Unexpanded,
                                            double,
                                            double,
                                            double,
                                            int,
                                            raft::layout_c_contiguous);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, int, raft::layout_f_contiguous);
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, int, raft::layout_f_contiguous);
 
 #undef instantiate_raft_distance_getWorkspaceSize
 
 #define instantiate_raft_distance_pairwise_distance(DataT, IdxT)                        \
-  template void raft::distance::pairwise_distance(raft::resources const& handle,        \
+  template void cuvs::distance::pairwise_distance(raft::resources const& handle,        \
                                                   const DataT* x,                       \
                                                   const DataT* y,                       \
                                                   DataT* dist,                          \
@@ -597,7 +597,7 @@ instantiate_raft_distance_getWorkspaceSize(
                                                   IdxT n,                               \
                                                   IdxT k,                               \
                                                   rmm::device_uvector<char>& workspace, \
-                                                  raft::distance::DistanceType metric,  \
+                                                  cuvs::distance::DistanceType metric,  \
                                                   bool isRowMajor,                      \
                                                   DataT metric_arg)
 
@@ -608,14 +608,14 @@ instantiate_raft_distance_pairwise_distance(double, int);
 
 // Same, but without workspace
 #define instantiate_raft_distance_pairwise_distance(DataT, IdxT)                       \
-  template void raft::distance::pairwise_distance(raft::resources const& handle,       \
+  template void cuvs::distance::pairwise_distance(raft::resources const& handle,       \
                                                   const DataT* x,                      \
                                                   const DataT* y,                      \
                                                   DataT* dist,                         \
                                                   IdxT m,                              \
                                                   IdxT n,                              \
                                                   IdxT k,                              \
-                                                  raft::distance::DistanceType metric, \
+                                                  cuvs::distance::DistanceType metric, \
                                                   bool isRowMajor,                     \
                                                   DataT metric_arg)
 
@@ -626,7 +626,7 @@ instantiate_raft_distance_pairwise_distance(double, int);
 
 // Version with mdspan
 #define instantiate_raft_distance_distance(DistT, DataT, AccT, OutT, layout, IdxT) \
-  template void raft::distance::distance<DistT, DataT, AccT, OutT, layout, IdxT>(  \
+  template void cuvs::distance::distance<DistT, DataT, AccT, OutT, layout, IdxT>(  \
     raft::resources const& handle,                                                 \
     raft::device_matrix_view<DataT, IdxT, layout> const x,                         \
     raft::device_matrix_view<DataT, IdxT, layout> const y,                         \
@@ -635,280 +635,280 @@ instantiate_raft_distance_pairwise_distance(double, int);
 
 // Again, we might want to consider reigning in the number of instantiations...
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, float, float, float, raft::layout_c_contiguous, int);
+  cuvs::distance::DistanceType::Canberra, float, float, float, raft::layout_c_contiguous, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, double, double, double, raft::layout_c_contiguous, int);
+  cuvs::distance::DistanceType::Canberra, double, double, double, raft::layout_c_contiguous, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, float, float, float, raft::layout_f_contiguous, int);
+  cuvs::distance::DistanceType::Canberra, float, float, float, raft::layout_f_contiguous, int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Canberra, double, double, double, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CorrelationExpanded,
+  cuvs::distance::DistanceType::Canberra, double, double, double, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CorrelationExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CorrelationExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CorrelationExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CorrelationExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CorrelationExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CorrelationExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CorrelationExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CosineExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CosineExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CosineExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::CosineExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::CosineExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HammingUnexpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HammingUnexpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HammingUnexpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HammingUnexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HammingUnexpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HellingerExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HellingerExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HellingerExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HellingerExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HellingerExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HellingerExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::HellingerExpanded,
-                                   double,
-                                   double,
-                                   double,
-                                   raft::layout_f_contiguous,
-                                   int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::InnerProduct,
-                                   double,
-                                   double,
-                                   double,
-                                   raft::layout_c_contiguous,
-                                   int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::InnerProduct, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::InnerProduct,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::HellingerExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::JensenShannon,
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::InnerProduct,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::JensenShannon, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::JensenShannon,
+  cuvs::distance::DistanceType::InnerProduct, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::InnerProduct,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::KLDivergence,
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::JensenShannon,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::KLDivergence, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::KLDivergence,
+  cuvs::distance::DistanceType::JensenShannon, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::JensenShannon,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L1, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L1, double, double, double, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L1, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L1, double, double, double, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, double, double, double, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Expanded, double, double, double, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtExpanded,
-                                   float,
-                                   float,
-                                   float,
-                                   raft::layout_c_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtExpanded,
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::KLDivergence,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtExpanded,
-                                   float,
-                                   float,
-                                   float,
-                                   raft::layout_f_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtExpanded,
-                                   double,
-                                   double,
-                                   double,
-                                   raft::layout_f_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtUnexpanded,
-                                   float,
-                                   float,
-                                   float,
-                                   raft::layout_c_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtUnexpanded,
-                                   double,
-                                   double,
-                                   double,
-                                   raft::layout_c_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtUnexpanded,
-                                   float,
-                                   float,
-                                   float,
-                                   raft::layout_f_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2SqrtUnexpanded,
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::KLDivergence, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::KLDivergence,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2Unexpanded,
+  cuvs::distance::DistanceType::L1, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L1, double, double, double, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L1, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L1, double, double, double, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                   float,
+                                   float,
+                                   float,
+                                   raft::layout_c_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtExpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::L2Unexpanded, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2Unexpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                   float,
+                                   float,
+                                   float,
+                                   raft::layout_f_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtExpanded,
+                                   double,
+                                   double,
+                                   double,
+                                   raft::layout_f_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                   float,
+                                   float,
+                                   float,
+                                   raft::layout_c_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                   double,
+                                   double,
+                                   double,
+                                   raft::layout_c_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtUnexpanded,
+                                   float,
+                                   float,
+                                   float,
+                                   raft::layout_f_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2SqrtUnexpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Linf, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Linf, double, double, double, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Linf, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::Linf, double, double, double, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, float, float, float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::LpUnexpanded,
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2Unexpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
 instantiate_raft_distance_distance(
-  raft::distance::DistanceType::LpUnexpanded, float, float, float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::LpUnexpanded,
+  cuvs::distance::DistanceType::L2Unexpanded, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2Unexpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::RusselRaoExpanded,
-                                   float,
-                                   float,
-                                   float,
-                                   raft::layout_c_contiguous,
-                                   int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::RusselRaoExpanded,
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::Linf, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::Linf, double, double, double, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::Linf, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::Linf, double, double, double, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::LpUnexpanded, float, float, float, raft::layout_c_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::LpUnexpanded,
                                    double,
                                    double,
                                    double,
                                    raft::layout_c_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::RusselRaoExpanded,
+instantiate_raft_distance_distance(
+  cuvs::distance::DistanceType::LpUnexpanded, float, float, float, raft::layout_f_contiguous, int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::LpUnexpanded,
+                                   double,
+                                   double,
+                                   double,
+                                   raft::layout_f_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::RusselRaoExpanded,
+                                   float,
+                                   float,
+                                   float,
+                                   raft::layout_c_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::RusselRaoExpanded,
+                                   double,
+                                   double,
+                                   double,
+                                   raft::layout_c_contiguous,
+                                   int);
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::RusselRaoExpanded,
                                    float,
                                    float,
                                    float,
                                    raft::layout_f_contiguous,
                                    int);
-instantiate_raft_distance_distance(raft::distance::DistanceType::RusselRaoExpanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::RusselRaoExpanded,
                                    double,
                                    double,
                                    double,
@@ -918,12 +918,12 @@ instantiate_raft_distance_distance(raft::distance::DistanceType::RusselRaoExpand
 #undef instantiate_raft_distance_distance
 
 #define instantiate_raft_distance_pairwise_distance(DataT, layout, IdxT) \
-  template void raft::distance::pairwise_distance(                       \
+  template void cuvs::distance::pairwise_distance(                       \
     raft::resources const& handle,                                       \
     raft::device_matrix_view<DataT, IdxT, layout> const x,               \
     raft::device_matrix_view<DataT, IdxT, layout> const y,               \
     raft::device_matrix_view<DataT, IdxT, layout> dist,                  \
-    raft::distance::DistanceType metric,                                 \
+    cuvs::distance::DistanceType metric,                                 \
     DataT metric_arg)
 
 instantiate_raft_distance_pairwise_distance(float, raft::layout_c_contiguous, int);

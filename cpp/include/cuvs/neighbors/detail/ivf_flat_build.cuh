@@ -16,7 +16,11 @@
 
 #pragma once
 
-#include <raft/cluster/kmeans_balanced.cuh>
+#include <cuvs/cluster/kmeans_balanced.cuh>
+#include <cuvs/neighbors/ivf_flat_codepacker.hpp>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_list_types.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/nvtx.hpp>
@@ -26,10 +30,6 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
-#include <raft/neighbors/ivf_flat_codepacker.hpp>
-#include <raft/neighbors/ivf_flat_types.hpp>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_list_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/pow2_utils.cuh>
@@ -38,7 +38,7 @@
 
 #include <cstdint>
 
-namespace raft::neighbors::ivf_flat::detail {
+namespace cuvs::neighbors::ivf_flat::detail {
 
 using namespace raft::spatial::knn::detail;  // NOLINT
 
@@ -156,7 +156,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   }
 }
 
-/** See raft::neighbors::ivf_flat::extend docs */
+/** See cuvs::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
             index<T, IdxT>* index,
@@ -179,12 +179,12 @@ void extend(raft::resources const& handle,
                "You must pass data indices when the index is non-empty.");
 
   auto new_labels = raft::make_device_vector<LabelT, IdxT>(handle, n_rows);
-  raft::cluster::kmeans_balanced_params kmeans_params;
+  cuvs::cluster::kmeans_balanced_params kmeans_params;
   kmeans_params.metric  = index->metric();
   auto new_vectors_view = raft::make_device_matrix_view<const T, IdxT>(new_vectors, n_rows, dim);
   auto orig_centroids_view =
     raft::make_device_matrix_view<const float, IdxT>(index->centers().data_handle(), n_lists, dim);
-  raft::cluster::kmeans_balanced::predict(handle,
+  cuvs::cluster::kmeans_balanced::predict(handle,
                                           kmeans_params,
                                           new_vectors_view,
                                           orig_centroids_view,
@@ -203,7 +203,7 @@ void extend(raft::resources const& handle,
       raft::make_device_vector_view<std::remove_pointer_t<decltype(list_sizes_ptr)>, IdxT>(
         list_sizes_ptr, n_lists);
     auto const_labels_view = make_const_mdspan(new_labels.view());
-    raft::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
+    cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
                                                                     new_vectors_view,
                                                                     const_labels_view,
                                                                     centroids_view,
@@ -283,7 +283,7 @@ void extend(raft::resources const& handle,
   }
 }
 
-/** See raft::neighbors::ivf_flat::extend docs */
+/** See cuvs::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
             const index<T, IdxT>& orig_index,
@@ -296,7 +296,7 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-/** See raft::neighbors::ivf_flat::build docs */
+/** See cuvs::neighbors::ivf_flat::build docs */
 template <typename T, typename IdxT>
 inline auto build(raft::resources const& handle,
                   const index_params& params,
@@ -336,10 +336,10 @@ inline auto build(raft::resources const& handle,
       raft::make_device_matrix_view<const T, IdxT>(trainset.data(), n_rows_train, index.dim());
     auto centers_view = raft::make_device_matrix_view<float, IdxT>(
       index.centers().data_handle(), index.n_lists(), index.dim());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans_balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = index.metric();
-    raft::cluster::kmeans_balanced::fit(
+    cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
 
@@ -353,7 +353,7 @@ inline auto build(raft::resources const& handle,
 /**
  * Build an index that can be used in refinement operation.
  *
- * See raft::neighbors::refine for details on the refinement operation.
+ * See cuvs::neighbors::refine for details on the refinement operation.
  *
  * The returned index cannot be used for a regular ivf_flat::search. The index misses information
  * about coarse clusters. Instead, the neighbor candidates are assumed to form clusters, one for
@@ -490,4 +490,4 @@ void unpack_list_data(
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
-}  // namespace raft::neighbors::ivf_flat::detail
+}  // namespace cuvs::neighbors::ivf_flat::detail

@@ -25,18 +25,18 @@
  */
 
 #include <cstdint>
-#include <raft/neighbors/brute_force-inl.cuh>
+#include <cuvs/neighbors/brute_force-inl.cuh>
 
 #define instantiate_raft_neighbors_brute_force_knn(                                         \
   idx_t, value_t, matrix_idx, index_layout, search_layout, epilogue_op)                     \
-  template void raft::neighbors::brute_force::                                              \
+  template void cuvs::neighbors::brute_force::                                              \
     knn<idx_t, value_t, matrix_idx, index_layout, search_layout, epilogue_op>(              \
       raft::resources const& handle,                                                        \
       std::vector<raft::device_matrix_view<const value_t, matrix_idx, index_layout>> index, \
       raft::device_matrix_view<const value_t, matrix_idx, search_layout> search,            \
       raft::device_matrix_view<idx_t, matrix_idx, row_major> indices,                       \
       raft::device_matrix_view<value_t, matrix_idx, row_major> distances,                   \
-      raft::distance::DistanceType metric,                                                  \
+      cuvs::distance::DistanceType metric,                                                  \
       std::optional<float> metric_arg,                                                      \
       std::optional<idx_t> global_id_offset,                                                \
       epilogue_op distance_epilogue);

@@ -17,7 +17,7 @@
 
 #include <cstddef>                           // size_t
 #include <cstdint>                           // uint32_t
-#include <raft/distance/distance_types.hpp>  // DistanceType
+#include <cuvs/distance/distance_types.hpp>  // DistanceType
 #include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
 
 #if defined(RAFT_EXPLICIT_INSTANTIATE_ONLY)
@@ -36,7 +36,7 @@ void fusedL2Knn(size_t D,
                 bool rowMajorIndex,
                 bool rowMajorQuery,
                 cudaStream_t stream,
-                raft::distance::DistanceType metric,
+                cuvs::distance::DistanceType metric,
                 const value_t* index_norms = NULL,
                 const value_t* query_norms = NULL) RAFT_EXPLICIT;
 
@@ -58,7 +58,7 @@ void fusedL2Knn(size_t D,
     bool rowMajorIndex,                                                                     \
     bool rowMajorQuery,                                                                     \
     cudaStream_t stream,                                                                    \
-    raft::distance::DistanceType metric,                                                    \
+    cuvs::distance::DistanceType metric,                                                    \
     const Mvalue_t* index_norms,                                                            \
     const Mvalue_t* query_norms);
 

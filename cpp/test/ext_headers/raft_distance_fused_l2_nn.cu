@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/distance/fused_l2_nn.cuh>
+#include <cuvs/distance/fused_l2_nn.cuh>

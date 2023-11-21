@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -25,7 +26,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <rmm/device_uvector.hpp>
 #include <vector>
@@ -42,7 +42,7 @@
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
 // #define _CLK_BREAKDOWN
@@ -625,7 +625,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
       // topk with bitonic sort
       _CLK_START();
       if (std::is_same<SAMPLE_FILTER_T,
-                       raft::neighbors::filtering::none_cagra_sample_filter>::value ||
+                       cuvs::neighbors::filtering::none_cagra_sample_filter>::value ||
           *filter_flag == 0) {
         topk_by_bitonic_sort<MAX_ITOPK, MAX_CANDIDATES>(result_distances_buffer,
                                                         result_indices_buffer,
@@ -722,7 +722,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
 
     // Filtering
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                raft::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
       if (threadIdx.x == 0) { *filter_flag = 0; }
       __syncthreads();
 
@@ -748,7 +748,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
 
   // Post process for filtering
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                              raft::neighbors::filtering::none_cagra_sample_filter>::value) {
+                              cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
     constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
     const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
 
@@ -953,4 +953,4 @@ void select_and_run(  // raft::resources const& res,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 }  // namespace single_cta_search
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

@@ -22,11 +22,11 @@ namespace distance {
 
 template <typename DataType>
 class DistanceCorrelation
-  : public DistanceTest<raft::distance::DistanceType::CorrelationExpanded, DataType> {};
+  : public DistanceTest<cuvs::distance::DistanceType::CorrelationExpanded, DataType> {};
 
 template <typename DataType>
 class DistanceCorrelationXequalY
-  : public DistanceTestSameBuffer<raft::distance::DistanceType::CorrelationExpanded, DataType> {};
+  : public DistanceTestSameBuffer<cuvs::distance::DistanceType::CorrelationExpanded, DataType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 1024, 1024, 32, true, 1234ULL},
@@ -88,7 +88,7 @@ TEST_P(DistanceCorrelationD, Result)
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationD, ::testing::ValuesIn(inputsd));
 
 class BigMatrixCorrelation
-  : public BigMatrixDistanceTest<raft::distance::DistanceType::CorrelationExpanded> {};
+  : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CorrelationExpanded> {};
 TEST_F(BigMatrixCorrelation, Result) {}
 }  // end namespace distance
 }  // end namespace raft

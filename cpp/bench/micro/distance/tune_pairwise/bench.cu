@@ -41,11 +41,11 @@
 #include "kernel.cuh"                                       // launch_kernel
 #include <algorithm>                                        // std::min
 #include <common/benchmark.hpp>                             // RAFT_BENCH_REGISTER
-#include <raft/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
+#include <cuvs/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
 #include <rmm/device_uvector.hpp>                           // rmm::device_uvector
 #include <vector>                                           // std::vector
 
-namespace raft::bench::distance::tune {
+namespace cuvs::bench::distance::tune {
 
 // Max throughput benchmark.
 //
@@ -148,4 +148,4 @@ struct throughput_bench : public fixture {
 
 RAFT_BENCH_REGISTER(throughput_bench, "", throughput_params);
 
-}  // namespace raft::bench::distance::tune
+}  // namespace cuvs::bench::distance::tune

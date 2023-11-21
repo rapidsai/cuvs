@@ -15,16 +15,16 @@
  */
 #pragma once
 #include <cub/cub.cuh>
+#include <cuvs/neighbors/detail/faiss_select/Select.cuh>
 #include <limits>
 #include <raft/linalg/norm.cuh>
-#include <raft/neighbors/detail/faiss_select/Select.cuh>
 // TODO: Need to hide the PairwiseDistance class impl and expose to public API
 #include "processing.cuh"
+#include <cuvs/distance/detail/distance.cuh>
+#include <cuvs/distance/detail/distance_ops/l2_exp.cuh>
+#include <cuvs/distance/detail/distance_ops/l2_unexp.cuh>
+#include <cuvs/distance/detail/pairwise_distance_base.cuh>
 #include <raft/core/operators.hpp>
-#include <raft/distance/detail/distance.cuh>
-#include <raft/distance/detail/distance_ops/l2_exp.cuh>
-#include <raft/distance/detail/distance_ops/l2_unexp.cuh>
-#include <raft/distance/detail/pairwise_distance_base.cuh>
 #include <raft/util/cuda_utils.cuh>
 
 namespace raft {
@@ -219,7 +219,7 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
   constexpr auto identity = std::numeric_limits<AccT>::max();
   constexpr auto keyMax   = std::numeric_limits<uint32_t>::max();
   constexpr auto Dir      = false;
-  using namespace raft::neighbors::detail::faiss_select;
+  using namespace cuvs::neighbors::detail::faiss_select;
   typedef WarpSelect<AccT, uint32_t, Dir, Comparator<AccT>, NumWarpQ, NumThreadQ, 32> myWarpSelect;
 
   auto rowEpilog_lambda =
@@ -485,7 +485,7 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
     };
 
   constexpr bool write_out = false;
-  raft::distance::detail::PairwiseDistances<DataT,
+  cuvs::distance::detail::PairwiseDistances<DataT,
                                             OutT,
                                             IdxT,
                                             Policy,
@@ -548,7 +548,7 @@ void fusedL2UnexpKnnImpl(const DataT* x,
   // Accumulation operation lambda
   typedef cub::KeyValuePair<uint32_t, AccT> Pair;
 
-  raft::distance::detail::ops::l2_unexp_distance_op<DataT, AccT, IdxT> distance_op{sqrt};
+  cuvs::distance::detail::ops::l2_unexp_distance_op<DataT, AccT, IdxT> distance_op{sqrt};
   raft::identity_op fin_op{};
 
   if constexpr (isRowMajor) {
@@ -585,7 +585,7 @@ void fusedL2UnexpKnnImpl(const DataT* x,
     const auto sharedMemSize =
       distance_op.template shared_mem_size<KPolicy>() + KPolicy::Mblk * numOfNN * sizeof(Pair);
 
-    dim3 grid = raft::distance::detail::launchConfigGenerator<KPolicy>(
+    dim3 grid = cuvs::distance::detail::launchConfigGenerator<KPolicy>(
       m, n, sharedMemSize, fusedL2UnexpKnnRowMajor);
 
     if (grid.x > 1) {
@@ -737,7 +737,7 @@ void fusedL2ExpKnnImpl(const DataT* x,
 
   typedef cub::KeyValuePair<uint32_t, AccT> Pair;
 
-  raft::distance::detail::ops::l2_exp_distance_op<DataT, AccT, IdxT> distance_op{sqrt};
+  cuvs::distance::detail::ops::l2_exp_distance_op<DataT, AccT, IdxT> distance_op{sqrt};
   raft::identity_op fin_op{};
 
   if constexpr (isRowMajor) {
@@ -773,7 +773,7 @@ void fusedL2ExpKnnImpl(const DataT* x,
 
     const auto sharedMemSize =
       distance_op.template shared_mem_size<KPolicy>() + (KPolicy::Mblk * numOfNN * sizeof(Pair));
-    dim3 grid = raft::distance::detail::launchConfigGenerator<KPolicy>(
+    dim3 grid = cuvs::distance::detail::launchConfigGenerator<KPolicy>(
       m, n, sharedMemSize, fusedL2ExpKnnRowMajor);
     int32_t* mutexes = nullptr;
     if (grid.x > 1) {
@@ -943,7 +943,7 @@ void fusedL2Knn(size_t D,
                 bool rowMajorIndex,
                 bool rowMajorQuery,
                 cudaStream_t stream,
-                raft::distance::DistanceType metric,
+                cuvs::distance::DistanceType metric,
                 const value_t* index_norms = NULL,
                 const value_t* query_norms = NULL)
 {
@@ -971,10 +971,10 @@ void fusedL2Knn(size_t D,
   value_idx lda = D, ldb = D, ldd = n_index_rows;
 
   switch (metric) {
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded:
-      tempWorksize = raft::distance::detail::
-        getWorkspaceSize<raft::distance::DistanceType::L2Expanded, float, float, float, value_idx>(
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded:
+      tempWorksize = cuvs::distance::detail::
+        getWorkspaceSize<cuvs::distance::DistanceType::L2Expanded, float, float, float, value_idx>(
           query, index, n_query_rows, n_index_rows, D);
       worksize = tempWorksize;
       workspace.resize(worksize, stream);
@@ -1016,8 +1016,8 @@ void fusedL2Knn(size_t D,
                                                                                 worksize);
       }
       break;
-    case raft::distance::DistanceType::L2Unexpanded:
-    case raft::distance::DistanceType::L2SqrtUnexpanded:
+    case cuvs::distance::DistanceType::L2Unexpanded:
+    case cuvs::distance::DistanceType::L2SqrtUnexpanded:
       fusedL2UnexpKnn<value_t, value_t, value_t, value_idx, usePrevTopKs, true>(n_query_rows,
                                                                                 n_index_rows,
                                                                                 D,

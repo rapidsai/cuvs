@@ -20,18 +20,18 @@
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-#include <raft/neighbors/detail/ivf_pq_codepacking.cuh>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/detail/ivf_pq_codepacking.cuh>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 
-#include <raft/cluster/kmeans_balanced.cuh>
+#include <cuvs/cluster/kmeans_balanced.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/detail/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/detail/qr.cuh>
 #include <raft/linalg/gemm.cuh>
@@ -60,7 +60,7 @@
 #include <memory>
 #include <variant>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 using namespace raft::spatial::knn::detail;  // NOLINT
 
@@ -454,10 +454,10 @@ void train_per_subset(raft::resources const& handle,
     auto sub_labels_view = raft::make_device_vector_view<uint32_t, IdxT>(sub_labels.data(), n_rows);
     auto cluster_sizes_view =
       raft::make_device_vector_view<uint32_t, IdxT>(pq_cluster_sizes.data(), index.pq_book_size());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans_balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
-    raft::cluster::kmeans_balanced::helpers::build_clusters(handle,
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
                                                             kmeans_params,
                                                             sub_trainset_view,
                                                             centers_tmp_view,
@@ -539,10 +539,10 @@ void train_per_cluster(raft::resources const& handle,
       raft::make_device_vector_view<uint32_t, IdxT>(pq_labels.data(), pq_n_rows);
     auto pq_cluster_sizes_view =
       raft::make_device_vector_view<uint32_t, IdxT>(pq_cluster_sizes.data(), index.pq_book_size());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans_balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
-    raft::cluster::kmeans_balanced::helpers::build_clusters(handle,
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
                                                             kmeans_params,
                                                             rot_vectors_view,
                                                             centers_tmp_view,
@@ -1669,9 +1669,9 @@ void extend(raft::resources const& handle,
         new_data_labels.data() + batch.offset(), batch.size());
       auto centers_view = raft::make_device_matrix_view<const float, IdxT>(
         cluster_centers.data(), n_clusters, index->dim());
-      raft::cluster::kmeans_balanced_params kmeans_params;
+      cuvs::cluster::kmeans_balanced_params kmeans_params;
       kmeans_params.metric = index->metric();
-      raft::cluster::kmeans_balanced::predict(handle,
+      cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
                                               batch_data_view,
                                               centers_view,
@@ -1858,10 +1858,10 @@ auto build(raft::resources const& handle,
       raft::make_device_matrix_view<const float, IdxT>(trainset.data(), n_rows_train, index.dim());
     auto centers_view =
       raft::make_device_matrix_view<float, IdxT>(cluster_centers, index.n_lists(), index.dim());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans_balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = index.metric();
-    raft::cluster::kmeans_balanced::fit(
+    cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
 
     // Trainset labels are needed for training PQ codebooks
@@ -1869,7 +1869,7 @@ auto build(raft::resources const& handle,
     auto centers_const_view = raft::make_device_matrix_view<const float, IdxT>(
       cluster_centers, index.n_lists(), index.dim());
     auto labels_view = raft::make_device_vector_view<uint32_t, IdxT>(labels.data(), n_rows_train);
-    raft::cluster::kmeans_balanced::predict(handle,
+    cuvs::cluster::kmeans_balanced::predict(handle,
                                             kmeans_params,
                                             trainset_const_view,
                                             centers_const_view,
@@ -1915,4 +1915,4 @@ auto build(raft::resources const& handle,
   }
   return index;
 }
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

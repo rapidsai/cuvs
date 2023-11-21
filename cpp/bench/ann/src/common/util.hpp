@@ -36,7 +36,7 @@
 #include <filesystem>
 #include <functional>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
 struct buf {
@@ -345,4 +345,4 @@ void log_error(Ts&&... vs)
   log_("error", std::forward<Ts>(vs)...);
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

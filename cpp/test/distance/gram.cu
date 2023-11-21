@@ -16,17 +16,17 @@
 
 #include "../test_utils.cuh"
 #include "gram_base.cuh"
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/kernels.cuh>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/kernels.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft::distance::kernels {
+namespace cuvs::distance::kernels {
 
 struct GramMatrixInputs {
   int n1;      // feature vectors in matrix 1
@@ -167,4 +167,4 @@ typedef GramMatrixTest<double> GramMatrixTestDouble;
 TEST_P(GramMatrixTestFloat, Gram) { runTest(); }
 
 INSTANTIATE_TEST_SUITE_P(GramMatrixTests, GramMatrixTestFloat, ::testing::ValuesIn(inputs));
-};  // end namespace raft::distance::kernels
+};  // end namespace cuvs::distance::kernels

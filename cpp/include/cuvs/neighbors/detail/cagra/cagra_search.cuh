@@ -16,24 +16,24 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/ivf_pq_search.cuh>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/neighbors/detail/ivf_pq_search.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
+#include <cuvs/neighbors/cagra_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/detail/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/cagra_types.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
 #include "factory.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 
 template <class CagraSampleFilterT>
 struct CagraSampleFilterWithQueryIdOffset {
@@ -56,8 +56,8 @@ struct CagraSampleFilterT_Selector {
   using type = CagraSampleFilterWithQueryIdOffset<CagraSampleFilterT>;
 };
 template <>
-struct CagraSampleFilterT_Selector<raft::neighbors::filtering::none_cagra_sample_filter> {
-  using type = raft::neighbors::filtering::none_cagra_sample_filter;
+struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter> {
+  using type = cuvs::neighbors::filtering::none_cagra_sample_filter;
 };
 
 // A helper function to set a query id offset
@@ -70,9 +70,9 @@ inline typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type set_offset
 }
 template <>
 inline
-  typename CagraSampleFilterT_Selector<raft::neighbors::filtering::none_cagra_sample_filter>::type
-  set_offset<raft::neighbors::filtering::none_cagra_sample_filter>(
-    raft::neighbors::filtering::none_cagra_sample_filter filter, const uint32_t)
+  typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter>::type
+  set_offset<cuvs::neighbors::filtering::none_cagra_sample_filter>(
+    cuvs::neighbors::filtering::none_cagra_sample_filter filter, const uint32_t)
 {
   return filter;
 }
@@ -110,7 +110,7 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
-  resource::detail::warn_non_pool_workspace(res, "raft::neighbors::cagra::search");
+  resource::detail::warn_non_pool_workspace(res, "cuvs::neighbors::cagra::search");
   RAFT_LOG_DEBUG("# dataset size = %lu, dim = %lu\n",
                  static_cast<size_t>(index.dataset().extent(0)),
                  static_cast<size_t>(index.dataset().extent(1)));
@@ -190,4 +190,4 @@ void search_main(raft::resources const& res,
 }
 /** @} */  // end group cagra
 
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

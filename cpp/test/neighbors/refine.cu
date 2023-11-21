@@ -20,11 +20,11 @@
 
 #include <cuvs_internal/neighbors/refine_helper.cuh>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/detail/refine.cuh>
+#include <cuvs/neighbors/refine.cuh>
 #include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/detail/refine.cuh>
-#include <raft/neighbors/refine.cuh>
 #include <raft/spatial/knn/ann.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -34,7 +34,7 @@
 
 #include <vector>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 template <typename DataT, typename DistanceT, typename IdxT>
 class RefineTest : public ::testing::TestWithParam<RefineInputs<IdxT>> {
@@ -53,7 +53,7 @@ class RefineTest : public ::testing::TestWithParam<RefineInputs<IdxT>> {
     std::vector<DistanceT> distances(data.p.n_queries * data.p.k);
 
     if (data.p.host_data) {
-      raft::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
+      cuvs::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
                                                             data.dataset_host.view(),
                                                             data.queries_host.view(),
                                                             data.candidates_host.view(),
@@ -70,7 +70,7 @@ class RefineTest : public ::testing::TestWithParam<RefineInputs<IdxT>> {
                  stream_);
 
     } else {
-      raft::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
+      cuvs::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
                                                             data.dataset.view(),
                                                             data.queries.view(),
                                                             data.candidates.view(),
@@ -88,7 +88,7 @@ class RefineTest : public ::testing::TestWithParam<RefineInputs<IdxT>> {
 
     double min_recall = 1;
 
-    ASSERT_TRUE(raft::neighbors::eval_neighbours(data.true_refined_indices_host,
+    ASSERT_TRUE(cuvs::neighbors::eval_neighbours(data.true_refined_indices_host,
                                                  indices,
                                                  data.true_refined_distances_host,
                                                  distances,
@@ -111,7 +111,7 @@ const std::vector<RefineInputs<int64_t>> inputs =
     {static_cast<int64_t>(16)},
     {static_cast<int64_t>(1), static_cast<int64_t>(10), static_cast<int64_t>(33)},
     {static_cast<int64_t>(33)},
-    {raft::distance::DistanceType::L2Expanded, raft::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true});
 
 typedef RefineTest<float, float, std::int64_t> RefineTestF;
@@ -126,4 +126,4 @@ INSTANTIATE_TEST_CASE_P(RefineTest, RefineTestF_uint8, ::testing::ValuesIn(input
 typedef RefineTest<int8_t, float, std::int64_t> RefineTestF_int8;
 TEST_P(RefineTestF_int8, AnnRefine) { this->testRefine(); }
 INSTANTIATE_TEST_CASE_P(RefineTest, RefineTestF_int8, ::testing::ValuesIn(inputs));
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

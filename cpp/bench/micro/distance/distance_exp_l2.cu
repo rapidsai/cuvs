@@ -16,9 +16,9 @@
 
 #include "distance_common.cuh"
 
-namespace raft::bench::distance {
+namespace cuvs::bench::distance {
 
-DIST_BENCH_REGISTER(DistanceL2Sq, raft::distance::DistanceType::L2Expanded);
-DIST_BENCH_REGISTER(DistanceL2Sqrt, raft::distance::DistanceType::L2SqrtExpanded);
+DIST_BENCH_REGISTER(DistanceL2Sq, cuvs::distance::DistanceType::L2Expanded);
+DIST_BENCH_REGISTER(DistanceL2Sqrt, cuvs::distance::DistanceType::L2SqrtExpanded);
 
-}  // namespace raft::bench::distance
+}  // namespace cuvs::bench::distance

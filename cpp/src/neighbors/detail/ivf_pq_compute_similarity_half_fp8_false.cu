@@ -24,13 +24,13 @@
  *
  */
 
-#include <raft/neighbors/detail/ivf_pq_compute_similarity-inl.cuh>
-#include <raft/neighbors/detail/ivf_pq_fp_8bit.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_compute_similarity-inl.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_fp_8bit.cuh>
 
 #define instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(                 \
   OutT, LutT, IvfSampleFilterT)                                                             \
   template auto                                                                             \
-  raft::neighbors::ivf_pq::detail::compute_similarity_select<OutT, LutT, IvfSampleFilterT>( \
+  cuvs::neighbors::ivf_pq::detail::compute_similarity_select<OutT, LutT, IvfSampleFilterT>( \
     const cudaDeviceProp& dev_props,                                                        \
     bool manage_local_topk,                                                                 \
     int locality_hint,                                                                      \
@@ -41,19 +41,19 @@
     uint32_t n_queries,                                                                     \
     uint32_t n_probes,                                                                      \
     uint32_t topk)                                                                          \
-    ->raft::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT>;              \
+    ->cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT>;              \
                                                                                             \
   template void                                                                             \
-  raft::neighbors::ivf_pq::detail::compute_similarity_run<OutT, LutT, IvfSampleFilterT>(    \
-    raft::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT> s,              \
+  cuvs::neighbors::ivf_pq::detail::compute_similarity_run<OutT, LutT, IvfSampleFilterT>(    \
+    cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT> s,              \
     rmm::cuda_stream_view stream,                                                           \
     uint32_t dim,                                                                           \
     uint32_t n_probes,                                                                      \
     uint32_t pq_dim,                                                                        \
     uint32_t n_queries,                                                                     \
     uint32_t queries_offset,                                                                \
-    raft::distance::DistanceType metric,                                                    \
-    raft::neighbors::ivf_pq::codebook_gen codebook_kind,                                    \
+    cuvs::distance::DistanceType metric,                                                    \
+    cuvs::neighbors::ivf_pq::codebook_gen codebook_kind,                                    \
     uint32_t topk,                                                                          \
     uint32_t max_samples,                                                                   \
     const float* cluster_centers,                                                           \
@@ -72,9 +72,9 @@
 #define COMMA ,
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
-  raft::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 
 #undef COMMA
 

@@ -16,7 +16,7 @@
 
 #include <cstddef>                           // size_t
 #include <cstdint>                           // int_Xt
-#include <raft/distance/distance_types.hpp>  // DistanceType
+#include <cuvs/distance/distance_types.hpp>  // DistanceType
 #include <raft/spatial/knn/detail/fused_l2_knn-inl.cuh>
 
 #define instantiate_raft_spatial_knn_detail_fusedL2Knn(Mvalue_idx, Mvalue_t, MusePrevTopKs)  \
@@ -32,7 +32,7 @@
     bool rowMajorIndex,                                                                      \
     bool rowMajorQuery,                                                                      \
     cudaStream_t stream,                                                                     \
-    raft::distance::DistanceType metric,                                                     \
+    cuvs::distance::DistanceType metric,                                                     \
     const Mvalue_t* index_norms,                                                             \
     const Mvalue_t* query_norms)
 

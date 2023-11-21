@@ -18,13 +18,13 @@
 
 #include <algorithm>
 #include <cub/cub.cuh>
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <iostream>
 #include <math.h>
 #include <numeric>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/eltwise.cuh>
 #include <raft/linalg/map_then_reduce.cuh>
@@ -200,7 +200,7 @@ DataT silhouette_score(
   int nLabels,
   DataT* silhouette_scorePerSample,
   cudaStream_t stream,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   ASSERT(nLabels >= 2 && nLabels <= (nRows - 1),
          "silhouette Score not defined for the given number of labels!");
@@ -209,7 +209,7 @@ DataT silhouette_score(
   rmm::device_uvector<DataT> distanceMatrix(nRows * nRows, stream);
   rmm::device_uvector<char> workspace(1, stream);
 
-  raft::distance::pairwise_distance(
+  cuvs::distance::pairwise_distance(
     handle, X_in, X_in, distanceMatrix.data(), nRows, nRows, nCols, metric);
 
   // deciding on the array of silhouette scores for each dataPoint

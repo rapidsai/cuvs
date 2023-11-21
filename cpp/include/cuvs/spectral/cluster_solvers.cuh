@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <utility>  // for std::pair
 
@@ -58,7 +58,7 @@ struct kmeans_solver_t {
     RAFT_EXPECTS(codes != nullptr, "Null codes buffer.");
     value_type_t residual{};
     index_type_t iters{};
-    raft::cluster::KMeansParams km_params;
+    cuvs::cluster::KMeansParams km_params;
     km_params.n_clusters     = config_.n_clusters;
     km_params.tol            = config_.tol;
     km_params.max_iter       = config_.maxIter;
@@ -75,7 +75,7 @@ struct kmeans_solver_t {
                  1);
 
     auto sw = std::make_optional((raft::device_vector_view<const value_type_t>)weight.view());
-    raft::cluster::kmeans_fit_predict<value_type_t, index_type_t>(
+    cuvs::cluster::kmeans_fit_predict<value_type_t, index_type_t>(
       handle,
       km_params,
       X,

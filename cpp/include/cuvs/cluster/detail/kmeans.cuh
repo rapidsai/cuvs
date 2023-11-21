@@ -137,8 +137,8 @@ void kmeansPlusPlus(raft::resources const& handle,
   // L2 norm of X: ||c||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
 
-  if (metric == raft::distance::DistanceType::L2Expanded ||
-      metric == raft::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::rowNorm(L2NormX.data_handle(),
                           X.data_handle(),
                           X.extent(1),
@@ -400,8 +400,8 @@ void kmeans_fit_main(raft::resources const& handle,
   auto l2normx_view =
     raft::make_device_vector_view<const DataT, IndexT>(L2NormX.data_handle(), n_samples);
 
-  if (metric == raft::distance::DistanceType::L2Expanded ||
-      metric == raft::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::rowNorm(L2NormX.data_handle(),
                           X.data_handle(),
                           X.extent(1),
@@ -624,8 +624,8 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
 
   // L2 norm of X: ||x||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
-  if (metric == raft::distance::DistanceType::L2Expanded ||
-      metric == raft::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::rowNorm(L2NormX.data_handle(),
                           X.data_handle(),
                           X.extent(1),
@@ -845,8 +845,8 @@ void kmeans_fit(raft::resources const& handle,
 
   // Display a message if the batch size is smaller than n_samples but will be ignored
   if (params.batch_samples < (int)n_samples &&
-      (params.metric == raft::distance::DistanceType::L2Expanded ||
-       params.metric == raft::distance::DistanceType::L2SqrtExpanded)) {
+      (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+       params.metric == cuvs::distance::DistanceType::L2SqrtExpanded)) {
     RAFT_LOG_DEBUG(
       "batch_samples=%d was passed, but batch_samples=%d will be used (reason: "
       "batch_samples has no impact on the memory footprint when FusedL2NN can be used)",
@@ -855,8 +855,8 @@ void kmeans_fit(raft::resources const& handle,
   }
   // Display a message if batch_centroids is set and a fusedL2NN-compatible metric is used
   if (params.batch_centroids != 0 && params.batch_centroids != params.n_clusters &&
-      (params.metric == raft::distance::DistanceType::L2Expanded ||
-       params.metric == raft::distance::DistanceType::L2SqrtExpanded)) {
+      (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+       params.metric == cuvs::distance::DistanceType::L2SqrtExpanded)) {
     RAFT_LOG_DEBUG(
       "batch_centroids=%d was passed, but batch_centroids=%d will be used (reason: "
       "batch_centroids has no impact on the memory footprint when FusedL2NN can be used)",
@@ -1033,8 +1033,8 @@ void kmeans_predict(raft::resources const& handle,
 
   // L2 norm of X: ||x||^2
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
-  if (metric == raft::distance::DistanceType::L2Expanded ||
-      metric == raft::distance::DistanceType::L2SqrtExpanded) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     raft::linalg::rowNorm(L2NormX.data_handle(),
                           X.data_handle(),
                           X.extent(1),

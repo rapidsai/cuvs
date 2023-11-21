@@ -15,7 +15,7 @@
  */
 #pragma once
 
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 template <typename IdxT, typename DataT, typename OutT, typename FinOpT>
 struct pairwise_matrix_params {
@@ -44,4 +44,4 @@ struct pairwise_matrix_params {
   }
 };
 
-}  // namespace raft::distance::detail
+}  // namespace cuvs::distance::detail

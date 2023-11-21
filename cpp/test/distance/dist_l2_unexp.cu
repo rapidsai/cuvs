@@ -22,7 +22,7 @@ namespace distance {
 
 template <typename DataType>
 class DistanceEucUnexpTest
-  : public DistanceTest<raft::distance::DistanceType::L2Unexpanded, DataType> {};
+  : public DistanceTest<cuvs::distance::DistanceType::L2Unexpanded, DataType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 1024, 1024, 32, true, 1234ULL},
@@ -64,7 +64,7 @@ TEST_P(DistanceEucUnexpTestD, Result)
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceEucUnexpTestD, ::testing::ValuesIn(inputsd));
 
-class BigMatrixEucUnexp : public BigMatrixDistanceTest<raft::distance::DistanceType::L2Unexpanded> {
+class BigMatrixEucUnexp : public BigMatrixDistanceTest<cuvs::distance::DistanceType::L2Unexpanded> {
 };
 TEST_F(BigMatrixEucUnexp, Result) {}
 }  // end namespace distance

@@ -24,9 +24,9 @@
 #include "brute_force-ext.cuh"
 #endif
 
-#include <raft/neighbors/detail/knn_brute_force_batch_k_query.cuh>
+#include <cuvs/neighbors/detail/knn_brute_force_batch_k_query.cuh>
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 /**
  * @brief Make a brute force query over batches of k
  *
@@ -35,7 +35,7 @@ namespace raft::neighbors::brute_force {
  *
  * Example usage:
  * @code{.cpp}
- * #include <raft/neighbors/brute_force.cuh>
+ * #include <cuvs/neighbors/brute_force.cuh>
  * #include <raft/core/device_mdarray.hpp>
  * #include <raft/random/make_blobs.cuh>
 
@@ -50,7 +50,7 @@ namespace raft::neighbors::brute_force {
  * raft::make_blobs(res, dataset.view(), labels.view());
  *
  * // create a brute_force knn index from the dataset
- * auto index = raft::neighbors::brute_force::build(res,
+ * auto index = cuvs::neighbors::brute_force::build(res,
  *                                                  raft::make_const_mdspan(dataset.view()));
  *
  * // search the index in batches of 128 nearest neighbors
@@ -82,11 +82,11 @@ namespace raft::neighbors::brute_force {
 template <typename T, typename IdxT>
 std::shared_ptr<batch_k_query<T, IdxT>> make_batch_k_query(
   const raft::resources& res,
-  const raft::neighbors::brute_force::index<T>& index,
+  const cuvs::neighbors::brute_force::index<T>& index,
   raft::device_matrix_view<const T, int64_t, row_major> query,
   int64_t batch_size)
 {
   return std::shared_ptr<batch_k_query<T, IdxT>>(
     new detail::gpu_batch_k_query<T, IdxT>(res, index, query, batch_size));
 }
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force

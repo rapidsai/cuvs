@@ -15,10 +15,10 @@
  */
 #include "../test_utils.cuh"
 #include <algorithm>
+#include <cuvs/distance/distance_types.hpp>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 
 #include <raft/stats/silhouette_score.cuh>
@@ -33,7 +33,7 @@ struct silhouetteScoreParam {
   int nRows;
   int nCols;
   int nLabels;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   int chunk;
   double tolerance;
 };
@@ -78,7 +78,7 @@ class silhouetteScoreTest : public ::testing::TestWithParam<silhouetteScoreParam
     rmm::device_uvector<double> d_distanceMatrix(nRows * nRows, stream);
     double* h_distanceMatrix = (double*)malloc(nRows * nRows * sizeof(double*));
 
-    raft::distance::pairwise_distance(
+    cuvs::distance::pairwise_distance(
       handle, d_X.data(), d_X.data(), d_distanceMatrix.data(), nRows, nRows, nCols, params.metric);
 
     resource::sync_stream(handle, stream);
@@ -206,13 +206,13 @@ class silhouetteScoreTest : public ::testing::TestWithParam<silhouetteScoreParam
 
 // setting test parameter values
 const std::vector<silhouetteScoreParam> inputs = {
-  {4, 2, 3, raft::distance::DistanceType::L2Expanded, 4, 0.00001},
-  {4, 2, 2, raft::distance::DistanceType::L2SqrtUnexpanded, 2, 0.00001},
-  {8, 8, 3, raft::distance::DistanceType::L2Unexpanded, 4, 0.00001},
-  {11, 2, 5, raft::distance::DistanceType::L2Expanded, 3, 0.00001},
-  {40, 2, 8, raft::distance::DistanceType::L2Expanded, 10, 0.00001},
-  {12, 7, 3, raft::distance::DistanceType::CosineExpanded, 8, 0.00001},
-  {7, 5, 5, raft::distance::DistanceType::L1, 2, 0.00001}};
+  {4, 2, 3, cuvs::distance::DistanceType::L2Expanded, 4, 0.00001},
+  {4, 2, 2, cuvs::distance::DistanceType::L2SqrtUnexpanded, 2, 0.00001},
+  {8, 8, 3, cuvs::distance::DistanceType::L2Unexpanded, 4, 0.00001},
+  {11, 2, 5, cuvs::distance::DistanceType::L2Expanded, 3, 0.00001},
+  {40, 2, 8, cuvs::distance::DistanceType::L2Expanded, 10, 0.00001},
+  {12, 7, 3, cuvs::distance::DistanceType::CosineExpanded, 8, 0.00001},
+  {7, 5, 5, cuvs::distance::DistanceType::L1, 2, 0.00001}};
 
 // writing the test suite
 typedef silhouetteScoreTest<int, double> silhouetteScoreTestClass;

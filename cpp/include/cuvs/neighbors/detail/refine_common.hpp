@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/mdspan.hpp>
-#include <raft/distance/distance_types.hpp>
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 /** Checks whether the input data extents are compatible. */
 template <typename ExtentsT>
@@ -54,4 +54,4 @@ void refine_check_input(ExtentsT dataset,
                static_cast<int>(k));
 }
 
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

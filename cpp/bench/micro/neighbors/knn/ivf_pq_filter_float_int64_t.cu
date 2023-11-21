@@ -17,8 +17,8 @@
 #undef RAFT_EXPLICIT_INSTANTIATE_ONLY  // Enable instantiation of search with filter
 #include "../knn.cuh"
 
-namespace raft::bench::spatial {
+namespace cuvs::bench::spatial {
 
 KNN_REGISTER(float, int64_t, ivf_pq_filter_knn, kInputsFilter, kNoCopyOnly, kScopeFull);
 
-}  // namespace raft::bench::spatial
+}  // namespace cuvs::bench::spatial

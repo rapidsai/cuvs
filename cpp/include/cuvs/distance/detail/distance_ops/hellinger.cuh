@@ -17,7 +17,7 @@
 #pragma once
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 /**
  * @brief the Hellinger distance matrix calculation
@@ -74,4 +74,4 @@ struct hellinger_distance_op {
   }
 };
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

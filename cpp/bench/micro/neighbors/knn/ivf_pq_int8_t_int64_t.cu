@@ -16,8 +16,8 @@
 
 #include "../knn.cuh"
 
-namespace raft::bench::spatial {
+namespace cuvs::bench::spatial {
 
 KNN_REGISTER(int8_t, int64_t, ivf_pq_knn, kInputs, kNoCopyOnly, kAllScopes);
 
-}  // namespace raft::bench::spatial
+}  // namespace cuvs::bench::spatial

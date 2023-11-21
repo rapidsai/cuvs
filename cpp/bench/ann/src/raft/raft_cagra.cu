@@ -15,8 +15,8 @@
  */
 #include "raft_cagra_wrapper.h"
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 template class RaftCagra<uint8_t, uint32_t>;
 template class RaftCagra<int8_t, uint32_t>;
 template class RaftCagra<float, uint32_t>;
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

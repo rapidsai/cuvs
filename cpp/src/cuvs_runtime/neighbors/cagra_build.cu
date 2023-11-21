@@ -14,42 +14,42 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/cagra.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/cagra.cuh>
+#include <cuvs/neighbors/ivf_pq.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 #include <raft_runtime/neighbors/cagra.hpp>
 
-namespace raft::runtime::neighbors::cagra {
+namespace cuvs::runtime::neighbors::cagra {
 
 #define RAFT_INST_CAGRA_BUILD(T, IdxT)                                             \
   auto build(raft::resources const& handle,                                        \
-             const raft::neighbors::cagra::index_params& params,                   \
+             const cuvs::neighbors::cagra::index_params& params,                   \
              raft::device_matrix_view<const T, int64_t, row_major> dataset)        \
-    ->raft::neighbors::cagra::index<T, IdxT>                                       \
+    ->cuvs::neighbors::cagra::index<T, IdxT>                                       \
   {                                                                                \
-    return raft::neighbors::cagra::build<T, IdxT>(handle, params, dataset);        \
+    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);        \
   }                                                                                \
                                                                                    \
   auto build(raft::resources const& handle,                                        \
-             const raft::neighbors::cagra::index_params& params,                   \
+             const cuvs::neighbors::cagra::index_params& params,                   \
              raft::host_matrix_view<const T, int64_t, row_major> dataset)          \
-    ->raft::neighbors::cagra::index<T, IdxT>                                       \
+    ->cuvs::neighbors::cagra::index<T, IdxT>                                       \
   {                                                                                \
-    return raft::neighbors::cagra::build<T, IdxT>(handle, params, dataset);        \
+    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);        \
   }                                                                                \
                                                                                    \
   void build_device(raft::resources const& handle,                                 \
-                    const raft::neighbors::cagra::index_params& params,            \
+                    const cuvs::neighbors::cagra::index_params& params,            \
                     raft::device_matrix_view<const T, int64_t, row_major> dataset, \
-                    raft::neighbors::cagra::index<T, IdxT>& idx)                   \
+                    cuvs::neighbors::cagra::index<T, IdxT>& idx)                   \
   {                                                                                \
     idx = build(handle, params, dataset);                                          \
   }                                                                                \
                                                                                    \
   void build_host(raft::resources const& handle,                                   \
-                  const raft::neighbors::cagra::index_params& params,              \
+                  const cuvs::neighbors::cagra::index_params& params,              \
                   raft::host_matrix_view<const T, int64_t, row_major> dataset,     \
-                  raft::neighbors::cagra::index<T, IdxT>& idx)                     \
+                  cuvs::neighbors::cagra::index<T, IdxT>& idx)                     \
   {                                                                                \
     idx = build(handle, params, dataset);                                          \
   }
@@ -65,17 +65,17 @@ RAFT_INST_CAGRA_BUILD(uint8_t, uint32_t);
                        raft::device_matrix_view<IdxT, int64_t, row_major> knn_graph, \
                        raft::host_matrix_view<IdxT, int64_t, row_major> new_graph)   \
   {                                                                                  \
-    raft::neighbors::cagra::optimize(handle, knn_graph, new_graph);                  \
+    cuvs::neighbors::cagra::optimize(handle, knn_graph, new_graph);                  \
   }                                                                                  \
   void optimize_host(raft::resources const& handle,                                  \
                      raft::host_matrix_view<IdxT, int64_t, row_major> knn_graph,     \
                      raft::host_matrix_view<IdxT, int64_t, row_major> new_graph)     \
   {                                                                                  \
-    raft::neighbors::cagra::optimize(handle, knn_graph, new_graph);                  \
+    cuvs::neighbors::cagra::optimize(handle, knn_graph, new_graph);                  \
   }
 
 RAFT_INST_CAGRA_OPTIMIZE(uint32_t);
 
 #undef RAFT_INST_CAGRA_OPTIMIZE
 
-}  // namespace raft::runtime::neighbors::cagra
+}  // namespace cuvs::runtime::neighbors::cagra

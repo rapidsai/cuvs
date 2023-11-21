@@ -22,6 +22,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <vector>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
@@ -29,16 +30,15 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/detail/device_memory_resource.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-#include <raft/neighbors/detail/refine.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-#include <raft/neighbors/nn_descent.cuh>
-#include <raft/neighbors/refine.cuh>
+#include <cuvs/neighbors/detail/refine.cuh>
+#include <cuvs/neighbors/ivf_pq.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/nn_descent.cuh>
+#include <cuvs/neighbors/refine.cuh>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT, typename IdxT, typename accessor>
 void build_knn_graph(raft::resources const& res,
@@ -48,7 +48,7 @@ void build_knn_graph(raft::resources const& res,
                      std::optional<ivf_pq::index_params> build_params   = std::nullopt,
                      std::optional<ivf_pq::search_params> search_params = std::nullopt)
 {
-  resource::detail::warn_non_pool_workspace(res, "raft::neighbors::cagra::build");
+  resource::detail::warn_non_pool_workspace(res, "cuvs::neighbors::cagra::build");
   RAFT_EXPECTS(!build_params || build_params->metric == distance::DistanceType::L2Expanded,
                "Currently only L2Expanded metric is supported");
 
@@ -170,7 +170,7 @@ void build_knn_graph(raft::resources const& res,
         refined_distances_host.data_handle(), batch.size(), top_k);
       resource::sync_stream(res);
 
-      raft::neighbors::detail::refine_host<int64_t, DataT, float, int64_t>(
+      cuvs::neighbors::detail::refine_host<int64_t, DataT, float, int64_t>(
         dataset,
         queries_host_view,
         neighbors_host_view,
@@ -187,7 +187,7 @@ void build_knn_graph(raft::resources const& res,
 
       auto dataset_view = make_device_matrix_view<const DataT, int64_t>(
         dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-      raft::neighbors::detail::refine_device<int64_t, DataT, float, int64_t>(
+      cuvs::neighbors::detail::refine_device<int64_t, DataT, float, int64_t>(
         res,
         dataset_view,
         queries_view,
@@ -346,4 +346,4 @@ index<T, IdxT> build(
   // Construct an index from dataset and optimized knn graph.
   return index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
 }
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

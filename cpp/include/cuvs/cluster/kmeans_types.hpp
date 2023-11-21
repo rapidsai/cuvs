@@ -18,19 +18,19 @@
 #include <raft/core/logger.hpp>
 #include <raft/random/rng_state.hpp>
 
-namespace raft::cluster {
+namespace cuvs::cluster {
 
 /** Base structure for parameters that are common to all k-means algorithms */
 struct kmeans_base_params {
   /**
    * Metric to use for distance computation. The supported metrics can vary per algorithm.
    */
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Expanded;
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 };
 
-}  // namespace raft::cluster
+}  // namespace cuvs::cluster
 
-namespace raft::cluster::kmeans {
+namespace cuvs::cluster::kmeans {
 
 /**
  * Simple object to specify hyper-parameters to the kmeans algorithm.
@@ -113,10 +113,10 @@ struct KMeansParams : kmeans_base_params {
   bool inertia_check = false;
 };
 
-}  // namespace raft::cluster::kmeans
+}  // namespace cuvs::cluster::kmeans
 
-namespace raft::cluster {
+namespace cuvs::cluster {
 
 using kmeans::KMeansParams;
 
-}  // namespace raft::cluster
+}  // namespace cuvs::cluster

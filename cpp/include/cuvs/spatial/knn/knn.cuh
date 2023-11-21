@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/knn_brute_force.cuh>
+#include <cuvs/neighbors/detail/selection_faiss.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/matrix/detail/select_radix.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/neighbors/detail/knn_brute_force.cuh>
-#include <raft/neighbors/detail/selection_faiss.cuh>
 
 namespace raft::spatial::knn {
 
@@ -60,7 +60,7 @@ inline void knn_merge_parts(const value_t* in_keys,
                             cudaStream_t stream,
                             idx_t* translations)
 {
-  raft::neighbors::detail::knn_merge_parts(
+  cuvs::neighbors::detail::knn_merge_parts(
     in_keys, in_values, out_keys, out_values, n_samples, n_parts, k, stream, translations);
 }
 
@@ -211,7 +211,7 @@ void brute_force_knn(raft::resources const& handle,
 {
   ASSERT(input.size() == sizes.size(), "input and sizes vectors must be the same size");
 
-  raft::neighbors::detail::brute_force_knn_impl(handle,
+  cuvs::neighbors::detail::brute_force_knn_impl(handle,
                                                 input,
                                                 sizes,
                                                 D,

@@ -19,11 +19,11 @@
 #include <cuvs/cluster/single_linkage_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 
-namespace raft::cluster {
+namespace cuvs::cluster {
 
 /**
- * Note: All of the functions below in the raft::cluster namespace are deprecated
- * and will be removed in a future release. Please use raft::cluster::hierarchy
+ * Note: All of the functions below in the cuvs::cluster namespace are deprecated
+ * and will be removed in a future release. Please use cuvs::cluster::hierarchy
  * instead.
  */
 
@@ -54,7 +54,7 @@ void single_linkage(raft::resources const& handle,
                     const value_t* X,
                     size_t m,
                     size_t n,
-                    raft::distance::DistanceType metric,
+                    cuvs::distance::DistanceType metric,
                     linkage_output<value_idx>* out,
                     int c,
                     size_t n_clusters)
@@ -62,9 +62,9 @@ void single_linkage(raft::resources const& handle,
   detail::single_linkage<value_idx, value_t, dist_type>(
     handle, X, m, n, metric, out, c, n_clusters);
 }
-};  // namespace raft::cluster
+};  // namespace cuvs::cluster
 
-namespace raft::cluster::hierarchy {
+namespace cuvs::cluster::hierarchy {
 
 constexpr int DEFAULT_CONST_C = 15;
 
@@ -91,7 +91,7 @@ void single_linkage(raft::resources const& handle,
                     raft::device_matrix_view<const value_t, idx_t, row_major> X,
                     raft::device_matrix_view<idx_t, idx_t, row_major> dendrogram,
                     raft::device_vector_view<idx_t, idx_t> labels,
-                    raft::distance::DistanceType metric,
+                    cuvs::distance::DistanceType metric,
                     size_t n_clusters,
                     std::optional<int> c = std::make_optional<int>(DEFAULT_CONST_C))
 {
@@ -99,7 +99,7 @@ void single_linkage(raft::resources const& handle,
   out_arrs.children = dendrogram.data_handle();
   out_arrs.labels   = labels.data_handle();
 
-  raft::cluster::single_linkage<idx_t, value_t, dist_type>(
+  cuvs::cluster::single_linkage<idx_t, value_t, dist_type>(
     handle,
     X.data_handle(),
     static_cast<std::size_t>(X.extent(0)),
@@ -109,4 +109,4 @@ void single_linkage(raft::resources const& handle,
     c.has_value() ? c.value() : DEFAULT_CONST_C,
     n_clusters);
 }
-};  // namespace raft::cluster::hierarchy
+};  // namespace cuvs::cluster::hierarchy

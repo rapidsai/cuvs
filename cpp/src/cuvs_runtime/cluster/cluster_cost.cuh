@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 template <typename ElementType, typename IndexType>
 void cluster_cost(raft::resources const& handle,
                   const ElementType* X,
@@ -55,7 +55,7 @@ void cluster_cost(raft::resources const& handle,
 
   auto min_cluster_distance =
     raft::make_device_vector<raft::KeyValuePair<IndexType, ElementType>>(handle, n_samples);
-  raft::distance::fusedL2NNMinReduce(min_cluster_distance.data_handle(),
+  cuvs::distance::fusedL2NNMinReduce(min_cluster_distance.data_handle(),
                                      X,
                                      centroids,
                                      x_norms.data(),
@@ -76,7 +76,7 @@ void cluster_cost(raft::resources const& handle,
                     raft::value_op{});
 
   rmm::device_scalar<ElementType> device_cost(0, resource::get_cuda_stream(handle));
-  raft::cluster::kmeans::cluster_cost(handle,
+  cuvs::cluster::kmeans::cluster_cost(handle,
                                       distances.view(),
                                       workspace,
                                       make_device_scalar_view<ElementType>(device_cost.data()),
@@ -84,4 +84,4 @@ void cluster_cost(raft::resources const& handle,
 
   raft::update_host(cost, device_cost.data(), 1, resource::get_cuda_stream(handle));
 }
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

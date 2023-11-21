@@ -18,18 +18,18 @@
 #include <cuvs_internal/neighbors/naive_knn.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/random/rng.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 template <typename IdxT>
 struct RefineInputs {
@@ -38,7 +38,7 @@ struct RefineInputs {
   IdxT dim;
   IdxT k;   // after refinement
   IdxT k0;  // initial k before refinement (k0 >= k).
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   bool host_data;
 };
 
@@ -155,4 +155,4 @@ class RefineHelper {
   std::vector<IdxT> true_refined_indices_host;
   std::vector<DistanceT> true_refined_distances_host;
 };
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

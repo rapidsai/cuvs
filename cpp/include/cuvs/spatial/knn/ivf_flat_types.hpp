@@ -26,15 +26,15 @@
 
 #pragma message(__FILE__                                                    \
                   " is deprecated and will be removed in a future release." \
-                  " Please use the raft::neighbors version instead.")
+                  " Please use the cuvs::neighbors version instead.")
 
-#include <raft/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
 
 namespace raft::spatial::knn::ivf_flat {
 
-using raft::neighbors::ivf_flat::index;
-using raft::neighbors::ivf_flat::index_params;
-using raft::neighbors::ivf_flat::kIndexGroupSize;
-using raft::neighbors::ivf_flat::search_params;
+using cuvs::neighbors::ivf_flat::index;
+using cuvs::neighbors::ivf_flat::index_params;
+using cuvs::neighbors::ivf_flat::kIndexGroupSize;
+using cuvs::neighbors::ivf_flat::search_params;
 
 };  // namespace raft::spatial::knn::ivf_flat

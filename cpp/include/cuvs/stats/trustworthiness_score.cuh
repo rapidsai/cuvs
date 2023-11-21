@@ -37,7 +37,7 @@ namespace stats {
  * @param[in] batchSize Batch size
  * @return[out] Trustworthiness score
  */
-template <typename math_t, raft::distance::DistanceType distance_type>
+template <typename math_t, cuvs::distance::DistanceType distance_type>
 double trustworthiness_score(const raft::resources& h,
                              const math_t* X,
                              math_t* X_embedded,
@@ -69,7 +69,7 @@ double trustworthiness_score(const raft::resources& h,
  * @note The constness of the data in X_embedded is currently casted away and the data is slightly
  * modified.
  */
-template <raft::distance::DistanceType distance_type, typename value_t, typename idx_t>
+template <cuvs::distance::DistanceType distance_type, typename value_t, typename idx_t>
 double trustworthiness_score(
   raft::resources const& handle,
   raft::device_matrix_view<const value_t, idx_t, raft::row_major> X,

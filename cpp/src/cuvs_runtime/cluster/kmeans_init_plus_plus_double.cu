@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 
 void init_plus_plus(raft::resources const& handle,
-                    const raft::cluster::kmeans::KMeansParams& params,
+                    const cuvs::cluster::kmeans::KMeansParams& params,
                     raft::device_matrix_view<const double, int> X,
                     raft::device_matrix_view<double, int> centroids)
 {
   rmm::device_uvector<char> workspace(0, resource::get_cuda_stream(handle));
-  raft::cluster::kmeans::init_plus_plus<double, int>(handle, params, X, centroids, workspace);
+  cuvs::cluster::kmeans::init_plus_plus<double, int>(handle, params, X, centroids, workspace);
 }
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

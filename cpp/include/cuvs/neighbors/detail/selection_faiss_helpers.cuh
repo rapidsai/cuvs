@@ -16,7 +16,7 @@
 
 #pragma once
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 // This function is used in cpp/test/neighbors/select.cu. We want to make it
 // available through both the selection_faiss-inl.cuh and
@@ -28,4 +28,4 @@ constexpr int kFaissMaxK()
   return 2048;
 }
 
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

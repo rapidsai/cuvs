@@ -17,10 +17,10 @@
 #undef RAFT_EXPLICIT_INSTANTIATE_ONLY  // Enable instantiation of search with filter
 #include "../ann_ivf_pq.cuh"
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 using f32_f32_i64_filter = ivf_pq_filter_test<float, float, int64_t>;
 
 TEST_BUILD_SEARCH(f32_f32_i64_filter)
 INSTANTIATE(f32_f32_i64_filter, defaults() + big_dims_moderate_lut());
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq

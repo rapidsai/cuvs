@@ -26,15 +26,15 @@
 
 #pragma message(__FILE__                                                    \
                   " is deprecated and will be removed in a future release." \
-                  " Please use the raft::neighbors version instead.")
+                  " Please use the cuvs::neighbors version instead.")
 
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 
 namespace raft::spatial::knn::ivf_pq {
 
-using raft::neighbors::ivf_pq::codebook_gen;
-using raft::neighbors::ivf_pq::index;
-using raft::neighbors::ivf_pq::index_params;
-using raft::neighbors::ivf_pq::search_params;
+using cuvs::neighbors::ivf_pq::codebook_gen;
+using cuvs::neighbors::ivf_pq::index;
+using cuvs::neighbors::ivf_pq::index_params;
+using cuvs::neighbors::ivf_pq::search_params;
 
 }  // namespace raft::spatial::knn::ivf_pq

@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 //
 __device__ inline uint32_t convert(uint32_t x)
 {
@@ -1035,4 +1035,4 @@ inline void _cuann_find_topk(uint32_t topK,
 
   return;
 }
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

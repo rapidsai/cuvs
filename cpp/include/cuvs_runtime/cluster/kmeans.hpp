@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 
-#include <raft/cluster/kmeans_types.hpp>
+#include <cuvs/cluster/kmeans_types.hpp>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 
 /**
  * @defgroup kmeans_runtime Kmeans Runtime API
@@ -51,7 +51,7 @@ void update_centroids(raft::resources const& handle,
                       double* weight_per_cluster);
 
 void fit(raft::resources const& handle,
-         const raft::cluster::kmeans::KMeansParams& params,
+         const cuvs::cluster::kmeans::KMeansParams& params,
          raft::device_matrix_view<const float, int, row_major> X,
          std::optional<raft::device_vector_view<const float, int>> sample_weight,
          raft::device_matrix_view<float, int, row_major> centroids,
@@ -59,7 +59,7 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<int, int> n_iter);
 
 void fit(raft::resources const& handle,
-         const raft::cluster::kmeans::KMeansParams& params,
+         const cuvs::cluster::kmeans::KMeansParams& params,
          raft::device_matrix_view<const double, int, row_major> X,
          std::optional<raft::device_vector_view<const double, int>> sample_weight,
          raft::device_matrix_view<double, int, row_major> centroids,
@@ -67,12 +67,12 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<int, int> n_iter);
 
 void init_plus_plus(raft::resources const& handle,
-                    const raft::cluster::kmeans::KMeansParams& params,
+                    const cuvs::cluster::kmeans::KMeansParams& params,
                     raft::device_matrix_view<const float, int, row_major> X,
                     raft::device_matrix_view<float, int, row_major> centroids);
 
 void init_plus_plus(raft::resources const& handle,
-                    const raft::cluster::kmeans::KMeansParams& params,
+                    const cuvs::cluster::kmeans::KMeansParams& params,
                     raft::device_matrix_view<const double, int, row_major> X,
                     raft::device_matrix_view<double, int, row_major> centroids);
 
@@ -94,4 +94,4 @@ void cluster_cost(raft::resources const& handle,
 
 /** @} */  // end group kmeans_runtime
 
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

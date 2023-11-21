@@ -21,7 +21,7 @@ namespace raft {
 namespace distance {
 
 template <typename DataType>
-class DistanceUnexpL1 : public DistanceTest<raft::distance::DistanceType::L1, DataType> {};
+class DistanceUnexpL1 : public DistanceTest<cuvs::distance::DistanceType::L1, DataType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 1024, 1024, 32, true, 1234ULL},
@@ -63,7 +63,7 @@ TEST_P(DistanceUnexpL1D, Result)
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceUnexpL1D, ::testing::ValuesIn(inputsd));
 
-class BigMatrixUnexpL1 : public BigMatrixDistanceTest<raft::distance::DistanceType::L1> {};
+class BigMatrixUnexpL1 : public BigMatrixDistanceTest<cuvs::distance::DistanceType::L1> {};
 TEST_F(BigMatrixUnexpL1, Result) {}
 
 }  // end namespace distance

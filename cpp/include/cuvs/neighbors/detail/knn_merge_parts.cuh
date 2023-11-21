@@ -20,10 +20,10 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <cstdint>
-#include <raft/neighbors/detail/faiss_select/DistanceUtils.h>
-#include <raft/neighbors/detail/faiss_select/Select.cuh>
+#include <cuvs/neighbors/detail/faiss_select/DistanceUtils.h>
+#include <cuvs/neighbors/detail/faiss_select/Select.cuh>
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename value_idx = std::int64_t,
           typename value_t   = float,
@@ -169,4 +169,4 @@ inline void knn_merge_parts(const value_t* inK,
     knn_merge_parts_impl<value_idx, value_t, 1024, 8>(
       inK, inV, outK, outV, n_samples, n_parts, k, stream, translations);
 }
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

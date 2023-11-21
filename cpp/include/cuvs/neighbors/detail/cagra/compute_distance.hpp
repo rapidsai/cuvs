@@ -22,7 +22,7 @@
 #include "utils.hpp"
 #include <type_traits>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 namespace device {
 
 // using LOAD_256BIT_T = ulonglong4;
@@ -257,4 +257,4 @@ _RAFT_DEVICE void compute_distance_to_child_nodes(INDEX_T* const result_child_in
 }
 
 }  // namespace device
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

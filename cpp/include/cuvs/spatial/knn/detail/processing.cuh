@@ -17,8 +17,8 @@
 
 #include "processing.hpp"
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/unary_op.cuh>

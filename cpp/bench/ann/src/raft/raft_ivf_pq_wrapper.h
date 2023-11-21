@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -22,9 +24,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <raft_runtime/neighbors/ivf_pq.hpp>
 #include <raft_runtime/neighbors/refine.hpp>
@@ -37,7 +37,7 @@
 #include "raft_ann_bench_utils.h"
 #include <raft/util/cudart_utils.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, typename IdxT>
 class RaftIvfPQ : public ANN<T> {
@@ -46,12 +46,12 @@ class RaftIvfPQ : public ANN<T> {
   using ANN<T>::dim_;
 
   struct SearchParam : public AnnSearchParam {
-    raft::neighbors::ivf_pq::search_params pq_param;
+    cuvs::neighbors::ivf_pq::search_params pq_param;
     float refine_ratio = 1.0f;
     auto needs_dataset() const -> bool override { return refine_ratio > 1.0f; }
   };
 
-  using BuildParam = raft::neighbors::ivf_pq::index_params;
+  using BuildParam = cuvs::neighbors::ivf_pq::index_params;
 
   RaftIvfPQ(Metric metric, int dim, const BuildParam& param)
     : ANN<T>(metric, dim), index_params_(param), dimension_(dim)
@@ -92,8 +92,8 @@ class RaftIvfPQ : public ANN<T> {
   raft::device_resources handle_;
   cudaEvent_t sync_{nullptr};
   BuildParam index_params_;
-  raft::neighbors::ivf_pq::search_params search_params_;
-  std::optional<raft::neighbors::ivf_pq::index<IdxT>> index_;
+  cuvs::neighbors::ivf_pq::search_params search_params_;
+  std::optional<cuvs::neighbors::ivf_pq::index<IdxT>> index_;
   int device_;
   int dimension_;
   float refine_ratio_ = 1.0;
@@ -115,7 +115,7 @@ void RaftIvfPQ<T, IdxT>::save(const std::string& file) const
 template <typename T, typename IdxT>
 void RaftIvfPQ<T, IdxT>::load(const std::string& file)
 {
-  auto index_tmp = raft::neighbors::ivf_pq::index<IdxT>(handle_, index_params_, dimension_);
+  auto index_tmp = cuvs::neighbors::ivf_pq::index<IdxT>(handle_, index_params_, dimension_);
   raft::runtime::neighbors::ivf_pq::deserialize(handle_, file, &index_tmp);
   index_.emplace(std::move(index_tmp));
   return;
@@ -218,4 +218,4 @@ void RaftIvfPQ<T, IdxT>::search(const T* queries,
     stream_wait(stream);  // RAFT stream -> bench stream
   }
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

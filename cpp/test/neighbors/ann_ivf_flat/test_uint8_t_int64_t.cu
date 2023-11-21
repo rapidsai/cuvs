@@ -18,11 +18,11 @@
 
 #include "../ann_ivf_flat.cuh"
 
-namespace raft::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat {
 
 typedef AnnIVFFlatTest<float, uint8_t, std::int64_t> AnnIVFFlatTestF_uint8;
 TEST_P(AnnIVFFlatTestF_uint8, AnnIVFFlat) { this->testIVFFlat(); }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_uint8, ::testing::ValuesIn(inputs));
 
-}  // namespace raft::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

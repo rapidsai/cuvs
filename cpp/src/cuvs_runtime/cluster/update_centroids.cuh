@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/norm.cuh>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 
 template <typename DataT, typename IndexT>
 void update_centroids(raft::resources const& handle,
@@ -61,7 +61,7 @@ void update_centroids(raft::resources const& handle,
     weight_per_cluster == nullptr ? weight_per_cluster_uvec.data() : weight_per_cluster,
     n_clusters);
 
-  raft::cluster::kmeans::update_centroids<DataT, IndexT>(handle,
+  cuvs::cluster::kmeans::update_centroids<DataT, IndexT>(handle,
                                                          X_view,
                                                          sample_weights_view,
                                                          centroids_view,
@@ -69,4 +69,4 @@ void update_centroids(raft::resources const& handle,
                                                          weight_per_cluster_view,
                                                          new_centroids_view);
 }
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

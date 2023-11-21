@@ -23,7 +23,7 @@
 
 #include "../ann_ivf_pq.cuh"
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 using f32_f32_u32        = ivf_pq_test<float, float, uint32_t>;
 using f32_f32_u32_filter = ivf_pq_filter_test<float, float, uint32_t>;
@@ -34,4 +34,4 @@ INSTANTIATE(f32_f32_u32, defaults() + var_n_probes() + var_k() + special_cases()
 
 TEST_BUILD_SEARCH(f32_f32_u32_filter)
 INSTANTIATE(f32_f32_u32_filter, defaults());
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq

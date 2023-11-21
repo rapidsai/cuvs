@@ -23,16 +23,16 @@
 
 #include "detail/processing.hpp"
 #include "ivf_flat_types.hpp"
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 
 namespace raft {
 namespace spatial {
 namespace knn {
 
 struct knnIndex {
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   float metricArg;
   int nprobe;
   std::unique_ptr<MetricProcessor<float>> metric_processor;
@@ -41,7 +41,7 @@ struct knnIndex {
   std::unique_ptr<const ivf_flat::index<uint8_t, int64_t>> ivf_flat_uint8_t_;
   std::unique_ptr<const ivf_flat::index<int8_t, int64_t>> ivf_flat_int8_t_;
 
-  std::unique_ptr<const raft::neighbors::ivf_pq::index<int64_t>> ivf_pq;
+  std::unique_ptr<const cuvs::neighbors::ivf_pq::index<int64_t>> ivf_pq;
 
   int device;
 
@@ -88,7 +88,7 @@ struct IVFPQParam : IVFParam {
 };
 
 inline auto from_legacy_index_params(const IVFFlatParam& legacy,
-                                     raft::distance::DistanceType metric,
+                                     cuvs::distance::DistanceType metric,
                                      float metric_arg)
 {
   ivf_flat::index_params params;

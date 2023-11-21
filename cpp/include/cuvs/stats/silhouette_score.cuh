@@ -53,7 +53,7 @@ DataT silhouette_score(
   int nLabels,
   DataT* silhouette_scorePerSample,
   cudaStream_t stream,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   return detail::silhouette_score(
     handle, X_in, nRows, nCols, labels, nLabels, silhouette_scorePerSample, stream, metric);
@@ -69,7 +69,7 @@ value_t silhouette_score_batched(
   label_idx n_labels,
   value_t* scores,
   value_idx chunk,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   return batched::detail::silhouette_score(
     handle, X, n_rows, n_cols, y, n_labels, scores, chunk, metric);
@@ -104,7 +104,7 @@ value_t silhouette_score(
   raft::device_vector_view<const label_t, idx_t> labels,
   std::optional<raft::device_vector_view<value_t, idx_t>> silhouette_score_per_sample,
   idx_t n_unique_labels,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   RAFT_EXPECTS(labels.extent(0) == X_in.extent(0), "Size mismatch between labels and data");
 
@@ -151,7 +151,7 @@ value_t silhouette_score_batched(
   std::optional<raft::device_vector_view<value_t, idx_t>> silhouette_score_per_sample,
   idx_t n_unique_labels,
   idx_t batch_size,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   static_assert(std::is_integral_v<idx_t>,
                 "silhouette_score_batched: The index type "
@@ -193,7 +193,7 @@ value_t silhouette_score(
   raft::device_vector_view<const label_t, idx_t> labels,
   std::nullopt_t silhouette_score_per_sample,
   idx_t n_unique_labels,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   std::optional<raft::device_vector_view<value_t, idx_t>> opt_scores = silhouette_score_per_sample;
   return silhouette_score(handle, X_in, labels, opt_scores, n_unique_labels, metric);
@@ -214,7 +214,7 @@ value_t silhouette_score_batched(
   std::nullopt_t silhouette_score_per_sample,
   idx_t n_unique_labels,
   idx_t batch_size,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   std::optional<raft::device_vector_view<value_t, idx_t>> opt_scores = silhouette_score_per_sample;
   return silhouette_score_batched(

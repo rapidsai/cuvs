@@ -20,7 +20,7 @@
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>
 
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 /**
  * @brief Compress 2D boolean matrix to bitfield
@@ -120,4 +120,4 @@ void compress_to_bits(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-};  // namespace raft::distance::detail
+};  // namespace cuvs::distance::detail

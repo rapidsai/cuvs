@@ -17,7 +17,7 @@
 
 #include "topk_for_cagra/topk_core.cuh"
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
 template <unsigned MAX_INTERNAL_TOPK>
@@ -88,4 +88,4 @@ TOP_FUNC_PARTIAL_SPECIALIZATION(512);
 TOP_FUNC_PARTIAL_SPECIALIZATION(1024);
 
 }  // namespace single_cta_search
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

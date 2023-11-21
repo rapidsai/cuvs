@@ -23,14 +23,14 @@
  *
  */
 
-#include <raft/core/operators.hpp>                                // raft::identity_op
-#include <raft/distance/detail/distance_ops/all_ops.cuh>          // ops::*
-#include <raft/distance/detail/pairwise_matrix/dispatch-inl.cuh>  // dispatch
-#include <raft/distance/detail/pairwise_matrix/dispatch_sm60.cuh>
-#include <raft/distance/detail/pairwise_matrix/dispatch_sm80.cuh>
+#include <cuvs/distance/detail/distance_ops/all_ops.cuh>          // ops::*
+#include <cuvs/distance/detail/pairwise_matrix/dispatch-inl.cuh>  // dispatch
+#include <cuvs/distance/detail/pairwise_matrix/dispatch_sm60.cuh>
+#include <cuvs/distance/detail/pairwise_matrix/dispatch_sm80.cuh>
+#include <raft/core/operators.hpp>  // raft::identity_op
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
-  template void raft::distance::detail::                                               \
+  template void cuvs::distance::detail::                                               \
     pairwise_matrix_dispatch<OpT<DataT, AccT, IdxT>, DataT, AccT, OutT, FinOpT, IdxT>( \
       OpT<DataT, AccT, IdxT> distance_op,                                              \
       IdxT m,                                                                          \
@@ -46,6 +46,6 @@
       bool is_row_major)
 
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_exp_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::l2_exp_distance_op, float, float, float, raft::identity_op, int);
 
 #undef instantiate_raft_distance_detail_pairwise_matrix_dispatch

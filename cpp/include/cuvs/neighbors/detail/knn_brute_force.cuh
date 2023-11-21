@@ -27,25 +27,25 @@
 #include <rmm/device_uvector.hpp>
 
 #include <cstdint>
+#include <cuvs/distance/detail/distance_ops/l2_exp.cuh>
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/brute_force_types.hpp>
+#include <cuvs/neighbors/detail/faiss_select/DistanceUtils.h>
+#include <cuvs/neighbors/detail/knn_merge_parts.cuh>
 #include <iostream>
 #include <raft/core/resources.hpp>
-#include <raft/distance/detail/distance_ops/l2_exp.cuh>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/select_k.cuh>
-#include <raft/neighbors/brute_force_types.hpp>
-#include <raft/neighbors/detail/faiss_select/DistanceUtils.h>
-#include <raft/neighbors/detail/knn_merge_parts.cuh>
 #include <raft/spatial/knn/detail/fused_l2_knn.cuh>
 #include <raft/spatial/knn/detail/haversine_distance.cuh>
 #include <raft/spatial/knn/detail/processing.cuh>
 #include <set>
 #include <thrust/iterator/transform_iterator.h>
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 using namespace raft::spatial::knn::detail;
 using namespace raft::spatial::knn;
 
@@ -65,7 +65,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            size_t k,
                            ElementType* distances,  // size (m, k)
                            IndexType* indices,      // size (m, k)
-                           raft::distance::DistanceType metric,
+                           cuvs::distance::DistanceType metric,
                            float metric_arg                            = 2.0,
                            size_t max_row_tile_size                    = 0,
                            size_t max_col_tile_size                    = 0,
@@ -97,13 +97,13 @@ void tiled_brute_force_knn(const raft::resources& handle,
   auto pairwise_metric = metric;
   rmm::device_uvector<ElementType> search_norms(0, stream);
   rmm::device_uvector<ElementType> index_norms(0, stream);
-  if (metric == raft::distance::DistanceType::L2Expanded ||
-      metric == raft::distance::DistanceType::L2SqrtExpanded ||
-      metric == raft::distance::DistanceType::CosineExpanded) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      metric == cuvs::distance::DistanceType::CosineExpanded) {
     if (!precomputed_search_norms) { search_norms.resize(m, stream); }
     if (!precomputed_index_norms) { index_norms.resize(n, stream); }
     // cosine needs the l2norm, where as l2 distances needs the squared norm
-    if (metric == raft::distance::DistanceType::CosineExpanded) {
+    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (!precomputed_search_norms) {
         raft::linalg::rowNorm(search_norms.data(),
                               search,
@@ -134,7 +134,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
           index_norms.data(), index, d, n, raft::linalg::NormType::L2Norm, true, stream);
       }
     }
-    pairwise_metric = raft::distance::DistanceType::InnerProduct;
+    pairwise_metric = cuvs::distance::DistanceType::InnerProduct;
   }
 
   // if we're tiling over columns, we need additional buffers for temporary output
@@ -163,7 +163,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
   rmm::device_uvector<ElementType> temp_out_distances(tile_rows * temp_out_cols, stream);
   rmm::device_uvector<IndexType> temp_out_indices(tile_rows * temp_out_cols, stream);
 
-  bool select_min = raft::distance::is_min_close(metric);
+  bool select_min = cuvs::distance::is_min_close(metric);
 
   for (size_t i = 0; i < m; i += tile_rows) {
     size_t current_query_size = std::min(tile_rows, m - i);
@@ -187,12 +187,12 @@ void tiled_brute_force_knn(const raft::resources& handle,
                                                     pairwise_metric,
                                                     true,
                                                     metric_arg);
-      if (metric == raft::distance::DistanceType::L2Expanded ||
-          metric == raft::distance::DistanceType::L2SqrtExpanded) {
+      if (metric == cuvs::distance::DistanceType::L2Expanded ||
+          metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
         auto row_norms = precomputed_search_norms ? precomputed_search_norms : search_norms.data();
         auto col_norms = precomputed_index_norms ? precomputed_index_norms : index_norms.data();
         auto dist      = temp_distances.data();
-        bool sqrt      = metric == raft::distance::DistanceType::L2SqrtExpanded;
+        bool sqrt      = metric == cuvs::distance::DistanceType::L2SqrtExpanded;
 
         raft::linalg::map_offset(
           handle,
@@ -201,11 +201,11 @@ void tiled_brute_force_knn(const raft::resources& handle,
             IndexType row = i + (idx / current_centroid_size);
             IndexType col = j + (idx % current_centroid_size);
 
-            raft::distance::detail::ops::l2_exp_cutlass_op<ElementType, ElementType> l2_op(sqrt);
+            cuvs::distance::detail::ops::l2_exp_cutlass_op<ElementType, ElementType> l2_op(sqrt);
             auto val = l2_op(row_norms[row], col_norms[col], dist[idx]);
             return distance_epilogue(val, row, col);
           });
-      } else if (metric == raft::distance::DistanceType::CosineExpanded) {
+      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         auto row_norms = precomputed_search_norms ? precomputed_search_norms : search_norms.data();
         auto col_norms = precomputed_index_norms ? precomputed_index_norms : index_norms.data();
         auto dist      = temp_distances.data();
@@ -315,7 +315,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
  * @param[in] rowMajorQuery are the query array in row-major layout?
  * @param[in] translations translation ids for indices when index rows represent
  *        non-contiguous partitions
- * @param[in] metric corresponds to the raft::distance::DistanceType enum (default is L2Expanded)
+ * @param[in] metric corresponds to the cuvs::distance::DistanceType enum (default is L2Expanded)
  * @param[in] metricArg metric argument to use. Corresponds to the p arg for lp norm
  */
 template <typename IntType          = int,
@@ -335,7 +335,7 @@ void brute_force_knn_impl(
   bool rowMajorIndex                  = true,
   bool rowMajorQuery                  = true,
   std::vector<IdxType>* translations  = nullptr,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Expanded,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded,
   float metricArg                     = 0,
   DistanceEpilogue distance_epilogue  = raft::identity_op(),
   std::vector<value_t*>* input_norms  = nullptr,
@@ -418,10 +418,10 @@ void brute_force_knn_impl(
 
     if (k <= 64 && rowMajorQuery == rowMajorIndex && rowMajorQuery == true &&
         std::is_same_v<DistanceEpilogue, raft::identity_op> &&
-        (metric == raft::distance::DistanceType::L2Unexpanded ||
-         metric == raft::distance::DistanceType::L2SqrtUnexpanded ||
-         metric == raft::distance::DistanceType::L2Expanded ||
-         metric == raft::distance::DistanceType::L2SqrtExpanded)) {
+        (metric == cuvs::distance::DistanceType::L2Unexpanded ||
+         metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
+         metric == cuvs::distance::DistanceType::L2Expanded ||
+         metric == cuvs::distance::DistanceType::L2SqrtExpanded)) {
       fusedL2Knn(D,
                  out_i_ptr,
                  out_d_ptr,
@@ -438,11 +438,11 @@ void brute_force_knn_impl(
                  search_norms);
 
       // Perform necessary post-processing
-      if (metric == raft::distance::DistanceType::L2SqrtExpanded ||
-          metric == raft::distance::DistanceType::L2SqrtUnexpanded ||
-          metric == raft::distance::DistanceType::LpUnexpanded) {
+      if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+          metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
+          metric == cuvs::distance::DistanceType::LpUnexpanded) {
         float p = 0.5;  // standard l2
-        if (metric == raft::distance::DistanceType::LpUnexpanded) p = 1.0 / metricArg;
+        if (metric == cuvs::distance::DistanceType::LpUnexpanded) p = 1.0 / metricArg;
         raft::linalg::unaryOp<float>(
           res_D,
           res_D,
@@ -452,7 +452,7 @@ void brute_force_knn_impl(
       }
     } else {
       switch (metric) {
-        case raft::distance::DistanceType::Haversine:
+        case cuvs::distance::DistanceType::Haversine:
           ASSERT(D == 2,
                  "Haversine distance requires 2 dimensions "
                  "(latitude / longitude).");
@@ -511,7 +511,7 @@ void brute_force_knn_impl(
 template <typename T, typename IdxT>
 void brute_force_search(
   raft::resources const& res,
-  const raft::neighbors::brute_force::index<T>& idx,
+  const cuvs::neighbors::brute_force::index<T>& idx,
   raft::device_matrix_view<const T, int64_t, row_major> queries,
   raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
   raft::device_matrix_view<T, int64_t, row_major> distances,
@@ -547,4 +547,4 @@ void brute_force_search(
                                          norms.size() ? &norms : nullptr,
                                          query_norms ? query_norms->data_handle() : nullptr);
 }
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

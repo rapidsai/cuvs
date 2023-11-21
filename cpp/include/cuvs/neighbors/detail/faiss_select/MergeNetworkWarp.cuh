@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include <raft/neighbors/detail/faiss_select/MergeNetworkUtils.cuh>
-#include <raft/neighbors/detail/faiss_select/StaticUtils.h>
+#include <cuvs/neighbors/detail/faiss_select/MergeNetworkUtils.cuh>
+#include <cuvs/neighbors/detail/faiss_select/StaticUtils.h>
 
 #include <raft/util/cuda_utils.cuh>
 
-namespace raft::neighbors::detail::faiss_select {
+namespace cuvs::neighbors::detail::faiss_select {
 
 //
 // This file contains functions to:
@@ -517,4 +517,4 @@ inline __device__ void warpSortAnyRegisters(K k[N], V v[N])
   BitonicSortStep<K, V, N, Dir, Comp>::sort(k, v);
 }
 
-}  // namespace raft::neighbors::detail::faiss_select
+}  // namespace cuvs::neighbors::detail::faiss_select

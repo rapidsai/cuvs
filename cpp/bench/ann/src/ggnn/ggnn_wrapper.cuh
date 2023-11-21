@@ -24,7 +24,7 @@
 #include <memory>
 #include <stdexcept>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
 class GgnnImpl;
@@ -291,4 +291,4 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::load(const std::string& file)
   RAFT_CUDA_TRY(cudaStreamSynchronize(ggnn_device.stream));
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

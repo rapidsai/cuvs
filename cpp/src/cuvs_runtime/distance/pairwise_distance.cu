@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
 
-namespace raft::runtime::distance {
+namespace cuvs::runtime::distance {
 
 void pairwise_distance(raft::resources const& handle,
                        float* x,
@@ -27,11 +27,11 @@ void pairwise_distance(raft::resources const& handle,
                        int m,
                        int n,
                        int k,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        bool isRowMajor,
                        float metric_arg)
 {
-  raft::distance::pairwise_distance<float, int>(
+  cuvs::distance::pairwise_distance<float, int>(
     handle, x, y, dists, m, n, k, metric, isRowMajor, metric_arg);
 }
 
@@ -42,11 +42,11 @@ void pairwise_distance(raft::resources const& handle,
                        int m,
                        int n,
                        int k,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        bool isRowMajor,
                        float metric_arg)
 {
-  raft::distance::pairwise_distance<double, int>(
+  cuvs::distance::pairwise_distance<double, int>(
     handle, x, y, dists, m, n, k, metric, isRowMajor, metric_arg);
 }
-}  // namespace raft::runtime::distance
+}  // namespace cuvs::runtime::distance

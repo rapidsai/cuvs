@@ -18,7 +18,7 @@
 
 #include "../ann_cagra.cuh"
 
-namespace raft::neighbors::cagra {
+namespace cuvs::neighbors::cagra {
 
 typedef AnnCagraTest<float, std::int8_t, std::uint32_t> AnnCagraTestI8_U32;
 TEST_P(AnnCagraTestI8_U32, AnnCagra) { this->testCagra(); }
@@ -35,4 +35,4 @@ INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestI8_U32, ::testing::ValuesIn(in
 INSTANTIATE_TEST_CASE_P(AnnCagraSortTest, AnnCagraSortTestI8_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest, AnnCagraFilterTestI8_U32, ::testing::ValuesIn(inputs));
 
-}  // namespace raft::neighbors::cagra
+}  // namespace cuvs::neighbors::cagra

@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include <cuvs/distance/detail/fused_l2_nn.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/detail/fused_l2_nn.cuh>
 
-namespace raft::distance {
+namespace cuvs::distance {
 
 /**
  * \defgroup fused_l2_nn Fused 1-nearest neighbors
@@ -47,4 +47,4 @@ void initialize(raft::resources const& handle, OutT* min, IdxT m, DataT maxVal, 
     min, m, maxVal, redOp, resource::get_cuda_stream(handle));
 }
 
-}  // namespace raft::distance
+}  // namespace cuvs::distance

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/detail/refine_host-inl.hpp>
+#include <cuvs/neighbors/detail/refine_host-inl.hpp>
 
 #define instantiate_raft_neighbors_refine(IdxT, DataT, DistanceT, ExtentsT)             \
-  template void raft::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
+  template void cuvs::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
     raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,                   \
     raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,                   \
     raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,        \

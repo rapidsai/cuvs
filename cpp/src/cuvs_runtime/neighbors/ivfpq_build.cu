@@ -14,40 +14,40 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/ivf_pq.cuh>
+#include <cuvs/neighbors/ivf_pq.cuh>
 #include <raft_runtime/neighbors/ivf_pq.hpp>
 
-namespace raft::runtime::neighbors::ivf_pq {
+namespace cuvs::runtime::neighbors::ivf_pq {
 
 #define RAFT_INST_BUILD_EXTEND(T, IdxT)                                                     \
-  raft::neighbors::ivf_pq::index<IdxT> build(                                               \
+  cuvs::neighbors::ivf_pq::index<IdxT> build(                                               \
     raft::resources const& handle,                                                          \
-    const raft::neighbors::ivf_pq::index_params& params,                                    \
+    const cuvs::neighbors::ivf_pq::index_params& params,                                    \
     raft::device_matrix_view<const T, IdxT, row_major> dataset)                             \
   {                                                                                         \
-    return raft::neighbors::ivf_pq::build<T, IdxT>(handle, params, dataset);                \
+    return cuvs::neighbors::ivf_pq::build<T, IdxT>(handle, params, dataset);                \
   }                                                                                         \
   void build(raft::resources const& handle,                                                 \
-             const raft::neighbors::ivf_pq::index_params& params,                           \
+             const cuvs::neighbors::ivf_pq::index_params& params,                           \
              raft::device_matrix_view<const T, IdxT, row_major> dataset,                    \
-             raft::neighbors::ivf_pq::index<IdxT>* idx)                                     \
+             cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                     \
   {                                                                                         \
-    *idx = raft::neighbors::ivf_pq::build<T, IdxT>(handle, params, dataset);                \
+    *idx = cuvs::neighbors::ivf_pq::build<T, IdxT>(handle, params, dataset);                \
   }                                                                                         \
-  raft::neighbors::ivf_pq::index<IdxT> extend(                                              \
+  cuvs::neighbors::ivf_pq::index<IdxT> extend(                                              \
     raft::resources const& handle,                                                          \
     raft::device_matrix_view<const T, IdxT, row_major> new_vectors,                         \
     std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,                  \
-    const raft::neighbors::ivf_pq::index<IdxT>& idx)                                        \
+    const cuvs::neighbors::ivf_pq::index<IdxT>& idx)                                        \
   {                                                                                         \
-    return raft::neighbors::ivf_pq::extend<T, IdxT>(handle, new_vectors, new_indices, idx); \
+    return cuvs::neighbors::ivf_pq::extend<T, IdxT>(handle, new_vectors, new_indices, idx); \
   }                                                                                         \
   void extend(raft::resources const& handle,                                                \
               raft::device_matrix_view<const T, IdxT, row_major> new_vectors,               \
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,        \
-              raft::neighbors::ivf_pq::index<IdxT>* idx)                                    \
+              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                    \
   {                                                                                         \
-    raft::neighbors::ivf_pq::extend<T, IdxT>(handle, new_vectors, new_indices, idx);        \
+    cuvs::neighbors::ivf_pq::extend<T, IdxT>(handle, new_vectors, new_indices, idx);        \
   }
 
 RAFT_INST_BUILD_EXTEND(float, int64_t);
@@ -56,4 +56,4 @@ RAFT_INST_BUILD_EXTEND(uint8_t, int64_t);
 
 #undef RAFT_INST_BUILD_EXTEND
 
-}  // namespace raft::runtime::neighbors::ivf_pq
+}  // namespace cuvs::runtime::neighbors::ivf_pq

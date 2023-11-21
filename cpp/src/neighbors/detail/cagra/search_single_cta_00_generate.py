@@ -38,10 +38,10 @@ header = """
  *
  */
 
-#include <raft/neighbors/detail/cagra/search_single_cta_kernel-inl.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
+#include <cuvs/neighbors/detail/cagra/search_single_cta_kernel-inl.cuh>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 
-namespace raft::neighbors::cagra::detail::single_cta_search {
+namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 #define instantiate_single_cta_select_and_run(                                              \\
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                 \\
@@ -78,7 +78,7 @@ namespace raft::neighbors::cagra::detail::single_cta_search {
 trailer = """
 #undef instantiate_single_cta_search_kernel
 
-}  // namespace raft::neighbors::cagra::detail::single_cta_search
+}  // namespace cuvs::neighbors::cagra::detail::single_cta_search
 """
 
 mxdim_team = [(128, 8), (256, 16), (512, 32), (1024, 32)]
@@ -105,7 +105,7 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
         with open(path, "w") as f:
             f.write(header)
             f.write(
-                f"instantiate_single_cta_select_and_run(\n  {team}, {mxdim}, {data_t}, {idx_t}, {distance_t}, raft::neighbors::filtering::none_cagra_sample_filter);\n"
+                f"instantiate_single_cta_select_and_run(\n  {team}, {mxdim}, {data_t}, {idx_t}, {distance_t}, cuvs::neighbors::filtering::none_cagra_sample_filter);\n"
             )
 
             f.write(trailer)

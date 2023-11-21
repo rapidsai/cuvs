@@ -16,8 +16,7 @@
 
 #pragma once
 
-namespace raft {
-namespace distance {
+namespace cuvs::distance {
 
 /** enum to tell how to compute distance */
 enum DistanceType : unsigned short {
@@ -104,5 +103,4 @@ struct KernelParams {
 };
 }  // end namespace kernels
 
-};  // namespace distance
-};  // end namespace raft
+};  // namespace cuvs::distance

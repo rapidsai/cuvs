@@ -19,11 +19,11 @@
 #undef RAFT_EXPLICIT_INSTANTIATE_ONLY  // Enable instantiation of search with filter
 #include "../ann_ivf_flat.cuh"
 
-namespace raft::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat {
 
 typedef AnnIVFFlatTest<float, float, std::int64_t> AnnIVFFlatFilterTestF;
 TEST_P(AnnIVFFlatFilterTestF, AnnIVFFlatFilter) { this->testFilter(); }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatFilterTestF, ::testing::ValuesIn(inputs));
 
-}  // namespace raft::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

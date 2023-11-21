@@ -29,7 +29,7 @@
 #include <cuvs/stats/dispersion.cuh>
 #include <raft/core/resources.hpp>
 
-namespace raft::cluster::detail {
+namespace cuvs::cluster::detail {
 
 template <typename value_t, typename idx_t>
 void compute_dispersion(raft::resources const& handle,
@@ -56,7 +56,7 @@ void compute_dispersion(raft::resources const& handle,
 
   params.n_clusters = val;
 
-  raft::cluster::detail::kmeans_fit_predict<value_t, idx_t>(
+  cuvs::cluster::detail::kmeans_fit_predict<value_t, idx_t>(
     handle, params, X, std::nullopt, std::make_optional(centroids_view), labels, residual, n_iter);
 
   detail::countLabels(handle, labels.data_handle(), clusterSizes.data_handle(), n, val, workspace);
@@ -220,7 +220,7 @@ void find_k(raft::resources const& handle,
       raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), best_k[0], d);
 
     params.n_clusters = best_k[0];
-    raft::cluster::detail::kmeans_fit_predict<value_t, idx_t>(handle,
+    cuvs::cluster::detail::kmeans_fit_predict<value_t, idx_t>(handle,
                                                               params,
                                                               X,
                                                               std::nullopt,
@@ -230,4 +230,4 @@ void find_k(raft::resources const& handle,
                                                               n_iter);
   }
 }
-}  // namespace raft::cluster::detail
+}  // namespace cuvs::cluster::detail

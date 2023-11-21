@@ -17,10 +17,10 @@
 
 #include <algorithm>                                        // std::min
 #include <cstdint>                                          // size_t
+#include <cuvs/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
 #include <raft/core/error.hpp>                              // RAFT_EXPECTS
-#include <raft/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
 #include <type_traits>                                      // std::integral_constant
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 /**
  * @brief: Computes minimal common alignment of the rows in a 2D array in bytes
@@ -113,4 +113,4 @@ auto dispatch_layout(bool row_major, int vec_len, F&& f)
   }
 }
 
-};  // namespace raft::distance::detail
+};  // namespace cuvs::distance::detail

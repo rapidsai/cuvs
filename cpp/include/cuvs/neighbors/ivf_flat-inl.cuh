@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <raft/neighbors/detail/ivf_flat_build.cuh>
-#include <raft/neighbors/detail/ivf_flat_search.cuh>
-#include <raft/neighbors/ivf_flat_serialize.cuh>
-#include <raft/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/detail/ivf_flat_build.cuh>
+#include <cuvs/neighbors/detail/ivf_flat_search.cuh>
+#include <cuvs/neighbors/ivf_flat_serialize.cuh>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
 
 #include <raft/core/resources.hpp>
 
@@ -27,7 +27,7 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
-namespace raft::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat {
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -39,7 +39,7 @@ namespace raft::neighbors::ivf_flat {
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -68,7 +68,7 @@ auto build(raft::resources const& handle,
            IdxT n_rows,
            uint32_t dim) -> index<T, IdxT>
 {
-  return raft::neighbors::ivf_flat::detail::build(handle, params, dataset, n_rows, dim);
+  return cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, n_rows, dim);
 }
 
 /**
@@ -86,7 +86,7 @@ auto build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -111,7 +111,7 @@ auto build(raft::resources const& handle,
            const index_params& params,
            raft::device_matrix_view<const T, IdxT, row_major> dataset) -> index<T, IdxT>
 {
-  return raft::neighbors::ivf_flat::detail::build(handle,
+  return cuvs::neighbors::ivf_flat::detail::build(handle,
                                                   params,
                                                   dataset.data_handle(),
                                                   static_cast<IdxT>(dataset.extent(0)),
@@ -128,7 +128,7 @@ auto build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -153,9 +153,9 @@ template <typename T, typename IdxT>
 void build(raft::resources const& handle,
            const index_params& params,
            raft::device_matrix_view<const T, IdxT, row_major> dataset,
-           raft::neighbors::ivf_flat::index<T, IdxT>& idx)
+           cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)
 {
-  idx = raft::neighbors::ivf_flat::detail::build(handle,
+  idx = cuvs::neighbors::ivf_flat::detail::build(handle,
                                                  params,
                                                  dataset.data_handle(),
                                                  static_cast<IdxT>(dataset.extent(0)),
@@ -173,7 +173,7 @@ void build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -203,7 +203,7 @@ auto extend(raft::resources const& handle,
             const IdxT* new_indices,
             IdxT n_rows) -> index<T, IdxT>
 {
-  return raft::neighbors::ivf_flat::detail::extend(
+  return cuvs::neighbors::ivf_flat::detail::extend(
     handle, orig_index, new_vectors, new_indices, n_rows);
 }
 
@@ -221,7 +221,7 @@ auto extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -264,7 +264,7 @@ auto extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -292,7 +292,7 @@ void extend(raft::resources const& handle,
             const IdxT* new_indices,
             IdxT n_rows)
 {
-  raft::neighbors::ivf_flat::detail::extend(handle, index, new_vectors, new_indices, n_rows);
+  cuvs::neighbors::ivf_flat::detail::extend(handle, index, new_vectors, new_indices, n_rows);
 }
 
 /**
@@ -305,7 +305,7 @@ void extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -403,7 +403,7 @@ void search_with_filtering(raft::resources const& handle,
                            rmm::mr::device_memory_resource* mr = nullptr,
                            IvfSampleFilterT sample_filter      = IvfSampleFilterT())
 {
-  raft::neighbors::ivf_flat::detail::search(
+  cuvs::neighbors::ivf_flat::detail::search(
     handle, params, index, queries, n_queries, k, neighbors, distances, mr, sample_filter);
 }
 
@@ -460,7 +460,7 @@ void search(raft::resources const& handle,
             float* distances,
             rmm::mr::device_memory_resource* mr = nullptr)
 {
-  raft::neighbors::ivf_flat::detail::search(handle,
+  cuvs::neighbors::ivf_flat::detail::search(handle,
                                             params,
                                             index,
                                             queries,
@@ -469,7 +469,7 @@ void search(raft::resources const& handle,
                                             neighbors,
                                             distances,
                                             mr,
-                                            raft::neighbors::filtering::none_ivf_sample_filter());
+                                            cuvs::neighbors::filtering::none_ivf_sample_filter());
 }
 
 /**
@@ -594,9 +594,9 @@ void search(raft::resources const& handle,
                         queries,
                         neighbors,
                         distances,
-                        raft::neighbors::filtering::none_ivf_sample_filter());
+                        cuvs::neighbors::filtering::none_ivf_sample_filter());
 }
 
 /** @} */
 
-}  // namespace raft::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

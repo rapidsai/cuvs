@@ -18,7 +18,7 @@
 
 #include "detail/ivf_flat_serialize.cuh"
 
-namespace raft::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat {
 
 /**
  * \defgroup ivf_flat_serialize IVF-Flat Serialize
@@ -110,7 +110,7 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] is input stream
  *
- * @return raft::neighbors::ivf_flat::index<T, IdxT>
+ * @return cuvs::neighbors::ivf_flat::index<T, IdxT>
  */
 template <typename T, typename IdxT>
 index<T, IdxT> deserialize(raft::resources const& handle, std::istream& is)
@@ -141,7 +141,7 @@ index<T, IdxT> deserialize(raft::resources const& handle, std::istream& is)
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
  *
- * @return raft::neighbors::ivf_flat::index<T, IdxT>
+ * @return cuvs::neighbors::ivf_flat::index<T, IdxT>
  */
 template <typename T, typename IdxT>
 index<T, IdxT> deserialize(raft::resources const& handle, const std::string& filename)
@@ -151,4 +151,4 @@ index<T, IdxT> deserialize(raft::resources const& handle, const std::string& fil
 
 /**@}*/
 
-}  // namespace raft::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

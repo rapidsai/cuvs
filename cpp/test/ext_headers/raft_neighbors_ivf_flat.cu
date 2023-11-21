@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/ivf_flat.cuh>
+#include <cuvs/neighbors/ivf_flat.cuh>

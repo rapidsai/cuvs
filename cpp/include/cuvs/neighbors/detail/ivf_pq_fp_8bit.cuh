@@ -18,15 +18,15 @@
 
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
@@ -47,7 +47,7 @@
 
 #include <optional>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 /** 8-bit floating-point storage type.
  *
@@ -125,4 +125,4 @@ struct fp_8bit {
   }
 };
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

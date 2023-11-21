@@ -52,8 +52,8 @@
 #include <cutlass/layout/matrix.h>
 #include <cutlass/layout/tensor.h>
 
-#include <raft/distance/detail/fused_distance_nn/epilogue.cuh>
-#include <raft/distance/detail/fused_distance_nn/persistent_gemm.h>
+#include <cuvs/distance/detail/fused_distance_nn/epilogue.cuh>
+#include <cuvs/distance/detail/fused_distance_nn/persistent_gemm.h>
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 

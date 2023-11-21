@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
+#include <cuvs/neighbors/brute_force.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/brute_force.cuh>
 
 #include <raft_runtime/neighbors/brute_force.hpp>
 
 #include <vector>
 
-namespace raft::runtime::neighbors::brute_force {
+namespace cuvs::runtime::neighbors::brute_force {
 
 #define RAFT_INST_BFKNN(IDX_T, DATA_T, MATRIX_IDX_T, INDEX_LAYOUT, SEARCH_LAYOUT)        \
   void knn(raft::resources const& handle,                                                \
@@ -36,7 +36,7 @@ namespace raft::runtime::neighbors::brute_force {
   {                                                                                      \
     std::vector<raft::device_matrix_view<const DATA_T, MATRIX_IDX_T, INDEX_LAYOUT>> vec; \
     vec.push_back(index);                                                                \
-    raft::neighbors::brute_force::knn(                                                   \
+    cuvs::neighbors::brute_force::knn(                                                   \
       handle, vec, search, indices, distances, metric, metric_arg, global_id_offset);    \
   }
 
@@ -44,4 +44,4 @@ RAFT_INST_BFKNN(int64_t, float, int64_t, raft::row_major, raft::row_major);
 
 #undef RAFT_INST_BFKNN
 
-}  // namespace raft::runtime::neighbors::brute_force
+}  // namespace cuvs::runtime::neighbors::brute_force

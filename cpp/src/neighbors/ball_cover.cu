@@ -15,34 +15,34 @@
  */
 
 #include <cstdint>
-#include <raft/neighbors/ball_cover-inl.cuh>
+#include <cuvs/neighbors/ball_cover-inl.cuh>
 
 #define instantiate_raft_neighbors_ball_cover(idx_t, value_t, int_t, matrix_idx_t)                 \
-  template void raft::neighbors::ball_cover::build_index<idx_t, value_t, int_t, matrix_idx_t>(     \
+  template void cuvs::neighbors::ball_cover::build_index<idx_t, value_t, int_t, matrix_idx_t>(     \
     raft::resources const& handle,                                                                 \
-    raft::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index);      \
+    cuvs::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index);      \
                                                                                                    \
-  template void raft::neighbors::ball_cover::all_knn_query<idx_t, value_t, int_t, matrix_idx_t>(   \
+  template void cuvs::neighbors::ball_cover::all_knn_query<idx_t, value_t, int_t, matrix_idx_t>(   \
     raft::resources const& handle,                                                                 \
-    raft::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index,       \
+    cuvs::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index,       \
     int_t k,                                                                                       \
     idx_t* inds,                                                                                   \
     value_t* dists,                                                                                \
     bool perform_post_filtering,                                                                   \
     float weight);                                                                                 \
                                                                                                    \
-  template void raft::neighbors::ball_cover::all_knn_query<idx_t, value_t, int_t, matrix_idx_t>(   \
+  template void cuvs::neighbors::ball_cover::all_knn_query<idx_t, value_t, int_t, matrix_idx_t>(   \
     raft::resources const& handle,                                                                 \
-    raft::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index,       \
+    cuvs::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index,       \
     raft::device_matrix_view<idx_t, matrix_idx_t, row_major> inds,                                 \
     raft::device_matrix_view<value_t, matrix_idx_t, row_major> dists,                              \
     int_t k,                                                                                       \
     bool perform_post_filtering,                                                                   \
     float weight);                                                                                 \
                                                                                                    \
-  template void raft::neighbors::ball_cover::knn_query<idx_t, value_t, int_t>(                     \
+  template void cuvs::neighbors::ball_cover::knn_query<idx_t, value_t, int_t>(                     \
     raft::resources const& handle,                                                                 \
-    const raft::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t>& index,               \
+    const cuvs::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t>& index,               \
     int_t k,                                                                                       \
     const value_t* query,                                                                          \
     int_t n_query_pts,                                                                             \
@@ -51,9 +51,9 @@
     bool perform_post_filtering,                                                                   \
     float weight);                                                                                 \
                                                                                                    \
-  template void raft::neighbors::ball_cover::knn_query<idx_t, value_t, int_t, matrix_idx_t>(       \
+  template void cuvs::neighbors::ball_cover::knn_query<idx_t, value_t, int_t, matrix_idx_t>(       \
     raft::resources const& handle,                                                                 \
-    const raft::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index, \
+    const cuvs::neighbors::ball_cover::BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index, \
     raft::device_matrix_view<const value_t, matrix_idx_t, row_major> query,                        \
     raft::device_matrix_view<idx_t, matrix_idx_t, row_major> inds,                                 \
     raft::device_matrix_view<value_t, matrix_idx_t, row_major> dists,                              \

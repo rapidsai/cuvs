@@ -20,14 +20,14 @@
 #include "detail/cagra/cagra_search.cuh"
 #include "detail/cagra/graph_core.cuh"
 
+#include <cuvs/neighbors/cagra_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/cagra_types.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
-namespace raft::neighbors::cagra {
+namespace cuvs::neighbors::cagra {
 
 /**
  * @defgroup cagra CUDA ANN Graph-based nearest neighbor search
@@ -49,7 +49,7 @@ namespace raft::neighbors::cagra {
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params build_params;
  *   ivf_pq::search_params search_params
@@ -109,8 +109,8 @@ void build_knn_graph(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
- *   using namespace raft::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
+ *   using namespace cuvs::neighbors::experimental;
  *   // use default index parameters
  *   nn_descent::index_params build_params;
  *   build_params.graph_degree = 128;
@@ -155,7 +155,7 @@ void build_knn_graph(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   cagra::index_params build_params;
  *   auto knn_graph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
  *   // build KNN graph not using `cagra::build_knn_graph`
@@ -245,7 +245,7 @@ void optimize(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -324,14 +324,14 @@ void search(raft::resources const& res,
 
   cagra::detail::search_main<T,
                              internal_IdxT,
-                             decltype(raft::neighbors::filtering::none_cagra_sample_filter()),
+                             decltype(cuvs::neighbors::filtering::none_cagra_sample_filter()),
                              IdxT>(res,
                                    params,
                                    idx,
                                    queries_internal,
                                    neighbors_internal,
                                    distances_internal,
-                                   raft::neighbors::filtering::none_cagra_sample_filter());
+                                   cuvs::neighbors::filtering::none_cagra_sample_filter());
 }
 
 /**
@@ -339,7 +339,7 @@ void search(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -406,13 +406,13 @@ void search_with_filtering(raft::resources const& res,
 
 /** @} */  // end group cagra
 
-}  // namespace raft::neighbors::cagra
+}  // namespace cuvs::neighbors::cagra
 
 // TODO: Remove deprecated experimental namespace in 23.12 release
-namespace raft::neighbors::experimental::cagra {
-using raft::neighbors::cagra::build;
-using raft::neighbors::cagra::build_knn_graph;
-using raft::neighbors::cagra::optimize;
-using raft::neighbors::cagra::search;
-using raft::neighbors::cagra::sort_knn_graph;
-}  // namespace raft::neighbors::experimental::cagra
+namespace cuvs::neighbors::experimental::cagra {
+using cuvs::neighbors::cagra::build;
+using cuvs::neighbors::cagra::build_knn_graph;
+using cuvs::neighbors::cagra::optimize;
+using cuvs::neighbors::cagra::search;
+using cuvs::neighbors::cagra::sort_knn_graph;
+}  // namespace cuvs::neighbors::experimental::cagra

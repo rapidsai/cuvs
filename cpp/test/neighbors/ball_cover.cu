@@ -16,12 +16,12 @@
 
 #include "../test_utils.cuh"
 #include "spatial_data.h"
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ball_cover.cuh>
+#include <cuvs/neighbors/brute_force.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/ball_cover.cuh>
-#include <raft/neighbors/brute_force.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -37,7 +37,7 @@
 #include <iostream>
 #include <vector>
 
-namespace raft::neighbors::ball_cover {
+namespace cuvs::neighbors::ball_cover {
 using namespace std;
 
 template <typename value_idx, typename value_t>
@@ -107,14 +107,14 @@ void compute_bfknn(const raft::resources& handle,
                    uint32_t n_query_rows,
                    uint32_t d,
                    uint32_t k,
-                   const raft::distance::DistanceType metric,
+                   const cuvs::distance::DistanceType metric,
                    value_t* dists,
                    int64_t* inds)
 {
   std::vector<raft::device_matrix_view<const value_t, uint32_t>> input_vec = {
     make_device_matrix_view(X1, n_rows, d)};
 
-  raft::neighbors::brute_force::knn(handle,
+  cuvs::neighbors::brute_force::knn(handle,
                                     input_vec,
                                     make_device_matrix_view(X2, n_query_rows, d),
                                     make_device_matrix_view(inds, n_query_rows, k),
@@ -133,7 +133,7 @@ struct BallCoverInputs {
   value_int n_cols;
   float weight;
   value_int n_query;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
 };
 
 template <typename value_idx, typename value_t, typename value_int = std::uint32_t>
@@ -175,7 +175,7 @@ class BallCoverKNNQueryTest : public ::testing::TestWithParam<BallCoverInputs<va
     rmm::device_uvector<value_idx> d_ref_I(params.n_query * k, resource::get_cuda_stream(handle));
     rmm::device_uvector<value_t> d_ref_D(params.n_query * k, resource::get_cuda_stream(handle));
 
-    if (metric == raft::distance::DistanceType::Haversine) {
+    if (metric == cuvs::distance::DistanceType::Haversine) {
       thrust::transform(
         resource::get_thrust_policy(handle), X.data(), X.data() + X.size(), X.data(), ToRadians());
       thrust::transform(resource::get_thrust_policy(handle),
@@ -279,7 +279,7 @@ class BallCoverAllKNNTest : public ::testing::TestWithParam<BallCoverInputs<valu
     auto X_view = raft::make_device_matrix_view<const value_t, value_int>(
       (const value_t*)X.data(), params.n_rows, params.n_cols);
 
-    if (metric == raft::distance::DistanceType::Haversine) {
+    if (metric == cuvs::distance::DistanceType::Haversine) {
       thrust::transform(
         resource::get_thrust_policy(handle), X.data(), X.data() + X.size(), X.data(), ToRadians());
     }
@@ -349,15 +349,15 @@ typedef BallCoverAllKNNTest<int64_t, float> BallCoverAllKNNTestF;
 typedef BallCoverKNNQueryTest<int64_t, float> BallCoverKNNQueryTestF;
 
 const std::vector<BallCoverInputs<std::uint32_t>> ballcover_inputs = {
-  {11, 5000, 2, 1.0, 10000, raft::distance::DistanceType::Haversine},
-  {25, 10000, 2, 1.0, 5000, raft::distance::DistanceType::Haversine},
-  {2, 10000, 2, 1.0, 5000, raft::distance::DistanceType::L2SqrtUnexpanded},
-  {2, 5000, 2, 1.0, 10000, raft::distance::DistanceType::Haversine},
-  {11, 10000, 2, 1.0, 5000, raft::distance::DistanceType::L2SqrtUnexpanded},
-  {25, 5000, 2, 1.0, 10000, raft::distance::DistanceType::L2SqrtUnexpanded},
-  {5, 8000, 3, 1.0, 10000, raft::distance::DistanceType::L2SqrtUnexpanded},
-  {11, 6000, 3, 1.0, 10000, raft::distance::DistanceType::L2SqrtUnexpanded},
-  {25, 10000, 3, 1.0, 5000, raft::distance::DistanceType::L2SqrtUnexpanded}};
+  {11, 5000, 2, 1.0, 10000, cuvs::distance::DistanceType::Haversine},
+  {25, 10000, 2, 1.0, 5000, cuvs::distance::DistanceType::Haversine},
+  {2, 10000, 2, 1.0, 5000, cuvs::distance::DistanceType::L2SqrtUnexpanded},
+  {2, 5000, 2, 1.0, 10000, cuvs::distance::DistanceType::Haversine},
+  {11, 10000, 2, 1.0, 5000, cuvs::distance::DistanceType::L2SqrtUnexpanded},
+  {25, 5000, 2, 1.0, 10000, cuvs::distance::DistanceType::L2SqrtUnexpanded},
+  {5, 8000, 3, 1.0, 10000, cuvs::distance::DistanceType::L2SqrtUnexpanded},
+  {11, 6000, 3, 1.0, 10000, cuvs::distance::DistanceType::L2SqrtUnexpanded},
+  {25, 10000, 3, 1.0, 5000, cuvs::distance::DistanceType::L2SqrtUnexpanded}};
 
 INSTANTIATE_TEST_CASE_P(BallCoverAllKNNTest,
                         BallCoverAllKNNTestF,
@@ -369,4 +369,4 @@ INSTANTIATE_TEST_CASE_P(BallCoverKNNQueryTest,
 TEST_P(BallCoverAllKNNTestF, Fit) { basicTest(); }
 TEST_P(BallCoverKNNQueryTestF, Fit) { basicTest(); }
 
-}  // namespace raft::neighbors::ball_cover
+}  // namespace cuvs::neighbors::ball_cover

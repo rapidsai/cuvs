@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 #include <raft/core/logger.hpp>  // RAFT_LOG_TRACE
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/neighbors/ivf_flat_types.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
 #include <raft/util/device_loads_stores.cuh>
@@ -30,7 +30,7 @@
 #include <raft/util/vectorized.cuh>
 #include <rmm/cuda_stream_view.hpp>
 
-namespace raft::neighbors::ivf_flat::detail {
+namespace cuvs::neighbors::ivf_flat::detail {
 
 using namespace raft::spatial::knn::detail;  // NOLINT
 
@@ -952,11 +952,11 @@ template <int Capacity,
           typename IdxT,
           typename IvfSampleFilterT,
           typename... Args>
-void launch_with_fixed_consts(raft::distance::DistanceType metric, Args&&... args)
+void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... args)
 {
   switch (metric) {
-    case raft::distance::DistanceType::L2Expanded:
-    case raft::distance::DistanceType::L2Unexpanded:
+    case cuvs::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2Unexpanded:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,
@@ -966,8 +966,8 @@ void launch_with_fixed_consts(raft::distance::DistanceType metric, Args&&... arg
                            IvfSampleFilterT,
                            euclidean_dist<Veclen, T, AccT>,
                            raft::identity_op>({}, {}, std::forward<Args>(args)...);
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2SqrtUnexpanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2SqrtUnexpanded:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,
@@ -977,7 +977,7 @@ void launch_with_fixed_consts(raft::distance::DistanceType metric, Args&&... arg
                            IvfSampleFilterT,
                            euclidean_dist<Veclen, T, AccT>,
                            raft::sqrt_op>({}, {}, std::forward<Args>(args)...);
-    case raft::distance::DistanceType::InnerProduct:
+    case cuvs::distance::DistanceType::InnerProduct:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,
@@ -1087,7 +1087,7 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
-                              const raft::distance::DistanceType metric,
+                              const cuvs::distance::DistanceType metric,
                               const uint32_t n_probes,
                               const uint32_t k,
                               const bool select_min,
@@ -1099,7 +1099,7 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
 {
   const int capacity = bound_by_power_of_two(k);
 
-  auto filter_adapter = raft::neighbors::filtering::ivf_to_sample_filter(
+  auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
   select_interleaved_scan_kernel<T, AccT, IdxT, decltype(filter_adapter)>::run(capacity,
                                                                                index.veclen(),
@@ -1119,4 +1119,4 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                                                                                stream);
 }
 
-}  // namespace raft::neighbors::ivf_flat::detail
+}  // namespace cuvs::neighbors::ivf_flat::detail

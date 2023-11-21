@@ -17,15 +17,15 @@
 #pragma once
 
 #include <common/benchmark.hpp>
-#include <raft/neighbors/cagra.cuh>
-#include <raft/neighbors/sample_filter.cuh>
+#include <cuvs/neighbors/cagra.cuh>
+#include <cuvs/neighbors/sample_filter.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 #include <thrust/sequence.h>
 
 #include <optional>
 
-namespace raft::bench::neighbors {
+namespace cuvs::bench::neighbors {
 
 struct params {
   /** Size of the dataset. */
@@ -77,7 +77,7 @@ struct CagraBench : public fixture {
     raft::random::uniformInt<IdxT>(
       handle, state, knn_graph_.data_handle(), knn_graph_.size(), 0, ps.n_samples - 1);
 
-    auto metric = raft::distance::DistanceType::L2Expanded;
+    auto metric = cuvs::distance::DistanceType::L2Expanded;
 
     auto removed_indices =
       raft::make_device_vector<IdxT, int64_t>(handle, ps.removed_ratio * ps.n_samples);
@@ -86,13 +86,13 @@ struct CagraBench : public fixture {
       thrust::device_pointer_cast(removed_indices.data_handle()),
       thrust::device_pointer_cast(removed_indices.data_handle() + removed_indices.extent(0)));
     removed_indices_bitset_.set(handle, removed_indices.view());
-    index_.emplace(raft::neighbors::cagra::index<T, IdxT>(
+    index_.emplace(cuvs::neighbors::cagra::index<T, IdxT>(
       handle, metric, make_const_mdspan(dataset_.view()), make_const_mdspan(knn_graph_.view())));
   }
 
   void run_benchmark(::benchmark::State& state) override
   {
-    raft::neighbors::cagra::search_params search_params;
+    cuvs::neighbors::cagra::search_params search_params;
     search_params.max_queries       = 1024;
     search_params.itopk_size        = params_.itopk_size;
     search_params.team_size         = 0;
@@ -108,14 +108,14 @@ struct CagraBench : public fixture {
 
     auto queries_v = make_const_mdspan(queries_.view());
     if (params_.removed_ratio > 0) {
-      auto filter = raft::neighbors::filtering::bitset_filter(removed_indices_bitset_.view());
+      auto filter = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset_.view());
       loop_on_state(state, [&]() {
-        raft::neighbors::cagra::search_with_filtering(
+        cuvs::neighbors::cagra::search_with_filtering(
           this->handle, search_params, *this->index_, queries_v, ind_v, dist_v, filter);
       });
     } else {
       loop_on_state(state, [&]() {
-        raft::neighbors::cagra::search(
+        cuvs::neighbors::cagra::search(
           this->handle, search_params, *this->index_, queries_v, ind_v, dist_v);
       });
     }
@@ -145,7 +145,7 @@ struct CagraBench : public fixture {
 
  private:
   const params params_;
-  std::optional<const raft::neighbors::cagra::index<T, IdxT>> index_;
+  std::optional<const cuvs::neighbors::cagra::index<T, IdxT>> index_;
   raft::device_matrix<T, int64_t, row_major> queries_;
   raft::device_matrix<T, int64_t, row_major> dataset_;
   raft::device_matrix<IdxT, int64_t, row_major> knn_graph_;
@@ -203,4 +203,4 @@ const std::vector<params> kCagraInputs = generate_inputs();
   RAFT_BENCH_REGISTER(AnnCagra, #ValT "/" #IdxT, inputs); \
   }
 
-}  // namespace raft::bench::neighbors
+}  // namespace cuvs::bench::neighbors

@@ -22,7 +22,7 @@
 
 #include <vector>
 
-namespace raft::runtime::matrix {
+namespace cuvs::runtime::matrix {
 
 void select_k(const resources& handle,
               raft::device_matrix_view<const float, int64_t, row_major> in_val,
@@ -33,4 +33,4 @@ void select_k(const resources& handle,
 {
   raft::matrix::select_k(handle, in_val, in_idx, out_val, out_idx, select_min);
 }
-}  // namespace raft::runtime::matrix
+}  // namespace cuvs::runtime::matrix

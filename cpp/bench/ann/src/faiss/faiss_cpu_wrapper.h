@@ -35,11 +35,11 @@
 
 namespace {
 
-faiss::MetricType parse_metric_type(raft::bench::ann::Metric metric)
+faiss::MetricType parse_metric_type(cuvs::bench::Metric metric)
 {
-  if (metric == raft::bench::ann::Metric::kInnerProduct) {
+  if (metric == cuvs::bench::Metric::kInnerProduct) {
     return faiss::METRIC_INNER_PRODUCT;
-  } else if (metric == raft::bench::ann::Metric::kEuclidean) {
+  } else if (metric == cuvs::bench::Metric::kEuclidean) {
     return faiss::METRIC_L2;
   } else {
     throw std::runtime_error("faiss supports only metric type of inner product and L2");
@@ -47,7 +47,7 @@ faiss::MetricType parse_metric_type(raft::bench::ann::Metric metric)
 }
 }  // namespace
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
 class FaissCpu : public ANN<T> {
@@ -310,4 +310,4 @@ class FaissCpuFlat : public FaissCpu<T> {
   void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
 };
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

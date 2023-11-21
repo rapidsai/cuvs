@@ -21,7 +21,7 @@
 
 #include <raft/core/bitset.cuh>
 
-namespace raft::neighbors::filtering {
+namespace cuvs::neighbors::filtering {
 /**
  * @brief Filter an index with a bitset
  *
@@ -46,4 +46,4 @@ struct bitset_filter {
   }
 };
 
-}  // namespace raft::neighbors::filtering
+}  // namespace cuvs::neighbors::filtering

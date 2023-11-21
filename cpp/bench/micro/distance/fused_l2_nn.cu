@@ -15,13 +15,13 @@
  */
 
 #include <common/benchmark.hpp>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft::bench::distance {
+namespace cuvs::bench::distance {
 
 struct fusedl2nn_inputs {
   int64_t m, n, k;
@@ -90,7 +90,7 @@ struct fusedl2nn : public fixture {
     state.SetLabel(label_stream.str());
 
     loop_on_state(state, [this]() {
-      raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
+      cuvs::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
                                                             x.data_handle(),
                                                             y.data_handle(),
                                                             x_norm.data_handle(),
@@ -158,4 +158,4 @@ FUSEDL2NN_BENCH(double, int64_t, double);
 FUSEDL2NN_BENCH(float, int64_t, (raft::KeyValuePair<int64_t, float>));
 FUSEDL2NN_BENCH(double, int64_t, (raft::KeyValuePair<int64_t, double>));
 
-}  // namespace raft::bench::distance
+}  // namespace cuvs::bench::distance

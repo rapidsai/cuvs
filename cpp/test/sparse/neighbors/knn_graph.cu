@@ -76,7 +76,7 @@ class KNNGraphTest : public ::testing::TestWithParam<KNNGraphInputs<value_idx, v
     update_device(X.data(), params.X.data(), params.X.size(), stream);
 
     raft::sparse::neighbors::knn_graph(
-      handle, X.data(), params.m, params.n, raft::distance::DistanceType::L2Unexpanded, *out);
+      handle, X.data(), params.m, params.n, cuvs::distance::DistanceType::L2Unexpanded, *out);
 
     rmm::device_scalar<value_idx> sum(stream);
     sum.set_value_to_zero_async(stream);

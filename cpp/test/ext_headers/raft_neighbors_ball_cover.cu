@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/ball_cover.cuh>
+#include <cuvs/neighbors/ball_cover.cuh>

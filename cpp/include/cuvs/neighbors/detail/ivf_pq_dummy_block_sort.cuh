@@ -27,7 +27,7 @@
  *
  */
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 template <typename T, typename IdxT>
 struct dummy_block_sort_t {
@@ -36,4 +36,4 @@ struct dummy_block_sort_t {
   __device__ dummy_block_sort_t(int k, Args...){};
 };
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

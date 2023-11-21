@@ -37,7 +37,7 @@
 #include <type_traits>
 
 namespace raft::matrix {
-using namespace raft::bench;  // NOLINT
+using namespace cuvs::bench;  // NOLINT
 
 template <typename KeyT>
 struct replace_with_mask {
@@ -258,7 +258,7 @@ SELECTION_REGISTER(double, int64_t, kWarpDistributedShm);    // NOLINT
          << input.len << "/" << input.k << "/" << input.use_index_input << "/"            \
          << input.use_memory_pool;                                                        \
     auto* b = ::benchmark::internal::RegisterBenchmarkInternal(                           \
-      new raft::bench::internal::Fixture<SelectK, select::params>(name.str(), input));    \
+      new cuvs::bench::internal::Fixture<SelectK, select::params>(name.str(), input));    \
     b->UseManualTime();                                                                   \
     b->Unit(benchmark::kMillisecond);                                                     \
   }
@@ -279,7 +279,7 @@ const static size_t MAX_MEMORY = 16 * 1024 * 1024 * 1024ULL;
         SELECTION_REGISTER_ALGO_INPUT(KeyT, IdxT, kWarpDistributed, input)     \
         SELECTION_REGISTER_ALGO_INPUT(KeyT, IdxT, kWarpDistributedShm, input)  \
       }                                                                        \
-      if (input.k <= raft::neighbors::detail::kFaissMaxK<IdxT, KeyT>()) {      \
+      if (input.k <= cuvs::neighbors::detail::kFaissMaxK<IdxT, KeyT>()) {      \
         SELECTION_REGISTER_ALGO_INPUT(KeyT, IdxT, kFaissBlockSelect, input)    \
       }                                                                        \
     }                                                                          \

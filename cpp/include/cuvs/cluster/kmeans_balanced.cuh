@@ -51,13 +51,13 @@ namespace cuvs::cluster::kmeans_balanced {
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
- *   raft::cluster::kmeans_balanced_params params;
+ *   cuvs::cluster::kmeans_balanced_params params;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
- *   raft::cluster::kmeans_balanced::fit(handle, params, X, centroids.view());
+ *   cuvs::cluster::kmeans_balanced::fit(handle, params, X, centroids.view());
  * @endcode
  *
  * @tparam DataT Type of the input data.
@@ -103,13 +103,13 @@ void fit(const raft::resources& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
- *   raft::cluster::kmeans_balanced_params params;
+ *   cuvs::cluster::kmeans_balanced_params params;
  *   auto labels = raft::make_device_vector<float, int>(handle, n_rows);
- *   raft::cluster::kmeans_balanced::predict(handle, params, X, centroids, labels);
+ *   cuvs::cluster::kmeans_balanced::predict(handle, params, X, centroids, labels);
  * @endcode
  *
  * @tparam DataT Type of the input data.
@@ -166,14 +166,14 @@ void predict(const raft::resources& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
- *   raft::cluster::kmeans_balanced_params params;
+ *   cuvs::cluster::kmeans_balanced_params params;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *   auto labels = raft::make_device_vector<float, int>(handle, n_rows);
- *   raft::cluster::kmeans_balanced::fit_predict(
+ *   cuvs::cluster::kmeans_balanced::fit_predict(
  *       handle, params, X, centroids.view(), labels.view());
  * @endcode
  *
@@ -205,8 +205,8 @@ void fit_predict(const raft::resources& handle,
 {
   auto centroids_const = raft::make_device_matrix_view<const MathT, IndexT>(
     centroids.data_handle(), centroids.extent(0), centroids.extent(1));
-  raft::cluster::kmeans_balanced::fit(handle, params, X, centroids, mapping_op);
-  raft::cluster::kmeans_balanced::predict(handle, params, X, centroids_const, labels, mapping_op);
+  cuvs::cluster::kmeans_balanced::fit(handle, params, X, centroids, mapping_op);
+  cuvs::cluster::kmeans_balanced::predict(handle, params, X, centroids_const, labels, mapping_op);
 }
 
 namespace helpers {
@@ -220,15 +220,15 @@ namespace helpers {
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
- *   raft::cluster::kmeans_balanced_params params;
+ *   cuvs::cluster::kmeans_balanced_params params;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, n_samples);
  *   auto sizes = raft::make_device_vector<int, int>(handle, n_clusters);
- *   raft::cluster::kmeans_balanced::build_clusters(
+ *   cuvs::cluster::kmeans_balanced::build_clusters(
  *       handle, params, X, centroids.view(), labels.view(), sizes.view());
  * @endcode
  *
@@ -301,12 +301,12 @@ void build_clusters(const raft::resources& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
  *   ...
  *   raft::handle_t handle;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *   auto sizes = raft::make_device_vector<int, int>(handle, n_clusters);
- *   raft::cluster::kmeans_balanced::calc_centers_and_sizes(
+ *   cuvs::cluster::kmeans_balanced::calc_centers_and_sizes(
  *       handle, X, labels, centroids.view(), sizes.view(), true);
  * @endcode
  *

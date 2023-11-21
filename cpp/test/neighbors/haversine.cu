@@ -15,10 +15,10 @@
  */
 
 #include "../test_utils.cuh"
+#include <cuvs/distance/distance_types.hpp>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/spatial/knn/detail/haversine_distance.cuh>
 #include <rmm/device_uvector.hpp>
 #include <vector>

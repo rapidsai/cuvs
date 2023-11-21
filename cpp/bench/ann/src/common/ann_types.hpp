@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 enum Objective {
   THROUGHPUT,  // See how many vectors we can push through
@@ -43,9 +43,9 @@ enum class Metric {
 inline auto parse_metric(const std::string& metric_str) -> Metric
 {
   if (metric_str == "inner_product") {
-    return raft::bench::ann::Metric::kInnerProduct;
+    return cuvs::bench::Metric::kInnerProduct;
   } else if (metric_str == "euclidean") {
-    return raft::bench::ann::Metric::kEuclidean;
+    return cuvs::bench::Metric::kEuclidean;
   } else {
     throw std::runtime_error("invalid metric: '" + metric_str + "'");
   }
@@ -127,12 +127,11 @@ class ANN : public AnnBase {
   virtual void set_search_dataset(const T* /*dataset*/, size_t /*nrow*/){};
 };
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench
 
-#define REGISTER_ALGO_INSTANCE(DataT)                                                            \
-  template auto raft::bench::ann::create_algo<DataT>(                                            \
-    const std::string&, const std::string&, int, const nlohmann::json&, const std::vector<int>&) \
-    ->std::unique_ptr<raft::bench::ann::ANN<DataT>>;                                             \
-  template auto raft::bench::ann::create_search_param<DataT>(const std::string&,                 \
-                                                             const nlohmann::json&)              \
-    ->std::unique_ptr<typename raft::bench::ann::ANN<DataT>::AnnSearchParam>;
+#define REGISTER_ALGO_INSTANCE(DataT)                                                              \
+  template auto cuvs::bench::create_algo<DataT>(                                                   \
+    const std::string&, const std::string&, int, const nlohmann::json&, const std::vector<int>&)   \
+    ->std::unique_ptr<cuvs::bench::ANN<DataT>>;                                                    \
+  template auto cuvs::bench::create_search_param<DataT>(const std::string&, const nlohmann::json&) \
+    ->std::unique_ptr<typename cuvs::bench::ANN<DataT>::AnnSearchParam>;

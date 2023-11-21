@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #pragma once
-#include <raft/distance/detail/pairwise_distance_base.cuh>
+#include <cuvs/distance/detail/pairwise_distance_base.cuh>
 #include <raft/linalg/contractions.cuh>
 #include <raft/util/cuda_utils.cuh>
 

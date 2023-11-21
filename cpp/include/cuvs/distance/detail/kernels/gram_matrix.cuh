@@ -16,11 +16,11 @@
 
 #pragma once
 
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
 // #include <raft/sparse/detail/cusparse_wrappers.h>
 #include <raft/sparse/distance/distance.cuh>
 #include <raft/sparse/linalg/spmm.cuh>
@@ -28,7 +28,7 @@
 #include <raft/linalg/detail/cublas_wrappers.hpp>
 #include <raft/linalg/gemm.cuh>
 
-namespace raft::distance::kernels::detail {
+namespace cuvs::distance::kernels::detail {
 
 template <typename math_t>
 using dense_input_matrix_view_t = raft::device_matrix_view<const math_t, int, layout_stride>;
@@ -476,14 +476,14 @@ class GramMatrixBase {
       auto out_row_major = raft::make_device_matrix_view<math_t, int, raft::row_major>(
         out.data_handle(), out.extent(1), out.extent(0));
       raft::sparse::distance::pairwise_distance(
-        handle, x2, x1, out_row_major, raft::distance::DistanceType::InnerProduct, 0.0);
+        handle, x2, x1, out_row_major, cuvs::distance::DistanceType::InnerProduct, 0.0);
     } else {
       auto out_row_major = raft::make_device_matrix_view<math_t, int, raft::row_major>(
         out.data_handle(), out.extent(0), out.extent(1));
       raft::sparse::distance::pairwise_distance(
-        handle, x1, x2, out_row_major, raft::distance::DistanceType::InnerProduct, 0.0);
+        handle, x1, x2, out_row_major, cuvs::distance::DistanceType::InnerProduct, 0.0);
     }
   }
 };
 
-};  // end namespace raft::distance::kernels::detail
+};  // end namespace cuvs::distance::kernels::detail

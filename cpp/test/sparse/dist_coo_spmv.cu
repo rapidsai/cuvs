@@ -17,9 +17,9 @@
 #include <gtest/gtest.h>
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/operators.cuh>
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/detail/cusparse_wrappers.h>
 #include <raft/util/cudart_utils.hpp>
@@ -49,7 +49,7 @@ struct InputConfiguration {
 
   std::vector<value_t> out_dists_ref_h;
 
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
 
   float metric_arg = 0.0;
 };
@@ -139,25 +139,25 @@ class SparseDistanceCOOSPMVTest
   void run_spmv()
   {
     switch (params.input_configuration.metric) {
-      case raft::distance::DistanceType::InnerProduct:
+      case cuvs::distance::DistanceType::InnerProduct:
         compute_dist(raft::mul_op(), raft::add_op(), raft::atomic_add_op(), true);
         break;
-      case raft::distance::DistanceType::L2Unexpanded:
+      case cuvs::distance::DistanceType::L2Unexpanded:
         compute_dist(raft::sqdiff_op(), raft::add_op(), raft::atomic_add_op());
         break;
-      case raft::distance::DistanceType::Canberra:
+      case cuvs::distance::DistanceType::Canberra:
         compute_dist(
           [] __device__(value_t a, value_t b) { return fabsf(a - b) / (fabsf(a) + fabsf(b)); },
           raft::add_op(),
           raft::atomic_add_op());
         break;
-      case raft::distance::DistanceType::L1:
+      case cuvs::distance::DistanceType::L1:
         compute_dist(absdiff_op(), raft::add_op(), raft::atomic_add_op());
         break;
-      case raft::distance::DistanceType::Linf:
+      case cuvs::distance::DistanceType::Linf:
         compute_dist(absdiff_op(), raft::max_op(), raft::atomic_max_op());
         break;
-      case raft::distance::DistanceType::LpUnexpanded: {
+      case cuvs::distance::DistanceType::LpUnexpanded: {
         compute_dist(
           raft::compose_op(raft::pow_const_op<value_t>(params.input_configuration.metric_arg),
                            raft::sub_op()),
@@ -256,7 +256,7 @@ const InputConfiguration<int, float> input_inner_product = {
   {0, 1, 0, 1, 0, 1, 0, 1},
   {1.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f},
   {5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0},
-  raft::distance::DistanceType::InnerProduct,
+  cuvs::distance::DistanceType::InnerProduct,
   0.0};
 
 const InputConfiguration<int, float> input_l2_unexpanded = {
@@ -283,7 +283,7 @@ const InputConfiguration<int, float> input_l2_unexpanded = {
     1832.0,
     0.0,
   },
-  raft::distance::DistanceType::L2Unexpanded,
+  cuvs::distance::DistanceType::L2Unexpanded,
   0.0};
 
 const InputConfiguration<int, float> input_canberra = {
@@ -396,7 +396,7 @@ const InputConfiguration<int, float> input_canberra = {
    6.903282911791188,
    7.0,
    0.0},
-  raft::distance::DistanceType::Canberra,
+  cuvs::distance::DistanceType::Canberra,
   0.0};
 
 const InputConfiguration<int, float> input_lp_unexpanded = {
@@ -509,7 +509,7 @@ const InputConfiguration<int, float> input_lp_unexpanded = {
    1.0083692448135637,
    1.3661374102525012,
    0.0},
-  raft::distance::DistanceType::LpUnexpanded,
+  cuvs::distance::DistanceType::LpUnexpanded,
   2.0};
 
 const InputConfiguration<int, float> input_linf = {
@@ -622,7 +622,7 @@ const InputConfiguration<int, float> input_linf = {
    0.5079750812968089,
    0.8429599432532096,
    0.0},
-  raft::distance::DistanceType::Linf,
+  cuvs::distance::DistanceType::Linf,
   0.0};
 
 const InputConfiguration<int, float> input_l1 = {4,
@@ -648,7 +648,7 @@ const InputConfiguration<int, float> input_l1 = {4,
                                                    0.84454,
                                                    0.0,
                                                  },
-                                                 raft::distance::DistanceType::L1,
+                                                 cuvs::distance::DistanceType::L1,
                                                  0.0};
 
 // test dense smem strategy

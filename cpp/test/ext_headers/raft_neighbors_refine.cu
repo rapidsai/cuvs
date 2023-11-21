@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/refine.cuh>
+#include <cuvs/neighbors/refine.cuh>

@@ -46,7 +46,7 @@ struct distance_graph_impl {
            const value_t* X,
            size_t m,
            size_t n,
-           raft::distance::DistanceType metric,
+           cuvs::distance::DistanceType metric,
            rmm::device_uvector<value_idx>& indptr,
            rmm::device_uvector<value_idx>& indices,
            rmm::device_uvector<value_t>& data,
@@ -59,12 +59,12 @@ struct distance_graph_impl {
  * @tparam value_t
  */
 template <typename value_idx, typename value_t>
-struct distance_graph_impl<raft::cluster::LinkageDistance::KNN_GRAPH, value_idx, value_t> {
+struct distance_graph_impl<cuvs::cluster::LinkageDistance::KNN_GRAPH, value_idx, value_t> {
   void run(raft::resources const& handle,
            const value_t* X,
            size_t m,
            size_t n,
-           raft::distance::DistanceType metric,
+           cuvs::distance::DistanceType metric,
            rmm::device_uvector<value_idx>& indptr,
            rmm::device_uvector<value_idx>& indices,
            rmm::device_uvector<value_t>& data,
@@ -133,7 +133,7 @@ void pairwise_distances(const raft::resources& handle,
                         const value_t* X,
                         size_t m,
                         size_t n,
-                        raft::distance::DistanceType metric,
+                        cuvs::distance::DistanceType metric,
                         value_idx* indptr,
                         value_idx* indices,
                         value_t* data)
@@ -176,12 +176,12 @@ void pairwise_distances(const raft::resources& handle,
  * @tparam value_t
  */
 template <typename value_idx, typename value_t>
-struct distance_graph_impl<raft::cluster::LinkageDistance::PAIRWISE, value_idx, value_t> {
+struct distance_graph_impl<cuvs::cluster::LinkageDistance::PAIRWISE, value_idx, value_t> {
   void run(const raft::resources& handle,
            const value_t* X,
            size_t m,
            size_t n,
-           raft::distance::DistanceType metric,
+           cuvs::distance::DistanceType metric,
            rmm::device_uvector<value_idx>& indptr,
            rmm::device_uvector<value_idx>& indices,
            rmm::device_uvector<value_t>& data,
@@ -214,12 +214,12 @@ struct distance_graph_impl<raft::cluster::LinkageDistance::PAIRWISE, value_idx, 
  * @param[out] c constant 'c' used for nearest neighbors-based distances
  *             which will guarantee k <= log(n) + c
  */
-template <typename value_idx, typename value_t, raft::cluster::LinkageDistance dist_type>
+template <typename value_idx, typename value_t, cuvs::cluster::LinkageDistance dist_type>
 void get_distance_graph(raft::resources const& handle,
                         const value_t* X,
                         size_t m,
                         size_t n,
-                        raft::distance::DistanceType metric,
+                        cuvs::distance::DistanceType metric,
                         rmm::device_uvector<value_idx>& indptr,
                         rmm::device_uvector<value_idx>& indices,
                         rmm::device_uvector<value_t>& data,

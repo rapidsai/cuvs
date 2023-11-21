@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/ivf_pq-inl.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>  // raft::neighbors::ivf_pq::index
+#include <cuvs/neighbors/ivf_pq-inl.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>  // cuvs::neighbors::ivf_pq::index
 
 #define instantiate_raft_neighbors_ivf_pq_build(T, IdxT)                                 \
-  template raft::neighbors::ivf_pq::index<IdxT> raft::neighbors::ivf_pq::build<T, IdxT>( \
+  template cuvs::neighbors::ivf_pq::index<IdxT> cuvs::neighbors::ivf_pq::build<T, IdxT>( \
     raft::resources const& handle,                                                       \
-    const raft::neighbors::ivf_pq::index_params& params,                                 \
+    const cuvs::neighbors::ivf_pq::index_params& params,                                 \
     raft::device_matrix_view<const T, IdxT, row_major> dataset);                         \
                                                                                          \
-  template auto raft::neighbors::ivf_pq::build(                                          \
+  template auto cuvs::neighbors::ivf_pq::build(                                          \
     raft::resources const& handle,                                                       \
-    const raft::neighbors::ivf_pq::index_params& params,                                 \
+    const cuvs::neighbors::ivf_pq::index_params& params,                                 \
     const T* dataset,                                                                    \
     IdxT n_rows,                                                                         \
     uint32_t dim)                                                                        \
-    ->raft::neighbors::ivf_pq::index<IdxT>;
+    ->cuvs::neighbors::ivf_pq::index<IdxT>;
 
 instantiate_raft_neighbors_ivf_pq_build(float, int64_t);
 

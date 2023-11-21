@@ -25,17 +25,17 @@
  */
 
 #include <cstdint>
-#include <raft/neighbors/brute_force-inl.cuh>
+#include <cuvs/neighbors/brute_force-inl.cuh>
 
 #define instantiate_raft_neighbors_brute_force_fused_l2_knn(            \
   value_t, idx_t, idx_layout, query_layout)                             \
-  template void raft::neighbors::brute_force::fused_l2_knn(             \
+  template void cuvs::neighbors::brute_force::fused_l2_knn(             \
     raft::resources const& handle,                                      \
     raft::device_matrix_view<const value_t, idx_t, idx_layout> index,   \
     raft::device_matrix_view<const value_t, idx_t, query_layout> query, \
     raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,         \
     raft::device_matrix_view<value_t, idx_t, row_major> out_dists,      \
-    raft::distance::DistanceType metric);
+    cuvs::distance::DistanceType metric);
 
 instantiate_raft_neighbors_brute_force_fused_l2_knn(float,
                                                     int64_t,

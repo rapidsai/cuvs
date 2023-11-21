@@ -16,8 +16,8 @@
 
 #include "common.cuh"
 
-namespace raft::runtime::random {
+namespace cuvs::runtime::random {
 
 FUNC_DEF(int, float);
 
-}  // namespace raft::runtime::random
+}  // namespace cuvs::runtime::random

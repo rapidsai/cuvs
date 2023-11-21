@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 
 namespace raft::runtime::distance {
 

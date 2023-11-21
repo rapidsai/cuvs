@@ -17,46 +17,46 @@
 #include <sstream>
 #include <string>
 
+#include <cuvs/neighbors/cagra_serialize.cuh>
+#include <cuvs/neighbors/cagra_types.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/neighbors/cagra_serialize.cuh>
-#include <raft/neighbors/cagra_types.hpp>
 #include <raft_runtime/neighbors/cagra.hpp>
 
-namespace raft::runtime::neighbors::cagra {
+namespace cuvs::runtime::neighbors::cagra {
 
 #define RAFT_INST_CAGRA_SERIALIZE(DTYPE)                                             \
   void serialize_file(raft::resources const& handle,                                 \
                       const std::string& filename,                                   \
-                      const raft::neighbors::cagra::index<DTYPE, uint32_t>& index,   \
+                      const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,   \
                       bool include_dataset)                                          \
   {                                                                                  \
-    raft::neighbors::cagra::serialize(handle, filename, index, include_dataset);     \
+    cuvs::neighbors::cagra::serialize(handle, filename, index, include_dataset);     \
   };                                                                                 \
                                                                                      \
   void deserialize_file(raft::resources const& handle,                               \
                         const std::string& filename,                                 \
-                        raft::neighbors::cagra::index<DTYPE, uint32_t>* index)       \
+                        cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)       \
   {                                                                                  \
     if (!index) { RAFT_FAIL("Invalid index pointer"); }                              \
-    *index = raft::neighbors::cagra::deserialize<DTYPE, uint32_t>(handle, filename); \
+    *index = cuvs::neighbors::cagra::deserialize<DTYPE, uint32_t>(handle, filename); \
   };                                                                                 \
   void serialize(raft::resources const& handle,                                      \
                  std::string& str,                                                   \
-                 const raft::neighbors::cagra::index<DTYPE, uint32_t>& index,        \
+                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,        \
                  bool include_dataset)                                               \
   {                                                                                  \
     std::stringstream os;                                                            \
-    raft::neighbors::cagra::serialize(handle, os, index, include_dataset);           \
+    cuvs::neighbors::cagra::serialize(handle, os, index, include_dataset);           \
     str = os.str();                                                                  \
   }                                                                                  \
                                                                                      \
   void deserialize(raft::resources const& handle,                                    \
                    const std::string& str,                                           \
-                   raft::neighbors::cagra::index<DTYPE, uint32_t>* index)            \
+                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)            \
   {                                                                                  \
     std::istringstream is(str);                                                      \
     if (!index) { RAFT_FAIL("Invalid index pointer"); }                              \
-    *index = raft::neighbors::cagra::deserialize<DTYPE, uint32_t>(handle, is);       \
+    *index = cuvs::neighbors::cagra::deserialize<DTYPE, uint32_t>(handle, is);       \
   }
 
 RAFT_INST_CAGRA_SERIALIZE(float);
@@ -64,4 +64,4 @@ RAFT_INST_CAGRA_SERIALIZE(int8_t);
 RAFT_INST_CAGRA_SERIALIZE(uint8_t);
 
 #undef RAFT_INST_CAGRA_SERIALIZE
-}  // namespace raft::runtime::neighbors::cagra
+}  // namespace cuvs::runtime::neighbors::cagra

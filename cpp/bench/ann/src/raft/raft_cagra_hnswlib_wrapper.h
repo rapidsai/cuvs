@@ -19,7 +19,7 @@
 #include "raft_cagra_wrapper.h"
 #include <memory>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, typename IdxT>
 class RaftCagraHnswlib : public ANN<T> {
@@ -117,4 +117,4 @@ void RaftCagraHnswlib<T, IdxT>::search(
   hnswlib_search_->search(queries, batch_size, k, neighbors, distances);
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

@@ -15,11 +15,11 @@
  */
 
 #include "../test_utils.cuh"
+#include <cuvs/distance/detail/fused_l2_nn.cuh>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <gtest/gtest.h>
 #include <raft/core/kvp.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/detail/fused_l2_nn.cuh>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>

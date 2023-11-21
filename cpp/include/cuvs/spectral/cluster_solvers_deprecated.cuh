@@ -16,7 +16,7 @@
 
 /**
  * Note: This file is deprecated and will be removed in a future release
- * Please use include/raft/cluster/kmeans.cuh instead
+ * Please use include/cuvs/cluster/kmeans.cuh instead
  */
 
 #ifndef __CLUSTER_SOLVERS_deprecated_H
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include <raft/cluster/kmeans_deprecated.cuh>
+#include <cuvs/cluster/kmeans_deprecated.cuh>
 #include <utility>  // for std::pair
 
 namespace raft {
@@ -63,7 +63,7 @@ struct kmeans_solver_deprecated_t {
     value_type_t residual{};
     index_type_t iters{};
 
-    raft::cluster::kmeans(handle,
+    cuvs::cluster::kmeans(handle,
                           n_obs_vecs,
                           dim,
                           config_.n_clusters,

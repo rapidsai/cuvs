@@ -16,27 +16,27 @@
 
 #pragma once
 
-#include <raft/core/logger.hpp>  // RAFT_LOG_TRACE
+#include <cuvs/distance/distance_types.hpp>                     // is_min_close, DistanceType
+#include <cuvs/neighbors/detail/ivf_flat_interleaved_scan.cuh>  // interleaved_scan
+#include <cuvs/neighbors/ivf_flat_types.hpp>                    // cuvs::neighbors::ivf_flat::index
+#include <cuvs/neighbors/sample_filter_types.hpp>               // none_ivf_sample_filter
+#include <raft/core/logger.hpp>                                 // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>                              // raft::resources
-#include <raft/distance/distance_types.hpp>                     // is_min_close, DistanceType
-#include <raft/linalg/gemm.cuh>                                 // raft::linalg::gemm
-#include <raft/linalg/norm.cuh>                                 // raft::linalg::norm
-#include <raft/linalg/unary_op.cuh>                             // raft::linalg::unary_op
-#include <raft/matrix/detail/select_k.cuh>                      // matrix::detail::select_k
-#include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>  // interleaved_scan
-#include <raft/neighbors/ivf_flat_types.hpp>                    // raft::neighbors::ivf_flat::index
-#include <raft/neighbors/sample_filter_types.hpp>               // none_ivf_sample_filter
-#include <raft/spatial/knn/detail/ann_utils.cuh>                // utils::mapping
-#include <rmm/mr/device/per_device_resource.hpp>                // rmm::device_memory_resource
+#include <raft/core/resources.hpp>                // raft::resources
+#include <raft/linalg/gemm.cuh>                   // raft::linalg::gemm
+#include <raft/linalg/norm.cuh>                   // raft::linalg::norm
+#include <raft/linalg/unary_op.cuh>               // raft::linalg::unary_op
+#include <raft/matrix/detail/select_k.cuh>        // matrix::detail::select_k
+#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping
+#include <rmm/mr/device/per_device_resource.hpp>  // rmm::device_memory_resource
 
-namespace raft::neighbors::ivf_flat::detail {
+namespace cuvs::neighbors::ivf_flat::detail {
 
 using namespace raft::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
-                 const raft::neighbors::ivf_flat::index<T, IdxT>& index,
+                 const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,
                  const T* queries,
                  uint32_t n_queries,
                  uint32_t queries_offset,
@@ -83,8 +83,8 @@ void search_impl(raft::resources const& handle,
 
   // todo(lsugy): raft distance? (if performance is similar/better than gemm)
   switch (index.metric()) {
-    case raft::distance::DistanceType::L2Expanded:
-    case raft::distance::DistanceType::L2SqrtExpanded: {
+    case cuvs::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded: {
       alpha = -2.0f;
       beta  = 1.0f;
       raft::linalg::rowNorm(query_norm_dev.data(),
@@ -204,10 +204,10 @@ void search_impl(raft::resources const& handle,
   }
 }
 
-/** See raft::neighbors::ivf_flat::search docs */
+/** See cuvs::neighbors::ivf_flat::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 inline void search(raft::resources const& handle,
                    const search_params& params,
                    const index<T, IdxT>& index,
@@ -249,7 +249,7 @@ inline void search(raft::resources const& handle,
                                                   offset_q,
                                                   k,
                                                   n_probes,
-                                                  raft::distance::is_min_close(index.metric()),
+                                                  cuvs::distance::is_min_close(index.metric()),
                                                   neighbors + offset_q * k,
                                                   distances + offset_q * k,
                                                   mr,
@@ -257,4 +257,4 @@ inline void search(raft::resources const& handle,
   }
 }
 
-}  // namespace raft::neighbors::ivf_flat::detail
+}  // namespace cuvs::neighbors::ivf_flat::detail

@@ -37,8 +37,8 @@
 #include <cutlass/matrix_coord.h>
 #include <cutlass/tensor_view.h>
 
-#include <raft/distance/detail/fused_distance_nn/epilogue_elementwise.cuh>  // FusedDistanceNNEpilogueElementwise
-#include <raft/distance/detail/fused_distance_nn/gemm.h>                    // FusedDistanceNNGemm
+#include <cuvs/distance/detail/fused_distance_nn/epilogue_elementwise.cuh>  // FusedDistanceNNEpilogueElementwise
+#include <cuvs/distance/detail/fused_distance_nn/gemm.h>                    // FusedDistanceNNGemm
 #include <raft/util/cudart_utils.hpp>   // getMultiProcessorCount
 #include <raft/util/cutlass_utils.cuh>  // RAFT_CUTLASS_TRY
 

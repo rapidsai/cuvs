@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/distance/distance.cuh>
+#include <cuvs/distance/distance.cuh>

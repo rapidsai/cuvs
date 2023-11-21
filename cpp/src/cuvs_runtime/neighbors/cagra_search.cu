@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/cagra.cuh>
+#include <cuvs/neighbors/cagra.cuh>
 #include <raft_runtime/neighbors/cagra.hpp>
 
-namespace raft::runtime::neighbors::cagra {
+namespace cuvs::runtime::neighbors::cagra {
 
 #define RAFT_INST_CAGRA_SEARCH(T, IdxT)                                                            \
   void search(raft::resources const& handle,                                                       \
-              raft::neighbors::cagra::search_params const& params,                                 \
-              const raft::neighbors::cagra::index<T, IdxT>& index,                                 \
+              cuvs::neighbors::cagra::search_params const& params,                                 \
+              const cuvs::neighbors::cagra::index<T, IdxT>& index,                                 \
               raft::device_matrix_view<const T, int64_t, row_major> queries,                       \
               raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,                        \
               raft::device_matrix_view<float, int64_t, row_major> distances)                       \
   {                                                                                                \
-    raft::neighbors::cagra::search<T, IdxT>(handle, params, index, queries, neighbors, distances); \
+    cuvs::neighbors::cagra::search<T, IdxT>(handle, params, index, queries, neighbors, distances); \
   }
 
 RAFT_INST_CAGRA_SEARCH(float, uint32_t);
@@ -36,4 +36,4 @@ RAFT_INST_CAGRA_SEARCH(uint8_t, uint32_t);
 
 #undef RAFT_INST_CAGRA_SEARCH
 
-}  // namespace raft::runtime::neighbors::cagra
+}  // namespace cuvs::runtime::neighbors::cagra

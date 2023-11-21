@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <raft/neighbors/detail/ivf_flat_build.cuh>
-#include <raft/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/detail/ivf_flat_build.cuh>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-namespace raft::neighbors::ivf_flat::helpers {
+namespace cuvs::neighbors::ivf_flat::helpers {
 using namespace raft::spatial::knn::detail;  // NOLINT
 /**
  * @defgroup ivf_flat_helpers Helper functions for manipulationg IVF Flat Index
@@ -66,7 +66,7 @@ void pack(
   uint32_t offset,
   device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, row_major> list_data)
 {
-  raft::neighbors::ivf_flat::detail::pack_list_data<T, IdxT>(res, codes, veclen, offset, list_data);
+  cuvs::neighbors::ivf_flat::detail::pack_list_data<T, IdxT>(res, codes, veclen, offset, list_data);
 }
 
 /**
@@ -105,7 +105,7 @@ void unpack(
   uint32_t offset,
   device_matrix_view<T, uint32_t, row_major> codes)
 {
-  raft::neighbors::ivf_flat::detail::unpack_list_data<T, IdxT>(
+  cuvs::neighbors::ivf_flat::detail::unpack_list_data<T, IdxT>(
     res, list_data, veclen, offset, codes);
 }
 }  // namespace codepacker
@@ -118,7 +118,7 @@ void unpack(
  * Usage example:
  * @code{.cpp}
  *   raft::resources res;
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // initialize an empty index
@@ -142,4 +142,4 @@ void reset_index(const raft::resources& res, index<T, IdxT>* index)
   utils::memzero(index->inds_ptrs().data_handle(), index->inds_ptrs().size(), stream);
 }
 /** @} */
-}  // namespace raft::neighbors::ivf_flat::helpers
+}  // namespace cuvs::neighbors::ivf_flat::helpers

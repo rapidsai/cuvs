@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/linalg/norm.cuh>
 #include <thrust/for_each.h>
 #include <thrust/tuple.h>
 
-namespace raft::runtime::distance {
+namespace cuvs::runtime::distance {
 
 template <typename IndexT, typename DataT>
 struct KeyValueIndexOp {
@@ -56,7 +56,7 @@ void compute_fused_l2_nn_min_arg(raft::resources const& handle,
   raft::linalg::rowNorm(
     y_norms.data(), y, k, n, raft::linalg::L2Norm, true, resource::get_cuda_stream(handle));
 
-  raft::distance::fusedL2NNMinReduce(kvp.data_handle(),
+  cuvs::distance::fusedL2NNMinReduce(kvp.data_handle(),
                                      x,
                                      y,
                                      x_norms.data(),
@@ -102,4 +102,4 @@ void fused_l2_nn_min_arg(raft::resources const& handle,
   compute_fused_l2_nn_min_arg<double, int>(handle, min, x, y, m, n, k, sqrt);
 }
 
-}  // end namespace raft::runtime::distance
+}  // end namespace cuvs::runtime::distance

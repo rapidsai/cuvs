@@ -16,6 +16,13 @@
 #pragma once
 
 #include <cassert>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/cagra.cuh>
+#include <cuvs/neighbors/cagra_serialize.cuh>
+#include <cuvs/neighbors/cagra_types.hpp>
+#include <cuvs/neighbors/detail/cagra/cagra_build.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/nn_descent_types.hpp>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -24,14 +31,7 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/neighbors/cagra.cuh>
-#include <raft/neighbors/cagra_serialize.cuh>
-#include <raft/neighbors/cagra_types.hpp>
-#include <raft/neighbors/detail/cagra/cagra_build.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-#include <raft/neighbors/nn_descent_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 #include <stdexcept>
@@ -48,7 +48,7 @@
 #include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 enum class AllocatorType { HostPinned, HostHugePage, Device };
 template <typename T, typename IdxT>
@@ -57,19 +57,19 @@ class RaftCagra : public ANN<T> {
   using typename ANN<T>::AnnSearchParam;
 
   struct SearchParam : public AnnSearchParam {
-    raft::neighbors::experimental::cagra::search_params p;
+    cuvs::neighbors::experimental::cagra::search_params p;
     AllocatorType graph_mem   = AllocatorType::Device;
     AllocatorType dataset_mem = AllocatorType::Device;
     auto needs_dataset() const -> bool override { return true; }
   };
 
   struct BuildParam {
-    raft::neighbors::cagra::index_params cagra_params;
-    std::optional<raft::neighbors::experimental::nn_descent::index_params> nn_descent_params =
+    cuvs::neighbors::cagra::index_params cagra_params;
+    std::optional<cuvs::neighbors::experimental::nn_descent::index_params> nn_descent_params =
       std::nullopt;
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
-    std::optional<raft::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
-    std::optional<raft::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
+    std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
+    std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
   };
 
   RaftCagra(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
@@ -134,8 +134,8 @@ class RaftCagra : public ANN<T> {
   AllocatorType dataset_mem_;
   BuildParam index_params_;
   bool need_dataset_update_;
-  raft::neighbors::cagra::search_params search_params_;
-  std::optional<raft::neighbors::cagra::index<T, IdxT>> index_;
+  cuvs::neighbors::cagra::search_params search_params_;
+  std::optional<cuvs::neighbors::cagra::index<T, IdxT>> index_;
   int device_;
   int dimension_;
   raft::device_matrix<IdxT, int64_t, row_major> graph_;
@@ -151,7 +151,7 @@ void RaftCagra<T, IdxT>::build(const T* dataset, size_t nrow, cudaStream_t)
 
   auto& params = index_params_.cagra_params;
 
-  index_.emplace(raft::neighbors::cagra::detail::build(handle_,
+  index_.emplace(cuvs::neighbors::cagra::detail::build(handle_,
                                                        params,
                                                        dataset_view,
                                                        index_params_.nn_descent_params,
@@ -209,7 +209,7 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
                   allocator_to_string(dataset_mem_).c_str());
 
     auto mr = get_mr(dataset_mem_);
-    raft::neighbors::cagra::detail::copy_with_padding(handle_, dataset_, input_dataset_v_, mr);
+    cuvs::neighbors::cagra::detail::copy_with_padding(handle_, dataset_, input_dataset_v_, mr);
 
     index_->update_dataset(handle_, make_const_mdspan(dataset_.view()));
 
@@ -237,19 +237,19 @@ void RaftCagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void RaftCagra<T, IdxT>::save(const std::string& file) const
 {
-  raft::neighbors::cagra::serialize<T, IdxT>(handle_, file, *index_);
+  cuvs::neighbors::cagra::serialize<T, IdxT>(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
 void RaftCagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
-  raft::neighbors::cagra::serialize_to_hnswlib<T, IdxT>(handle_, file, *index_);
+  cuvs::neighbors::cagra::serialize_to_hnswlib<T, IdxT>(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
 void RaftCagra<T, IdxT>::load(const std::string& file)
 {
-  index_ = raft::neighbors::cagra::deserialize<T, IdxT>(handle_, file);
+  index_ = cuvs::neighbors::cagra::deserialize<T, IdxT>(handle_, file);
 }
 
 template <typename T, typename IdxT>
@@ -270,7 +270,7 @@ void RaftCagra<T, IdxT>::search(
   auto neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(neighbors_IdxT, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
-  raft::neighbors::cagra::search(
+  cuvs::neighbors::cagra::search(
     handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
 
   if (!std::is_same<IdxT, size_t>::value) {
@@ -283,4 +283,4 @@ void RaftCagra<T, IdxT>::search(
 
   handle_.sync_stream();
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

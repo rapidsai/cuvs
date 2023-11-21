@@ -15,17 +15,17 @@
  */
 
 #if defined RAFT_DISTANCE_COMPILED
+#include <cuvs/distance/specializations.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/specializations.cuh>
 #endif
 
 #include "../distance/gram_base.cuh"
 #include "../test_utils.cuh"
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/kernels.cuh>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/kernels.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/sparse/convert/dense.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -33,7 +33,7 @@
 #include <raft/util/itertools.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft::distance::kernels {
+namespace cuvs::distance::kernels {
 
 /**
  * Structure to describe structure of the input matrices:
@@ -325,4 +325,4 @@ INSTANTIATE_TEST_SUITE_P(GramMatrixTests, GramMatrixTestFloatLd, ::testing::Valu
 INSTANTIATE_TEST_SUITE_P(GramMatrixTests,
                          GramMatrixTestFloatLdCsr,
                          ::testing::ValuesIn(inputs_ld_csr));
-};  // end namespace raft::distance::kernels
+};  // end namespace cuvs::distance::kernels

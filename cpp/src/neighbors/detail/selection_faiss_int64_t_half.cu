@@ -26,10 +26,10 @@
 
 #include <cstddef>  // size_t
 #include <cstdint>  // uint32_t
-#include <raft/neighbors/detail/selection_faiss-inl.cuh>
+#include <cuvs/neighbors/detail/selection_faiss-inl.cuh>
 
 #define instantiate_raft_neighbors_detail_select_k(payload_t, key_t)    \
-  template void raft::neighbors::detail::select_k(const key_t* inK,     \
+  template void cuvs::neighbors::detail::select_k(const key_t* inK,     \
                                                   const payload_t* inV, \
                                                   size_t n_rows,        \
                                                   size_t n_cols,        \

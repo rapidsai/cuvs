@@ -40,8 +40,8 @@ struct kmeans_balanced_params : kmeans_base_params {
 
 }  // namespace cuvs::cluster::kmeans_balanced
 
-namespace raft::cluster {
+namespace cuvs::cluster {
 
 using kmeans_balanced::kmeans_balanced_params;
 
-}  // namespace raft::cluster
+}  // namespace cuvs::cluster

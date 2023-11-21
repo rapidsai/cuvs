@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/detail/ivf_flat_interleaved_scan-inl.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
+#include <cuvs/neighbors/detail/ivf_flat_interleaved_scan-inl.cuh>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 
 #define instantiate_raft_neighbors_ivf_flat_detail_ivfflat_interleaved_scan(                    \
   T, AccT, IdxT, IvfSampleFilterT)                                                              \
   template void                                                                                 \
-  raft::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<T, AccT, IdxT, IvfSampleFilterT>( \
-    const raft::neighbors::ivf_flat::index<T, IdxT>& index,                                     \
+  cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<T, AccT, IdxT, IvfSampleFilterT>( \
+    const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                                     \
     const T* queries,                                                                           \
     const uint32_t* coarse_query_results,                                                       \
     const uint32_t n_queries,                                                                   \
     const uint32_t queries_offset,                                                              \
-    const raft::distance::DistanceType metric,                                                  \
+    const cuvs::distance::DistanceType metric,                                                  \
     const uint32_t n_probes,                                                                    \
     const uint32_t k,                                                                           \
     const bool select_min,                                                                      \
@@ -37,6 +37,6 @@
     rmm::cuda_stream_view stream)
 
 instantiate_raft_neighbors_ivf_flat_detail_ivfflat_interleaved_scan(
-  float, float, int64_t, raft::neighbors::filtering::none_ivf_sample_filter);
+  float, float, int64_t, cuvs::neighbors::filtering::none_ivf_sample_filter);
 
 #undef instantiate_raft_neighbors_ivf_flat_detail_ivfflat_interleaved_scan

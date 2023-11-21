@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/detail/ivf_pq_compute_similarity.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_compute_similarity.cuh>

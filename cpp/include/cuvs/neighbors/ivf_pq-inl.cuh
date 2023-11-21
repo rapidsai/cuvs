@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <raft/neighbors/detail/ivf_pq_build.cuh>
-#include <raft/neighbors/detail/ivf_pq_search.cuh>
-#include <raft/neighbors/ivf_pq_serialize.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_search.cuh>
+#include <cuvs/neighbors/ivf_pq_serialize.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -29,7 +29,7 @@
 
 #include <memory>  // shared_ptr
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 /**
  * @defgroup ivf_pq IVF PQ Algorithm
@@ -232,7 +232,7 @@ void search(raft::resources const& handle,
                         queries,
                         neighbors,
                         distances,
-                        raft::neighbors::filtering::none_ivf_sample_filter{});
+                        cuvs::neighbors::filtering::none_ivf_sample_filter{});
 }
 
 /** @} */  // end group ivf_pq
@@ -247,7 +247,7 @@ void search(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -288,7 +288,7 @@ auto build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_pq::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -494,7 +494,7 @@ void search(raft::resources const& handle,
                                k,
                                neighbors,
                                distances,
-                               raft::neighbors::filtering::none_ivf_sample_filter{});
+                               cuvs::neighbors::filtering::none_ivf_sample_filter{});
 }
 
 /**
@@ -523,7 +523,7 @@ search(raft::resources const& handle,
                                neighbors,
                                distances,
                                mr,
-                               raft::neighbors::filtering::none_ivf_sample_filter{});
+                               cuvs::neighbors::filtering::none_ivf_sample_filter{});
 }
 
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq

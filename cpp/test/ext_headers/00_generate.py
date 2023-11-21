@@ -41,24 +41,24 @@ copyright_notice = """
 """
 
 ext_headers = [
-    "raft/neighbors/brute_force-ext.cuh",
-    "raft/distance/distance-ext.cuh",
-    "raft/distance/detail/pairwise_matrix/dispatch-ext.cuh",
+    "cuvs/neighbors/brute_force-ext.cuh",
+    "cuvs/distance/distance-ext.cuh",
+    "cuvs/distance/detail/pairwise_matrix/dispatch-ext.cuh",
     "raft/matrix/detail/select_k-ext.cuh",
-    "raft/neighbors/ball_cover-ext.cuh",
+    "cuvs/neighbors/ball_cover-ext.cuh",
     "raft/spatial/knn/detail/fused_l2_knn-ext.cuh",
-    "raft/distance/fused_l2_nn-ext.cuh",
-    "raft/neighbors/ivf_pq-ext.cuh",
+    "cuvs/distance/fused_l2_nn-ext.cuh",
+    "cuvs/neighbors/ivf_pq-ext.cuh",
     "raft/util/memory_pool-ext.hpp",
-    "raft/neighbors/ivf_flat-ext.cuh",
+    "cuvs/neighbors/ivf_flat-ext.cuh",
     "raft/core/logger-ext.hpp",
-    "raft/neighbors/refine-ext.cuh",
-    "raft/neighbors/detail/ivf_flat_search-ext.cuh",
-    "raft/neighbors/detail/selection_faiss-ext.cuh",
+    "cuvs/neighbors/refine-ext.cuh",
+    "cuvs/neighbors/detail/ivf_flat_search-ext.cuh",
+    "cuvs/neighbors/detail/selection_faiss-ext.cuh",
     "raft/linalg/detail/coalesced_reduction-ext.cuh",
     "raft/spatial/knn/detail/ball_cover/registers-ext.cuh",
-    "raft/neighbors/detail/ivf_flat_interleaved_scan-ext.cuh",
-    "raft/neighbors/detail/ivf_pq_compute_similarity-ext.cuh",
+    "cuvs/neighbors/detail/ivf_flat_interleaved_scan-ext.cuh",
+    "cuvs/neighbors/detail/ivf_pq_compute_similarity-ext.cuh",
 ]
 
 for ext_header in ext_headers:

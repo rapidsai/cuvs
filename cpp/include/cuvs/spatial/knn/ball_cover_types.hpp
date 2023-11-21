@@ -26,12 +26,12 @@
 
 #pragma message(__FILE__                                                    \
                   " is deprecated and will be removed in a future release." \
-                  " Please use the raft::neighbors version instead.")
+                  " Please use the cuvs::neighbors version instead.")
 
-#include <raft/neighbors/ball_cover_types.hpp>
+#include <cuvs/neighbors/ball_cover_types.hpp>
 
 namespace raft::spatial::knn {
 
-using raft::neighbors::ball_cover::BallCoverIndex;
+using cuvs::neighbors::ball_cover::BallCoverIndex;
 
 }  // namespace raft::spatial::knn

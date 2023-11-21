@@ -19,17 +19,17 @@
 #include "ann_types.hpp"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/neighbors_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/neighbors_types.hpp>
 
 #include <raft/core/logger.hpp>
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 /**
  * @addtogroup brute_force_knn
  * @{
@@ -46,7 +46,7 @@ template <typename T>
 struct index : ann::index {
  public:
   /** Distance metric used for retrieval */
-  [[nodiscard]] constexpr inline raft::distance::DistanceType metric() const noexcept
+  [[nodiscard]] constexpr inline cuvs::distance::DistanceType metric() const noexcept
   {
     return metric_;
   }
@@ -95,7 +95,7 @@ struct index : ann::index {
   index(raft::resources const& res,
         mdspan<const T, matrix_extent<int64_t>, row_major, data_accessor> dataset,
         std::optional<raft::device_vector<T, int64_t>>&& norms,
-        raft::distance::DistanceType metric,
+        cuvs::distance::DistanceType metric,
         T metric_arg = 0.0)
     : ann::index(),
       metric_(metric),
@@ -116,7 +116,7 @@ struct index : ann::index {
   index(raft::resources const& res,
         raft::device_matrix_view<const T, int64_t, row_major> dataset_view,
         std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
-        raft::distance::DistanceType metric,
+        cuvs::distance::DistanceType metric,
         T metric_arg = 0.0)
     : ann::index(),
       metric_(metric),
@@ -153,7 +153,7 @@ struct index : ann::index {
     dataset_view_ = make_const_mdspan(dataset_.view());
   }
 
-  raft::distance::DistanceType metric_;
+  cuvs::distance::DistanceType metric_;
   raft::device_matrix<T, int64_t, row_major> dataset_;
   std::optional<raft::device_vector<T, int64_t>> norms_;
   std::optional<raft::device_vector_view<const T, int64_t>> norms_view_;
@@ -174,7 +174,7 @@ struct index : ann::index {
  *
  * Note that this class is an abstract class without any cuda dependencies, meaning
  * that it doesn't require a cuda compiler to use - but also means it can't be directly
- * instantiated.  See the raft::neighbors::brute_force::make_batch_k_query
+ * instantiated.  See the cuvs::neighbors::brute_force::make_batch_k_query
  * function for usage examples.
  *
  * @tparam T data element type
@@ -192,11 +192,11 @@ class batch_k_query {
   }
   virtual ~batch_k_query() {}
 
-  using value_type = raft::neighbors::batch<T, IdxT>;
+  using value_type = cuvs::neighbors::batch<T, IdxT>;
 
   class iterator {
    public:
-    using value_type = raft::neighbors::batch<T, IdxT>;
+    using value_type = cuvs::neighbors::batch<T, IdxT>;
     using reference  = const value_type&;
     using pointer    = const value_type*;
 
@@ -230,7 +230,7 @@ class batch_k_query {
      * Using operator++ means that we will load up the same batch_size for each
      * batch. This method allows us to get around this restriction, and load up
      * arbitrary batch sizes on each iteration.
-     * See raft::neighbors::brute_force::make_batch_k_query for a usage example.
+     * See cuvs::neighbors::brute_force::make_batch_k_query for a usage example.
      *
      * @param[in] next_batch_size: size of the next batch to load up
      */
@@ -279,4 +279,4 @@ class batch_k_query {
 };
 /** @} */
 
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force

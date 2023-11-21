@@ -18,11 +18,11 @@
 
 #include "../ann_nn_descent.cuh"
 
-namespace raft::neighbors::experimental::nn_descent {
+namespace cuvs::neighbors::experimental::nn_descent {
 
 typedef AnnNNDescentTest<float, uint8_t, std::uint32_t> AnnNNDescentTestUI8_U32;
 TEST_P(AnnNNDescentTestUI8_U32, AnnNNDescent) { this->testNNDescent(); }
 
 INSTANTIATE_TEST_CASE_P(AnnNNDescentTest, AnnNNDescentTestUI8_U32, ::testing::ValuesIn(inputs));
 
-}  // namespace raft::neighbors::experimental::nn_descent
+}  // namespace cuvs::neighbors::experimental::nn_descent

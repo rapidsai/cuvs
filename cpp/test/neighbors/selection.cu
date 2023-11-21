@@ -15,11 +15,11 @@
  */
 
 #include <algorithm>
+#include <cuvs/neighbors/detail/selection_faiss.cuh>
+#include <cuvs/neighbors/detail/selection_faiss_helpers.cuh>  // kFaissMax
 #include <gtest/gtest.h>
 #include <numeric>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/neighbors/detail/selection_faiss.cuh>
-#include <raft/neighbors/detail/selection_faiss_helpers.cuh>  // kFaissMax
 #include <raft/random/rng.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -117,7 +117,7 @@ struct SelectInOutComputed {
         }
         break;
       case knn::SelectKAlgo::FAISS:
-        if (spec.k > raft::neighbors::detail::kFaissMaxK<IdxT, KeyT>()) {
+        if (spec.k > cuvs::neighbors::detail::kFaissMaxK<IdxT, KeyT>()) {
           not_supported = true;
           return;
         }

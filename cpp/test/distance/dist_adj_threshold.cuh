@@ -16,7 +16,7 @@
 
 #include <cstdint>  // uint8_t
 
-namespace raft::distance {
+namespace cuvs::distance {
 
 template <typename AccT, typename DataT, typename OutT, typename Index>
 struct threshold_final_op {
@@ -33,4 +33,4 @@ struct threshold_final_op {
 using threshold_float  = threshold_final_op<float, float, uint8_t, int>;
 using threshold_double = threshold_final_op<double, double, uint8_t, int>;
 
-}  // namespace raft::distance
+}  // namespace cuvs::distance

@@ -20,8 +20,8 @@
 
 #include <cuvs_internal/neighbors/naive_knn.cuh>
 
+#include <cuvs/neighbors/nn_descent.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/neighbors/nn_descent.cuh>
 #include <raft/util/itertools.hpp>
 
 #include <gtest/gtest.h>
@@ -31,13 +31,13 @@
 #include <string>
 #include <vector>
 
-namespace raft::neighbors::experimental::nn_descent {
+namespace cuvs::neighbors::experimental::nn_descent {
 
 struct AnnNNDescentInputs {
   int n_rows;
   int dim;
   int graph_degree;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   bool host_dataset;
   double min_recall;
 };
@@ -149,8 +149,8 @@ const std::vector<AnnNNDescentInputs> inputs = raft::util::itertools::product<An
   {1000, 2000},                                              // n_rows
   {3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
   {32, 64},                                                  // graph_degree
-  {raft::distance::DistanceType::L2Expanded},
+  {cuvs::distance::DistanceType::L2Expanded},
   {false, true},
   {0.90});
 
-}  // namespace raft::neighbors::experimental::nn_descent
+}  // namespace cuvs::neighbors::experimental::nn_descent

@@ -20,10 +20,10 @@
 #pragma once
 
 #include <cub/cub.cuh>
+#include <cuvs/distance/detail/fused_l2_nn.cuh>
+#include <cuvs/distance/fused_l2_nn_helpers.cuh>
 #include <limits>
 #include <raft/core/resources.hpp>
-#include <raft/distance/detail/fused_l2_nn.cuh>
-#include <raft/distance/fused_l2_nn_helpers.cuh>
 #include <raft/linalg/contractions.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <stdint.h>

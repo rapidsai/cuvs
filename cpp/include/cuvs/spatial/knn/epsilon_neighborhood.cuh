@@ -26,13 +26,13 @@
 
 #pragma message(__FILE__                                                    \
                   " is deprecated and will be removed in a future release." \
-                  " Please use the raft::neighbors version instead.")
+                  " Please use the cuvs::neighbors version instead.")
 
-#include <raft/neighbors/epsilon_neighborhood.cuh>
+#include <cuvs/neighbors/epsilon_neighborhood.cuh>
 
 namespace raft::spatial::knn {
 
-using raft::neighbors::epsilon_neighborhood::eps_neighbors_l2sq;
-using raft::neighbors::epsilon_neighborhood::epsUnexpL2SqNeighborhood;
+using cuvs::neighbors::epsilon_neighborhood::eps_neighbors_l2sq;
+using cuvs::neighbors::epsilon_neighborhood::epsUnexpL2SqNeighborhood;
 
 }  // namespace raft::spatial::knn

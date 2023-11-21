@@ -43,7 +43,7 @@ struct KmeansBalancedInputs {
   IdxT n_rows;
   IdxT n_cols;
   IdxT n_clusters;
-  raft::cluster::kmeans_balanced_params kb_params;
+  cuvs::cluster::kmeans_balanced_params kb_params;
   MathT tol;
 };
 
@@ -154,7 +154,7 @@ std::vector<KmeansBalancedInputs<MathT, IdxT>> get_kmeans_balanced_inputs()
   std::vector<KmeansBalancedInputs<MathT, IdxT>> out;
   KmeansBalancedInputs<MathT, IdxT> p;
   p.kb_params.n_iters = 20;
-  p.kb_params.metric  = raft::distance::DistanceType::L2Expanded;
+  p.kb_params.metric  = cuvs::distance::DistanceType::L2Expanded;
   p.tol               = MathT{0.0001};
   std::vector<std::tuple<size_t, size_t, size_t>> row_cols_k = {{1000, 32, 5},
                                                                 {1000, 100, 20},

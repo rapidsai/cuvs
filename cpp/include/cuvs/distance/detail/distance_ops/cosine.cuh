@@ -18,7 +18,7 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 // Epilogue operator for CUTLASS based kernel
 template <typename DataT, typename AccT>
@@ -82,4 +82,4 @@ struct cosine_distance_op {
   }
 };
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

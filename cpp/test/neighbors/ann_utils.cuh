@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdarray.hpp>  // raft::make_device_matrix
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/detail/select_k.cuh>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
@@ -34,7 +34,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 struct print_dtype {
   cudaDataType_t value;
@@ -77,33 +77,33 @@ inline auto operator<<(std::ostream& os, const print_dtype& p) -> std::ostream&
 }
 
 struct print_metric {
-  raft::distance::DistanceType value;
+  cuvs::distance::DistanceType value;
 };
 
 inline auto operator<<(std::ostream& os, const print_metric& p) -> std::ostream&
 {
   switch (p.value) {
-    case raft::distance::L2Expanded: os << "distance::L2Expanded"; break;
-    case raft::distance::L2SqrtExpanded: os << "distance::L2SqrtExpanded"; break;
-    case raft::distance::CosineExpanded: os << "distance::CosineExpanded"; break;
-    case raft::distance::L1: os << "distance::L1"; break;
-    case raft::distance::L2Unexpanded: os << "distance::L2Unexpanded"; break;
-    case raft::distance::L2SqrtUnexpanded: os << "distance::L2SqrtUnexpanded"; break;
-    case raft::distance::InnerProduct: os << "distance::InnerProduct"; break;
-    case raft::distance::Linf: os << "distance::Linf"; break;
-    case raft::distance::Canberra: os << "distance::Canberra"; break;
-    case raft::distance::LpUnexpanded: os << "distance::LpUnexpanded"; break;
-    case raft::distance::CorrelationExpanded: os << "distance::CorrelationExpanded"; break;
-    case raft::distance::JaccardExpanded: os << "distance::JaccardExpanded"; break;
-    case raft::distance::HellingerExpanded: os << "distance::HellingerExpanded"; break;
-    case raft::distance::Haversine: os << "distance::Haversine"; break;
-    case raft::distance::BrayCurtis: os << "distance::BrayCurtis"; break;
-    case raft::distance::JensenShannon: os << "distance::JensenShannon"; break;
-    case raft::distance::HammingUnexpanded: os << "distance::HammingUnexpanded"; break;
-    case raft::distance::KLDivergence: os << "distance::KLDivergence"; break;
-    case raft::distance::RusselRaoExpanded: os << "distance::RusselRaoExpanded"; break;
-    case raft::distance::DiceExpanded: os << "distance::DiceExpanded"; break;
-    case raft::distance::Precomputed: os << "distance::Precomputed"; break;
+    case cuvs::distance::L2Expanded: os << "distance::L2Expanded"; break;
+    case cuvs::distance::L2SqrtExpanded: os << "distance::L2SqrtExpanded"; break;
+    case cuvs::distance::CosineExpanded: os << "distance::CosineExpanded"; break;
+    case cuvs::distance::L1: os << "distance::L1"; break;
+    case cuvs::distance::L2Unexpanded: os << "distance::L2Unexpanded"; break;
+    case cuvs::distance::L2SqrtUnexpanded: os << "distance::L2SqrtUnexpanded"; break;
+    case cuvs::distance::InnerProduct: os << "distance::InnerProduct"; break;
+    case cuvs::distance::Linf: os << "distance::Linf"; break;
+    case cuvs::distance::Canberra: os << "distance::Canberra"; break;
+    case cuvs::distance::LpUnexpanded: os << "distance::LpUnexpanded"; break;
+    case cuvs::distance::CorrelationExpanded: os << "distance::CorrelationExpanded"; break;
+    case cuvs::distance::JaccardExpanded: os << "distance::JaccardExpanded"; break;
+    case cuvs::distance::HellingerExpanded: os << "distance::HellingerExpanded"; break;
+    case cuvs::distance::Haversine: os << "distance::Haversine"; break;
+    case cuvs::distance::BrayCurtis: os << "distance::BrayCurtis"; break;
+    case cuvs::distance::JensenShannon: os << "distance::JensenShannon"; break;
+    case cuvs::distance::HammingUnexpanded: os << "distance::HammingUnexpanded"; break;
+    case cuvs::distance::KLDivergence: os << "distance::KLDivergence"; break;
+    case cuvs::distance::RusselRaoExpanded: os << "distance::RusselRaoExpanded"; break;
+    case cuvs::distance::DiceExpanded: os << "distance::DiceExpanded"; break;
+    case cuvs::distance::Precomputed: os << "distance::Precomputed"; break;
     default: RAFT_FAIL("unreachable code");
   }
   return os;
@@ -252,7 +252,7 @@ auto eval_distances(raft::resources const& handle,
                     size_t n_cols,
                     size_t n_queries,
                     uint32_t k,
-                    raft::distance::DistanceType metric,
+                    cuvs::distance::DistanceType metric,
                     double eps) -> testing::AssertionResult
 {
   // for each vector, we calculate the actual distance to the k neighbors
@@ -291,4 +291,4 @@ auto eval_distances(raft::resources const& handle,
   }
   return testing::AssertionSuccess();
 }
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

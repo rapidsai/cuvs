@@ -27,7 +27,7 @@
  *
  * @tparam Value_ a compile-time value representable as a power-of-two.
  */
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 template <auto Value_>
 struct div_utils {
   typedef decltype(Value_) Type;
@@ -63,4 +63,4 @@ struct div_utils {
 #endif
   }
 };
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/selection_faiss.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/detail/select_radix.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/matrix/select_k.cuh>
-#include <raft/neighbors/detail/selection_faiss.cuh>
 
 namespace raft::matrix::select {
 

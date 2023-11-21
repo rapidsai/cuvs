@@ -20,9 +20,9 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/detail/faiss_select/Select.cuh>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/detail/faiss_select/Select.cuh>
 
 namespace raft {
 namespace spatial {
@@ -65,7 +65,7 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
   __shared__ value_t smemK[kNumWarps * warp_q];
   __shared__ value_idx smemV[kNumWarps * warp_q];
 
-  using namespace raft::neighbors::detail::faiss_select;
+  using namespace cuvs::neighbors::detail::faiss_select;
   BlockSelect<value_t, value_idx, false, Comparator<value_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<value_t>::max(), std::numeric_limits<value_idx>::max(), smemK, smemV, k);
 

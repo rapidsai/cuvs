@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 
 namespace raft::spatial::knn {
 
@@ -26,7 +26,7 @@ struct index {};
 /** The base for KNN index parameters. */
 struct index_params {
   /** Distance type. */
-  raft::distance::DistanceType metric = distance::DistanceType::L2Expanded;
+  cuvs::distance::DistanceType metric = distance::DistanceType::L2Expanded;
   /** The argument used by some distance metrics. */
   float metric_arg = 2.0f;
   /**

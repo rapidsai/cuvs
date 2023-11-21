@@ -17,16 +17,16 @@
 #pragma once
 
 #include <cstdio>
+#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/neighbors/detail/ivf_pq_build.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-namespace raft::neighbors::ivf_pq::helpers {
+namespace cuvs::neighbors::ivf_pq::helpers {
 using namespace raft::spatial::knn::detail;  // NOLINT
 /**
  * @defgroup ivf_pq_helpers Helper functions for manipulationg IVF PQ Index
@@ -241,7 +241,7 @@ void pack_list_data(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
@@ -605,7 +605,7 @@ void erase_list(raft::resources const& res, index<IdxT>* index, uint32_t label)
  * Usage example:
  * @code{.cpp}
  *   raft::resources res;
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
  *   // initialize an empty index
@@ -634,7 +634,7 @@ void reset_index(const raft::resources& res, index<IdxT>* index)
 /**
  * @brief Public helper API exposing the computation of the index's rotation matrix.
  * NB: This is to be used only when the rotation matrix is not already computed through
- * raft::neighbors::ivf_pq::build.
+ * cuvs::neighbors::ivf_pq::build.
  *
  * Usage example:
  * @code{.cpp}
@@ -644,11 +644,11 @@ void reset_index(const raft::resources& res, index<IdxT>* index)
  *   // force random rotation
  *   index_params.force_random_rotation = true;
  *   // initialize an empty index
- *   raft::neighbors::ivf_pq::index<int64_t> index(res, index_params, D);
+ *   cuvs::neighbors::ivf_pq::index<int64_t> index(res, index_params, D);
  *   // reset the index
  *   reset_index(res, &index);
  *   // compute the rotation matrix with random_rotation
- *   raft::neighbors::ivf_pq::helpers::make_rotation_matrix(
+ *   cuvs::neighbors::ivf_pq::helpers::make_rotation_matrix(
  *     res, &index, index_params.force_random_rotation);
  * @endcode
  *
@@ -657,14 +657,14 @@ void reset_index(const raft::resources& res, index<IdxT>* index)
  * @param[in] res raft resource
  * @param[inout] index pointer to IVF-PQ index
  * @param[in] force_random_rotation whether to apply a random rotation matrix on the input data. See
- * raft::neighbors::ivf_pq::index_params for more details.
+ * cuvs::neighbors::ivf_pq::index_params for more details.
  */
 template <typename IdxT>
 void make_rotation_matrix(raft::resources const& res,
                           index<IdxT>* index,
                           bool force_random_rotation)
 {
-  raft::neighbors::ivf_pq::detail::make_rotation_matrix(res,
+  cuvs::neighbors::ivf_pq::detail::make_rotation_matrix(res,
                                                         force_random_rotation,
                                                         index->rot_dim(),
                                                         index->dim(),
@@ -673,7 +673,7 @@ void make_rotation_matrix(raft::resources const& res,
 
 /**
  * @brief Public helper API for externally modifying the index's IVF centroids.
- * NB: The index must be reset before this. Use raft::neighbors::ivf_pq::extend to construct IVF
+ * NB: The index must be reset before this. Use cuvs::neighbors::ivf_pq::extend to construct IVF
  lists according to new centroids.
  *
  * Usage example:
@@ -686,9 +686,9 @@ void make_rotation_matrix(raft::resources const& res,
  *   // reset the index
  *   reset_index(res, &index);
  *   // recompute the state of the index
- *   raft::neighbors::ivf_pq::helpers::recompute_internal_state(res, index);
+ *   cuvs::neighbors::ivf_pq::helpers::recompute_internal_state(res, index);
  *   // Write the IVF centroids
- *   raft::neighbors::ivf_pq::helpers::set_centers(
+ *   cuvs::neighbors::ivf_pq::helpers::set_centers(
                     res,
                     &index,
                     cluster_centers);
@@ -719,7 +719,7 @@ void set_centers(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
@@ -759,7 +759,7 @@ void recompute_internal_state(const raft::resources& res, index<IdxT>* index)
  *   auto cluster_centers = raft::make_device_matrix<float, uint32_t>(
  *     res, index.n_lists(), index.dim());
  *   // Extract the IVF centroids into the buffer
- *   raft::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
+ *   cuvs::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
  * @endcode
  *
  * @tparam IdxT
@@ -790,4 +790,4 @@ void extract_centers(raft::resources const& res,
                                   stream));
 }
 /** @} */
-}  // namespace raft::neighbors::ivf_pq::helpers
+}  // namespace cuvs::neighbors::ivf_pq::helpers

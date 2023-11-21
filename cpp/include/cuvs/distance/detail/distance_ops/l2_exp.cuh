@@ -19,7 +19,7 @@
 #include <raft/core/math.hpp>
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 /**
  * Reserve 1 digit of precision from each floating-point type
@@ -133,4 +133,4 @@ struct l2_exp_distance_op {
   }
 };
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

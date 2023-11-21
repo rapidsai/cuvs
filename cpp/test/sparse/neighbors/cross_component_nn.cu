@@ -38,7 +38,7 @@
 #include <raft/sparse/neighbors/knn_graph.cuh>
 #include <raft/sparse/selection/cross_component_nn.cuh>
 
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
@@ -92,7 +92,7 @@ class ConnectComponentsTest
                                        data.data(),
                                        params.n_row,
                                        params.n_col,
-                                       raft::distance::DistanceType::L2SqrtExpanded,
+                                       cuvs::distance::DistanceType::L2SqrtExpanded,
                                        knn_graph_coo,
                                        params.c);
 

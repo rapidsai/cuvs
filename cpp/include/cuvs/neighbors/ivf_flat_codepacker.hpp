@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/div_utils.hpp>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/div_utils.hpp>
-#include <raft/neighbors/ivf_flat_types.hpp>
 
-namespace raft::neighbors::ivf_flat::codepacker {
+namespace cuvs::neighbors::ivf_flat::codepacker {
 
 /**
  * Write one flat code into a block by the given offset. The offset indicates the id of the record
@@ -87,4 +87,4 @@ _RAFT_HOST_DEVICE void unpack_1(
     }
   }
 }
-}  // namespace raft::neighbors::ivf_flat::codepacker
+}  // namespace cuvs::neighbors::ivf_flat::codepacker

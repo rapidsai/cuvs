@@ -19,11 +19,11 @@
 #include <raft/common/nvtx.hpp>  // common::nvtx::range
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <raft/core/device_mdspan.hpp>  // make_device_matrix_view
-#include <raft/core/operators.hpp>      // raft::sqrt
-#include <raft/core/resources.hpp>      // raft::resources
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>  // raft::distance::DistanceType
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
+#include <raft/core/device_mdspan.hpp>       // make_device_matrix_view
+#include <raft/core/operators.hpp>           // raft::sqrt
+#include <raft/core/resources.hpp>           // raft::resources
 #include <raft/random/rng.cuh>
 #include <rmm/device_uvector.hpp>  // rmm::device_uvector
 
@@ -37,7 +37,7 @@ RAFT_KERNEL naiveDistanceKernel(DataType* dist,
                                 int m,
                                 int n,
                                 int k,
-                                raft::distance::DistanceType type,
+                                cuvs::distance::DistanceType type,
                                 bool isRowMajor)
 {
   int midx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -50,8 +50,8 @@ RAFT_KERNEL naiveDistanceKernel(DataType* dist,
     auto diff = x[xidx] - y[yidx];
     acc += diff * diff;
   }
-  if (type == raft::distance::DistanceType::L2SqrtExpanded ||
-      type == raft::distance::DistanceType::L2SqrtUnexpanded)
+  if (type == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      type == cuvs::distance::DistanceType::L2SqrtUnexpanded)
     acc = raft::sqrt(acc);
   int outidx   = isRowMajor ? midx * n + nidx : midx + m * nidx;
   dist[outidx] = acc;
@@ -64,7 +64,7 @@ RAFT_KERNEL naiveL1_Linf_CanberraDistanceKernel(DataType* dist,
                                                 int m,
                                                 int n,
                                                 int k,
-                                                raft::distance::DistanceType type,
+                                                cuvs::distance::DistanceType type,
                                                 bool isRowMajor)
 {
   int midx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -78,9 +78,9 @@ RAFT_KERNEL naiveL1_Linf_CanberraDistanceKernel(DataType* dist,
     auto a    = x[xidx];
     auto b    = y[yidx];
     auto diff = (a > b) ? (a - b) : (b - a);
-    if (type == raft::distance::DistanceType::Linf) {
+    if (type == cuvs::distance::DistanceType::Linf) {
       acc = raft::max(acc, diff);
-    } else if (type == raft::distance::DistanceType::Canberra) {
+    } else if (type == cuvs::distance::DistanceType::Canberra) {
       const auto add = raft::abs(a) + raft::abs(b);
       // deal with potential for 0 in denominator by
       // forcing 1/0 instead
@@ -332,7 +332,7 @@ void naiveDistance(DataType* dist,
                    int m,
                    int n,
                    int k,
-                   raft::distance::DistanceType type,
+                   cuvs::distance::DistanceType type,
                    bool isRowMajor,
                    DataType metric_arg = 2.0f,
                    cudaStream_t stream = 0)
@@ -341,51 +341,51 @@ void naiveDistance(DataType* dist,
   dim3 nblks(raft::ceildiv(m, (int)TPB.x), raft::ceildiv(n, (int)TPB.y), 1);
 
   switch (type) {
-    case raft::distance::DistanceType::Canberra:
-    case raft::distance::DistanceType::Linf:
-    case raft::distance::DistanceType::L1:
+    case cuvs::distance::DistanceType::Canberra:
+    case cuvs::distance::DistanceType::Linf:
+    case cuvs::distance::DistanceType::L1:
       naiveL1_Linf_CanberraDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, type, isRowMajor);
       break;
-    case raft::distance::DistanceType::L2SqrtUnexpanded:
-    case raft::distance::DistanceType::L2Unexpanded:
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2SqrtUnexpanded:
+    case cuvs::distance::DistanceType::L2Unexpanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded:
       naiveDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, type, isRowMajor);
       break;
-    case raft::distance::DistanceType::CosineExpanded:
+    case cuvs::distance::DistanceType::CosineExpanded:
       naiveCosineDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::HellingerExpanded:
+    case cuvs::distance::DistanceType::HellingerExpanded:
       naiveHellingerDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::LpUnexpanded:
+    case cuvs::distance::DistanceType::LpUnexpanded:
       naiveLpUnexpDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor, metric_arg);
       break;
-    case raft::distance::DistanceType::HammingUnexpanded:
+    case cuvs::distance::DistanceType::HammingUnexpanded:
       naiveHammingDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::InnerProduct:
+    case cuvs::distance::DistanceType::InnerProduct:
       naiveInnerProductKernel<DataType><<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::JensenShannon:
+    case cuvs::distance::DistanceType::JensenShannon:
       naiveJensenShannonDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::RusselRaoExpanded:
+    case cuvs::distance::DistanceType::RusselRaoExpanded:
       naiveRussellRaoDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::KLDivergence:
+    case cuvs::distance::DistanceType::KLDivergence:
       naiveKLDivergenceDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
-    case raft::distance::DistanceType::CorrelationExpanded:
+    case cuvs::distance::DistanceType::CorrelationExpanded:
       naiveCorrelationDistanceKernel<DataType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
@@ -428,7 +428,7 @@ constexpr bool layout_to_row_major<layout_f_contiguous>()
   return false;
 }
 
-template <raft::distance::DistanceType distanceType, typename DataType, typename layout>
+template <cuvs::distance::DistanceType distanceType, typename DataType, typename layout>
 void distanceLauncher(raft::resources const& handle,
                       DataType* x,
                       DataType* y,
@@ -445,11 +445,11 @@ void distanceLauncher(raft::resources const& handle,
   auto y_v    = make_device_matrix_view<DataType, int, layout>(y, n, k);
   auto dist_v = make_device_matrix_view<DataType, int, layout>(dist, m, n);
 
-  raft::distance::distance<distanceType, DataType, DataType, DataType, layout>(
+  cuvs::distance::distance<distanceType, DataType, DataType, DataType, layout>(
     handle, x_v, y_v, dist_v, metric_arg);
 }
 
-template <raft::distance::DistanceType distanceType, typename DataType>
+template <cuvs::distance::DistanceType distanceType, typename DataType>
 class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
  public:
   DistanceTest()
@@ -474,13 +474,13 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
     int k               = params.k;
     DataType metric_arg = params.metric_arg;
     bool isRowMajor     = params.isRowMajor;
-    if (distanceType == raft::distance::DistanceType::HellingerExpanded ||
-        distanceType == raft::distance::DistanceType::JensenShannon ||
-        distanceType == raft::distance::DistanceType::KLDivergence) {
+    if (distanceType == cuvs::distance::DistanceType::HellingerExpanded ||
+        distanceType == cuvs::distance::DistanceType::JensenShannon ||
+        distanceType == cuvs::distance::DistanceType::KLDivergence) {
       // Hellinger works only on positive numbers
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
       uniform(handle, r, y.data(), n * k, DataType(0.0), DataType(1.0));
-    } else if (distanceType == raft::distance::DistanceType::RusselRaoExpanded) {
+    } else if (distanceType == cuvs::distance::DistanceType::RusselRaoExpanded) {
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
       uniform(handle, r, y.data(), n * k, DataType(0.0), DataType(1.0));
       // Russel rao works on boolean values.
@@ -539,7 +539,7 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
  * It may happen that though both X and Y are same buffer but user passes
  * different dimensions for them like in case of tiled_brute_force_knn.
  */
-template <raft::distance::DistanceType distanceType, typename DataType>
+template <cuvs::distance::DistanceType distanceType, typename DataType>
 class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<DataType>> {
  public:
   using dev_vector = rmm::device_uvector<DataType>;
@@ -564,12 +564,12 @@ class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<Da
     int k               = params.k;
     DataType metric_arg = params.metric_arg;
     bool isRowMajor     = params.isRowMajor;
-    if (distanceType == raft::distance::DistanceType::HellingerExpanded ||
-        distanceType == raft::distance::DistanceType::JensenShannon ||
-        distanceType == raft::distance::DistanceType::KLDivergence) {
+    if (distanceType == cuvs::distance::DistanceType::HellingerExpanded ||
+        distanceType == cuvs::distance::DistanceType::JensenShannon ||
+        distanceType == cuvs::distance::DistanceType::KLDivergence) {
       // Hellinger works only on positive numbers
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
-    } else if (distanceType == raft::distance::DistanceType::RusselRaoExpanded) {
+    } else if (distanceType == cuvs::distance::DistanceType::RusselRaoExpanded) {
       uniform(handle, r, x.data(), m * k, DataType(0.0), DataType(1.0));
       // Russel rao works on boolean values.
       bernoulli(handle, r, x.data(), m * k, 0.5f);
@@ -634,7 +634,7 @@ class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<Da
   std::array<dev_vector, N> dist_ref, dist, dist2;
 };
 
-template <raft::distance::DistanceType distanceType>
+template <cuvs::distance::DistanceType distanceType>
 class BigMatrixDistanceTest : public ::testing::Test {
  public:
   BigMatrixDistanceTest()
@@ -652,12 +652,12 @@ class BigMatrixDistanceTest : public ::testing::Test {
                            int m,
                            int n,
                            int k,
-                           raft::distance::DistanceType metric,
+                           cuvs::distance::DistanceType metric,
                            bool isRowMajor,
                            float metric_arg);
     constexpr bool row_major   = true;
     constexpr float metric_arg = 0.0f;
-    raft::distance::distance<distanceType, float, float, float>(
+    cuvs::distance::distance<distanceType, float, float, float>(
       handle, x.data(), x.data(), dist.data(), m, n, k, row_major, metric_arg);
     RAFT_CUDA_TRY(cudaStreamSynchronize(resource::get_cuda_stream(handle)));
   }

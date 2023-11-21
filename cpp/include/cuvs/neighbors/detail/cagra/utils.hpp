@@ -26,7 +26,7 @@
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <type_traits>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 namespace utils {
 template <class DATA_T>
 inline cudaDataType_t get_cuda_data_type();
@@ -279,4 +279,4 @@ void copy_with_padding(raft::resources const& res,
                                     resource::get_cuda_stream(res)));
   }
 }
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

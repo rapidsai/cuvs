@@ -15,18 +15,18 @@
  */
 
 #include <common/benchmark.hpp>
-#include <raft/distance/distance.cuh>
+#include <cuvs/distance/distance.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft::bench::distance {
+namespace cuvs::bench::distance {
 
 struct distance_params {
   int m, n, k;
   bool isRowMajor;
 };  // struct distance_params
 
-template <typename T, raft::distance::DistanceType DType>
+template <typename T, cuvs::distance::DistanceType DType>
 struct distance : public fixture {
   distance(const distance_params& p)
     : params(p),
@@ -38,7 +38,7 @@ struct distance : public fixture {
     RAFT_CUDA_TRY(cudaMemsetAsync(x.data(), 0, x.size() * sizeof(T), stream));
     RAFT_CUDA_TRY(cudaMemsetAsync(y.data(), 0, y.size() * sizeof(T), stream));
     RAFT_CUDA_TRY(cudaMemsetAsync(out.data(), 0, out.size() * sizeof(T), stream));
-    worksize = raft::distance::getWorkspaceSize<DType, T, T, T>(
+    worksize = cuvs::distance::getWorkspaceSize<DType, T, T, T>(
       x.data(), y.data(), params.m, params.n, params.k);
     workspace.resize(worksize, stream);
   }
@@ -46,7 +46,7 @@ struct distance : public fixture {
   void run_benchmark(::benchmark::State& state) override
   {
     loop_on_state(state, [this]() {
-      raft::distance::distance<DType, T, T, T>(handle,
+      cuvs::distance::distance<DType, T, T, T>(handle,
                                                x.data(),
                                                y.data(),
                                                out.data(),
@@ -89,4 +89,4 @@ const std::vector<distance_params> dist_input_vecs{
   using Name##D = distance<double, Metric>;          \
   RAFT_BENCH_REGISTER(Name##D, "", dist_input_vecs);
 
-}  // namespace raft::bench::distance
+}  // namespace cuvs::bench::distance

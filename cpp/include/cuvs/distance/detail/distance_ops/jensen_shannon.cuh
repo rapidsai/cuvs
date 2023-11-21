@@ -18,7 +18,7 @@
 #include <raft/core/operators.hpp>            // raft::log
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 // Describes the computation the jensen_shannon distance
 
@@ -78,4 +78,4 @@ struct jensen_shannon_distance_op {
   }
 };
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

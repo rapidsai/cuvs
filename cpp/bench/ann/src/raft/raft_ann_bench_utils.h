@@ -15,12 +15,12 @@
  */
 #pragma once
 #include <cassert>
+#include <cuvs/distance/distance_types.hpp>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 #include <sstream>
@@ -28,17 +28,17 @@
 #include <string>
 #include <type_traits>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
-inline raft::distance::DistanceType parse_metric_type(raft::bench::ann::Metric metric)
+inline cuvs::distance::DistanceType parse_metric_type(cuvs::bench::Metric metric)
 {
-  if (metric == raft::bench::ann::Metric::kInnerProduct) {
-    return raft::distance::DistanceType::InnerProduct;
-  } else if (metric == raft::bench::ann::Metric::kEuclidean) {
+  if (metric == cuvs::bench::Metric::kInnerProduct) {
+    return cuvs::distance::DistanceType::InnerProduct;
+  } else if (metric == cuvs::bench::Metric::kEuclidean) {
     // Even for L2 expanded RAFT IVF Flat uses unexpanded formula
-    return raft::distance::DistanceType::L2Expanded;
+    return cuvs::distance::DistanceType::L2Expanded;
   } else {
     throw std::runtime_error("raft supports only metric type of inner product and L2");
   }
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

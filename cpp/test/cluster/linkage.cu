@@ -197,23 +197,23 @@ class LinkageTest : public ::testing::TestWithParam<LinkageInputs<T, IdxT>> {
 
     if (params.use_knn) {
       cuvs::cluster::hierarchy::
-        single_linkage<T, IdxT, raft::cluster::hierarchy::LinkageDistance::KNN_GRAPH>(
+        single_linkage<T, IdxT, cuvs::cluster::hierarchy::LinkageDistance::KNN_GRAPH>(
           handle,
           data_view,
           dendrogram_view,
           labels_view,
-          raft::distance::DistanceType::L2SqrtExpanded,
+          cuvs::distance::DistanceType::L2SqrtExpanded,
           params.n_clusters,
           std::make_optional<int>(params.c));
 
     } else {
       cuvs::cluster::hierarchy::
-        single_linkage<T, IdxT, raft::cluster::hierarchy::LinkageDistance::PAIRWISE>(
+        single_linkage<T, IdxT, cuvs::cluster::hierarchy::LinkageDistance::PAIRWISE>(
           handle,
           data_view,
           dendrogram_view,
           labels_view,
-          raft::distance::DistanceType::L2SqrtExpanded,
+          cuvs::distance::DistanceType::L2SqrtExpanded,
           params.n_clusters,
           std::make_optional<int>(params.c));
     }

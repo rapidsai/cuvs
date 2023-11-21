@@ -18,13 +18,13 @@
 
 #include <cstdint>  // int64_t
 
+#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
 #include <raft/core/host_mdspan.hpp>         // raft::host_matrix_view
-#include <raft/distance/distance_types.hpp>  // raft::distance::DistanceType
 #include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host(
@@ -40,7 +40,7 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_refine(IdxT, DataT, DistanceT, ExtentsT)                    \
-  extern template void raft::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
+  extern template void cuvs::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
     raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,                          \
     raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,                          \
     raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,               \

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include <cstdint>            // int64_t
+#include <cstdint>  // int64_t
+#include <cuvs/distance/fused_l2_nn-inl.cuh>
 #include <raft/core/kvp.hpp>  // raft::KeyValuePair
-#include <raft/distance/fused_l2_nn-inl.cuh>
 
 #define instantiate_raft_distance_fusedL2NNMinReduce(DataT, OutT, IdxT)                   \
-  template void raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(OutT * min,         \
+  template void cuvs::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(OutT * min,         \
                                                                       const DataT* x,     \
                                                                       const DataT* y,     \
                                                                       const DataT* xn,    \

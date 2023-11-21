@@ -16,10 +16,10 @@
 #pragma once
 
 #include <algorithm>                                                 // std::min
-#include <raft/distance/detail/pairwise_distance_cutlass_base.cuh>   // cutlassDistanceKernel
-#include <raft/distance/detail/pairwise_matrix/dispatch_layout.cuh>  // dispatch_layout
+#include <cuvs/distance/detail/pairwise_distance_cutlass_base.cuh>   // cutlassDistanceKernel
+#include <cuvs/distance/detail/pairwise_matrix/dispatch_layout.cuh>  // dispatch_layout
 
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 template <typename OpT,
           typename IdxT,
@@ -65,4 +65,4 @@ void pairwise_matrix_sm80_dispatch(OpT distance_op,
   dispatch_layout(params.is_row_major, vec_len, f);
 }
 
-};  // namespace raft::distance::detail
+};  // namespace cuvs::distance::detail

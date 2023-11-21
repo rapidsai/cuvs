@@ -20,11 +20,11 @@
 
 #include <common/benchmark.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/detail/refine.cuh>
+#include <cuvs/neighbors/refine.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/detail/refine.cuh>
-#include <raft/neighbors/refine.cuh>
 #include <raft/random/rng.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -34,9 +34,9 @@
 #include <iostream>
 #include <sstream>
 
-using namespace raft::neighbors;
+using namespace cuvs::neighbors;
 
-namespace raft::bench::neighbors {
+namespace cuvs::bench::neighbors {
 
 template <typename IdxT>
 inline auto operator<<(std::ostream& os, const RefineInputs<IdxT>& p) -> std::ostream&
@@ -63,7 +63,7 @@ class RefineAnn : public fixture {
 
     if (data.p.host_data) {
       loop_on_state(state, [this]() {
-        raft::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
+        cuvs::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
                                                               data.dataset_host.view(),
                                                               data.queries_host.view(),
                                                               data.candidates_host.view(),
@@ -73,7 +73,7 @@ class RefineAnn : public fixture {
       });
     } else {
       loop_on_state(state, [&]() {
-        raft::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
+        cuvs::neighbors::refine<IdxT, DataT, DistanceT, IdxT>(handle_,
                                                               data.dataset.view(),
                                                               data.queries.view(),
                                                               data.candidates.view(),
@@ -94,7 +94,7 @@ template <typename T>
 std::vector<RefineInputs<T>> getInputs()
 {
   std::vector<RefineInputs<T>> out;
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Expanded;
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
   for (bool host_data : {true, false}) {
     for (T n_queries : {1000, 10000}) {
       for (T dim : {128, 512}) {
@@ -106,4 +106,4 @@ std::vector<RefineInputs<T>> getInputs()
   return out;
 }
 
-}  // namespace raft::bench::neighbors
+}  // namespace cuvs::bench::neighbors

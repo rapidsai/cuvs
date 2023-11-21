@@ -19,7 +19,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include "../../test_utils.cuh"
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/sparse/neighbors/knn.cuh>
 
 #include <raft/util/cudart_utils.hpp>
@@ -47,7 +47,7 @@ struct SparseKNNInputs {
   int batch_size_index = 2;
   int batch_size_query = 2;
 
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2SqrtExpanded;
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded;
 };
 
 template <typename value_idx, typename value_t>
@@ -169,7 +169,7 @@ const std::vector<SparseKNNInputs<int, float>> inputs_i32_f = {
    2,
    2,
    2,
-   raft::distance::DistanceType::L2SqrtExpanded}};
+   cuvs::distance::DistanceType::L2SqrtExpanded}};
 typedef SparseKNNTest<int, float> SparseKNNTestF;
 TEST_P(SparseKNNTestF, Result) { compare(); }
 INSTANTIATE_TEST_CASE_P(SparseKNNTest, SparseKNNTestF, ::testing::ValuesIn(inputs_i32_f));

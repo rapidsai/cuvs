@@ -26,14 +26,14 @@
 
 #pragma message(__FILE__                                                    \
                   " is deprecated and will be removed in a future release." \
-                  " Please use the raft::neighbors version instead.")
+                  " Please use the cuvs::neighbors version instead.")
 
-#include <raft/neighbors/ivf_flat.cuh>
+#include <cuvs/neighbors/ivf_flat.cuh>
 
 namespace raft::spatial::knn::ivf_flat {
 
-using raft::neighbors::ivf_flat::build;
-using raft::neighbors::ivf_flat::extend;
-using raft::neighbors::ivf_flat::search;
+using cuvs::neighbors::ivf_flat::build;
+using cuvs::neighbors::ivf_flat::extend;
+using cuvs::neighbors::ivf_flat::search;
 
 };  // namespace raft::spatial::knn::ivf_flat

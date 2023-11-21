@@ -19,7 +19,7 @@
 #include <type_traits>  // std::false_type
 #include <utility>      // std::declval
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 // This file defines the named requirement "has_cutlass_op" that can be used to
 // determine if a distance operation has a CUTLASS op that can be used to pass
@@ -37,4 +37,4 @@ template <typename T>
 struct has_cutlass_op<T, std::void_t<decltype(std::declval<T>().get_cutlass_op())>>
   : std::true_type {};
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

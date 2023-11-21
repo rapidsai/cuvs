@@ -26,7 +26,7 @@
 #include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 template <typename EvalT, typename DataT, typename IdxT>
 RAFT_KERNEL naive_distance_kernel(EvalT* dist,
@@ -35,7 +35,7 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
                                   IdxT m,
                                   IdxT n,
                                   IdxT k,
-                                  raft::distance::DistanceType metric)
+                                  cuvs::distance::DistanceType metric)
 {
   IdxT midx = IdxT(threadIdx.x) + IdxT(blockIdx.x) * IdxT(blockDim.x);
   if (midx >= m) return;
@@ -48,13 +48,13 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
       auto xv   = EvalT(x[xidx]);
       auto yv   = EvalT(y[yidx]);
       switch (metric) {
-        case raft::distance::DistanceType::InnerProduct: {
+        case cuvs::distance::DistanceType::InnerProduct: {
           acc += xv * yv;
         } break;
-        case raft::distance::DistanceType::L2SqrtExpanded:
-        case raft::distance::DistanceType::L2SqrtUnexpanded:
-        case raft::distance::DistanceType::L2Expanded:
-        case raft::distance::DistanceType::L2Unexpanded: {
+        case cuvs::distance::DistanceType::L2SqrtExpanded:
+        case cuvs::distance::DistanceType::L2SqrtUnexpanded:
+        case cuvs::distance::DistanceType::L2Expanded:
+        case cuvs::distance::DistanceType::L2Unexpanded: {
           auto diff = xv - yv;
           acc += diff * diff;
         } break;
@@ -62,8 +62,8 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
       }
     }
     switch (metric) {
-      case raft::distance::DistanceType::L2SqrtExpanded:
-      case raft::distance::DistanceType::L2SqrtUnexpanded: {
+      case cuvs::distance::DistanceType::L2SqrtExpanded:
+      case cuvs::distance::DistanceType::L2SqrtUnexpanded: {
         acc = raft::sqrt(acc);
       } break;
       default: break;
@@ -88,7 +88,7 @@ void naive_knn(raft::resources const& handle,
                size_t input_len,
                size_t dim,
                uint32_t k,
-               raft::distance::DistanceType type)
+               cuvs::distance::DistanceType type)
 {
   rmm::mr::device_memory_resource* mr = nullptr;
   auto pool_guard                     = raft::get_pool_memory_resource(mr, 1024 * 1024);
@@ -119,10 +119,10 @@ void naive_knn(raft::resources const& handle,
                                           static_cast<int>(k),
                                           dist_topk + offset * k,
                                           indices_topk + offset * k,
-                                          type != raft::distance::DistanceType::InnerProduct,
+                                          type != cuvs::distance::DistanceType::InnerProduct,
                                           mr);
   }
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 }
 
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 
 namespace raft::runtime::distance {
 
@@ -30,7 +30,7 @@ void pairwise_distance(raft::resources const& handle,
                        int m,
                        int n,
                        int k,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        bool isRowMajor,
                        float metric_arg);
 
@@ -41,7 +41,7 @@ void pairwise_distance(raft::resources const& handle,
                        int m,
                        int n,
                        int k,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        bool isRowMajor,
                        float metric_arg);
 

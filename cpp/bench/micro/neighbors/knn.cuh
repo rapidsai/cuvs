@@ -21,10 +21,10 @@
 
 #include <raft/random/rng.cuh>
 
+#include <cuvs/neighbors/ivf_flat.cuh>
+#include <cuvs/neighbors/ivf_pq.cuh>
+#include <cuvs/neighbors/sample_filter.cuh>
 #include <raft/core/bitset.cuh>
-#include <raft/neighbors/ivf_flat.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
-#include <raft/neighbors/sample_filter.cuh>
 #include <raft/spatial/knn/knn.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -38,7 +38,7 @@
 
 #include <optional>
 
-namespace raft::bench::spatial {
+namespace cuvs::bench::spatial {
 
 struct params {
   /** Size of the dataset. */
@@ -141,16 +141,16 @@ template <typename ValT, typename IdxT>
 struct ivf_flat_knn {
   using dist_t = float;
 
-  std::optional<const raft::neighbors::ivf_flat::index<ValT, IdxT>> index;
-  raft::neighbors::ivf_flat::index_params index_params;
-  raft::neighbors::ivf_flat::search_params search_params;
+  std::optional<const cuvs::neighbors::ivf_flat::index<ValT, IdxT>> index;
+  cuvs::neighbors::ivf_flat::index_params index_params;
+  cuvs::neighbors::ivf_flat::search_params search_params;
   params ps;
 
   ivf_flat_knn(const raft::device_resources& handle, const params& ps, const ValT* data) : ps(ps)
   {
     index_params.n_lists = 4096;
-    index_params.metric  = raft::distance::DistanceType::L2Expanded;
-    index.emplace(raft::neighbors::ivf_flat::build(
+    index_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    index.emplace(cuvs::neighbors::ivf_flat::build(
       handle, index_params, data, IdxT(ps.n_samples), uint32_t(ps.n_dims)));
   }
 
@@ -160,7 +160,7 @@ struct ivf_flat_knn {
               IdxT* out_idxs)
   {
     search_params.n_probes = 20;
-    raft::neighbors::ivf_flat::search(
+    cuvs::neighbors::ivf_flat::search(
       handle, search_params, *index, search_items, ps.n_queries, ps.k, out_idxs, out_dists);
   }
 };
@@ -169,17 +169,17 @@ template <typename ValT, typename IdxT>
 struct ivf_pq_knn {
   using dist_t = float;
 
-  std::optional<const raft::neighbors::ivf_pq::index<IdxT>> index;
-  raft::neighbors::ivf_pq::index_params index_params;
-  raft::neighbors::ivf_pq::search_params search_params;
+  std::optional<const cuvs::neighbors::ivf_pq::index<IdxT>> index;
+  cuvs::neighbors::ivf_pq::index_params index_params;
+  cuvs::neighbors::ivf_pq::search_params search_params;
   params ps;
 
   ivf_pq_knn(const raft::device_resources& handle, const params& ps, const ValT* data) : ps(ps)
   {
     index_params.n_lists = 4096;
-    index_params.metric  = raft::distance::DistanceType::L2Expanded;
+    index_params.metric  = cuvs::distance::DistanceType::L2Expanded;
     auto data_view = raft::make_device_matrix_view<const ValT, IdxT>(data, ps.n_samples, ps.n_dims);
-    index.emplace(raft::neighbors::ivf_pq::build(handle, index_params, data_view));
+    index.emplace(cuvs::neighbors::ivf_pq::build(handle, index_params, data_view));
   }
 
   void search(const raft::device_resources& handle,
@@ -193,7 +193,7 @@ struct ivf_pq_knn {
     auto idxs_view = raft::make_device_matrix_view<IdxT, uint32_t>(out_idxs, ps.n_queries, ps.k);
     auto dists_view =
       raft::make_device_matrix_view<dist_t, uint32_t>(out_dists, ps.n_queries, ps.k);
-    raft::neighbors::ivf_pq::search(
+    cuvs::neighbors::ivf_pq::search(
       handle, search_params, *index, queries_view, idxs_view, dists_view);
   }
 };
@@ -233,9 +233,9 @@ template <typename ValT, typename IdxT>
 struct ivf_flat_filter_knn {
   using dist_t = float;
 
-  std::optional<const raft::neighbors::ivf_flat::index<ValT, IdxT>> index;
-  raft::neighbors::ivf_flat::index_params index_params;
-  raft::neighbors::ivf_flat::search_params search_params;
+  std::optional<const cuvs::neighbors::ivf_flat::index<ValT, IdxT>> index;
+  cuvs::neighbors::ivf_flat::index_params index_params;
+  cuvs::neighbors::ivf_flat::search_params search_params;
   raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset_;
   params ps;
 
@@ -243,8 +243,8 @@ struct ivf_flat_filter_knn {
     : ps(ps), removed_indices_bitset_(handle, ps.n_samples)
   {
     index_params.n_lists = 4096;
-    index_params.metric  = raft::distance::DistanceType::L2Expanded;
-    index.emplace(raft::neighbors::ivf_flat::build(
+    index_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    index.emplace(cuvs::neighbors::ivf_flat::build(
       handle, index_params, data, IdxT(ps.n_samples), uint32_t(ps.n_dims)));
     auto removed_indices =
       raft::make_device_vector<IdxT, int64_t>(handle, ps.removed_ratio * ps.n_samples);
@@ -265,13 +265,13 @@ struct ivf_flat_filter_knn {
       raft::make_device_matrix_view<const ValT, IdxT>(search_items, ps.n_queries, ps.n_dims);
     auto neighbors_view = raft::make_device_matrix_view<IdxT, IdxT>(out_idxs, ps.n_queries, ps.k);
     auto distance_view = raft::make_device_matrix_view<dist_t, IdxT>(out_dists, ps.n_queries, ps.k);
-    auto filter        = raft::neighbors::filtering::bitset_filter(removed_indices_bitset_.view());
+    auto filter        = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset_.view());
 
     if (ps.removed_ratio > 0) {
-      raft::neighbors::ivf_flat::search_with_filtering(
+      cuvs::neighbors::ivf_flat::search_with_filtering(
         handle, search_params, *index, queries_view, neighbors_view, distance_view, filter);
     } else {
-      raft::neighbors::ivf_flat::search(
+      cuvs::neighbors::ivf_flat::search(
         handle, search_params, *index, queries_view, neighbors_view, distance_view);
     }
   }
@@ -281,9 +281,9 @@ template <typename ValT, typename IdxT>
 struct ivf_pq_filter_knn {
   using dist_t = float;
 
-  std::optional<const raft::neighbors::ivf_pq::index<IdxT>> index;
-  raft::neighbors::ivf_pq::index_params index_params;
-  raft::neighbors::ivf_pq::search_params search_params;
+  std::optional<const cuvs::neighbors::ivf_pq::index<IdxT>> index;
+  cuvs::neighbors::ivf_pq::index_params index_params;
+  cuvs::neighbors::ivf_pq::search_params search_params;
   raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset_;
   params ps;
 
@@ -291,9 +291,9 @@ struct ivf_pq_filter_knn {
     : ps(ps), removed_indices_bitset_(handle, ps.n_samples)
   {
     index_params.n_lists = 4096;
-    index_params.metric  = raft::distance::DistanceType::L2Expanded;
+    index_params.metric  = cuvs::distance::DistanceType::L2Expanded;
     auto data_view = raft::make_device_matrix_view<const ValT, IdxT>(data, ps.n_samples, ps.n_dims);
-    index.emplace(raft::neighbors::ivf_pq::build(handle, index_params, data_view));
+    index.emplace(cuvs::neighbors::ivf_pq::build(handle, index_params, data_view));
     auto removed_indices =
       raft::make_device_vector<IdxT, int64_t>(handle, ps.removed_ratio * ps.n_samples);
     thrust::sequence(
@@ -315,13 +315,13 @@ struct ivf_pq_filter_knn {
       raft::make_device_matrix_view<IdxT, uint32_t>(out_idxs, ps.n_queries, ps.k);
     auto distance_view =
       raft::make_device_matrix_view<dist_t, uint32_t>(out_dists, ps.n_queries, ps.k);
-    auto filter = raft::neighbors::filtering::bitset_filter(removed_indices_bitset_.view());
+    auto filter = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset_.view());
 
     if (ps.removed_ratio > 0) {
-      raft::neighbors::ivf_pq::search_with_filtering(
+      cuvs::neighbors::ivf_pq::search_with_filtering(
         handle, search_params, *index, queries_view, neighbors_view, distance_view, filter);
     } else {
-      raft::neighbors::ivf_pq::search(
+      cuvs::neighbors::ivf_pq::search(
         handle, search_params, *index, queries_view, neighbors_view, distance_view);
     }
   }
@@ -506,4 +506,4 @@ inline const std::vector<Scope> kAllScopes{Scope::BUILD_SEARCH, Scope::SEARCH, S
   RAFT_BENCH_REGISTER(KNN, #ValT "/" #IdxT "/" #ImplT, inputs, strats, scope); \
   }
 
-}  // namespace raft::bench::spatial
+}  // namespace cuvs::bench::spatial

@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/brute_force.cuh>
+#include <cuvs/neighbors/brute_force.cuh>

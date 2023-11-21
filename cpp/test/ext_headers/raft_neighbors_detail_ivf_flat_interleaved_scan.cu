@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
+#include <cuvs/neighbors/detail/ivf_flat_interleaved_scan.cuh>

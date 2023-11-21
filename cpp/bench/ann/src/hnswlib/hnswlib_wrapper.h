@@ -35,7 +35,7 @@
 #include "../common/thread_pool.hpp"
 #include <hnswlib.h>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
 struct hnsw_dist_t {
@@ -227,4 +227,4 @@ void HnswLib<T>::get_search_knn_results_(const T* query,
   }
 }
 
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench

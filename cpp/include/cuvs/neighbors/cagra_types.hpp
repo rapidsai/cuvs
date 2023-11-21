@@ -19,13 +19,13 @@
 #include "ann_types.hpp"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/detail/cagra/utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/detail/cagra/utils.hpp>
 #include <raft/util/integer_utils.hpp>
 
 #include <memory>
@@ -35,7 +35,7 @@
 #include <type_traits>
 
 #include <raft/core/logger.hpp>
-namespace raft::neighbors::cagra {
+namespace cuvs::neighbors::cagra {
 /**
  * @addtogroup cagra
  * @{
@@ -137,7 +137,7 @@ struct index : ann::index {
 
  public:
   /** Distance metric used for clustering. */
-  [[nodiscard]] constexpr inline auto metric() const noexcept -> raft::distance::DistanceType
+  [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
   {
     return metric_;
   }
@@ -182,7 +182,7 @@ struct index : ann::index {
 
   /** Construct an empty index. */
   index(raft::resources const& res,
-        raft::distance::DistanceType metric = raft::distance::DistanceType::L2Expanded)
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : ann::index(),
       metric_(metric),
       dataset_(make_device_matrix<T, int64_t>(res, 0, 0)),
@@ -205,7 +205,7 @@ struct index : ann::index {
    *
    * - Cagra index is normally created by the cagra::build
    * @code{.cpp}
-   *   using namespace raft::neighbors::experimental;
+   *   using namespace cuvs::neighbors::experimental;
    *   auto dataset = raft::make_host_matrix<float, int64_t>(n_rows, n_cols);
    *   load_dataset(dataset.view());
    *   // use default index parameters
@@ -225,7 +225,7 @@ struct index : ann::index {
    *
    * - Constructing index using existing knn-graph
    * @code{.cpp}
-   *   using namespace raft::neighbors::experimental;
+   *   using namespace cuvs::neighbors::experimental;
    *
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
    *   auto knn_graph = raft::make_device_matrix<uint32_n, int64_t>(res, n_rows, graph_degree);
@@ -246,7 +246,7 @@ struct index : ann::index {
    */
   template <typename data_accessor, typename graph_accessor>
   index(raft::resources const& res,
-        raft::distance::DistanceType metric,
+        cuvs::distance::DistanceType metric,
         mdspan<const T, matrix_extent<int64_t>, row_major, data_accessor> dataset,
         mdspan<const IdxT, matrix_extent<int64_t>, row_major, graph_accessor> knn_graph)
     : ann::index(),
@@ -341,7 +341,7 @@ struct index : ann::index {
                    static_cast<size_t>(dataset_view_.stride(0)));
   }
 
-  raft::distance::DistanceType metric_;
+  cuvs::distance::DistanceType metric_;
   raft::device_matrix<T, int64_t, row_major> dataset_;
   raft::device_matrix<IdxT, int64_t, row_major> graph_;
   raft::device_matrix_view<const T, int64_t, layout_stride> dataset_view_;
@@ -350,14 +350,14 @@ struct index : ann::index {
 
 /** @} */
 
-}  // namespace raft::neighbors::cagra
+}  // namespace cuvs::neighbors::cagra
 
 // TODO: Remove deprecated experimental namespace in 23.12 release
-namespace raft::neighbors::experimental::cagra {
-using raft::neighbors::cagra::graph_build_algo;
-using raft::neighbors::cagra::hash_mode;
-using raft::neighbors::cagra::index;
-using raft::neighbors::cagra::index_params;
-using raft::neighbors::cagra::search_algo;
-using raft::neighbors::cagra::search_params;
-}  // namespace raft::neighbors::experimental::cagra
+namespace cuvs::neighbors::experimental::cagra {
+using cuvs::neighbors::cagra::graph_build_algo;
+using cuvs::neighbors::cagra::hash_mode;
+using cuvs::neighbors::cagra::index;
+using cuvs::neighbors::cagra::index_params;
+using cuvs::neighbors::cagra::search_algo;
+using cuvs::neighbors::cagra::search_params;
+}  // namespace cuvs::neighbors::experimental::cagra

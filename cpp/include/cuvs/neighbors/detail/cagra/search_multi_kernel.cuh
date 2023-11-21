@@ -19,13 +19,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 #include <iostream>
 #include <memory>
 #include <numeric>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 #include <vector>
@@ -41,7 +41,7 @@
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 namespace multi_kernel_search {
 
 template <class T>
@@ -376,7 +376,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   }
 
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                              raft::neighbors::filtering::none_cagra_sample_filter>::value) {
+                              cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
     if (!sample_filter(query_id, parent_index)) {
       parent_candidates_ptr[parent_list_index + (lds * query_id)] = utils::get_max_value<INDEX_T>();
       parent_distance_ptr[parent_list_index + (lds * query_id)] =
@@ -790,7 +790,7 @@ struct search : search_plan_impl<DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T> {
     auto result_distances_ptr = result_distances.data() + (iter & 0x1) * result_buffer_size;
 
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                raft::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
       // Remove parent bit in search results
       remove_parent_bit(num_queries,
                         result_buffer_size,
@@ -859,4 +859,4 @@ struct search : search_plan_impl<DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T> {
 };
 
 }  // namespace multi_kernel_search
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

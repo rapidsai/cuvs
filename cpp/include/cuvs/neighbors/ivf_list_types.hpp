@@ -23,7 +23,7 @@
 #include <limits>
 #include <type_traits>
 
-namespace raft::neighbors::ivf {
+namespace cuvs::neighbors::ivf {
 
 /**
  * Default value filled in the `indices` array.
@@ -76,4 +76,4 @@ struct enable_if_valid_list<list<SpecT, SizeT, SpecExtraArgs...>, T> {
 template <typename ListT, class T = void>
 using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
 
-}  // namespace raft::neighbors::ivf
+}  // namespace cuvs::neighbors::ivf

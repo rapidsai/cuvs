@@ -15,10 +15,10 @@
  */
 
 #include "update_centroids.cuh"
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 
 void update_centroids(raft::resources const& handle,
                       const double* X,
@@ -43,4 +43,4 @@ void update_centroids(raft::resources const& handle,
                                 weight_per_cluster);
 }
 
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

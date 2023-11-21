@@ -17,13 +17,13 @@
 #include "../test_utils.cuh"
 #include "../test_utils.h"
 #include <cstdio>
+#include <cuvs/distance/detail/compress_to_bits.cuh>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/detail/compress_to_bits.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -31,7 +31,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/itertools.hpp>
 
-namespace raft::distance::masked_nn::compress_to_bits {
+namespace cuvs::distance::masked_nn::compress_to_bits {
 
 /**
  * @brief Transpose and decompress 2D bitfield to boolean matrix
@@ -111,7 +111,7 @@ inline auto operator<<(std::ostream& os, const Params& p) -> std::ostream&
 template <typename T>
 void check_invertible(const Params& p)
 {
-  using raft::distance::detail::compress_to_bits;
+  using cuvs::distance::detail::compress_to_bits;
   constexpr int bits_per_elem = sizeof(T) * 8;
 
   // Make m and n that are safe to ceildiv.
@@ -156,7 +156,7 @@ void check_invertible(const Params& p)
 
 void check_all_true(const Params& p)
 {
-  using raft::distance::detail::compress_to_bits;
+  using cuvs::distance::detail::compress_to_bits;
   using T                     = uint64_t;
   constexpr int bits_per_elem = sizeof(T) * 8;
 
@@ -214,4 +214,4 @@ std::vector<Params> params = raft::util::itertools::product<Params>(
 
 INSTANTIATE_TEST_CASE_P(CompressToBits, CompressToBitsTest, ::testing::ValuesIn(params));
 
-}  // namespace raft::distance::masked_nn::compress_to_bits
+}  // namespace cuvs::distance::masked_nn::compress_to_bits

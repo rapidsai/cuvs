@@ -16,8 +16,8 @@
 
 #pragma once
 
+#include <cuvs/distance/distance.cuh>
 #include <memory>
-#include <raft/distance/distance.cuh>
 #include <raft/linalg/eltwise.cuh>
 #include <raft/linalg/power.cuh>
 #include <raft/linalg/subtract.cuh>

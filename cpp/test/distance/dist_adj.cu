@@ -15,10 +15,10 @@
  */
 
 #include "../test_utils.cuh"
+#include <cuvs/distance/distance.cuh>
 #include <gtest/gtest.h>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -112,15 +112,15 @@ class DistanceAdjTest : public ::testing::TestWithParam<DistanceAdjInputs<DataTy
     DataType threshold = params.eps;
 
     naiveDistanceAdj(dist_ref.data(), x.data(), y.data(), m, n, k, threshold, isRowMajor, stream);
-    size_t worksize = raft::distance::
-      getWorkspaceSize<raft::distance::DistanceType::L2Expanded, DataType, DataType, uint8_t>(
+    size_t worksize = cuvs::distance::
+      getWorkspaceSize<cuvs::distance::DistanceType::L2Expanded, DataType, DataType, uint8_t>(
         x.data(), y.data(), m, n, k);
     rmm::device_uvector<char> workspace(worksize, stream);
 
     using threshold_final_op_ = threshold_final_op<DataType, DataType, uint8_t, int>;
     threshold_final_op_ threshold_op(threshold);
 
-    raft::distance::distance<raft::distance::DistanceType::L2Expanded,
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2Expanded,
                              DataType,
                              DataType,
                              uint8_t,

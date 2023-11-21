@@ -19,12 +19,12 @@
 #include <cstddef>                                            // size_t
 #include <cstdint>                                            // uint32_t
 #include <cuda_fp16.h>                                        // __half
-#include <raft/neighbors/detail/selection_faiss_helpers.cuh>  // kFaissMaxK
+#include <cuvs/neighbors/detail/selection_faiss_helpers.cuh>  // kFaissMaxK
 #include <raft/util/raft_explicit.hpp>                        // RAFT_EXPLICIT
 
 #if defined(RAFT_EXPLICIT_INSTANTIATE_ONLY)
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename payload_t = int, typename key_t = float>
 void select_k(const key_t* inK,
@@ -36,12 +36,12 @@ void select_k(const key_t* inK,
               bool select_min,
               int k,
               cudaStream_t stream) RAFT_EXPLICIT;
-};  // namespace raft::neighbors::detail
+};  // namespace cuvs::neighbors::detail
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_detail_select_k(payload_t, key_t)           \
-  extern template void raft::neighbors::detail::select_k(const key_t* inK,     \
+  extern template void cuvs::neighbors::detail::select_k(const key_t* inK,     \
                                                          const payload_t* inV, \
                                                          size_t n_rows,        \
                                                          size_t n_cols,        \

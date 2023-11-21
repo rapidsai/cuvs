@@ -24,7 +24,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/spatial/knn/detail/epsilon_neighborhood.cuh>
 
-namespace raft::neighbors::epsilon_neighborhood {
+namespace cuvs::neighbors::epsilon_neighborhood {
 
 /**
  * @brief Computes epsilon neighborhood for the L2-Squared distance metric
@@ -72,10 +72,10 @@ void epsUnexpL2SqNeighborhood(bool* adj,
  * indptr array.
  *
  * @code{.cpp}
- *  #include <raft/neighbors/epsilon_neighborhood.cuh>
+ *  #include <cuvs/neighbors/epsilon_neighborhood.cuh>
  *  #include <raft/core/resources.hpp>
  *  #include <raft/core/device_mdarray.hpp>
- *  using namespace raft::neighbors;
+ *  using namespace cuvs::neighbors;
  *  raft::raft::resources handle;
  *  ...
  *  auto adj = raft::make_device_matrix<bool>(handle, m * n);
@@ -118,6 +118,6 @@ void eps_neighbors_l2sq(raft::resources const& handle,
 
 /** @} */  // end group epsilon_neighbors
 
-}  // namespace raft::neighbors::epsilon_neighborhood
+}  // namespace cuvs::neighbors::epsilon_neighborhood
 
 #endif

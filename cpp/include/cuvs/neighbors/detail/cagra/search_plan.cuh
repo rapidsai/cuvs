@@ -21,12 +21,12 @@
 // #include "search_single_cta.cuh"
 // #include "topk_for_cagra/topk_core.cuh"
 
+#include <cuvs/neighbors/cagra_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/cagra_types.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 
 struct search_plan_impl_base : public search_params {
   int64_t max_dim;
@@ -292,7 +292,7 @@ struct search_plan_impl : public search_plan_impl_base {
         std::to_string(hashmap_max_fill_rate) + " has been given.";
     }
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                raft::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
       if (hashmap_mode == hash_mode::SMALL) {
         error_message += "`SMALL` hash is not available when filtering";
       } else {
@@ -327,4 +327,4 @@ struct search_plan_impl : public search_plan_impl_base {
 // };
 /** @} */  // end group cagra
 
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

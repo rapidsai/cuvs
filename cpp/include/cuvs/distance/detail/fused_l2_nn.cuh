@@ -17,12 +17,12 @@
 #pragma once
 
 #include <cstddef>                                       // size_t
-#include <limits>                                        // std::numeric_limits
-#include <raft/core/kvp.hpp>                             // raft::KeyValuePair
-#include <raft/core/operators.hpp>                       // raft::identity_op
-#include <raft/distance/detail/distance_ops/l2_exp.cuh>  // ops::l2_exp_distance_op
-#include <raft/distance/detail/fused_distance_nn/cutlass_base.cuh>
-#include <raft/distance/detail/pairwise_distance_base.cuh>  // PairwiseDistances
+#include <cuvs/distance/detail/distance_ops/l2_exp.cuh>  // ops::l2_exp_distance_op
+#include <cuvs/distance/detail/fused_distance_nn/cutlass_base.cuh>
+#include <cuvs/distance/detail/pairwise_distance_base.cuh>  // PairwiseDistances
+#include <limits>                                           // std::numeric_limits
+#include <raft/core/kvp.hpp>                                // raft::KeyValuePair
+#include <raft/core/operators.hpp>                          // raft::identity_op
 #include <raft/linalg/contractions.cuh>                     // Policy
 #include <raft/util/arch.cuh>                               // raft::util::arch::SM_*
 #include <raft/util/cuda_utils.cuh>                         // raft::ceildiv, raft::shfl
@@ -336,7 +336,7 @@ void fusedL2NNImpl(OutT* min,
 
   if (cutlass_range.contains(runtime_arch)) {
     // If device is SM_80 or later, use CUTLASS-based kernel.
-    using L2Op                  = raft::distance::detail::ops::l2_exp_cutlass_op<DataT, DataT>;
+    using L2Op                  = cuvs::distance::detail::ops::l2_exp_cutlass_op<DataT, DataT>;
     using kvp_cg_min_reduce_op_ = kvp_cg_min_reduce_op<DataT, IdxT, OutT>;
     kvp_cg_min_reduce_op_ cg_reduce_op;
     L2Op L2_dist_op(sqrt);

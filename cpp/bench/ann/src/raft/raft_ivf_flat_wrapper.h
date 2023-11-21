@@ -16,6 +16,9 @@
 #pragma once
 
 #include <cassert>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_flat.cuh>
+#include <cuvs/neighbors/ivf_flat_types.hpp>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -23,10 +26,7 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/neighbors/ivf_flat.cuh>
-#include <raft/neighbors/ivf_flat_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
@@ -38,7 +38,7 @@
 #include "raft_ann_bench_utils.h"
 #include <raft/util/cudart_utils.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, typename IdxT>
 class RaftIvfFlatGpu : public ANN<T> {
@@ -46,10 +46,10 @@ class RaftIvfFlatGpu : public ANN<T> {
   using typename ANN<T>::AnnSearchParam;
 
   struct SearchParam : public AnnSearchParam {
-    raft::neighbors::ivf_flat::search_params ivf_flat_params;
+    cuvs::neighbors::ivf_flat::search_params ivf_flat_params;
   };
 
-  using BuildParam = raft::neighbors::ivf_flat::index_params;
+  using BuildParam = cuvs::neighbors::ivf_flat::index_params;
 
   RaftIvfFlatGpu(Metric metric, int dim, const BuildParam& param)
     : ANN<T>(metric, dim), index_params_(param), dimension_(dim)
@@ -88,8 +88,8 @@ class RaftIvfFlatGpu : public ANN<T> {
  private:
   raft::device_resources handle_;
   BuildParam index_params_;
-  raft::neighbors::ivf_flat::search_params search_params_;
-  std::optional<raft::neighbors::ivf_flat::index<T, IdxT>> index_;
+  cuvs::neighbors::ivf_flat::search_params search_params_;
+  std::optional<cuvs::neighbors::ivf_flat::index<T, IdxT>> index_;
   int device_;
   int dimension_;
 };
@@ -98,7 +98,7 @@ template <typename T, typename IdxT>
 void RaftIvfFlatGpu<T, IdxT>::build(const T* dataset, size_t nrow, cudaStream_t)
 {
   index_.emplace(
-    raft::neighbors::ivf_flat::build(handle_, index_params_, dataset, IdxT(nrow), dimension_));
+    cuvs::neighbors::ivf_flat::build(handle_, index_params_, dataset, IdxT(nrow), dimension_));
   return;
 }
 
@@ -113,14 +113,14 @@ void RaftIvfFlatGpu<T, IdxT>::set_search_param(const AnnSearchParam& param)
 template <typename T, typename IdxT>
 void RaftIvfFlatGpu<T, IdxT>::save(const std::string& file) const
 {
-  raft::neighbors::ivf_flat::serialize(handle_, file, *index_);
+  cuvs::neighbors::ivf_flat::serialize(handle_, file, *index_);
   return;
 }
 
 template <typename T, typename IdxT>
 void RaftIvfFlatGpu<T, IdxT>::load(const std::string& file)
 {
-  index_ = raft::neighbors::ivf_flat::deserialize<T, IdxT>(handle_, file);
+  index_ = cuvs::neighbors::ivf_flat::deserialize<T, IdxT>(handle_, file);
   return;
 }
 
@@ -129,9 +129,9 @@ void RaftIvfFlatGpu<T, IdxT>::search(
   const T* queries, int batch_size, int k, size_t* neighbors, float* distances, cudaStream_t) const
 {
   static_assert(sizeof(size_t) == sizeof(IdxT), "IdxT is incompatible with size_t");
-  raft::neighbors::ivf_flat::search(
+  cuvs::neighbors::ivf_flat::search(
     handle_, search_params_, *index_, queries, batch_size, k, (IdxT*)neighbors, distances);
   resource::sync_stream(handle_);
   return;
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

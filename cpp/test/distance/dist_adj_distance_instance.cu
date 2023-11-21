@@ -18,10 +18,10 @@
 
 #include "dist_adj_threshold.cuh"
 #include <cstdint>
-#include <raft/distance/distance-inl.cuh>
+#include <cuvs/distance/distance-inl.cuh>
 
 #define instantiate_raft_distance_distance(DT, DataT, AccT, OutT, FinalLambda, IdxT) \
-  template void raft::distance::distance<DT, DataT, AccT, OutT, FinalLambda, IdxT>(  \
+  template void cuvs::distance::distance<DT, DataT, AccT, OutT, FinalLambda, IdxT>(  \
     raft::resources const& handle,                                                   \
     const DataT* x,                                                                  \
     const DataT* y,                                                                  \
@@ -35,29 +35,29 @@
     bool isRowMajor,                                                                 \
     DataT metric_arg)
 
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2Expanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2Expanded,
                                    float,
                                    float,
                                    uint8_t,
-                                   raft::distance::threshold_float,
+                                   cuvs::distance::threshold_float,
                                    int);
 
-instantiate_raft_distance_distance(raft::distance::DistanceType::L2Expanded,
+instantiate_raft_distance_distance(cuvs::distance::DistanceType::L2Expanded,
                                    double,
                                    double,
                                    uint8_t,
-                                   raft::distance::threshold_double,
+                                   cuvs::distance::threshold_double,
                                    int);
 
 #undef instantiate_raft_distance_distance
 
 #define instantiate_raft_distance_getWorkspaceSize(DistT, DataT, AccT, OutT, IdxT)  \
-  template size_t raft::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>( \
+  template size_t cuvs::distance::getWorkspaceSize<DistT, DataT, AccT, OutT, IdxT>( \
     const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k)
 
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, float, float, uint8_t, int);
+  cuvs::distance::DistanceType::L2Expanded, float, float, uint8_t, int);
 instantiate_raft_distance_getWorkspaceSize(
-  raft::distance::DistanceType::L2Expanded, double, double, uint8_t, int);
+  cuvs::distance::DistanceType::L2Expanded, double, double, uint8_t, int);
 
 #undef instantiate_raft_distance_getWorkspaceSize

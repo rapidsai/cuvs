@@ -18,7 +18,7 @@
 
 #include "detail/ivf_pq_serialize.cuh"
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 /**
  * \defgroup ivf_pq_serialize IVF-PQ Serialize
@@ -104,7 +104,7 @@ void serialize(raft::resources const& handle, const std::string& filename, const
  * @param[in] handle the raft handle
  * @param[in] is input stream
  *
- * @return raft::neighbors::ivf_pq::index<IdxT>
+ * @return cuvs::neighbors::ivf_pq::index<IdxT>
  */
 template <typename IdxT>
 index<IdxT> deserialize(raft::resources const& handle, std::istream& is)
@@ -133,7 +133,7 @@ index<IdxT> deserialize(raft::resources const& handle, std::istream& is)
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
  *
- * @return raft::neighbors::ivf_pq::index<IdxT>
+ * @return cuvs::neighbors::ivf_pq::index<IdxT>
  */
 template <typename IdxT>
 index<IdxT> deserialize(raft::resources const& handle, const std::string& filename)
@@ -143,4 +143,4 @@ index<IdxT> deserialize(raft::resources const& handle, const std::string& filena
 
 /**@}*/
 
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq

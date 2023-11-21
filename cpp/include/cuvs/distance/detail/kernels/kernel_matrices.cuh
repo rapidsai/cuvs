@@ -19,13 +19,13 @@
 #include "gram_matrix.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <raft/distance/detail/kernels/rbf_fin_op.cuh>
-#include <raft/distance/distance.cuh>
+#include <cuvs/distance/detail/kernels/rbf_fin_op.cuh>
+#include <cuvs/distance/distance.cuh>
 #include <raft/linalg/gemm.cuh>
 #include <raft/sparse/linalg/norm.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-namespace raft::distance::kernels::detail {
+namespace cuvs::distance::kernels::detail {
 
 /** Epiloge function for polynomial kernel without padding.
  * Calculates output = (gain*in + offset)^exponent
@@ -755,7 +755,7 @@ class RBFKernel : public GramMatrixBase<math_t> {
     raft::resources handle;
     resource::set_cuda_stream(handle, stream);
 
-    raft::distance::distance<raft::distance::DistanceType::L2Unexpanded,
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2Unexpanded,
                              math_t,
                              math_t,
                              math_t,
@@ -774,4 +774,4 @@ class RBFKernel : public GramMatrixBase<math_t> {
   }
 };
 
-};  // end namespace raft::distance::kernels::detail
+};  // end namespace cuvs::distance::kernels::detail

@@ -18,15 +18,15 @@
 
 #include <cstdint>  // int64_t
 
+#include <cuvs/neighbors/ivf_pq_types.hpp>        // cuvs::neighbors::ivf_pq::index
 #include <raft/core/device_mdspan.hpp>            // raft::device_matrix_view
 #include <raft/core/resources.hpp>                // raft::resources
-#include <raft/neighbors/ivf_pq_types.hpp>        // raft::neighbors::ivf_pq::index
 #include <raft/util/raft_explicit.hpp>            // RAFT_EXPLICIT
 #include <rmm/mr/device/per_device_resource.hpp>  // rmm::mr::device_memory_resource
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 template <typename T, typename IdxT = uint32_t>
 index<IdxT> build(raft::resources const& handle,
@@ -85,7 +85,7 @@ void extend(raft::resources const& handle,
 
 template <typename T, typename IdxT, typename IvfSampleFilterT>
 void search_with_filtering(raft::resources const& handle,
-                           const raft::neighbors::ivf_pq::search_params& params,
+                           const cuvs::neighbors::ivf_pq::search_params& params,
                            const index<IdxT>& idx,
                            const T* queries,
                            uint32_t n_queries,
@@ -96,7 +96,7 @@ void search_with_filtering(raft::resources const& handle,
 
 template <typename T, typename IdxT>
 void search(raft::resources const& handle,
-            const raft::neighbors::ivf_pq::search_params& params,
+            const cuvs::neighbors::ivf_pq::search_params& params,
             const index<IdxT>& idx,
             const T* queries,
             uint32_t n_queries,
@@ -108,7 +108,7 @@ template <typename T, typename IdxT, typename IvfSampleFilterT>
 [[deprecated(
   "Drop the `mr` argument and use `raft::resource::set_workspace_resource` instead")]] void
 search_with_filtering(raft::resources const& handle,
-                      const raft::neighbors::ivf_pq::search_params& params,
+                      const cuvs::neighbors::ivf_pq::search_params& params,
                       const index<IdxT>& idx,
                       const T* queries,
                       uint32_t n_queries,
@@ -122,7 +122,7 @@ template <typename T, typename IdxT>
 [[deprecated(
   "Drop the `mr` argument and use `raft::resource::set_workspace_resource` instead")]] void
 search(raft::resources const& handle,
-       const raft::neighbors::ivf_pq::search_params& params,
+       const cuvs::neighbors::ivf_pq::search_params& params,
        const index<IdxT>& idx,
        const T* queries,
        uint32_t n_queries,
@@ -131,23 +131,23 @@ search(raft::resources const& handle,
        float* distances,
        rmm::mr::device_memory_resource* mr) RAFT_EXPLICIT;
 
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_ivf_pq_build(T, IdxT)                                        \
-  extern template raft::neighbors::ivf_pq::index<IdxT> raft::neighbors::ivf_pq::build<T, IdxT>( \
+  extern template cuvs::neighbors::ivf_pq::index<IdxT> cuvs::neighbors::ivf_pq::build<T, IdxT>( \
     raft::resources const& handle,                                                              \
-    const raft::neighbors::ivf_pq::index_params& params,                                        \
+    const cuvs::neighbors::ivf_pq::index_params& params,                                        \
     raft::device_matrix_view<const T, IdxT, row_major> dataset);                                \
                                                                                                 \
-  extern template auto raft::neighbors::ivf_pq::build(                                          \
+  extern template auto cuvs::neighbors::ivf_pq::build(                                          \
     raft::resources const& handle,                                                              \
-    const raft::neighbors::ivf_pq::index_params& params,                                        \
+    const cuvs::neighbors::ivf_pq::index_params& params,                                        \
     const T* dataset,                                                                           \
     IdxT n_rows,                                                                                \
     uint32_t dim)                                                                               \
-    ->raft::neighbors::ivf_pq::index<IdxT>;
+    ->cuvs::neighbors::ivf_pq::index<IdxT>;
 
 instantiate_raft_neighbors_ivf_pq_build(float, int64_t);
 instantiate_raft_neighbors_ivf_pq_build(int8_t, int64_t);
@@ -156,29 +156,29 @@ instantiate_raft_neighbors_ivf_pq_build(uint8_t, int64_t);
 #undef instantiate_raft_neighbors_ivf_pq_build
 
 #define instantiate_raft_neighbors_ivf_pq_extend(T, IdxT)                                        \
-  extern template raft::neighbors::ivf_pq::index<IdxT> raft::neighbors::ivf_pq::extend<T, IdxT>( \
+  extern template cuvs::neighbors::ivf_pq::index<IdxT> cuvs::neighbors::ivf_pq::extend<T, IdxT>( \
     raft::resources const& handle,                                                               \
     raft::device_matrix_view<const T, IdxT, row_major> new_vectors,                              \
     std::optional<raft::device_vector_view<const IdxT, IdxT, row_major>> new_indices,            \
-    const raft::neighbors::ivf_pq::index<IdxT>& idx);                                            \
+    const cuvs::neighbors::ivf_pq::index<IdxT>& idx);                                            \
                                                                                                  \
-  extern template void raft::neighbors::ivf_pq::extend<T, IdxT>(                                 \
+  extern template void cuvs::neighbors::ivf_pq::extend<T, IdxT>(                                 \
     raft::resources const& handle,                                                               \
     raft::device_matrix_view<const T, IdxT, row_major> new_vectors,                              \
     std::optional<raft::device_vector_view<const IdxT, IdxT, row_major>> new_indices,            \
-    raft::neighbors::ivf_pq::index<IdxT>* idx);                                                  \
+    cuvs::neighbors::ivf_pq::index<IdxT>* idx);                                                  \
                                                                                                  \
-  extern template auto raft::neighbors::ivf_pq::extend<T, IdxT>(                                 \
+  extern template auto cuvs::neighbors::ivf_pq::extend<T, IdxT>(                                 \
     raft::resources const& handle,                                                               \
-    const raft::neighbors::ivf_pq::index<IdxT>& idx,                                             \
+    const cuvs::neighbors::ivf_pq::index<IdxT>& idx,                                             \
     const T* new_vectors,                                                                        \
     const IdxT* new_indices,                                                                     \
     IdxT n_rows)                                                                                 \
-    ->raft::neighbors::ivf_pq::index<IdxT>;                                                      \
+    ->cuvs::neighbors::ivf_pq::index<IdxT>;                                                      \
                                                                                                  \
-  extern template void raft::neighbors::ivf_pq::extend<T, IdxT>(                                 \
+  extern template void cuvs::neighbors::ivf_pq::extend<T, IdxT>(                                 \
     raft::resources const& handle,                                                               \
-    raft::neighbors::ivf_pq::index<IdxT>* idx,                                                   \
+    cuvs::neighbors::ivf_pq::index<IdxT>* idx,                                                   \
     const T* new_vectors,                                                                        \
     const IdxT* new_indices,                                                                     \
     IdxT n_rows);
@@ -190,18 +190,18 @@ instantiate_raft_neighbors_ivf_pq_extend(uint8_t, int64_t);
 #undef instantiate_raft_neighbors_ivf_pq_extend
 
 #define instantiate_raft_neighbors_ivf_pq_search(T, IdxT)            \
-  extern template void raft::neighbors::ivf_pq::search<T, IdxT>(     \
+  extern template void cuvs::neighbors::ivf_pq::search<T, IdxT>(     \
     raft::resources const& handle,                                   \
-    const raft::neighbors::ivf_pq::search_params& params,            \
-    const raft::neighbors::ivf_pq::index<IdxT>& idx,                 \
+    const cuvs::neighbors::ivf_pq::search_params& params,            \
+    const cuvs::neighbors::ivf_pq::index<IdxT>& idx,                 \
     raft::device_matrix_view<const T, uint32_t, row_major> queries,  \
     raft::device_matrix_view<IdxT, uint32_t, row_major> neighbors,   \
     raft::device_matrix_view<float, uint32_t, row_major> distances); \
                                                                      \
-  extern template void raft::neighbors::ivf_pq::search<T, IdxT>(     \
+  extern template void cuvs::neighbors::ivf_pq::search<T, IdxT>(     \
     raft::resources const& handle,                                   \
-    const raft::neighbors::ivf_pq::search_params& params,            \
-    const raft::neighbors::ivf_pq::index<IdxT>& idx,                 \
+    const cuvs::neighbors::ivf_pq::search_params& params,            \
+    const cuvs::neighbors::ivf_pq::index<IdxT>& idx,                 \
     const T* queries,                                                \
     uint32_t n_queries,                                              \
     uint32_t k,                                                      \
@@ -209,10 +209,10 @@ instantiate_raft_neighbors_ivf_pq_extend(uint8_t, int64_t);
     float* distances,                                                \
     rmm::mr::device_memory_resource* mr);                            \
                                                                      \
-  extern template void raft::neighbors::ivf_pq::search<T, IdxT>(     \
+  extern template void cuvs::neighbors::ivf_pq::search<T, IdxT>(     \
     raft::resources const& handle,                                   \
-    const raft::neighbors::ivf_pq::search_params& params,            \
-    const raft::neighbors::ivf_pq::index<IdxT>& idx,                 \
+    const cuvs::neighbors::ivf_pq::search_params& params,            \
+    const cuvs::neighbors::ivf_pq::index<IdxT>& idx,                 \
     const T* queries,                                                \
     uint32_t n_queries,                                              \
     uint32_t k,                                                      \

@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/neighbors/detail/ivf_pq_build.cuh>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_pq_types.hpp>
 
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -29,7 +29,7 @@
 #include <fstream>
 #include <memory>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 // Serialization version
 // No backward compatibility yet; that is, can't add additional fields without breaking
@@ -133,8 +133,8 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
   auto pq_dim  = deserialize_scalar<std::uint32_t>(handle_, is);
   auto cma     = deserialize_scalar<bool>(handle_, is);
 
-  auto metric        = deserialize_scalar<raft::distance::DistanceType>(handle_, is);
-  auto codebook_kind = deserialize_scalar<raft::neighbors::ivf_pq::codebook_gen>(handle_, is);
+  auto metric        = deserialize_scalar<cuvs::distance::DistanceType>(handle_, is);
+  auto codebook_kind = deserialize_scalar<cuvs::neighbors::ivf_pq::codebook_gen>(handle_, is);
   auto n_lists       = deserialize_scalar<std::uint32_t>(handle_, is);
 
   RAFT_LOG_DEBUG("n_rows %zu, dim %d, pq_dim %d, pq_bits %d, n_lists %d",
@@ -144,7 +144,7 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  auto index = raft::neighbors::ivf_pq::index<IdxT>(
+  auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
   deserialize_mdspan(handle_, is, index.pq_centers());
@@ -188,4 +188,4 @@ auto deserialize(raft::resources const& handle_, const std::string& filename) ->
   return index;
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

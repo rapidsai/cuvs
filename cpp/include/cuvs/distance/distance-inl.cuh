@@ -15,10 +15,10 @@
  */
 #pragma once
 
+#include <cuvs/distance/detail/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/detail/distance.cuh>
-#include <raft/distance/distance_types.hpp>
 #include <rmm/device_uvector.hpp>
 #include <type_traits>
 
@@ -58,7 +58,7 @@ namespace distance {
  * as follows:  <pre>OutT fin_op(AccT in, int g_idx);</pre>. If one needs
  * any other parameters, feel free to pass them via closure.
  */
-template <raft::distance::DistanceType DistT,
+template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
@@ -100,7 +100,7 @@ void distance(raft::resources const& handle,
  * @param isRowMajor whether the matrices are row-major or col-major
  * @param metric_arg metric argument (used for Minkowski distance)
  */
-template <raft::distance::DistanceType DistT,
+template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
@@ -137,7 +137,7 @@ void distance(raft::resources const& handle,
  * @note If the specified DistT doesn't need the workspace at all, it
  * returns 0.
  */
-template <raft::distance::DistanceType DistT,
+template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
@@ -161,7 +161,7 @@ size_t getWorkspaceSize(const DataT* x, const DataT* y, IdxT m, IdxT n, IdxT k)
  * @note If the specified DistT doesn't need the workspace at all, it
  * returns 0.
  */
-template <raft::distance::DistanceType DistT,
+template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
@@ -193,7 +193,7 @@ size_t getWorkspaceSize(raft::device_matrix_view<DataT, IdxT, layout> const& x,
  * @param isRowMajor whether the matrices are row-major or col-major
  * @param metric_arg metric argument (used for Minkowski distance)
  */
-template <raft::distance::DistanceType DistT,
+template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
@@ -243,7 +243,7 @@ void pairwise_distance(raft::resources const& handle,
                        IdxT n,
                        IdxT k,
                        rmm::device_uvector<char>& workspace,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        bool isRowMajor = true,
                        Type metric_arg = 2.0f)
 {
@@ -272,7 +272,7 @@ void pairwise_distance(raft::resources const& handle,
     case DistanceType::HellingerExpanded:
       dispatch(std::integral_constant<DistanceType, DistanceType::HellingerExpanded>{});
       break;
-    case raft::distance::DistanceType::InnerProduct:
+    case cuvs::distance::DistanceType::InnerProduct:
       dispatch(std::integral_constant<DistanceType, DistanceType::InnerProduct>{});
       break;
     case DistanceType::JensenShannon:
@@ -333,7 +333,7 @@ void pairwise_distance(raft::resources const& handle,
                        IdxT m,
                        IdxT n,
                        IdxT k,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        bool isRowMajor = true,
                        Type metric_arg = 2.0f)
 {
@@ -360,7 +360,7 @@ void pairwise_distance(raft::resources const& handle,
  * #include <raft/core/resources.hpp>
  * #include <raft/core/device_mdarray.hpp>
  * #include <raft/random/make_blobs.cuh>
- * #include <raft/distance/distance.cuh>
+ * #include <cuvs/distance/distance.cuh>
  *
  * raft::raft::resources handle;
  * int n_samples = 5000;
@@ -371,8 +371,8 @@ void pairwise_distance(raft::resources const& handle,
  * auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
  *
  * raft::random::make_blobs(handle, input.view(), labels.view());
- * auto metric = raft::distance::DistanceType::L2SqrtExpanded;
- * raft::distance::pairwise_distance(handle, input.view(), input.view(), output.view(), metric);
+ * auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
+ * cuvs::distance::pairwise_distance(handle, input.view(), input.view(), output.view(), metric);
  * @endcode
  *
  * @tparam DistanceType which distance to evaluate
@@ -386,7 +386,7 @@ void pairwise_distance(raft::resources const& handle,
  * @param dist output distance matrix (size n*m)
  * @param metric_arg metric argument (used for Minkowski distance)
  */
-template <raft::distance::DistanceType DistT,
+template <cuvs::distance::DistanceType DistT,
           typename DataT,
           typename AccT,
           typename OutT,
@@ -439,7 +439,7 @@ void pairwise_distance(raft::resources const& handle,
                        device_matrix_view<Type, IdxT, layout> const x,
                        device_matrix_view<Type, IdxT, layout> const y,
                        device_matrix_view<Type, IdxT, layout> dist,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        Type metric_arg = 2.0f)
 {
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");

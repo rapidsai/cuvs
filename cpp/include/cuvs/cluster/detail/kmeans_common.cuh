@@ -294,7 +294,7 @@ void pairwise_distance_kmeans(raft::resources const& handle,
                               raft::device_matrix_view<const DataT, IndexT> centroids,
                               raft::device_matrix_view<DataT, IndexT> pairwiseDistance,
                               rmm::device_uvector<char>& workspace,
-                              raft::distance::DistanceType metric)
+                              cuvs::distance::DistanceType metric)
 {
   auto n_samples  = X.extent(0);
   auto n_features = X.extent(1);
@@ -303,7 +303,7 @@ void pairwise_distance_kmeans(raft::resources const& handle,
   ASSERT(X.extent(1) == centroids.extent(1),
          "# features in dataset and centroids are different (must be same)");
 
-  raft::distance::pairwise_distance(handle,
+  cuvs::distance::pairwise_distance(handle,
                                     X.data_handle(),
                                     centroids.data_handle(),
                                     pairwiseDistance.data_handle(),
@@ -358,7 +358,7 @@ void minClusterAndDistanceCompute(
   raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
   raft::device_vector_view<const DataT, IndexT> L2NormX,
   rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-  raft::distance::DistanceType metric,
+  cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
   rmm::device_uvector<char>& workspace)
@@ -368,8 +368,8 @@ void minClusterAndDistanceCompute(
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
   // todo(lsugy): change batch size computation when using fusedL2NN!
-  bool is_fused = metric == raft::distance::DistanceType::L2Expanded ||
-                  metric == raft::distance::DistanceType::L2SqrtExpanded;
+  bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
+                  metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   auto dataBatchSize = is_fused ? (IndexT)n_samples : getDataBatchSize(batch_samples, n_samples);
   auto centroidsBatchSize = getCentroidsBatchSize(batch_centroids, n_clusters);
 
@@ -426,7 +426,7 @@ void minClusterAndDistanceCompute(
       workspace.resize((sizeof(int)) * ns, stream);
 
       // todo(lsugy): remove cIdx
-      raft::distance::fusedL2NNMinReduce<DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
+      cuvs::distance::fusedL2NNMinReduce<DataT, raft::KeyValuePair<IndexT, DataT>, IndexT>(
         minClusterAndDistanceView.data_handle(),
         datasetView.data_handle(),
         centroids.data_handle(),
@@ -436,7 +436,7 @@ void minClusterAndDistanceCompute(
         n_clusters,
         n_features,
         (void*)workspace.data(),
-        metric != raft::distance::DistanceType::L2Expanded,
+        metric != cuvs::distance::DistanceType::L2Expanded,
         false,
         stream);
     } else {
@@ -491,7 +491,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
                                raft::device_vector_view<DataT, IndexT> minClusterDistance,
                                raft::device_vector_view<DataT, IndexT> L2NormX,
                                rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-                               raft::distance::DistanceType metric,
+                               cuvs::distance::DistanceType metric,
                                int batch_samples,
                                int batch_centroids,
                                rmm::device_uvector<char>& workspace)
@@ -501,8 +501,8 @@ void minClusterDistanceCompute(raft::resources const& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
 
-  bool is_fused = metric == raft::distance::DistanceType::L2Expanded ||
-                  metric == raft::distance::DistanceType::L2SqrtExpanded;
+  bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
+                  metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   auto dataBatchSize = is_fused ? (IndexT)n_samples : getDataBatchSize(batch_samples, n_samples);
   auto centroidsBatchSize = getCentroidsBatchSize(batch_centroids, n_clusters);
 
@@ -553,7 +553,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
     if (is_fused) {
       workspace.resize((sizeof(IndexT)) * ns, stream);
 
-      raft::distance::fusedL2NNMinReduce<DataT, DataT, IndexT>(
+      cuvs::distance::fusedL2NNMinReduce<DataT, DataT, IndexT>(
         minClusterDistanceView.data_handle(),
         datasetView.data_handle(),
         centroids.data_handle(),
@@ -563,7 +563,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
         n_clusters,
         n_features,
         (void*)workspace.data(),
-        metric != raft::distance::DistanceType::L2Expanded,
+        metric != cuvs::distance::DistanceType::L2Expanded,
         false,
         stream);
     } else {

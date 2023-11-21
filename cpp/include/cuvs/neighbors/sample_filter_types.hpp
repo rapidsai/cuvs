@@ -21,7 +21,7 @@
 
 #include <raft/core/detail/macros.hpp>
 
-namespace raft::neighbors::filtering {
+namespace cuvs::neighbors::filtering {
 
 /* A filter that filters nothing. This is the default behavior. */
 struct none_ivf_sample_filter {
@@ -128,7 +128,7 @@ struct ivf_to_sample_filter {
  *   filter_type filter(raft_ivfpq_index.inds_ptrs().data_handle());
  *
  * Use it as:
- *   raft::neighbors::ivf_pq::search_with_filtering<data_t, idx_t, filter_type>(
+ *   cuvs::neighbors::ivf_pq::search_with_filtering<data_t, idx_t, filter_type>(
  *     ...regular parameters here...,
  *     filter
  *   );
@@ -172,4 +172,4 @@ struct ivf_to_sample_filter {
  *   }
  * };
  */
-}  // namespace raft::neighbors::filtering
+}  // namespace cuvs::neighbors::filtering

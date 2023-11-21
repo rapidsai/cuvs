@@ -30,10 +30,10 @@
 
 #include <raft/util/cuda_utils.cuh>
 
-#include <raft/neighbors/detail/faiss_select/key_value_block_select.cuh>
+#include <cuvs/neighbors/detail/faiss_select/key_value_block_select.cuh>
 
+#include <cuvs/neighbors/brute_force.cuh>
 #include <raft/matrix/copy.cuh>
-#include <raft/neighbors/brute_force.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/sparse/convert/csr.cuh>
 
@@ -188,7 +188,7 @@ void k_closest_landmarks(raft::resources const& handle,
 {
   std::vector<raft::device_matrix_view<const value_t, value_int>> inputs = {index.get_R()};
 
-  raft::neighbors::brute_force::knn<value_idx, value_t, value_int>(
+  cuvs::neighbors::brute_force::knn<value_idx, value_t, value_int>(
     handle,
     inputs,
     make_device_matrix_view(query_pts, n_query_pts, inputs[0].extent(1)),

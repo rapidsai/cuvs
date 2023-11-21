@@ -17,6 +17,9 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
+#include <cuvs/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/sample_filter.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan.hpp>
@@ -24,21 +27,18 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/neighbors/ivf_flat_types.hpp>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/sample_filter.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/fast_int_div.cuh>
 #include <thrust/functional.h>
 
 #include <cuvs_internal/neighbors/naive_knn.cuh>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_flat.cuh>
+#include <cuvs/neighbors/ivf_flat_helpers.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/matrix/gather.cuh>
-#include <raft/neighbors/ivf_flat.cuh>
-#include <raft/neighbors/ivf_flat_helpers.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/spatial/knn/ann.cuh>
 #include <raft/spatial/knn/knn.cuh>
@@ -56,7 +56,7 @@
 #include <iostream>
 #include <vector>
 
-namespace raft::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat {
 
 struct test_ivf_sample_filter {
   static constexpr unsigned offset = 300;
@@ -70,7 +70,7 @@ struct AnnIvfFlatInputs {
   IdxT k;
   IdxT nprobe;
   IdxT nlist;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   bool adaptive_centers;
 };
 
@@ -491,7 +491,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           search_queries_view,
           indices_ivfflat_dev.view(),
           distances_ivfflat_dev.view(),
-          raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+          cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
         update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);
@@ -547,47 +547,47 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // test various dims (aligned and not aligned to vector sizes)
-  {1000, 10000, 1, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 2, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 3, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 4, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 5, 16, 40, 1024, raft::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 8, 16, 40, 1024, raft::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 5, 16, 40, 1024, raft::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 10000, 8, 16, 40, 1024, raft::distance::DistanceType::L2SqrtExpanded, true},
+  {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
 
   // test dims that do not fit into kernel shared memory limits
-  {1000, 10000, 2048, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2049, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 2050, 16, 40, 1024, raft::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 2051, 16, 40, 1024, raft::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 2052, 16, 40, 1024, raft::distance::DistanceType::InnerProduct, false},
-  {1000, 10000, 2053, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 2056, 16, 40, 1024, raft::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
 
   // various random combinations
-  {1000, 10000, 16, 10, 40, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 50, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 10000, 16, 10, 70, 1024, raft::distance::DistanceType::L2Expanded, false},
-  {100, 10000, 16, 10, 20, 512, raft::distance::DistanceType::L2Expanded, false},
-  {20, 100000, 16, 10, 20, 1024, raft::distance::DistanceType::L2Expanded, true},
-  {1000, 100000, 16, 10, 20, 1024, raft::distance::DistanceType::L2Expanded, true},
-  {10000, 131072, 8, 10, 20, 1024, raft::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false},
 
-  {1000, 10000, 16, 10, 40, 1024, raft::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 16, 10, 50, 1024, raft::distance::DistanceType::InnerProduct, true},
-  {1000, 10000, 16, 10, 70, 1024, raft::distance::DistanceType::InnerProduct, false},
-  {100, 10000, 16, 10, 20, 512, raft::distance::DistanceType::InnerProduct, true},
-  {20, 100000, 16, 10, 20, 1024, raft::distance::DistanceType::InnerProduct, true},
-  {1000, 100000, 16, 10, 20, 1024, raft::distance::DistanceType::InnerProduct, false},
-  {10000, 131072, 8, 10, 50, 1024, raft::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
 
-  {1000, 10000, 4096, 20, 50, 1024, raft::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
 
   // test splitting the big query batches  (> max gridDim.y) into smaller batches
-  {100000, 1024, 32, 10, 64, 64, raft::distance::DistanceType::InnerProduct, false},
-  {1000000, 1024, 32, 10, 256, 256, raft::distance::DistanceType::InnerProduct, false},
-  {98306, 1024, 32, 10, 64, 64, raft::distance::DistanceType::InnerProduct, true},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000000, 1024, 32, 10, 256, 256, cuvs::distance::DistanceType::InnerProduct, false},
+  {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, true},
 
   // test radix_sort for getting the cluster selection
   {1000,
@@ -596,7 +596,7 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
    10,
    raft::matrix::detail::select::warpsort::kMaxCapacity * 2,
    raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
-   raft::distance::DistanceType::L2Expanded,
+   cuvs::distance::DistanceType::L2Expanded,
    false},
   {1000,
    10000,
@@ -604,12 +604,12 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
    10,
    raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
    raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
-   raft::distance::DistanceType::InnerProduct,
+   cuvs::distance::DistanceType::InnerProduct,
    false},
 
   // The following two test cases should show very similar recall.
   // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, adaptive_centers
-  {20000, 8712, 3, 10, 51, 66, raft::distance::DistanceType::L2Expanded, false},
-  {100000, 8712, 3, 10, 51, 66, raft::distance::DistanceType::L2Expanded, false}};
+  {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false}};
 
-}  // namespace raft::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

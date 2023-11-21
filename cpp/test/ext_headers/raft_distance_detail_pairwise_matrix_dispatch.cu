@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/distance/detail/pairwise_matrix/dispatch.cuh>
+#include <cuvs/distance/detail/pairwise_matrix/dispatch.cuh>

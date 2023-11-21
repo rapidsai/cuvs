@@ -17,17 +17,17 @@
 #pragma once
 
 #include <cuda_fp16.h>                               // __half
+#include <cuvs/distance/distance_types.hpp>          // cuvs::distance::DistanceType
+#include <cuvs/neighbors/detail/ivf_pq_fp_8bit.cuh>  // cuvs::neighbors::ivf_pq::detail::fp_8bit
+#include <cuvs/neighbors/ivf_pq_types.hpp>           // cuvs::neighbors::ivf_pq::codebook_gen
+#include <cuvs/neighbors/sample_filter_types.hpp>    // none_ivf_sample_filter
 #include <raft/core/detail/macros.hpp>               // RAFT_WEAK_FUNCTION
-#include <raft/distance/distance_types.hpp>          // raft::distance::DistanceType
-#include <raft/neighbors/detail/ivf_pq_fp_8bit.cuh>  // raft::neighbors::ivf_pq::detail::fp_8bit
-#include <raft/neighbors/ivf_pq_types.hpp>           // raft::neighbors::ivf_pq::codebook_gen
-#include <raft/neighbors/sample_filter_types.hpp>    // none_ivf_sample_filter
 #include <raft/util/raft_explicit.hpp>               // RAFT_EXPLICIT
 #include <rmm/cuda_stream_view.hpp>                  // rmm::cuda_stream_view
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 // is_local_topk_feasible is not inline here, because we would have to define it
 // here as well. That would run the risk of the definitions here and in the
@@ -130,14 +130,14 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                uint32_t topk)
   -> selected<OutT, LutT, IvfSampleFilterT> RAFT_EXPLICIT;
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(                 \
   OutT, LutT, IvfSampleFilterT)                                                             \
   extern template auto                                                                      \
-  raft::neighbors::ivf_pq::detail::compute_similarity_select<OutT, LutT, IvfSampleFilterT>( \
+  cuvs::neighbors::ivf_pq::detail::compute_similarity_select<OutT, LutT, IvfSampleFilterT>( \
     const cudaDeviceProp& dev_props,                                                        \
     bool manage_local_topk,                                                                 \
     int locality_hint,                                                                      \
@@ -148,19 +148,19 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
     uint32_t n_queries,                                                                     \
     uint32_t n_probes,                                                                      \
     uint32_t topk)                                                                          \
-    ->raft::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT>;              \
+    ->cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT>;              \
                                                                                             \
   extern template void                                                                      \
-  raft::neighbors::ivf_pq::detail::compute_similarity_run<OutT, LutT, IvfSampleFilterT>(    \
-    raft::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT> s,              \
+  cuvs::neighbors::ivf_pq::detail::compute_similarity_run<OutT, LutT, IvfSampleFilterT>(    \
+    cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT> s,              \
     rmm::cuda_stream_view stream,                                                           \
     uint32_t dim,                                                                           \
     uint32_t n_probes,                                                                      \
     uint32_t pq_dim,                                                                        \
     uint32_t n_queries,                                                                     \
     uint32_t queries_offset,                                                                \
-    raft::distance::DistanceType metric,                                                    \
-    raft::neighbors::ivf_pq::codebook_gen codebook_kind,                                    \
+    cuvs::distance::DistanceType metric,                                                    \
+    cuvs::neighbors::ivf_pq::codebook_gen codebook_kind,                                    \
     uint32_t topk,                                                                          \
     uint32_t max_samples,                                                                   \
     const float* cluster_centers,                                                           \
@@ -179,39 +179,39 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
 #define COMMA ,
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
-  raft::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
-  raft::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
   half,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
   half,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
   float,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
-  raft::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 instantiate_raft_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
-  raft::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
-  raft::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA raft::neighbors::filtering::none_ivf_sample_filter>);
+  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
+  cuvs::neighbors::filtering::ivf_to_sample_filter<
+    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
 
 #undef COMMA
 

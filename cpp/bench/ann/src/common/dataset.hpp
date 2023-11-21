@@ -36,7 +36,7 @@ typedef uint16_t half;
 #include <type_traits>
 #include <vector>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 // http://big-ann-benchmarks.com/index.html:
 // binary format that starts with 8 bytes of data consisting of num_points(uint32_t)
@@ -498,4 +498,4 @@ void BinDataset<T>::map_base_set_() const
   this->mapped_base_set_ = base_file_.map();
 }
 
-}  // namespace  raft::bench::ann
+}  // namespace  cuvs::bench

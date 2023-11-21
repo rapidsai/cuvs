@@ -16,6 +16,10 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/ivf_flat_build.cuh>
+#include <cuvs/neighbors/detail/ivf_flat_interleaved_scan.cuh>
+#include <cuvs/neighbors/detail/refine_common.hpp>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
@@ -23,18 +27,14 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/neighbors/detail/ivf_flat_build.cuh>
-#include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
-#include <raft/neighbors/detail/refine_common.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <thrust/sequence.h>
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 /**
- * See raft::neighbors::refine for docs.
+ * See cuvs::neighbors::refine for docs.
  */
 template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
 void refine_device(raft::resources const& handle,
@@ -77,17 +77,17 @@ void refine_device(raft::resources const& handle,
                    fake_coarse_idx.data(),
                    fake_coarse_idx.data() + n_queries);
 
-  raft::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
+  cuvs::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
     handle, metric, n_queries, false, true, dim);
 
-  raft::neighbors::ivf_flat::detail::fill_refinement_index(handle,
+  cuvs::neighbors::ivf_flat::detail::fill_refinement_index(handle,
                                                            &refinement_index,
                                                            dataset.data_handle(),
                                                            neighbor_candidates.data_handle(),
                                                            n_queries,
                                                            n_candidates);
   uint32_t grid_dim_x = 1;
-  raft::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<
+  cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<
     data_t,
     typename raft::spatial::knn::detail::utils::config<data_t>::value_t,
     idx_t>(refinement_index,
@@ -98,12 +98,12 @@ void refine_device(raft::resources const& handle,
            refinement_index.metric(),
            1,
            k,
-           raft::distance::is_min_close(metric),
-           raft::neighbors::filtering::none_ivf_sample_filter(),
+           cuvs::distance::is_min_close(metric),
+           cuvs::neighbors::filtering::none_ivf_sample_filter(),
            indices.data_handle(),
            distances.data_handle(),
            grid_dim_x,
            resource::get_cuda_stream(handle));
 }
 
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

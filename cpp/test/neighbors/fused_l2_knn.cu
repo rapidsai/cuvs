@@ -18,13 +18,13 @@
 #include "./knn_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/brute_force.cuh>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/brute_force.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/spatial/knn/knn.cuh>
 
-#include <raft/distance/distance.cuh>
+#include <cuvs/distance/distance.cuh>
 
 #include <rmm/device_buffer.hpp>
 
@@ -42,7 +42,7 @@ struct FusedL2KNNInputs {
   int num_db_vecs;
   int dim;
   int k;
-  raft::distance::DistanceType metric_;
+  cuvs::distance::DistanceType metric_;
 };
 
 template <typename T>
@@ -101,7 +101,7 @@ class FusedL2KNNTest : public ::testing::TestWithParam<FusedL2KNNInputs> {
       raft::make_device_matrix_view<int64_t, int64_t>(raft_indices_.data(), num_queries, k_);
     auto out_dists_view =
       raft::make_device_matrix_view<T, int64_t>(raft_distances_.data(), num_queries, k_);
-    raft::neighbors::brute_force::fused_l2_knn(
+    cuvs::neighbors::brute_force::fused_l2_knn(
       handle_, index_view, query_view, out_indices_view, out_dists_view, metric);
 
     // verify.
@@ -143,26 +143,26 @@ class FusedL2KNNTest : public ::testing::TestWithParam<FusedL2KNNInputs> {
   rmm::device_uvector<int64_t> ref_indices_;
   rmm::device_uvector<T> ref_distances_;
   int k_;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
 };
 
 const std::vector<FusedL2KNNInputs> inputs = {
-  {100, 1000, 16, 10, raft::distance::DistanceType::L2Expanded},
-  {256, 256, 30, 10, raft::distance::DistanceType::L2Expanded},
-  {1000, 10000, 16, 10, raft::distance::DistanceType::L2Expanded},
-  {100, 1000, 16, 50, raft::distance::DistanceType::L2Expanded},
-  {20, 10000, 16, 10, raft::distance::DistanceType::L2Expanded},
-  {1000, 10000, 16, 50, raft::distance::DistanceType::L2Expanded},
-  {1000, 10000, 32, 50, raft::distance::DistanceType::L2Expanded},
-  {10000, 40000, 32, 30, raft::distance::DistanceType::L2Expanded},
+  {100, 1000, 16, 10, cuvs::distance::DistanceType::L2Expanded},
+  {256, 256, 30, 10, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 10, cuvs::distance::DistanceType::L2Expanded},
+  {100, 1000, 16, 50, cuvs::distance::DistanceType::L2Expanded},
+  {20, 10000, 16, 10, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 16, 50, cuvs::distance::DistanceType::L2Expanded},
+  {1000, 10000, 32, 50, cuvs::distance::DistanceType::L2Expanded},
+  {10000, 40000, 32, 30, cuvs::distance::DistanceType::L2Expanded},
   // L2 unexpanded
-  {100, 1000, 16, 10, raft::distance::DistanceType::L2Unexpanded},
-  {1000, 10000, 16, 10, raft::distance::DistanceType::L2Unexpanded},
-  {100, 1000, 16, 50, raft::distance::DistanceType::L2Unexpanded},
-  {20, 10000, 16, 50, raft::distance::DistanceType::L2Unexpanded},
-  {1000, 10000, 16, 50, raft::distance::DistanceType::L2Unexpanded},
-  {1000, 10000, 32, 50, raft::distance::DistanceType::L2Unexpanded},
-  {10000, 40000, 32, 30, raft::distance::DistanceType::L2Unexpanded},
+  {100, 1000, 16, 10, cuvs::distance::DistanceType::L2Unexpanded},
+  {1000, 10000, 16, 10, cuvs::distance::DistanceType::L2Unexpanded},
+  {100, 1000, 16, 50, cuvs::distance::DistanceType::L2Unexpanded},
+  {20, 10000, 16, 50, cuvs::distance::DistanceType::L2Unexpanded},
+  {1000, 10000, 16, 50, cuvs::distance::DistanceType::L2Unexpanded},
+  {1000, 10000, 32, 50, cuvs::distance::DistanceType::L2Unexpanded},
+  {10000, 40000, 32, 30, cuvs::distance::DistanceType::L2Unexpanded},
 };
 
 typedef FusedL2KNNTest<float> FusedL2KNNTestF;

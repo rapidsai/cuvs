@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/detail/ivf_flat_search.cuh>
+#include <cuvs/neighbors/detail/ivf_flat_search.cuh>

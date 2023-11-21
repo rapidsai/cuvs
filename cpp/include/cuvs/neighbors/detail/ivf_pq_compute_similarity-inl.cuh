@@ -16,18 +16,18 @@
 
 #pragma once
 
-#include <raft/distance/distance_types.hpp>  // raft::distance::DistanceType
+#include <cuvs/distance/distance_types.hpp>                   // cuvs::distance::DistanceType
+#include <cuvs/neighbors/detail/ivf_pq_dummy_block_sort.cuh>  // dummy_block_sort_t
+#include <cuvs/neighbors/ivf_pq_types.hpp>                    // codebook_gen
+#include <cuvs/neighbors/sample_filter_types.hpp>             // none_ivf_sample_filter
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
-#include <raft/neighbors/detail/ivf_pq_dummy_block_sort.cuh>  // dummy_block_sort_t
-#include <raft/neighbors/ivf_pq_types.hpp>                    // codebook_gen
-#include <raft/neighbors/sample_filter_types.hpp>             // none_ivf_sample_filter
-#include <raft/util/cuda_rt_essentials.hpp>                   // RAFT_CUDA_TRY
-#include <raft/util/device_atomics.cuh>                       // raft::atomicMin
-#include <raft/util/pow2_utils.cuh>                           // raft::Pow2
-#include <raft/util/vectorized.cuh>                           // raft::TxN_t
-#include <rmm/cuda_stream_view.hpp>                           // rmm::cuda_stream_view
+#include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
+#include <raft/util/device_atomics.cuh>      // raft::atomicMin
+#include <raft/util/pow2_utils.cuh>          // raft::Pow2
+#include <raft/util/vectorized.cuh>          // raft::TxN_t
+#include <rmm/cuda_stream_view.hpp>          // rmm::cuda_stream_view
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 /**
  * Maximum value of k for the fused calculate & select in ivfpq.
@@ -512,7 +512,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
 // The signature of the kernel defined by a minimal set of template parameters
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 using compute_similarity_kernel_t =
   decltype(&compute_similarity_kernel<OutT, LutT, IvfSampleFilterT, 8, 0, true, true>);
 
@@ -521,7 +521,7 @@ template <typename OutT,
           typename LutT,
           bool PrecompBaseDiff,
           bool EnableSMemLut,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 struct compute_similarity_kernel_config {
  public:
   static auto get(uint32_t pq_bits, uint32_t k_max)
@@ -571,7 +571,7 @@ template <typename OutT,
           typename LutT,
           bool PrecompBaseDiff,
           bool EnableSMemLut,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 auto get_compute_similarity_kernel(uint32_t pq_bits, uint32_t k_max)
   -> compute_similarity_kernel_t<OutT, LutT, IvfSampleFilterT>
 {
@@ -616,7 +616,7 @@ struct selected {
 
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                             rmm::cuda_stream_view stream,
                             uint32_t dim,
@@ -681,7 +681,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
  */
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                bool manage_local_topk,
                                int locality_hint,
@@ -938,4 +938,4 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
   return selected_config;
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

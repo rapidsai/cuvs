@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <raft/neighbors/ann_types.hpp>
-#include <raft/neighbors/ivf_list_types.hpp>
+#include <cuvs/neighbors/ann_types.hpp>
+#include <cuvs/neighbors/ivf_list_types.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/util/integer_utils.hpp>
 
 #include <thrust/fill.h>
@@ -32,7 +32,7 @@
 #include <memory>
 #include <type_traits>
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 /**
  * @addtogroup ivf_pq
@@ -304,7 +304,7 @@ struct index : ann::index {
     return 1 << pq_bits();
   }
   /** Distance metric used for clustering. */
-  [[nodiscard]] constexpr inline auto metric() const noexcept -> raft::distance::DistanceType
+  [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
   {
     return metric_;
   }
@@ -333,7 +333,7 @@ struct index : ann::index {
 
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& handle,
-        raft::distance::DistanceType metric,
+        cuvs::distance::DistanceType metric,
         codebook_gen codebook_kind,
         uint32_t n_lists,
         uint32_t dim,
@@ -496,7 +496,7 @@ struct index : ann::index {
    *   // extend the IVF lists while building the index
    *   index_params.add_data_on_build = true;
    *   // create and fill the index from a [N, D] dataset
-   *   auto index = raft::neighbors::ivf_pq::build<int64_t>(res, index_params, dataset, N, D);
+   *   auto index = cuvs::neighbors::ivf_pq::build<int64_t>(res, index_params, dataset, N, D);
    *   // Fetch the size of the fourth list
    *   uint32_t size = index.get_list_size_in_bytes(3);
    * @endcode
@@ -512,7 +512,7 @@ struct index : ann::index {
   }
 
  private:
-  raft::distance::DistanceType metric_;
+  cuvs::distance::DistanceType metric_;
   codebook_gen codebook_kind_;
   uint32_t dim_;
   uint32_t pq_bits_;
@@ -574,4 +574,4 @@ struct index : ann::index {
 
 /** @} */
 
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq

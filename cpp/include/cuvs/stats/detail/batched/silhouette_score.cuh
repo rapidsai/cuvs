@@ -137,12 +137,12 @@ rmm::device_uvector<value_t> get_pairwise_distance(raft::resources const& handle
                                                    value_idx& n_left_rows,
                                                    value_idx& n_right_rows,
                                                    value_idx& n_cols,
-                                                   raft::distance::DistanceType metric,
+                                                   cuvs::distance::DistanceType metric,
                                                    cudaStream_t stream)
 {
   rmm::device_uvector<value_t> distances(n_left_rows * n_right_rows, stream);
 
-  raft::distance::pairwise_distance(
+  cuvs::distance::pairwise_distance(
     handle, left_begin, right_begin, distances.data(), n_left_rows, n_right_rows, n_cols, metric);
 
   return distances;
@@ -180,7 +180,7 @@ value_t silhouette_score(
   label_idx n_labels,
   value_t* scores,
   value_idx chunk,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2Unexpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   ASSERT(n_labels >= 2 && n_labels <= (n_rows - 1),
          "silhouette Score not defined for the given number of labels!");

@@ -35,12 +35,12 @@
 
 #include "../nn_descent_types.hpp"
 
+#include <cuvs/neighbors/detail/cagra/device_common.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/cagra/device_common.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -48,7 +48,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-namespace raft::neighbors::experimental::nn_descent::detail {
+namespace cuvs::neighbors::experimental::nn_descent::detail {
 
 using pinned_memory_resource = thrust::universal_host_pinned_memory_resource;
 template <typename T>
@@ -1349,7 +1349,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
         graph_shrink_buffer[i * build_config_.node_degree + j] = id;
       } else {
         graph_shrink_buffer[i * build_config_.node_degree + j] =
-          raft::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
       }
     }
   }
@@ -1451,4 +1451,4 @@ index<IdxT> build(raft::resources const& res,
   return idx;
 }
 
-}  // namespace raft::neighbors::experimental::nn_descent::detail
+}  // namespace cuvs::neighbors::experimental::nn_descent::detail

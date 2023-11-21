@@ -47,12 +47,12 @@ using KeyValueIndexOp = detail::KeyValueIndexOp<IndexT, DataT>;
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
- *   using namespace raft::cluster;
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
+ *   using namespace cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
- *   raft::cluster::KMeansParams params;
+ *   cuvs::cluster::KMeansParams params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -101,12 +101,12 @@ void fit(raft::resources const& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
- *   using namespace raft::cluster;
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
+ *   using namespace cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
- *   raft::cluster::KMeansParams params;
+ *   cuvs::cluster::KMeansParams params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -168,12 +168,12 @@ void predict(raft::resources const& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
- *   using namespace raft::cluster;
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
+ *   using namespace cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
- *   raft::cluster::KMeansParams params;
+ *   cuvs::cluster::KMeansParams params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
@@ -269,12 +269,12 @@ void transform(raft::resources const& handle,
  *
  *  @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
  *
  *   #include <raft/random/make_blobs.cuh>
  *
- *   using namespace raft::cluster;
+ *   using namespace cuvs::cluster;
  *
  *   raft::handle_t handle;
  *   int n_samples = 100, n_features = 15, n_clusters = 10;
@@ -437,7 +437,7 @@ void min_cluster_distance(raft::resources const& handle,
                           raft::device_vector_view<DataT, IndexT> minClusterDistance,
                           raft::device_vector_view<DataT, IndexT> L2NormX,
                           rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-                          raft::distance::DistanceType metric,
+                          cuvs::distance::DistanceType metric,
                           int batch_samples,
                           int batch_centroids,
                           rmm::device_uvector<char>& workspace)
@@ -488,7 +488,7 @@ void min_cluster_and_distance(
   raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
   raft::device_vector_view<DataT, IndexT> L2NormX,
   rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-  raft::distance::DistanceType metric,
+  cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
   rmm::device_uvector<char>& workspace)
@@ -629,11 +629,11 @@ void fit_main(raft::resources const& handle,
 
 };  // namespace cuvs::cluster::kmeans
 
-namespace raft::cluster {
+namespace cuvs::cluster {
 
 /**
- * Note: All of the functions below in raft::cluster are deprecated and will
- * be removed in a future release. Please use raft::cluster::kmeans instead.
+ * Note: All of the functions below in cuvs::cluster are deprecated and will
+ * be removed in a future release. Please use cuvs::cluster::kmeans instead.
  */
 
 /**
@@ -1113,4 +1113,4 @@ void kmeans_fit_main(raft::resources const& handle,
   kmeans::fit_main<DataT, IndexT>(
     handle, params, X, weight, centroidsRawData, inertia, n_iter, workspace);
 }
-};  // namespace raft::cluster
+};  // namespace cuvs::cluster

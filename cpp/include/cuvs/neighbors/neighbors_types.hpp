@@ -20,7 +20,7 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 /** A single batch of nearest neighbors in device memory */
 template <typename T, typename IdxT>
@@ -60,4 +60,4 @@ class batch {
   raft::device_matrix<IdxT, int64_t> indices_;
   raft::device_matrix<T, int64_t> distances_;
 };
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

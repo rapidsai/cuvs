@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 #include <common/benchmark.hpp>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/kernels.cuh>
 #include <memory>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/resource/cublas_handle.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/kernels.cuh>
 #include <raft/random/rng.cuh>
 #include <sstream>
 #include <string>
 #include <vector>
 
-namespace raft::bench::distance::kernels {
+namespace cuvs::bench::distance::kernels {
 
-using namespace raft::distance::kernels;
+using namespace cuvs::distance::kernels;
 struct GramTestParams {
   int m;  // m parameter of the GEMM
   int k;  // k parameter of the GEMM
@@ -117,4 +117,4 @@ static std::vector<GramTestParams> getInputs()
 RAFT_BENCH_REGISTER(GramMatrix<float>, "", getInputs());
 RAFT_BENCH_REGISTER(GramMatrix<double>, "", getInputs());
 
-}  // namespace raft::bench::distance::kernels
+}  // namespace cuvs::bench::distance::kernels

@@ -15,10 +15,10 @@
  */
 #pragma once
 
-#include <raft/neighbors/sample_filter_types.hpp>  // none_cagra_sample_filter
+#include <cuvs/neighbors/sample_filter_types.hpp>  // none_cagra_sample_filter
 #include <raft/util/raft_explicit.hpp>             // RAFT_EXPLICIT
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 
 namespace multi_cta_search {
 #define instantiate_kernel_selection(                                                       \
@@ -51,13 +51,13 @@ namespace multi_cta_search {
     cudaStream_t stream);
 
 instantiate_kernel_selection(
-  32, 1024, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  32, 1024, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_kernel_selection(
-  8, 128, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  8, 128, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_kernel_selection(
-  16, 256, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  16, 256, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_kernel_selection(
-  32, 512, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  32, 512, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 
 #undef instantiate_kernel_selection
 }  // namespace multi_cta_search
@@ -95,13 +95,13 @@ namespace single_cta_search {
     cudaStream_t stream);
 
 instantiate_single_cta_select_and_run(
-  32, 1024, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  32, 1024, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_single_cta_select_and_run(
-  8, 128, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  8, 128, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_single_cta_select_and_run(
-  16, 256, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  16, 256, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_single_cta_select_and_run(
-  32, 512, float, uint64_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  32, 512, float, uint64_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 
 }  // namespace single_cta_search
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

@@ -20,12 +20,13 @@
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-#include <raft/neighbors/detail/ivf_pq_compute_similarity.cuh>
-#include <raft/neighbors/detail/ivf_pq_dummy_block_sort.cuh>
-#include <raft/neighbors/detail/ivf_pq_fp_8bit.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
+#include <cuvs/neighbors/detail/ivf_pq_compute_similarity.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_dummy_block_sort.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_fp_8bit.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -34,7 +35,6 @@
 #include <raft/core/resource/detail/device_memory_resource.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
@@ -55,7 +55,7 @@
 
 #include <optional>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 using namespace raft::spatial::knn::detail;  // NOLINT
 
@@ -75,7 +75,7 @@ void select_clusters(raft::resources const& handle,
                      uint32_t n_lists,
                      uint32_t dim,
                      uint32_t dim_ext,
-                     raft::distance::DistanceType metric,
+                     cuvs::distance::DistanceType metric,
                      const T* queries,              // [n_queries, dim]
                      const float* cluster_centers,  // [n_lists, dim_ext]
                      rmm::mr::device_memory_resource* mr)
@@ -103,9 +103,9 @@ void select_clusters(raft::resources const& handle,
  */
   float norm_factor;
   switch (metric) {
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
-    case raft::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
+    case cuvs::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
   auto float_queries_view =
@@ -121,14 +121,14 @@ void select_clusters(raft::resources const& handle,
   float beta;
   uint32_t gemm_k = dim;
   switch (metric) {
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded: {
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded: {
       alpha  = -2.0;
       beta   = 0.0;
       gemm_k = dim + 1;
       RAFT_EXPECTS(gemm_k <= dim_ext, "unexpected gemm_k or dim_ext");
     } break;
-    case raft::distance::DistanceType::InnerProduct: {
+    case cuvs::distance::DistanceType::InnerProduct: {
       alpha = -1.0;
       beta  = 0.0;
     } break;
@@ -647,7 +647,7 @@ struct ivfpq_search {
   {
     bool signed_metric = false;
     switch (metric) {
-      case raft::distance::DistanceType::InnerProduct: signed_metric = true; break;
+      case cuvs::distance::DistanceType::InnerProduct: signed_metric = true; break;
       default: break;
     }
 
@@ -728,7 +728,7 @@ inline auto get_max_batch_size(raft::resources const& res,
 /** See raft::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 inline void search(raft::resources const& handle,
                    const search_params& params,
                    const index<IdxT>& index,
@@ -794,7 +794,7 @@ inline void search(raft::resources const& handle,
   rmm::device_uvector<float> rot_queries(max_queries * index.rot_dim(), stream, mr);
   rmm::device_uvector<uint32_t> clusters_to_probe(max_queries * n_probes, stream, mr);
 
-  auto filter_adapter = raft::neighbors::filtering::ivf_to_sample_filter(
+  auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
   auto search_instance = ivfpq_search<IdxT, decltype(filter_adapter)>::fun(params, index.metric());
 
@@ -857,4 +857,4 @@ inline void search(raft::resources const& handle,
   }
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

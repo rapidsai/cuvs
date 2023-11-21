@@ -15,10 +15,10 @@
  */
 
 #include "cluster_cost.cuh"
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 
-namespace raft::runtime::cluster::kmeans {
+namespace cuvs::runtime::cluster::kmeans {
 
 void cluster_cost(raft::resources const& handle,
                   const float* X,
@@ -30,4 +30,4 @@ void cluster_cost(raft::resources const& handle,
 {
   cluster_cost<float, int>(handle, X, n_samples, n_features, n_clusters, centroids, cost);
 }
-}  // namespace raft::runtime::cluster::kmeans
+}  // namespace cuvs::runtime::cluster::kmeans

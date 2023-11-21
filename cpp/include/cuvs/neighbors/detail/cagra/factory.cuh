@@ -20,14 +20,14 @@
 #include "search_multi_kernel.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
-#include <raft/neighbors/sample_filter_types.hpp>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 
 template <typename T,
           typename IdxT               = uint32_t,
           typename DistanceT          = float,
-          typename CagraSampleFilterT = raft::neighbors::filtering::none_cagra_sample_filter>
+          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_cagra_sample_filter>
 class factory {
  public:
   /**
@@ -94,4 +94,4 @@ class factory {
     }
   }
 };
-};  // namespace raft::neighbors::cagra::detail
+};  // namespace cuvs::neighbors::cagra::detail

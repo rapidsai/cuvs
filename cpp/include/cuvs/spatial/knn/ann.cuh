@@ -41,7 +41,7 @@ template <typename T = float, typename value_idx = int>
 approx_knn_build_index(raft::resources& handle,
                        raft::spatial::knn::knnIndex* index,
                        knnIndexParam* params,
-                       raft::distance::DistanceType metric,
+                       cuvs::distance::DistanceType metric,
                        float metricArg,
                        T* index_array,
                        value_idx n,

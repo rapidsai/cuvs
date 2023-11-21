@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
+#include <cuvs/distance/distance.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance.cuh>
 #include <raft/matrix/col_wise_sort.cuh>
 #include <raft/spatial/knn/knn.cuh>
 #include <rmm/device_scalar.hpp>
@@ -87,7 +87,7 @@ RAFT_KERNEL compute_rank(double* rank,
  * @param[out] indices KNN indexes
  * @param[out] distances KNN distances
  */
-template <raft::distance::DistanceType distance_type, typename math_t>
+template <cuvs::distance::DistanceType distance_type, typename math_t>
 void run_knn(const raft::resources& h,
              math_t* input,
              int n,
@@ -128,7 +128,7 @@ void run_knn(const raft::resources& h,
  * @param batchSize Batch size
  * @return Trustworthiness score
  */
-template <typename math_t, raft::distance::DistanceType distance_type>
+template <typename math_t, cuvs::distance::DistanceType distance_type>
 double trustworthiness_score(const raft::resources& h,
                              const math_t* X,
                              math_t* X_embedded,
@@ -159,7 +159,7 @@ double trustworthiness_score(const raft::resources& h,
     int curBatchSize = min(toDo, batchSize);
 
     // Takes at most batchSize vectors at a time
-    raft::distance::pairwise_distance(
+    cuvs::distance::pairwise_distance(
       h, &X[(n - toDo) * m], X, X_dist.data(), curBatchSize, n, m, distance_type);
 
     size_t colSortWorkspaceSize = 0;

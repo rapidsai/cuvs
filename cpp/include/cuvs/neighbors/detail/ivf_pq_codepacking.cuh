@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -28,7 +28,7 @@
 
 #include <variant>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 /** A chunk of PQ-encoded vector managed by one CUDA thread. */
 using pq_vec_t = TxN_t<uint8_t, kIndexGroupVecLen>::io_t;
@@ -211,4 +211,4 @@ __device__ void write_list(
   }
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

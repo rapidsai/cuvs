@@ -19,10 +19,10 @@
 
 #pragma once
 
+#include <cuvs/distance/detail/masked_nn.cuh>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <limits>
 #include <raft/core/handle.hpp>
-#include <raft/distance/detail/masked_nn.cuh>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <stdint.h>
 
@@ -41,13 +41,13 @@ namespace distance {
  *
  * Usage example:
  * @code{.cpp}
- * #include <raft/distance/masked_nn.cuh>
+ * #include <cuvs/distance/masked_nn.cuh>
  *
  * using IdxT        = int;
  * using DataT       = float;
- * using RedOpT      = raft::distance::MinAndDistanceReduceOp<IdxT, DataT>;
- * using PairRedOpT  = raft::distance::KVPMinReduce<IdxT, DataT>;
- * using ParamT      = raft::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
+ * using RedOpT      = cuvs::distance::MinAndDistanceReduceOp<IdxT, DataT>;
+ * using PairRedOpT  = cuvs::distance::KVPMinReduce<IdxT, DataT>;
+ * using ParamT      = cuvs::distance::masked_l2_nn_params<RedOpT, PairRedOpT>;
  *
  * bool init_out = true;
  * bool sqrt     = false;
@@ -146,7 +146,7 @@ struct masked_l2_nn_params {
  */
 template <typename DataT, typename OutT, typename IdxT, typename ReduceOpT, typename KVPReduceOpT>
 void masked_l2_nn(raft::resources const& handle,
-                  raft::distance::masked_l2_nn_params<ReduceOpT, KVPReduceOpT> params,
+                  cuvs::distance::masked_l2_nn_params<ReduceOpT, KVPReduceOpT> params,
                   raft::device_matrix_view<const DataT, IdxT, raft::layout_c_contiguous> x,
                   raft::device_matrix_view<const DataT, IdxT, raft::layout_c_contiguous> y,
                   raft::device_vector_view<const DataT, IdxT, raft::layout_c_contiguous> x_norm,

@@ -21,12 +21,12 @@ namespace raft {
 namespace distance {
 
 template <typename DataType>
-class DistanceEucExpTest : public DistanceTest<raft::distance::DistanceType::L2Expanded, DataType> {
+class DistanceEucExpTest : public DistanceTest<cuvs::distance::DistanceType::L2Expanded, DataType> {
 };
 
 template <typename DataType>
 class DistanceEucExpTestXequalY
-  : public DistanceTestSameBuffer<raft::distance::DistanceType::L2Expanded, DataType> {};
+  : public DistanceTestSameBuffer<cuvs::distance::DistanceType::L2Expanded, DataType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 2048, 4096, 128, true, 1234ULL},
@@ -107,7 +107,7 @@ TEST_P(DistanceEucExpTestD, Result)
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceEucExpTestD, ::testing::ValuesIn(inputsd));
 
-class BigMatrixEucExp : public BigMatrixDistanceTest<raft::distance::DistanceType::L2Expanded> {};
+class BigMatrixEucExp : public BigMatrixDistanceTest<cuvs::distance::DistanceType::L2Expanded> {};
 TEST_F(BigMatrixEucExp, Result) {}
 }  // end namespace distance
 }  // end namespace raft

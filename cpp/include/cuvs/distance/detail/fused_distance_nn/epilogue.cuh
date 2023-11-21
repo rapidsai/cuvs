@@ -69,10 +69,10 @@ operation.
 #include <cutlass/epilogue/threadblock/default_epilogue_tensor_op.h>
 #include <cutlass/epilogue/threadblock/default_epilogue_volta_tensor_op.h>
 #include <cutlass/epilogue/threadblock/epilogue.h>
-#include <raft/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast.h>
+#include <cuvs/distance/detail/fused_distance_nn/custom_epilogue_with_broadcast.h>
 
-#include <raft/distance/detail/fused_distance_nn/predicated_tile_iterator_normvec_smem.h>
-#include <raft/distance/detail/fused_distance_nn/predicated_tile_iterator_reduced_vec.h>
+#include <cuvs/distance/detail/fused_distance_nn/predicated_tile_iterator_normvec_smem.h>
+#include <cuvs/distance/detail/fused_distance_nn/predicated_tile_iterator_reduced_vec.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 

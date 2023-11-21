@@ -55,7 +55,7 @@ class NeighborhoodRecallTest : public ::testing::TestWithParam<NeighborhoodRecal
     // calculate nn for dataset 1
     auto distances_1 = raft::make_device_matrix<DistanceT, IdxT>(res, ps.n_rows, ps.k);
     auto indices_1   = raft::make_device_matrix<IdxT, IdxT>(res, ps.n_rows, ps.k);
-    raft::neighbors::naive_knn<DistanceT, DistanceT, IdxT>(
+    cuvs::neighbors::naive_knn<DistanceT, DistanceT, IdxT>(
       res,
       distances_1.data_handle(),
       indices_1.data_handle(),
@@ -65,7 +65,7 @@ class NeighborhoodRecallTest : public ::testing::TestWithParam<NeighborhoodRecal
       ps.n_rows,
       ps.n_cols,
       ps.k,
-      raft::distance::DistanceType::L2Expanded);
+      cuvs::distance::DistanceType::L2Expanded);
     std::vector<DistanceT> distances_1_h(queries_size);
     std::vector<IdxT> indices_1_h(queries_size);
     raft::copy(distances_1_h.data(),
@@ -80,7 +80,7 @@ class NeighborhoodRecallTest : public ::testing::TestWithParam<NeighborhoodRecal
     // calculate nn for dataset 2
     auto distances_2 = raft::make_device_matrix<DistanceT, IdxT>(res, ps.n_rows, ps.k);
     auto indices_2   = raft::make_device_matrix<IdxT, IdxT>(res, ps.n_rows, ps.k);
-    raft::neighbors::naive_knn<DistanceT, DistanceT, IdxT>(
+    cuvs::neighbors::naive_knn<DistanceT, DistanceT, IdxT>(
       res,
       distances_2.data_handle(),
       indices_2.data_handle(),
@@ -90,7 +90,7 @@ class NeighborhoodRecallTest : public ::testing::TestWithParam<NeighborhoodRecal
       ps.n_rows,
       ps.n_cols,
       ps.k,
-      raft::distance::DistanceType::L2Expanded);
+      cuvs::distance::DistanceType::L2Expanded);
     std::vector<DistanceT> distances_2_h(queries_size);
     std::vector<IdxT> indices_2_h(queries_size);
     raft::copy(distances_2_h.data(),
@@ -106,8 +106,8 @@ class NeighborhoodRecallTest : public ::testing::TestWithParam<NeighborhoodRecal
 
     // find CPU recall scores
     [[maybe_unused]] auto [indices_only_recall_h, mc1, tc1] =
-      raft::neighbors::calc_recall(indices_1_h, indices_2_h, ps.n_rows, ps.k);
-    [[maybe_unused]] auto [recall_h, mc2, tc2] = raft::neighbors::calc_recall(
+      cuvs::neighbors::calc_recall(indices_1_h, indices_2_h, ps.n_rows, ps.k);
+    [[maybe_unused]] auto [recall_h, mc2, tc2] = cuvs::neighbors::calc_recall(
       indices_1_h, indices_2_h, distances_1_h, distances_2_h, ps.n_rows, ps.k, 0.001);
 
     // find GPU recall scores

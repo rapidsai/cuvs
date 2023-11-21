@@ -25,10 +25,10 @@
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_pq.cuh>
 #include <raft/label/classlabels.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 
@@ -42,7 +42,7 @@ template <typename T = float, typename IntType = int>
 void approx_knn_build_index(raft::resources const& handle,
                             knnIndex* index,
                             knnIndexParam* params,
-                            raft::distance::DistanceType metric,
+                            cuvs::distance::DistanceType metric,
                             float metricArg,
                             T* index_array,
                             IntType n,
@@ -62,9 +62,9 @@ void approx_knn_build_index(raft::resources const& handle,
     // For cosine/correlation distance, the metric processor translates distance
     // to inner product via pre/post processing - pass the translated metric to
     // ANN index
-    if (metric == raft::distance::DistanceType::CosineExpanded ||
-        metric == raft::distance::DistanceType::CorrelationExpanded) {
-      metric = index->metric = raft::distance::DistanceType::InnerProduct;
+    if (metric == cuvs::distance::DistanceType::CosineExpanded ||
+        metric == cuvs::distance::DistanceType::CorrelationExpanded) {
+      metric = index->metric = cuvs::distance::DistanceType::InnerProduct;
     }
   }
   if constexpr (std::is_same_v<T, float>) { index->metric_processor->preprocess(index_array); }
@@ -130,14 +130,14 @@ void approx_knn_search(raft::resources const& handle,
   if constexpr (std::is_same_v<T, float>) { index->metric_processor->revert(query_array); }
 
   // perform post-processing to show the real distances
-  if (index->metric == raft::distance::DistanceType::L2SqrtExpanded ||
-      index->metric == raft::distance::DistanceType::L2SqrtUnexpanded ||
-      index->metric == raft::distance::DistanceType::LpUnexpanded) {
+  if (index->metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      index->metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
+      index->metric == cuvs::distance::DistanceType::LpUnexpanded) {
     /**
      * post-processing
      */
     float p = 0.5;  // standard l2
-    if (index->metric == raft::distance::DistanceType::LpUnexpanded) p = 1.0 / index->metricArg;
+    if (index->metric == cuvs::distance::DistanceType::LpUnexpanded) p = 1.0 / index->metricArg;
     raft::linalg::unaryOp<float>(
       distances, distances, n * k, raft::pow_const_op<float>(p), resource::get_cuda_stream(handle));
   }

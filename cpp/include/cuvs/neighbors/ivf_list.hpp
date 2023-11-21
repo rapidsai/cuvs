@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ivf_list_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
-#include <raft/neighbors/ivf_list_types.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
@@ -34,7 +34,7 @@
 #include <memory>
 #include <type_traits>
 
-namespace raft::neighbors::ivf {
+namespace cuvs::neighbors::ivf {
 
 /** The data for a single IVF list. */
 template <template <typename, typename...> typename SpecT,
@@ -191,4 +191,4 @@ auto deserialize_list(const raft::resources& handle,
   resource::sync_stream(handle);
 }
 
-}  // namespace raft::neighbors::ivf
+}  // namespace cuvs::neighbors::ivf

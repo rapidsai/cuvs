@@ -16,14 +16,14 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/refine_common.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
-#include <raft/neighbors/detail/refine_common.hpp>
 
 #include <algorithm>
 #include <omp.h>
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename DC, typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host_impl(
@@ -126,14 +126,14 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
                      metric);
 
   switch (metric) {
-    case raft::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2Expanded:
       return refine_host_impl<distance_comp_l2>(
         dataset, queries, neighbor_candidates, indices, distances);
-    case raft::distance::DistanceType::InnerProduct:
+    case cuvs::distance::DistanceType::InnerProduct:
       return refine_host_impl<distance_comp_inner>(
         dataset, queries, neighbor_candidates, indices, distances);
     default: throw raft::logic_error("Unsupported metric");
   }
 }
 
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

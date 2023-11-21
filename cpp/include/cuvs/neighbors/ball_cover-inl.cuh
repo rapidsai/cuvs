@@ -20,13 +20,13 @@
 
 #include <cstdint>
 
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/ball_cover_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ball_cover_types.hpp>
 #include <raft/spatial/knn/detail/ball_cover.cuh>
 #include <raft/spatial/knn/detail/ball_cover/common.cuh>
 #include <thrust/transform.h>
 
-namespace raft::neighbors::ball_cover {
+namespace cuvs::neighbors::ball_cover {
 
 /**
  * @defgroup random_ball_cover Random Ball Cover algorithm
@@ -40,13 +40,13 @@ namespace raft::neighbors::ball_cover {
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
- *  auto metric = raft::distance::DistanceType::L2Expanded;
+ *  auto metric = cuvs::distance::DistanceType::L2Expanded;
  *  BallCoverIndex index(handle, X, metric);
  *
  *  ball_cover::build_index(handle, index);
@@ -64,11 +64,11 @@ void build_index(raft::resources const& handle,
                  BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index)
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
-  if (index.metric == raft::distance::DistanceType::Haversine) {
+  if (index.metric == cuvs::distance::DistanceType::Haversine) {
     raft::spatial::knn::detail::rbc_build_index(
       handle, index, spatial::knn::detail::HaversineFunc<value_t, int_t>());
-  } else if (index.metric == raft::distance::DistanceType::L2SqrtExpanded ||
-             index.metric == raft::distance::DistanceType::L2SqrtUnexpanded) {
+  } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+             index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
     raft::spatial::knn::detail::rbc_build_index(
       handle, index, spatial::knn::detail::EuclideanFunc<value_t, int_t>());
   } else {
@@ -118,7 +118,7 @@ void all_knn_query(raft::resources const& handle,
                    float weight                = 1.0)
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
-  if (index.metric == raft::distance::DistanceType::Haversine) {
+  if (index.metric == cuvs::distance::DistanceType::Haversine) {
     raft::spatial::knn::detail::rbc_all_knn_query(
       handle,
       index,
@@ -128,8 +128,8 @@ void all_knn_query(raft::resources const& handle,
       spatial::knn::detail::HaversineFunc<value_t, int_t>(),
       perform_post_filtering,
       weight);
-  } else if (index.metric == raft::distance::DistanceType::L2SqrtExpanded ||
-             index.metric == raft::distance::DistanceType::L2SqrtUnexpanded) {
+  } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+             index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
     raft::spatial::knn::detail::rbc_all_knn_query(
       handle,
       index,
@@ -164,13 +164,13 @@ void all_knn_query(raft::resources const& handle,
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
- *  auto metric = raft::distance::DistanceType::L2Expanded;
+ *  auto metric = cuvs::distance::DistanceType::L2Expanded;
  *
  *  // Construct a ball cover index
  *  BallCoverIndex index(handle, X, metric);
@@ -267,7 +267,7 @@ void knn_query(raft::resources const& handle,
                float weight                = 1.0)
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
-  if (index.metric == raft::distance::DistanceType::Haversine) {
+  if (index.metric == cuvs::distance::DistanceType::Haversine) {
     raft::spatial::knn::detail::rbc_knn_query(handle,
                                               index,
                                               k,
@@ -278,8 +278,8 @@ void knn_query(raft::resources const& handle,
                                               spatial::knn::detail::HaversineFunc<value_t, int_t>(),
                                               perform_post_filtering,
                                               weight);
-  } else if (index.metric == raft::distance::DistanceType::L2SqrtExpanded ||
-             index.metric == raft::distance::DistanceType::L2SqrtUnexpanded) {
+  } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+             index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
     raft::spatial::knn::detail::rbc_knn_query(handle,
                                               index,
                                               k,
@@ -312,13 +312,13 @@ void knn_query(raft::resources const& handle,
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
- *  auto metric = raft::distance::DistanceType::L2Expanded;
+ *  auto metric = cuvs::distance::DistanceType::L2Expanded;
  *
  *  // Build a ball cover index
  *  BallCoverIndex index(handle, X, metric);
@@ -390,6 +390,6 @@ void knn_query(raft::resources const& handle,
 //  4. rbc_eps_neigh() - given a populated index, perform query against different query array
 //  5. rbc_all_eps_neigh() - populate a BallCoverIndex and query against training data
 
-}  // namespace raft::neighbors::ball_cover
+}  // namespace cuvs::neighbors::ball_cover
 
 #endif

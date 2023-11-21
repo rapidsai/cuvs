@@ -16,12 +16,12 @@
 #pragma once
 
 #include <cassert>                                          // assert
+#include <cuvs/distance/detail/pairwise_distance_base.cuh>  // PairwiseDistances
+#include <cuvs/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
 #include <raft/core/operators.hpp>                          // raft::void_op
-#include <raft/distance/detail/pairwise_distance_base.cuh>  // PairwiseDistances
-#include <raft/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
 #include <raft/util/arch.cuh>                               // raft::util::arch::SM_compute_arch
 
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 template <typename Policy,
           bool row_major,
@@ -152,4 +152,4 @@ pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT> make_pairwise_matri
     grid, block, smem_size, kernel};
 }
 
-};  // namespace raft::distance::detail
+};  // namespace cuvs::distance::detail

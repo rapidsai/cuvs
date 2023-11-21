@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/ivf_pq.cuh>
+#include <cuvs/neighbors/ivf_pq.cuh>
 
 #include <raft_runtime/neighbors/ivf_pq.hpp>
 
-namespace raft::runtime::neighbors::ivf_pq {
+namespace cuvs::runtime::neighbors::ivf_pq {
 
 #define RAFT_SEARCH_INST(T, IdxT)                                                                 \
   void search(raft::resources const& handle,                                                      \
-              const raft::neighbors::ivf_pq::search_params& params,                               \
-              const raft::neighbors::ivf_pq::index<IdxT>& idx,                                    \
+              const cuvs::neighbors::ivf_pq::search_params& params,                               \
+              const cuvs::neighbors::ivf_pq::index<IdxT>& idx,                                    \
               raft::device_matrix_view<const T, IdxT, row_major> queries,                         \
               raft::device_matrix_view<IdxT, IdxT, row_major> neighbors,                          \
               raft::device_matrix_view<float, IdxT, row_major> distances)                         \
   {                                                                                               \
-    raft::neighbors::ivf_pq::search<T, IdxT>(handle, params, idx, queries, neighbors, distances); \
+    cuvs::neighbors::ivf_pq::search<T, IdxT>(handle, params, idx, queries, neighbors, distances); \
   }
 
 RAFT_SEARCH_INST(float, int64_t);
 
 #undef RAFT_INST_SEARCH
 
-}  // namespace raft::runtime::neighbors::ivf_pq
+}  // namespace cuvs::runtime::neighbors::ivf_pq

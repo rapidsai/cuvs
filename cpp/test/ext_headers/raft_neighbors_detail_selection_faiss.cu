@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/neighbors/detail/selection_faiss.cuh>
+#include <cuvs/neighbors/detail/selection_faiss.cuh>

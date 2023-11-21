@@ -19,15 +19,15 @@
 #include "./knn_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance.cuh>  // cuvs::distance::pairwise_distance
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/brute_force.cuh>
+#include <cuvs/neighbors/detail/knn_brute_force.cuh>  // cuvs::neighbors::detail::brute_force_knn_impl
+#include <cuvs/neighbors/detail/selection_faiss.cuh>  // cuvs::neighbors::detail::select_k
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/distance/distance.cuh>  // raft::distance::pairwise_distance
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
-#include <raft/neighbors/brute_force.cuh>
-#include <raft/neighbors/detail/knn_brute_force.cuh>  // raft::neighbors::detail::brute_force_knn_impl
-#include <raft/neighbors/detail/selection_faiss.cuh>  // raft::neighbors::detail::select_k
 
 #include <rmm/device_buffer.hpp>
 
@@ -37,7 +37,7 @@
 #include <iostream>
 #include <vector>
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 
 struct TiledKNNInputs {
   int num_queries;
@@ -46,7 +46,7 @@ struct TiledKNNInputs {
   int k;
   int row_tiles;
   int col_tiles;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
   bool row_major;
 };
 
@@ -128,13 +128,13 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
       temp_dist = temp_row_major_dist.data();
     }
 
-    raft::neighbors::detail::select_k<int, T>(temp_dist,
+    cuvs::neighbors::detail::select_k<int, T>(temp_dist,
                                               nullptr,
                                               num_queries,
                                               num_db_vecs,
                                               ref_distances_.data(),
                                               ref_indices_.data(),
-                                              raft::distance::is_min_close(metric),
+                                              cuvs::distance::is_min_close(metric),
                                               k_,
                                               stream_);
 
@@ -185,7 +185,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
     // Also test out the 'index' api - where we can use precomputed norms
     if (params_.row_major) {
       auto idx =
-        raft::neighbors::brute_force::build<T>(handle_,
+        cuvs::neighbors::brute_force::build<T>(handle_,
                                                raft::make_device_matrix_view<const T, int64_t>(
                                                  database.data(), params_.num_db_vecs, params_.dim),
                                                metric,
@@ -194,7 +194,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
       auto query_view = raft::make_device_matrix_view<const T, int64_t>(
         search_queries.data(), params_.num_queries, params_.dim);
 
-      raft::neighbors::brute_force::search<T, int>(
+      cuvs::neighbors::brute_force::search<T, int>(
         handle_,
         idx,
         query_view,
@@ -217,7 +217,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
       auto all_size      = std::min(params_.num_db_vecs, 1024);
       auto all_indices   = raft::make_device_matrix<int, int64_t>(handle_, num_queries, all_size);
       auto all_distances = raft::make_device_matrix<T, int64_t>(handle_, num_queries, all_size);
-      raft::neighbors::brute_force::search<T, int>(
+      cuvs::neighbors::brute_force::search<T, int>(
         handle_, idx, query_view, all_indices.view(), all_distances.view());
 
       int64_t offset = 0;
@@ -294,7 +294,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
     raft::random::RngState r(seed);
 
     // JensenShannon distance requires positive values
-    T min_val = metric == raft::distance::DistanceType::JensenShannon ? T(0.0) : T(-1.0);
+    T min_val = metric == cuvs::distance::DistanceType::JensenShannon ? T(0.0) : T(-1.0);
     uniform(handle_, r, database.data(), num_db_vecs * dim, min_val, T(1.0));
     uniform(handle_, r, search_queries.data(), num_queries * dim, min_val, T(1.0));
   }
@@ -313,42 +313,42 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
   rmm::device_uvector<int> ref_indices_;
   rmm::device_uvector<T> ref_distances_;
   int k_;
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
 };
 
 const std::vector<TiledKNNInputs> random_inputs = {
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::L2Expanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::L2Unexpanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::L2SqrtExpanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::L2SqrtUnexpanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::L1, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::Linf, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::InnerProduct, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::CorrelationExpanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::CosineExpanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::LpUnexpanded, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::JensenShannon, true},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::L2SqrtExpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::L2Expanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::L1, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::Linf, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::InnerProduct, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::CorrelationExpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::CosineExpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::LpUnexpanded, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::JensenShannon, true},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
   // BrayCurtis isn't currently supported by pairwise_distance api
-  // {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::BrayCurtis},
-  {256, 512, 16, 8, 16, 8, raft::distance::DistanceType::Canberra, true},
-  {10000, 40000, 32, 30, 512, 1024, raft::distance::DistanceType::L2Expanded, true},
-  {345, 1023, 16, 128, 512, 1024, raft::distance::DistanceType::CosineExpanded, true},
-  {789, 20516, 64, 256, 512, 4096, raft::distance::DistanceType::L2SqrtExpanded, true},
+  // {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::BrayCurtis},
+  {256, 512, 16, 8, 16, 8, cuvs::distance::DistanceType::Canberra, true},
+  {10000, 40000, 32, 30, 512, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {345, 1023, 16, 128, 512, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {789, 20516, 64, 256, 512, 4096, cuvs::distance::DistanceType::L2SqrtExpanded, true},
   // Test where the final column tile has < K items:
-  {4, 12, 32, 6, 4, 8, raft::distance::DistanceType::L2Expanded, true},
+  {4, 12, 32, 6, 4, 8, cuvs::distance::DistanceType::L2Expanded, true},
   // Test where passing column_tiles < K
-  {1, 40, 32, 30, 1, 8, raft::distance::DistanceType::L2Expanded, true},
+  {1, 40, 32, 30, 1, 8, cuvs::distance::DistanceType::L2Expanded, true},
   // Passing tile sizes of 0 means to use brute_force_knn_impl (instead of the
   // tiled_brute_force_knn api).
-  {1000, 500000, 128, 128, 0, 0, raft::distance::DistanceType::L2Expanded, true},
-  {1000, 500000, 128, 128, 0, 0, raft::distance::DistanceType::L2Expanded, false},
-  {1000, 5000, 128, 128, 0, 0, raft::distance::DistanceType::LpUnexpanded, true},
-  {1000, 5000, 128, 128, 0, 0, raft::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 5000, 128, 128, 0, 0, raft::distance::DistanceType::InnerProduct, false}};
+  {1000, 500000, 128, 128, 0, 0, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 500000, 128, 128, 0, 0, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 5000, 128, 128, 0, 0, cuvs::distance::DistanceType::LpUnexpanded, true},
+  {1000, 5000, 128, 128, 0, 0, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 5000, 128, 128, 0, 0, cuvs::distance::DistanceType::InnerProduct, false}};
 
 typedef TiledKNNTest<float> TiledKNNTestF;
 TEST_P(TiledKNNTestF, BruteForce) { this->testBruteForce(); }
 
 INSTANTIATE_TEST_CASE_P(TiledKNNTest, TiledKNNTestF, ::testing::ValuesIn(random_inputs));
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force

@@ -25,24 +25,24 @@
  *
  * 2. Provide concise function templates that can be instantiated in
  *    src/distance/detail/pairwise_matrix/. Previously,
- *    raft::distance::detail::distance was instantiated. The function
+ *    cuvs::distance::detail::distance was instantiated. The function
  *    necessarily required a large set of include files, which slowed down the
- *    build. The raft::distance::detail::pairwise_matrix_arch_dispatch functions
+ *    build. The cuvs::distance::detail::pairwise_matrix_arch_dispatch functions
  *    do not require as large an include files set, which speeds up the build.
  */
 
-#include <raft/distance/detail/distance_ops/cutlass.cuh>           // ops::has_cutlass_op
-#include <raft/distance/detail/pairwise_matrix/dispatch_sm60.cuh>  // dispatch_sm60
-#include <raft/distance/detail/pairwise_matrix/params.cuh>         // pairwise_matrix_params
+#include <cuvs/distance/detail/distance_ops/cutlass.cuh>           // ops::has_cutlass_op
+#include <cuvs/distance/detail/pairwise_matrix/dispatch_sm60.cuh>  // dispatch_sm60
+#include <cuvs/distance/detail/pairwise_matrix/params.cuh>         // pairwise_matrix_params
 #include <raft/util/arch.cuh>                                      // raft::util::arch::SM_*
 
 // NOTE: to minimize compile times, we do not include dispatch_sm80.cuh.
 // Including dispatch_sm80.cuh can slow down compile times (due to CUTLASS).
 // Therefore, it is the including file's responsibility to include the correct
-// dispatch_smXX.cuh headers, as is done in raft/distance/detail/distance.cuh
+// dispatch_smXX.cuh headers, as is done in cuvs/distance/detail/distance.cuh
 // and src/distance/detail/pairwise_matrix/dispatch_*.cu.
 
-namespace raft::distance::detail {
+namespace cuvs::distance::detail {
 
 // This forward-declaration ensures that we do not need to include
 // dispatch_sm80.cuh if we are not calling it in practice. This makes compiling
@@ -124,4 +124,4 @@ void pairwise_matrix_dispatch(OpT distance_op,
   }
 }
 
-};  // namespace raft::distance::detail
+};  // namespace cuvs::distance::detail

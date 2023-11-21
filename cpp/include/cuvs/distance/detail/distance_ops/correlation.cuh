@@ -18,7 +18,7 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 /** @brief The correlation distance
  *
@@ -123,4 +123,4 @@ struct correlation_distance_op {
   }
 };
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

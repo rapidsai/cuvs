@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <raft/distance/detail/distance_ops/all_ops.cuh>    // lp_unexp_distance_op
-#include <raft/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
+#include <cuvs/distance/detail/distance_ops/all_ops.cuh>    // lp_unexp_distance_op
+#include <cuvs/distance/detail/pairwise_matrix/params.cuh>  // pairwise_matrix_params
 
-namespace raft::bench::distance::tune {
+namespace cuvs::bench::distance::tune {
 
 // Launch one specific kernel with the following template parameters
 constexpr bool row_major = true;
@@ -31,7 +31,7 @@ using IdxT               = int;
 using FinOpT = raft::identity_op;
 
 using pairwise_matrix_params =
-  raft::distance::detail::pairwise_matrix_params<IdxT, DataT, OutT, FinOpT>;
+  cuvs::distance::detail::pairwise_matrix_params<IdxT, DataT, OutT, FinOpT>;
 
 // Launches kernel
 void launch_kernel(pairwise_matrix_params, dim3, cudaStream_t);
@@ -41,4 +41,4 @@ void get_block_size(int& m, int& n, int& k);
 
 int get_max_occupancy();
 
-}  // namespace raft::bench::distance::tune
+}  // namespace cuvs::bench::distance::tune

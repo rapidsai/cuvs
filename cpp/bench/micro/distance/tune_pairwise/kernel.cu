@@ -15,14 +15,14 @@
  */
 
 #include "kernel.cuh"
-#include <raft/distance/detail/pairwise_matrix/kernel_sm60.cuh>  // pairwise_matrix_sm60_wrapper
+#include <cuvs/distance/detail/pairwise_matrix/kernel_sm60.cuh>  // pairwise_matrix_sm60_wrapper
 #include <raft/linalg/contractions.cuh>                          // raft::linalg::Policy4x4
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_compute_arch
 
-namespace raft::bench::distance::tune {
+namespace cuvs::bench::distance::tune {
 
 // Distance op
-using OpT                  = raft::distance::detail::ops::lp_unexp_distance_op<DataT, AccT, IdxT>;
+using OpT                  = cuvs::distance::detail::ops::lp_unexp_distance_op<DataT, AccT, IdxT>;
 constexpr float metric_arg = 2.0;
 OpT distance_op{metric_arg};
 
@@ -40,7 +40,7 @@ void launch_kernel(pairwise_matrix_params params, dim3 grid, cudaStream_t stream
   int smem_size = OpT::shared_mem_size<Policy>();
 
   // Obtain function pointer to kernel
-  auto kernel = raft::distance::detail::pairwise_matrix_kernel<Policy,
+  auto kernel = cuvs::distance::detail::pairwise_matrix_kernel<Policy,
                                                                row_major,
                                                                decltype(sm_compat_range),
                                                                OpT,
@@ -62,7 +62,7 @@ void get_block_size(int& m, int& n, int& k)
 
 void* get_kernel_ptr()
 {
-  auto kernel = raft::distance::detail::pairwise_matrix_kernel<Policy,
+  auto kernel = cuvs::distance::detail::pairwise_matrix_kernel<Policy,
                                                                row_major,
                                                                decltype(sm_compat_range),
                                                                OpT,
@@ -85,4 +85,4 @@ int get_max_occupancy()
   return max_occupancy;
 }
 
-}  // namespace raft::bench::distance::tune
+}  // namespace cuvs::bench::distance::tune

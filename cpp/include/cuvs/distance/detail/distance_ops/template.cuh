@@ -18,7 +18,7 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
-namespace raft::distance::detail::ops {
+namespace cuvs::distance::detail::ops {
 
 // Describes the computation the template distance
 //
@@ -65,4 +65,4 @@ struct template_distance_op {
   constexpr l2_exp_cutlass_op<DataT, AccT> get_cutlass_op() const { TODO; }
 };
 
-}  // namespace raft::distance::detail::ops
+}  // namespace cuvs::distance::detail::ops

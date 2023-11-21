@@ -34,7 +34,7 @@
 #include <rmm/mr/device/per_device_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
 
-namespace raft::bench {
+namespace cuvs::bench {
 
 /**
  * RAII way to temporary set the pooling memory allocator in rmm.
@@ -333,7 +333,7 @@ struct registrar {
 };  // namespace internal
 
 #define RAFT_BENCH_REGISTER_INTERNAL(TestClass, ...)                                    \
-  static raft::bench::internal::registrar<TestClass> BENCHMARK_PRIVATE_NAME(registrar)( \
+  static cuvs::bench::internal::registrar<TestClass> BENCHMARK_PRIVATE_NAME(registrar)( \
     RAFT_STRINGIFY(TestClass), __VA_ARGS__)
 
 /**
@@ -341,7 +341,7 @@ struct registrar {
  * for the set of benchmarks to be registered so that the main harness inside
  * google bench can find these benchmarks and run them.
  *
- * @param TestClass   child class of `raft::bench::Fixture` which contains
+ * @param TestClass   child class of `cuvs::bench::Fixture` which contains
  *                    the logic to generate the dataset and run training on it
  *                    for a given algo. Ideally, once such struct is needed for
  *                    every algo to be benchmarked
@@ -353,4 +353,4 @@ struct registrar {
 #define RAFT_BENCH_REGISTER(TestClass, ...) \
   RAFT_BENCH_REGISTER_INTERNAL(RAFT_DEPAREN(TestClass), __VA_ARGS__)
 
-}  // namespace raft::bench
+}  // namespace cuvs::bench

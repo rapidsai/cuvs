@@ -24,10 +24,10 @@
  *
  */
 
-#include <raft/neighbors/detail/cagra/search_multi_cta_kernel-inl.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
+#include <cuvs/neighbors/detail/cagra/search_multi_cta_kernel-inl.cuh>
+#include <cuvs/neighbors/sample_filter_types.hpp>
 
-namespace raft::neighbors::cagra::detail::multi_cta_search {
+namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
 #define instantiate_kernel_selection(                                                       \
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                 \
@@ -59,8 +59,8 @@ namespace raft::neighbors::cagra::detail::multi_cta_search {
     cudaStream_t stream);
 
 instantiate_kernel_selection(
-  8, 128, uint8_t, uint32_t, float, raft::neighbors::filtering::none_cagra_sample_filter);
+  8, 128, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 
 #undef instantiate_kernel_selection
 
-}  // namespace raft::neighbors::cagra::detail::multi_cta_search
+}  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

@@ -18,18 +18,18 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cuvs/neighbors/cagra_types.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
-#include <raft/neighbors/cagra_types.hpp>
 
 #include <fstream>
 #include <type_traits>
 
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 
 constexpr int serialization_version = 3;
 
@@ -245,7 +245,7 @@ auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
   auto n_rows       = deserialize_scalar<IdxT>(res, is);
   auto dim          = deserialize_scalar<std::uint32_t>(res, is);
   auto graph_degree = deserialize_scalar<std::uint32_t>(res, is);
-  auto metric       = deserialize_scalar<raft::distance::DistanceType>(res, is);
+  auto metric       = deserialize_scalar<cuvs::distance::DistanceType>(res, is);
 
   auto graph = raft::make_host_matrix<IdxT, int64_t>(n_rows, graph_degree);
   deserialize_mdspan(res, is, graph.view());
@@ -278,4 +278,4 @@ auto deserialize(raft::resources const& res, const std::string& filename) -> ind
 
   return index;
 }
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

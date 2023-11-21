@@ -15,15 +15,15 @@
  */
 
 #include <common/benchmark.hpp>
-#include <raft/cluster/kmeans.cuh>
-#include <raft/cluster/kmeans_types.hpp>
+#include <cuvs/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans_types.hpp>
 
-namespace raft::bench::cluster {
+namespace cuvs::bench::cluster {
 
 struct KMeansBenchParams {
   DatasetParams data;
   BlobsParams blobs;
-  raft::cluster::KMeansParams kmeans;
+  cuvs::cluster::KMeansParams kmeans;
 };
 
 inline auto operator<<(std::ostream& os, const KMeansBenchParams& p) -> std::ostream&
@@ -57,7 +57,7 @@ struct KMeans : public BlobsFixture<T, IndexT> {
     raft::host_scalar_view<IndexT> n_iter_view = raft::make_host_scalar_view<IndexT>(&n_iter);
 
     this->loop_on_state(state, [&]() {
-      raft::cluster::kmeans_fit_predict<T, IndexT>(this->handle,
+      cuvs::cluster::kmeans_fit_predict<T, IndexT>(this->handle,
                                                    params.kmeans,
                                                    X_view,
                                                    opt_weights_view,
@@ -93,11 +93,11 @@ std::vector<KMeansBenchParams> getKMeansInputs()
   p.blobs.center_box_min                            = -10.0;
   p.blobs.center_box_max                            = 10.0;
   p.blobs.seed                                      = 12345ULL;
-  p.kmeans.init                                     = raft::cluster::KMeansParams::KMeansPlusPlus;
+  p.kmeans.init                                     = cuvs::cluster::KMeansParams::KMeansPlusPlus;
   p.kmeans.max_iter                                 = 300;
   p.kmeans.tol                                      = 1e-4;
   p.kmeans.verbosity                                = RAFT_LEVEL_INFO;
-  p.kmeans.metric                                   = raft::distance::DistanceType::L2Expanded;
+  p.kmeans.metric                                   = cuvs::distance::DistanceType::L2Expanded;
   p.kmeans.inertia_check                            = true;
   std::vector<std::tuple<int, int, int>> row_cols_k = {
     {1000000, 20, 1000},
@@ -121,4 +121,4 @@ RAFT_BENCH_REGISTER((KMeans<double, int>), "", getKMeansInputs());
 // RAFT_BENCH_REGISTER((KMeans<float, int64_t>), "", getKMeansInputs());
 // RAFT_BENCH_REGISTER((KMeans<double, int64_t>), "", getKMeansInputs());
 
-}  // namespace raft::bench::cluster
+}  // namespace cuvs::bench::cluster

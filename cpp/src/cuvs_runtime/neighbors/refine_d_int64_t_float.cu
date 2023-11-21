@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/refine.cuh>
+#include <cuvs/neighbors/refine.cuh>
 
-namespace raft::runtime::neighbors {
+namespace cuvs::runtime::neighbors {
 
 void refine(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, row_major> dataset,
@@ -26,8 +26,8 @@ void refine(raft::resources const& handle,
             raft::device_matrix_view<float, int64_t, row_major> distances,
             distance::DistanceType metric)
 {
-  raft::neighbors::refine<int64_t, float, float, int64_t>(
+  cuvs::neighbors::refine<int64_t, float, float, int64_t>(
     handle, dataset, queries, neighbor_candidates, indices, distances, metric);
 }
 
-}  // namespace raft::runtime::neighbors
+}  // namespace cuvs::runtime::neighbors

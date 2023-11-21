@@ -17,13 +17,13 @@
 #pragma once
 
 #include <cstdint>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft::neighbors::ball_cover {
+namespace cuvs::neighbors::ball_cover {
 
 /**
  * @ingroup random_ball_cover
@@ -49,7 +49,7 @@ class BallCoverIndex {
                           const value_t* X_,
                           value_int m_,
                           value_int n_,
-                          raft::distance::DistanceType metric_)
+                          cuvs::distance::DistanceType metric_)
     : handle(handle_),
       X(raft::make_device_matrix_view<const value_t, matrix_idx>(X_, m_, n_)),
       m(m_),
@@ -73,7 +73,7 @@ class BallCoverIndex {
 
   explicit BallCoverIndex(raft::resources const& handle_,
                           raft::device_matrix_view<const value_t, matrix_idx, row_major> X_,
-                          raft::distance::DistanceType metric_)
+                          cuvs::distance::DistanceType metric_)
     : handle(handle_),
       X(X_),
       m(X_.extent(0)),
@@ -131,7 +131,7 @@ class BallCoverIndex {
   }
   raft::device_matrix_view<const value_t, matrix_idx, row_major> get_X() const { return X; }
 
-  raft::distance::DistanceType get_metric() const { return metric; }
+  cuvs::distance::DistanceType get_metric() const { return metric; }
 
   value_int get_n_landmarks() const { return n_landmarks; }
   bool is_index_trained() const { return index_trained; };
@@ -147,7 +147,7 @@ class BallCoverIndex {
 
   raft::device_matrix_view<const value_t, matrix_idx, row_major> X;
 
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
 
  private:
   // CSR storing the neighborhoods for each data point
@@ -166,4 +166,4 @@ class BallCoverIndex {
 
 /** @} */
 
-}  // namespace raft::neighbors::ball_cover
+}  // namespace cuvs::neighbors::ball_cover

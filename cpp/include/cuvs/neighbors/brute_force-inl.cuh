@@ -16,14 +16,14 @@
 
 #pragma once
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/brute_force_types.hpp>
+#include <cuvs/neighbors/detail/knn_brute_force.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/brute_force_types.hpp>
-#include <raft/neighbors/detail/knn_brute_force.cuh>
 #include <raft/spatial/knn/detail/fused_l2_knn.cuh>
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 
 /**
  * @defgroup brute_force_knn Brute-force K-Nearest Neighbors
@@ -56,8 +56,8 @@ namespace raft::neighbors::brute_force {
  * Usage example:
  * @code{.cpp}
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/brute_force.cuh>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/brute_force.cuh>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
@@ -122,13 +122,13 @@ inline void knn_merge_parts(
  * Usage example:
  * @code{.cpp}
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/brute_force.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/brute_force.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
- *  auto metric = raft::distance::DistanceType::L2SqrtExpanded;
+ *  auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
  *  brute_force::knn(handle, index, search, indices, distances, metric);
  * @endcode
  *
@@ -187,7 +187,7 @@ void knn(raft::resources const& handle,
 
   std::vector<idx_t>* trans_arg = global_id_offset.has_value() ? &trans : nullptr;
 
-  raft::neighbors::detail::brute_force_knn_impl(handle,
+  cuvs::neighbors::detail::brute_force_knn_impl(handle,
                                                 inputs,
                                                 sizes,
                                                 index[0].extent(1),
@@ -215,13 +215,13 @@ void knn(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/brute_force.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/brute_force.cuh>
+ *  #include <cuvs/distance/distance_types.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
- *  auto metric = raft::distance::DistanceType::L2SqrtExpanded;
+ *  auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
  *  brute_force::fused_l2_knn(handle, index, search, indices, distances, metric);
  * @endcode
 
@@ -242,7 +242,7 @@ void fused_l2_knn(raft::resources const& handle,
                   raft::device_matrix_view<const value_t, idx_t, query_layout> query,
                   raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,
                   raft::device_matrix_view<value_t, idx_t, row_major> out_dists,
-                  raft::distance::DistanceType metric)
+                  cuvs::distance::DistanceType metric)
 {
   int k = static_cast<int>(out_inds.extent(1));
 
@@ -297,18 +297,18 @@ void fused_l2_knn(raft::resources const& handle,
 template <typename T, typename Accessor>
 index<T> build(raft::resources const& res,
                mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
-               raft::distance::DistanceType metric = distance::DistanceType::L2Unexpanded,
+               cuvs::distance::DistanceType metric = distance::DistanceType::L2Unexpanded,
                T metric_arg                        = 0.0)
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time
   std::optional<device_vector<T, int64_t>> norms;
-  if (metric == raft::distance::DistanceType::L2Expanded ||
-      metric == raft::distance::DistanceType::L2SqrtExpanded ||
-      metric == raft::distance::DistanceType::CosineExpanded) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      metric == cuvs::distance::DistanceType::CosineExpanded) {
     norms = make_device_vector<T, int64_t>(res, dataset.extent(0));
     // cosine needs the l2norm, where as l2 distances needs the squared norm
-    if (metric == raft::distance::DistanceType::CosineExpanded) {
+    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       raft::linalg::norm(res,
                          dataset,
                          norms->view(),
@@ -348,7 +348,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::device_matrix_view<T, int64_t, row_major> distances)
 {
-  raft::neighbors::detail::brute_force_search<T, IdxT>(res, idx, queries, neighbors, distances);
+  cuvs::neighbors::detail::brute_force_search<T, IdxT>(res, idx, queries, neighbors, distances);
 }
 /** @} */  // end group brute_force_knn
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force

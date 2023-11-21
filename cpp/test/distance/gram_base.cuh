@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/kernels.cuh>
 #include <iostream>
 #include <memory>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/kernels.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>

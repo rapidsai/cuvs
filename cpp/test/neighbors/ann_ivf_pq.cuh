@@ -21,15 +21,15 @@
 
 #include <cuvs_internal/neighbors/naive_knn.cuh>
 
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/ivf_pq.cuh>
+#include <cuvs/neighbors/ivf_pq_helpers.cuh>
+#include <cuvs/neighbors/ivf_pq_serialize.cuh>
+#include <cuvs/neighbors/sample_filter.cuh>
 #include <raft/core/logger.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/map_reduce.cuh>
 #include <raft/matrix/gather.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
-#include <raft/neighbors/ivf_pq_helpers.cuh>
-#include <raft/neighbors/ivf_pq_serialize.cuh>
-#include <raft/neighbors/sample_filter.cuh>
 #include <raft/random/rng.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -48,7 +48,7 @@
 #include <optional>
 #include <vector>
 
-namespace raft::neighbors::ivf_pq {
+namespace cuvs::neighbors::ivf_pq {
 
 struct test_ivf_sample_filter {
   static constexpr unsigned offset = 1500;
@@ -690,7 +690,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       query_view,
       inds_view,
       dists_view,
-      raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
     update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
@@ -1092,4 +1092,4 @@ inline auto special_cases() -> test_cases_t
 #define INSTANTIATE(type, vals) \
   INSTANTIATE_TEST_SUITE_P(IvfPq, type, ::testing::ValuesIn(vals)); /* NOLINT */
 
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq

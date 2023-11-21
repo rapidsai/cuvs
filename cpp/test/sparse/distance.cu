@@ -19,7 +19,7 @@
 
 #include <cusparse_v2.h>
 
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/sparse/detail/cusparse_wrappers.h>
 #include <raft/util/cudart_utils.hpp>
 
@@ -44,7 +44,7 @@ struct SparseDistanceInputs {
 
   std::vector<value_t> out_dists_ref_h;
 
-  raft::distance::DistanceType metric;
+  cuvs::distance::DistanceType metric;
 
   float metric_arg = 0.0;
 };
@@ -149,7 +149,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
    {1, 2},
    {0.5, 0.5},
    {0, 1, 1, 1, 0, 1, 1, 1, 0},
-   raft::distance::DistanceType::CosineExpanded,
+   cuvs::distance::DistanceType::CosineExpanded,
    0.0},
   {5,
    {0, 0, 1, 2},
@@ -157,7 +157,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
    {1, 2},
    {1.0, 1.0},
    {0, 1, 1, 1, 0, 1, 1, 1, 0},
-   raft::distance::DistanceType::JaccardExpanded,
+   cuvs::distance::DistanceType::JaccardExpanded,
    0.0},
   {2,
    {0, 2, 4, 6, 8},
@@ -182,14 +182,14 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
      1832.0,
      0.0,
    },
-   raft::distance::DistanceType::L2Expanded,
+   cuvs::distance::DistanceType::L2Expanded,
    0.0},
   {2,
    {0, 2, 4, 6, 8},
    {0, 1, 0, 1, 0, 1, 0, 1},
    {1.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f},
    {5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0},
-   raft::distance::DistanceType::InnerProduct,
+   cuvs::distance::DistanceType::InnerProduct,
    0.0},
   {2,
    {0, 2, 4, 6, 8},
@@ -214,7 +214,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
      1832.0,
      0.0,
    },
-   raft::distance::DistanceType::L2Unexpanded,
+   cuvs::distance::DistanceType::L2Unexpanded,
    0.0},
 
   {10,
@@ -239,7 +239,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     1.,         0.54847744, 0.8321819,  0.43324829, 0.67676228, 0.24558392, 0.76064776, 0.51360432,
     0.,         1.,         0.76978799, 0.78021386, 1.,         0.84923694, 0.73155632, 0.99166225,
     0.61547536, 0.68185144, 1.,         0.},
-   raft::distance::DistanceType::CosineExpanded,
+   cuvs::distance::DistanceType::CosineExpanded,
    0.0},
 
   {10,
@@ -349,7 +349,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     0.75,
     1.0,
     0.0},
-   raft::distance::DistanceType::JaccardExpanded,
+   cuvs::distance::DistanceType::JaccardExpanded,
    0.0},
 
   {10,
@@ -461,7 +461,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     6.903282911791188,
     7.0,
     0.0},
-   raft::distance::DistanceType::Canberra,
+   cuvs::distance::DistanceType::Canberra,
    0.0},
 
   {10,
@@ -573,7 +573,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     1.0083692448135637,
     1.3661374102525012,
     0.0},
-   raft::distance::DistanceType::LpUnexpanded,
+   cuvs::distance::DistanceType::LpUnexpanded,
    2.0},
 
   {10,
@@ -685,7 +685,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     0.5079750812968089,
     0.8429599432532096,
     0.0},
-   raft::distance::DistanceType::Linf,
+   cuvs::distance::DistanceType::Linf,
    0.0},
 
   {15,
@@ -724,7 +724,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     1.00000000e+00, 8.05419635e-01, 9.53789212e-01, 8.07933016e-01,
     7.40428532e-01, 7.95485011e-01, 8.51370877e-01, 1.49011612e-08},
    // Dataset is L1 normalized into pdfs
-   raft::distance::DistanceType::HellingerExpanded,
+   cuvs::distance::DistanceType::HellingerExpanded,
    0.0},
 
   {4,
@@ -750,7 +750,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
      0.84454,
      0.0,
    },
-   raft::distance::DistanceType::L1,
+   cuvs::distance::DistanceType::L1,
    0.0},
   {5,
    {0, 3, 8, 12, 16, 20, 25, 30, 35, 40, 45},
@@ -776,7 +776,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     1.1232498,  0.40658897, 0.60215168, 1.74288748, 1.18328348, 0.48505269, 1.92108999, 1.47318624,
     0.,         0.24992619, 1.08166081, 0.56136388, 0.46993848, 1.50610116, 0.82486987, 0.53862363,
     1.88812175, 1.92660889, 0.24992619, 0.},
-   raft::distance::DistanceType::CorrelationExpanded,
+   cuvs::distance::DistanceType::CorrelationExpanded,
    0.0},
   {5,
    {0, 1, 2, 4, 4, 5, 6, 7, 9, 9, 10},
@@ -788,7 +788,7 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     0.8, 1.,  1.,  1., 0.,  1., 1.,  0.8, 1., 1.,  1.,  1., 1.,  1., 1.,  0.,  1.,  0.8, 1., 1.,
     1.,  1.,  0.8, 1., 1.,  1., 0.,  1.,  1., 0.8, 0.8, 1., 1.,  1., 0.8, 0.8, 1.,  0.,  1., 1.,
     1.,  1.,  1.,  1., 1.,  1., 1.,  1.,  0., 1.,  1.,  1., 0.8, 1., 1.,  1.,  0.8, 1.,  1., 0.},
-   raft::distance::DistanceType::RusselRaoExpanded,
+   cuvs::distance::DistanceType::RusselRaoExpanded,
    0.0},
   {5,
    {0, 1, 1, 3, 3, 4, 4, 6, 9, 10, 10},
@@ -801,28 +801,28 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
     0.,  0.4, 0.,  0.2, 0.,  0.4, 0.6, 0.2, 0.,  0.6, 0.4, 0.4, 0.4, 0.6, 0.4, 0.,  0.2,
     0.2, 0.4, 0.4, 0.6, 0.6, 0.6, 0.8, 0.6, 0.2, 0.,  0.4, 0.6, 0.4, 0.2, 0.6, 0.2, 0.4,
     0.2, 0.2, 0.4, 0.,  0.2, 0.2, 0.,  0.4, 0.,  0.2, 0.,  0.4, 0.6, 0.2, 0.},
-   raft::distance::DistanceType::HammingUnexpanded,
+   cuvs::distance::DistanceType::HammingUnexpanded,
    0.0},
   {3,
    {0, 1, 2},
    {0, 1},
    {1.0, 1.0},
    {0.0, 0.83255, 0.83255, 0.0},
-   raft::distance::DistanceType::JensenShannon,
+   cuvs::distance::DistanceType::JensenShannon,
    0.0},
   {2,
    {0, 1, 3},
    {0, 0, 1},
    {1.0, 0.5, 0.5},
    {0, 0.4645014, 0.4645014, 0},
-   raft::distance::DistanceType::JensenShannon,
+   cuvs::distance::DistanceType::JensenShannon,
    0.0},
   {3,
    {0, 1, 2},
    {0, 0},
    {1.0, 1.0},
    {0.0, 0.0, 0.0, 0.0},
-   raft::distance::DistanceType::JensenShannon,
+   cuvs::distance::DistanceType::JensenShannon,
    0.0},
 
   {3,
@@ -830,14 +830,14 @@ const std::vector<SparseDistanceInputs<int, float>> inputs_i32_f = {
    {0, 1},
    {1.0, 1.0},
    {0.0, 1.0, 1.0, 0.0},
-   raft::distance::DistanceType::DiceExpanded,
+   cuvs::distance::DistanceType::DiceExpanded,
    0.0},
   {3,
    {0, 1, 3},
    {0, 0, 1},
    {1.0, 1.0, 1.0},
    {0, 0.333333, 0.333333, 0},
-   raft::distance::DistanceType::DiceExpanded,
+   cuvs::distance::DistanceType::DiceExpanded,
    0.0},
 
 };

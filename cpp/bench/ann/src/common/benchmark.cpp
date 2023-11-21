@@ -26,7 +26,7 @@
 #include <dlfcn.h>
 #include <filesystem>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 struct lib_handle {
   void* handle{nullptr};
@@ -72,7 +72,7 @@ auto create_algo(const std::string& algo,
                  const std::string& distance,
                  int dim,
                  const nlohmann::json& conf,
-                 const std::vector<int>& dev_list) -> std::unique_ptr<raft::bench::ann::ANN<T>>
+                 const std::vector<int>& dev_list) -> std::unique_ptr<cuvs::bench::ANN<T>>
 {
   static auto fname = get_fun_name(reinterpret_cast<void*>(&create_algo<T>));
   auto handle       = load_lib(algo);
@@ -85,7 +85,7 @@ auto create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::ANN<T>::AnnSearchParam> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   static auto fname = get_fun_name(reinterpret_cast<void*>(&create_search_param<T>));
@@ -98,7 +98,7 @@ std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search
   return fun(algo, conf);
 }
 
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -106,4 +106,4 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #include "benchmark.hpp"
 
-int main(int argc, char** argv) { return raft::bench::ann::run_main(argc, argv); }
+int main(int argc, char** argv) { return cuvs::bench::run_main(argc, argv); }

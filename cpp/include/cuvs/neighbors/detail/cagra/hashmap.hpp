@@ -23,7 +23,7 @@
 // #pragma GCC diagnostic push
 // #pragma GCC diagnostic ignored
 // #pragma GCC diagnostic pop
-namespace raft::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra::detail {
 namespace hashmap {
 
 _RAFT_HOST_DEVICE inline uint32_t get_size(const uint32_t bitlen) { return 1U << bitlen; }
@@ -76,4 +76,4 @@ _RAFT_DEVICE inline uint32_t insert(IdxT* const table, const uint32_t bitlen, co
 }
 
 }  // namespace hashmap
-}  // namespace raft::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail

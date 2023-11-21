@@ -96,8 +96,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 {
   auto stream = resource::get_cuda_stream(handle);
   switch (params.metric) {
-    case raft::distance::DistanceType::L2Expanded:
-    case raft::distance::DistanceType::L2SqrtExpanded: {
+    case cuvs::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded: {
       auto workspace = raft::make_device_mdarray<char, IdxT>(
         handle, mr, make_extents<IdxT>((sizeof(int)) * n_rows));
 
@@ -114,7 +114,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       raft::linalg::rowNorm<MathT, IdxT>(
         centroidsNorm.data_handle(), centers, dim, n_clusters, raft::linalg::L2Norm, true, stream);
 
-      raft::distance::fusedL2NNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+      cuvs::distance::fusedL2NNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
         dataset,
         centers,
@@ -124,7 +124,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         n_clusters,
         dim,
         (void*)workspace.data_handle(),
-        (params.metric == raft::distance::DistanceType::L2Expanded) ? false : true,
+        (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
         false,
         stream);
 
@@ -137,7 +137,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
-    case raft::distance::DistanceType::InnerProduct: {
+    case cuvs::distance::DistanceType::InnerProduct: {
       // TODO: pass buffer
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
 
@@ -192,7 +192,7 @@ template <typename MathT, typename IdxT>
 constexpr auto calc_minibatch_size(IdxT n_clusters,
                                    IdxT n_rows,
                                    IdxT dim,
-                                   raft::distance::DistanceType metric,
+                                   cuvs::distance::DistanceType metric,
                                    bool needs_conversion) -> std::tuple<IdxT, size_t>
 {
   n_clusters = std::max<IdxT>(1, n_clusters);
@@ -297,7 +297,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
   }
 
   // Compute weight of each cluster
-  raft::cluster::detail::countLabels(handle, labels, temp_sizes, n_rows, n_clusters, workspace);
+  cuvs::cluster::detail::countLabels(handle, labels, temp_sizes, n_rows, n_clusters, workspace);
 
   // Add previous sizes if necessary
   if (!reset_counters) {
@@ -389,8 +389,8 @@ void predict(const raft::resources& handle,
   rmm::device_uvector<MathT> cur_dataset(
     std::is_same_v<T, MathT> ? 0 : max_minibatch_size * dim, stream, mr);
   bool need_compute_norm =
-    dataset_norm == nullptr && (params.metric == raft::distance::DistanceType::L2Expanded ||
-                                params.metric == raft::distance::DistanceType::L2SqrtExpanded);
+    dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                                params.metric == cuvs::distance::DistanceType::L2SqrtExpanded);
   rmm::device_uvector<MathT> cur_dataset_norm(
     need_compute_norm ? max_minibatch_size : 0, stream, mr);
   const MathT* dataset_norm_ptr = nullptr;
@@ -655,9 +655,9 @@ void balancing_em_iters(const raft::resources& handle,
     switch (params.metric) {
       // For some metrics, cluster calculation and adjustment tends to favor zero center vectors.
       // To avoid converging to zero, we normalize the center vectors on every iteration.
-      case raft::distance::DistanceType::InnerProduct:
-      case raft::distance::DistanceType::CosineExpanded:
-      case raft::distance::DistanceType::CorrelationExpanded: {
+      case cuvs::distance::DistanceType::InnerProduct:
+      case cuvs::distance::DistanceType::CosineExpanded:
+      case cuvs::distance::DistanceType::CorrelationExpanded: {
         auto clusters_in_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
           cluster_centers, n_clusters, dim);
         auto clusters_out_view = raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
@@ -899,8 +899,8 @@ auto build_fine_clusters(const raft::resources& handle,
 
     cub::TransformInputIterator<MathT, MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
     raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
-    if (params.metric == raft::distance::DistanceType::L2Expanded ||
-        params.metric == raft::distance::DistanceType::L2SqrtExpanded) {
+    if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
       thrust::gather(resource::get_thrust_policy(handle),
                      mc_trainset_ids,
                      mc_trainset_ids + k,
@@ -984,8 +984,8 @@ void build_hierarchical(const raft::resources& handle,
   // Precompute the L2 norm of the dataset if relevant.
   const MathT* dataset_norm = nullptr;
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
-  if (params.metric == raft::distance::DistanceType::L2Expanded ||
-      params.metric == raft::distance::DistanceType::L2SqrtExpanded) {
+  if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+      params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);

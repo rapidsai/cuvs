@@ -18,16 +18,16 @@
 
 #include <optional>
 
-#include <raft/core/device_mdspan.hpp>       // raft::device_matrix_view
-#include <raft/core/operators.hpp>           // raft::identity_op
-#include <raft/core/resources.hpp>           // raft::resources
-#include <raft/distance/distance_types.hpp>  // raft::distance::DistanceType
-#include <raft/neighbors/brute_force_types.hpp>
+#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
+#include <cuvs/neighbors/brute_force_types.hpp>
+#include <raft/core/device_mdspan.hpp>  // raft::device_matrix_view
+#include <raft/core/operators.hpp>      // raft::identity_op
+#include <raft/core/resources.hpp>      // raft::resources
 #include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 
 template <typename value_t, typename idx_t>
 inline void knn_merge_parts(
@@ -42,7 +42,7 @@ inline void knn_merge_parts(
 template <typename T, typename Accessor>
 index<T> build(raft::resources const& res,
                mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
-               raft::distance::DistanceType metric = distance::DistanceType::L2Unexpanded,
+               cuvs::distance::DistanceType metric = distance::DistanceType::L2Unexpanded,
                T metric_arg                        = 0.0) RAFT_EXPLICIT;
 
 template <typename T, typename IdxT>
@@ -74,24 +74,24 @@ void fused_l2_knn(raft::resources const& handle,
                   raft::device_matrix_view<const value_t, idx_t, query_layout> query,
                   raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,
                   raft::device_matrix_view<value_t, idx_t, row_major> out_dists,
-                  raft::distance::DistanceType metric) RAFT_EXPLICIT;
+                  cuvs::distance::DistanceType metric) RAFT_EXPLICIT;
 
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-// No extern template for raft::neighbors::brute_force::knn_merge_parts
+// No extern template for cuvs::neighbors::brute_force::knn_merge_parts
 
 #define instantiate_raft_neighbors_brute_force_knn(                                         \
   idx_t, value_t, matrix_idx, index_layout, search_layout, epilogue_op)                     \
-  extern template void raft::neighbors::brute_force::                                       \
+  extern template void cuvs::neighbors::brute_force::                                       \
     knn<idx_t, value_t, matrix_idx, index_layout, search_layout, epilogue_op>(              \
       raft::resources const& handle,                                                        \
       std::vector<raft::device_matrix_view<const value_t, matrix_idx, index_layout>> index, \
       raft::device_matrix_view<const value_t, matrix_idx, search_layout> search,            \
       raft::device_matrix_view<idx_t, matrix_idx, row_major> indices,                       \
       raft::device_matrix_view<value_t, matrix_idx, row_major> distances,                   \
-      raft::distance::DistanceType metric,                                                  \
+      cuvs::distance::DistanceType metric,                                                  \
       std::optional<float> metric_arg,                                                      \
       std::optional<idx_t> global_id_offset,                                                \
       epilogue_op distance_epilogue);
@@ -107,38 +107,38 @@ instantiate_raft_neighbors_brute_force_knn(
 
 #undef instantiate_raft_neighbors_brute_force_knn
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 
 extern template void search<float, int>(
   raft::resources const& res,
-  const raft::neighbors::brute_force::index<float>& idx,
+  const cuvs::neighbors::brute_force::index<float>& idx,
   raft::device_matrix_view<const float, int64_t, row_major> queries,
   raft::device_matrix_view<int, int64_t, row_major> neighbors,
   raft::device_matrix_view<float, int64_t, row_major> distances);
 
 extern template void search<float, int64_t>(
   raft::resources const& res,
-  const raft::neighbors::brute_force::index<float>& idx,
+  const cuvs::neighbors::brute_force::index<float>& idx,
   raft::device_matrix_view<const float, int64_t, row_major> queries,
   raft::device_matrix_view<int64_t, int64_t, row_major> neighbors,
   raft::device_matrix_view<float, int64_t, row_major> distances);
 
-extern template raft::neighbors::brute_force::index<float> build<float>(
+extern template cuvs::neighbors::brute_force::index<float> build<float>(
   raft::resources const& res,
   raft::device_matrix_view<const float, int64_t, row_major> dataset,
-  raft::distance::DistanceType metric,
+  cuvs::distance::DistanceType metric,
   float metric_arg);
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force
 
 #define instantiate_raft_neighbors_brute_force_fused_l2_knn(            \
   value_t, idx_t, idx_layout, query_layout)                             \
-  extern template void raft::neighbors::brute_force::fused_l2_knn(      \
+  extern template void cuvs::neighbors::brute_force::fused_l2_knn(      \
     raft::resources const& handle,                                      \
     raft::device_matrix_view<const value_t, idx_t, idx_layout> index,   \
     raft::device_matrix_view<const value_t, idx_t, query_layout> query, \
     raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,         \
     raft::device_matrix_view<value_t, idx_t, row_major> out_dists,      \
-    raft::distance::DistanceType metric);
+    cuvs::distance::DistanceType metric);
 
 instantiate_raft_neighbors_brute_force_fused_l2_knn(float,
                                                     int64_t,

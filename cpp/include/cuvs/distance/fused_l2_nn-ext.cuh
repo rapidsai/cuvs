@@ -17,9 +17,9 @@
 #pragma once
 
 #include <cstdint>                                // int64_t
+#include <cuvs/distance/fused_l2_nn_helpers.cuh>  // include initialize and reduce operations
 #include <raft/core/kvp.hpp>                      // raft::KeyValuePair
 #include <raft/core/resources.hpp>                // raft::resources
-#include <raft/distance/fused_l2_nn_helpers.cuh>  // include initialize and reduce operations
 #include <raft/util/raft_explicit.hpp>            // RAFT_EXPLICIT
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
@@ -47,7 +47,7 @@ void fusedL2NNMinReduce(OutT* min,
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_distance_fusedL2NNMinReduce(DataT, OutT, IdxT)                          \
-  extern template void raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(OutT * min,         \
+  extern template void cuvs::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(OutT * min,         \
                                                                              const DataT* x,     \
                                                                              const DataT* y,     \
                                                                              const DataT* xn,    \

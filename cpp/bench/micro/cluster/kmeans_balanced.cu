@@ -15,16 +15,16 @@
  */
 
 #include <common/benchmark.hpp>
-#include <raft/cluster/kmeans_balanced.cuh>
+#include <cuvs/cluster/kmeans_balanced.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/random/rng.cuh>
 
-namespace raft::bench::cluster {
+namespace cuvs::bench::cluster {
 
 struct KMeansBalancedBenchParams {
   DatasetParams data;
   uint32_t n_lists;
-  raft::cluster::kmeans_balanced_params kb_params;
+  cuvs::cluster::kmeans_balanced_params kb_params;
 };
 
 template <typename T, typename IndexT = int>
@@ -36,7 +36,7 @@ struct KMeansBalanced : public fixture {
     this->loop_on_state(state, [this]() {
       raft::device_matrix_view<const T, IndexT> X_view   = this->X.view();
       raft::device_matrix_view<T, IndexT> centroids_view = this->centroids.view();
-      raft::cluster::kmeans_balanced::fit(
+      cuvs::cluster::kmeans_balanced::fit(
         this->handle, this->params.kb_params, X_view, centroids_view);
     });
   }
@@ -76,7 +76,7 @@ std::vector<KMeansBalancedBenchParams> getKMeansBalancedInputs()
   KMeansBalancedBenchParams p;
   p.data.row_major                          = true;
   p.kb_params.n_iters                       = 20;
-  p.kb_params.metric                        = raft::distance::DistanceType::L2Expanded;
+  p.kb_params.metric                        = cuvs::distance::DistanceType::L2Expanded;
   std::vector<std::pair<int, int>> row_cols = {
     {100000, 128}, {1000000, 128}, {10000000, 128},
     // The following dataset sizes are too large for most GPUs.
@@ -96,4 +96,4 @@ std::vector<KMeansBalancedBenchParams> getKMeansBalancedInputs()
 // Note: the datasets sizes are too large for 32-bit index types.
 RAFT_BENCH_REGISTER((KMeansBalanced<float, int64_t>), "", getKMeansBalancedInputs());
 
-}  // namespace raft::bench::cluster
+}  // namespace cuvs::bench::cluster

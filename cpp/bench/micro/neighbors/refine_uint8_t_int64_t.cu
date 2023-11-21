@@ -17,9 +17,9 @@
 #include "refine.cuh"
 #include <common/benchmark.hpp>
 
-using namespace raft::neighbors;
+using namespace cuvs::neighbors;
 
-namespace raft::bench::neighbors {
+namespace cuvs::bench::neighbors {
 using refine_uint8_int64 = RefineAnn<uint8_t, float, int64_t>;
 RAFT_BENCH_REGISTER(refine_uint8_int64, "", getInputs<int64_t>());
-}  // namespace raft::bench::neighbors
+}  // namespace cuvs::bench::neighbors

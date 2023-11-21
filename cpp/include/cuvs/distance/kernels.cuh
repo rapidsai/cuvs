@@ -16,17 +16,17 @@
 
 #pragma once
 
-#include <raft/distance/detail/kernels/gram_matrix.cuh>
-#include <raft/distance/detail/kernels/kernel_factory.cuh>
+#include <cuvs/distance/detail/kernels/gram_matrix.cuh>
+#include <cuvs/distance/detail/kernels/kernel_factory.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-#include <raft/distance/distance.cuh>
+#include <cuvs/distance/distance.cuh>
 #include <raft/linalg/gemm.cuh>
 
-namespace raft::distance::kernels {
+namespace cuvs::distance::kernels {
 
 // TODO: Need to expose formal APIs for this that are more consistent w/ other APIs in RAFT
-using raft::distance::kernels::detail::GramMatrixBase;
-using raft::distance::kernels::detail::KernelFactory;
+using cuvs::distance::kernels::detail::GramMatrixBase;
+using cuvs::distance::kernels::detail::KernelFactory;
 
-};  // end namespace raft::distance::kernels
+};  // end namespace cuvs::distance::kernels

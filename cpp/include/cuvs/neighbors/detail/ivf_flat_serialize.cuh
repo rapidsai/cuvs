@@ -16,18 +16,18 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ivf_flat_types.hpp>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_list_types.hpp>
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
-#include <raft/neighbors/ivf_flat_types.hpp>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_list_types.hpp>
 #include <raft/util/pow2_utils.cuh>
 
 #include <fstream>
 
-namespace raft::neighbors::ivf_flat::detail {
+namespace cuvs::neighbors::ivf_flat::detail {
 
 // Serialization version
 // No backward compatibility yet; that is, can't add additional fields without breaking
@@ -127,7 +127,7 @@ auto deserialize(raft::resources const& handle, std::istream& is) -> index<T, Id
   auto n_rows           = deserialize_scalar<IdxT>(handle, is);
   auto dim              = deserialize_scalar<std::uint32_t>(handle, is);
   auto n_lists          = deserialize_scalar<std::uint32_t>(handle, is);
-  auto metric           = deserialize_scalar<raft::distance::DistanceType>(handle, is);
+  auto metric           = deserialize_scalar<cuvs::distance::DistanceType>(handle, is);
   bool adaptive_centers = deserialize_scalar<bool>(handle, is);
   bool cma              = deserialize_scalar<bool>(handle, is);
 
@@ -171,4 +171,4 @@ auto deserialize(raft::resources const& handle, const std::string& filename) -> 
 
   return index;
 }
-}  // namespace raft::neighbors::ivf_flat::detail
+}  // namespace cuvs::neighbors::ivf_flat::detail

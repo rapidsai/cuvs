@@ -19,10 +19,10 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-#include <raft/neighbors/detail/faiss_select/Select.cuh>
-#include <raft/neighbors/detail/selection_faiss_helpers.cuh>  // kFaissMaxK
+#include <cuvs/neighbors/detail/faiss_select/Select.cuh>
+#include <cuvs/neighbors/detail/selection_faiss_helpers.cuh>  // kFaissMaxK
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename payload_t, typename key_t, bool select_min, int warp_q, int thread_q, int tpb>
 RAFT_KERNEL select_k_kernel(const key_t* inK,
@@ -160,4 +160,4 @@ inline void select_k(const key_t* inK,
   else
     ASSERT(k <= max_k, "Current max k is %d (requested %d)", max_k, k);
 }
-};  // namespace raft::neighbors::detail
+};  // namespace cuvs::neighbors::detail

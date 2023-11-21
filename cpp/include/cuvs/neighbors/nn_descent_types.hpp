@@ -19,13 +19,13 @@
 #include "ann_types.hpp"
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 
-namespace raft::neighbors::experimental::nn_descent {
+namespace cuvs::neighbors::experimental::nn_descent {
 /**
  * @ingroup nn_descent
  * @{
@@ -77,7 +77,7 @@ struct index : ann::index {
   index(raft::resources const& res, int64_t n_rows, int64_t n_cols)
     : ann::index(),
       res_{res},
-      metric_{raft::distance::DistanceType::L2Expanded},
+      metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, row_major>(n_rows, n_cols)},
       graph_view_{graph_.view()}
   {
@@ -97,14 +97,14 @@ struct index : ann::index {
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view)
     : ann::index(),
       res_{res},
-      metric_{raft::distance::DistanceType::L2Expanded},
+      metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, row_major>(0, 0)},
       graph_view_{graph_view}
   {
   }
 
   /** Distance metric used for clustering. */
-  [[nodiscard]] constexpr inline auto metric() const noexcept -> raft::distance::DistanceType
+  [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
   {
     return metric_;
   }
@@ -136,7 +136,7 @@ struct index : ann::index {
 
  private:
   raft::resources const& res_;
-  raft::distance::DistanceType metric_;
+  cuvs::distance::DistanceType metric_;
   raft::host_matrix<IdxT, int64_t, row_major> graph_;  // graph to return for non-int IdxT
   raft::host_matrix_view<IdxT, int64_t, row_major>
     graph_view_;  // view of graph for user provided matrix
@@ -144,4 +144,4 @@ struct index : ann::index {
 
 /** @} */
 
-}  // namespace raft::neighbors::experimental::nn_descent
+}  // namespace cuvs::neighbors::experimental::nn_descent

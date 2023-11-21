@@ -35,12 +35,12 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace raft::neighbors;
+  using namespace cuvs::neighbors;
 
   ivf_flat::index_params index_params;
   index_params.n_lists                  = 1024;
   index_params.kmeans_trainset_fraction = 0.1;
-  index_params.metric                   = raft::distance::DistanceType::L2Expanded;
+  index_params.metric                   = cuvs::distance::DistanceType::L2Expanded;
 
   std::cout << "Building IVF-Flat index" << std::endl;
   auto index = ivf_flat::build(dev_resources, index_params, dataset);
@@ -72,7 +72,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
                                   raft::device_matrix_view<const float, int64_t> dataset,
                                   raft::device_matrix_view<const float, int64_t> queries)
 {
-  using namespace raft::neighbors;
+  using namespace cuvs::neighbors;
 
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
@@ -87,7 +87,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
 
   ivf_flat::index_params index_params;
   index_params.n_lists           = 100;
-  index_params.metric            = raft::distance::DistanceType::L2Expanded;
+  index_params.metric            = cuvs::distance::DistanceType::L2Expanded;
   index_params.add_data_on_build = false;
 
   std::cout << "\nRun k-means clustering using the training set" << std::endl;

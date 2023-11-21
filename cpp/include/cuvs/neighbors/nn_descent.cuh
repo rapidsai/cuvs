@@ -21,7 +21,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 
-namespace raft::neighbors::experimental::nn_descent {
+namespace cuvs::neighbors::experimental::nn_descent {
 
 /**
  * @defgroup nn-descent CUDA gradient descent nearest neighbor
@@ -36,7 +36,7 @@ namespace raft::neighbors::experimental::nn_descent {
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors::experimental;
+ *   using namespace cuvs::neighbors::experimental;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
@@ -71,7 +71,7 @@ index<IdxT> build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors::experimental;
+ *   using namespace cuvs::neighbors::experimental;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
@@ -90,7 +90,7 @@ index<IdxT> build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
  *                in device memory
- * @param[out] idx raft::neighbors::experimental::nn_descentindex containing all-neighbors knn graph
+ * @param[out] idx cuvs::neighbors::experimental::nn_descentindex containing all-neighbors knn graph
  * in host memory
  */
 template <typename T, typename IdxT = uint32_t>
@@ -110,7 +110,7 @@ void build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors::experimental;
+ *   using namespace cuvs::neighbors::experimental;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
@@ -145,7 +145,7 @@ index<IdxT> build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors::experimental;
+ *   using namespace cuvs::neighbors::experimental;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
@@ -164,7 +164,7 @@ index<IdxT> build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] idx raft::neighbors::experimental::nn_descentindex containing all-neighbors knn graph
+ * @param[out] idx cuvs::neighbors::experimental::nn_descentindex containing all-neighbors knn graph
  * in host memory
  */
 template <typename T, typename IdxT = uint32_t>
@@ -178,4 +178,4 @@ void build(raft::resources const& res,
 
 /** @} */  // end group nn-descent
 
-}  // namespace raft::neighbors::experimental::nn_descent
+}  // namespace cuvs::neighbors::experimental::nn_descent

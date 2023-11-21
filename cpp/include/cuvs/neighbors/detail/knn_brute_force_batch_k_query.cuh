@@ -15,17 +15,17 @@
  */
 #pragma once
 
+#include <cuvs/neighbors/brute_force_types.hpp>
+#include <cuvs/neighbors/detail/knn_brute_force.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/matrix/slice.cuh>
-#include <raft/neighbors/brute_force_types.hpp>
-#include <raft/neighbors/detail/knn_brute_force.cuh>
 
-namespace raft::neighbors::brute_force::detail {
+namespace cuvs::neighbors::brute_force::detail {
 template <typename T, typename IdxT = int64_t>
 class gpu_batch_k_query : public batch_k_query<T, IdxT> {
  public:
   gpu_batch_k_query(const raft::resources& res,
-                    const raft::neighbors::brute_force::index<T>& index,
+                    const cuvs::neighbors::brute_force::index<T>& index,
                     raft::device_matrix_view<const T, int64_t, row_major> query,
                     int64_t batch_size)
     : batch_k_query<T, IdxT>(res, index.size(), query.extent(0), batch_size),
@@ -35,12 +35,12 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
     auto metric = index.metric();
 
     // precompute query norms, and re-use across batches
-    if (metric == raft::distance::DistanceType::L2Expanded ||
-        metric == raft::distance::DistanceType::L2SqrtExpanded ||
-        metric == raft::distance::DistanceType::CosineExpanded) {
+    if (metric == cuvs::distance::DistanceType::L2Expanded ||
+        metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+        metric == cuvs::distance::DistanceType::CosineExpanded) {
       query_norms = make_device_vector<T, int64_t>(res, query.extent(0));
 
-      if (metric == raft::distance::DistanceType::CosineExpanded) {
+      if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         raft::linalg::norm(res,
                            query,
                            query_norms->view(),
@@ -70,7 +70,7 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
     std::optional<raft::device_vector_view<const float, int64_t>> query_norms_view;
     if (query_norms) { query_norms_view = query_norms->view(); }
 
-    raft::neighbors::detail::brute_force_search<T, IdxT>(
+    cuvs::neighbors::detail::brute_force_search<T, IdxT>(
       this->res, index, query, output->indices(), output->distances(), query_norms_view);
   };
 
@@ -91,8 +91,8 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
     matrix::slice(this->res, input.distances(), output->distances(), coords);
   }
 
-  const raft::neighbors::brute_force::index<T>& index;
+  const cuvs::neighbors::brute_force::index<T>& index;
   raft::device_matrix_view<const T, int64_t, row_major> query;
   std::optional<device_vector<T, int64_t>> query_norms;
 };
-}  // namespace raft::neighbors::brute_force::detail
+}  // namespace cuvs::neighbors::brute_force::detail

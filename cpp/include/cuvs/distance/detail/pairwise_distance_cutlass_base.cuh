@@ -38,7 +38,7 @@
 #include <cutlass/matrix_coord.h>
 #include <cutlass/tensor_view.h>
 
-#include <raft/distance/detail/distance_ops/cutlass.cuh>
+#include <cuvs/distance/detail/distance_ops/cutlass.cuh>
 #include <raft/util/cutlass_utils.cuh>
 
 #include "./pairwise_distance_epilogue_elementwise.h"

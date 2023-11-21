@@ -16,9 +16,9 @@
 #pragma once
 
 #include <cassert>
+#include <cuvs/distance/detail/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <memory>
-#include <raft/distance/detail/distance.cuh>
-#include <raft/distance/distance_types.hpp>
 #include <raft/spatial/knn/detail/fused_l2_knn.cuh>
 #include <stdexcept>
 #include <string>
@@ -28,12 +28,12 @@
 
 namespace raft_temp {
 
-inline raft::distance::DistanceType parse_metric_type(raft::bench::ann::Metric metric)
+inline cuvs::distance::DistanceType parse_metric_type(cuvs::bench::Metric metric)
 {
-  if (metric == raft::bench::ann::Metric::kInnerProduct) {
-    return raft::distance::DistanceType::InnerProduct;
-  } else if (metric == raft::bench::ann::Metric::kEuclidean) {
-    return raft::distance::DistanceType::L2Expanded;
+  if (metric == cuvs::bench::Metric::kInnerProduct) {
+    return cuvs::distance::DistanceType::InnerProduct;
+  } else if (metric == cuvs::bench::Metric::kEuclidean) {
+    return cuvs::distance::DistanceType::L2Expanded;
   } else {
     throw std::runtime_error("raft supports only metric type of inner product and L2");
   }
@@ -41,7 +41,7 @@ inline raft::distance::DistanceType parse_metric_type(raft::bench::ann::Metric m
 
 }  // namespace raft_temp
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 // brute force fused L2 KNN - RAFT
 template <typename T>
@@ -77,7 +77,7 @@ class RaftGpu : public ANN<T> {
   void load(const std::string&) override { return; };
 
  protected:
-  raft::distance::DistanceType metric_type_;
+  cuvs::distance::DistanceType metric_type_;
   int device_;
   const T* dataset_;
   size_t nrow_;
@@ -88,7 +88,7 @@ RaftGpu<T>::RaftGpu(Metric metric, int dim)
   : ANN<T>(metric, dim), metric_type_(raft_temp::parse_metric_type(metric))
 {
   static_assert(std::is_same_v<T, float>, "raft support only float type");
-  assert(metric_type_ == raft::distance::DistanceType::L2Expanded);
+  assert(metric_type_ == cuvs::distance::DistanceType::L2Expanded);
   RAFT_CUDA_TRY(cudaGetDevice(&device_));
 }
 
@@ -150,4 +150,4 @@ void RaftGpu<T>::search(const T* queries,
                                          metric_type_);
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench

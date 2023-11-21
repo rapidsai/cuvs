@@ -31,24 +31,24 @@
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
-std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
-                                                      const std::string& distance,
-                                                      int dim,
-                                                      const nlohmann::json& conf,
-                                                      const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::ANN<T>> create_algo(const std::string& algo,
+                                                 const std::string& distance,
+                                                 int dim,
+                                                 const nlohmann::json& conf,
+                                                 const std::vector<int>& dev_list)
 {
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  raft::bench::ann::Metric metric = parse_metric(distance);
-  std::unique_ptr<raft::bench::ann::ANN<T>> ann;
+  cuvs::bench::Metric metric = parse_metric(distance);
+  std::unique_ptr<cuvs::bench::ANN<T>> ann;
 
   if constexpr (std::is_same_v<T, float>) {
 #ifdef CUVS_BENCH_USE_RAFT_BFKNN
-    if (algo == "raft_bfknn") { ann = std::make_unique<raft::bench::ann::RaftGpu<T>>(metric, dim); }
+    if (algo == "raft_bfknn") { ann = std::make_unique<cuvs::bench::RaftGpu<T>>(metric, dim); }
 #endif
   }
 
@@ -56,23 +56,23 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
 
 #ifdef CUVS_BENCH_USE_RAFT_IVF_FLAT
   if (algo == "raft_ivf_flat") {
-    typename raft::bench::ann::RaftIvfFlatGpu<T, int64_t>::BuildParam param;
+    typename cuvs::bench::RaftIvfFlatGpu<T, int64_t>::BuildParam param;
     parse_build_param<T, int64_t>(conf, param);
-    ann = std::make_unique<raft::bench::ann::RaftIvfFlatGpu<T, int64_t>>(metric, dim, param);
+    ann = std::make_unique<cuvs::bench::RaftIvfFlatGpu<T, int64_t>>(metric, dim, param);
   }
 #endif
 #ifdef CUVS_BENCH_USE_RAFT_IVF_PQ
   if (algo == "raft_ivf_pq") {
-    typename raft::bench::ann::RaftIvfPQ<T, int64_t>::BuildParam param;
+    typename cuvs::bench::RaftIvfPQ<T, int64_t>::BuildParam param;
     parse_build_param<T, int64_t>(conf, param);
-    ann = std::make_unique<raft::bench::ann::RaftIvfPQ<T, int64_t>>(metric, dim, param);
+    ann = std::make_unique<cuvs::bench::RaftIvfPQ<T, int64_t>>(metric, dim, param);
   }
 #endif
 #ifdef CUVS_BENCH_USE_RAFT_CAGRA
   if (algo == "raft_cagra") {
-    typename raft::bench::ann::RaftCagra<T, uint32_t>::BuildParam param;
+    typename cuvs::bench::RaftCagra<T, uint32_t>::BuildParam param;
     parse_build_param<T, uint32_t>(conf, param);
-    ann = std::make_unique<raft::bench::ann::RaftCagra<T, uint32_t>>(metric, dim, param);
+    ann = std::make_unique<cuvs::bench::RaftCagra<T, uint32_t>>(metric, dim, param);
   }
 #endif
 
@@ -82,33 +82,32 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::ANN<T>::AnnSearchParam> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
 #ifdef CUVS_BENCH_USE_RAFT_BFKNN
   if (algo == "raft_brute_force") {
-    auto param = std::make_unique<typename raft::bench::ann::ANN<T>::AnnSearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::ANN<T>::AnnSearchParam>();
     return param;
   }
 #endif
 #ifdef CUVS_BENCH_USE_RAFT_IVF_FLAT
   if (algo == "raft_ivf_flat") {
-    auto param =
-      std::make_unique<typename raft::bench::ann::RaftIvfFlatGpu<T, int64_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::RaftIvfFlatGpu<T, int64_t>::SearchParam>();
     parse_search_param<T, int64_t>(conf, *param);
     return param;
   }
 #endif
 #ifdef CUVS_BENCH_USE_RAFT_IVF_PQ
   if (algo == "raft_ivf_pq") {
-    auto param = std::make_unique<typename raft::bench::ann::RaftIvfPQ<T, int64_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::RaftIvfPQ<T, int64_t>::SearchParam>();
     parse_search_param<T, int64_t>(conf, *param);
     return param;
   }
 #endif
 #ifdef CUVS_BENCH_USE_RAFT_CAGRA
   if (algo == "raft_cagra") {
-    auto param = std::make_unique<typename raft::bench::ann::RaftCagra<T, uint32_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::RaftCagra<T, uint32_t>::SearchParam>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }
@@ -118,7 +117,7 @@ std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -135,6 +134,6 @@ int main(int argc, char** argv)
     &pool_mr);  // Updates the current device resource pointer to `pool_mr`
   rmm::mr::device_memory_resource* mr =
     rmm::mr::get_current_device_resource();  // Points to `pool_mr`
-  return raft::bench::ann::run_main(argc, argv);
+  return cuvs::bench::run_main(argc, argv);
 }
 #endif
