@@ -81,10 +81,10 @@ namespace cuvs::neighbors::brute_force {
 template <typename value_t, typename idx_t>
 inline void knn_merge_parts(
   raft::resources const& handle,
-  raft::device_matrix_view<const value_t, idx_t, row_major> in_keys,
-  raft::device_matrix_view<const idx_t, idx_t, row_major> in_values,
-  raft::device_matrix_view<value_t, idx_t, row_major> out_keys,
-  raft::device_matrix_view<idx_t, idx_t, row_major> out_values,
+  raft::device_matrix_view<const value_t, idx_t, raft::row_major> in_keys,
+  raft::device_matrix_view<const idx_t, idx_t, raft::row_major> in_values,
+  raft::device_matrix_view<value_t, idx_t, raft::row_major> out_keys,
+  raft::device_matrix_view<idx_t, idx_t, raft::row_major> out_values,
   size_t n_samples,
   std::optional<raft::device_vector_view<idx_t, idx_t>> translations = std::nullopt)
 {
@@ -156,8 +156,8 @@ template <typename idx_t,
 void knn(raft::resources const& handle,
          std::vector<raft::device_matrix_view<const value_t, matrix_idx, index_layout>> index,
          raft::device_matrix_view<const value_t, matrix_idx, search_layout> search,
-         raft::device_matrix_view<idx_t, matrix_idx, row_major> indices,
-         raft::device_matrix_view<value_t, matrix_idx, row_major> distances,
+         raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
+         raft::device_matrix_view<value_t, matrix_idx, raft::row_major> distances,
          distance::DistanceType metric         = distance::DistanceType::L2Unexpanded,
          std::optional<float> metric_arg       = std::make_optional<float>(2.0f),
          std::optional<idx_t> global_id_offset = std::nullopt,
@@ -240,8 +240,8 @@ template <typename value_t, typename idx_t, typename idx_layout, typename query_
 void fused_l2_knn(raft::resources const& handle,
                   raft::device_matrix_view<const value_t, idx_t, idx_layout> index,
                   raft::device_matrix_view<const value_t, idx_t, query_layout> query,
-                  raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,
-                  raft::device_matrix_view<value_t, idx_t, row_major> out_dists,
+                  raft::device_matrix_view<idx_t, idx_t, raft::row_major> out_inds,
+                  raft::device_matrix_view<value_t, idx_t, raft::row_major> out_dists,
                   cuvs::distance::DistanceType metric)
 {
   int k = static_cast<int>(out_inds.extent(1));
@@ -277,7 +277,7 @@ void fused_l2_knn(raft::resources const& handle,
                                          k,
                                          rowMajorIndex,
                                          rowMajorQuery,
-                                         resource::get_cuda_stream(handle),
+                                         raft::resource::get_cuda_stream(handle),
                                          metric);
 }
 
@@ -295,10 +295,11 @@ void fused_l2_knn(raft::resources const& handle,
  * @return the constructed brute force index
  */
 template <typename T, typename Accessor>
-index<T> build(raft::resources const& res,
-               mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
-               cuvs::distance::DistanceType metric = distance::DistanceType::L2Unexpanded,
-               T metric_arg                        = 0.0)
+index<T> build(
+  raft::resources const& res,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  cuvs::distance::DistanceType metric = distance::DistanceType::L2Unexpanded,
+  T metric_arg                        = 0.0)
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time
@@ -306,7 +307,7 @@ index<T> build(raft::resources const& res,
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
-    norms = make_device_vector<T, int64_t>(res, dataset.extent(0));
+    norms = raft::make_device_vector<T, int64_t>(res, dataset.extent(0));
     // cosine needs the l2norm, where as l2 distances needs the squared norm
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       raft::linalg::norm(res,
@@ -344,9 +345,9 @@ index<T> build(raft::resources const& res,
 template <typename T, typename IdxT>
 void search(raft::resources const& res,
             const index<T>& idx,
-            raft::device_matrix_view<const T, int64_t, row_major> queries,
-            raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
-            raft::device_matrix_view<T, int64_t, row_major> distances)
+            raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<T, int64_t, raft::row_major> distances)
 {
   cuvs::neighbors::detail::brute_force_search<T, IdxT>(res, idx, queries, neighbors, distances);
 }

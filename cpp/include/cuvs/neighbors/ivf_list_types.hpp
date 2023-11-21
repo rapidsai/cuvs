@@ -46,9 +46,9 @@ struct list {
   using list_extents = typename spec_type::list_extents;
 
   /** Possibly encoded data; it's layout is defined by `SpecT`. */
-  device_mdarray<value_type, list_extents, row_major> data;
+  device_mdarray<value_type, list_extents, raft::row_major> data;
   /** Source indices. */
-  device_mdarray<index_type, extent_1d<size_type>, row_major> indices;
+  device_mdarray<index_type, extent_1d<size_type>, raft::row_major> indices;
   /** The actual size of the content. */
   std::atomic<size_type> size;
 

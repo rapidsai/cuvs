@@ -354,6 +354,11 @@ add_library(
   src/spatial/knn/detail/fused_l2_knn_uint32_t_float.cu
 )
 
+target_compile_options(
+  cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
+                 --expt-relaxed-constexpr>
+)
+
 add_library(cuvs::cuvs ALIAS cuvs)
 
 target_include_directories(

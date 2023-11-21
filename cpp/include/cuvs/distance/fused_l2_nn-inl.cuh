@@ -98,33 +98,35 @@ void fusedL2NN(OutT* min,
   auto py      = reinterpret_cast<uintptr_t>(y);
   if (16 % sizeof(DataT) == 0 && bytes % 16 == 0 && px % 16 == 0 && py % 16 == 0) {
     if (is_skinny) {
-      detail::fusedL2NNImpl<DataT,
-                            OutT,
-                            IdxT,
-                            typename linalg::Policy4x4Skinny<DataT, 16 / sizeof(DataT)>::Policy,
-                            ReduceOpT>(
+      detail::fusedL2NNImpl<
+        DataT,
+        OutT,
+        IdxT,
+        typename raft::linalg::Policy4x4Skinny<DataT, 16 / sizeof(DataT)>::Policy,
+        ReduceOpT>(
         min, x, y, xn, yn, m, n, k, (int*)workspace, redOp, pairRedOp, sqrt, initOutBuffer, stream);
     } else {
       detail::fusedL2NNImpl<DataT,
                             OutT,
                             IdxT,
-                            typename linalg::Policy4x4<DataT, 16 / sizeof(DataT)>::Policy,
+                            typename raft::linalg::Policy4x4<DataT, 16 / sizeof(DataT)>::Policy,
                             ReduceOpT>(
         min, x, y, xn, yn, m, n, k, (int*)workspace, redOp, pairRedOp, sqrt, initOutBuffer, stream);
     }
   } else if (8 % sizeof(DataT) == 0 && bytes % 8 == 0 && px % 8 == 0 && py % 8 == 0) {
     if (is_skinny) {
-      detail::fusedL2NNImpl<DataT,
-                            OutT,
-                            IdxT,
-                            typename linalg::Policy4x4Skinny<DataT, 8 / sizeof(DataT)>::Policy,
-                            ReduceOpT>(
+      detail::fusedL2NNImpl<
+        DataT,
+        OutT,
+        IdxT,
+        typename raft::linalg::Policy4x4Skinny<DataT, 8 / sizeof(DataT)>::Policy,
+        ReduceOpT>(
         min, x, y, xn, yn, m, n, k, (int*)workspace, redOp, pairRedOp, sqrt, initOutBuffer, stream);
     } else {
       detail::fusedL2NNImpl<DataT,
                             OutT,
                             IdxT,
-                            typename linalg::Policy4x4<DataT, 8 / sizeof(DataT)>::Policy,
+                            typename raft::linalg::Policy4x4<DataT, 8 / sizeof(DataT)>::Policy,
                             ReduceOpT>(
         min, x, y, xn, yn, m, n, k, (int*)workspace, redOp, pairRedOp, sqrt, initOutBuffer, stream);
     }
@@ -133,14 +135,14 @@ void fusedL2NN(OutT* min,
       detail::fusedL2NNImpl<DataT,
                             OutT,
                             IdxT,
-                            typename linalg::Policy4x4Skinny<DataT, 1>::Policy,
+                            typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
                             ReduceOpT>(
         min, x, y, xn, yn, m, n, k, (int*)workspace, redOp, pairRedOp, sqrt, initOutBuffer, stream);
     } else {
       detail::fusedL2NNImpl<DataT,
                             OutT,
                             IdxT,
-                            typename linalg::Policy4x4<DataT, 1>::Policy,
+                            typename raft::linalg::Policy4x4<DataT, 1>::Policy,
                             ReduceOpT>(
         min, x, y, xn, yn, m, n, k, (int*)workspace, redOp, pairRedOp, sqrt, initOutBuffer, stream);
     }

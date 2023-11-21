@@ -100,7 +100,8 @@ struct bitfield_view_t {
  */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_vector(
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
   uint32_t in_ix,
   uint32_t out_ix,
   uint32_t pq_dim,
@@ -142,7 +143,8 @@ __device__ void run_on_vector(
  */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
 __device__ void write_vector(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> out_list_data,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    out_list_data,
   uint32_t out_ix,
   IdxT in_ix,
   uint32_t pq_dim,
@@ -177,7 +179,8 @@ __device__ void write_vector(
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_list(
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,
   uint32_t pq_dim,
@@ -194,7 +197,8 @@ __device__ void run_on_list(
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename Action>
 __device__ void write_list(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> out_list_data,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    out_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,
   uint32_t pq_dim,

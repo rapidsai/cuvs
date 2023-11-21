@@ -502,7 +502,7 @@ void apply_filter(INDEX_T* const result_indices_ptr,
                   cudaStream_t cuda_stream)
 {
   const std::uint32_t block_size = 256;
-  const std::uint32_t grid_size  = ceildiv(num_queries * result_buffer_size, block_size);
+  const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);
 
   apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(result_indices_ptr,
                                                                  result_distances_ptr,
@@ -674,7 +674,7 @@ struct search : search_plan_impl<DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T> {
 
   void operator()(raft::resources const& res,
                   raft::device_matrix_view<const DATA_T, int64_t, layout_stride> dataset,
-                  raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,
+                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
                   INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
                   DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]

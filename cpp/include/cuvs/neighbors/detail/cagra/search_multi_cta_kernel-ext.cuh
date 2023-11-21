@@ -30,7 +30,7 @@ template <unsigned TEAM_SIZE,
           class DISTANCE_T,
           class SAMPLE_FILTER_T>
 void select_and_run(raft::device_matrix_view<const DATA_T, int64_t, layout_stride> dataset,
-                    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,
+                    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
                     INDEX_T* const topk_indices_ptr,
                     DISTANCE_T* const topk_distances_ptr,
                     const DATA_T* const queries_ptr,
@@ -60,7 +60,7 @@ void select_and_run(raft::device_matrix_view<const DATA_T, int64_t, layout_strid
   extern template void                                                                      \
   select_and_run<TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T>( \
     raft::device_matrix_view<const DATA_T, int64_t, layout_stride> dataset,                 \
-    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,                      \
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,                \
     INDEX_T* const topk_indices_ptr,                                                        \
     DISTANCE_T* const topk_distances_ptr,                                                   \
     const DATA_T* const queries_ptr,                                                        \

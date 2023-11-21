@@ -26,23 +26,23 @@
 
 #include <cuvs/neighbors/refine-inl.cuh>
 
-#define instantiate_raft_neighbors_refine(idx_t, data_t, distance_t, matrix_idx)      \
-  template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(       \
-    raft::resources const& handle,                                                    \
-    raft::device_matrix_view<const data_t, matrix_idx, row_major> dataset,            \
-    raft::device_matrix_view<const data_t, matrix_idx, row_major> queries,            \
-    raft::device_matrix_view<const idx_t, matrix_idx, row_major> neighbor_candidates, \
-    raft::device_matrix_view<idx_t, matrix_idx, row_major> indices,                   \
-    raft::device_matrix_view<distance_t, matrix_idx, row_major> distances,            \
-    cuvs::distance::DistanceType metric);                                             \
-                                                                                      \
-  template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(       \
-    raft::resources const& handle,                                                    \
-    raft::host_matrix_view<const data_t, matrix_idx, row_major> dataset,              \
-    raft::host_matrix_view<const data_t, matrix_idx, row_major> queries,              \
-    raft::host_matrix_view<const idx_t, matrix_idx, row_major> neighbor_candidates,   \
-    raft::host_matrix_view<idx_t, matrix_idx, row_major> indices,                     \
-    raft::host_matrix_view<distance_t, matrix_idx, row_major> distances,              \
+#define instantiate_raft_neighbors_refine(idx_t, data_t, distance_t, matrix_idx)            \
+  template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(             \
+    raft::resources const& handle,                                                          \
+    raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,            \
+    raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> queries,            \
+    raft::device_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates, \
+    raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,                   \
+    raft::device_matrix_view<distance_t, matrix_idx, raft::row_major> distances,            \
+    cuvs::distance::DistanceType metric);                                                   \
+                                                                                            \
+  template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(             \
+    raft::resources const& handle,                                                          \
+    raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,              \
+    raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> queries,              \
+    raft::host_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,   \
+    raft::host_matrix_view<idx_t, matrix_idx, raft::row_major> indices,                     \
+    raft::host_matrix_view<distance_t, matrix_idx, raft::row_major> distances,              \
     cuvs::distance::DistanceType metric);
 
 instantiate_raft_neighbors_refine(int64_t, int8_t, float, int64_t);

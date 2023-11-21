@@ -47,8 +47,8 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                 \\
   template void                                                                             \\
   select_and_run<TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T>( \\
-    raft::device_matrix_view<const DATA_T, int64_t, layout_stride> dataset,                 \\
-    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,                      \\
+    raft::device_matrix_view<const DATA_T, int64_t,raft::layout_stride> dataset,                 \\
+    raft::device_matrix_view<const INDEX_T, int64_t,raft::row_major> graph,                      \\
     INDEX_T* const topk_indices_ptr,                                                        \\
     DISTANCE_T* const topk_distances_ptr,                                                   \\
     const DATA_T* const queries_ptr,                                                        \\

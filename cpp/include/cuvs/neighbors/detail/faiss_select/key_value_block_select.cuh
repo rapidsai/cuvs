@@ -26,7 +26,7 @@ template <typename K,
           int NumThreadQ,
           int ThreadsPerBlock>
 struct KeyValueBlockSelect {
-  static constexpr int kNumWarps          = ThreadsPerBlock / WarpSize;
+  static constexpr int kNumWarps          = ThreadsPerBlock / raft::WarpSize;
   static constexpr int kTotalWarpSortSize = NumWarpQ;
 
   __device__ inline KeyValueBlockSelect(
@@ -53,13 +53,13 @@ struct KeyValueBlockSelect {
     }
 
     int laneId = raft::laneId();
-    int warpId = threadIdx.x / WarpSize;
+    int warpId = threadIdx.x / raft::WarpSize;
     warpK      = sharedK + warpId * kTotalWarpSortSize;
     warpV      = sharedV + warpId * kTotalWarpSortSize;
 
     // Fill warp queue (only the actual queue space is fine, not where
     // we write the per-thread queues for merging)
-    for (int i = laneId; i < NumWarpQ; i += WarpSize) {
+    for (int i = laneId; i < NumWarpQ; i += raft::WarpSize) {
       warpK[i]       = initK;
       warpV[i].key   = initVk;
       warpV[i].value = initVv;
@@ -132,15 +132,15 @@ struct KeyValueBlockSelect {
     // Sort all of the per-thread queues
     warpSortAnyRegisters<K, KeyValuePair<K, V>, NumThreadQ, !Dir, Comp>(threadK, threadV);
 
-    constexpr int kNumWarpQRegisters = NumWarpQ / WarpSize;
-    K warpKRegisters[kNumWarpQRegisters];
+    constexpr int kNumWarpQRegisters = NumWarpQ / raft::WarpSize;
+    K raft::warpKRegisters[kNumWarpQRegisters];
     KeyValuePair<K, V> warpVRegisters[kNumWarpQRegisters];
 
 #pragma unroll
     for (int i = 0; i < kNumWarpQRegisters; ++i) {
-      warpKRegisters[i]       = warpK[i * WarpSize + laneId];
-      warpVRegisters[i].key   = warpV[i * WarpSize + laneId].key;
-      warpVRegisters[i].value = warpV[i * WarpSize + laneId].value;
+      raft::warpKRegisters[i] = warpK[i * raft::WarpSize + laneId];
+      warpVRegisters[i].key   = warpV[i * raft::WarpSize + laneId].key;
+      warpVRegisters[i].value = warpV[i * raft::WarpSize + laneId].value;
     }
 
     warpFence();
@@ -149,14 +149,14 @@ struct KeyValueBlockSelect {
     // per-thread queue, merge both sorted lists together, producing
     // one sorted list
     warpMergeAnyRegisters<K, KeyValuePair<K, V>, kNumWarpQRegisters, NumThreadQ, !Dir, Comp, false>(
-      warpKRegisters, warpVRegisters, threadK, threadV);
+      raft::warpKRegisters, warpVRegisters, threadK, threadV);
 
     // Write back out the warp queue
 #pragma unroll
     for (int i = 0; i < kNumWarpQRegisters; ++i) {
-      warpK[i * WarpSize + laneId]       = warpKRegisters[i];
-      warpV[i * WarpSize + laneId].key   = warpVRegisters[i].key;
-      warpV[i * WarpSize + laneId].value = warpVRegisters[i].value;
+      warpK[i * raft::WarpSize + laneId]       = raft::warpKRegisters[i];
+      warpV[i * raft::WarpSize + laneId].key   = warpVRegisters[i].key;
+      warpV[i * raft::WarpSize + laneId].value = warpVRegisters[i].value;
     }
 
     warpFence();

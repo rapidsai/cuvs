@@ -51,8 +51,8 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
     capacity = std::min<SizeT>(capacity, spec.align_max);
   }
   try {
-    data    = make_device_mdarray<value_type>(res, spec.make_list_extents(capacity));
-    indices = make_device_vector<index_type, SizeT>(res, capacity);
+    data    = raft::make_device_mdarray<value_type>(res, spec.make_list_extents(capacity));
+    indices = raft::make_device_vector<index_type, SizeT>(res, capacity);
   } catch (std::bad_alloc& e) {
     RAFT_FAIL(
       "ivf::list: failed to allocate a big enough list to hold all data "
@@ -100,9 +100,11 @@ void resize_list(raft::resources const& res,
   auto new_list = std::make_shared<ListT>(res, spec, new_used_size);
   if (old_used_size > 0) {
     auto copied_data_extents = spec.make_list_extents(old_used_size);
-    auto copied_view =
-      make_mdspan<typename ListT::value_type, typename ListT::size_type, row_major, false, true>(
-        new_list->data.data_handle(), copied_data_extents);
+    auto copied_view         = make_mdspan<typename ListT::value_type,
+                                   typename ListT::size_type,
+                                   raft::row_major,
+                                   false,
+                                   true>(new_list->data.data_handle(), copied_data_extents);
     copy(copied_view.data_handle(),
          orig_list->data.data_handle(),
          copied_view.size(),
@@ -131,8 +133,8 @@ auto serialize_list(const raft::resources& handle,
 
   auto data_extents = store_spec.make_list_extents(size);
   auto data_array =
-    make_host_mdarray<typename ListT::value_type, size_type, row_major>(data_extents);
-  auto inds_array = make_host_mdarray<typename ListT::index_type, size_type, row_major>(
+    raft::make_host_mdarray<typename ListT::value_type, size_type, raft::row_major>(data_extents);
+  auto inds_array = raft::make_host_mdarray<typename ListT::index_type, size_type, raft::row_major>(
     make_extents<size_type>(size));
   copy(data_array.data_handle(),
        ld.data.data_handle(),
@@ -175,8 +177,8 @@ auto deserialize_list(const raft::resources& handle,
   std::make_shared<ListT>(handle, device_spec, size).swap(ld);
   auto data_extents = store_spec.make_list_extents(size);
   auto data_array =
-    make_host_mdarray<typename ListT::value_type, size_type, row_major>(data_extents);
-  auto inds_array = make_host_mdarray<typename ListT::index_type, size_type, row_major>(
+    raft::make_host_mdarray<typename ListT::value_type, size_type, raft::row_major>(data_extents);
+  auto inds_array = raft::make_host_mdarray<typename ListT::index_type, size_type, raft::row_major>(
     make_extents<size_type>(size));
   deserialize_mdspan(handle, is, data_array.view());
   deserialize_mdspan(handle, is, inds_array.view());

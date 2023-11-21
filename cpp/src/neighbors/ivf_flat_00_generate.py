@@ -59,13 +59,13 @@ build_macro = """
   template auto cuvs::neighbors::ivf_flat::build<T, IdxT>( \\
     raft::resources const& handle,                         \\
     const cuvs::neighbors::ivf_flat::index_params& params,        \\
-    raft::device_matrix_view<const T, IdxT, row_major> dataset)   \\
+    raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)   \\
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                  \\
                                                                   \\
   template void cuvs::neighbors::ivf_flat::build<T, IdxT>( \\
     raft::resources const& handle,                         \\
     const cuvs::neighbors::ivf_flat::index_params& params,        \\
-    raft::device_matrix_view<const T, IdxT, row_major> dataset,   \\
+    raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,   \\
     cuvs::neighbors::ivf_flat::index<T, IdxT>& idx);
 """
 
@@ -81,7 +81,7 @@ extend_macro = """
                                                                            \\
   template auto cuvs::neighbors::ivf_flat::extend<T, IdxT>(         \\
     raft::resources const& handle,                                  \\
-    raft::device_matrix_view<const T, IdxT, row_major> new_vectors,        \\
+    raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,        \\
     std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
     const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)           \\
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                           \\
@@ -95,7 +95,7 @@ extend_macro = """
                                                                            \\
   template void cuvs::neighbors::ivf_flat::extend<T, IdxT>(         \\
     raft::resources const& handle,                                  \\
-    raft::device_matrix_view<const T, IdxT, row_major> new_vectors,        \\
+    raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,        \\
     std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
     cuvs::neighbors::ivf_flat::index<T, IdxT>* index);
 """
@@ -117,9 +117,9 @@ search_macro = """
     raft::resources const& handle,                          \\
     const cuvs::neighbors::ivf_flat::search_params& params,        \\
     const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,        \\
-    raft::device_matrix_view<const T, IdxT, row_major> queries,    \\
-    raft::device_matrix_view<IdxT, IdxT, row_major> neighbors,     \\
-    raft::device_matrix_view<float, IdxT, row_major> distances);
+    raft::device_matrix_view<const T, IdxT, raft::row_major> queries,    \\
+    raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,     \\
+    raft::device_matrix_view<float, IdxT, raft::row_major> distances);
 """
 
 macros = dict(

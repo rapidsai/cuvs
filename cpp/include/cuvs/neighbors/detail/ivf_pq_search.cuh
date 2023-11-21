@@ -483,7 +483,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     // possible.
     index_list_sorted_buf.resize(n_queries_probes, stream);
     auto index_list_buf =
-      make_device_mdarray<uint32_t>(handle, mr, make_extents<uint32_t>(n_queries_probes));
+      raft::make_device_mdarray<uint32_t>(handle, mr, make_extents<uint32_t>(n_queries_probes));
     rmm::device_uvector<uint32_t> cluster_labels_out(n_queries_probes, stream, mr);
     auto index_list   = index_list_buf.data_handle();
     index_list_sorted = index_list_sorted_buf.data();
@@ -552,7 +552,7 @@ void ivfpq_search_worker(raft::resources const& handle,
   float* query_kths = nullptr;
   if (manage_local_topk) {
     query_kths_buf.emplace(
-      make_device_mdarray<float>(handle, mr, make_extents<uint32_t>(n_queries)));
+      raft::make_device_mdarray<float>(handle, mr, make_extents<uint32_t>(n_queries)));
     linalg::map(handle,
                 query_kths_buf->view(),
                 raft::const_op<float>{dummy_block_sort_t<ScoreT, IdxT>::queue_t::kDummy});

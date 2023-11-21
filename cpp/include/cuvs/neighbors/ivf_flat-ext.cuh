@@ -39,13 +39,13 @@ auto build(raft::resources const& handle,
 template <typename T, typename IdxT>
 auto build(raft::resources const& handle,
            const index_params& params,
-           raft::device_matrix_view<const T, IdxT, row_major> dataset)
+           raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)
   -> index<T, IdxT> RAFT_EXPLICIT;
 
 template <typename T, typename IdxT>
 void build(raft::resources const& handle,
            const index_params& params,
-           raft::device_matrix_view<const T, IdxT, row_major> dataset,
+           raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,
            cuvs::neighbors::ivf_flat::index<T, IdxT>& idx) RAFT_EXPLICIT;
 
 template <typename T, typename IdxT>
@@ -57,7 +57,7 @@ auto extend(raft::resources const& handle,
 
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, IdxT, row_major> new_vectors,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
             const index<T, IdxT>& orig_index) -> index<T, IdxT> RAFT_EXPLICIT;
 
@@ -70,7 +70,7 @@ void extend(raft::resources const& handle,
 
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, IdxT, row_major> new_vectors,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
             index<T, IdxT>* index) RAFT_EXPLICIT;
 
@@ -101,42 +101,42 @@ template <typename T, typename IdxT, typename IvfSampleFilterT>
 void search_with_filtering(raft::resources const& handle,
                            const search_params& params,
                            const index<T, IdxT>& index,
-                           raft::device_matrix_view<const T, IdxT, row_major> queries,
-                           raft::device_matrix_view<IdxT, IdxT, row_major> neighbors,
-                           raft::device_matrix_view<float, IdxT, row_major> distances,
+                           raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+                           raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+                           raft::device_matrix_view<float, IdxT, raft::row_major> distances,
                            IvfSampleFilterT sample_filter = IvfSampleFilterT()) RAFT_EXPLICIT;
 
 template <typename T, typename IdxT>
 void search(raft::resources const& handle,
             const search_params& params,
             const index<T, IdxT>& index,
-            raft::device_matrix_view<const T, IdxT, row_major> queries,
-            raft::device_matrix_view<IdxT, IdxT, row_major> neighbors,
-            raft::device_matrix_view<float, IdxT, row_major> distances) RAFT_EXPLICIT;
+            raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+            raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+            raft::device_matrix_view<float, IdxT, raft::row_major> distances) RAFT_EXPLICIT;
 
 }  // namespace cuvs::neighbors::ivf_flat
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-#define instantiate_raft_neighbors_ivf_flat_build(T, IdxT)        \
-  extern template auto cuvs::neighbors::ivf_flat::build<T, IdxT>( \
-    raft::resources const& handle,                                \
-    const cuvs::neighbors::ivf_flat::index_params& params,        \
-    const T* dataset,                                             \
-    IdxT n_rows,                                                  \
-    uint32_t dim)                                                 \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                  \
-                                                                  \
-  extern template auto cuvs::neighbors::ivf_flat::build<T, IdxT>( \
-    raft::resources const& handle,                                \
-    const cuvs::neighbors::ivf_flat::index_params& params,        \
-    raft::device_matrix_view<const T, IdxT, row_major> dataset)   \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                  \
-                                                                  \
-  extern template void cuvs::neighbors::ivf_flat::build<T, IdxT>( \
-    raft::resources const& handle,                                \
-    const cuvs::neighbors::ivf_flat::index_params& params,        \
-    raft::device_matrix_view<const T, IdxT, row_major> dataset,   \
+#define instantiate_raft_neighbors_ivf_flat_build(T, IdxT)            \
+  extern template auto cuvs::neighbors::ivf_flat::build<T, IdxT>(     \
+    raft::resources const& handle,                                    \
+    const cuvs::neighbors::ivf_flat::index_params& params,            \
+    const T* dataset,                                                 \
+    IdxT n_rows,                                                      \
+    uint32_t dim)                                                     \
+    ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                      \
+                                                                      \
+  extern template auto cuvs::neighbors::ivf_flat::build<T, IdxT>(     \
+    raft::resources const& handle,                                    \
+    const cuvs::neighbors::ivf_flat::index_params& params,            \
+    raft::device_matrix_view<const T, IdxT, raft::row_major> dataset) \
+    ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                      \
+                                                                      \
+  extern template void cuvs::neighbors::ivf_flat::build<T, IdxT>(     \
+    raft::resources const& handle,                                    \
+    const cuvs::neighbors::ivf_flat::index_params& params,            \
+    raft::device_matrix_view<const T, IdxT, raft::row_major> dataset, \
     cuvs::neighbors::ivf_flat::index<T, IdxT>& idx);
 
 instantiate_raft_neighbors_ivf_flat_build(float, int64_t);
@@ -155,7 +155,7 @@ instantiate_raft_neighbors_ivf_flat_build(uint8_t, int64_t);
                                                                            \
   extern template auto cuvs::neighbors::ivf_flat::extend<T, IdxT>(         \
     raft::resources const& handle,                                         \
-    raft::device_matrix_view<const T, IdxT, row_major> new_vectors,        \
+    raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \
     std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
     const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)           \
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                           \
@@ -169,7 +169,7 @@ instantiate_raft_neighbors_ivf_flat_build(uint8_t, int64_t);
                                                                            \
   extern template void cuvs::neighbors::ivf_flat::extend<T, IdxT>(         \
     raft::resources const& handle,                                         \
-    raft::device_matrix_view<const T, IdxT, row_major> new_vectors,        \
+    raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \
     std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
     cuvs::neighbors::ivf_flat::index<T, IdxT>* index);
 
@@ -179,25 +179,25 @@ instantiate_raft_neighbors_ivf_flat_extend(uint8_t, int64_t);
 
 #undef instantiate_raft_neighbors_ivf_flat_extend
 
-#define instantiate_raft_neighbors_ivf_flat_search(T, IdxT)        \
-  extern template void cuvs::neighbors::ivf_flat::search<T, IdxT>( \
-    raft::resources const& handle,                                 \
-    const cuvs::neighbors::ivf_flat::search_params& params,        \
-    const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,        \
-    const T* queries,                                              \
-    uint32_t n_queries,                                            \
-    uint32_t k,                                                    \
-    IdxT* neighbors,                                               \
-    float* distances,                                              \
-    rmm::mr::device_memory_resource* mr);                          \
-                                                                   \
-  extern template void cuvs::neighbors::ivf_flat::search<T, IdxT>( \
-    raft::resources const& handle,                                 \
-    const cuvs::neighbors::ivf_flat::search_params& params,        \
-    const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,        \
-    raft::device_matrix_view<const T, IdxT, row_major> queries,    \
-    raft::device_matrix_view<IdxT, IdxT, row_major> neighbors,     \
-    raft::device_matrix_view<float, IdxT, row_major> distances);
+#define instantiate_raft_neighbors_ivf_flat_search(T, IdxT)           \
+  extern template void cuvs::neighbors::ivf_flat::search<T, IdxT>(    \
+    raft::resources const& handle,                                    \
+    const cuvs::neighbors::ivf_flat::search_params& params,           \
+    const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,           \
+    const T* queries,                                                 \
+    uint32_t n_queries,                                               \
+    uint32_t k,                                                       \
+    IdxT* neighbors,                                                  \
+    float* distances,                                                 \
+    rmm::mr::device_memory_resource* mr);                             \
+                                                                      \
+  extern template void cuvs::neighbors::ivf_flat::search<T, IdxT>(    \
+    raft::resources const& handle,                                    \
+    const cuvs::neighbors::ivf_flat::search_params& params,           \
+    const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,           \
+    raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \
+    raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \
+    raft::device_matrix_view<float, IdxT, raft::row_major> distances);
 
 instantiate_raft_neighbors_ivf_flat_search(float, int64_t);
 instantiate_raft_neighbors_ivf_flat_search(int8_t, int64_t);

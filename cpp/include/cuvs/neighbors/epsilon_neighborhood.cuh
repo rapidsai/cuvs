@@ -99,9 +99,9 @@ void epsUnexpL2SqNeighborhood(bool* adj,
  */
 template <typename value_t, typename idx_t, typename matrix_idx_t>
 void eps_neighbors_l2sq(raft::resources const& handle,
-                        raft::device_matrix_view<const value_t, matrix_idx_t, row_major> x,
-                        raft::device_matrix_view<const value_t, matrix_idx_t, row_major> y,
-                        raft::device_matrix_view<bool, matrix_idx_t, row_major> adj,
+                        raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
+                        raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,
+                        raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
                         raft::device_vector_view<idx_t, matrix_idx_t> vd,
                         value_t eps)
 {

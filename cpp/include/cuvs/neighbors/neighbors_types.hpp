@@ -40,7 +40,7 @@ class batch {
   }
 
   /** Returns the indices for the batch */
-  device_matrix_view<const IdxT, int64_t> indices() const
+  raft::device_matrix_view<const IdxT, int64_t> indices() const
   {
     return raft::make_const_mdspan(indices_.view());
   }

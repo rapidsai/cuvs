@@ -37,13 +37,14 @@ namespace cuvs::neighbors::detail {
  * See cuvs::neighbors::refine for docs.
  */
 template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
-void refine_device(raft::resources const& handle,
-                   raft::device_matrix_view<const data_t, matrix_idx, row_major> dataset,
-                   raft::device_matrix_view<const data_t, matrix_idx, row_major> queries,
-                   raft::device_matrix_view<const idx_t, matrix_idx, row_major> neighbor_candidates,
-                   raft::device_matrix_view<idx_t, matrix_idx, row_major> indices,
-                   raft::device_matrix_view<distance_t, matrix_idx, row_major> distances,
-                   distance::DistanceType metric = distance::DistanceType::L2Unexpanded)
+void refine_device(
+  raft::resources const& handle,
+  raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
+  raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
+  raft::device_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
+  raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
+  raft::device_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
+  distance::DistanceType metric = distance::DistanceType::L2Unexpanded)
 {
   matrix_idx n_candidates = neighbor_candidates.extent(1);
   matrix_idx n_queries    = queries.extent(0);

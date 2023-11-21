@@ -27,14 +27,14 @@
 #include <cstdint>
 #include <cuvs/neighbors/brute_force-inl.cuh>
 
-#define instantiate_raft_neighbors_brute_force_fused_l2_knn(            \
-  value_t, idx_t, idx_layout, query_layout)                             \
-  template void cuvs::neighbors::brute_force::fused_l2_knn(             \
-    raft::resources const& handle,                                      \
-    raft::device_matrix_view<const value_t, idx_t, idx_layout> index,   \
-    raft::device_matrix_view<const value_t, idx_t, query_layout> query, \
-    raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,         \
-    raft::device_matrix_view<value_t, idx_t, row_major> out_dists,      \
+#define instantiate_raft_neighbors_brute_force_fused_l2_knn(             \
+  value_t, idx_t, idx_layout, query_layout)                              \
+  template void cuvs::neighbors::brute_force::fused_l2_knn(              \
+    raft::resources const& handle,                                       \
+    raft::device_matrix_view<const value_t, idx_t, idx_layout> index,    \
+    raft::device_matrix_view<const value_t, idx_t, query_layout> query,  \
+    raft::device_matrix_view<idx_t, idx_t, raft::row_major> out_inds,    \
+    raft::device_matrix_view<value_t, idx_t, raft::row_major> out_dists, \
     cuvs::distance::DistanceType metric);
 
 instantiate_raft_neighbors_brute_force_fused_l2_knn(float,

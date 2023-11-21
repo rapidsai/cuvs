@@ -412,8 +412,8 @@ void rbc_all_knn_query(raft::resources const& handle,
   ASSERT(index.n_landmarks >= k, "number of landmark samples must be >= k");
   ASSERT(!index.is_index_trained(), "index cannot be previously trained");
 
-  rmm::device_uvector<value_idx> R_knn_inds(k * index.m, resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_t> R_knn_dists(k * index.m, resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_idx> R_knn_inds(k * index.m, raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_t> R_knn_dists(k * index.m, raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
   thrust::fill(resource::get_thrust_policy(handle),
@@ -435,8 +435,9 @@ void rbc_all_knn_query(raft::resources const& handle,
                std::numeric_limits<value_t>::max());
 
   // For debugging / verification. Remove before releasing
-  rmm::device_uvector<value_int> dists_counter(index.m, resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_int> post_dists_counter(index.m, resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_int> dists_counter(index.m, raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_int> post_dists_counter(index.m,
+                                                    raft::resource::get_cuda_stream(handle));
 
   sample_landmarks<value_idx, value_t>(handle, index);
 
@@ -487,8 +488,10 @@ void rbc_knn_query(raft::resources const& handle,
   ASSERT(index.n_landmarks >= k, "number of landmark samples must be >= k");
   ASSERT(index.is_index_trained(), "index must be previously trained");
 
-  rmm::device_uvector<value_idx> R_knn_inds(k * n_query_pts, resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_t> R_knn_dists(k * n_query_pts, resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_idx> R_knn_inds(k * n_query_pts,
+                                            raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_t> R_knn_dists(k * n_query_pts,
+                                           raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
   thrust::fill(resource::get_thrust_policy(handle),
@@ -512,8 +515,9 @@ void rbc_knn_query(raft::resources const& handle,
   k_closest_landmarks(handle, index, query, n_query_pts, k, R_knn_inds.data(), R_knn_dists.data());
 
   // For debugging / verification. Remove before releasing
-  rmm::device_uvector<value_int> dists_counter(index.m, resource::get_cuda_stream(handle));
-  rmm::device_uvector<value_int> post_dists_counter(index.m, resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_int> dists_counter(index.m, raft::resource::get_cuda_stream(handle));
+  rmm::device_uvector<value_int> post_dists_counter(index.m,
+                                                    raft::resource::get_cuda_stream(handle));
   thrust::fill(resource::get_thrust_policy(handle),
                post_dists_counter.data(),
                post_dists_counter.data() + post_dists_counter.size(),

@@ -285,7 +285,7 @@ void block_copy(const IdxT* in_offsets,
   update_host(&in_size, in_offsets + n_blocks, 1, stream);
   stream.synchronize();
   dim3 threads(128, 1, 1);
-  dim3 blocks(ceildiv<IdxT>(in_size * n_mult, threads.x), 1, 1);
+  dim3 blocks(raft::ceildiv<IdxT>(in_size * n_mult, threads.x), 1, 1);
   block_copy_kernel<<<blocks, threads, 0, stream>>>(
     in_offsets, out_offsets, n_blocks, in_data, out_data, n_mult);
 }
@@ -309,7 +309,7 @@ template <typename T, typename IdxT>
 void outer_add(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c, rmm::cuda_stream_view stream)
 {
   dim3 threads(128, 1, 1);
-  dim3 blocks(ceildiv<IdxT>(len_a * len_b, threads.x), 1, 1);
+  dim3 blocks(raft::ceildiv<IdxT>(len_a * len_b, threads.x), 1, 1);
   outer_add_kernel<<<blocks, threads, 0, stream>>>(a, len_a, b, len_b, c);
 }
 
@@ -357,7 +357,7 @@ void copy_selected(IdxT n_rows,
     case pointer_residency::host_and_device:
     case pointer_residency::device_only: {
       IdxT block_dim = 128;
-      IdxT grid_dim  = ceildiv(n_rows * n_cols, block_dim);
+      IdxT grid_dim  = raft::ceildiv(n_rows * n_cols, block_dim);
       copy_selected_kernel<T, S>
         <<<grid_dim, block_dim, 0, stream>>>(n_rows, n_cols, src, row_ids, ld_src, dst, ld_dst);
     } break;

@@ -40,8 +40,8 @@ struct FinalBlockMerge<2, NumThreads, K, V, NumWarpQ, Dir, Comp> {
   static inline __device__ void merge(K* sharedK, V* sharedV)
   {
     // Final merge doesn't need to fully merge the second list
-    blockMerge<NumThreads, K, V, NumThreads / (WarpSize * 2), NumWarpQ, !Dir, Comp, false>(sharedK,
-                                                                                           sharedV);
+    blockMerge<NumThreads, K, V, NumThreads / (raft::WarpSize * 2), NumWarpQ, !Dir, Comp, false>(
+      sharedK, sharedV);
   }
 };
 
@@ -49,11 +49,17 @@ template <int NumThreads, typename K, typename V, int NumWarpQ, bool Dir, typena
 struct FinalBlockMerge<4, NumThreads, K, V, NumWarpQ, Dir, Comp> {
   static inline __device__ void merge(K* sharedK, V* sharedV)
   {
-    blockMerge<NumThreads, K, V, NumThreads / (WarpSize * 2), NumWarpQ, !Dir, Comp>(sharedK,
-                                                                                    sharedV);
+    blockMerge<NumThreads, K, V, NumThreads / (raft::WarpSize * 2), NumWarpQ, !Dir, Comp>(sharedK,
+                                                                                          sharedV);
     // Final merge doesn't need to fully merge the second list
-    blockMerge<NumThreads, K, V, NumThreads / (WarpSize * 4), NumWarpQ * 2, !Dir, Comp, false>(
-      sharedK, sharedV);
+    blockMerge<NumThreads,
+               K,
+               V,
+               NumThreads / (raft::WarpSize * 4),
+               NumWarpQ * 2,
+               !Dir,
+               Comp,
+               false>(sharedK, sharedV);
   }
 };
 
@@ -61,13 +67,19 @@ template <int NumThreads, typename K, typename V, int NumWarpQ, bool Dir, typena
 struct FinalBlockMerge<8, NumThreads, K, V, NumWarpQ, Dir, Comp> {
   static inline __device__ void merge(K* sharedK, V* sharedV)
   {
-    blockMerge<NumThreads, K, V, NumThreads / (WarpSize * 2), NumWarpQ, !Dir, Comp>(sharedK,
-                                                                                    sharedV);
-    blockMerge<NumThreads, K, V, NumThreads / (WarpSize * 4), NumWarpQ * 2, !Dir, Comp>(sharedK,
-                                                                                        sharedV);
-    // Final merge doesn't need to fully merge the second list
-    blockMerge<NumThreads, K, V, NumThreads / (WarpSize * 8), NumWarpQ * 4, !Dir, Comp, false>(
+    blockMerge<NumThreads, K, V, NumThreads / (raft::WarpSize * 2), NumWarpQ, !Dir, Comp>(sharedK,
+                                                                                          sharedV);
+    blockMerge<NumThreads, K, V, NumThreads / (raft::WarpSize * 4), NumWarpQ * 2, !Dir, Comp>(
       sharedK, sharedV);
+    // Final merge doesn't need to fully merge the second list
+    blockMerge<NumThreads,
+               K,
+               V,
+               NumThreads / (raft::WarpSize * 8),
+               NumWarpQ * 4,
+               !Dir,
+               Comp,
+               false>(sharedK, sharedV);
   }
 };
 
@@ -81,7 +93,7 @@ template <typename K,
           int NumThreadQ,
           int ThreadsPerBlock>
 struct BlockSelect {
-  static constexpr int kNumWarps          = ThreadsPerBlock / WarpSize;
+  static constexpr int kNumWarps          = ThreadsPerBlock / raft::WarpSize;
   static constexpr int kTotalWarpSortSize = NumWarpQ;
 
   __device__ inline BlockSelect(K initKVal, V initVVal, K* smemK, V* smemV, int k)
@@ -104,13 +116,13 @@ struct BlockSelect {
     }
 
     int laneId = raft::laneId();
-    int warpId = threadIdx.x / WarpSize;
+    int warpId = threadIdx.x / raft::WarpSize;
     warpK      = sharedK + warpId * kTotalWarpSortSize;
     warpV      = sharedV + warpId * kTotalWarpSortSize;
 
     // Fill warp queue (only the actual queue space is fine, not where
     // we write the per-thread queues for merging)
-    for (int i = laneId; i < NumWarpQ; i += WarpSize) {
+    for (int i = laneId; i < NumWarpQ; i += raft::WarpSize) {
       warpK[i] = initK;
       warpV[i] = initV;
     }
@@ -178,14 +190,14 @@ struct BlockSelect {
     // Sort all of the per-thread queues
     warpSortAnyRegisters<K, V, NumThreadQ, !Dir, Comp>(threadK, threadV);
 
-    constexpr int kNumWarpQRegisters = NumWarpQ / WarpSize;
-    K warpKRegisters[kNumWarpQRegisters];
+    constexpr int kNumWarpQRegisters = NumWarpQ / raft::WarpSize;
+    K raft::warpKRegisters[kNumWarpQRegisters];
     V warpVRegisters[kNumWarpQRegisters];
 
 #pragma unroll
     for (int i = 0; i < kNumWarpQRegisters; ++i) {
-      warpKRegisters[i] = warpK[i * WarpSize + laneId];
-      warpVRegisters[i] = warpV[i * WarpSize + laneId];
+      warpKRegisters[i] = warpK[i * raft::WarpSize + laneId];
+      warpVRegisters[i] = warpV[i * raft::WarpSize + laneId];
     }
 
     warpFence();
@@ -194,13 +206,13 @@ struct BlockSelect {
     // per-thread queue, merge both sorted lists together, producing
     // one sorted list
     warpMergeAnyRegisters<K, V, kNumWarpQRegisters, NumThreadQ, !Dir, Comp, false>(
-      warpKRegisters, warpVRegisters, threadK, threadV);
+      raft::warpKRegisters, warpVRegisters, threadK, threadV);
 
     // Write back out the warp queue
 #pragma unroll
     for (int i = 0; i < kNumWarpQRegisters; ++i) {
-      warpK[i * WarpSize + laneId] = warpKRegisters[i];
-      warpV[i * WarpSize + laneId] = warpVRegisters[i];
+      warpK[i * raft::WarpSize + laneId] = raft::warpKRegisters[i];
+      warpV[i * raft::WarpSize + laneId] = warpVRegisters[i];
     }
 
     warpFence();
@@ -264,7 +276,7 @@ struct BlockSelect {
 /// Specialization for k == 1 (NumWarpQ == 1)
 template <typename K, typename V, bool Dir, typename Comp, int NumThreadQ, int ThreadsPerBlock>
 struct BlockSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
-  static constexpr int kNumWarps = ThreadsPerBlock / WarpSize;
+  static constexpr int kNumWarps = ThreadsPerBlock / raft::WarpSize;
 
   __device__ inline BlockSelect(K initK, V initV, K* smemK, V* smemV, int k)
     : threadK(initK), threadV(initV), sharedK(smemK), sharedV(smemV)
@@ -289,17 +301,17 @@ struct BlockSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
   __device__ inline void reduce()
   {
     // Reduce within the warp
-    KeyValuePair<K, V> pair(threadK, threadV);
+    raft::KeyValuePair<K, V> pair(threadK, threadV);
 
     if (Dir) {
-      pair = warpReduce(pair, max_op{});
+      pair = warpReduce(pair, raft::max_op{});
     } else {
-      pair = warpReduce(pair, min_op{});
+      pair = warpReduce(pair, raft::min_op{});
     }
 
     // Each warp writes out a single value
     int laneId = raft::laneId();
-    int warpId = threadIdx.x / WarpSize;
+    int warpId = threadIdx.x / raft::WarpSize;
 
     if (laneId == 0) {
       sharedK[warpId] = pair.key;
@@ -358,10 +370,14 @@ template <typename K,
           int NumThreadQ,
           int ThreadsPerBlock>
 struct WarpSelect {
-  static constexpr int kNumWarpQRegisters = NumWarpQ / WarpSize;
+  static constexpr int kNumWarpQRegisters = NumWarpQ / raft::WarpSize;
 
   __device__ inline WarpSelect(K initKVal, V initVVal, int k)
-    : initK(initKVal), initV(initVVal), numVals(0), warpKTop(initKVal), kLane((k - 1) % WarpSize)
+    : initK(initKVal),
+      initV(initVVal),
+      numVals(0),
+      warpKTop(initKVal),
+      kLane((k - 1) % raft::WarpSize)
   {
     static_assert(utils::isPowerOf2(ThreadsPerBlock), "threads must be a power-of-2");
     static_assert(utils::isPowerOf2(NumWarpQ), "warp queue must be power-of-2");
@@ -425,7 +441,7 @@ struct WarpSelect {
     }
 
     // We have to beat at least this element
-    warpKTop = shfl(warpK[kNumWarpQRegisters - 1], kLane);
+    warpKTop = raft::shfl(warpK[kNumWarpQRegisters - 1], kLane);
   }
 
   /// This function handles sorting and merging together the
@@ -465,7 +481,7 @@ struct WarpSelect {
 
 #pragma unroll
     for (int i = 0; i < kNumWarpQRegisters; ++i) {
-      int idx = i * WarpSize + laneId;
+      int idx = i * raft::WarpSize + laneId;
 
       if (idx < k) {
         outK[idx] = warpK[i];
@@ -503,7 +519,7 @@ struct WarpSelect {
 /// Specialization for k == 1 (NumWarpQ == 1)
 template <typename K, typename V, bool Dir, typename Comp, int NumThreadQ, int ThreadsPerBlock>
 struct WarpSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
-  static constexpr int kNumWarps = ThreadsPerBlock / WarpSize;
+  static constexpr int kNumWarps = ThreadsPerBlock / raft::WarpSize;
 
   __device__ inline WarpSelect(K initK, V initV, int k) : threadK(initK), threadV(initV) {}
 
@@ -525,12 +541,12 @@ struct WarpSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
   __device__ inline void reduce()
   {
     // Reduce within the warp
-    KeyValuePair<K, V> pair(threadK, threadV);
+    raft::KeyValuePair<K, V> pair(threadK, threadV);
 
     if (Dir) {
-      pair = warpReduce(pair, max_op{});
+      pair = warpReduce(pair, raft::max_op{});
     } else {
-      pair = warpReduce(pair, min_op{});
+      pair = warpReduce(pair, raft::min_op{});
     }
 
     threadK = pair.key;

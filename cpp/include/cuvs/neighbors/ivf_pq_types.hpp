@@ -168,8 +168,8 @@ struct list_spec {
   using index_type = IdxT;
   /** PQ-encoded data stored in the interleaved format:
    *
-   *    [ ceildiv(list_size, kIndexGroupSize)
-   *    , ceildiv(pq_dim, (kIndexGroupVecLen * 8u) / pq_bits)
+   *    [ raft::ceildiv(list_size, kIndexGroupSize)
+   *    , raft::ceildiv(pq_dim, (kIndexGroupVecLen * 8u) / pq_bits)
    *    , kIndexGroupSize
    *    , kIndexGroupVecLen
    *    ].
@@ -382,12 +382,12 @@ struct index : ann::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  inline auto pq_centers() noexcept -> device_mdspan<float, pq_centers_extents, row_major>
+  inline auto pq_centers() noexcept -> device_mdspan<float, pq_centers_extents, raft::row_major>
   {
     return pq_centers_.view();
   }
   [[nodiscard]] inline auto pq_centers() const noexcept
-    -> device_mdspan<const float, pq_centers_extents, row_major>
+    -> device_mdspan<const float, pq_centers_extents, raft::row_major>
   {
     return pq_centers_.view();
   }
@@ -401,36 +401,37 @@ struct index : ann::index {
   }
 
   /** Pointers to the inverted lists (clusters) data  [n_lists]. */
-  inline auto data_ptrs() noexcept -> device_vector_view<uint8_t*, uint32_t, row_major>
+  inline auto data_ptrs() noexcept -> raft::device_vector_view<uint8_t*, uint32_t, raft::row_major>
   {
     return data_ptrs_.view();
   }
   [[nodiscard]] inline auto data_ptrs() const noexcept
-    -> device_vector_view<const uint8_t* const, uint32_t, row_major>
+    -> raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major>
   {
-    return make_mdspan<const uint8_t* const, uint32_t, row_major, false, true>(
+    return make_mdspan<const uint8_t* const, uint32_t, raft::row_major, false, true>(
       data_ptrs_.data_handle(), data_ptrs_.extents());
   }
 
   /** Pointers to the inverted lists (clusters) indices  [n_lists]. */
-  inline auto inds_ptrs() noexcept -> device_vector_view<IdxT*, uint32_t, row_major>
+  inline auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t, raft::row_major>
   {
     return inds_ptrs_.view();
   }
   [[nodiscard]] inline auto inds_ptrs() const noexcept
-    -> device_vector_view<const IdxT* const, uint32_t, row_major>
+    -> raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major>
   {
-    return make_mdspan<const IdxT* const, uint32_t, row_major, false, true>(
+    return make_mdspan<const IdxT* const, uint32_t, raft::row_major, false, true>(
       inds_ptrs_.data_handle(), inds_ptrs_.extents());
   }
 
   /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
-  inline auto rotation_matrix() noexcept -> device_matrix_view<float, uint32_t, row_major>
+  inline auto rotation_matrix() noexcept
+    -> raft::device_matrix_view<float, uint32_t, raft::row_major>
   {
     return rotation_matrix_.view();
   }
   [[nodiscard]] inline auto rotation_matrix() const noexcept
-    -> device_matrix_view<const float, uint32_t, row_major>
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
   {
     return rotation_matrix_.view();
   }
@@ -444,45 +445,45 @@ struct index : ann::index {
    *
    * This span is used during search to estimate the maximum size of the workspace.
    */
-  inline auto accum_sorted_sizes() noexcept -> host_vector_view<IdxT, uint32_t, row_major>
+  inline auto accum_sorted_sizes() noexcept -> host_vector_view<IdxT, uint32_t, raft::row_major>
   {
     return accum_sorted_sizes_.view();
   }
   [[nodiscard]] inline auto accum_sorted_sizes() const noexcept
-    -> host_vector_view<const IdxT, uint32_t, row_major>
+    -> host_vector_view<const IdxT, uint32_t, raft::row_major>
   {
     return accum_sorted_sizes_.view();
   }
 
   /** Sizes of the lists [n_lists]. */
-  inline auto list_sizes() noexcept -> device_vector_view<uint32_t, uint32_t, row_major>
+  inline auto list_sizes() noexcept -> raft::device_vector_view<uint32_t, uint32_t, raft::row_major>
   {
     return list_sizes_.view();
   }
   [[nodiscard]] inline auto list_sizes() const noexcept
-    -> device_vector_view<const uint32_t, uint32_t, row_major>
+    -> raft::device_vector_view<const uint32_t, uint32_t, raft::row_major>
   {
     return list_sizes_.view();
   }
 
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
-  inline auto centers() noexcept -> device_matrix_view<float, uint32_t, row_major>
+  inline auto centers() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
   {
     return centers_.view();
   }
   [[nodiscard]] inline auto centers() const noexcept
-    -> device_matrix_view<const float, uint32_t, row_major>
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
   {
     return centers_.view();
   }
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  inline auto centers_rot() noexcept -> device_matrix_view<float, uint32_t, row_major>
+  inline auto centers_rot() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
   {
     return centers_rot_.view();
   }
   [[nodiscard]] inline auto centers_rot() const noexcept
-    -> device_matrix_view<const float, uint32_t, row_major>
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
   {
     return centers_rot_.view();
   }
@@ -521,16 +522,16 @@ struct index : ann::index {
 
   // Primary data members
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
-  device_vector<uint32_t, uint32_t, row_major> list_sizes_;
-  device_mdarray<float, pq_centers_extents, row_major> pq_centers_;
-  device_matrix<float, uint32_t, row_major> centers_;
-  device_matrix<float, uint32_t, row_major> centers_rot_;
-  device_matrix<float, uint32_t, row_major> rotation_matrix_;
+  raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
+  device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
+  raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
 
   // Computed members for accelerating search.
-  device_vector<uint8_t*, uint32_t, row_major> data_ptrs_;
-  device_vector<IdxT*, uint32_t, row_major> inds_ptrs_;
-  host_vector<IdxT, uint32_t, row_major> accum_sorted_sizes_;
+  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
+  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
+  host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
 
   /** Throw an error if the index content is inconsistent. */
   void check_consistency()

@@ -60,7 +60,7 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
                                  size_t n_index_rows,
                                  int k)
 {
-  constexpr int kNumWarps = tpb / WarpSize;
+  constexpr int kNumWarps = tpb / raft::WarpSize;
 
   __shared__ value_t smemK[kNumWarps * warp_q];
   __shared__ value_idx smemV[kNumWarps * warp_q];
@@ -70,7 +70,7 @@ RAFT_KERNEL haversine_knn_kernel(value_idx* out_inds,
     std::numeric_limits<value_t>::max(), std::numeric_limits<value_idx>::max(), smemK, smemV, k);
 
   // Grid is exactly sized to rows available
-  int limit = Pow2<WarpSize>::roundDown(n_index_rows);
+  int limit = Pow2<raft::WarpSize>::roundDown(n_index_rows);
 
   const value_t* query_ptr = query + (blockIdx.x * 2);
   value_t x1               = query_ptr[0];

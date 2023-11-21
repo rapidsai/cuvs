@@ -124,12 +124,12 @@ class BallCoverIndex {
   raft::device_vector_view<value_idx, matrix_idx> get_R_1nn_cols() { return R_1nn_cols.view(); }
   raft::device_vector_view<value_t, matrix_idx> get_R_1nn_dists() { return R_1nn_dists.view(); }
   raft::device_vector_view<value_t, matrix_idx> get_R_radius() { return R_radius.view(); }
-  raft::device_matrix_view<value_t, matrix_idx, row_major> get_R() { return R.view(); }
+  raft::device_matrix_view<value_t, matrix_idx, raft::row_major> get_R() { return R.view(); }
   raft::device_vector_view<value_t, matrix_idx> get_R_closest_landmark_dists()
   {
     return R_closest_landmark_dists.view();
   }
-  raft::device_matrix_view<const value_t, matrix_idx, row_major> get_X() const { return X; }
+  raft::device_matrix_view<const value_t, matrix_idx, raft::row_major> get_X() const { return X; }
 
   cuvs::distance::DistanceType get_metric() const { return metric; }
 
@@ -145,7 +145,7 @@ class BallCoverIndex {
   value_int n;
   value_int n_landmarks;
 
-  raft::device_matrix_view<const value_t, matrix_idx, row_major> X;
+  raft::device_matrix_view<const value_t, matrix_idx, raft::row_major> X;
 
   cuvs::distance::DistanceType metric;
 
@@ -158,7 +158,7 @@ class BallCoverIndex {
 
   raft::device_vector<value_t, matrix_idx> R_radius;
 
-  raft::device_matrix<value_t, matrix_idx, row_major> R;
+  raft::device_matrix<value_t, matrix_idx, raft::row_major> R;
 
  protected:
   bool index_trained;

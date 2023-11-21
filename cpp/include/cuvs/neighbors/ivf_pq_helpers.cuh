@@ -39,7 +39,7 @@ namespace codepacker {
  * starting at given `offset`.
  *
  * Bit compression is removed, which means output will have pq_dim dimensional vectors (one code per
- * byte, instead of ceildiv(pq_dim * pq_bits, 8) bytes of pq codes).
+ * byte, instead of raft::ceildiv(pq_dim * pq_bits, 8) bytes of pq codes).
  *
  * Usage example:
  * @code{.cpp}
@@ -66,10 +66,11 @@ namespace codepacker {
  */
 inline void unpack(
   raft::resources const& res,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    list_data,
   uint32_t pq_bits,
   uint32_t offset,
-  device_matrix_view<uint8_t, uint32_t, row_major> codes)
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes)
 {
   ivf_pq::detail::unpack_list_data(
     codes, list_data, offset, pq_bits, resource::get_cuda_stream(res));
@@ -78,8 +79,8 @@ inline void unpack(
 /**
  * @brief Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
  * starting at given `offset`. The output codes of a single vector are contiguous, not expanded to
- * one code per byte, which means the output has ceildiv(pq_dim * pq_bits, 8) bytes per PQ encoded
- * vector.
+ * one code per byte, which means the output has raft::ceildiv(pq_dim * pq_bits, 8) bytes per PQ
+ * encoded vector.
  *
  * Usage example:
  * @code{.cpp}
@@ -105,13 +106,14 @@ inline void unpack(
  * @param[in] n_rows How many records to unpack
  * @param[in] pq_dim The dimensionality of the PQ compressed records
  * @param[out] codes
- *   the destination buffer [n_rows, ceildiv(pq_dim * pq_bits, 8)].
+ *   the destination buffer [n_rows, raft::ceildiv(pq_dim * pq_bits, 8)].
  *   The length `n_rows` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
 inline void unpack_contiguous(
   raft::resources const& res,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    list_data,
   uint32_t pq_bits,
   uint32_t offset,
   uint32_t n_rows,
@@ -146,10 +148,10 @@ inline void unpack_contiguous(
  */
 inline void pack(
   raft::resources const& res,
-  device_matrix_view<const uint8_t, uint32_t, row_major> codes,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   uint32_t pq_bits,
   uint32_t offset,
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data)
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data)
 {
   ivf_pq::detail::pack_list_data(list_data, codes, offset, pq_bits, resource::get_cuda_stream(res));
 }
@@ -175,7 +177,7 @@ inline void pack(
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] codes flat PQ codes, [n_vec, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[in] codes flat PQ codes, [n_vec, raft::ceildiv(pq_dim * pq_bits, 8)]
  * @param[in] n_rows number of records
  * @param[in] pq_dim
  * @param[in] pq_bits bit length of encoded vector elements
@@ -189,7 +191,7 @@ inline void pack_contiguous(
   uint32_t pq_dim,
   uint32_t pq_bits,
   uint32_t offset,
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data)
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data)
 {
   ivf_pq::detail::pack_contiguous_list_data(
     list_data, codes, n_rows, pq_dim, offset, pq_bits, resource::get_cuda_stream(res));
@@ -223,7 +225,7 @@ inline void pack_contiguous(
 template <typename IdxT>
 void pack_list_data(raft::resources const& res,
                     index<IdxT>* index,
-                    device_matrix_view<const uint8_t, uint32_t, row_major> codes,
+                    raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
                     uint32_t label,
                     uint32_t offset)
 {
@@ -264,7 +266,7 @@ void pack_list_data(raft::resources const& res,
  *
  * @param[in] res raft resource
  * @param[inout] index pointer to IVF-PQ index
- * @param[in] codes flat contiguous PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[in] codes flat contiguous PQ codes [n_rows, raft::ceildiv(pq_dim * pq_bits, 8)]
  * @param[in] n_rows how many records to pack
  * @param[in] label The id of the list (cluster) into which we write.
  * @param[in] offset how many records to skip before writing the data into the list
@@ -314,7 +316,7 @@ void pack_contiguous_list_data(raft::resources const& res,
 template <typename IdxT>
 void unpack_list_data(raft::resources const& res,
                       const index<IdxT>& index,
-                      device_matrix_view<uint8_t, uint32_t, row_major> out_codes,
+                      raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
                       uint32_t label,
                       uint32_t offset)
 {
@@ -356,8 +358,8 @@ void unpack_list_data(raft::resources const& res,
 template <typename IdxT>
 void unpack_list_data(raft::resources const& res,
                       const index<IdxT>& index,
-                      device_vector_view<const uint32_t> in_cluster_indices,
-                      device_matrix_view<uint8_t, uint32_t, row_major> out_codes,
+                      raft::device_vector_view<const uint32_t> in_cluster_indices,
+                      raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
                       uint32_t label)
 {
   return ivf_pq::detail::unpack_list_data<IdxT>(res, index, out_codes, label, in_cluster_indices);
@@ -366,7 +368,7 @@ void unpack_list_data(raft::resources const& res,
 /**
  * @brief Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
  * compressed index starting at given `offset`, not expanded to one code per byte. Each code in the
- * output buffer occupies ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes.
+ * output buffer occupies raft::ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes.
  *
  * Usage example:
  * @code{.cpp}
@@ -389,7 +391,7 @@ void unpack_list_data(raft::resources const& res,
  * @param[in] res raft resource
  * @param[in] index IVF-PQ index (passed by reference)
  * @param[out] out_codes
- *   the destination buffer [n_rows, ceildiv(index.pq_dim() * index.pq_bits(), 8)].
+ *   the destination buffer [n_rows, raft::ceildiv(index.pq_dim() * index.pq_bits(), 8)].
  *   The length `n_rows` defines how many records to unpack,
  *   offset + n_rows must be smaller than or equal to the list size.
  * @param[in] n_rows how many codes to unpack
@@ -445,7 +447,7 @@ void unpack_contiguous_list_data(raft::resources const& res,
 template <typename T, typename IdxT>
 void reconstruct_list_data(raft::resources const& res,
                            const index<IdxT>& index,
-                           device_matrix_view<T, uint32_t, row_major> out_vectors,
+                           raft::device_matrix_view<T, uint32_t, raft::row_major> out_vectors,
                            uint32_t label,
                            uint32_t offset)
 {
@@ -489,8 +491,8 @@ void reconstruct_list_data(raft::resources const& res,
 template <typename T, typename IdxT>
 void reconstruct_list_data(raft::resources const& res,
                            const index<IdxT>& index,
-                           device_vector_view<const uint32_t> in_cluster_indices,
-                           device_matrix_view<T, uint32_t, row_major> out_vectors,
+                           raft::device_vector_view<const uint32_t> in_cluster_indices,
+                           raft::device_matrix_view<T, uint32_t, raft::row_major> out_vectors,
                            uint32_t label)
 {
   return ivf_pq::detail::reconstruct_list_data(res, index, out_vectors, label, in_cluster_indices);
@@ -509,7 +511,7 @@ void reconstruct_list_data(raft::resources const& res,
  *   // Indices of the new vectors
  *   auto indices = raft::make_device_vector<uint32_t>(res, n_vec);
  *   ... fill the indices ...
- *   auto new_codes = raft::make_device_matrix<uint8_t, uint32_t, row_major> new_codes(
+ *   auto new_codes = raft::make_device_matrix<uint8_t, uint32_t, raft::row_major> new_codes(
  *       res, n_vec, index.pq_dim());
  *   ... fill codes ...
  *   // extend list with new codes
@@ -526,11 +528,12 @@ void reconstruct_list_data(raft::resources const& res,
  * @param[in] label the id of the target list (cluster).
  */
 template <typename IdxT>
-void extend_list_with_codes(raft::resources const& res,
-                            index<IdxT>* index,
-                            device_matrix_view<const uint8_t, uint32_t, row_major> new_codes,
-                            device_vector_view<const IdxT, uint32_t, row_major> new_indices,
-                            uint32_t label)
+void extend_list_with_codes(
+  raft::resources const& res,
+  index<IdxT>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
+  uint32_t label)
 {
   ivf_pq::detail::extend_list_with_codes(res, index, new_codes, new_indices, label);
 }
@@ -548,7 +551,7 @@ void extend_list_with_codes(raft::resources const& res,
  *   // Indices of the new vectors
  *   auto indices = raft::make_device_vector<uint32_t>(res, n_vec);
  *   ... fill the indices ...
- *   auto new_vectors = raft::make_device_matrix<float, uint32_t, row_major> new_codes(
+ *   auto new_vectors = raft::make_device_matrix<float, uint32_t, raft::row_major> new_codes(
  *       res, n_vec, index.dim());
  *   ... fill vectors ...
  *   // extend list with new vectors
@@ -569,8 +572,8 @@ void extend_list_with_codes(raft::resources const& res,
 template <typename T, typename IdxT>
 void extend_list(raft::resources const& res,
                  index<IdxT>* index,
-                 device_matrix_view<const T, uint32_t, row_major> new_vectors,
-                 device_vector_view<const IdxT, uint32_t, row_major> new_indices,
+                 raft::device_matrix_view<const T, uint32_t, raft::row_major> new_vectors,
+                 raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
                  uint32_t label)
 {
   ivf_pq::detail::extend_list(res, index, new_vectors, new_indices, label);
@@ -703,7 +706,7 @@ void make_rotation_matrix(raft::resources const& res,
 template <typename IdxT>
 void set_centers(raft::resources const& res,
                  index<IdxT>* index,
-                 device_matrix_view<const float, uint32_t> cluster_centers)
+                 raft::device_matrix_view<const float, uint32_t> cluster_centers)
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");

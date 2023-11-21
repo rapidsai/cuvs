@@ -259,7 +259,7 @@ struct index : ann::index {
                  "Dataset and knn_graph must have equal number of rows");
     update_dataset(res, dataset);
     update_graph(res, knn_graph);
-    resource::sync_stream(res);
+    raft::resource::sync_stream(res);
   }
 
   /**
@@ -323,7 +323,7 @@ struct index : ann::index {
     raft::copy(graph_.data_handle(),
                knn_graph.data_handle(),
                knn_graph.size(),
-               resource::get_cuda_stream(res));
+               raft::resource::get_cuda_stream(res));
     graph_view_ = graph_.view();
   }
 

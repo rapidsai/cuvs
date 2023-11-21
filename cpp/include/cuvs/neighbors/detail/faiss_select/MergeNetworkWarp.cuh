@@ -18,15 +18,15 @@ namespace cuvs::neighbors::detail::faiss_select {
 // This file contains functions to:
 //
 // -perform bitonic merges on pairs of sorted lists, held in
-// registers. Each list contains N * WarpSize (multiple of 32)
+// registers. Each list contains N *raft::WarpSize (multiple of 32)
 // elements for some N.
 // The bitonic merge is implemented for arbitrary sizes;
-// sorted list A of size N1 * WarpSize registers
-// sorted list B of size N2 * WarpSize registers =>
-// sorted list C if size (N1 + N2) * WarpSize registers. N1 and N2
+// sorted list A of size N1 *raft::WarpSize registers
+// sorted list B of size N2 *raft::WarpSize registers =>
+// sorted list C if size (N1 + N2) *raft::WarpSize registers. N1 and N2
 // are >= 1 and don't have to be powers of 2.
 //
-// -perform bitonic sorts on a set of N * WarpSize key/value pairs
+// -perform bitonic sorts on a set of N *raft::WarpSize key/value pairs
 // held in registers, by using the above bitonic merge as a
 // primitive.
 // N can be an arbitrary N >= 1; i.e., the bitonic sort here supports
@@ -75,7 +75,7 @@ namespace cuvs::neighbors::detail::faiss_select {
 // performing both < and > comparisons with the variables, so I just
 // stick with this.
 
-// This function merges WarpSize / 2L lists in parallel using warp
+// This function mergesraft::WarpSize / 2L lists in parallel using warp
 // shuffles.
 // It works on at most size-16 lists, as we need 32 threads for this
 // shuffle merge.
@@ -86,7 +86,7 @@ template <typename K, typename V, int L, bool Dir, typename Comp, bool IsBitonic
 inline __device__ void warpBitonicMergeLE16(K& k, V& v)
 {
   static_assert(utils::isPowerOf2(L), "L must be a power-of-2");
-  static_assert(L <= WarpSize / 2, "merge list size must be <= 16");
+  static_assert(L <= raft::WarpSize / 2, "merge list size must be <= 16");
 
   int laneId = raft::laneId();
 
@@ -94,8 +94,8 @@ inline __device__ void warpBitonicMergeLE16(K& k, V& v)
     // Reverse the first comparison stage.
     // For example, merging a list of size 8 has the exchanges:
     // 0 <-> 15, 1 <-> 14, ...
-    K otherK = shfl_xor(k, 2 * L - 1);
-    V otherV = shfl_xor(v, 2 * L - 1);
+    K otherK = raft::shfl_xor(k, 2 * L - 1);
+    V otherV = raft::shfl_xor(v, 2 * L - 1);
 
     // Whether we are the lesser thread in the exchange
     bool small = !(laneId & L);
@@ -117,8 +117,8 @@ inline __device__ void warpBitonicMergeLE16(K& k, V& v)
 
 #pragma unroll
   for (int stride = IsBitonic ? L : L / 2; stride > 0; stride /= 2) {
-    K otherK = shfl_xor(k, stride);
-    V otherV = shfl_xor(v, stride);
+    K otherK = raft::shfl_xor(k, stride);
+    V otherV = raft::shfl_xor(v, stride);
 
     // Whether we are the lesser thread in the exchange
     bool small = !(laneId & stride);
@@ -388,8 +388,8 @@ struct BitonicMergeStep<K, V, N, Dir, Comp, false, false> {
 };
 
 /// Merges two sets of registers across the warp of any size;
-/// i.e., merges a sorted k/v list of size WarpSize * N1 with a
-/// sorted k/v list of size WarpSize * N2, where N1 and N2 are any
+/// i.e., merges a sorted k/v list of sizeraft::WarpSize * N1 with a
+/// sorted k/v list of sizeraft::WarpSize * N2, where N1 and N2 are any
 /// value >= 1
 template <typename K, typename V, int N1, int N2, bool Dir, typename Comp, bool FullMerge = true>
 inline __device__ void warpMergeAnyRegisters(K k1[N1], V v1[N1], K k2[N2], V v2[N2])
@@ -409,12 +409,12 @@ inline __device__ void warpMergeAnyRegisters(K k1[N1], V v1[N1], K k2[N2], V v2[
 
     if (FullMerge) {
       // We need the other values
-      otherKa = shfl_xor(ka, WarpSize - 1);
-      otherVa = shfl_xor(va, WarpSize - 1);
+      otherKa = raft::shfl_xor(ka, raft::WarpSize - 1);
+      otherVa = raft::shfl_xor(va, raft::WarpSize - 1);
     }
 
-    K otherKb = shfl_xor(kb, WarpSize - 1);
-    V otherVb = shfl_xor(vb, WarpSize - 1);
+    K otherKb = raft::shfl_xor(kb, raft::WarpSize - 1);
+    V otherVb = raft::shfl_xor(vb, raft::WarpSize - 1);
 
     // ka is always first in the list, so we needn't use our lane
     // in this comparison
@@ -498,8 +498,8 @@ struct BitonicSortStep<K, V, 1, Dir, Comp> {
   static inline __device__ void sort(K k[1], V v[1])
   {
     // Update this code if this changes
-    // should go from 1 -> WarpSize in multiples of 2
-    static_assert(WarpSize == 32, "unexpected warp size");
+    // should go from 1 ->raft::WarpSize in multiples of 2
+    static_assert(raft::WarpSize == 32, "unexpected warp size");
 
     warpBitonicMergeLE16<K, V, 1, Dir, Comp, false>(k[0], v[0]);
     warpBitonicMergeLE16<K, V, 2, Dir, Comp, false>(k[0], v[0]);
@@ -509,7 +509,7 @@ struct BitonicSortStep<K, V, 1, Dir, Comp> {
   }
 };
 
-/// Sort a list of WarpSize * N elements in registers, where N is an
+/// Sort a list ofraft::WarpSize * N elements in registers, where N is an
 /// arbitrary >= 1
 template <typename K, typename V, int N, bool Dir, typename Comp>
 inline __device__ void warpSortAnyRegisters(K k[N], V v[N])

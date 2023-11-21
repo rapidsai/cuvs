@@ -26,7 +26,7 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
  public:
   gpu_batch_k_query(const raft::resources& res,
                     const cuvs::neighbors::brute_force::index<T>& index,
-                    raft::device_matrix_view<const T, int64_t, row_major> query,
+                    raft::device_matrix_view<const T, int64_t, raft::row_major> query,
                     int64_t batch_size)
     : batch_k_query<T, IdxT>(res, index.size(), query.extent(0), batch_size),
       index(index),
@@ -38,7 +38,7 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
     if (metric == cuvs::distance::DistanceType::L2Expanded ||
         metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
         metric == cuvs::distance::DistanceType::CosineExpanded) {
-      query_norms = make_device_vector<T, int64_t>(res, query.extent(0));
+      query_norms = raft::make_device_vector<T, int64_t>(res, query.extent(0));
 
       if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         raft::linalg::norm(res,
@@ -92,7 +92,7 @@ class gpu_batch_k_query : public batch_k_query<T, IdxT> {
   }
 
   const cuvs::neighbors::brute_force::index<T>& index;
-  raft::device_matrix_view<const T, int64_t, row_major> query;
+  raft::device_matrix_view<const T, int64_t, raft::row_major> query;
   std::optional<device_vector<T, int64_t>> query_norms;
 };
 }  // namespace cuvs::neighbors::brute_force::detail

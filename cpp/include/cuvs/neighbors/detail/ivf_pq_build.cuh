@@ -185,11 +185,11 @@ void select_residuals(raft::resources const& handle,
   raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream);
 
   raft::matrix::linewise_op(handle,
-                            make_device_matrix_view<const T, IdxT>(tmp.data(), n_rows, dim),
-                            make_device_matrix_view<T, IdxT>(tmp.data(), n_rows, dim),
+                            raft::make_device_matrix_view<const T, IdxT>(tmp.data(), n_rows, dim),
+                            raft::make_device_matrix_view<T, IdxT>(tmp.data(), n_rows, dim),
                             true,
                             raft::sub_op{},
-                            make_device_vector_view<const T, IdxT>(center, dim));
+                            raft::make_device_vector_view<const T, IdxT>(center, dim));
 
   float alpha = 1.0;
   float beta  = 0.0;
@@ -222,10 +222,11 @@ void flat_compute_residuals(
   raft::resources const& handle,
   float* residuals,  // [n_rows, rot_dim]
   IdxT n_rows,
-  device_matrix_view<const float, uint32_t, row_major> rotation_matrix,  // [rot_dim, dim]
-  device_matrix_view<const float, uint32_t, row_major> centers,          // [n_lists, dim_ext]
-  const T* dataset,                                                      // [n_rows, dim]
-  std::variant<uint32_t, const uint32_t*> labels,                        // [n_rows]
+  raft::device_matrix_view<const float, uint32_t, raft::row_major>
+    rotation_matrix,                                                         // [rot_dim, dim]
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,  // [n_lists, dim_ext]
+  const T* dataset,                                                          // [n_rows, dim]
+  std::variant<uint32_t, const uint32_t*> labels,                            // [n_rows]
   rmm::mr::device_memory_resource* device_memory)
 {
   auto stream  = resource::get_cuda_stream(handle);
@@ -376,8 +377,8 @@ void transpose_pq_centers(const resources& handle,
   static_assert(extents.rank() == 3);
   auto extents_source =
     make_extents<uint32_t>(extents.extent(0), extents.extent(2), extents.extent(1));
-  auto span_source =
-    make_mdspan<const float, uint32_t, row_major, false, true>(pq_centers_source, extents_source);
+  auto span_source = make_mdspan<const float, uint32_t, raft::row_major, false, true>(
+    pq_centers_source, extents_source);
   auto pq_centers_view = raft::make_device_vector_view<float, IdxT>(
     index.pq_centers().data_handle(), index.pq_centers().size());
   linalg::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
@@ -567,15 +568,15 @@ void train_per_cluster(raft::resources const& handle,
  */
 template <typename T, typename IdxT>
 static __device__ auto reinterpret_vectors(
-  device_matrix_view<T, IdxT, row_major> vectors,
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers)
-  -> device_mdspan<T, extent_3d<IdxT>, row_major>
+  raft::device_matrix_view<T, IdxT, raft::row_major> vectors,
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers)
+  -> device_mdspan<T, extent_3d<IdxT>, raft::row_major>
 {
   const uint32_t pq_len = pq_centers.extent(1);
   const uint32_t pq_dim = vectors.extent(1) / pq_len;
   using layout_t        = typename decltype(vectors)::layout_type;
   using accessor_t      = typename decltype(vectors)::accessor_type;
-  return mdspan<T, extent_3d<IdxT>, layout_t, accessor_t>(
+  return raft::mdspan<T, extent_3d<IdxT>, layout_t, accessor_t>(
     vectors.data_handle(), extent_3d<IdxT>{vectors.extent(0), pq_dim, pq_len});
 }
 
@@ -585,14 +586,14 @@ static __device__ auto reinterpret_vectors(
  * the whole byte, hence one vectors uses pq_dim bytes.
  */
 struct unpack_codes {
-  device_matrix_view<uint8_t, uint32_t, row_major> out_codes;
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes;
 
   /**
    * Create a callable to be passed to `run_on_list`.
    *
    * @param[out] out_codes the destination for the read codes.
    */
-  __device__ inline unpack_codes(device_matrix_view<uint8_t, uint32_t, row_major> out_codes)
+  __device__ inline unpack_codes(device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes)
     : out_codes{out_codes}
   {
   }
@@ -606,8 +607,9 @@ struct unpack_codes {
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) RAFT_KERNEL unpack_list_data_kernel(
-  device_matrix_view<uint8_t, uint32_t, row_major> out_codes,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
   const uint32_t pq_dim = out_codes.extent(1);
@@ -625,8 +627,9 @@ __launch_bounds__(BlockSize) RAFT_KERNEL unpack_list_data_kernel(
  * @param[in] stream
  */
 inline void unpack_list_data(
-  device_matrix_view<uint8_t, uint32_t, row_major> codes,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
@@ -655,7 +658,7 @@ inline void unpack_list_data(
 template <typename IdxT>
 void unpack_list_data(raft::resources const& res,
                       const index<IdxT>& index,
-                      device_matrix_view<uint8_t, uint32_t, row_major> out_codes,
+                      raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
                       uint32_t label,
                       std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
@@ -696,7 +699,8 @@ struct unpack_contiguous {
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) RAFT_KERNEL unpack_contiguous_list_data_kernel(
   uint8_t* out_codes,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
@@ -708,7 +712,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL unpack_contiguous_list_data_kernel(
 /**
  * Unpack flat PQ codes from an existing list by the given offset.
  *
- * @param[out] codes flat compressed PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[out] codes flat compressed PQ codes [n_rows, raft::ceildiv(pq_dim * pq_bits, 8)]
  * @param[in] list_data the packed ivf::list data.
  * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
  * @param[in] pq_bits codebook size (1 << pq_bits)
@@ -716,7 +720,8 @@ __launch_bounds__(BlockSize) RAFT_KERNEL unpack_contiguous_list_data_kernel(
  */
 inline void unpack_contiguous_list_data(
   uint8_t* codes,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
@@ -766,9 +771,9 @@ struct reconstruct_vectors {
   codebook_gen codebook_kind;
   uint32_t cluster_ix;
   uint32_t pq_len;
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers;
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> centers_rot;
-  device_mdspan<float, extent_3d<uint32_t>, row_major> out_vectors;
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers;
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> centers_rot;
+  device_mdspan<float, extent_3d<uint32_t>, raft::row_major> out_vectors;
 
   /**
    * Create a callable to be passed to `run_on_list`.
@@ -780,9 +785,9 @@ struct reconstruct_vectors {
    * @param[in] cluster_ix label/id of the cluster.
    */
   __device__ inline reconstruct_vectors(
-    device_matrix_view<float, uint32_t, row_major> out_vectors,
-    device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers,
-    device_matrix_view<const float, uint32_t, row_major> centers_rot,
+    raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
+    device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers,
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
     codebook_gen codebook_kind,
     uint32_t cluster_ix)
     : codebook_kind{codebook_kind},
@@ -818,10 +823,11 @@ struct reconstruct_vectors {
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_list_data_kernel(
-  device_matrix_view<float, uint32_t, row_major> out_vectors,
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers,
-  device_matrix_view<const float, uint32_t, row_major> centers_rot,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
+  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
   codebook_gen codebook_kind,
   uint32_t cluster_ix,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
@@ -837,7 +843,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_list_data_kernel(
 template <typename T, typename IdxT>
 void reconstruct_list_data(raft::resources const& res,
                            const index<IdxT>& index,
-                           device_matrix_view<T, uint32_t, row_major> out_vectors,
+                           raft::device_matrix_view<T, uint32_t, raft::row_major> out_vectors,
                            uint32_t label,
                            std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
@@ -852,7 +858,7 @@ void reconstruct_list_data(raft::resources const& res,
                  "offset + output size must be not bigger than the cluster size.");
   }
 
-  auto tmp = make_device_mdarray<float>(
+  auto tmp = raft::make_device_mdarray<float>(
     res, resource::get_workspace_resource(res), make_extents<uint32_t>(n_rows, index.rot_dim()));
 
   constexpr uint32_t kBlockSize = 256;
@@ -909,7 +915,7 @@ void reconstruct_list_data(raft::resources const& res,
     linalg::map(res,
                 out_vectors,
                 utils::mapping<T>{},
-                make_device_matrix_view<const float>(out_float_ptr, n_rows, index.dim()));
+                raft::make_device_matrix_view<const float>(out_float_ptr, n_rows, index.dim()));
   }
 }
 
@@ -919,14 +925,14 @@ void reconstruct_list_data(raft::resources const& res,
  * pq_dim bytes.
  */
 struct pass_codes {
-  device_matrix_view<const uint8_t, uint32_t, row_major> codes;
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes;
 
   /**
    * Create a callable to be passed to `run_on_list`.
    *
    * @param[in] codes the source codes.
    */
-  __device__ inline pass_codes(device_matrix_view<const uint8_t, uint32_t, row_major> codes)
+  __device__ inline pass_codes(device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes)
     : codes{codes}
   {
   }
@@ -937,8 +943,8 @@ struct pass_codes {
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) RAFT_KERNEL pack_list_data_kernel(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
-  device_matrix_view<const uint8_t, uint32_t, row_major> codes,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
   write_list<PqBits, 1>(
@@ -957,8 +963,8 @@ __launch_bounds__(BlockSize) RAFT_KERNEL pack_list_data_kernel(
  * @param[in] stream
  */
 inline void pack_list_data(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
-  device_matrix_view<const uint8_t, uint32_t, row_major> codes,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
@@ -986,7 +992,7 @@ inline void pack_list_data(
 template <typename IdxT>
 void pack_list_data(raft::resources const& res,
                     index<IdxT>* index,
-                    device_matrix_view<const uint8_t, uint32_t, row_major> new_codes,
+                    raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
                     uint32_t label,
                     std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
@@ -1026,7 +1032,7 @@ struct pack_contiguous {
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) RAFT_KERNEL pack_contiguous_list_data_kernel(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data,
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
@@ -1042,13 +1048,13 @@ __launch_bounds__(BlockSize) RAFT_KERNEL pack_contiguous_list_data_kernel(
  * NB: no memory allocation happens here; the list must fit the data (offset + n_rows).
  *
  * @param[out] list_data the packed ivf::list data.
- * @param[in] codes flat compressed PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[in] codes flat compressed PQ codes [n_rows, raft::ceildiv(pq_dim * pq_bits, 8)]
  * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
 inline void pack_contiguous_list_data(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data,
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
@@ -1118,12 +1124,12 @@ template <uint32_t SubWarpSize, typename IdxT>
 struct encode_vectors {
   codebook_gen codebook_kind;
   uint32_t cluster_ix;
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers;
-  device_mdspan<const float, extent_3d<IdxT>, row_major> in_vectors;
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers;
+  device_mdspan<const float, extent_3d<IdxT>, raft::row_major> in_vectors;
 
   __device__ inline encode_vectors(
-    device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers,
-    device_matrix_view<const float, IdxT, row_major> in_vectors,
+    device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers,
+    raft::device_matrix_view<const float, IdxT, raft::row_major> in_vectors,
     codebook_gen codebook_kind,
     uint32_t cluster_ix)
     : codebook_kind{codebook_kind},
@@ -1171,8 +1177,8 @@ struct encode_vectors {
     // reduce among threads
 #pragma unroll
     for (uint32_t stride = SubWarpSize >> 1; stride > 0; stride >>= 1) {
-      const auto other_dist = shfl_xor(min_dist, stride, SubWarpSize);
-      const auto other_code = shfl_xor(code, stride, SubWarpSize);
+      const auto other_dist = raft::shfl_xor(min_dist, stride, SubWarpSize);
+      const auto other_code = raft::shfl_xor(code, stride, SubWarpSize);
       if (other_dist < min_dist) {
         min_dist = other_dist;
         code     = other_code;
@@ -1184,13 +1190,13 @@ struct encode_vectors {
 
 template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
-  device_matrix_view<const float, IdxT, row_major> new_vectors,
+  raft::device_matrix_view<const float, IdxT, raft::row_major> new_vectors,
   std::variant<IdxT, const IdxT*> src_offset_or_indices,
   const uint32_t* new_labels,
-  device_vector_view<uint32_t, uint32_t, row_major> list_sizes,
-  device_vector_view<IdxT*, uint32_t, row_major> inds_ptrs,
-  device_vector_view<uint8_t*, uint32_t, row_major> data_ptrs,
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers,
+  raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes,
+  raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs,
+  raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs,
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(WarpSize, 1u << PqBits);
@@ -1218,7 +1224,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   const uint32_t pq_dim = new_vectors.extent(1) / pq_centers.extent(1);
   auto pq_extents = list_spec<uint32_t, IdxT>{PqBits, pq_dim, true}.make_list_extents(out_ix + 1);
   auto pq_dataset =
-    make_mdspan<uint8_t, uint32_t, row_major, false, true>(data_ptrs[cluster_ix], pq_extents);
+    make_mdspan<uint8_t, uint32_t, raft::row_major, false, true>(data_ptrs[cluster_ix], pq_extents);
   write_vector<PqBits, kSubWarpSize>(
     pq_dataset,
     out_ix,
@@ -1229,9 +1235,9 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
 
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) RAFT_KERNEL encode_list_data_kernel(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data,
-  device_matrix_view<const float, uint32_t, row_major> new_vectors,
-  device_mdspan<const float, extent_3d<uint32_t>, row_major> pq_centers,
+  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major> list_data,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
+  device_mdspan<const float, extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind,
   uint32_t cluster_ix,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
@@ -1247,7 +1253,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL encode_list_data_kernel(
 template <typename T, typename IdxT>
 void encode_list_data(raft::resources const& res,
                       index<IdxT>* index,
-                      device_matrix_view<const T, uint32_t, row_major> new_vectors,
+                      raft::device_matrix_view<const T, uint32_t, raft::row_major> new_vectors,
                       uint32_t label,
                       std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
@@ -1257,7 +1263,7 @@ void encode_list_data(raft::resources const& res,
   auto mr = resource::get_workspace_resource(res);
 
   auto new_vectors_residual =
-    make_device_mdarray<float>(res, mr, make_extents<uint32_t>(n_rows, index->rot_dim()));
+    raft::make_device_mdarray<float>(res, mr, make_extents<uint32_t>(n_rows, index->rot_dim()));
 
   flat_compute_residuals<T, uint32_t>(res,
                                       new_vectors_residual.data_handle(),
@@ -1328,7 +1334,7 @@ void process_and_fill_codes(raft::resources const& handle,
                             rmm::mr::device_memory_resource* mr)
 {
   auto new_vectors_residual =
-    make_device_mdarray<float>(handle, mr, make_extents<IdxT>(n_rows, index.rot_dim()));
+    raft::make_device_mdarray<float>(handle, mr, make_extents<IdxT>(n_rows, index.rot_dim()));
 
   flat_compute_residuals<T, IdxT>(handle,
                                   new_vectors_residual.data_handle(),
@@ -1424,10 +1430,11 @@ void recompute_internal_state(const raft::resources& res, index<IdxT>& index)
  * @return offset for writing the data
  */
 template <typename IdxT>
-auto extend_list_prepare(raft::resources const& res,
-                         index<IdxT>* index,
-                         device_vector_view<const IdxT, uint32_t, row_major> new_indices,
-                         uint32_t label) -> uint32_t
+auto extend_list_prepare(
+  raft::resources const& res,
+  index<IdxT>* index,
+  raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
+  uint32_t label) -> uint32_t
 {
   uint32_t n_rows = new_indices.extent(0);
   uint32_t offset;
@@ -1453,11 +1460,12 @@ auto extend_list_prepare(raft::resources const& res,
  * See the public interface for the api and usage.
  */
 template <typename IdxT>
-void extend_list_with_codes(raft::resources const& res,
-                            index<IdxT>* index,
-                            device_matrix_view<const uint8_t, uint32_t, row_major> new_codes,
-                            device_vector_view<const IdxT, uint32_t, row_major> new_indices,
-                            uint32_t label)
+void extend_list_with_codes(
+  raft::resources const& res,
+  index<IdxT>* index,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
+  raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
+  uint32_t label)
 {
   // Allocate memory and write indices
   auto offset = extend_list_prepare(res, index, new_indices, label);
@@ -1474,8 +1482,8 @@ void extend_list_with_codes(raft::resources const& res,
 template <typename T, typename IdxT>
 void extend_list(raft::resources const& res,
                  index<IdxT>* index,
-                 device_matrix_view<const T, uint32_t, row_major> new_vectors,
-                 device_vector_view<const IdxT, uint32_t, row_major> new_indices,
+                 raft::device_matrix_view<const T, uint32_t, raft::row_major> new_vectors,
+                 raft::device_vector_view<const IdxT, uint32_t, raft::row_major> new_indices,
                  uint32_t label)
 {
   // Allocate memory and write indices

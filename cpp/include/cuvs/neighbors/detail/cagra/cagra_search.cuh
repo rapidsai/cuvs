@@ -105,9 +105,9 @@ template <typename T,
 void search_main(raft::resources const& res,
                  search_params params,
                  const index<T, IdxT>& index,
-                 raft::device_matrix_view<const T, int64_t, row_major> queries,
-                 raft::device_matrix_view<internal_IdxT, int64_t, row_major> neighbors,
-                 raft::device_matrix_view<DistanceT, int64_t, row_major> distances,
+                 raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+                 raft::device_matrix_view<internal_IdxT, int64_t, raft::row_major> neighbors,
+                 raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
   resource::detail::warn_non_pool_workspace(res, "cuvs::neighbors::cagra::search");
@@ -150,14 +150,16 @@ void search_main(raft::resources const& res,
     uint32_t* _num_executed_iterations = nullptr;
 
     auto dataset_internal =
-      make_device_strided_matrix_view<const T, int64_t, row_major>(index.dataset().data_handle(),
-                                                                   index.dataset().extent(0),
-                                                                   index.dataset().extent(1),
-                                                                   index.dataset().stride(0));
-    auto graph_internal = raft::make_device_matrix_view<const internal_IdxT, int64_t, row_major>(
-      reinterpret_cast<const internal_IdxT*>(index.graph().data_handle()),
-      index.graph().extent(0),
-      index.graph().extent(1));
+      raft::make_device_strided_matrix_view<const T, int64_t, raft::row_major>(
+        index.dataset().data_handle(),
+        index.dataset().extent(0),
+        index.dataset().extent(1),
+        index.dataset().stride(0));
+    auto graph_internal =
+      raft::make_device_matrix_view<const internal_IdxT, int64_t, raft::row_major>(
+        reinterpret_cast<const internal_IdxT*>(index.graph().data_handle()),
+        index.graph().extent(0),
+        index.graph().extent(1));
 
     (*plan)(res,
             dataset_internal,

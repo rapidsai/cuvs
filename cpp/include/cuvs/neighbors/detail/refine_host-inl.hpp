@@ -27,11 +27,11 @@ namespace cuvs::neighbors::detail {
 
 template <typename DC, typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host_impl(
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,
-  raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,
-  raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,
-  raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances)
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
+  raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
+  raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances)
 {
   size_t n_queries = queries.extent(0);
   size_t n_rows    = dataset.extent(0);
@@ -111,11 +111,11 @@ struct distance_comp_inner {
  */
 template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host(
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,
-  raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,
-  raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,
-  raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
+  raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
+  raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,
   distance::DistanceType metric = distance::DistanceType::L2Unexpanded)
 {
   refine_check_input(dataset.extents(),

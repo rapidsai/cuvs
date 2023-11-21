@@ -72,7 +72,7 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<T, I
     bool has_norms = false;
     serialize_scalar(handle, os, has_norms);
   }
-  auto sizes_host = make_host_vector<uint32_t, uint32_t>(index_.list_sizes().extent(0));
+  auto sizes_host = raft::make_host_vector<uint32_t, uint32_t>(index_.list_sizes().extent(0));
   copy(sizes_host.data_handle(),
        index_.list_sizes().data_handle(),
        sizes_host.size(),

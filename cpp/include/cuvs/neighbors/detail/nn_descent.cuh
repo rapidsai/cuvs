@@ -147,7 +147,7 @@ using align32 = raft::Pow2<32>;
 template <typename T>
 int get_batch_size(const int it_now, const T nrow, const int batch_size)
 {
-  int it_total = ceildiv(nrow, batch_size);
+  int it_total = raft::ceildiv(nrow, batch_size);
   return (it_now == it_total - 1) ? nrow - it_now * batch_size : batch_size;
 }
 
@@ -157,7 +157,7 @@ constexpr __host__ __device__ __forceinline__ int skew_dim(int ndim)
 {
   // all "4"s are for alignment
   if constexpr (std::is_same<T, float>::value) {
-    ndim = ceildiv(ndim, 4) * 4;
+    ndim = raft::ceildiv(ndim, 4) * 4;
     return ndim + (ndim % 32 == 0) * 4;
   }
 }
@@ -410,7 +410,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
   if constexpr (std::is_same_v<Data_t, float> or std::is_same_v<Data_t, uint8_t> or
                 std::is_same_v<Data_t, int8_t>) {
     constexpr int num_load_elems_per_warp = raft::warp_size();
-    for (int step = 0; step < ceildiv(padding_dims, num_load_elems_per_warp); step++) {
+    for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
       int idx = step * num_load_elems_per_warp + lane_id;
       if (idx < load_dims) {
         vec_buffer[idx] = d_vec[idx];
@@ -424,7 +424,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
         load_dims % 4 == 0 && padding_dims % 4 == 0) {
       constexpr int num_load_elems_per_warp = raft::warp_size() * 4;
 #pragma unroll
-      for (int step = 0; step < ceildiv(padding_dims, num_load_elems_per_warp); step++) {
+      for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
         int idx_in_vec = step * num_load_elems_per_warp + lane_id * 4;
         if (idx_in_vec + 4 <= load_dims) {
           *(float2*)(vec_buffer + idx_in_vec) = *(float2*)(d_vec + idx_in_vec);
@@ -434,7 +434,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
       }
     } else {
       constexpr int num_load_elems_per_warp = raft::warp_size();
-      for (int step = 0; step < ceildiv(padding_dims, num_load_elems_per_warp); step++) {
+      for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
         int idx = step * num_load_elems_per_warp + lane_id;
         if (idx < load_dims) {
           vec_buffer[idx] = d_vec[idx];
@@ -464,7 +464,7 @@ RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
   int lane_id = threadIdx.x % raft::warp_size();
-  for (int step = 0; step < ceildiv(dim, raft::warp_size()); step++) {
+  for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
     int idx         = step * raft::warp_size() + lane_id;
     float part_dist = 0;
     if (idx < dim) {
@@ -479,7 +479,7 @@ RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
     __syncwarp();
   }
 
-  for (int step = 0; step < ceildiv(dim, raft::warp_size()); step++) {
+  for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
     int idx = step * raft::warp_size() + threadIdx.x;
     if (idx < dim) {
       if (l2_norms == nullptr) {
@@ -528,7 +528,7 @@ __device__ void insert_to_global_graph(ResultItem<Index_t> elem,
   size_t global_idx_base = list_id * node_degree;
   if (elem.id() == list_id) return;
 
-  const int num_segments = ceildiv(node_degree, raft::warp_size());
+  const int num_segments = raft::ceildiv(node_degree, raft::warp_size());
 
   int loop_flag = 0;
   do {
@@ -785,8 +785,8 @@ __launch_bounds__(BLOCK_SIZE, 4)
   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
   wmma::fill_fragment(c_frag, 0.0);
-  for (int step = 0; step < ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-    int num_load_elems = (step == ceildiv(data_dim, TILE_COL_WIDTH) - 1)
+  for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
+    int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
                            ? data_dim - step * TILE_COL_WIDTH
                            : TILE_COL_WIDTH;
 #pragma unroll
@@ -835,7 +835,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
   }
   __syncthreads();
 
-  for (int step = 0; step < ceildiv(list_new_size, num_warps); step++) {
+  for (int step = 0; step < raft::ceildiv(list_new_size, num_warps); step++) {
     int idx_in_list = step * num_warps + tx / raft::warp_size();
     if (idx_in_list >= list_new_size) continue;
     auto min_elem = get_min_item(s_list[idx_in_list], idx_in_list, new_neighbors, s_distances);
@@ -849,8 +849,8 @@ __launch_bounds__(BLOCK_SIZE, 4)
   __syncthreads();
 
   wmma::fill_fragment(c_frag, 0.0);
-  for (int step = 0; step < ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-    int num_load_elems = (step == ceildiv(data_dim, TILE_COL_WIDTH) - 1)
+  for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
+    int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
                            ? data_dim - step * TILE_COL_WIDTH
                            : TILE_COL_WIDTH;
     if (TILE_COL_WIDTH < data_dim) {
@@ -914,7 +914,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
   }
   __syncthreads();
 
-  for (int step = 0; step < ceildiv(MAX_NUM_BI_SAMPLES * 2, num_warps); step++) {
+  for (int step = 0; step < raft::ceildiv(MAX_NUM_BI_SAMPLES * 2, num_warps); step++) {
     int idx_in_list = step * num_warps + tx / raft::warp_size();
     if (idx_in_list >= list_new_size && idx_in_list < MAX_NUM_BI_SAMPLES) continue;
     if (idx_in_list >= MAX_NUM_BI_SAMPLES + list_old_size && idx_in_list < MAX_NUM_BI_SAMPLES * 2)
@@ -1227,16 +1227,17 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
   cuvs::spatial::knn::detail::utils::batch_load_iterator vec_batches{
     data, static_cast<size_t>(nrow_), build_config_.dataset_dim, batch_size, stream};
   for (auto const& batch : vec_batches) {
-    preprocess_data_kernel<<<
-      batch.size(),
-      raft::warp_size(),
-      sizeof(Data_t) * ceildiv(build_config_.dataset_dim, static_cast<size_t>(raft::warp_size())) *
-        raft::warp_size(),
-      stream>>>(batch.data(),
-                d_data_.data_handle(),
-                build_config_.dataset_dim,
-                l2_norms_.data_handle(),
-                batch.offset());
+    preprocess_data_kernel<<<batch.size(),
+                             raft::warp_size(),
+                             sizeof(Data_t) *
+                               raft::ceildiv(build_config_.dataset_dim,
+                                             static_cast<size_t>(raft::warp_size())) *
+                               raft::warp_size(),
+                             stream>>>(batch.data(),
+                                       d_data_.data_handle(),
+                                       build_config_.dataset_dim,
+                                       l2_norms_.data_handle(),
+                                       batch.offset());
   }
 
   thrust::fill(thrust::device.on(stream),
@@ -1370,7 +1371,7 @@ template <typename T,
             host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
 void build(raft::resources const& res,
            const index_params& params,
-           mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
            index<IdxT>& idx)
 {
   RAFT_EXPECTS(dataset.extent(0) < std::numeric_limits<int>::max() - 1,
@@ -1402,7 +1403,7 @@ void build(raft::resources const& res,
   size_t extended_intermediate_degree = align32::roundUp(
     static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
-  auto int_graph = raft::make_host_matrix<int, int64_t, row_major>(
+  auto int_graph = raft::make_host_matrix<int, int64_t, raft::row_major>(
     dataset.extent(0), static_cast<int64_t>(extended_graph_degree));
 
   BuildConfig build_config{.max_dataset_size      = static_cast<size_t>(dataset.extent(0)),
@@ -1428,9 +1429,10 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
-index<IdxT> build(raft::resources const& res,
-                  const index_params& params,
-                  mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset)
+index<IdxT> build(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;

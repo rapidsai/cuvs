@@ -453,10 +453,10 @@ RAFT_KERNEL unpack_interleaved_list_kernel(
 template <typename T, typename IdxT>
 void pack_list_data(
   raft::resources const& res,
-  device_matrix_view<const T, uint32_t, row_major> codes,
+  raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
   uint32_t veclen,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, row_major> list_data)
+  device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major> list_data)
 {
   uint32_t n_rows = codes.extent(0);
   uint32_t dim    = codes.extent(1);
@@ -473,10 +473,11 @@ void pack_list_data(
 template <typename T, typename IdxT>
 void unpack_list_data(
   raft::resources const& res,
-  device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, row_major> list_data,
+  device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data,
   uint32_t veclen,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  device_matrix_view<T, uint32_t, row_major> codes)
+  raft::device_matrix_view<T, uint32_t, raft::row_major> codes)
 {
   uint32_t n_rows = codes.extent(0);
   uint32_t dim    = codes.extent(1);

@@ -59,13 +59,14 @@ struct index : ann::index {
 
   /** Dataset [size, dim] */
   [[nodiscard]] inline auto dataset() const noexcept
-    -> device_matrix_view<const T, int64_t, row_major>
+    -> raft::device_matrix_view<const T, int64_t, raft::row_major>
   {
     return dataset_view_;
   }
 
   /** Dataset norms */
-  [[nodiscard]] inline auto norms() const -> device_vector_view<const T, int64_t, row_major>
+  [[nodiscard]] inline auto norms() const
+    -> raft::device_vector_view<const T, int64_t, raft::row_major>
   {
     return norms_view_.value();
   }
@@ -114,7 +115,7 @@ struct index : ann::index {
    * Having precomputed norms gives us a performance advantage at query time.
    */
   index(raft::resources const& res,
-        raft::device_matrix_view<const T, int64_t, row_major> dataset_view,
+        raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
         std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
         cuvs::distance::DistanceType metric,
         T metric_arg = 0.0)
@@ -132,7 +133,7 @@ struct index : ann::index {
    * Replace the dataset with a new dataset.
    */
   void update_dataset(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, row_major> dataset)
+                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     dataset_view_ = dataset;
   }
@@ -143,7 +144,7 @@ struct index : ann::index {
    * We create a copy of the dataset on the device. The index manages the lifetime of this copy.
    */
   void update_dataset(raft::resources const& res,
-                      raft::host_matrix_view<const T, int64_t, row_major> dataset)
+                      raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     dataset_ = raft::make_device_matrix<T, int64_t>(dataset.extents(0), dataset.extents(1));
     raft::copy(dataset_.data_handle(),
@@ -154,10 +155,10 @@ struct index : ann::index {
   }
 
   cuvs::distance::DistanceType metric_;
-  raft::device_matrix<T, int64_t, row_major> dataset_;
+  raft::device_matrix<T, int64_t, raft::row_major> dataset_;
   std::optional<raft::device_vector<T, int64_t>> norms_;
   std::optional<raft::device_vector_view<const T, int64_t>> norms_view_;
-  raft::device_matrix_view<const T, int64_t, row_major> dataset_view_;
+  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view_;
   T metric_arg_;
 };
 

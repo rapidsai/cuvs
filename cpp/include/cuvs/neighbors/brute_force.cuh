@@ -83,7 +83,7 @@ template <typename T, typename IdxT>
 std::shared_ptr<batch_k_query<T, IdxT>> make_batch_k_query(
   const raft::resources& res,
   const cuvs::neighbors::brute_force::index<T>& index,
-  raft::device_matrix_view<const T, int64_t, row_major> query,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> query,
   int64_t batch_size)
 {
   return std::shared_ptr<batch_k_query<T, IdxT>>(

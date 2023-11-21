@@ -21,7 +21,7 @@
   template cuvs::neighbors::ivf_pq::index<IdxT> cuvs::neighbors::ivf_pq::build<T, IdxT>( \
     raft::resources const& handle,                                                       \
     const cuvs::neighbors::ivf_pq::index_params& params,                                 \
-    raft::device_matrix_view<const T, IdxT, row_major> dataset);                         \
+    raft::device_matrix_view<const T, IdxT, raft::row_major> dataset);                   \
                                                                                          \
   template auto cuvs::neighbors::ivf_pq::build(                                          \
     raft::resources const& handle,                                                       \

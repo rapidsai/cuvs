@@ -89,7 +89,7 @@ static_assert(std::is_aggregate_v<search_params>);
 template <typename SizeT, typename ValueT, typename IdxT>
 struct list_spec {
   using value_type   = ValueT;
-  using list_extents = matrix_extent<SizeT>;
+  using list_extents = raft::matrix_extent<SizeT>;
   using index_type   = IdxT;
 
   SizeT align_max;
@@ -177,23 +177,23 @@ struct index : ann::index {
    * NB: This may differ from the actual list size if the shared lists have been extended by another
    * index
    */
-  inline auto list_sizes() noexcept -> device_vector_view<uint32_t, uint32_t>
+  inline auto list_sizes() noexcept -> raft::device_vector_view<uint32_t, uint32_t>
   {
     return list_sizes_.view();
   }
   [[nodiscard]] inline auto list_sizes() const noexcept
-    -> device_vector_view<const uint32_t, uint32_t>
+    -> raft::device_vector_view<const uint32_t, uint32_t>
   {
     return list_sizes_.view();
   }
 
   /** k-means cluster centers corresponding to the lists [n_lists, dim] */
-  inline auto centers() noexcept -> device_matrix_view<float, uint32_t, row_major>
+  inline auto centers() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
   {
     return centers_.view();
   }
   [[nodiscard]] inline auto centers() const noexcept
-    -> device_matrix_view<const float, uint32_t, row_major>
+    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
   {
     return centers_.view();
   }
@@ -274,18 +274,23 @@ struct index : ann::index {
   }
 
   /** Pointers to the inverted lists (clusters) data  [n_lists]. */
-  inline auto data_ptrs() noexcept -> device_vector_view<T*, uint32_t> { return data_ptrs_.view(); }
-  [[nodiscard]] inline auto data_ptrs() const noexcept -> device_vector_view<T* const, uint32_t>
+  inline auto data_ptrs() noexcept -> raft::device_vector_view<T*, uint32_t>
+  {
+    return data_ptrs_.view();
+  }
+  [[nodiscard]] inline auto data_ptrs() const noexcept
+    -> raft::device_vector_view<T* const, uint32_t>
   {
     return data_ptrs_.view();
   }
 
   /** Pointers to the inverted lists (clusters) indices  [n_lists]. */
-  inline auto inds_ptrs() noexcept -> device_vector_view<IdxT*, uint32_t>
+  inline auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t>
   {
     return inds_ptrs_.view();
   }
-  [[nodiscard]] inline auto inds_ptrs() const noexcept -> device_vector_view<IdxT* const, uint32_t>
+  [[nodiscard]] inline auto inds_ptrs() const noexcept
+    -> raft::device_vector_view<IdxT* const, uint32_t>
   {
     return inds_ptrs_.view();
   }
@@ -332,7 +337,7 @@ struct index : ann::index {
       case cuvs::distance::DistanceType::L2SqrtExpanded:
       case cuvs::distance::DistanceType::L2Unexpanded:
       case cuvs::distance::DistanceType::L2SqrtUnexpanded:
-        center_norms_ = make_device_vector<float, uint32_t>(res, n_lists());
+        center_norms_ = raft::make_device_vector<float, uint32_t>(res, n_lists());
         break;
       default: center_norms_ = std::nullopt;
     }
@@ -359,13 +364,13 @@ struct index : ann::index {
   bool adaptive_centers_;
   bool conservative_memory_allocation_;
   std::vector<std::shared_ptr<list_data<T, IdxT>>> lists_;
-  device_vector<uint32_t, uint32_t> list_sizes_;
-  device_matrix<float, uint32_t, row_major> centers_;
+  raft::device_vector<uint32_t, uint32_t> list_sizes_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   std::optional<device_vector<float, uint32_t>> center_norms_;
 
   // Computed members
-  device_vector<T*, uint32_t> data_ptrs_;
-  device_vector<IdxT*, uint32_t> inds_ptrs_;
+  raft::device_vector<T*, uint32_t> data_ptrs_;
+  raft::device_vector<IdxT*, uint32_t> inds_ptrs_;
   IdxT total_size_;
 
   /** Throw an error if the index content is inconsistent. */

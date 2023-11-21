@@ -49,8 +49,8 @@ knn_macro = """
         raft::resources const& handle,                           \\
         std::vector<raft::device_matrix_view<const value_t, matrix_idx, index_layout>> index, \\
         raft::device_matrix_view<const value_t, matrix_idx, search_layout> search, \\
-        raft::device_matrix_view<idx_t, matrix_idx, row_major> indices, \\
-        raft::device_matrix_view<value_t, matrix_idx, row_major> distances, \\
+        raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices, \\
+        raft::device_matrix_view<value_t, matrix_idx, raft::row_major> distances, \\
         cuvs::distance::DistanceType metric,                            \\
         std::optional<float> metric_arg,                                \\
         std::optional<idx_t> global_id_offset,                          \\
@@ -64,8 +64,8 @@ fused_l2_knn_macro = """
         raft::resources const& handle,                           \\
         raft::device_matrix_view<const value_t, idx_t, idx_layout> index, \\
         raft::device_matrix_view<const value_t, idx_t, query_layout> query, \\
-        raft::device_matrix_view<idx_t, idx_t, row_major> out_inds,     \\
-        raft::device_matrix_view<value_t, idx_t, row_major> out_dists,  \\
+        raft::device_matrix_view<idx_t, idx_t, raft::row_major> out_inds,     \\
+        raft::device_matrix_view<value_t, idx_t, raft::row_major> out_dists,  \\
         cuvs::distance::DistanceType metric);
 
 """

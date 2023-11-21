@@ -723,7 +723,7 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
 
       // The number of interleaved groups to be processed
       const uint32_t num_groups =
-        align_warp::div(list_length + align_warp::Mask);  // ceildiv by power of 2
+        align_warp::div(list_length + align_warp::Mask);  // raft::ceildiv by power of 2
 
       constexpr int kUnroll        = WarpSize / Veclen;
       constexpr uint32_t kNumWarps = kThreadsPerBlock / WarpSize;
@@ -799,7 +799,7 @@ uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMem
     &num_blocks_per_sm, func, kThreadsPerBlock, sMemSize));
 
   size_t min_grid_size = num_sms * num_blocks_per_sm;
-  size_t min_grid_x    = ceildiv<size_t>(min_grid_size, numQueries);
+  size_t min_grid_x    = raft::ceildiv<size_t>(min_grid_size, numQueries);
   return min_grid_x > n_probes ? n_probes : static_cast<uint32_t>(min_grid_x);
 }
 

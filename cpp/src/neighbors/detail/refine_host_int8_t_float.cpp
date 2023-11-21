@@ -18,11 +18,11 @@
 
 #define instantiate_raft_neighbors_refine(IdxT, DataT, DistanceT, ExtentsT)             \
   template void cuvs::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
-    raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,                   \
-    raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,                   \
-    raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,        \
-    raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,                          \
-    raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances,                   \
+    raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,             \
+    raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,             \
+    raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,  \
+    raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,                    \
+    raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,             \
     distance::DistanceType metric);
 instantiate_raft_neighbors_refine(int64_t, int8_t, float, int64_t);
 

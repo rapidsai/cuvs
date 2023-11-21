@@ -238,12 +238,12 @@ void tiled_brute_force_knn(const raft::resources& handle,
 
       matrix::select_k<ElementType, IndexType>(
         handle,
-        raft::make_device_matrix_view<const ElementType, int64_t, row_major>(
+        raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_distances.data(), current_query_size, current_centroid_size),
         std::nullopt,
-        raft::make_device_matrix_view<ElementType, int64_t, row_major>(
+        raft::make_device_matrix_view<ElementType, int64_t, raft::row_major>(
           distances + i * k, current_query_size, current_k),
-        raft::make_device_matrix_view<IndexType, int64_t, row_major>(
+        raft::make_device_matrix_view<IndexType, int64_t, raft::row_major>(
           indices + i * k, current_query_size, current_k),
         select_min,
         true);
@@ -280,13 +280,13 @@ void tiled_brute_force_knn(const raft::resources& handle,
       // select the actual top-k items here from the temporary output
       matrix::select_k<ElementType, IndexType>(
         handle,
-        raft::make_device_matrix_view<const ElementType, int64_t, row_major>(
+        raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_out_distances.data(), current_query_size, temp_out_cols),
-        raft::make_device_matrix_view<const IndexType, int64_t, row_major>(
+        raft::make_device_matrix_view<const IndexType, int64_t, raft::row_major>(
           temp_out_indices.data(), current_query_size, temp_out_cols),
-        raft::make_device_matrix_view<ElementType, int64_t, row_major>(
+        raft::make_device_matrix_view<ElementType, int64_t, raft::row_major>(
           distances + i * k, current_query_size, k),
-        raft::make_device_matrix_view<IndexType, int64_t, row_major>(
+        raft::make_device_matrix_view<IndexType, int64_t, raft::row_major>(
           indices + i * k, current_query_size, k),
         select_min,
         true);
@@ -512,9 +512,9 @@ template <typename T, typename IdxT>
 void brute_force_search(
   raft::resources const& res,
   const cuvs::neighbors::brute_force::index<T>& idx,
-  raft::device_matrix_view<const T, int64_t, row_major> queries,
-  raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
-  raft::device_matrix_view<T, int64_t, row_major> distances,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<T, int64_t, raft::row_major> distances,
   std::optional<raft::device_vector_view<const T, int64_t>> query_norms = std::nullopt)
 {
   RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1), "Value of k must match for outputs");

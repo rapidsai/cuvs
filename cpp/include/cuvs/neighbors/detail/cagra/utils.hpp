@@ -155,7 +155,7 @@ struct gen_index_msb_1_mask {
 }  // namespace utils
 
 /**
- * Utility to sync memory from a host_matrix_view to a device_matrix_view
+ * Utility to sync memory from a host_matrix_view to a raft::device_matrix_view
  *
  * In certain situations (UVM/HMM/ATS) host memory might be directly accessible on the
  * device, and no extra allocations need to be performed. This class checks
@@ -168,7 +168,8 @@ struct gen_index_msb_1_mask {
 template <typename T, typename IdxT>
 class device_matrix_view_from_host {
  public:
-  device_matrix_view_from_host(raft::resources const& res, host_matrix_view<T, IdxT> host_view)
+  device_matrix_view_from_host(raft::resources const& res,
+                               raft::host_matrix_view<T, IdxT> host_view)
     : host_view_(host_view)
   {
     cudaPointerAttributes attr;
@@ -181,7 +182,7 @@ class device_matrix_view_from_host {
       raft::copy(device_mem_->data_handle(),
                  host_view.data_handle(),
                  host_view.extent(0) * host_view.extent(1),
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
       device_ptr = device_mem_->data_handle();
     }
   }
@@ -203,11 +204,11 @@ class device_matrix_view_from_host {
 };
 
 /**
- * Utility to sync memory from a device_matrix_view to a host_matrix_view
+ * Utility to sync memory from a raft::device_matrix_view to a host_matrix_view
  *
  * In certain situations (UVM/HMM/ATS) device memory might be directly accessible on the
  * host, and no extra allocations need to be performed. This class checks
- * if the device_matrix_view is already accessible on the host, and only creates host
+ * if the raft::device_matrix_view is already accessible on the host, and only creates host
  * memory and copies over if necessary. In memory limited situations this is preferable
  * to having both a host and device copy
  * TODO: once the mdbuffer changes here https://github.com/wphicks/raft/blob/fea-mdbuffer
@@ -230,7 +231,7 @@ class host_matrix_view_from_device {
       raft::copy(host_mem_->data_handle(),
                  device_view.data_handle(),
                  device_view.extent(0) * device_view.extent(1),
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
       host_ptr = host_mem_->data_handle();
     }
   }
@@ -269,11 +270,12 @@ void copy_with_padding(
       raft::make_device_mdarray<T>(res, mr, raft::make_extents<int64_t>(src.extent(0), padded_dim));
   }
   if (dst.extent(1) == src.extent(1)) {
-    raft::copy(dst.data_handle(), src.data_handle(), src.size(), resource::get_cuda_stream(res));
+    raft::copy(
+      dst.data_handle(), src.data_handle(), src.size(), raft::resource::get_cuda_stream(res));
   } else {
     // copy with padding
     RAFT_CUDA_TRY(cudaMemsetAsync(
-      dst.data_handle(), 0, dst.size() * sizeof(T), resource::get_cuda_stream(res)));
+      dst.data_handle(), 0, dst.size() * sizeof(T), raft::resource::get_cuda_stream(res)));
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
                                     sizeof(T) * dst.extent(1),
                                     src.data_handle(),
@@ -281,7 +283,7 @@ void copy_with_padding(
                                     sizeof(T) * src.extent(1),
                                     src.extent(0),
                                     cudaMemcpyDefault,
-                                    resource::get_cuda_stream(res)));
+                                    raft::resource::get_cuda_stream(res)));
   }
 }
 }  // namespace cuvs::neighbors::cagra::detail

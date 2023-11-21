@@ -109,7 +109,7 @@ template <int NumThreads, typename K, typename V, int L, bool Dir, typename Comp
 inline __device__ void blockMergeLarge(K* listK, V* listV)
 {
   static_assert(utils::isPowerOf2(L), "L must be a power-of-2");
-  static_assert(L >= WarpSize, "merge list size must be >= 32");
+  static_assert(L >= raft::WarpSize, "merge list size must be >= 32");
   static_assert(utils::isPowerOf2(NumThreads), "NumThreads must be a power-of-2");
   static_assert(L >= NumThreads, "merge list size must be >= NumThreads");
 

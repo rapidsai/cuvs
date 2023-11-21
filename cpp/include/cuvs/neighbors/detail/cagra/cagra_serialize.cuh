@@ -69,7 +69,7 @@ void serialize(raft::resources const& res,
   if (include_dataset) {
     auto dataset = index_.dataset();
     // Remove padding before saving the dataset
-    auto host_dataset = make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
+    auto host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
                                     sizeof(T) * host_dataset.extent(1),
                                     dataset.data_handle(),
@@ -153,7 +153,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 
   auto dataset = index_.dataset();
   // Remove padding before saving the dataset
-  auto host_dataset = make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
+  auto host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
                                   sizeof(T) * host_dataset.extent(1),
                                   dataset.data_handle(),

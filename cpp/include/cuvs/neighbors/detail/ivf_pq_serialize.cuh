@@ -73,7 +73,8 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
   serialize_mdspan(handle_, os, index.centers_rot());
   serialize_mdspan(handle_, os, index.rotation_matrix());
 
-  auto sizes_host = make_host_mdarray<uint32_t, uint32_t, row_major>(index.list_sizes().extents());
+  auto sizes_host =
+    raft::make_host_mdarray<uint32_t, uint32_t, raft::row_major>(index.list_sizes().extents());
   copy(sizes_host.data_handle(),
        index.list_sizes().data_handle(),
        sizes_host.size(),

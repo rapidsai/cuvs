@@ -204,8 +204,8 @@ void all_knn_query(raft::resources const& handle,
 template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
 void all_knn_query(raft::resources const& handle,
                    BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index,
-                   raft::device_matrix_view<idx_t, matrix_idx_t, row_major> inds,
-                   raft::device_matrix_view<value_t, matrix_idx_t, row_major> dists,
+                   raft::device_matrix_view<idx_t, matrix_idx_t, raft::row_major> inds,
+                   raft::device_matrix_view<value_t, matrix_idx_t, raft::row_major> dists,
                    int_t k,
                    bool perform_post_filtering = true,
                    float weight                = 1.0)
@@ -354,9 +354,9 @@ void knn_query(raft::resources const& handle,
 template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
 void knn_query(raft::resources const& handle,
                const BallCoverIndex<idx_t, value_t, int_t, matrix_idx_t>& index,
-               raft::device_matrix_view<const value_t, matrix_idx_t, row_major> query,
-               raft::device_matrix_view<idx_t, matrix_idx_t, row_major> inds,
-               raft::device_matrix_view<value_t, matrix_idx_t, row_major> dists,
+               raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> query,
+               raft::device_matrix_view<idx_t, matrix_idx_t, raft::row_major> inds,
+               raft::device_matrix_view<value_t, matrix_idx_t, raft::row_major> dists,
                int_t k,
                bool perform_post_filtering = true,
                float weight                = 1.0)

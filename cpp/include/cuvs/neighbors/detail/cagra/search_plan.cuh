@@ -90,32 +90,33 @@ struct search_plan_impl : public search_plan_impl_base {
                    int64_t graph_degree,
                    uint32_t topk)
     : search_plan_impl_base(params, dim, graph_degree, topk),
-      hashmap(0, resource::get_cuda_stream(res)),
+      hashmap(0, raft::resource::get_cuda_stream(res)),
       num_executed_iterations(0, resource::get_cuda_stream(res)),
-      dev_seed(0, resource::get_cuda_stream(res)),
+      dev_seed(0, raft::resource::get_cuda_stream(res)),
       num_seeds(0)
   {
     adjust_search_params();
     check_params();
     calc_hashmap_params(res);
     set_max_dim_team(dim);
-    num_executed_iterations.resize(max_queries, resource::get_cuda_stream(res));
+    num_executed_iterations.resize(max_queries, raft::resource::get_cuda_stream(res));
     RAFT_LOG_DEBUG("# algo = %d", static_cast<int>(algo));
   }
 
   virtual ~search_plan_impl() {}
 
-  virtual void operator()(raft::resources const& res,
-                          raft::device_matrix_view<const DATA_T, int64_t, layout_stride> dataset,
-                          raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,
-                          INDEX_T* const result_indices_ptr,       // [num_queries, topk]
-                          DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
-                          const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
-                          const std::uint32_t num_queries,
-                          const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
-                          std::uint32_t* const num_executed_iterations,  // [num_queries]
-                          uint32_t topk,
-                          SAMPLE_FILTER_T sample_filter){};
+  virtual void operator()(
+    raft::resources const& res,
+    raft::device_matrix_view<const DATA_T, int64_t, raft::layout_stride> dataset,
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+    INDEX_T* const result_indices_ptr,       // [num_queries, topk]
+    DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
+    const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
+    const std::uint32_t num_queries,
+    const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
+    std::uint32_t* const num_executed_iterations,  // [num_queries]
+    uint32_t topk,
+    SAMPLE_FILTER_T sample_filter){};
 
   void adjust_search_params()
   {

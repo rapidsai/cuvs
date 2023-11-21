@@ -78,7 +78,7 @@ struct index : ann::index {
     : ann::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
-      graph_{raft::make_host_matrix<IdxT, int64_t, row_major>(n_rows, n_cols)},
+      graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(n_rows, n_cols)},
       graph_view_{graph_.view()}
   {
   }
@@ -98,7 +98,7 @@ struct index : ann::index {
     : ann::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
-      graph_{raft::make_host_matrix<IdxT, int64_t, row_major>(0, 0)},
+      graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},
       graph_view_{graph_view}
   {
   }
@@ -122,7 +122,7 @@ struct index : ann::index {
   }
 
   /** neighborhood graph [size, graph-degree] */
-  [[nodiscard]] inline auto graph() noexcept -> host_matrix_view<IdxT, int64_t, row_major>
+  [[nodiscard]] inline auto graph() noexcept -> host_matrix_view<IdxT, int64_t, raft::row_major>
   {
     return graph_view_;
   }
@@ -137,8 +137,8 @@ struct index : ann::index {
  private:
   raft::resources const& res_;
   cuvs::distance::DistanceType metric_;
-  raft::host_matrix<IdxT, int64_t, row_major> graph_;  // graph to return for non-int IdxT
-  raft::host_matrix_view<IdxT, int64_t, row_major>
+  raft::host_matrix<IdxT, int64_t, raft::row_major> graph_;  // graph to return for non-int IdxT
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major>
     graph_view_;  // view of graph for user provided matrix
 };
 

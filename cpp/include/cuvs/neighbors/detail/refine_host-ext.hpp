@@ -28,11 +28,11 @@ namespace cuvs::neighbors::detail {
 
 template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host(
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,
-  raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,
-  raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,
-  raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
+  raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
+  raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,
   distance::DistanceType metric = distance::DistanceType::L2Unexpanded) RAFT_EXPLICIT;
 
 }
@@ -41,11 +41,11 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 
 #define instantiate_raft_neighbors_refine(IdxT, DataT, DistanceT, ExtentsT)                    \
   extern template void cuvs::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
-    raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,                          \
-    raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,                          \
-    raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,               \
-    raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,                                 \
-    raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances,                          \
+    raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,                    \
+    raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,                    \
+    raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,         \
+    raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,                           \
+    raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,                    \
     distance::DistanceType metric);
 
 instantiate_raft_neighbors_refine(int64_t, float, float, int64_t);
