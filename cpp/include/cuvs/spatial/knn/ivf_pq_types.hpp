@@ -30,11 +30,11 @@
 
 #include <cuvs/neighbors/ivf_pq_types.hpp>
 
-namespace raft::spatial::knn::ivf_pq {
+namespace cuvs::spatial::knn::ivf_pq {
 
 using cuvs::neighbors::ivf_pq::codebook_gen;
 using cuvs::neighbors::ivf_pq::index;
 using cuvs::neighbors::ivf_pq::index_params;
 using cuvs::neighbors::ivf_pq::search_params;
 
-}  // namespace raft::spatial::knn::ivf_pq
+}  // namespace cuvs::spatial::knn::ivf_pq

@@ -18,8 +18,8 @@
 #include <cassert>
 #include <cuvs/distance/detail/distance.cuh>
 #include <cuvs/distance/distance_types.hpp>
+#include <cuvs/spatial/knn/detail/fused_l2_knn.cuh>
 #include <memory>
-#include <raft/spatial/knn/detail/fused_l2_knn.cuh>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -136,7 +136,7 @@ void RaftGpu<T>::search(const T* queries,
 {
   // TODO: Integrate new `raft::brute_force::index` (from
   // https://github.com/rapidsai/raft/pull/1817)
-  raft::spatial::knn::detail::fusedL2Knn(this->dim_,
+  cuvs::spatial::knn::detail::fusedL2Knn(this->dim_,
                                          reinterpret_cast<int64_t*>(neighbors),
                                          distances,
                                          dataset_,

@@ -35,7 +35,7 @@
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -176,4 +176,4 @@ double mutual_info_score(const T* firstClusterArray,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

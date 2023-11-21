@@ -35,7 +35,7 @@
 #include <raft/stats/detail/batched/information_criterion.cuh>
 #include <raft/stats/stats_types.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -114,5 +114,5 @@ void information_criterion_batched(raft::resources const& handle,
 /** @} */  // end group stats_information_criterion
 
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs
 #endif

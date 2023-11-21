@@ -27,7 +27,7 @@
 #include <raft/core/operators.hpp>
 #include <raft/util/cuda_utils.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -1059,4 +1059,4 @@ void fusedL2Knn(size_t D,
 }  // namespace detail
 }  // namespace knn
 }  // namespace spatial
-}  // namespace raft
+}  // namespace cuvs

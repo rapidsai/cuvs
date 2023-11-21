@@ -21,7 +21,7 @@
 #include <raft/sparse/solver/lanczos.cuh>
 #include <raft/spectral/matrix_wrappers.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 
 // aggregate of control params for Eigen Solver:
@@ -102,6 +102,6 @@ struct lanczos_solver_t {
 };
 
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

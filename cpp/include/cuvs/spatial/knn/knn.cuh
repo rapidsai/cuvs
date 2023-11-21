@@ -23,7 +23,7 @@
 #include <raft/matrix/detail/select_radix.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 
 /**
  * Performs a k-select across row partitioned index/distance
@@ -227,4 +227,4 @@ void brute_force_knn(raft::resources const& handle,
                                                 metric_arg);
 }
 
-}  // namespace raft::spatial::knn
+}  // namespace cuvs::spatial::knn

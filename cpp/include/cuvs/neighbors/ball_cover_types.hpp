@@ -72,7 +72,7 @@ class BallCoverIndex {
   }
 
   explicit BallCoverIndex(raft::resources const& handle_,
-                          raft::device_matrix_view<const value_t, matrix_idx, row_major> X_,
+                          raft::device_matrix_view<const value_t, matrix_idx, raft::row_major> X_,
                           cuvs::distance::DistanceType metric_)
     : handle(handle_),
       X(X_),
@@ -111,7 +111,7 @@ class BallCoverIndex {
   {
     return R_radius.view();
   }
-  auto get_R() const -> raft::device_matrix_view<const value_t, matrix_idx, row_major>
+  auto get_R() const -> raft::device_matrix_view<const value_t, matrix_idx, raft::row_major>
   {
     return R.view();
   }

@@ -24,12 +24,12 @@
  */
 
 #include <cstdint>  // int64_t
-#include <raft/spatial/knn/detail/ball_cover/registers-inl.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/registers-inl.cuh>
 
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(                            \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims, Mdist_func)                                       \
   template void                                                                              \
-  raft::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
     raft::resources const& handle,                                                           \
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \
     const Mvalue_t* query,                                                                   \
@@ -44,5 +44,5 @@
     Mvalue_int* dists_counter)
 
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::EuclideanFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::EuclideanFunc);
 #undef instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one

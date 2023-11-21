@@ -24,7 +24,7 @@
 
 #include <raft/core/device_mdspan.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 
 /**
@@ -434,11 +434,11 @@ void distance(raft::resources const& handle,
  * @param metric distance metric
  * @param metric_arg metric argument (used for Minkowski distance)
  */
-template <typename Type, typename layout = layout_c_contiguous, typename IdxT = int>
+template <typename Type, typename layout = raft::layout_c_contiguous, typename IdxT = int>
 void pairwise_distance(raft::resources const& handle,
-                       device_matrix_view<Type, IdxT, layout> const x,
-                       device_matrix_view<Type, IdxT, layout> const y,
-                       device_matrix_view<Type, IdxT, layout> dist,
+                       raft::device_matrix_view<Type, IdxT, layout> const x,
+                       raft::device_matrix_view<Type, IdxT, layout> const y,
+                       raft::device_matrix_view<Type, IdxT, layout> dist,
                        cuvs::distance::DistanceType metric,
                        Type metric_arg = 2.0f)
 {
@@ -474,4 +474,4 @@ void pairwise_distance(raft::resources const& handle,
 /** @} */
 
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs

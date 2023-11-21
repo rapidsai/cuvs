@@ -20,6 +20,7 @@
 #include <cuvs/neighbors/detail/ivf_flat_interleaved_scan.cuh>  // interleaved_scan
 #include <cuvs/neighbors/ivf_flat_types.hpp>                    // cuvs::neighbors::ivf_flat::index
 #include <cuvs/neighbors/sample_filter_types.hpp>               // none_ivf_sample_filter
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>                // utils::mapping
 #include <raft/core/logger.hpp>                                 // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>                // raft::resources
@@ -27,12 +28,11 @@
 #include <raft/linalg/norm.cuh>                   // raft::linalg::norm
 #include <raft/linalg/unary_op.cuh>               // raft::linalg::unary_op
 #include <raft/matrix/detail/select_k.cuh>        // matrix::detail::select_k
-#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping
 #include <rmm/mr/device/per_device_resource.hpp>  // rmm::device_memory_resource
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,

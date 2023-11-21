@@ -28,7 +28,7 @@
 
 #include <math.h>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -313,4 +313,4 @@ void contingencyMatrix(const T* groundTruth,
 
 };  // namespace detail
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs

@@ -20,7 +20,7 @@
 
 #include <cstddef>  // size_t
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace detail {
 
@@ -323,4 +323,4 @@ dim3 launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func)
 
 };  // namespace detail
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs

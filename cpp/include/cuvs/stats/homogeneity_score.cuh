@@ -23,7 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/homogeneity_score.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -89,6 +89,6 @@ double homogeneity_score(raft::resources const& handle,
 /** @} */  // end group stats_homogeneity_score
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

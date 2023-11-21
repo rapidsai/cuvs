@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <cuvs/distance/distance_types.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
@@ -30,7 +31,6 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/detail/device_memory_resource.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <cuvs/neighbors/detail/refine.cuh>
 #include <cuvs/neighbors/ivf_pq.cuh>
@@ -129,7 +129,7 @@ void build_knn_graph(raft::resources const& res,
   auto pool_guard = raft::get_pool_memory_resource(device_memory, 1024 * 1024);
   if (pool_guard) { RAFT_LOG_DEBUG("ivf_pq using pool memory resource"); }
 
-  raft::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
+  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
     dataset.data_handle(),
     dataset.extent(0),
     dataset.extent(1),

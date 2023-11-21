@@ -22,7 +22,7 @@
 
 #include <raft/spectral/detail/modularity_maximization.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 
 // =========================================================
@@ -81,6 +81,6 @@ void analyzeModularity(raft::resources const& handle,
 }
 
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

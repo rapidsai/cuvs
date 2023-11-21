@@ -27,7 +27,7 @@
 
 #include <limits>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -140,5 +140,5 @@ void minmax(raft::resources const& handle,
 /** @} */  // end group stats_minmax
 
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs
 #endif

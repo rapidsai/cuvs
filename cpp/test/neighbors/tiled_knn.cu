@@ -172,7 +172,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
     }
 
     // verify.
-    ASSERT_TRUE(raft::spatial::knn::devArrMatchKnnPair(ref_indices_.data(),
+    ASSERT_TRUE(cuvs::spatial::knn::devArrMatchKnnPair(ref_indices_.data(),
                                                        raft_indices_.data(),
                                                        ref_distances_.data(),
                                                        raft_distances_.data(),
@@ -203,7 +203,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
         raft::make_device_matrix_view<T, int64_t>(
           raft_distances_.data(), params_.num_queries, params_.k));
 
-      ASSERT_TRUE(raft::spatial::knn::devArrMatchKnnPair(ref_indices_.data(),
+      ASSERT_TRUE(cuvs::spatial::knn::devArrMatchKnnPair(ref_indices_.data(),
                                                          raft_indices_.data(),
                                                          ref_distances_.data(),
                                                          raft_distances_.data(),
@@ -233,7 +233,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
         matrix::slice(
           handle_, raft::make_const_mdspan(all_distances.view()), distances.view(), coords);
 
-        ASSERT_TRUE(raft::spatial::knn::devArrMatchKnnPair(indices.data_handle(),
+        ASSERT_TRUE(cuvs::spatial::knn::devArrMatchKnnPair(indices.data_handle(),
                                                            batch.indices().data_handle(),
                                                            distances.data_handle(),
                                                            batch.distances().data_handle(),
@@ -264,7 +264,7 @@ class TiledKNNTest : public ::testing::TestWithParam<TiledKNNInputs> {
         matrix::slice(
           handle_, raft::make_const_mdspan(all_distances.view()), distances.view(), coords);
 
-        ASSERT_TRUE(raft::spatial::knn::devArrMatchKnnPair(indices.data_handle(),
+        ASSERT_TRUE(cuvs::spatial::knn::devArrMatchKnnPair(indices.data_handle(),
                                                            it->indices().data_handle(),
                                                            distances.data_handle(),
                                                            it->distances().data_handle(),

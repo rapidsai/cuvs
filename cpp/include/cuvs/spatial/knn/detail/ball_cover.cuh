@@ -50,7 +50,7 @@
 #include <thrust/sort.h>
 #include <thrust/tuple.h>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -542,4 +542,4 @@ void rbc_knn_query(raft::resources const& handle,
 };  // namespace detail
 };  // namespace knn
 };  // namespace spatial
-};  // namespace raft
+};  // namespace cuvs

@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/spatial/knn/detail/ball_cover/registers.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/registers.cuh>

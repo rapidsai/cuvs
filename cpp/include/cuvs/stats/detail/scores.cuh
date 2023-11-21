@@ -17,11 +17,11 @@
 #pragma once
 
 #include <cuvs/distance/distance.cuh>
+#include <cuvs/spatial/knn/knn.cuh>
 #include <memory>
 #include <raft/linalg/eltwise.cuh>
 #include <raft/linalg/power.cuh>
 #include <raft/linalg/subtract.cuh>
-#include <raft/spatial/knn/knn.cuh>
 #include <raft/stats/mean.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_scalar.hpp>
@@ -33,7 +33,7 @@
 
 #define N_THREADS 512
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 /**
@@ -214,4 +214,4 @@ void regression_metrics(const T* predictions,
 }
 }  // namespace detail
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs

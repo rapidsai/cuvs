@@ -21,7 +21,7 @@
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -72,4 +72,4 @@ void weightedMean(Type* mu,
 }
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

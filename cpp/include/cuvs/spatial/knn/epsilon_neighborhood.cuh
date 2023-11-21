@@ -30,9 +30,9 @@
 
 #include <cuvs/neighbors/epsilon_neighborhood.cuh>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 
 using cuvs::neighbors::epsilon_neighborhood::eps_neighbors_l2sq;
 using cuvs::neighbors::epsilon_neighborhood::epsUnexpL2SqNeighborhood;
 
-}  // namespace raft::spatial::knn
+}  // namespace cuvs::spatial::knn

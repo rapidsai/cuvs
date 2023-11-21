@@ -24,7 +24,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -135,4 +135,4 @@ DataT dispersion(const DataT* centroids,
 
 }  // end namespace detail
 }  // end namespace stats
-}  // end namespace raft
+}  // namespace cuvs

@@ -30,11 +30,11 @@
 
 #include <cuvs/neighbors/ivf_flat_types.hpp>
 
-namespace raft::spatial::knn::ivf_flat {
+namespace cuvs::spatial::knn::ivf_flat {
 
 using cuvs::neighbors::ivf_flat::index;
 using cuvs::neighbors::ivf_flat::index_params;
 using cuvs::neighbors::ivf_flat::kIndexGroupSize;
 using cuvs::neighbors::ivf_flat::search_params;
 
-};  // namespace raft::spatial::knn::ivf_flat
+};  // namespace cuvs::spatial::knn::ivf_flat

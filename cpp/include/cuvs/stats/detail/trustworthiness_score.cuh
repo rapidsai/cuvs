@@ -15,15 +15,15 @@
  */
 
 #include <cuvs/distance/distance.cuh>
+#include <cuvs/spatial/knn/knn.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/col_wise_sort.cuh>
-#include <raft/spatial/knn/knn.cuh>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
 #define N_THREADS 512
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -101,7 +101,7 @@ void run_knn(const raft::resources& h,
   ptrs[0]  = input;
   sizes[0] = n;
 
-  raft::spatial::knn::brute_force_knn<int64_t, float, int>(h,
+  cuvs::spatial::knn::brute_force_knn<int64_t, float, int>(h,
                                                            ptrs,
                                                            sizes,
                                                            d,
@@ -217,4 +217,4 @@ double trustworthiness_score(const raft::resources& h,
 
 }  // namespace detail
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs

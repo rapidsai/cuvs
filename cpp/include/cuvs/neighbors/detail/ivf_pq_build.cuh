@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <cuvs/neighbors/detail/ivf_pq_codepacking.cuh>
 #include <cuvs/neighbors/ivf_list.hpp>
@@ -62,7 +62,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <uint32_t BlockDim, typename T, typename S>
 __launch_bounds__(BlockDim) RAFT_KERNEL copy_warped_kernel(
@@ -1547,7 +1547,7 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 
 /**
  * Extend the index in-place.
- * See raft::spatial::knn::ivf_pq::extend docs.
+ * See cuvs::spatial::knn::ivf_pq::extend docs.
  */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
@@ -1734,7 +1734,7 @@ void extend(raft::resources const& handle,
 
 /**
  * Create a new index that contains more data.
- * See raft::spatial::knn::ivf_pq::extend docs.
+ * See cuvs::spatial::knn::ivf_pq::extend docs.
  */
 template <typename T, typename IdxT>
 auto extend(raft::resources const& handle,
@@ -1748,7 +1748,7 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-/** See raft::spatial::knn::ivf_pq::build docs */
+/** See cuvs::spatial::knn::ivf_pq::build docs */
 template <typename T, typename IdxT>
 auto build(raft::resources const& handle,
            const index_params& params,

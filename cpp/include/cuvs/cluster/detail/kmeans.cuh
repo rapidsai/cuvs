@@ -51,7 +51,7 @@
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace cluster {
 namespace detail {
 
@@ -1251,4 +1251,4 @@ void kmeans_transform(raft::resources const& handle,
 }
 }  // namespace detail
 }  // namespace cluster
-}  // namespace raft
+}  // namespace cuvs

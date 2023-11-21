@@ -28,7 +28,7 @@
 #include <raft/util/cuda_utils.cuh>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace detail {
 
@@ -324,4 +324,4 @@ void masked_l2_nn_impl(raft::resources const& handle,
 
 }  // namespace detail
 }  // namespace distance
-}  // namespace raft
+}  // namespace cuvs

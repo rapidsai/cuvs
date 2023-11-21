@@ -18,7 +18,7 @@
 
 #include <cuvs/distance/distance_types.hpp>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 
 /** The base for approximate KNN index structures. */
 struct index {};
@@ -42,4 +42,4 @@ struct index_params {
 
 struct search_params {};
 
-};  // namespace raft::spatial::knn
+};  // namespace cuvs::spatial::knn

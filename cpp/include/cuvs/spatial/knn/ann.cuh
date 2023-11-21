@@ -21,7 +21,7 @@
 
 #include <raft/core/nvtx.hpp>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 
 /**
  * @brief Flat C++ API function to build an approximate nearest neighbors index
@@ -37,9 +37,9 @@ namespace raft::spatial::knn {
  * @param[in] D the dimensionality of the index array
  */
 template <typename T = float, typename value_idx = int>
-[[deprecated("Consider using new-style raft::spatial::knn::*::build functions")]] inline void
+[[deprecated("Consider using new-style cuvs::spatial::knn::*::build functions")]] inline void
 approx_knn_build_index(raft::resources& handle,
-                       raft::spatial::knn::knnIndex* index,
+                       cuvs::spatial::knn::knnIndex* index,
                        knnIndexParam* params,
                        cuvs::distance::DistanceType metric,
                        float metricArg,
@@ -66,11 +66,11 @@ approx_knn_build_index(raft::resources& handle,
  * @param[in] n number of rows in the query array
  */
 template <typename T = float, typename value_idx = int>
-[[deprecated("Consider using new-style raft::spatial::knn::*::search functions")]] inline void
+[[deprecated("Consider using new-style cuvs::spatial::knn::*::search functions")]] inline void
 approx_knn_search(raft::resources& handle,
                   float* distances,
                   int64_t* indices,
-                  raft::spatial::knn::knnIndex* index,
+                  cuvs::spatial::knn::knnIndex* index,
                   value_idx k,
                   T* query_array,
                   value_idx n)
@@ -80,4 +80,4 @@ approx_knn_search(raft::resources& handle,
   detail::approx_knn_search(handle, distances, indices, index, k, query_array, n);
 }
 
-}  // namespace raft::spatial::knn
+}  // namespace cuvs::spatial::knn

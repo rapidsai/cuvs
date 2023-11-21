@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 
 #include <algorithm>
 #include <cassert>

@@ -23,7 +23,7 @@
 
 #if defined(RAFT_EXPLICIT_INSTANTIATE_ONLY)
 
-namespace raft::spatial::knn::detail {
+namespace cuvs::spatial::knn::detail {
 
 template <typename value_idx,
           typename value_t,
@@ -61,14 +61,14 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
                           float weight,
                           value_int* post_dists_counter) RAFT_EXPLICIT;
 
-};  // namespace raft::spatial::knn::detail
+};  // namespace cuvs::spatial::knn::detail
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(                            \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims, Mdist_func)                                       \
   extern template void                                                                       \
-  raft::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
     raft::resources const& handle,                                                           \
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \
     const Mvalue_t* query,                                                                   \
@@ -85,7 +85,7 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(                            \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims, Mdist_func)                                       \
   extern template void                                                                       \
-  raft::spatial::knn::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
     raft::resources const& handle,                                                           \
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \
     const Mvalue_t* query,                                                                   \
@@ -100,30 +100,30 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
     Mvalue_int* dists_counter)
 
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::HaversineFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::HaversineFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 3, raft::spatial::knn::detail::HaversineFunc);
+  std::int64_t, float, std::uint32_t, 3, cuvs::spatial::knn::detail::HaversineFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::EuclideanFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::EuclideanFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 3, raft::spatial::knn::detail::EuclideanFunc);
+  std::int64_t, float, std::uint32_t, 3, cuvs::spatial::knn::detail::EuclideanFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::DistFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::DistFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::uint32_t, 3, raft::spatial::knn::detail::DistFunc);
+  std::int64_t, float, std::uint32_t, 3, cuvs::spatial::knn::detail::DistFunc);
 
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::HaversineFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::HaversineFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::uint32_t, 3, raft::spatial::knn::detail::HaversineFunc);
+  std::int64_t, float, std::uint32_t, 3, cuvs::spatial::knn::detail::HaversineFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::EuclideanFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::EuclideanFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::uint32_t, 3, raft::spatial::knn::detail::EuclideanFunc);
+  std::int64_t, float, std::uint32_t, 3, cuvs::spatial::knn::detail::EuclideanFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::uint32_t, 2, raft::spatial::knn::detail::DistFunc);
+  std::int64_t, float, std::uint32_t, 2, cuvs::spatial::knn::detail::DistFunc);
 instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::uint32_t, 3, raft::spatial::knn::detail::DistFunc);
+  std::int64_t, float, std::uint32_t, 3, cuvs::spatial::knn::detail::DistFunc);
 
 #undef instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two
 #undef instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one

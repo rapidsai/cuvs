@@ -22,7 +22,7 @@
 
 #if defined(RAFT_EXPLICIT_INSTANTIATE_ONLY)
 
-namespace raft::spatial::knn::detail {
+namespace cuvs::spatial::knn::detail {
 
 template <typename value_idx, typename value_t, bool usePrevTopKs = false>
 void fusedL2Knn(size_t D,
@@ -40,13 +40,13 @@ void fusedL2Knn(size_t D,
                 const value_t* index_norms = NULL,
                 const value_t* query_norms = NULL) RAFT_EXPLICIT;
 
-}  // namespace raft::spatial::knn::detail
+}  // namespace cuvs::spatial::knn::detail
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_spatial_knn_detail_fusedL2Knn(Mvalue_idx, Mvalue_t, MusePrevTopKs) \
   extern template void                                                                      \
-  raft::spatial::knn::detail::fusedL2Knn<Mvalue_idx, Mvalue_t, MusePrevTopKs>(              \
+  cuvs::spatial::knn::detail::fusedL2Knn<Mvalue_idx, Mvalue_t, MusePrevTopKs>(              \
     size_t D,                                                                               \
     Mvalue_idx * out_inds,                                                                  \
     Mvalue_t * out_dists,                                                                   \

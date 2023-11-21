@@ -34,7 +34,7 @@
 #include <raft/util/cuda_utils.cuh>
 #include <rmm/device_scalar.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -317,4 +317,4 @@ DataT silhouette_score(
 
 };  // namespace detail
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs

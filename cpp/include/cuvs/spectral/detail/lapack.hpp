@@ -25,7 +25,7 @@
 //
 #define USE_LAPACK
 
-namespace raft {
+namespace cuvs {
 
 #define lapackCheckError(status)                                                     \
   {                                                                                  \
@@ -571,4 +571,4 @@ void Lapack<T>::geev(T* A,
 #endif
 }
 
-}  // namespace raft
+}  // namespace cuvs

@@ -15,10 +15,10 @@
  */
 
 #include <cstdint>
-#include <raft/spatial/knn/detail/ball_cover/common.cuh>
-#include <raft/spatial/knn/detail/ball_cover/registers.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/common.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/registers.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -82,4 +82,4 @@ extern template void rbc_low_dim_pass_two<std::int64_t, float, std::uint32_t, 3>
 };  // namespace detail
 };  // namespace knn
 };  // namespace spatial
-};  // namespace raft
+};  // namespace cuvs

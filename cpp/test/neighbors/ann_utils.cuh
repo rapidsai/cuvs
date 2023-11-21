@@ -17,11 +17,11 @@
 #pragma once
 
 #include <cuvs/distance/distance_types.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/device_mdarray.hpp>  // raft::make_device_matrix
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/detail/select_k.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/cuda_utils.cuh>
 
 #include <rmm/cuda_stream_view.hpp>

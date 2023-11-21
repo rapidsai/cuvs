@@ -28,15 +28,15 @@ class batch {
  public:
   /** Create a new empty batch of data */
   batch(raft::resources const& res, int64_t rows, int64_t cols)
-    : indices_(make_device_matrix<IdxT, int64_t>(res, rows, cols)),
-      distances_(make_device_matrix<T, int64_t>(res, rows, cols))
+    : indices_(raft::make_device_matrix<IdxT, int64_t>(res, rows, cols)),
+      distances_(raft::make_device_matrix<T, int64_t>(res, rows, cols))
   {
   }
 
   void resize(raft::resources const& res, int64_t rows, int64_t cols)
   {
-    indices_   = make_device_matrix<IdxT, int64_t>(res, rows, cols);
-    distances_ = make_device_matrix<T, int64_t>(res, rows, cols);
+    indices_   = raft::make_device_matrix<IdxT, int64_t>(res, rows, cols);
+    distances_ = raft::make_device_matrix<T, int64_t>(res, rows, cols);
   }
 
   /** Returns the indices for the batch */
@@ -44,14 +44,14 @@ class batch {
   {
     return raft::make_const_mdspan(indices_.view());
   }
-  device_matrix_view<IdxT, int64_t> indices() { return indices_.view(); }
+  raft::device_matrix_view<IdxT, int64_t> indices() { return indices_.view(); }
 
   /** Returns the distances for the batch */
-  device_matrix_view<const T, int64_t> distances() const
+  raft::device_matrix_view<const T, int64_t> distances() const
   {
     return raft::make_const_mdspan(distances_.view());
   }
-  device_matrix_view<T, int64_t> distances() { return distances_.view(); }
+  raft::device_matrix_view<T, int64_t> distances() { return distances_.view(); }
 
   /** Returns the size of the batch */
   int64_t batch_size() const { return indices().extent(1); }

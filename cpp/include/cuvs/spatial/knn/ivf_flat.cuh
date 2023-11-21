@@ -30,10 +30,10 @@
 
 #include <cuvs/neighbors/ivf_flat.cuh>
 
-namespace raft::spatial::knn::ivf_flat {
+namespace cuvs::spatial::knn::ivf_flat {
 
 using cuvs::neighbors::ivf_flat::build;
 using cuvs::neighbors::ivf_flat::extend;
 using cuvs::neighbors::ivf_flat::search;
 
-};  // namespace raft::spatial::knn::ivf_flat
+};  // namespace cuvs::spatial::knn::ivf_flat

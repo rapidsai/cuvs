@@ -19,7 +19,7 @@
 #include <raft/linalg/contractions.cuh>
 #include <raft/util/device_utils.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -238,4 +238,4 @@ void epsUnexpL2SqNeighborhood(bool* adj,
 }  // namespace detail
 }  // namespace knn
 }  // namespace spatial
-}  // namespace raft
+}  // namespace cuvs

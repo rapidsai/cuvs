@@ -36,7 +36,7 @@
 
 #include <thrust/iterator/transform_iterator.h>
 
-namespace raft::spatial::knn::detail {
+namespace cuvs::spatial::knn::detail {
 
 template <typename T = float, typename IntType = int>
 void approx_knn_build_index(raft::resources const& handle,
@@ -144,4 +144,4 @@ void approx_knn_search(raft::resources const& handle,
   if constexpr (std::is_same_v<T, float>) { index->metric_processor->postprocess(distances); }
 }
 
-}  // namespace raft::spatial::knn::detail
+}  // namespace cuvs::spatial::knn::detail

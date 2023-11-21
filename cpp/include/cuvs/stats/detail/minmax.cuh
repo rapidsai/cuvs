@@ -21,7 +21,7 @@
 
 #include <limits>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -235,4 +235,4 @@ void minmax(const T* data,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

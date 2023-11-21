@@ -19,6 +19,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cuvs/neighbors/sample_filter_types.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -26,7 +27,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <rmm/device_uvector.hpp>
 #include <vector>
 

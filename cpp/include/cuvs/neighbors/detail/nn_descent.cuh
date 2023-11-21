@@ -36,12 +36,12 @@
 #include "../nn_descent_types.hpp"
 
 #include <cuvs/neighbors/detail/cagra/device_common.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
@@ -1224,7 +1224,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));
   size_t batch_size = (data_ptr_attr.devicePointer == nullptr) ? 100000 : nrow_;
 
-  raft::spatial::knn::detail::utils::batch_load_iterator vec_batches{
+  cuvs::spatial::knn::detail::utils::batch_load_iterator vec_batches{
     data, static_cast<size_t>(nrow_), build_config_.dataset_dim, batch_size, stream};
   for (auto const& batch : vec_batches) {
     preprocess_data_kernel<<<

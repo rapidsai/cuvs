@@ -46,7 +46,7 @@ ext_headers = [
     "cuvs/distance/detail/pairwise_matrix/dispatch-ext.cuh",
     "raft/matrix/detail/select_k-ext.cuh",
     "cuvs/neighbors/ball_cover-ext.cuh",
-    "raft/spatial/knn/detail/fused_l2_knn-ext.cuh",
+    "cuvs/spatial/knn/detail/fused_l2_knn-ext.cuh",
     "cuvs/distance/fused_l2_nn-ext.cuh",
     "cuvs/neighbors/ivf_pq-ext.cuh",
     "raft/util/memory_pool-ext.hpp",
@@ -56,7 +56,7 @@ ext_headers = [
     "cuvs/neighbors/detail/ivf_flat_search-ext.cuh",
     "cuvs/neighbors/detail/selection_faiss-ext.cuh",
     "raft/linalg/detail/coalesced_reduction-ext.cuh",
-    "raft/spatial/knn/detail/ball_cover/registers-ext.cuh",
+    "cuvs/spatial/knn/detail/ball_cover/registers-ext.cuh",
     "cuvs/neighbors/detail/ivf_flat_interleaved_scan-ext.cuh",
     "cuvs/neighbors/detail/ivf_pq_compute_similarity-ext.cuh",
 ]

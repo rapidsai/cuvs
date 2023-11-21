@@ -18,8 +18,8 @@
 
 #include <cuvs/neighbors/detail/ivf_pq_search.cuh>
 #include <cuvs/neighbors/sample_filter_types.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <cuvs/neighbors/cagra_types.hpp>
 #include <raft/core/device_mdspan.hpp>

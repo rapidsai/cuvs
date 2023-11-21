@@ -23,7 +23,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/rand_index.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -73,6 +73,6 @@ double rand_index(raft::resources const& handle,
 /** @} */  // end group stats_rand_index
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

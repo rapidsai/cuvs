@@ -20,7 +20,7 @@
 
 #include <cstddef>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace detail {
 
@@ -323,4 +323,4 @@ struct MaskedDistances : public BaseClass {
 
 };  // namespace detail
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs

@@ -42,7 +42,7 @@
 #include <raft/util/cudart_utils.hpp>   // getMultiProcessorCount
 #include <raft/util/cutlass_utils.cuh>  // RAFT_CUTLASS_TRY
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace detail {
 
@@ -156,6 +156,6 @@ void cutlassFusedDistanceNN(const DataT* x,
 
 };  // namespace detail
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs
 
 #pragma GCC diagnostic pop

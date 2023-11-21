@@ -21,7 +21,7 @@
 
 #include <cub/cub.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -81,4 +81,4 @@ void sum(Type* output, const Type* input, IdxType D, IdxType N, bool rowMajor, c
 
 }  // namespace detail
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs

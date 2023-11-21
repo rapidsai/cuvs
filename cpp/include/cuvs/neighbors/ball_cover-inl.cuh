@@ -22,8 +22,8 @@
 
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/ball_cover_types.hpp>
-#include <raft/spatial/knn/detail/ball_cover.cuh>
-#include <raft/spatial/knn/detail/ball_cover/common.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/common.cuh>
 #include <thrust/transform.h>
 
 namespace cuvs::neighbors::ball_cover {
@@ -65,11 +65,11 @@ void build_index(raft::resources const& handle,
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
   if (index.metric == cuvs::distance::DistanceType::Haversine) {
-    raft::spatial::knn::detail::rbc_build_index(
+    cuvs::spatial::knn::detail::rbc_build_index(
       handle, index, spatial::knn::detail::HaversineFunc<value_t, int_t>());
   } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
              index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
-    raft::spatial::knn::detail::rbc_build_index(
+    cuvs::spatial::knn::detail::rbc_build_index(
       handle, index, spatial::knn::detail::EuclideanFunc<value_t, int_t>());
   } else {
     RAFT_FAIL("Metric not support");
@@ -119,7 +119,7 @@ void all_knn_query(raft::resources const& handle,
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
   if (index.metric == cuvs::distance::DistanceType::Haversine) {
-    raft::spatial::knn::detail::rbc_all_knn_query(
+    cuvs::spatial::knn::detail::rbc_all_knn_query(
       handle,
       index,
       k,
@@ -130,7 +130,7 @@ void all_knn_query(raft::resources const& handle,
       weight);
   } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
              index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
-    raft::spatial::knn::detail::rbc_all_knn_query(
+    cuvs::spatial::knn::detail::rbc_all_knn_query(
       handle,
       index,
       k,
@@ -268,7 +268,7 @@ void knn_query(raft::resources const& handle,
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
   if (index.metric == cuvs::distance::DistanceType::Haversine) {
-    raft::spatial::knn::detail::rbc_knn_query(handle,
+    cuvs::spatial::knn::detail::rbc_knn_query(handle,
                                               index,
                                               k,
                                               query,
@@ -280,7 +280,7 @@ void knn_query(raft::resources const& handle,
                                               weight);
   } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
              index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
-    raft::spatial::knn::detail::rbc_knn_query(handle,
+    cuvs::spatial::knn::detail::rbc_knn_query(handle,
                                               index,
                                               k,
                                               query,

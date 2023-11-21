@@ -17,10 +17,10 @@
 #include <cstddef>                           // size_t
 #include <cstdint>                           // int_Xt
 #include <cuvs/distance/distance_types.hpp>  // DistanceType
-#include <raft/spatial/knn/detail/fused_l2_knn-inl.cuh>
+#include <cuvs/spatial/knn/detail/fused_l2_knn-inl.cuh>
 
 #define instantiate_raft_spatial_knn_detail_fusedL2Knn(Mvalue_idx, Mvalue_t, MusePrevTopKs)  \
-  template void raft::spatial::knn::detail::fusedL2Knn<Mvalue_idx, Mvalue_t, MusePrevTopKs>( \
+  template void cuvs::spatial::knn::detail::fusedL2Knn<Mvalue_idx, Mvalue_t, MusePrevTopKs>( \
     size_t D,                                                                                \
     Mvalue_idx * out_inds,                                                                   \
     Mvalue_t * out_dists,                                                                    \

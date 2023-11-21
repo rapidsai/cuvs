@@ -21,7 +21,7 @@
 // Useful macros
 // =========================================================
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 namespace matrix {
 
@@ -46,4 +46,4 @@ using detail::modularity_matrix_t;
 
 }  // namespace matrix
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs

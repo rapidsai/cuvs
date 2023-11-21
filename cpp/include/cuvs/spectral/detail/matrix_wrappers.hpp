@@ -39,7 +39,7 @@
 // Get index of matrix entry
 #define IDX(i, j, lda) ((i) + (j) * (lda))
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 namespace matrix {
 namespace detail {
@@ -462,4 +462,4 @@ struct modularity_matrix_t : laplacian_matrix_t<index_type, value_type> {
 }  // namespace detail
 }  // namespace matrix
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs

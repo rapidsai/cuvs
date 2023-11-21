@@ -21,6 +21,7 @@
 #include <cuvs/neighbors/ivf_flat_types.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_list_types.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/nvtx.hpp>
@@ -30,7 +31,6 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/pow2_utils.cuh>
 
@@ -40,7 +40,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename IdxT>
 auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T, IdxT>

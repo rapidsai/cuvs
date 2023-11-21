@@ -24,7 +24,7 @@
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 
 template <typename DataT, typename OutT, typename IdxT>
@@ -42,7 +42,7 @@ void fusedL2NNMinReduce(OutT* min,
                         cudaStream_t stream) RAFT_EXPLICIT;
 
 }  // namespace distance
-}  // namespace raft
+}  // namespace cuvs
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 

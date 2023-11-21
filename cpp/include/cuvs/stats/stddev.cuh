@@ -23,7 +23,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/stddev.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -183,6 +183,6 @@ void vars(raft::resources const& handle,
 /** @} */  // end group stats_variance
 
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs
 
 #endif

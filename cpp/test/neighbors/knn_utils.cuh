@@ -23,7 +23,7 @@
 
 #include <raft/util/cudart_utils.hpp>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 template <typename IdxT, typename DistT, typename compareDist>
 struct idx_dist_pair {
   IdxT idx;
@@ -91,4 +91,4 @@ testing::AssertionResult devArrMatchKnnPair(const T* expected_idx,
   }
   return testing::AssertionSuccess();
 }
-}  // namespace raft::spatial::knn
+}  // namespace cuvs::spatial::knn

@@ -24,4 +24,4 @@
  *
  */
 
-#include <raft/spatial/knn/detail/fused_l2_knn.cuh>
+#include <cuvs/spatial/knn/detail/fused_l2_knn.cuh>

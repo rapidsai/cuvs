@@ -22,7 +22,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/trustworthiness_score.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -96,6 +96,6 @@ double trustworthiness_score(
 /** @} */  // end group stats_trustworthiness
 
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

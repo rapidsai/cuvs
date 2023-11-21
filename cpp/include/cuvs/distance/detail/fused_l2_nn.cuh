@@ -27,7 +27,7 @@
 #include <raft/util/arch.cuh>                               // raft::util::arch::SM_*
 #include <raft/util/cuda_utils.cuh>                         // raft::ceildiv, raft::shfl
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 
 namespace detail {
@@ -382,4 +382,4 @@ void fusedL2NNImpl(OutT* min,
 
 }  // namespace detail
 }  // namespace distance
-}  // namespace raft
+}  // namespace cuvs

@@ -23,7 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/weighted_mean.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -187,6 +187,6 @@ void col_weighted_mean(raft::resources const& handle,
 /** @} */  // end group stats_weighted_mean
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

@@ -44,7 +44,7 @@
 #include "./pairwise_distance_epilogue_elementwise.h"
 #include "./pairwise_distance_gemm.h"
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace detail {
 
@@ -167,6 +167,6 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
 
 };  // namespace detail
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs
 
 #pragma GCC diagnostic pop

@@ -27,7 +27,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_scalar.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -81,4 +81,4 @@ DataT kl_divergence(const DataT* modelPDF, const DataT* candidatePDF, int size, 
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

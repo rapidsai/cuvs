@@ -19,7 +19,7 @@
 #include "../haversine_distance.cuh"  // compute_haversine
 #include <cstdint>                    // uint32_t
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -40,7 +40,7 @@ struct HaversineFunc : public DistFunc<value_t, value_int> {
                                                          const value_t* b,
                                                          const value_int n_dims) override
   {
-    return raft::spatial::knn::detail::compute_haversine(a[0], b[0], a[1], b[1]);
+    return cuvs::spatial::knn::detail::compute_haversine(a[0], b[0], a[1], b[1]);
   }
 };
 
@@ -63,4 +63,4 @@ struct EuclideanFunc : public DistFunc<value_t, value_int> {
 };  // namespace detail
 };  // namespace knn
 };  // namespace spatial
-};  // namespace raft
+};  // namespace cuvs

@@ -30,10 +30,10 @@
 
 #include <cuvs/neighbors/ivf_pq.cuh>
 
-namespace raft::spatial::knn::ivf_pq {
+namespace cuvs::spatial::knn::ivf_pq {
 
 using cuvs::neighbors::ivf_pq::build;
 using cuvs::neighbors::ivf_pq::extend;
 using cuvs::neighbors::ivf_pq::search;
 
-}  // namespace raft::spatial::knn::ivf_pq
+}  // namespace cuvs::spatial::knn::ivf_pq

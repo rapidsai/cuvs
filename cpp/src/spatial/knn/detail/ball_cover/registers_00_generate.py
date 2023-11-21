@@ -38,7 +38,7 @@ header = """/*
  */
 
 #include <cstdint> // int64_t
-#include <raft/spatial/knn/detail/ball_cover/registers-inl.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/registers-inl.cuh>
 
 """
 
@@ -47,7 +47,7 @@ macro_pass_one = """
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(                            \\
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims, Mdist_func)                                       \\
   template void                                                                       \\
-  raft::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \\
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \\
     raft::resources const& handle,                                                    \\
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \\
     const Mvalue_t* query,                                                                   \\
@@ -67,7 +67,7 @@ macro_pass_two = """
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(                            \\
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims, Mdist_func)                                       \\
   template void                                                                       \\
-  raft::spatial::knn::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \\
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \\
     raft::resources const& handle,                                                    \\
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \\
     const Mvalue_t* query,                                                                   \\
@@ -84,9 +84,9 @@ macro_pass_two = """
 """
 
 distances = dict(
-    haversine="raft::spatial::knn::detail::HaversineFunc",
-    euclidean="raft::spatial::knn::detail::EuclideanFunc",
-    dist="raft::spatial::knn::detail::DistFunc",
+    haversine="cuvs::spatial::knn::detail::HaversineFunc",
+    euclidean="cuvs::spatial::knn::detail::EuclideanFunc",
+    dist="cuvs::spatial::knn::detail::DistFunc",
 )
 
 for k, v in distances.items():

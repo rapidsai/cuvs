@@ -21,7 +21,7 @@
 
 #include <cub/cub.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -179,4 +179,4 @@ void vars(Type* var,
 
 }  // namespace detail
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs

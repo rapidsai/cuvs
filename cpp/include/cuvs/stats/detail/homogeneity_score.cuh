@@ -25,7 +25,7 @@
 #include <raft/stats/entropy.cuh>
 #include <raft/stats/mutual_info_score.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 /**
@@ -68,4 +68,4 @@ double homogeneity_score(const T* truthClusterArray,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

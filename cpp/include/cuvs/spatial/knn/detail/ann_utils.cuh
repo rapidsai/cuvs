@@ -31,7 +31,7 @@
 
 #include <cuda_fp16.hpp>
 
-namespace raft::spatial::knn::detail::utils {
+namespace cuvs::spatial::knn::detail::utils {
 
 /** Whether pointers are accessible on the device or on the host. */
 enum class pointer_residency {
@@ -573,4 +573,4 @@ struct batch_load_iterator {
   size_type cur_pos_;
 };
 
-}  // namespace raft::spatial::knn::detail::utils
+}  // namespace cuvs::spatial::knn::detail::utils

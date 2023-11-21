@@ -37,7 +37,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -198,4 +198,4 @@ double compute_adjusted_rand_index(const T* firstClusterArray,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

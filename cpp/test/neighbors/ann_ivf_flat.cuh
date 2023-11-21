@@ -36,12 +36,12 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/ivf_flat.cuh>
 #include <cuvs/neighbors/ivf_flat_helpers.cuh>
+#include <cuvs/spatial/knn/ann.cuh>
+#include <cuvs/spatial/knn/knn.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/matrix/gather.cuh>
 #include <raft/random/rng.cuh>
-#include <raft/spatial/knn/ann.cuh>
-#include <raft/spatial/knn/knn.cuh>
 #include <raft/stats/mean.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -130,14 +130,14 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
       {
         // legacy interface
-        raft::spatial::knn::IVFFlatParam ivfParams;
+        cuvs::spatial::knn::IVFFlatParam ivfParams;
         ivfParams.nprobe = ps.nprobe;
         ivfParams.nlist  = ps.nlist;
-        raft::spatial::knn::knnIndex index;
+        cuvs::spatial::knn::knnIndex index;
 
         approx_knn_build_index(handle_,
                                &index,
-                               dynamic_cast<raft::spatial::knn::knnIndexParam*>(&ivfParams),
+                               dynamic_cast<cuvs::spatial::knn::knnIndexParam*>(&ivfParams),
                                ps.metric,
                                (IdxT)0,
                                database.data(),
@@ -245,7 +245,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           for (uint32_t l = 0; l < index_2.n_lists(); l++) {
             if (list_sizes[l] == 0) continue;
             rmm::device_uvector<float> cluster_data(list_sizes[l] * ps.dim, stream_);
-            raft::spatial::knn::detail::utils::copy_selected<float>((IdxT)list_sizes[l],
+            cuvs::spatial::knn::detail::utils::copy_selected<float>((IdxT)list_sizes[l],
                                                                     (IdxT)ps.dim,
                                                                     database.data(),
                                                                     list_indices[l],

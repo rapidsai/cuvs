@@ -26,7 +26,7 @@
 #include <raft/stats/mean_center.cuh>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 
@@ -186,4 +186,4 @@ template class DefaultMetricProcessor<float>;
 
 }  // namespace knn
 }  // namespace spatial
-}  // namespace raft
+}  // namespace cuvs

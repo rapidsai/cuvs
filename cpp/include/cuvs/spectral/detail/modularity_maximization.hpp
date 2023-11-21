@@ -34,7 +34,7 @@
 #include <raft/spectral/eigen_solvers.cuh>
 #include <raft/spectral/matrix_wrappers.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 namespace detail {
 
@@ -168,4 +168,4 @@ void analyzeModularity(raft::resources const& handle,
 
 }  // namespace detail
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs

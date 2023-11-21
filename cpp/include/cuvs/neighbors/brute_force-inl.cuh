@@ -19,9 +19,9 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/brute_force_types.hpp>
 #include <cuvs/neighbors/detail/knn_brute_force.cuh>
+#include <cuvs/spatial/knn/detail/fused_l2_knn.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/spatial/knn/detail/fused_l2_knn.cuh>
 
 namespace cuvs::neighbors::brute_force {
 
@@ -267,7 +267,7 @@ void fused_l2_knn(raft::resources const& handle,
   const bool rowMajorIndex = raft::is_row_major(index);
   const bool rowMajorQuery = raft::is_row_major(query);
 
-  raft::spatial::knn::detail::fusedL2Knn(D,
+  cuvs::spatial::knn::detail::fusedL2Knn(D,
                                          out_inds.data_handle(),
                                          out_dists.data_handle(),
                                          index.data_handle(),

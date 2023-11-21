@@ -25,7 +25,7 @@
 
 #ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 
 template <cuvs::distance::DistanceType DistT,
@@ -141,7 +141,7 @@ void pairwise_distance(raft::resources const& handle,
                        Type metric_arg = 2.0f) RAFT_EXPLICIT;
 
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs
 
 #endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 

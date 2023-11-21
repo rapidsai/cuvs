@@ -24,8 +24,8 @@
 #include <cuvs/neighbors/ivf_flat.cuh>
 #include <cuvs/neighbors/ivf_pq.cuh>
 #include <cuvs/neighbors/sample_filter.cuh>
+#include <cuvs/spatial/knn/knn.cuh>
 #include <raft/core/bitset.cuh>
-#include <raft/spatial/knn/knn.cuh>
 #include <raft/util/itertools.hpp>
 
 #include <rmm/mr/device/managed_memory_resource.hpp>
@@ -217,7 +217,7 @@ struct brute_force_knn {
   {
     std::vector<ValT*> input{index};
     std::vector<size_t> sizes{ps.n_samples};
-    raft::spatial::knn::brute_force_knn<IdxT, ValT, size_t>(handle,
+    cuvs::spatial::knn::brute_force_knn<IdxT, ValT, size_t>(handle,
                                                             input,
                                                             sizes,
                                                             ps.n_dims,

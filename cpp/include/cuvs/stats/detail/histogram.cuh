@@ -28,7 +28,7 @@
 
 ///@todo: add cub's histogram as another option
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -493,4 +493,4 @@ void histogram(HistType type,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

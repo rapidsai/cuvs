@@ -59,7 +59,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -164,4 +164,4 @@ double compute_rand_index(const T* firstClusterArray,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

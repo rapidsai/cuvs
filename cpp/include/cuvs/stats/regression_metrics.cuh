@@ -24,7 +24,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/scores.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -102,6 +102,6 @@ void regression_metrics(raft::resources const& handle,
 /** @} */  // end group stats_regression_metrics
 
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

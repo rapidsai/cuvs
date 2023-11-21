@@ -22,7 +22,7 @@
 #include <thrust/functional.h>
 #include <thrust/tuple.h>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -70,4 +70,4 @@ __device__ inline bool _get_val(std::uint32_t* arr, std::uint32_t h)
 };  // namespace detail
 };  // namespace knn
 };  // namespace spatial
-};  // namespace raft
+};  // namespace cuvs

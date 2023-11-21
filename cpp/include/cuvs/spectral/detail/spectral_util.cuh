@@ -36,7 +36,7 @@
 
 #include <algorithm>
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 
 template <typename index_type_t, typename value_type_t>
@@ -254,4 +254,4 @@ bool construct_indicator(raft::resources const& handle,
 }
 
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs

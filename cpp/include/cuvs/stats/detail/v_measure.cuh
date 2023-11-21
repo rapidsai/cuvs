@@ -19,7 +19,7 @@
 
 #include <raft/stats/homogeneity_score.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -61,4 +61,4 @@ double v_measure(const T* truthClusterArray,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

@@ -23,7 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/kl_divergence.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -77,6 +77,6 @@ value_t kl_divergence(raft::resources const& handle,
 /** @} */  // end group kl_divergence
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

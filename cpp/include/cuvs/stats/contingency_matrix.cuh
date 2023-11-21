@@ -26,7 +26,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/contingencyMatrix.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -212,6 +212,6 @@ void contingency_matrix(Args... args)
   contingency_matrix(std::forward<Args>(args)..., std::nullopt, std::nullopt);
 }
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs
 
 #endif

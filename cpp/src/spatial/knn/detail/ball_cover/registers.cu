@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include <raft/spatial/knn/detail/ball_cover/registers-inl.cuh>
+#include <cuvs/spatial/knn/detail/ball_cover/registers-inl.cuh>
 
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_one(                            \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims)                                                   \
   template void                                                                              \
-  raft::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
     raft::resources const& handle,                                                           \
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \
     const Mvalue_t* query,                                                                   \
@@ -27,7 +27,7 @@
     Mvalue_int k,                                                                            \
     const Mvalue_idx* R_knn_inds,                                                            \
     const Mvalue_t* R_knn_dists,                                                             \
-    raft::spatial::knn::detail::DistFunc<Mvalue_t, Mvalue_int>& dfunc,                       \
+    cuvs::spatial::knn::detail::DistFunc<Mvalue_t, Mvalue_int>& dfunc,                       \
     Mvalue_idx* inds,                                                                        \
     Mvalue_t* dists,                                                                         \
     float weight,                                                                            \
@@ -36,7 +36,7 @@
 #define instantiate_raft_spatial_knn_detail_rbc_low_dim_pass_two(                            \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mdims)                                                   \
   template void                                                                              \
-  raft::spatial::knn::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
+  cuvs::spatial::knn::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mdims>( \
     raft::resources const& handle,                                                           \
     const BallCoverIndex<Mvalue_idx, Mvalue_t, Mvalue_int>& index,                           \
     const Mvalue_t* query,                                                                   \
@@ -44,7 +44,7 @@
     Mvalue_int k,                                                                            \
     const Mvalue_idx* R_knn_inds,                                                            \
     const Mvalue_t* R_knn_dists,                                                             \
-    raft::spatial::knn::detail::DistFunc<Mvalue_t, Mvalue_int>& dfunc,                       \
+    cuvs::spatial::knn::detail::DistFunc<Mvalue_t, Mvalue_int>& dfunc,                       \
     Mvalue_idx* inds,                                                                        \
     Mvalue_t* dists,                                                                         \
     float weight,                                                                            \

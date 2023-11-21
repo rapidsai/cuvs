@@ -16,10 +16,10 @@
 
 #include "../test_utils.cuh"
 #include <cuvs/distance/distance_types.hpp>
+#include <cuvs/spatial/knn/detail/haversine_distance.cuh>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/spatial/knn/detail/haversine_distance.cuh>
 #include <rmm/device_uvector.hpp>
 #include <vector>
 
@@ -86,7 +86,7 @@ class HaversineKNNTest : public ::testing::Test {
     h_res_I.resize(n * n);
     raft::update_device<value_idx>(d_ref_I.data(), h_res_I.data(), n * n, stream);
 
-    raft::spatial::knn::detail::haversine_knn(d_pred_I.data(),
+    cuvs::spatial::knn::detail::haversine_knn(d_pred_I.data(),
                                               d_pred_D.data(),
                                               d_train_inputs.data(),
                                               d_train_inputs.data(),

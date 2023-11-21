@@ -23,7 +23,7 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <utility>  // for std::pair
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 
 using namespace matrix;
@@ -94,6 +94,6 @@ struct kmeans_solver_t {
 };
 
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

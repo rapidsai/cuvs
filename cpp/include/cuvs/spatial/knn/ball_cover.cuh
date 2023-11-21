@@ -29,9 +29,9 @@
                   " Please use the cuvs::neighbors version instead.")
 
 #include <cuvs/neighbors/ball_cover.cuh>
-#include <raft/spatial/knn/ball_cover_types.hpp>
+#include <cuvs/spatial/knn/ball_cover_types.hpp>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 
 template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
 void rbc_build_index(raft::resources const& handle,
@@ -67,4 +67,4 @@ void rbc_knn_query(raft::resources const& handle,
   cuvs::neighbors::ball_cover::knn_query(
     handle, index, k, query, n_query_pts, inds, dists, perform_post_filtering, weight);
 }
-}  // namespace raft::spatial::knn
+}  // namespace cuvs::spatial::knn

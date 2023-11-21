@@ -29,7 +29,7 @@
 #include <raft/linalg/unary_op.cuh>
 #include <type_traits>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace detail {
 
@@ -811,4 +811,4 @@ size_t getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, In
 
 };  // namespace detail
 };  // namespace distance
-};  // namespace raft
+};  // namespace cuvs

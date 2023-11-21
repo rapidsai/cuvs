@@ -27,7 +27,7 @@
 
 #include <cuvs/distance/distance_types.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 
@@ -100,4 +100,4 @@ inline auto from_legacy_index_params(const IVFFlatParam& legacy,
 
 };  // namespace knn
 };  // namespace spatial
-};  // namespace raft
+};  // namespace cuvs

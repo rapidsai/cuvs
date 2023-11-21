@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <cuvs/neighbors/detail/ivf_pq_compute_similarity.cuh>
 #include <cuvs/neighbors/detail/ivf_pq_dummy_block_sort.cuh>
@@ -57,7 +57,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 /**
  * Select the clusters to probe and, as a side-effect, translate the queries type `T -> float`
@@ -725,7 +725,7 @@ inline auto get_max_batch_size(raft::resources const& res,
   return max_batch_size;
 }
 
-/** See raft::spatial::knn::ivf_pq::search docs */
+/** See cuvs::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>

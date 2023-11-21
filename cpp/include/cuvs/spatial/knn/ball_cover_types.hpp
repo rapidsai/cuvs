@@ -30,8 +30,8 @@
 
 #include <cuvs/neighbors/ball_cover_types.hpp>
 
-namespace raft::spatial::knn {
+namespace cuvs::spatial::knn {
 
 using cuvs::neighbors::ball_cover::BallCoverIndex;
 
-}  // namespace raft::spatial::knn
+}  // namespace cuvs::spatial::knn

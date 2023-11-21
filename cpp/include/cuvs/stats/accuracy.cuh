@@ -23,7 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/scores.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -73,6 +73,6 @@ float accuracy(raft::resources const& handle,
 /** @} */  // end group stats_accuracy
 
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

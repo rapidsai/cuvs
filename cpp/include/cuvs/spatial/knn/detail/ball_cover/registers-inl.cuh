@@ -32,7 +32,7 @@
 
 #include <thrust/fill.h>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -791,4 +791,4 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
 };  // namespace detail
 };  // namespace knn
 };  // namespace spatial
-};  // namespace raft
+};  // namespace cuvs

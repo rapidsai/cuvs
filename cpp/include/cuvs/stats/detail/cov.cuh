@@ -20,7 +20,7 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/stats/mean_center.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 /**
@@ -93,4 +93,4 @@ void cov(raft::resources const& handle,
 }
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

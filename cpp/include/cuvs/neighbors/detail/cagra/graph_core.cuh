@@ -18,6 +18,7 @@
 #include <cassert>
 #include <climits>
 #include <cuda_fp16.h>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <float.h>
 #include <iostream>
 #include <memory>
@@ -27,7 +28,6 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <random>
 #include <sys/time.h>
 

@@ -23,7 +23,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/v_measure.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -93,6 +93,6 @@ double v_measure(raft::resources const& handle,
 /** @} */  // end group stats_vmeasure
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <type_traits>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 
 /**
@@ -201,6 +201,6 @@ void fusedL2NNMinReduce(OutT* min,
 /** @} */
 
 }  // namespace distance
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

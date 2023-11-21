@@ -23,7 +23,7 @@
 
 #include <raft/spectral/detail/partition.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 
 // =========================================================
@@ -90,6 +90,6 @@ void analyzePartition(raft::resources const& handle,
 }
 
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

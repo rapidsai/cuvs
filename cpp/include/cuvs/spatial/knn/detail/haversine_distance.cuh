@@ -24,7 +24,7 @@
 #include <cuvs/neighbors/detail/faiss_select/Select.cuh>
 #include <raft/core/resources.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 namespace detail {
@@ -140,4 +140,4 @@ void haversine_knn(value_idx* out_inds,
 }  // namespace detail
 }  // namespace knn
 }  // namespace spatial
-}  // namespace raft
+}  // namespace cuvs

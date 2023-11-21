@@ -15,7 +15,7 @@
  */
 #pragma once
 
-namespace raft {
+namespace cuvs {
 namespace spatial {
 namespace knn {
 
@@ -42,4 +42,4 @@ class MetricProcessor {
 
 }  // namespace knn
 }  // namespace spatial
-}  // namespace raft
+}  // namespace cuvs

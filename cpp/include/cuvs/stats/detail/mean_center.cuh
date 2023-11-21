@@ -20,7 +20,7 @@
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/vectorized.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 namespace detail {
 
@@ -82,4 +82,4 @@ void meanAdd(Type* out,
 
 };  // end namespace detail
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs

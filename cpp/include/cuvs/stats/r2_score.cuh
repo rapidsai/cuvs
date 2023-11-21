@@ -23,7 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/scores.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -88,6 +88,6 @@ value_t r2_score(raft::resources const& handle,
 /** @} */  // end group stats_r2_score
 
 }  // namespace stats
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

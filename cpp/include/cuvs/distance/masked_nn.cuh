@@ -26,7 +26,7 @@
 #include <raft/util/cuda_utils.cuh>
 #include <stdint.h>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 /**
  * \defgroup masked_nn Masked 1-nearest neighbors
@@ -194,6 +194,6 @@ void masked_l2_nn(raft::resources const& handle,
 /** @} */
 
 }  // namespace distance
-}  // namespace raft
+}  // namespace cuvs
 
 #endif

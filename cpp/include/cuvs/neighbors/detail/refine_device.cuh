@@ -20,6 +20,7 @@
 #include <cuvs/neighbors/detail/ivf_flat_interleaved_scan.cuh>
 #include <cuvs/neighbors/detail/refine_common.hpp>
 #include <cuvs/neighbors/sample_filter_types.hpp>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
@@ -27,7 +28,6 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <thrust/sequence.h>
 
@@ -89,7 +89,7 @@ void refine_device(raft::resources const& handle,
   uint32_t grid_dim_x = 1;
   cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<
     data_t,
-    typename raft::spatial::knn::detail::utils::config<data_t>::value_t,
+    typename cuvs::spatial::knn::detail::utils::config<data_t>::value_t,
     idx_t>(refinement_index,
            queries.data_handle(),
            fake_coarse_idx.data(),

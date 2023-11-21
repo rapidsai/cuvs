@@ -28,7 +28,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/adjusted_rand_index.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -84,6 +84,6 @@ double adjusted_rand_index(raft::resources const& handle,
 /** @} */  // end group stats_adj_rand_index
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

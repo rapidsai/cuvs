@@ -33,21 +33,21 @@
 #include <cuvs/neighbors/brute_force_types.hpp>
 #include <cuvs/neighbors/detail/faiss_select/DistanceUtils.h>
 #include <cuvs/neighbors/detail/knn_merge_parts.cuh>
+#include <cuvs/spatial/knn/detail/fused_l2_knn.cuh>
+#include <cuvs/spatial/knn/detail/haversine_distance.cuh>
+#include <cuvs/spatial/knn/detail/processing.cuh>
 #include <iostream>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/select_k.cuh>
-#include <raft/spatial/knn/detail/fused_l2_knn.cuh>
-#include <raft/spatial/knn/detail/haversine_distance.cuh>
-#include <raft/spatial/knn/detail/processing.cuh>
 #include <set>
 #include <thrust/iterator/transform_iterator.h>
 
 namespace cuvs::neighbors::detail {
-using namespace raft::spatial::knn::detail;
-using namespace raft::spatial::knn;
+using namespace cuvs::spatial::knn::detail;
+using namespace cuvs::spatial::knn;
 
 /**
  * Calculates brute force knn, using a fixed memory budget

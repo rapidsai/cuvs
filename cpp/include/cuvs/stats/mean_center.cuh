@@ -23,7 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/mean_center.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -161,6 +161,6 @@ void mean_add(raft::resources const& handle,
 /** @} */  // end group stats_mean_center
 
 };  // end namespace stats
-};  // end namespace raft
+};  // namespace cuvs
 
 #endif

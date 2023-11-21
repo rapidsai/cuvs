@@ -24,7 +24,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/stats/detail/dispersion.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -128,6 +128,6 @@ value_t cluster_dispersion(
   return cluster_dispersion(handle, centroids, cluster_sizes, opt_centroid, n_points);
 }
 }  // end namespace stats
-}  // end namespace raft
+}  // namespace cuvs
 
 #endif

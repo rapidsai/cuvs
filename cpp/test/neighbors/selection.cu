@@ -25,10 +25,10 @@
 
 #include "../test_utils.cuh"
 
+#include <cuvs/spatial/knn/knn.cuh>
 #include <raft/sparse/detail/utils.h>
-#include <raft/spatial/knn/knn.cuh>
 
-namespace raft::spatial::selection {
+namespace cuvs::spatial::selection {
 
 using namespace raft;
 using namespace raft::sparse;
@@ -135,7 +135,7 @@ struct SelectInOutComputed {
     update_device(in_dists_d.data(), in_dists_.data(), in_dists_.size(), stream);
     update_device(in_ids_d.data(), in_ids_.data(), in_ids_.size(), stream);
 
-    raft::spatial::knn::select_k<IdxT, KeyT>(in_dists_d.data(),
+    cuvs::spatial::knn::select_k<IdxT, KeyT>(in_dists_d.data(),
                                              spec.use_index_input ? in_ids_d.data() : nullptr,
                                              spec.n_inputs,
                                              spec.input_len,
@@ -496,4 +496,4 @@ INSTANTIATE_TEST_CASE_P(SelectionTest,
                         testing::Combine(inputs_random_largek,
                                          testing::Values(knn::SelectKAlgo::FAISS),
                                          testing::Values(std::make_shared<raft::resources>())));
-}  // namespace raft::spatial::selection
+}  // namespace cuvs::spatial::selection

@@ -20,9 +20,9 @@
 
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/brute_force.cuh>
+#include <cuvs/spatial/knn/knn.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/random/rng.cuh>
-#include <raft/spatial/knn/knn.cuh>
 
 #include <cuvs/distance/distance.cuh>
 

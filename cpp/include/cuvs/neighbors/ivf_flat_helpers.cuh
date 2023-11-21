@@ -22,10 +22,10 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 
 namespace cuvs::neighbors::ivf_flat::helpers {
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 /**
  * @defgroup ivf_flat_helpers Helper functions for manipulationg IVF Flat Index
  * @{

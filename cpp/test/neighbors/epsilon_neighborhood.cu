@@ -15,12 +15,12 @@
  */
 
 #include "../test_utils.cuh"
+#include <cuvs/spatial/knn/epsilon_neighborhood.cuh>
 #include <gtest/gtest.h>
 #include <memory>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/random/make_blobs.cuh>
-#include <raft/spatial/knn/epsilon_neighborhood.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 

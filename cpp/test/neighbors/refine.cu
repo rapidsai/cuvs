@@ -23,9 +23,9 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/detail/refine.cuh>
 #include <cuvs/neighbors/refine.cuh>
+#include <cuvs/spatial/knn/ann.cuh>
 #include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/spatial/knn/ann.cuh>
 #include <raft/util/itertools.hpp>
 
 #include <rmm/cuda_stream_view.hpp>

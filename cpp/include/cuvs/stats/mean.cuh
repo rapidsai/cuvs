@@ -24,7 +24,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/stats/detail/mean.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 /**
@@ -94,6 +94,6 @@ void mean(raft::resources const& handle,
 /** @} */  // end group stats_mean
 
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs
 
 #endif
