@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include <raft/cluster/detail/single_linkage.cuh>
-#include <raft/cluster/single_linkage_types.hpp>
+#include <cuvs/cluster/detail/single_linkage.cuh>
+#include <cuvs/cluster/single_linkage_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 
 namespace raft::cluster {

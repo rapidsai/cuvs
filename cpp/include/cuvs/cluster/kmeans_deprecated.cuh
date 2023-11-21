@@ -15,10 +15,9 @@
  */
 #pragma once
 
-#include <raft/cluster/detail/kmeans_deprecated.cuh>
+#include <cuvs/cluster/detail/kmeans_deprecated.cuh>
 
-namespace raft {
-namespace cluster {
+namespace cuvs::cluster {
 
 /**
  *  @brief Find clusters with k-means algorithm.
@@ -61,5 +60,4 @@ int kmeans(raft::resources const& handle,
   return detail::kmeans<index_type_t, value_type_t>(
     handle, n, d, k, tol, maxiter, obs, codes, residual, iters, seed);
 }
-}  // namespace cluster
-}  // namespace raft
+}  // namespace cuvs::cluster

@@ -37,7 +37,7 @@
 
 #include <cstddef>
 
-namespace raft::cluster::detail {
+namespace cuvs::cluster::detail {
 template <typename value_idx, typename value_t>
 class UnionFind {
  public:
@@ -325,4 +325,4 @@ void extract_flattened_clusters(raft::resources const& handle,
   }
 }
 
-};  // namespace raft::cluster::detail
+};  // namespace cuvs::cluster::detail

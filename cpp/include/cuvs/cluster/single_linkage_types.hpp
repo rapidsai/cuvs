@@ -18,7 +18,7 @@
 
 #include <raft/core/device_mdspan.hpp>
 
-namespace raft::cluster::hierarchy {
+namespace cuvs::cluster::hierarchy {
 
 /**
  * Determines the method for computing the minimum spanning tree (MST)
@@ -39,10 +39,10 @@ enum LinkageDistance {
   KNN_GRAPH = 1
 };
 
-};  // end namespace raft::cluster::hierarchy
+};  // namespace cuvs::cluster::hierarchy
 
 // The code below is now considered legacy
-namespace raft::cluster {
+namespace cuvs::cluster {
 
 using hierarchy::LinkageDistance;
 
@@ -80,4 +80,4 @@ class linkage_output {
 class linkage_output_int : public linkage_output<int> {};
 class linkage_output_int64 : public linkage_output<int64_t> {};
 
-};  // namespace raft::cluster
+};  // namespace cuvs::cluster

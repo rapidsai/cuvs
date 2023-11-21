@@ -15,16 +15,16 @@
  */
 #pragma once
 
+#include <cuvs/cluster/detail/kmeans.cuh>
+#include <cuvs/cluster/detail/kmeans_auto_find_k.cuh>
+#include <cuvs/cluster/kmeans_types.hpp>
 #include <optional>
-#include <raft/cluster/detail/kmeans.cuh>
-#include <raft/cluster/detail/kmeans_auto_find_k.cuh>
-#include <raft/cluster/kmeans_types.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
-namespace raft::cluster::kmeans {
+namespace cuvs::cluster::kmeans {
 
 /**
  * Functor used for sampling centroids
@@ -627,7 +627,7 @@ void fit_main(raft::resources const& handle,
     handle, params, X, sample_weights, centroids, inertia, n_iter, workspace);
 }
 
-};  // end namespace raft::cluster::kmeans
+};  // namespace cuvs::cluster::kmeans
 
 namespace raft::cluster {
 

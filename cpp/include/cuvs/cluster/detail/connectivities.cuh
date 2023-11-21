@@ -25,9 +25,9 @@
 #include <raft/linalg/unary_op.cuh>
 #include <rmm/device_uvector.hpp>
 
-#include <raft/cluster/single_linkage_types.hpp>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/cluster/single_linkage_types.hpp>
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/neighbors/knn_graph.cuh>
@@ -38,9 +38,9 @@
 
 #include <limits>
 
-namespace raft::cluster::detail {
+namespace cuvs::cluster::detail {
 
-template <raft::cluster::LinkageDistance dist_type, typename value_idx, typename value_t>
+template <cuvs::cluster::LinkageDistance dist_type, typename value_idx, typename value_t>
 struct distance_graph_impl {
   void run(raft::resources const& handle,
            const value_t* X,
@@ -233,4 +233,4 @@ void get_distance_graph(raft::resources const& handle,
   dist_graph.run(handle, X, m, n, metric, indptr, indices, data, c);
 }
 
-};  // namespace raft::cluster::detail
+};  // namespace cuvs::cluster::detail

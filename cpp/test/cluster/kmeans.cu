@@ -20,12 +20,12 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <vector>
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
+#include <cuvs/stats/adjusted_rand_index.cuh>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/make_blobs.cuh>
-#include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <rmm/device_uvector.hpp>
 #include <thrust/fill.h>
@@ -47,7 +47,7 @@ void run_cluster_cost(const raft::resources& handle,
                       rmm::device_uvector<char>& workspace,
                       raft::device_scalar_view<DataT> clusterCost)
 {
-  raft::cluster::kmeans::cluster_cost(
+  cuvs::cluster::kmeans::cluster_cost(
     handle, minClusterDistance, workspace, clusterCost, raft::add_op{});
 }
 
@@ -115,14 +115,14 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     auto miniX = raft::make_device_matrix<T, int>(handle, n_samples / 4, n_features);
 
     // Initialize kmeans on a portion of X
-    raft::cluster::kmeans::shuffle_and_gather(
+    cuvs::cluster::kmeans::shuffle_and_gather(
       handle,
       X_view,
       raft::make_device_matrix_view<T, int>(miniX.data_handle(), miniX.extent(0), miniX.extent(1)),
       miniX.extent(0),
       params.rng_state.seed);
 
-    raft::cluster::kmeans::init_plus_plus(
+    cuvs::cluster::kmeans::init_plus_plus(
       handle, params, raft::make_const_mdspan(miniX.view()), centroids_view, workspace);
 
     auto minClusterDistance = raft::make_device_vector<T, int>(handle, n_samples);
@@ -140,7 +140,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
                           true,
                           stream);
 
-    raft::cluster::kmeans::min_cluster_distance(handle,
+    cuvs::cluster::kmeans::min_cluster_distance(handle,
                                                 X_view,
                                                 centroids_view,
                                                 minClusterDistance.view(),
@@ -154,7 +154,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     run_cluster_cost(handle, minClusterDistance.view(), workspace, clusterCostBefore.view());
 
     // Run a fit of kmeans
-    raft::cluster::kmeans::fit_main(handle,
+    cuvs::cluster::kmeans::fit_main(handle,
                                     params,
                                     X_view,
                                     weight_view,
@@ -164,7 +164,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
                                     workspace);
 
     // Check that the cluster cost decreased
-    raft::cluster::kmeans::min_cluster_distance(handle,
+    cuvs::cluster::kmeans::min_cluster_distance(handle,
                                                 X_view,
                                                 centroids_view,
                                                 minClusterDistance.view(),
@@ -184,7 +184,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
 
     // Count samples in clusters using 2 methods and compare them
     // Fill minClusterAndDistance
-    raft::cluster::kmeans::min_cluster_and_distance(
+    cuvs::cluster::kmeans::min_cluster_and_distance(
       handle,
       X_view,
       raft::make_device_matrix_view<const T, int>(
@@ -196,16 +196,16 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       params.batch_samples,
       params.batch_centroids,
       workspace);
-    raft::cluster::kmeans::KeyValueIndexOp<int, T> conversion_op;
+    cuvs::cluster::kmeans::KeyValueIndexOp<int, T> conversion_op;
     cub::TransformInputIterator<int,
-                                raft::cluster::kmeans::KeyValueIndexOp<int, T>,
+                                cuvs::cluster::kmeans::KeyValueIndexOp<int, T>,
                                 raft::KeyValuePair<int, T>*>
       itr(minClusterAndDistance.data_handle(), conversion_op);
 
     auto sampleCountInCluster = raft::make_device_vector<T, int>(handle, params.n_clusters);
     auto weigthInCluster      = raft::make_device_vector<T, int>(handle, params.n_clusters);
     auto newCentroids = raft::make_device_matrix<T, int>(handle, params.n_clusters, n_features);
-    raft::cluster::kmeans::update_centroids(handle,
+    cuvs::cluster::kmeans::update_centroids(handle,
                                             X_view,
                                             weight_view,
                                             raft::make_device_matrix_view<const T, int>(
@@ -213,7 +213,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
                                             itr,
                                             weigthInCluster.view(),
                                             newCentroids.view());
-    raft::cluster::kmeans::count_samples_in_cluster(handle,
+    cuvs::cluster::kmeans::count_samples_in_cluster(handle,
                                                     params,
                                                     X_view,
                                                     L2NormX.view(),
@@ -281,7 +281,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     int n_iter  = 0;
     auto X_view = raft::make_const_mdspan(X.view());
 
-    raft::cluster::kmeans_fit_predict<T, int>(
+    cuvs::cluster::kmeans_fit_predict<T, int>(
       handle,
       params,
       X_view,
@@ -293,7 +293,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
 
     resource::sync_stream(handle, stream);
 
-    score = raft::stats::adjusted_rand_index(
+    score = cuvs::stats::adjusted_rand_index(
       d_labels_ref.data(), d_labels.data(), n_samples, resource::get_cuda_stream(handle));
 
     if (score < 1.0) {
@@ -321,7 +321,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   rmm::device_uvector<T> d_centroids;
   rmm::device_uvector<T> d_sample_weight;
   double score;
-  raft::cluster::KMeansParams params;
+  cuvs::cluster::KMeansParams params;
 };
 
 const std::vector<KmeansInputs<float>> inputsf2 = {{1000, 32, 5, 0.0001f, true},

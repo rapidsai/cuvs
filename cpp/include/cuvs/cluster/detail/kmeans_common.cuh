@@ -29,7 +29,10 @@
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
 
-#include <raft/cluster/kmeans_types.hpp>
+#include <cuvs/cluster/kmeans_types.hpp>
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/kvp.hpp>
@@ -37,9 +40,6 @@
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
 #include <raft/linalg/unary_op.cuh>
@@ -51,7 +51,7 @@
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
 
-namespace raft {
+namespace cuvs {
 namespace cluster {
 namespace detail {
 
@@ -660,4 +660,4 @@ void countSamplesInCluster(raft::resources const& handle,
 }
 }  // namespace detail
 }  // namespace cluster
-}  // namespace raft
+}  // namespace cuvs

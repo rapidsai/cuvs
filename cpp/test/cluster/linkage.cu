@@ -26,12 +26,12 @@
 #include "../test_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/sparse/coo.hpp>
 
+#include <cuvs/cluster/single_linkage.cuh>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/sparse/hierarchy/single_linkage.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
@@ -40,7 +40,7 @@
 
 #include <vector>
 
-namespace raft {
+namespace cuvs {
 
 using namespace std;
 
@@ -196,7 +196,7 @@ class LinkageTest : public ::testing::TestWithParam<LinkageInputs<T, IdxT>> {
     auto labels_view = raft::make_device_vector_view<IdxT, IdxT>(labels.data(), params.n_row);
 
     if (params.use_knn) {
-      raft::cluster::hierarchy::
+      cuvs::cluster::hierarchy::
         single_linkage<T, IdxT, raft::cluster::hierarchy::LinkageDistance::KNN_GRAPH>(
           handle,
           data_view,
@@ -207,7 +207,7 @@ class LinkageTest : public ::testing::TestWithParam<LinkageInputs<T, IdxT>> {
           std::make_optional<int>(params.c));
 
     } else {
-      raft::cluster::hierarchy::
+      cuvs::cluster::hierarchy::
         single_linkage<T, IdxT, raft::cluster::hierarchy::LinkageDistance::PAIRWISE>(
           handle,
           data_view,
@@ -672,4 +672,4 @@ typedef LinkageTest<float, int> LinkageTestF_Int;
 TEST_P(LinkageTestF_Int, Result) { EXPECT_TRUE(score == 1.0); }
 
 INSTANTIATE_TEST_CASE_P(LinkageTest, LinkageTestF_Int, ::testing::ValuesIn(linkage_inputsf2));
-}  // end namespace raft
+}  // namespace cuvs

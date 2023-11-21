@@ -29,7 +29,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
-namespace raft::cluster::detail {
+namespace cuvs::cluster::detail {
 
 template <typename value_idx, typename value_t>
 void merge_msts(sparse::solver::Graph_COO<value_idx, value_idx, value_t>& coo1,
@@ -204,4 +204,4 @@ void build_sorted_mst(
   raft::copy_async(mst_weight, mst_coo.weights.data(), mst_coo.n_edges, stream);
 }
 
-};  // namespace raft::cluster::detail
+};  // namespace cuvs::cluster::detail

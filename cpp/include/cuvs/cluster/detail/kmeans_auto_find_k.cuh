@@ -22,12 +22,12 @@
 
 #include <raft/core/logger.hpp>
 
-#include <raft/cluster/detail/kmeans.cuh>
+#include <cuvs/cluster/detail/kmeans.cuh>
 
 #include <raft/core/error.hpp>
 
+#include <cuvs/stats/dispersion.cuh>
 #include <raft/core/resources.hpp>
-#include <raft/stats/dispersion.cuh>
 
 namespace raft::cluster::detail {
 

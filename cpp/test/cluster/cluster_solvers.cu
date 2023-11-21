@@ -21,10 +21,10 @@
 #include <raft/core/resource/device_id.hpp>
 #include <raft/core/resources.hpp>
 
-#include <raft/spectral/cluster_solvers.cuh>
-#include <raft/spectral/modularity_maximization.cuh>
+#include <cuvs/spectral/cluster_solvers.cuh>
+#include <cuvs/spectral/modularity_maximization.cuh>
 
-namespace raft {
+namespace cuvs {
 namespace spectral {
 
 TEST(Raft, ClusterSolvers)
@@ -100,4 +100,4 @@ TEST(Raft, ModularitySolvers)
 }
 
 }  // namespace spectral
-}  // namespace raft
+}  // namespace cuvs

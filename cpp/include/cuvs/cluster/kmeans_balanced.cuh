@@ -19,11 +19,11 @@
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <utility>
 
-#include <raft/cluster/detail/kmeans_balanced.cuh>
+#include <cuvs/cluster/detail/kmeans_balanced.cuh>
 #include <raft/core/mdarray.hpp>
 #include <raft/util/cuda_utils.cuh>
 
-namespace raft::cluster::kmeans_balanced {
+namespace cuvs::cluster::kmeans_balanced {
 
 /**
  * @brief Find clusters of balanced sizes with a hierarchical k-means algorithm.
@@ -363,4 +363,4 @@ void calc_centers_and_sizes(const raft::resources& handle,
 
 }  // namespace helpers
 
-}  // namespace raft::cluster::kmeans_balanced
+}  // namespace cuvs::cluster::kmeans_balanced

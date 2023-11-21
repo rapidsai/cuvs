@@ -20,13 +20,13 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <vector>
 
-#include <raft/cluster/kmeans_balanced.cuh>
+#include <cuvs/cluster/kmeans_balanced.cuh>
+#include <cuvs/stats/adjusted_rand_index.cuh>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/random/make_blobs.cuh>
-#include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <rmm/device_uvector.hpp>
 #include <thrust/fill.h>
@@ -36,7 +36,7 @@
  * dataset.
  */
 
-namespace raft {
+namespace cuvs {
 
 template <typename MathT, typename IdxT>
 struct KmeansBalancedInputs {
@@ -118,12 +118,12 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
       raft::make_device_matrix_view<MathT, IdxT>(d_centroids.data(), p.n_clusters, p.n_cols);
     auto d_labels_view = raft::make_device_vector_view<LabelT, IdxT>(d_labels.data(), p.n_rows);
 
-    raft::cluster::kmeans_balanced::fit_predict(
+    cuvs::cluster::kmeans_balanced::fit_predict(
       handle, p.kb_params, X_view, d_centroids_view, d_labels_view, op);
 
     resource::sync_stream(handle, stream);
 
-    score = raft::stats::adjusted_rand_index(
+    score = cuvs::stats::adjusted_rand_index(
       d_labels_ref.data(), d_labels.data(), p.n_rows, resource::get_cuda_stream(handle));
 
     if (score < 1.0) {
@@ -233,4 +233,4 @@ KB_TEST((KmeansBalancedTest<int8_t, double, uint32_t, int, i2f_scaler<int8_t, do
         KmeansBalancedTestDI8U32I32,
         inputsd_i32);
 
-}  // namespace raft
+}  // namespace cuvs

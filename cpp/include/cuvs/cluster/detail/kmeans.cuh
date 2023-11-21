@@ -28,8 +28,9 @@
 #include <thrust/fill.h>
 #include <thrust/transform.h>
 
-#include <raft/cluster/detail/kmeans_common.cuh>
-#include <raft/cluster/kmeans_types.hpp>
+#include <cuvs/cluster/detail/kmeans_common.cuh>
+#include <cuvs/cluster/kmeans_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/common/nvtx.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -39,7 +40,6 @@
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/map_then_reduce.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>

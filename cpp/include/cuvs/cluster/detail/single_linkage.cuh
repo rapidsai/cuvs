@@ -20,12 +20,12 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/device_uvector.hpp>
 
-#include <raft/cluster/detail/agglomerative.cuh>
-#include <raft/cluster/detail/connectivities.cuh>
-#include <raft/cluster/detail/mst.cuh>
-#include <raft/cluster/single_linkage_types.hpp>
+#include <cuvs/cluster/detail/agglomerative.cuh>
+#include <cuvs/cluster/detail/connectivities.cuh>
+#include <cuvs/cluster/detail/mst.cuh>
+#include <cuvs/cluster/single_linkage_types.hpp>
 
-namespace raft::cluster::detail {
+namespace cuvs::cluster::detail {
 
 static const size_t EMPTY = 0;
 
@@ -122,4 +122,4 @@ void single_linkage(raft::resources const& handle,
   out->n_leaves               = m;
   out->n_connected_components = 1;
 }
-};  // namespace raft::cluster::detail
+};  // namespace cuvs::cluster::detail

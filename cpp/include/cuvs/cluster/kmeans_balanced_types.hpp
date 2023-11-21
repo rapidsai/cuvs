@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <raft/cluster/kmeans_types.hpp>
+#include <cuvs/cluster/kmeans_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/random/rng_state.hpp>
 
-namespace raft::cluster::kmeans_balanced {
+namespace cuvs::cluster::kmeans_balanced {
 
 /**
  * Simple object to specify hyper-parameters to the balanced k-means algorithm.
@@ -38,7 +38,7 @@ struct kmeans_balanced_params : kmeans_base_params {
   uint32_t n_iters = 20;
 };
 
-}  // namespace raft::cluster::kmeans_balanced
+}  // namespace cuvs::cluster::kmeans_balanced
 
 namespace raft::cluster {
 

@@ -20,13 +20,13 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <vector>
 
-#include <raft/cluster/kmeans.cuh>
+#include <cuvs/cluster/kmeans.cuh>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-namespace raft {
+namespace cuvs {
 
 template <typename T>
 struct KmeansFindKInputs {
@@ -77,7 +77,7 @@ class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
     auto X_view =
       raft::make_device_matrix_view<const T, int>(X.data_handle(), X.extent(0), X.extent(1));
 
-    raft::cluster::kmeans::find_k<int, T>(
+    cuvs::cluster::kmeans::find_k<int, T>(
       handle, X_view, best_k.view(), inertia.view(), n_iter.view(), n_clusters);
 
     resource::sync_stream(handle, stream);
@@ -137,4 +137,4 @@ INSTANTIATE_TEST_CASE_P(KmeansFindKTests, KmeansFindKTestF, ::testing::ValuesIn(
 
 INSTANTIATE_TEST_CASE_P(KmeansFindKTests, KmeansFindKTestD, ::testing::ValuesIn(inputsd2));
 
-}  // namespace raft
+}  // namespace cuvs

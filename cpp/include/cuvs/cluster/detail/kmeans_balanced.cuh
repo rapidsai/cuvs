@@ -22,15 +22,15 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <type_traits>
 
-#include <raft/cluster/detail/kmeans_common.cuh>
-#include <raft/cluster/kmeans_balanced_types.hpp>
+#include <cuvs/cluster/detail/kmeans_common.cuh>
+#include <cuvs/cluster/kmeans_balanced_types.hpp>
+#include <cuvs/distance/distance.cuh>
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/fused_l2_nn.cuh>
 #include <raft/common/nvtx.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance.cuh>
-#include <raft/distance/distance_types.hpp>
-#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
@@ -56,7 +56,7 @@
 
 #include <tuple>
 
-namespace raft::cluster::detail {
+namespace cuvs::cluster::detail {
 
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
@@ -1094,4 +1094,4 @@ void build_hierarchical(const raft::resources& handle,
                      device_memory);
 }
 
-}  // namespace raft::cluster::detail
+}  // namespace cuvs::cluster::detail
