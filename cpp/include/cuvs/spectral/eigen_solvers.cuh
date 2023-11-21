@@ -51,7 +51,7 @@ struct lanczos_solver_t {
 
   index_type_t solve_smallest_eigenvectors(
     raft::resources const& handle,
-    matrix::sparse_matrix_t<index_type_t, value_type_t> const& A,
+    raft::matrix::sparse_matrix_t<index_type_t, value_type_t> const& A,
     value_type_t* __restrict__ eigVals,
     value_type_t* __restrict__ eigVecs) const
   {
@@ -74,7 +74,7 @@ struct lanczos_solver_t {
 
   index_type_t solve_largest_eigenvectors(
     raft::resources const& handle,
-    matrix::sparse_matrix_t<index_type_t, value_type_t> const& A,
+    raft::matrix::sparse_matrix_t<index_type_t, value_type_t> const& A,
     value_type_t* __restrict__ eigVals,
     value_type_t* __restrict__ eigVecs) const
   {

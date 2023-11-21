@@ -132,7 +132,7 @@ void distance(raft::resources const& handle,
               raft::device_matrix_view<OutT, IdxT, layout> dist,
               DataT metric_arg = 2.0f) RAFT_EXPLICIT;
 
-template <typename Type, typename layout = layout_c_contiguous, typename IdxT = int>
+template <typename Type, typename layout = raft::layout_c_contiguous, typename IdxT = int>
 void pairwise_distance(raft::resources const& handle,
                        device_matrix_view<Type, IdxT, layout> const x,
                        device_matrix_view<Type, IdxT, layout> const y,

@@ -47,7 +47,7 @@ approx_knn_build_index(raft::resources& handle,
                        value_idx n,
                        value_idx D)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "legacy approx_knn_build_index(n_rows = %u, dim = %u)", n, D);
   detail::approx_knn_build_index(handle, index, params, metric, metricArg, index_array, n, D);
 }
@@ -75,7 +75,7 @@ approx_knn_search(raft::resources& handle,
                   T* query_array,
                   value_idx n)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "legacy approx_knn_search(k = %u, n_queries = %u)", k, n);
   detail::approx_knn_search(handle, distances, indices, index, k, query_array, n);
 }

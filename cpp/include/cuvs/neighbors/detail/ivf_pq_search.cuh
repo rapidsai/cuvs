@@ -153,16 +153,16 @@ void select_clusters(raft::resources const& handle,
 
   // Select neighbor clusters for each query.
   rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
-  matrix::detail::select_k<float, uint32_t>(handle,
-                                            qc_distances.data(),
-                                            nullptr,
-                                            n_queries,
-                                            n_lists,
-                                            n_probes,
-                                            cluster_dists.data(),
-                                            clusters_to_probe,
-                                            true,
-                                            mr);
+  raft::matrix::detail::select_k<float, uint32_t>(handle,
+                                                  qc_distances.data(),
+                                                  nullptr,
+                                                  n_queries,
+                                                  n_lists,
+                                                  n_probes,
+                                                  cluster_dists.data(),
+                                                  clusters_to_probe,
+                                                  true,
+                                                  mr);
 }
 
 /**
@@ -187,7 +187,7 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   chunk_indices += n_probes * blockIdx.x;
 
   // block scan
-  const uint32_t n_probes_aligned = Pow2<BlockDim>::roundUp(n_probes);
+  const uint32_t n_probes_aligned = raft::Pow2<BlockDim>::roundUp(n_probes);
   uint32_t total                  = 0;
   for (uint32_t probe_ix = threadIdx.x; probe_ix < n_probes_aligned; probe_ix += BlockDim) {
     auto label = probe_ix < n_probes ? clusters_to_probe[probe_ix] : 0u;
@@ -230,7 +230,7 @@ struct calc_chunk_indices {
   template <int BlockDim>
   static auto try_block_dim(uint32_t n_probes, uint32_t n_queries) -> configured
   {
-    if constexpr (BlockDim >= WarpSize * 2) {
+    if constexpr (BlockDim >= raft::WarpSize * 2) {
       if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
     }
     return {reinterpret_cast<void*>(calc_chunk_indices_kernel<BlockDim>),
@@ -584,16 +584,16 @@ void ivfpq_search_worker(raft::resources const& handle,
 
   // Select topk vectors for each query
   rmm::device_uvector<ScoreT> topk_dists(n_queries * topK, stream, mr);
-  matrix::detail::select_k<ScoreT, uint32_t>(handle,
-                                             distances_buf.data(),
-                                             neighbors_ptr,
-                                             n_queries,
-                                             topk_len,
-                                             topK,
-                                             topk_dists.data(),
-                                             neighbors_uint32,
-                                             true,
-                                             mr);
+  raft::matrix::detail::select_k<ScoreT, uint32_t>(handle,
+                                                   distances_buf.data(),
+                                                   neighbors_ptr,
+                                                   n_queries,
+                                                   topk_len,
+                                                   topK,
+                                                   topk_dists.data(),
+                                                   neighbors_uint32,
+                                                   true,
+                                                   mr);
 
   // Postprocessing
   postprocess_distances(
@@ -741,7 +741,7 @@ inline void search(raft::resources const& handle,
 {
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>,
                 "Unsupported element type.");
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_pq::search(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,
     params.n_probes,
@@ -778,7 +778,7 @@ inline void search(raft::resources const& handle,
 
   uint32_t max_samples = 0;
   {
-    IdxT ms = Pow2<128>::roundUp(index.accum_sorted_sizes()(n_probes));
+    IdxT ms = raft::Pow2<128>::roundUp(index.accum_sorted_sizes()(n_probes));
     RAFT_EXPECTS(ms <= IdxT(std::numeric_limits<uint32_t>::max()),
                  "The maximum sample size is too big.");
     max_samples = ms;

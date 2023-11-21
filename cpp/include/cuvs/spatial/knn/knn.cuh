@@ -134,12 +134,13 @@ template <typename idx_t = int, typename value_t = float>
   cudaStream_t stream,
   SelectKAlgo algo = SelectKAlgo::FAISS)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope("select-%s-%d (%zu, %zu) algo-%d",
-                                                            select_min ? "min" : "max",
-                                                            k,
-                                                            n_inputs,
-                                                            input_len,
-                                                            int(algo));
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+    "select-%s-%d (%zu, %zu) algo-%d",
+    select_min ? "min" : "max",
+    k,
+    n_inputs,
+    input_len,
+    int(algo));
   ASSERT(size_t(input_len) >= size_t(k),
          "Size of the input (input_len = %zu) must be not smaller than the selection (k = %zu).",
          size_t(input_len),
@@ -152,17 +153,17 @@ template <typename idx_t = int, typename value_t = float>
       break;
 
     case SelectKAlgo::RADIX_8_BITS:
-      matrix::detail::select::radix::select_k<value_t, idx_t, 8, 512>(
+      raft::matrix::detail::select::radix::select_k<value_t, idx_t, 8, 512>(
         in_keys, in_values, n_inputs, input_len, k, out_keys, out_values, select_min, true, stream);
       break;
 
     case SelectKAlgo::RADIX_11_BITS:
-      matrix::detail::select::radix::select_k<value_t, idx_t, 11, 512>(
+      raft::matrix::detail::select::radix::select_k<value_t, idx_t, 11, 512>(
         in_keys, in_values, n_inputs, input_len, k, out_keys, out_values, select_min, true, stream);
       break;
 
     case SelectKAlgo::WARP_SORT:
-      matrix::detail::select::warpsort::select_k<value_t, idx_t>(
+      raft::matrix::detail::select::warpsort::select_k<value_t, idx_t>(
         in_keys, in_values, n_inputs, input_len, k, out_keys, out_values, select_min, stream);
       break;
 

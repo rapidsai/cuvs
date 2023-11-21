@@ -100,7 +100,7 @@ NB: current implementation here is not optimal, especially the rowmajor version;
  *
  * Assumptions:
  *
- *  1. blockDim.x == WarpSize
+ *  1. blockDim.x == raft::WarpSize
  *  2. Dimension X goes along columns (D)
  *  3. Dimension Y goes along rows (N)
  *
@@ -197,8 +197,9 @@ void meanvar(
   T* mean, T* var, const T* data, I D, I N, bool sample, bool rowMajor, cudaStream_t stream)
 {
   if (rowMajor) {
-    static_assert(BlockSize >= WarpSize, "Block size must be not smaller than the warp size.");
-    const dim3 bs(WarpSize, BlockSize / WarpSize, 1);
+    static_assert(BlockSize >= raft::WarpSize,
+                  "Block size must be not smaller than the warp size.");
+    const dim3 bs(WarpSize, BlockSize / raft::WarpSize, 1);
     dim3 gs(raft::ceildiv<decltype(bs.x)>(D, bs.x), raft::ceildiv<decltype(bs.y)>(N, bs.y), 1);
 
     // Don't create more blocks than necessary to occupy the GPU

@@ -127,7 +127,7 @@ struct BlockSelect {
       warpV[i] = initV;
     }
 
-    warpFence();
+    raft::warpFence();
   }
 
   __device__ inline void addThreadQ(K k, V v)
@@ -161,7 +161,7 @@ struct BlockSelect {
       return;
     }
 
-    // This has a trailing warpFence
+    // This has a trailing raft::warpFence
     mergeWarpQ();
 
     // Any top-k elements have been merged into the warp queue; we're
@@ -177,7 +177,7 @@ struct BlockSelect {
     // We have to beat at least this element
     warpKTop = warpK[kMinus1];
 
-    warpFence();
+    raft::warpFence();
   }
 
   /// This function handles sorting and merging together the
@@ -215,7 +215,7 @@ struct BlockSelect {
       warpV[i * raft::WarpSize + laneId] = warpVRegisters[i];
     }
 
-    warpFence();
+    raft::warpFence();
   }
 
   /// WARNING: all threads in a warp must participate in this.

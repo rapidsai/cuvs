@@ -64,7 +64,8 @@ void pack(
   raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
   uint32_t veclen,
   uint32_t offset,
-  device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major> list_data)
+  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data)
 {
   cuvs::neighbors::ivf_flat::detail::pack_list_data<T, IdxT>(res, codes, veclen, offset, list_data);
 }
@@ -100,7 +101,7 @@ void pack(
 template <typename T, typename IdxT>
 void unpack(
   raft::resources const& res,
-  device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
     list_data,
   uint32_t veclen,
   uint32_t offset,

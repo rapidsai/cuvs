@@ -86,7 +86,7 @@ void serialize(raft::resources const& handle, std::ostream& os, const index<T, I
                         os,
                         index_.lists()[label],
                         list_store_spec,
-                        Pow2<kIndexGroupSize>::roundUp(sizes_host(label)));
+                        raft::Pow2<kIndexGroupSize>::roundUp(sizes_host(label)));
   }
   resource::sync_stream(handle);
 }

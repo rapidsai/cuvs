@@ -255,7 +255,7 @@ void masked_l2_nn_impl(raft::resources const& handle,
 
   // Get stream and workspace memory resource
   rmm::mr::device_memory_resource* ws_mr =
-    dynamic_cast<rmm::mr::device_memory_resource*>(resource::get_workspace_resource(handle));
+    dynamic_cast<rmm::mr::device_memory_resource*>(raft::resource::get_workspace_resource(handle));
   auto stream = resource::get_cuda_stream(handle);
 
   // Acquire temporary buffers and initialize to zero:

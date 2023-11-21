@@ -101,7 +101,7 @@ void initialize(OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp, cudaStream_t s
 }
 
 // TODO: specialize this function for MinAndDistanceReduceOp<int, float>
-// with atomicCAS of 64 bit which will eliminate mutex and shfls
+// with atomicCAS of 64 bit which will eliminate mutex and raft::shfls
 template <typename P, typename OutT, typename IdxT, typename KVPair, typename ReduceOpT>
 DI void updateReducedVal(
   int* mutex, OutT* min, KVPair* val, ReduceOpT red_op, IdxT m, IdxT gridStrideY)
@@ -204,7 +204,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedL2NNkernel(OutT* min,
 #pragma unroll
         for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
           // Actually, the srcLane (lid +j) should be (lid +j) % P:AccThCols,
-          // but the shfl op applies the modulo internally.
+          // but the raft::shfl op applies the modulo internally.
           auto tmpkey   = raft::shfl(val[i].key, lid + j, P::AccThCols);
           auto tmpvalue = raft::shfl(val[i].value, lid + j, P::AccThCols);
           KVPair tmp    = {tmpkey, tmpvalue};

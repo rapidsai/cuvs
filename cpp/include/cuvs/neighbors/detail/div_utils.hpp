@@ -21,9 +21,9 @@
 #endif
 
 /**
- * @brief A simple wrapper for raft::Pow2 which uses Pow2 utils only when available and regular
- * integer division otherwise. This is done to allow a common interface for division arithmetic for
- * non CUDA headers.
+ * @brief A simple wrapper for raft::Pow2 which uses raft::Pow2 utils only when available and
+ * regular integer division otherwise. This is done to allow a common interface for division
+ * arithmetic for non CUDA headers.
  *
  * @tparam Value_ a compile-time value representable as a power-of-two.
  */
@@ -37,7 +37,7 @@ struct div_utils {
   static constexpr _RAFT_HOST_DEVICE inline auto roundDown(T x)
   {
 #if defined(_RAFT_HAS_CUDA)
-    return Pow2<Value_>::roundDown(x);
+    return raft::Pow2<Value_>::roundDown(x);
 #else
     return raft::round_down_safe(x, Value_);
 #endif
@@ -47,7 +47,7 @@ struct div_utils {
   static constexpr _RAFT_HOST_DEVICE inline auto mod(T x)
   {
 #if defined(_RAFT_HAS_CUDA)
-    return Pow2<Value_>::mod(x);
+    return raft::Pow2<Value_>::mod(x);
 #else
     return x % Value_;
 #endif
@@ -57,7 +57,7 @@ struct div_utils {
   static constexpr _RAFT_HOST_DEVICE inline auto div(T x)
   {
 #if defined(_RAFT_HAS_CUDA)
-    return Pow2<Value_>::div(x);
+    return raft::Pow2<Value_>::div(x);
 #else
     return x / Value_;
 #endif

@@ -72,17 +72,17 @@ void sample_landmarks(raft::resources const& handle,
   rmm::device_uvector<value_t> R_1nn_ones(index.m, resource::get_cuda_stream(handle));
   rmm::device_uvector<value_idx> R_indices(index.n_landmarks, resource::get_cuda_stream(handle));
 
-  thrust::sequence(resource::get_thrust_policy(handle),
+  thrust::sequence(raft::resource::get_thrust_policy(handle),
                    index.get_R_1nn_cols().data_handle(),
                    index.get_R_1nn_cols().data_handle() + index.m,
                    (value_idx)0);
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_1nn_ones.data(),
                R_1nn_ones.data() + R_1nn_ones.size(),
                1.0);
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_indices.data(),
                R_indices.data() + R_indices.size(),
                0.0);
@@ -131,7 +131,7 @@ void construct_landmark_1nn(raft::resources const& handle,
 {
   rmm::device_uvector<value_idx> R_1nn_inds(index.m, resource::get_cuda_stream(handle));
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_1nn_inds.data(),
                R_1nn_inds.data() + index.m,
                std::numeric_limits<value_idx>::max());
@@ -150,7 +150,7 @@ void construct_landmark_1nn(raft::resources const& handle,
     thrust::make_tuple(R_1nn_inds.data(), index.get_R_1nn_dists().data_handle()));
 
   // group neighborhoods for each reference landmark and sort each group by distance
-  thrust::sort_by_key(resource::get_thrust_policy(handle),
+  thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
                       keys,
                       keys + index.m,
                       index.get_R_1nn_cols().data_handle(),
@@ -214,7 +214,7 @@ void compute_landmark_radii(raft::resources const& handle,
   const value_idx* R_indptr_ptr  = index.get_R_indptr().data_handle();
   const value_t* R_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
   value_t* R_radius_ptr          = index.get_R_radius().data_handle();
-  thrust::for_each(resource::get_thrust_policy(handle),
+  thrust::for_each(raft::resource::get_thrust_policy(handle),
                    entries,
                    entries + index.n_landmarks,
                    [=] __device__(value_idx input) {
@@ -253,11 +253,11 @@ void perform_rbc_query(raft::resources const& handle,
                        bool perform_post_filtering = true)
 {
   // initialize output inds and dists
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                inds,
                inds + (k * n_query_pts),
                std::numeric_limits<value_idx>::max());
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                dists,
                dists + (k * n_query_pts),
                std::numeric_limits<value_t>::max());
@@ -349,11 +349,11 @@ void rbc_build_index(raft::resources const& handle,
   rmm::device_uvector<value_idx> R_knn_inds(index.m, resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_knn_inds.begin(),
                R_knn_inds.end(),
                std::numeric_limits<value_idx>::max());
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                index.get_R_closest_landmark_dists().data_handle(),
                index.get_R_closest_landmark_dists().data_handle() + index.m,
                std::numeric_limits<value_t>::max());
@@ -416,20 +416,20 @@ void rbc_all_knn_query(raft::resources const& handle,
   rmm::device_uvector<value_t> R_knn_dists(k * index.m, raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_knn_inds.begin(),
                R_knn_inds.end(),
                std::numeric_limits<value_idx>::max());
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_knn_dists.begin(),
                R_knn_dists.end(),
                std::numeric_limits<value_t>::max());
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                inds,
                inds + (k * index.m),
                std::numeric_limits<value_idx>::max());
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                dists,
                dists + (k * index.m),
                std::numeric_limits<value_t>::max());
@@ -494,20 +494,20 @@ void rbc_knn_query(raft::resources const& handle,
                                            raft::resource::get_cuda_stream(handle));
 
   // Initialize the uvectors
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_knn_inds.begin(),
                R_knn_inds.end(),
                std::numeric_limits<value_idx>::max());
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                R_knn_dists.begin(),
                R_knn_dists.end(),
                std::numeric_limits<value_t>::max());
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                inds,
                inds + (k * n_query_pts),
                std::numeric_limits<value_idx>::max());
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                dists,
                dists + (k * n_query_pts),
                std::numeric_limits<value_t>::max());
@@ -518,11 +518,11 @@ void rbc_knn_query(raft::resources const& handle,
   rmm::device_uvector<value_int> dists_counter(index.m, raft::resource::get_cuda_stream(handle));
   rmm::device_uvector<value_int> post_dists_counter(index.m,
                                                     raft::resource::get_cuda_stream(handle));
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                post_dists_counter.data(),
                post_dists_counter.data() + post_dists_counter.size(),
                0);
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                dists_counter.data(),
                dists_counter.data() + dists_counter.size(),
                0);

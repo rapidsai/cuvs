@@ -204,8 +204,8 @@ void random_pickup(const DATA_T* const dataset_ptr,  // [dataset_size, dataset_d
 
 template <class INDEX_T>
 RAFT_KERNEL pickup_next_parents_kernel(
-  INDEX_T* const parent_candidates_ptr,        // [num_queries, lds]
-  const std::size_t lds,                       // (*) lds >= parent_candidates_size
+  INDEX_T* const parent_candidates_ptr,        // [num_queries, raft::lds]
+  const std::size_t raft::lds,                 // (*) raft::lds >= parent_candidates_size
   const std::uint32_t parent_candidates_size,  //
   INDEX_T* const visited_hashmap_ptr,          // [num_queries, 1 << hash_bitlen]
   const std::size_t hash_bitlen,
@@ -268,8 +268,8 @@ RAFT_KERNEL pickup_next_parents_kernel(
 }
 
 template <class INDEX_T>
-void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries, lds]
-                         const std::size_t lds,                 // (*) lds >= parent_candidates_size
+void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries, raft::lds]
+                         const std::size_t raft::lds,  // (*) raft::lds >= parent_candidates_size
                          const std::size_t parent_candidates_size,  //
                          const std::size_t num_queries,
                          INDEX_T* const visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
@@ -291,7 +291,7 @@ void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries,
   }
   pickup_next_parents_kernel<INDEX_T>
     <<<num_queries, block_size, 0, cuda_stream>>>(parent_candidates_ptr,
-                                                  lds,
+                                                  raft::lds,
                                                   parent_candidates_size,
                                                   visited_hashmap_ptr,
                                                   hash_bitlen,
@@ -312,7 +312,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const INDEX_T* const parent_node_list,  // [num_queries, search_width]
   INDEX_T* const parent_candidates_ptr,   // [num_queries, search_width]
   DISTANCE_T* const parent_distance_ptr,  // [num_queries, search_width]
-  const std::size_t lds,
+  const std::size_t raft::lds,
   const std::uint32_t search_width,
   const DATA_T* const dataset_ptr,  // [dataset_size, data_dim]
   const std::uint32_t data_dim,
@@ -395,7 +395,7 @@ void compute_distance_to_child_nodes(
   const INDEX_T* const parent_node_list,  // [num_queries, search_width]
   INDEX_T* const parent_candidates_ptr,   // [num_queries, search_width]
   DISTANCE_T* const parent_distance_ptr,  // [num_queries, search_width]
-  const std::size_t lds,
+  const std::size_t raft::lds,
   const uint32_t search_width,
   const DATA_T* const dataset_ptr,  // [dataset_size, data_dim]
   const std::uint32_t data_dim,
@@ -421,7 +421,7 @@ void compute_distance_to_child_nodes(
     <<<grid_size, block_size, 0, cuda_stream>>>(parent_node_list,
                                                 parent_candidates_ptr,
                                                 parent_distance_ptr,
-                                                lds,
+                                                raft::lds,
                                                 search_width,
                                                 dataset_ptr,
                                                 data_dim,
@@ -471,7 +471,7 @@ void remove_parent_bit(const std::uint32_t num_queries,
 template <class INDEX_T, class DISTANCE_T, class SAMPLE_FILTER_T>
 RAFT_KERNEL apply_filter_kernel(INDEX_T* const result_indices_ptr,
                                 DISTANCE_T* const result_distances_ptr,
-                                const std::size_t lds,
+                                const std::size_t raft::lds,
                                 const std::uint32_t result_buffer_size,
                                 const std::uint32_t num_queries,
                                 const INDEX_T query_id_offset,
@@ -482,7 +482,7 @@ RAFT_KERNEL apply_filter_kernel(INDEX_T* const result_indices_ptr,
   if (tid >= result_buffer_size * num_queries) { return; }
   const auto i     = tid % result_buffer_size;
   const auto j     = tid / result_buffer_size;
-  const auto index = i + j * lds;
+  const auto index = i + j * raft::lds;
 
   if (result_indices_ptr[index] != ~index_msb_1_mask &&
       !sample_filter(query_id_offset + j, result_indices_ptr[index])) {
@@ -494,7 +494,7 @@ RAFT_KERNEL apply_filter_kernel(INDEX_T* const result_indices_ptr,
 template <class INDEX_T, class DISTANCE_T, class SAMPLE_FILTER_T>
 void apply_filter(INDEX_T* const result_indices_ptr,
                   DISTANCE_T* const result_distances_ptr,
-                  const std::size_t lds,
+                  const std::size_t raft::lds,
                   const std::uint32_t result_buffer_size,
                   const std::uint32_t num_queries,
                   const INDEX_T query_id_offset,
@@ -506,7 +506,7 @@ void apply_filter(INDEX_T* const result_indices_ptr,
 
   apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(result_indices_ptr,
                                                                  result_distances_ptr,
-                                                                 lds,
+                                                                 raft::lds,
                                                                  result_buffer_size,
                                                                  num_queries,
                                                                  query_id_offset,
@@ -642,7 +642,7 @@ struct search : search_plan_impl<DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T> {
       parent_node_list(0, resource::get_cuda_stream(res)),
       topk_hint(0, resource::get_cuda_stream(res)),
       topk_workspace(0, resource::get_cuda_stream(res)),
-      terminate_flag(resource::get_cuda_stream(res))
+      terminate_flag(raft::resource::get_cuda_stream(res))
   {
     set_params(res);
   }

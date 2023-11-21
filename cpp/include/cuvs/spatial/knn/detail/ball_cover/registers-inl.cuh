@@ -171,7 +171,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_index,
                                           dist_func dfunc,
                                           value_int* dist_counter)
 {
-  static constexpr int kNumWarps = tpb / WarpSize;
+  static constexpr int kNumWarps = tpb / raft::WarpSize;
 
   __shared__ value_t shared_memK[kNumWarps * warp_q];
   __shared__ KeyValuePair<value_t, value_idx> shared_memV[kNumWarps * warp_q];
@@ -191,7 +191,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_index,
     shared_memV,
     k);
 
-  const value_int n_k = Pow2<WarpSize>::roundDown(k);
+  const value_int n_k = raft::Pow2<WarpSize>::roundDown(k);
   value_int i         = threadIdx.x;
   for (; i < n_k; i += tpb) {
     value_idx ind = knn_inds[blockIdx.x * k + i];
@@ -218,7 +218,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_index,
       // Round R_size to the nearest warp threads so they can
       // all be computing in parallel.
 
-      const value_int limit = Pow2<WarpSize>::roundDown(R_size);
+      const value_int limit = raft::Pow2<WarpSize>::roundDown(R_size);
 
       i = threadIdx.x;
       for (; i < limit; i += tpb) {
@@ -328,7 +328,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_index,
                                        distance_func dfunc,
                                        float weight = 1.0)
 {
-  static constexpr value_int kNumWarps = tpb / WarpSize;
+  static constexpr value_int kNumWarps = tpb / raft::WarpSize;
 
   __shared__ value_t shared_memK[kNumWarps * warp_q];
   __shared__ KeyValuePair<value_t, value_idx> shared_memV[kNumWarps * warp_q];
@@ -379,7 +379,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_index,
 
     value_idx R_size = R_stop_offset - R_start_offset;
 
-    value_int limit = Pow2<WarpSize>::roundDown(R_size);
+    value_int limit = raft::Pow2<WarpSize>::roundDown(R_size);
     value_int i     = threadIdx.x;
     for (; i < limit; i += tpb) {
       // Index and distance of current candidate's nearest landmark

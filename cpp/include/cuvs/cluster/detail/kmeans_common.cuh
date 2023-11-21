@@ -267,7 +267,7 @@ void sampleCentroids(raft::resources const& handle,
   resource::sync_stream(handle, stream);
 
   uint8_t* rawPtr_isSampleCentroid = isSampleCentroid.data_handle();
-  thrust::for_each_n(resource::get_thrust_policy(handle),
+  thrust::for_each_n(raft::resource::get_thrust_policy(handle),
                      sampledMinClusterDistance.data_handle(),
                      nPtsSampledInRank,
                      [=] __device__(raft::KeyValuePair<ptrdiff_t, DataT> val) {
@@ -399,7 +399,7 @@ void minClusterAndDistanceCompute(
 
   raft::KeyValuePair<IndexT, DataT> initial_value(0, std::numeric_limits<DataT>::max());
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                minClusterAndDistance.data_handle(),
                minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
                initial_value);
@@ -527,7 +527,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
   auto pairwiseDistance = raft::make_device_matrix_view<DataT, IndexT>(
     L2NormBuf_OR_DistBuf.data(), dataBatchSize, centroidsBatchSize);
 
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                minClusterDistance.data_handle(),
                minClusterDistance.data_handle() + minClusterDistance.size(),
                std::numeric_limits<DataT>::max());

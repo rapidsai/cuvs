@@ -172,8 +172,8 @@ void knn(raft::resources const& handle,
   RAFT_EXPECTS(indices.extent(1) == distances.extent(1) && distances.extent(1),
                "Number of columns in output indices and distances matrices must the same");
 
-  bool rowMajorIndex = std::is_same_v<index_layout, layout_c_contiguous>;
-  bool rowMajorQuery = std::is_same_v<search_layout, layout_c_contiguous>;
+  bool rowMajorIndex = std::is_same_v<index_layout, raft::layout_c_contiguous>;
+  bool rowMajorQuery = std::is_same_v<search_layout, raft::layout_c_contiguous>;
 
   std::vector<value_t*> inputs;
   std::vector<matrix_idx> sizes;

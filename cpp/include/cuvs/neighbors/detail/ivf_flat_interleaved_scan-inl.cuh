@@ -206,7 +206,8 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t> {
         encV,
         reinterpret_cast<unsigned const*>(data) + loadIndex + j * kIndexGroupSize * veclen_int);
       uint32_t queryRegs[veclen_int];
-      lds(queryRegs, reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * veclen_int);
+      raft::lds(queryRegs,
+                reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
         compute_dist(dist, queryRegs[k], encV[k]);
@@ -234,7 +235,7 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t> {
         const int d = (i * kUnroll + j) * veclen_int;
 #pragma unroll
         for (int k = 0; k < veclen_int; ++k) {
-          compute_dist(dist, shfl(queryReg, d + k, raft::WarpSize), encV[k]);
+          compute_dist(dist, raft::shfl(queryReg, d + k, raft::WarpSize), encV[k]);
         }
       }
     }
@@ -255,7 +256,7 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t> {
       raft::ldg(enc, reinterpret_cast<uint32_t const*>(data) + lane_id * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
-        uint32_t q = shfl(queryReg, (d / 4) + k, raft::WarpSize);
+        uint32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);
         compute_dist(dist, q, enc[k]);
       }
     }
@@ -301,7 +302,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, uint32_t> {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         uint32_t encV = reinterpret_cast<unsigned const*>(data)[lane_id + j * kIndexGroupSize];
-        uint32_t q    = shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
         compute_dist(dist, q, encV);
       }
     }
@@ -318,7 +319,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, uint32_t> {
     uint32_t queryReg    = loadDim < dim ? reinterpret_cast<unsigned const*>(query)[loadDim] : 0;
     for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
       uint32_t enc = reinterpret_cast<unsigned const*>(data)[lane_id];
-      uint32_t q   = shfl(queryReg, d / veclen, raft::WarpSize);
+      uint32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
       compute_dist(dist, q, enc);
     }
   }
@@ -362,7 +363,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, uint32_t> {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         uint32_t encV = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
-        uint32_t q    = shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
         compute_dist(dist, q, encV);
       }
     }
@@ -379,7 +380,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, uint32_t> {
     uint32_t queryReg = loadDim < dim ? reinterpret_cast<uint16_t const*>(query + loadDim)[0] : 0;
     for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
       uint32_t enc = reinterpret_cast<uint16_t const*>(data)[lane_id];
-      uint32_t q   = shfl(queryReg, d / veclen, raft::WarpSize);
+      uint32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
       compute_dist(dist, q, enc);
     }
   }
@@ -422,7 +423,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, uint32_t> {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         uint32_t encV = data[lane_id + j * kIndexGroupSize];
-        uint32_t q    = shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
         compute_dist(dist, q, encV);
       }
     }
@@ -439,7 +440,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, uint32_t> {
     uint32_t queryReg    = loadDim < dim ? query[loadDim] : 0;
     for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
       uint32_t enc = data[lane_id];
-      uint32_t q   = shfl(queryReg, d, raft::WarpSize);
+      uint32_t q   = raft::shfl(queryReg, d, raft::WarpSize);
       compute_dist(dist, q, enc);
     }
   }
@@ -519,7 +520,7 @@ struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t> {
       raft::ldg(enc, reinterpret_cast<int32_t const*>(data) + lane_id * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
-        int32_t q = shfl(queryReg, (d / 4) + k, raft::WarpSize);  // Here 4 is for 1 - int;
+        int32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);  // Here 4 is for 1 - int;
         compute_dist(dist, q, enc[k]);
       }
     }
@@ -562,7 +563,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, int8_t, int32_t> {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         int32_t encV = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
-        int32_t q    = shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        int32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
         compute_dist(dist, q, encV);
       }
     }
@@ -576,7 +577,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, int8_t, int32_t> {
     int32_t queryReg = loadDim < dim ? reinterpret_cast<uint16_t const*>(query + loadDim)[0] : 0;
     for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
       int32_t enc = reinterpret_cast<uint16_t const*>(data + lane_id * veclen)[0];
-      int32_t q   = shfl(queryReg, d / veclen, raft::WarpSize);
+      int32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
       compute_dist(dist, q, enc);
     }
   }
@@ -702,8 +703,8 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   copy_vectorized(query_shared, query, std::min(dim, query_smem_elems));
   __syncthreads();
 
-  using block_sort_t = matrix::detail::select::warpsort::block_sort<
-    matrix::detail::select::warpsort::warp_sort_filtered,
+  using block_sort_t = raft::matrix::detail::select::warpsort::block_sort<
+    raft::matrix::detail::select::warpsort::warp_sort_filtered,
     Capacity,
     Ascending,
     float,
@@ -711,7 +712,7 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   block_sort_t queue(k);
 
   {
-    using align_warp  = Pow2<raft::WarpSize>;
+    using align_warp  = raft::Pow2<raft::WarpSize>;
     const int lane_id = align_warp::mod(threadIdx.x);
 
     // How many full warps needed to compute the distance (without remainder)
@@ -758,7 +759,7 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
         }
 
         if (dim > query_smem_elems) {
-          // The default path - using shfl ops - for dimensions beyond query_smem_elems
+          // The default path - using raft::shfl ops - for dimensions beyond query_smem_elems
           loadAndComputeDist<kUnroll, decltype(compute_dist), Veclen, T, AccT> lc(dist,
                                                                                   compute_dist);
           for (int pos = shm_assisted_dim; pos < full_warps_along_dim; pos += raft::WarpSize) {
@@ -835,7 +836,7 @@ void launch_kernel(Lambda lambda,
 {
   RAFT_EXPECTS(Veclen == index.veclen(),
                "Configured Veclen does not match the index interleaving pattern.");
-  constexpr auto kKernel   = interleaved_scan_kernel<Capacity,
+  constexpr auto kKernel     = interleaved_scan_kernel<Capacity,
                                                    Veclen,
                                                    Ascending,
                                                    T,
@@ -844,9 +845,9 @@ void launch_kernel(Lambda lambda,
                                                    IvfSampleFilterT,
                                                    Lambda,
                                                    PostLambda>;
-  const int max_query_smem = 16384;
-  int query_smem_elems =
-    std::min<int>(max_query_smem / sizeof(T), Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
+  const int max_query_smem   = 16384;
+  int query_smem_elems       = std::min<int>(max_query_smem / sizeof(T),
+                                       raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
   int smem_size              = query_smem_elems * sizeof(T);
   constexpr int kSubwarpSize = std::min<int>(Capacity, raft::WarpSize);
   auto block_merge_mem =
@@ -911,7 +912,7 @@ struct euclidean_dist<Veclen, uint8_t, uint32_t> {
   {
     if constexpr (Veclen > 1) {
       const auto diff = __vabsdiffu4(x, y);
-      acc             = dp4a(diff, diff, acc);
+      acc             = raft::dp4a(diff, diff, acc);
     } else {
       const auto diff = __usad(x, y, 0u);
       acc += diff * diff;
@@ -924,12 +925,12 @@ struct euclidean_dist<Veclen, int8_t, int32_t> {
   __device__ __forceinline__ void operator()(int32_t& acc, int32_t x, int32_t y)
   {
     if constexpr (Veclen > 1) {
-      // Note that we enforce here that the unsigned version of dp4a is used, because the difference
-      // between two int8 numbers can be greater than 127 and therefore represented as a negative
-      // number in int8. Casting from int8 to int32 would yield incorrect results, while casting
-      // from uint8 to uint32 is correct.
+      // Note that we enforce here that the unsigned version of raft::dp4a is used, because the
+      // difference between two int8 numbers can be greater than 127 and therefore represented as a
+      // negative number in int8. Casting from int8 to int32 would yield incorrect results, while
+      // casting from uint8 to uint32 is correct.
       const auto diff = __vabsdiffs4(x, y);
-      acc             = dp4a(diff, diff, static_cast<uint32_t>(acc));
+      acc             = raft::dp4a(diff, diff, static_cast<uint32_t>(acc));
     } else {
       const auto diff = x - y;
       acc += diff * diff;
@@ -1042,7 +1043,7 @@ struct select_interleaved_scan_kernel {
     RAFT_EXPECTS(capacity == Capacity,
                  "Capacity must be power-of-two not bigger than the maximum allowed size "
                  "matrix::detail::select::warpsort::kMaxCapacity (%d).",
-                 matrix::detail::select::warpsort::kMaxCapacity);
+                 raft::matrix::detail::select::warpsort::kMaxCapacity);
     RAFT_EXPECTS(
       veclen == Veclen,
       "Veclen must be power-of-two not bigger than the maximum allowed size for this data type.");

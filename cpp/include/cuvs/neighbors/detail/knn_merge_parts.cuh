@@ -41,7 +41,7 @@ RAFT_KERNEL knn_merge_parts_kernel(const value_t* inK,
                                    int k,
                                    value_idx* translations)
 {
-  constexpr int kNumWarps = tpb / WarpSize;
+  constexpr int kNumWarps = tpb / raft::WarpSize;
 
   __shared__ value_t smemK[kNumWarps * warp_q];
   __shared__ value_idx smemV[kNumWarps * warp_q];

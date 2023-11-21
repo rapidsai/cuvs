@@ -55,7 +55,7 @@ void refine_device(
                "k must be lest than topk::kMaxCapacity (%d).",
                raft::matrix::detail::select::warpsort::kMaxCapacity);
 
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "neighbors::refine(%zu, %u)", size_t(n_queries), uint32_t(n_candidates));
 
   refine_check_input(dataset.extents(),
@@ -74,7 +74,7 @@ void refine_device(
   // - We run IVF flat search with n_probes=1 to select the best k elements of the candidates.
   rmm::device_uvector<uint32_t> fake_coarse_idx(n_queries, resource::get_cuda_stream(handle));
 
-  thrust::sequence(resource::get_thrust_policy(handle),
+  thrust::sequence(raft::resource::get_thrust_policy(handle),
                    fake_coarse_idx.data(),
                    fake_coarse_idx.data() + n_queries);
 

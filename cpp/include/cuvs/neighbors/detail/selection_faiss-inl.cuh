@@ -35,7 +35,7 @@ RAFT_KERNEL select_k_kernel(const key_t* inK,
                             payload_t initV,
                             int k)
 {
-  using align_warp        = Pow2<WarpSize>;
+  using align_warp        = raft::Pow2<WarpSize>;
   constexpr int kNumWarps = align_warp::div(tpb);
 
   __shared__ key_t smemK[kNumWarps * warp_q];
@@ -93,7 +93,7 @@ inline void select_k_impl(const key_t* inK,
   constexpr int n_threads = (warp_q <= 1024) ? 128 : 64;
   auto block              = dim3(n_threads);
 
-  auto kInit = select_min ? upper_bound<key_t>() : lower_bound<key_t>();
+  auto kInit = select_min ? raft::upper_bound<key_t>() : lower_bound<key_t>();
   auto vInit = -1;
   if (select_min) {
     select_k_kernel<payload_t, key_t, false, warp_q, thread_q, n_threads>

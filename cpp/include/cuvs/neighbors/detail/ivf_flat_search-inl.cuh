@@ -27,7 +27,7 @@
 #include <raft/linalg/gemm.cuh>                   // raft::linalg::gemm
 #include <raft/linalg/norm.cuh>                   // raft::linalg::norm
 #include <raft/linalg/unary_op.cuh>               // raft::linalg::unary_op
-#include <raft/matrix/detail/select_k.cuh>        // matrix::detail::select_k
+#include <raft/matrix/detail/select_k.cuh>        // raft::matrix::detail::select_k
 #include <rmm/mr/device/per_device_resource.hpp>  // rmm::device_memory_resource
 
 namespace cuvs::neighbors::ivf_flat::detail {
@@ -127,16 +127,16 @@ void search_impl(raft::resources const& handle,
                stream);
 
   RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
-  matrix::detail::select_k<AccT, uint32_t>(handle,
-                                           distance_buffer_dev.data(),
-                                           nullptr,
-                                           n_queries,
-                                           index.n_lists(),
-                                           n_probes,
-                                           coarse_distances_dev.data(),
-                                           coarse_indices_dev.data(),
-                                           select_min,
-                                           search_mr);
+  raft::matrix::detail::select_k<AccT, uint32_t>(handle,
+                                                 distance_buffer_dev.data(),
+                                                 nullptr,
+                                                 n_queries,
+                                                 index.n_lists(),
+                                                 n_probes,
+                                                 coarse_distances_dev.data(),
+                                                 coarse_indices_dev.data(),
+                                                 select_min,
+                                                 search_mr);
   RAFT_LOG_TRACE_VEC(coarse_indices_dev.data(), n_probes);
   RAFT_LOG_TRACE_VEC(coarse_distances_dev.data(), n_probes);
 
@@ -191,16 +191,16 @@ void search_impl(raft::resources const& handle,
 
   // Merge topk values from different blocks
   if (grid_dim_x > 1) {
-    matrix::detail::select_k<AccT, IdxT>(handle,
-                                         refined_distances_dev.data(),
-                                         refined_indices_dev.data(),
-                                         n_queries,
-                                         k * grid_dim_x,
-                                         k,
-                                         distances,
-                                         neighbors,
-                                         select_min,
-                                         search_mr);
+    raft::matrix::detail::select_k<AccT, IdxT>(handle,
+                                               refined_distances_dev.data(),
+                                               refined_indices_dev.data(),
+                                               n_queries,
+                                               k * grid_dim_x,
+                                               k,
+                                               distances,
+                                               neighbors,
+                                               select_min,
+                                               search_mr);
   }
 }
 
@@ -219,7 +219,7 @@ inline void search(raft::resources const& handle,
                    rmm::mr::device_memory_resource* mr = nullptr,
                    IvfSampleFilterT sample_filter      = IvfSampleFilterT())
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_flat::search(k = %u, n_queries = %u, dim = %zu)", k, n_queries, index.dim());
 
   RAFT_EXPECTS(params.n_probes > 0,

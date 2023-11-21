@@ -104,7 +104,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, make_extents<IdxT>(n_rows));
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
-      thrust::fill(resource::get_thrust_policy(handle),
+      thrust::fill(raft::resource::get_thrust_policy(handle),
                    minClusterAndDistance.data_handle(),
                    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
                    initial_value);
@@ -130,7 +130,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       // todo(lsugy): use KVP + iterator in caller.
       // Copy keys to output labels
-      thrust::transform(resource::get_thrust_policy(handle),
+      thrust::transform(raft::resource::get_thrust_policy(handle),
                         minClusterAndDistance.data_handle(),
                         minClusterAndDistance.data_handle() + n_rows,
                         labels,
@@ -325,7 +325,7 @@ void compute_norm(const raft::resources& handle,
                   MappingOpT mapping_op,
                   rmm::mr::device_memory_resource* mr = nullptr)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope("compute_norm");
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("compute_norm");
   auto stream = resource::get_cuda_stream(handle);
   if (mr == nullptr) { mr = resource::get_workspace_resource(handle); }
   rmm::device_uvector<MathT> mapped_dataset(0, stream, mr);
@@ -381,7 +381,7 @@ void predict(const raft::resources& handle,
              const MathT* dataset_norm           = nullptr)
 {
   auto stream = resource::get_cuda_stream(handle);
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "predict(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
   if (mr == nullptr) { mr = resource::get_workspace_resource(handle); }
   auto [max_minibatch_size, _mem_per_row] =
@@ -473,7 +473,7 @@ __launch_bounds__((WarpSize * BlockDimY)) RAFT_KERNEL
   const MathT wc = min(static_cast<MathT>(csize), static_cast<MathT>(kAdjustCentersWeight));
   // Weight for the datapoint used to shift the center.
   const MathT wd = 1.0;
-  for (; j < dim; j += WarpSize) {
+  for (; j < dim; j += raft::WarpSize) {
     MathT val = 0;
     val += wc * centers[j + dim * li];
     val += wd * mapping_op(dataset[j + dim * i]);
@@ -533,7 +533,7 @@ auto adjust_centers(MathT* centers,
                     rmm::cuda_stream_view stream,
                     rmm::mr::device_memory_resource* device_memory) -> bool
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "adjust_centers(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
   if (n_clusters == 0) { return false; }
   constexpr static std::array kPrimes{29,   71,   113,  173,  229,  281,  349,  409,  463,  541,
@@ -901,7 +901,7 @@ auto build_fine_clusters(const raft::resources& handle,
     raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-      thrust::gather(resource::get_thrust_policy(handle),
+      thrust::gather(raft::resource::get_thrust_policy(handle),
                      mc_trainset_ids,
                      mc_trainset_ids + k,
                      dataset_norm_mptr,
@@ -964,7 +964,7 @@ void build_hierarchical(const raft::resources& handle,
   auto stream  = resource::get_cuda_stream(handle);
   using LabelT = uint32_t;
 
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "build_hierarchical(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
 
   IdxT n_mesoclusters = std::min(n_clusters, static_cast<IdxT>(std::sqrt(n_clusters) + 0.5));

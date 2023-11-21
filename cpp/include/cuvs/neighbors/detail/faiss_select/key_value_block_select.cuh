@@ -65,7 +65,7 @@ struct KeyValueBlockSelect {
       warpV[i].value = initVv;
     }
 
-    warpFence();
+    raft::warpFence();
   }
 
   __device__ inline void addThreadQ(K k, K vk, V vv)
@@ -101,7 +101,7 @@ struct KeyValueBlockSelect {
       return;
     }
 
-    // This has a trailing warpFence
+    // This has a trailing raft::warpFence
     mergeWarpQ();
 
     // Any top-k elements have been merged into the warp queue; we're
@@ -119,7 +119,7 @@ struct KeyValueBlockSelect {
     warpKTop      = warpK[kMinus1];
     warpKTopRDist = warpV[kMinus1].key;
 
-    warpFence();
+    raft::warpFence();
   }
 
   /// This function handles sorting and merging together the
@@ -143,7 +143,7 @@ struct KeyValueBlockSelect {
       warpVRegisters[i].value = warpV[i * raft::WarpSize + laneId].value;
     }
 
-    warpFence();
+    raft::warpFence();
 
     // The warp queue is already sorted, and now that we've sorted the
     // per-thread queue, merge both sorted lists together, producing
@@ -159,7 +159,7 @@ struct KeyValueBlockSelect {
       warpV[i * raft::WarpSize + laneId].value = warpVRegisters[i].value;
     }
 
-    warpFence();
+    raft::warpFence();
   }
 
   /// WARNING: all threads in a warp must participate in this.

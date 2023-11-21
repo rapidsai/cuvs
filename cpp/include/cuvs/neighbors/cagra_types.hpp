@@ -221,7 +221,7 @@ struct index : ann::index {
    * @endcode
    *   In the above example, we have passed a host dataset to build. The returned index will own a
    * device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a
-   * device_mdspan to build, then it will only store a reference to it.
+   * raft::device_mdspan to build, then it will only store a reference to it.
    *
    * - Constructing index using existing knn-graph
    * @code{.cpp}

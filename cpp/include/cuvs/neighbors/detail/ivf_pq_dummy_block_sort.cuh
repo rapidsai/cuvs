@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
+#include <raft/matrix/detail/select_warpsort.cuh>  // raft::matrix::detail::select::warpsort::warp_sort_distributed
 
 /*
  * This header file is a bit of an ugly duckling. The type dummy_block_sort is
@@ -31,7 +31,8 @@ namespace cuvs::neighbors::ivf_pq::detail {
 
 template <typename T, typename IdxT>
 struct dummy_block_sort_t {
-  using queue_t = matrix::detail::select::warpsort::warp_sort_distributed<WarpSize, true, T, IdxT>;
+  using queue_t =
+    raft::matrix::detail::select::warpsort::warp_sort_distributed<WarpSize, true, T, IdxT>;
   template <typename... Args>
   __device__ dummy_block_sort_t(int k, Args...){};
 };

@@ -323,7 +323,7 @@ struct index : ann::index {
       copy(&this_inds_ptrs(label), &inds_ptr, 1, stream);
     }
     auto this_list_sizes = list_sizes().data_handle();
-    total_size_          = thrust::reduce(resource::get_thrust_policy(res),
+    total_size_          = thrust::reduce(raft::resource::get_thrust_policy(res),
                                  this_list_sizes,
                                  this_list_sizes + this_lists.size(),
                                  0,

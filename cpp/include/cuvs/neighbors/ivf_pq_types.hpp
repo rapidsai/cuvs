@@ -175,7 +175,7 @@ struct list_spec {
    *    ].
    */
   using list_extents =
-    extents<SizeT, dynamic_extent, dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
+    extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
 
   SizeT align_max;
   SizeT align_min;
@@ -374,20 +374,21 @@ struct index : ann::index {
   {
   }
 
-  using pq_centers_extents =
-    std::experimental::extents<uint32_t, dynamic_extent, dynamic_extent, dynamic_extent>;
+  using pq_centers_extents = std::experimental::
+    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
   /**
    * PQ cluster centers
    *
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  inline auto pq_centers() noexcept -> device_mdspan<float, pq_centers_extents, raft::row_major>
+  inline auto pq_centers() noexcept
+    -> raft::device_mdspan<float, pq_centers_extents, raft::row_major>
   {
     return pq_centers_.view();
   }
   [[nodiscard]] inline auto pq_centers() const noexcept
-    -> device_mdspan<const float, pq_centers_extents, raft::row_major>
+    -> raft::device_mdspan<const float, pq_centers_extents, raft::row_major>
   {
     return pq_centers_.view();
   }
@@ -445,12 +446,13 @@ struct index : ann::index {
    *
    * This span is used during search to estimate the maximum size of the workspace.
    */
-  inline auto accum_sorted_sizes() noexcept -> host_vector_view<IdxT, uint32_t, raft::row_major>
+  inline auto accum_sorted_sizes() noexcept
+    -> raft::host_vector_view<IdxT, uint32_t, raft::row_major>
   {
     return accum_sorted_sizes_.view();
   }
   [[nodiscard]] inline auto accum_sorted_sizes() const noexcept
-    -> host_vector_view<const IdxT, uint32_t, raft::row_major>
+    -> raft::host_vector_view<const IdxT, uint32_t, raft::row_major>
   {
     return accum_sorted_sizes_.view();
   }
@@ -523,7 +525,7 @@ struct index : ann::index {
   // Primary data members
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
-  device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
+  raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
@@ -531,7 +533,7 @@ struct index : ann::index {
   // Computed members for accelerating search.
   raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
   raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
-  host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
+  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
 
   /** Throw an error if the index content is inconsistent. */
   void check_consistency()

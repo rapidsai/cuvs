@@ -222,7 +222,7 @@ struct PairwiseDistances : public BaseClass {
 
   DI void accumulate()
   {
-    // We have a separate ldsXY and accumulate_reg_tile outside the loop body,
+    // We have a separate raft::ldsXY and accumulate_reg_tile outside the loop body,
     // so that these separated calls can be interspersed with preceding and
     // following instructions, thereby hiding latency.
     this->ldsXY(0);

@@ -45,7 +45,7 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
                                            size_type n_rows)
   : size{n_rows}, data{res}, indices{res}
 {
-  auto capacity = round_up_safe<SizeT>(n_rows, spec.align_max);
+  auto capacity = raft::round_up_safe<SizeT>(n_rows, spec.align_max);
   if (n_rows < spec.align_max) {
     capacity = bound_by_power_of_two<SizeT>(std::max<SizeT>(n_rows, spec.align_min));
     capacity = std::min<SizeT>(capacity, spec.align_max);
@@ -63,7 +63,7 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
       e.what());
   }
   // Fill the index buffer with a pre-defined marker for easier debugging
-  thrust::fill_n(resource::get_thrust_policy(res),
+  thrust::fill_n(raft::resource::get_thrust_policy(res),
                  indices.data_handle(),
                  indices.size(),
                  ivf::kInvalidRecord<index_type>);

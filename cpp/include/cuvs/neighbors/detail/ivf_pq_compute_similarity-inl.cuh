@@ -20,7 +20,7 @@
 #include <cuvs/neighbors/detail/ivf_pq_dummy_block_sort.cuh>  // dummy_block_sort_t
 #include <cuvs/neighbors/ivf_pq_types.hpp>                    // codebook_gen
 #include <cuvs/neighbors/sample_filter_types.hpp>             // none_ivf_sample_filter
-#include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
+#include <raft/matrix/detail/select_warpsort.cuh>  // raft::matrix::detail::select::warpsort::warp_sort_distributed
 #include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
 #include <raft/util/device_atomics.cuh>      // raft::atomicMin
 #include <raft/util/pow2_utils.cuh>          // raft::Pow2
@@ -37,7 +37,7 @@ namespace cuvs::neighbors::ivf_pq::detail {
  */
 static constexpr int kMaxCapacity = 128;
 static_assert((kMaxCapacity >= 32) && !(kMaxCapacity & (kMaxCapacity - 1)),
-              "kMaxCapacity must be a power of two, not smaller than the WarpSize.");
+              "kMaxCapacity must be a power of two, not smaller than the raft::WarpSize.");
 
 // using weak attribute here, because it may be compiled multiple times.
 auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, uint32_t n_queries)
@@ -50,8 +50,8 @@ auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, ui
 
 template <int Capacity, typename T, typename IdxT>
 struct pq_block_sort {
-  using type = matrix::detail::select::warpsort::block_sort<
-    matrix::detail::select::warpsort::warp_sort_distributed_ext,
+  using type = raft::matrix::detail::select::warpsort::block_sort<
+    raft::matrix::detail::select::warpsort::warp_sort_distributed_ext,
     Capacity,
     true,
     T,
@@ -104,7 +104,7 @@ constexpr inline auto estimate_carveout(double shmem_fraction,
                                         size_t shmem_per_block,
                                         const cudaDeviceProp& dev_props) -> int
 {
-  using shmem_unit = Pow2<128>;
+  using shmem_unit = raft::Pow2<128>;
   size_t m         = shmem_unit::roundUp(shmem_per_block);
   size_t r         = dev_props.reservedSharedMemPerBlock;
   size_t s         = dev_props.sharedMemPerMultiprocessor;
@@ -437,11 +437,11 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     // Then, such a chunk contains `chunk_size = 128 / pq_bits` record elements, and the record
     // consists of `ceildiv(pq_dim, chunk_size)` chunks. The chunks are interleaved in groups of 32,
     // so that the warp can achieve the best coalesced read throughput.
-    using group_align  = Pow2<kIndexGroupSize>;
-    using vec_align    = Pow2<kIndexGroupVecLen>;
+    using group_align  = raft::Pow2<kIndexGroupSize>;
+    using vec_align    = raft::Pow2<kIndexGroupVecLen>;
     using local_topk_t = block_sort_t<Capacity, OutT, uint32_t>;
     using op_t         = uint32_t;
-    using vec_t        = TxN_t<op_t, kIndexGroupVecLen / sizeof(op_t)>;
+    using vec_t        = raft::TxN_t<op_t, kIndexGroupVecLen / sizeof(op_t)>;
 
     uint32_t sample_offset = 0;
     if (probe_ix > 0) { sample_offset = chunk_indices[probe_ix - 1]; }
@@ -453,7 +453,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                           group_align::mod(threadIdx.x) * vec_align::Value;
     pq_line_width *= blockDim.x;
 
-    constexpr OutT kDummy = upper_bound<OutT>();
+    constexpr OutT kDummy = raft::upper_bound<OutT>();
     OutT query_kth        = kDummy;
     if constexpr (kManageLocalTopK) { query_kth = OutT(query_kths[query_ix]); }
     OutT early_stop_limit = kDummy;
@@ -585,7 +585,7 @@ auto get_compute_similarity_kernel(uint32_t pq_bits, uint32_t k_max)
 /** Estimate the occupancy for the given kernel on the given device. */
 template <typename OutT, typename LutT, typename IvfSampleFilterT>
 struct occupancy_t {
-  using shmem_unit = Pow2<128>;
+  using shmem_unit = raft::Pow2<128>;
 
   int blocks_per_sm = 0;
   double occupancy  = 0.0;
@@ -725,7 +725,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
     ltk_reduce_mem_t(bool manage_local_topk, uint32_t topk)
       : manage_local_topk(manage_local_topk), topk(topk)
     {
-      subwarp_size = WarpSize;
+      subwarp_size = raft::WarpSize;
       while (topk * 2 <= subwarp_size) {
         subwarp_size /= 2;
       }
@@ -733,11 +733,10 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
 
     [[nodiscard]] auto operator()(uint32_t n_threads) const -> size_t
     {
-      return manage_local_topk
-               ? matrix::detail::select::warpsort::template calc_smem_size_for_block_wide<OutT,
-                                                                                          uint32_t>(
-                   n_threads / subwarp_size, topk)
-               : 0;
+      return manage_local_topk ? raft::matrix::detail::select::warpsort::
+                                   template calc_smem_size_for_block_wide<OutT, uint32_t>(
+                                     n_threads / subwarp_size, topk)
+                               : 0;
     }
   } ltk_reduce_mem{manage_local_topk, topk};
 
@@ -760,7 +759,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
   //   1. It's a power-of-two for efficient L1 caching of pq_centers values
   //      (multiples of `1 << pq_bits`).
   //   2. It should be large enough to fully utilize an SM.
-  uint32_t n_threads_min = WarpSize;
+  uint32_t n_threads_min = raft::WarpSize;
   while (dev_props.maxBlocksPerMultiProcessor * int(n_threads_min) <
          dev_props.maxThreadsPerMultiProcessor) {
     n_threads_min *= 2;
@@ -782,7 +781,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
 
   // Granularity of changing the number of threads when computing the maximum block size.
   // It's good to have it multiple of the PQ book width.
-  uint32_t n_threads_gty = round_up_safe<uint32_t>(1u << pq_bits, WarpSize);
+  uint32_t n_threads_gty = raft::round_up_safe<uint32_t>(1u << pq_bits, raft::WarpSize);
 
   /*
    Shared memory / L1 cache balance is the main limiter of this kernel.

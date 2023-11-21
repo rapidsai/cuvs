@@ -69,7 +69,7 @@ struct kmeans_solver_t {
     auto centroids =
       raft::make_device_matrix<value_type_t, index_type_t>(handle, config_.n_clusters, dim);
     auto weight = raft::make_device_vector<value_type_t, index_type_t>(handle, n_obs_vecs);
-    thrust::fill(resource::get_thrust_policy(handle),
+    thrust::fill(raft::resource::get_thrust_policy(handle),
                  weight.data_handle(),
                  weight.data_handle() + n_obs_vecs,
                  1);

@@ -134,7 +134,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   list_index[inlist_id] = source_ixs == nullptr ? i : source_ixs[i];
 
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = Pow2<kIndexGroupSize>;
+  using interleaved_group = raft::Pow2<kIndexGroupSize>;
   auto group_offset       = interleaved_group::roundDown(inlist_id);
   auto ingroup_id         = interleaved_group::mod(inlist_id) * veclen;
 
@@ -172,7 +172,7 @@ void extend(raft::resources const& handle,
   auto dim     = index->dim();
   list_spec<uint32_t, T, IdxT> list_device_spec{index->dim(),
                                                 index->conservative_memory_allocation()};
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_flat::extend(%zu, %u)", size_t(n_rows), dim);
 
   RAFT_EXPECTS(new_indices != nullptr || index->size() == 0,
@@ -235,7 +235,7 @@ void extend(raft::resources const& handle,
                        lists[label],
                        list_device_spec,
                        new_list_sizes[label],
-                       Pow2<kIndexGroupSize>::roundUp(old_list_sizes[label]));
+                       raft::Pow2<kIndexGroupSize>::roundUp(old_list_sizes[label]));
     }
   }
   // Update the pointers and the sizes
@@ -305,7 +305,7 @@ inline auto build(raft::resources const& handle,
                   uint32_t dim) -> index<T, IdxT>
 {
   auto stream = resource::get_cuda_stream(handle);
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_flat::build(%zu, %u)", size_t(n_rows), dim);
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>,
                 "unsupported data type");
@@ -379,7 +379,7 @@ inline void fill_refinement_index(raft::resources const& handle,
 
   auto stream      = resource::get_cuda_stream(handle);
   uint32_t n_lists = n_queries;
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_flat::fill_refinement_index(%zu, %u)", size_t(n_queries));
 
   rmm::device_uvector<LabelT> new_labels(n_queries * n_candidates, stream);
@@ -456,7 +456,8 @@ void pack_list_data(
   raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
   uint32_t veclen,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major> list_data)
+  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data)
 {
   uint32_t n_rows = codes.extent(0);
   uint32_t dim    = codes.extent(1);
@@ -473,7 +474,7 @@ void pack_list_data(
 template <typename T, typename IdxT>
 void unpack_list_data(
   raft::resources const& res,
-  device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
     list_data,
   uint32_t veclen,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,

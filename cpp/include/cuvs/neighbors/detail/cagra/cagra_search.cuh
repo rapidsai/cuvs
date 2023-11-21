@@ -122,7 +122,7 @@ void search_main(raft::resources const& res,
 
   if (params.max_queries == 0) { params.max_queries = queries.extent(0); }
 
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "cagra::search(max_queries = %u, k = %u, dim = %zu)", params.max_queries, topk, index.dim());
 
   using CagraSampleFilterT_s = typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type;
