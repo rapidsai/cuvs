@@ -209,47 +209,32 @@ endif()
 if(CUVS_BENCH_USE_RAFT_IVF_PQ)
   ConfigureAnnBench(
     NAME RAFT_IVF_PQ PATH bench/ann/src/raft/raft_benchmark.cu
-    $<$<BOOL:${CUVS_BENCH_USE_RAFT_IVF_PQ}>:bench/ann/src/raft/raft_ivf_pq.cu> LINKS raft::compiled
+    $<$<BOOL:${CUVS_BENCH_USE_RAFT_IVF_PQ}>:bench/ann/src/raft/raft_ivf_pq.cu> LINKS cuvs
   )
 endif()
 
 if(CUVS_BENCH_USE_RAFT_IVF_FLAT)
   ConfigureAnnBench(
-    NAME
-    RAFT_IVF_FLAT
-    PATH
-    bench/ann/src/raft/raft_benchmark.cu
-    $<$<BOOL:${CUVS_BENCH_USE_RAFT_IVF_FLAT}>:bench/ann/src/raft/raft_ivf_flat.cu>
-    LINKS
-    raft::compiled
+    NAME RAFT_IVF_FLAT PATH bench/ann/src/raft/raft_benchmark.cu
+    $<$<BOOL:${CUVS_BENCH_USE_RAFT_IVF_FLAT}>:bench/ann/src/raft/raft_ivf_flat.cu> LINKS cuvs
   )
 endif()
 
 if(CUVS_BENCH_USE_RAFT_BRUTE_FORCE)
-  ConfigureAnnBench(
-    NAME RAFT_BRUTE_FORCE PATH bench/ann/src/raft/raft_benchmark.cu LINKS raft::compiled
-  )
+  ConfigureAnnBench(NAME RAFT_BRUTE_FORCE PATH bench/ann/src/raft/raft_benchmark.cu LINKS cuvs)
 endif()
 
 if(CUVS_BENCH_USE_RAFT_CAGRA)
   ConfigureAnnBench(
     NAME RAFT_CAGRA PATH bench/ann/src/raft/raft_benchmark.cu
-    $<$<BOOL:${CUVS_BENCH_USE_RAFT_CAGRA}>:bench/ann/src/raft/raft_cagra.cu> LINKS raft::compiled
+    $<$<BOOL:${CUVS_BENCH_USE_RAFT_CAGRA}>:bench/ann/src/raft/raft_cagra.cu> LINKS cuvs
   )
 endif()
 
 if(CUVS_BENCH_USE_RAFT_CAGRA_HNSWLIB)
   ConfigureAnnBench(
-    NAME
-    RAFT_CAGRA_HNSWLIB
-    PATH
-    bench/ann/src/raft/raft_cagra_hnswlib.cu
-    INCLUDES
-    ${CMAKE_CURRENT_BINARY_DIR}/_deps/hnswlib-src/hnswlib
-    LINKS
-    raft::compiled
-    CXXFLAGS
-    "${HNSW_CXX_FLAGS}"
+    NAME RAFT_CAGRA_HNSWLIB PATH bench/ann/src/raft/raft_cagra_hnswlib.cu INCLUDES
+    ${CMAKE_CURRENT_BINARY_DIR}/_deps/hnswlib-src/hnswlib LINKS cuvs CXXFLAGS "${HNSW_CXX_FLAGS}"
   )
 endif()
 

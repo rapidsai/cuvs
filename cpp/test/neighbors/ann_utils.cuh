@@ -28,7 +28,7 @@
 #include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 
-#include <raft_internal/neighbors/naive_knn.cuh>
+#include <cuvs_internal/neighbors/naive_knn.cuh>
 
 #include "../test_utils.cuh"
 #include <gtest/gtest.h>

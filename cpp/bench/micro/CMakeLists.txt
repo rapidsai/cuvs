@@ -29,7 +29,7 @@ function(ConfigureBench)
 
   target_link_libraries(
     ${BENCH_NAME}
-    PRIVATE raft::raft ${CUVS_CTK_MATH_DEPENDENCIES} benchmark::benchmark Threads::Threads
+    PRIVATE raft::raft cuvs_internal benchmark::benchmark Threads::Threads
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:conda_env>
   )
 
@@ -67,7 +67,7 @@ function(ConfigureBench)
 
 endfunction()
 
-if(BUILD_PRIMS_BENCH)
+if(BUILD_MICRO_BENCH)
   ConfigureBench(
     NAME CLUSTER_BENCH PATH bench/micro/cluster/kmeans_balanced.cu bench/micro/cluster/kmeans.cu
     bench/micro/main.cpp OPTIONAL LIB EXPLICIT_INSTANTIATE_ONLY

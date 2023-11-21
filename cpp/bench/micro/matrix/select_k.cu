@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <raft_internal/matrix/select_k.cuh>
+#include <cuvs_internal/matrix/select_k.cuh>
 
 #include <common/benchmark.hpp>
 

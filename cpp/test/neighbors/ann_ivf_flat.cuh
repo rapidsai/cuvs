@@ -31,7 +31,7 @@
 #include <raft/util/fast_int_div.cuh>
 #include <thrust/functional.h>
 
-#include <raft_internal/neighbors/naive_knn.cuh>
+#include <cuvs_internal/neighbors/naive_knn.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger.hpp>

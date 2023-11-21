@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <raft_internal/neighbors/refine_helper.cuh>
+#include <cuvs_internal/neighbors/refine_helper.cuh>
 
 #include <common/benchmark.hpp>
 

@@ -46,17 +46,12 @@ function(ConfigureTest)
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE raft::raft
-            GTest::gtest
-            GTest::gtest_main
-            Threads::Threads
-            ${CUVS_CTK_MATH_DEPENDENCIES}
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-            $<TARGET_NAME_IF_EXISTS:conda_env>
+    PRIVATE cuvs raft::raft cuvs_internal GTest::gtest GTest::gtest_main Threads::Threads
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:conda_env>
   )
   set_target_properties(
     ${TEST_NAME}
-    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_BINARY_DIR}/gtests>"
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/gtests>"
                INSTALL_RPATH "\$ORIGIN/../../../lib"
                CXX_STANDARD 17
                CXX_STANDARD_REQUIRED ON
@@ -242,4 +237,4 @@ endif()
 # ##################################################################################################
 # Install tests ####################################################################################
 # ##################################################################################################
-rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libraft)
+rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)

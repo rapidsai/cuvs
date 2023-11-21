@@ -21,7 +21,7 @@
 #include "ann_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <raft_internal/neighbors/naive_knn.cuh>
+#include <cuvs_internal/neighbors/naive_knn.cuh>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>

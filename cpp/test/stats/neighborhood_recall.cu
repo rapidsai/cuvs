@@ -22,7 +22,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
-#include <raft_internal/neighbors/naive_knn.cuh>
+#include <cuvs_internal/neighbors/naive_knn.cuh>
 
 #include <raft/stats/neighborhood_recall.cuh>
 #include <raft/util/itertools.hpp>

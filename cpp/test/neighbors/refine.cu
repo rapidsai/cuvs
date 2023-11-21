@@ -18,7 +18,7 @@
 #include "ann_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <raft_internal/neighbors/refine_helper.cuh>
+#include <cuvs_internal/neighbors/refine_helper.cuh>
 
 #include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>

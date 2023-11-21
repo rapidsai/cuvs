@@ -12,10 +12,10 @@
 # the License.
 # =============================================================================
 
-if(BUILD_TESTS OR BUILD_PRIMS_BENCH)
-  add_library(raft_internal INTERFACE)
+if(BUILD_TESTS OR BUILD_MICRO_BENCH)
+  add_library(cuvs_internal INTERFACE)
   target_include_directories(
-    raft_internal INTERFACE "$<BUILD_INTERFACE:${RAFT_SOURCE_DIR}/internal>"
+    cuvs_internal INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/internal>"
   )
-  target_compile_features(raft_internal INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
+  target_compile_features(cuvs_internal INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 endif()

@@ -18,7 +18,7 @@
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 
-#include <raft_internal/neighbors/naive_knn.cuh>
+#include <cuvs_internal/neighbors/naive_knn.cuh>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/neighbors/nn_descent.cuh>
