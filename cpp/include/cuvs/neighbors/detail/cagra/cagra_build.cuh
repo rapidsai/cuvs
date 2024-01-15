@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/core/resource/detail/device_memory_resource.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 
 #include <cuvs/neighbors/detail/refine.cuh>
 #include <cuvs/neighbors/ivf_pq.cuh>

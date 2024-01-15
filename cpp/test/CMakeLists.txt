@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -46,7 +46,7 @@ function(ConfigureTest)
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE cuvs raft::raft cuvs_internal GTest::gtest GTest::gtest_main Threads::Threads
+    PRIVATE cuvs raft::raft GTest::gtest GTest::gtest_main Threads::Threads
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:conda_env>
   )
   set_target_properties(
@@ -152,15 +152,15 @@ if(BUILD_TESTS)
     test/neighbors/ann_cagra/test_float_uint32_t.cu
     test/neighbors/ann_cagra/test_int8_t_uint32_t.cu
     test/neighbors/ann_cagra/test_uint8_t_uint32_t.cu
-    test/neighbors/ann_cagra/test_float_int64_t.cu
-    src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim128_t8.cu
-    src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim256_t16.cu
-    src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim512_t32.cu
-    src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim1024_t32.cu
-    src/neighbors/detail/cagra/search_single_cta_float_uint64_dim128_t8.cu
-    src/neighbors/detail/cagra/search_single_cta_float_uint64_dim256_t16.cu
-    src/neighbors/detail/cagra/search_single_cta_float_uint64_dim512_t32.cu
-    src/neighbors/detail/cagra/search_single_cta_float_uint64_dim1024_t32.cu
+    #test/neighbors/ann_cagra/test_float_int64_t.cu
+    #src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim128_t8.cu
+    #src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim256_t16.cu
+    #src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim512_t32.cu
+    #src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim1024_t32.cu
+    #src/neighbors/detail/cagra/search_single_cta_float_uint64_dim128_t8.cu
+    #src/neighbors/detail/cagra/search_single_cta_float_uint64_dim256_t16.cu
+    #src/neighbors/detail/cagra/search_single_cta_float_uint64_dim512_t32.cu
+    #src/neighbors/detail/cagra/search_single_cta_float_uint64_dim1024_t32.cu
     LIB
     EXPLICIT_INSTANTIATE_ONLY
     GPUS

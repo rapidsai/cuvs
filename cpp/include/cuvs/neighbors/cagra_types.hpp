@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@
 
 #include "ann_types.hpp"
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/neighbors/cagra_types.hpp>
 
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/detail/cagra/utils.hpp>
+//#include <cuvs/neighbors/detail/cagra/utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -61,6 +62,20 @@ struct index_params : ann::index_params {
   graph_build_algo build_algo = graph_build_algo::IVF_PQ;
   /** Number of Iterations to run if building with NN_DESCENT */
   size_t nn_descent_niter = 20;
+
+  /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
+  operator raft::neighbors::cagra::index_params() const {
+    return raft::neighbors::cagra::index_params{
+      {
+        .metric = static_cast<raft::distance::DistanceType>((int)this->metric),
+        .metric_arg = this->metric_arg,
+        .add_data_on_build = this->add_data_on_build,
+      },
+      .intermediate_graph_degree = intermediate_graph_degree,
+      .graph_degree = graph_degree,
+      .build_algo = static_cast<raft::neighbors::cagra::graph_build_algo>((int)build_algo),
+      .nn_descent_niter = nn_descent_niter};
+  }
 };
 
 enum class search_algo {
@@ -116,6 +131,26 @@ struct search_params : ann::search_params {
   uint32_t num_random_samplings = 1;
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask = 0x128394;
+
+  /** Build a raft CAGRA search params from an existing cuvs CAGRA search params. */
+  operator raft::neighbors::cagra::search_params() const {
+    raft::neighbors::cagra::search_params result = {
+      {},
+      max_queries,
+      itopk_size,
+      max_iterations,
+      static_cast<raft::neighbors::cagra::search_algo>((int)algo),
+      team_size,
+      search_width,
+      min_iterations,
+      thread_block_size,
+      static_cast<raft::neighbors::cagra::hash_mode>((int)hashmap_mode),
+      hashmap_min_bitlen,
+      hashmap_max_fill_rate,
+      num_random_samplings,
+      rand_xor_mask};
+    return result;
+  }
 };
 
 static_assert(std::is_aggregate_v<index_params>);
@@ -132,6 +167,13 @@ static_assert(std::is_aggregate_v<search_params>);
  */
 template <typename T, typename IdxT>
 struct index : ann::index {
+
+  /** Build a cuvs CAGRA index from an existing RAFT CAGRA index. */
+  index(raft::neighbors::cagra::index<T, IdxT>&& raft_idx)
+    : ann::index(),
+      raft_index_{std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(std::move(raft_idx))}
+  {
+  }
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
@@ -139,38 +181,38 @@ struct index : ann::index {
   /** Distance metric used for clustering. */
   [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
   {
-    return metric_;
+    return static_cast<cuvs::distance::DistanceType>((int)raft_index_->metric());
   }
 
   /** Total length of the index (number of vectors). */
   [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
   {
-    return dataset_view_.extent(0);
+    return raft_index_->size();
   }
 
   /** Dimensionality of the data. */
   [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
   {
-    return dataset_view_.extent(1);
+    return raft_index_->dim();
   }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
   {
-    return graph_view_.extent(1);
+    return raft_index_->graph_degree();
   }
 
   /** Dataset [size, dim] */
   [[nodiscard]] inline auto dataset() const noexcept
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
   {
-    return dataset_view_;
+    return raft_index_->dataset();
   }
 
   /** neighborhood graph [size, graph-degree] */
   [[nodiscard]] inline auto graph() const noexcept
     -> raft::device_matrix_view<const IdxT, int64_t, raft::row_major>
   {
-    return graph_view_;
+    return raft_index_->graph();
   }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
@@ -184,12 +226,9 @@ struct index : ann::index {
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : ann::index(),
-      metric_(metric),
-      dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
-      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0))
+      raft_index_(std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(res, static_cast<raft::distance::DistanceType>((int)metric)))
   {
   }
-
   /** Construct an index from dataset and knn_graph arrays
    *
    * If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around
@@ -251,9 +290,8 @@ struct index : ann::index {
         raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
           knn_graph)
     : ann::index(),
-      metric_(metric),
-      dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
-      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0))
+      raft_index_(std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(
+        res, static_cast<raft::distance::DistanceType>((int)metric), dataset, knn_graph))
   {
     RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                  "Dataset and knn_graph must have equal number of rows");
@@ -272,15 +310,8 @@ struct index : ann::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    if (dataset.extent(1) * sizeof(T) % 16 != 0) {
-      RAFT_LOG_DEBUG("Creating a padded copy of CAGRA dataset in device memory");
-      copy_padded(res, dataset);
-    } else {
-      dataset_view_ = raft::make_device_strided_matrix_view<const T, int64_t>(
-        dataset.data_handle(), dataset.extent(0), dataset.extent(1), dataset.extent(1));
-    }
+    raft_index_->update_dataset(res, dataset);
   }
-
   /**
    * Replace the dataset with a new dataset.
    *
@@ -289,8 +320,7 @@ struct index : ann::index {
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    RAFT_LOG_DEBUG("Copying CAGRA dataset from host to device");
-    copy_padded(res, dataset);
+    raft_index_->update_dataset(res, dataset);
   }
 
   /**
@@ -302,7 +332,7 @@ struct index : ann::index {
   void update_graph(raft::resources const& res,
                     raft::device_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
   {
-    graph_view_ = knn_graph;
+    raft_index_->update_graph(res, knn_graph);
   }
 
   /**
@@ -313,54 +343,21 @@ struct index : ann::index {
   void update_graph(raft::resources const& res,
                     raft::host_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
   {
-    RAFT_LOG_DEBUG("Copying CAGRA knn graph from host to device");
-    if ((graph_.extent(0) != knn_graph.extent(0)) || (graph_.extent(1) != knn_graph.extent(1))) {
-      // clear existing memory before allocating to prevent OOM errors on large graphs
-      if (graph_.size()) { graph_ = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0); }
-      graph_ =
-        raft::make_device_matrix<IdxT, int64_t>(res, knn_graph.extent(0), knn_graph.extent(1));
-    }
-    raft::copy(graph_.data_handle(),
-               knn_graph.data_handle(),
-               knn_graph.size(),
-               raft::resource::get_cuda_stream(res));
-    graph_view_ = graph_.view();
+    raft_index_->update_graph(res, knn_graph);
   }
 
- private:
-  /** Create a device copy of the dataset, and pad it if necessary. */
-  template <typename data_accessor>
-  void copy_padded(
-    raft::resources const& res,
-    raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset)
+  auto get_raft_index() const -> const raft::neighbors::cagra::index<T, IdxT>*
   {
-    detail::copy_with_padding(res, dataset_, dataset);
-
-    dataset_view_ = raft::make_device_strided_matrix_view<const T, int64_t>(
-      dataset_.data_handle(), dataset_.extent(0), dataset.extent(1), dataset_.extent(1));
-    RAFT_LOG_DEBUG("CAGRA dataset strided matrix view %zux%zu, stride %zu",
-                   static_cast<size_t>(dataset_view_.extent(0)),
-                   static_cast<size_t>(dataset_view_.extent(1)),
-                   static_cast<size_t>(dataset_view_.stride(0)));
+    return raft_index_.get();
   }
-
-  cuvs::distance::DistanceType metric_;
-  raft::device_matrix<T, int64_t, raft::row_major> dataset_;
-  raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
-  raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset_view_;
-  raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
+  auto get_raft_index() -> raft::neighbors::cagra::index<T, IdxT>*
+  {
+    return raft_index_.get();
+  }
+ private:
+  std::unique_ptr<raft::neighbors::cagra::index<T, IdxT>> raft_index_;
 };
 
 /** @} */
 
 }  // namespace cuvs::neighbors::cagra
-
-// TODO: Remove deprecated experimental namespace in 23.12 release
-namespace cuvs::neighbors::experimental::cagra {
-using cuvs::neighbors::cagra::graph_build_algo;
-using cuvs::neighbors::cagra::hash_mode;
-using cuvs::neighbors::cagra::index;
-using cuvs::neighbors::cagra::index_params;
-using cuvs::neighbors::cagra::search_algo;
-using cuvs::neighbors::cagra::search_params;
-}  // namespace cuvs::neighbors::experimental::cagra

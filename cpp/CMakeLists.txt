@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -191,169 +191,170 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
-  src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_rbf.cu
-  src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
-  src/distance/distance.cu
-  src/distance/fused_l2_nn.cu
-  src/matrix/detail/select_k_double_int64_t.cu
-  src/matrix/detail/select_k_double_uint32_t.cu
-  src/matrix/detail/select_k_float_int64_t.cu
-  src/matrix/detail/select_k_float_uint32_t.cu
-  src/matrix/detail/select_k_float_int32.cu
-  src/matrix/detail/select_k_half_int64_t.cu
-  src/matrix/detail/select_k_half_uint32_t.cu
-  src/neighbors/ball_cover.cu
-  src/neighbors/brute_force_fused_l2_knn_float_int64_t.cu
-  src/neighbors/brute_force_knn_int64_t_float_int64_t.cu
-  src/neighbors/brute_force_knn_int64_t_float_uint32_t.cu
-  src/neighbors/brute_force_knn_int_float_int.cu
-  src/neighbors/brute_force_knn_uint32_t_float_uint32_t.cu
-  src/neighbors/brute_force_knn_index_float.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim1024_t32.cu
-  src/neighbors/detail/ivf_flat_interleaved_scan_float_float_int64_t.cu
-  src/neighbors/detail/ivf_flat_interleaved_scan_int8_t_int32_t_int64_t.cu
-  src/neighbors/detail/ivf_flat_interleaved_scan_uint8_t_uint32_t_int64_t.cu
-  src/neighbors/detail/ivf_flat_search.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_float_float.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_float_fp8_false.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_float_fp8_true.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_float_half.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_half_fp8_false.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_half_fp8_true.cu
-  src/neighbors/detail/ivf_pq_compute_similarity_half_half.cu
-  src/neighbors/detail/refine_host_float_float.cpp
-  src/neighbors/detail/refine_host_int8_t_float.cpp
-  src/neighbors/detail/refine_host_uint8_t_float.cpp
-  src/neighbors/detail/selection_faiss_int32_t_float.cu
-  src/neighbors/detail/selection_faiss_int_double.cu
-  src/neighbors/detail/selection_faiss_long_float.cu
-  src/neighbors/detail/selection_faiss_size_t_double.cu
-  src/neighbors/detail/selection_faiss_size_t_float.cu
-  src/neighbors/detail/selection_faiss_uint32_t_float.cu
-  src/neighbors/detail/selection_faiss_int64_t_double.cu
-  src/neighbors/detail/selection_faiss_int64_t_half.cu
-  src/neighbors/detail/selection_faiss_uint32_t_double.cu
-  src/neighbors/detail/selection_faiss_uint32_t_half.cu
-  src/neighbors/ivf_flat_build_float_int64_t.cu
-  src/neighbors/ivf_flat_build_int8_t_int64_t.cu
-  src/neighbors/ivf_flat_build_uint8_t_int64_t.cu
-  src/neighbors/ivf_flat_extend_float_int64_t.cu
-  src/neighbors/ivf_flat_extend_int8_t_int64_t.cu
-  src/neighbors/ivf_flat_extend_uint8_t_int64_t.cu
-  src/neighbors/ivf_flat_search_float_int64_t.cu
-  src/neighbors/ivf_flat_search_int8_t_int64_t.cu
-  src/neighbors/ivf_flat_search_uint8_t_int64_t.cu
-  src/neighbors/ivfpq_build_float_int64_t.cu
-  src/neighbors/ivfpq_build_int8_t_int64_t.cu
-  src/neighbors/ivfpq_build_uint8_t_int64_t.cu
-  src/neighbors/ivfpq_extend_float_int64_t.cu
-  src/neighbors/ivfpq_extend_int8_t_int64_t.cu
-  src/neighbors/ivfpq_extend_uint8_t_int64_t.cu
-  src/neighbors/ivfpq_search_float_int64_t.cu
-  src/neighbors/ivfpq_search_int8_t_int64_t.cu
-  src/neighbors/ivfpq_search_uint8_t_int64_t.cu
-  src/neighbors/refine_float_float.cu
-  src/neighbors/refine_int8_t_float.cu
-  src/neighbors/refine_uint8_t_float.cu
-  src/cuvs_runtime/cluster/cluster_cost.cuh
-  src/cuvs_runtime/cluster/cluster_cost_double.cu
-  src/cuvs_runtime/cluster/cluster_cost_float.cu
-  src/cuvs_runtime/cluster/kmeans_fit_double.cu
-  src/cuvs_runtime/cluster/kmeans_fit_float.cu
-  src/cuvs_runtime/cluster/kmeans_init_plus_plus_double.cu
-  src/cuvs_runtime/cluster/kmeans_init_plus_plus_float.cu
-  src/cuvs_runtime/cluster/update_centroids.cuh
-  src/cuvs_runtime/cluster/update_centroids_double.cu
-  src/cuvs_runtime/cluster/update_centroids_float.cu
-  src/cuvs_runtime/distance/fused_l2_min_arg.cu
-  src/cuvs_runtime/distance/pairwise_distance.cu
-  src/cuvs_runtime/matrix/select_k_float_int64_t.cu
-  src/cuvs_runtime/neighbors/brute_force_knn_int64_t_float.cu
-  src/cuvs_runtime/neighbors/cagra_build.cu
-  src/cuvs_runtime/neighbors/cagra_search.cu
-  src/cuvs_runtime/neighbors/cagra_serialize.cu
-  src/cuvs_runtime/neighbors/ivf_flat_build.cu
-  src/cuvs_runtime/neighbors/ivf_flat_search.cu
-  src/cuvs_runtime/neighbors/ivf_flat_serialize.cu
-  src/cuvs_runtime/neighbors/ivfpq_build.cu
-  src/cuvs_runtime/neighbors/ivfpq_deserialize.cu
-  src/cuvs_runtime/neighbors/ivfpq_search_float_int64_t.cu
-  src/cuvs_runtime/neighbors/ivfpq_search_int8_t_int64_t.cu
-  src/cuvs_runtime/neighbors/ivfpq_search_uint8_t_int64_t.cu
-  src/cuvs_runtime/neighbors/ivfpq_serialize.cu
-  src/cuvs_runtime/neighbors/refine_d_int64_t_float.cu
-  src/cuvs_runtime/neighbors/refine_d_int64_t_int8_t.cu
-  src/cuvs_runtime/neighbors/refine_d_int64_t_uint8_t.cu
-  src/cuvs_runtime/neighbors/refine_h_int64_t_float.cu
-  src/cuvs_runtime/neighbors/refine_h_int64_t_int8_t.cu
-  src/cuvs_runtime/neighbors/refine_h_int64_t_uint8_t.cu
-  src/cuvs_runtime/random/rmat_rectangular_generator_int64_double.cu
-  src/cuvs_runtime/random/rmat_rectangular_generator_int64_float.cu
-  src/cuvs_runtime/random/rmat_rectangular_generator_int_double.cu
-  src/cuvs_runtime/random/rmat_rectangular_generator_int_float.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_one_2d_dist.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_one_2d_euclidean.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_one_2d_haversine.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_one_3d_dist.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_one_3d_euclidean.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_one_3d_haversine.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_two_2d_dist.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_two_2d_euclidean.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_two_2d_haversine.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_two_3d_dist.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_two_3d_euclidean.cu
-  src/spatial/knn/detail/ball_cover/registers_pass_two_3d_haversine.cu
-  src/spatial/knn/detail/fused_l2_knn_int32_t_float.cu
-  src/spatial/knn/detail/fused_l2_knn_int64_t_float.cu
-  src/spatial/knn/detail/fused_l2_knn_uint32_t_float.cu
+  # src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_rbf.cu
+  # src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
+  # src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  # src/distance/distance.cu
+  # src/distance/fused_l2_nn.cu
+  # src/matrix/detail/select_k_double_int64_t.cu
+  # src/matrix/detail/select_k_double_uint32_t.cu
+  # src/matrix/detail/select_k_float_int64_t.cu
+  # src/matrix/detail/select_k_float_uint32_t.cu
+  # src/matrix/detail/select_k_float_int32.cu
+  # src/matrix/detail/select_k_half_int64_t.cu
+  # src/matrix/detail/select_k_half_uint32_t.cu
+  # src/neighbors/ball_cover.cu
+  # src/neighbors/brute_force_fused_l2_knn_float_int64_t.cu
+  # src/neighbors/brute_force_knn_int64_t_float_int64_t.cu
+  # src/neighbors/brute_force_knn_int64_t_float_uint32_t.cu
+  # src/neighbors/brute_force_knn_int_float_int.cu
+  # src/neighbors/brute_force_knn_uint32_t_float_uint32_t.cu
+  # src/neighbors/brute_force_knn_index_float.cu
+  # src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim128_t8.cu
+  # src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim256_t16.cu
+  # src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim512_t32.cu
+  # src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim1024_t32.cu
+  # src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim128_t8.cu
+  # src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim256_t16.cu
+  # src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim512_t32.cu
+  # src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim1024_t32.cu
+  # src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim128_t8.cu
+  # src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim256_t16.cu
+  # src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim512_t32.cu
+  # src/neighbors/detail/cagra/search_multi_cta_uint8_uint32_dim1024_t32.cu
+  # src/neighbors/detail/cagra/search_single_cta_float_uint32_dim128_t8.cu
+  # src/neighbors/detail/cagra/search_single_cta_float_uint32_dim256_t16.cu
+  # src/neighbors/detail/cagra/search_single_cta_float_uint32_dim512_t32.cu
+  # src/neighbors/detail/cagra/search_single_cta_float_uint32_dim1024_t32.cu
+  # src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim128_t8.cu
+  # src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim256_t16.cu
+  # src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim512_t32.cu
+  # src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim1024_t32.cu
+  # src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim128_t8.cu
+  # src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim256_t16.cu
+  # src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim512_t32.cu
+  # src/neighbors/detail/cagra/search_single_cta_uint8_uint32_dim1024_t32.cu
+  # src/neighbors/detail/ivf_flat_interleaved_scan_float_float_int64_t.cu
+  # src/neighbors/detail/ivf_flat_interleaved_scan_int8_t_int32_t_int64_t.cu
+  # src/neighbors/detail/ivf_flat_interleaved_scan_uint8_t_uint32_t_int64_t.cu
+  # src/neighbors/detail/ivf_flat_search.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_float_float.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_float_fp8_false.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_float_fp8_true.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_float_half.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_half_fp8_false.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_half_fp8_true.cu
+  # src/neighbors/detail/ivf_pq_compute_similarity_half_half.cu
+  # src/neighbors/detail/refine_host_float_float.cpp
+  # src/neighbors/detail/refine_host_int8_t_float.cpp
+  # src/neighbors/detail/refine_host_uint8_t_float.cpp
+  # src/neighbors/detail/selection_faiss_int32_t_float.cu
+  # src/neighbors/detail/selection_faiss_int_double.cu
+  # src/neighbors/detail/selection_faiss_long_float.cu
+  # src/neighbors/detail/selection_faiss_size_t_double.cu
+  # src/neighbors/detail/selection_faiss_size_t_float.cu
+  # src/neighbors/detail/selection_faiss_uint32_t_float.cu
+  # src/neighbors/detail/selection_faiss_int64_t_double.cu
+  # src/neighbors/detail/selection_faiss_int64_t_half.cu
+  # src/neighbors/detail/selection_faiss_uint32_t_double.cu
+  # src/neighbors/detail/selection_faiss_uint32_t_half.cu
+  # src/neighbors/ivf_flat_build_float_int64_t.cu
+  # src/neighbors/ivf_flat_build_int8_t_int64_t.cu
+  # src/neighbors/ivf_flat_build_uint8_t_int64_t.cu
+  # src/neighbors/ivf_flat_extend_float_int64_t.cu
+  # src/neighbors/ivf_flat_extend_int8_t_int64_t.cu
+  # src/neighbors/ivf_flat_extend_uint8_t_int64_t.cu
+  # src/neighbors/ivf_flat_search_float_int64_t.cu
+  # src/neighbors/ivf_flat_search_int8_t_int64_t.cu
+  # src/neighbors/ivf_flat_search_uint8_t_int64_t.cu
+  # src/neighbors/ivfpq_build_float_int64_t.cu
+  # src/neighbors/ivfpq_build_int8_t_int64_t.cu
+  # src/neighbors/ivfpq_build_uint8_t_int64_t.cu
+  # src/neighbors/ivfpq_extend_float_int64_t.cu
+  # src/neighbors/ivfpq_extend_int8_t_int64_t.cu
+  # src/neighbors/ivfpq_extend_uint8_t_int64_t.cu
+  # src/neighbors/ivfpq_search_float_int64_t.cu
+  # src/neighbors/ivfpq_search_int8_t_int64_t.cu
+  # src/neighbors/ivfpq_search_uint8_t_int64_t.cu
+  # src/neighbors/refine_float_float.cu
+  # src/neighbors/refine_int8_t_float.cu
+  # src/neighbors/refine_uint8_t_float.cu
+  # src/cuvs_runtime/cluster/cluster_cost.cuh
+  # src/cuvs_runtime/cluster/cluster_cost_double.cu
+  # src/cuvs_runtime/cluster/cluster_cost_float.cu
+  # src/cuvs_runtime/cluster/kmeans_fit_double.cu
+  # src/cuvs_runtime/cluster/kmeans_fit_float.cu
+  # src/cuvs_runtime/cluster/kmeans_init_plus_plus_double.cu
+  # src/cuvs_runtime/cluster/kmeans_init_plus_plus_float.cu
+  # src/cuvs_runtime/cluster/update_centroids.cuh
+  # src/cuvs_runtime/cluster/update_centroids_double.cu
+  # src/cuvs_runtime/cluster/update_centroids_float.cu
+  # src/cuvs_runtime/distance/fused_l2_min_arg.cu
+  # src/cuvs_runtime/distance/pairwise_distance.cu
+  # src/cuvs_runtime/matrix/select_k_float_int64_t.cu
+  # src/cuvs_runtime/neighbors/brute_force_knn_int64_t_float.cu
+  # src/cuvs_runtime/neighbors/ivf_flat_build.cu
+  # src/cuvs_runtime/neighbors/ivf_flat_search.cu
+  # src/cuvs_runtime/neighbors/ivf_flat_serialize.cu
+  # src/cuvs_runtime/neighbors/ivfpq_build.cu
+  # src/cuvs_runtime/neighbors/ivfpq_deserialize.cu
+  # src/cuvs_runtime/neighbors/ivfpq_search_float_int64_t.cu
+  # src/cuvs_runtime/neighbors/ivfpq_search_int8_t_int64_t.cu
+  # src/cuvs_runtime/neighbors/ivfpq_search_uint8_t_int64_t.cu
+  # src/cuvs_runtime/neighbors/ivfpq_serialize.cu
+  # src/cuvs_runtime/neighbors/refine_d_int64_t_float.cu
+  # src/cuvs_runtime/neighbors/refine_d_int64_t_int8_t.cu
+  # src/cuvs_runtime/neighbors/refine_d_int64_t_uint8_t.cu
+  # src/cuvs_runtime/neighbors/refine_h_int64_t_float.cu
+  # src/cuvs_runtime/neighbors/refine_h_int64_t_int8_t.cu
+  # src/cuvs_runtime/neighbors/refine_h_int64_t_uint8_t.cu
+  # src/cuvs_runtime/random/rmat_rectangular_generator_int64_double.cu
+  # src/cuvs_runtime/random/rmat_rectangular_generator_int64_float.cu
+  # src/cuvs_runtime/random/rmat_rectangular_generator_int_double.cu
+  # src/cuvs_runtime/random/rmat_rectangular_generator_int_float.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_one_2d_dist.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_one_2d_euclidean.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_one_2d_haversine.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_one_3d_dist.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_one_3d_euclidean.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_one_3d_haversine.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_two_2d_dist.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_two_2d_euclidean.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_two_2d_haversine.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_two_3d_dist.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_two_3d_euclidean.cu
+  # src/spatial/knn/detail/ball_cover/registers_pass_two_3d_haversine.cu
+  # src/spatial/knn/detail/fused_l2_knn_int32_t_float.cu
+  # src/spatial/knn/detail/fused_l2_knn_int64_t_float.cu
+  # src/spatial/knn/detail/fused_l2_knn_uint32_t_float.cu
+
+  src/neighbors/cagra_build.cu
+  src/neighbors/cagra_search.cu
+  src/neighbors/cagra_serialize.cu
 )
 
 target_compile_options(
@@ -370,7 +371,7 @@ target_include_directories(
 
 if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
-  target_link_libraries(cuvs PUBLIC raft::raft nvidia::cutlass::cutlass)
+  target_link_libraries(cuvs PUBLIC raft::raft raft::compiled nvidia::cutlass::cutlass)
 endif()
 
 # Endian detection
