@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,7 @@
 
 #include <cassert>
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/cagra.cuh>
-#include <cuvs/neighbors/cagra_serialize.cuh>
-#include <cuvs/neighbors/cagra_types.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/detail/cagra/cagra_build.cuh>
 #include <cuvs/neighbors/ivf_pq_types.hpp>
 #include <cuvs/neighbors/nn_descent_types.hpp>
@@ -57,7 +55,7 @@ class RaftCagra : public ANN<T> {
   using typename ANN<T>::AnnSearchParam;
 
   struct SearchParam : public AnnSearchParam {
-    cuvs::neighbors::experimental::cagra::search_params p;
+    cuvs::neighbors::cagra::search_params p;
     AllocatorType graph_mem   = AllocatorType::Device;
     AllocatorType dataset_mem = AllocatorType::Device;
     auto needs_dataset() const -> bool override { return true; }
@@ -209,7 +207,7 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
                   allocator_to_string(dataset_mem_).c_str());
 
     auto mr = get_mr(dataset_mem_);
-    cuvs::neighbors::cagra::detail::copy_with_padding(handle_, dataset_, input_dataset_v_, mr);
+    raft::neighbors::cagra::detail::copy_with_padding(handle_, dataset_, input_dataset_v_, mr);
 
     index_->update_dataset(handle_, make_const_mdspan(dataset_.view()));
 

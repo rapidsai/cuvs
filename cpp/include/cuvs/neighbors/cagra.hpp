@@ -18,11 +18,11 @@
 
 #include "ann_types.hpp"
 #include <cuvs/distance/distance_types.hpp>
-#include <raft/neighbors/cagra_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/neighbors/cagra_types.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
 namespace cuvs::neighbors::cagra {
@@ -53,16 +53,17 @@ struct index_params : ann::index_params {
   size_t nn_descent_niter = 20;
 
   /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
-  operator raft::neighbors::cagra::index_params() const {
+  operator raft::neighbors::cagra::index_params() const
+  {
     return raft::neighbors::cagra::index_params{
       {
-        .metric = static_cast<raft::distance::DistanceType>((int)this->metric),
-        .metric_arg = this->metric_arg,
+        .metric            = static_cast<raft::distance::DistanceType>((int)this->metric),
+        .metric_arg        = this->metric_arg,
         .add_data_on_build = this->add_data_on_build,
       },
       .intermediate_graph_degree = intermediate_graph_degree,
-      .graph_degree = graph_degree,
-      .build_algo = static_cast<raft::neighbors::cagra::graph_build_algo>((int)build_algo),
+      .graph_degree              = graph_degree,
+      .build_algo       = static_cast<raft::neighbors::cagra::graph_build_algo>((int)build_algo),
       .nn_descent_niter = nn_descent_niter};
   }
 };
@@ -122,7 +123,8 @@ struct search_params : ann::search_params {
   uint64_t rand_xor_mask = 0x128394;
 
   /** Build a raft CAGRA search params from an existing cuvs CAGRA search params. */
-  operator raft::neighbors::cagra::search_params() const {
+  operator raft::neighbors::cagra::search_params() const
+  {
     raft::neighbors::cagra::search_params result = {
       {},
       max_queries,
@@ -156,7 +158,6 @@ static_assert(std::is_aggregate_v<search_params>);
  */
 template <typename T, typename IdxT>
 struct index : ann::index {
-
   /** Build a cuvs CAGRA index from an existing RAFT CAGRA index. */
   index(raft::neighbors::cagra::index<T, IdxT>&& raft_idx)
     : ann::index(),
@@ -174,10 +175,7 @@ struct index : ann::index {
   }
 
   /** Total length of the index (number of vectors). */
-  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
-  {
-    return raft_index_->size();
-  }
+  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT { return raft_index_->size(); }
 
   /** Dimensionality of the data. */
   [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
@@ -215,7 +213,8 @@ struct index : ann::index {
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(res, static_cast<raft::distance::DistanceType>((int)metric)))
+      raft_index_(std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(
+        res, static_cast<raft::distance::DistanceType>((int)metric)))
   {
   }
   /** Construct an index from dataset and knn_graph arrays
@@ -339,57 +338,55 @@ struct index : ann::index {
   {
     return raft_index_.get();
   }
-  auto get_raft_index() -> raft::neighbors::cagra::index<T, IdxT>*
-  {
-    return raft_index_.get();
-  }
+  auto get_raft_index() -> raft::neighbors::cagra::index<T, IdxT>* { return raft_index_.get(); }
+
  private:
   std::unique_ptr<raft::neighbors::cagra::index<T, IdxT>> raft_index_;
 };
 
 // Using device and host_matrix_view avoids needing to typedef multiple mdspans based on accessors
-#define CUVS_INST_CAGRA_FUNCS(T, IdxT)                                             \
-  auto build(raft::resources const& handle,                                        \
-             const cuvs::neighbors::cagra::index_params& params,                   \
+#define CUVS_INST_CAGRA_FUNCS(T, IdxT)                                                   \
+  auto build(raft::resources const& handle,                                              \
+             const cuvs::neighbors::cagra::index_params& params,                         \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)        \
-    ->cuvs::neighbors::cagra::index<T, IdxT>;                                      \
-                                                                                   \
-  auto build(raft::resources const& handle,                                        \
-             const cuvs::neighbors::cagra::index_params& params,                   \
+    ->cuvs::neighbors::cagra::index<T, IdxT>;                                            \
+                                                                                         \
+  auto build(raft::resources const& handle,                                              \
+             const cuvs::neighbors::cagra::index_params& params,                         \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)          \
-    ->cuvs::neighbors::cagra::index<T, IdxT>;                                      \
-                                                                                   \
-  void build_device(raft::resources const& handle,                                 \
-                    const cuvs::neighbors::cagra::index_params& params,            \
+    ->cuvs::neighbors::cagra::index<T, IdxT>;                                            \
+                                                                                         \
+  void build_device(raft::resources const& handle,                                       \
+                    const cuvs::neighbors::cagra::index_params& params,                  \
                     raft::device_matrix_view<const T, int64_t, raft::row_major> dataset, \
-                    cuvs::neighbors::cagra::index<T, IdxT>& idx);                  \
-                                                                                   \
-  void build_host(raft::resources const& handle,                                   \
-                  const cuvs::neighbors::cagra::index_params& params,              \
+                    cuvs::neighbors::cagra::index<T, IdxT>& idx);                        \
+                                                                                         \
+  void build_host(raft::resources const& handle,                                         \
+                  const cuvs::neighbors::cagra::index_params& params,                    \
                   raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,     \
-                  cuvs::neighbors::cagra::index<T, IdxT>& idx);                    \
-                                                                                   \
-  void search(raft::resources const& handle,                                       \
-              cuvs::neighbors::cagra::search_params const& params,                 \
-              const cuvs::neighbors::cagra::index<T, IdxT>& index,                 \
+                  cuvs::neighbors::cagra::index<T, IdxT>& idx);                          \
+                                                                                         \
+  void search(raft::resources const& handle,                                             \
+              cuvs::neighbors::cagra::search_params const& params,                       \
+              const cuvs::neighbors::cagra::index<T, IdxT>& index,                       \
               raft::device_matrix_view<const T, int64_t, raft::row_major> queries,       \
               raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,        \
               raft::device_matrix_view<float, int64_t, raft::row_major> distances);      \
-  void serialize_file(raft::resources const& handle,                               \
-                      const std::string& filename,                                 \
-                      const cuvs::neighbors::cagra::index<T, IdxT>& index,         \
-                      bool include_dataset = true);                                \
-                                                                                   \
-  void deserialize_file(raft::resources const& handle,                             \
-                        const std::string& filename,                               \
-                        cuvs::neighbors::cagra::index<T, IdxT>* index);            \
-  void serialize(raft::resources const& handle,                                    \
-                 std::string& str,                                                 \
-                 const cuvs::neighbors::cagra::index<T, IdxT>& index,              \
-                 bool include_dataset = true);                                     \
-                                                                                   \
-  void deserialize(raft::resources const& handle,                                  \
-                   const std::string& str,                                         \
+  void serialize_file(raft::resources const& handle,                                     \
+                      const std::string& filename,                                       \
+                      const cuvs::neighbors::cagra::index<T, IdxT>& index,               \
+                      bool include_dataset = true);                                      \
+                                                                                         \
+  void deserialize_file(raft::resources const& handle,                                   \
+                        const std::string& filename,                                     \
+                        cuvs::neighbors::cagra::index<T, IdxT>* index);                  \
+  void serialize(raft::resources const& handle,                                          \
+                 std::string& str,                                                       \
+                 const cuvs::neighbors::cagra::index<T, IdxT>& index,                    \
+                 bool include_dataset = true);                                           \
+                                                                                         \
+  void deserialize(raft::resources const& handle,                                        \
+                   const std::string& str,                                               \
                    cuvs::neighbors::cagra::index<T, IdxT>* index);
 
 CUVS_INST_CAGRA_FUNCS(float, uint32_t);
@@ -398,12 +395,12 @@ CUVS_INST_CAGRA_FUNCS(uint8_t, uint32_t);
 
 #undef CUVS_INST_CAGRA_FUNCS
 
-#define CUVS_INST_CAGRA_OPTIMIZE(IdxT)                                               \
-  void optimize_device(raft::resources const& res,                                   \
+#define CUVS_INST_CAGRA_OPTIMIZE(IdxT)                                                     \
+  void optimize_device(raft::resources const& res,                                         \
                        raft::device_matrix_view<IdxT, int64_t, raft::row_major> knn_graph, \
                        raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph);  \
-                                                                                     \
-  void optimize_host(raft::resources const& res,                                     \
+                                                                                           \
+  void optimize_host(raft::resources const& res,                                           \
                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,     \
                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph);
 

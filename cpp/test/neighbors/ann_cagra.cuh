@@ -15,7 +15,6 @@
  */
 #pragma once
 
-
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
@@ -24,12 +23,11 @@
 
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/cagra.hpp>
-//#include <cuvs/neighbors/sample_filter.cuh>
-#include <raft/neighbors/cagra.cuh>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/linalg/add.cuh>
+#include <raft/neighbors/cagra.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -184,15 +182,15 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
       rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
       cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
-                                        distances_naive_dev.data(),
-                                        indices_naive_dev.data(),
-                                        search_queries.data(),
-                                        database.data(),
-                                        ps.n_queries,
-                                        ps.n_rows,
-                                        ps.dim,
-                                        ps.k,
-                                        ps.metric);
+                                                         distances_naive_dev.data(),
+                                                         indices_naive_dev.data(),
+                                                         search_queries.data(),
+                                                         database.data(),
+                                                         ps.n_queries,
+                                                         ps.n_rows,
+                                                         ps.dim,
+                                                         ps.k,
+                                                         ps.metric);
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);

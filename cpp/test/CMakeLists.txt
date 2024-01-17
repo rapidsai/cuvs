@@ -84,67 +84,7 @@ endfunction()
 # test sources ##################################################################################
 # ##################################################################################################
 
-# ##################################################################################################
-# * distance tests -------------------------------------------------------------------------
-
 if(BUILD_TESTS)
-  ConfigureTest(
-    NAME
-    CLUSTER_TEST
-    PATH
-    test/cluster/kmeans.cu
-    test/cluster/kmeans_balanced.cu
-    test/cluster/cluster_solvers.cu
-    test/cluster/linkage.cu
-    test/cluster/kmeans_find_k.cu
-    LIB
-    EXPLICIT_INSTANTIATE_ONLY
-  )
-
-  ConfigureTest(
-    NAME
-    DISTANCE_TEST
-    PATH
-    test/distance/dist_adj.cu
-    test/distance/dist_adj_distance_instance.cu
-    test/distance/dist_canberra.cu
-    test/distance/dist_correlation.cu
-    test/distance/dist_cos.cu
-    test/distance/dist_hamming.cu
-    test/distance/dist_hellinger.cu
-    test/distance/dist_inner_product.cu
-    test/distance/dist_jensen_shannon.cu
-    test/distance/dist_kl_divergence.cu
-    test/distance/dist_l1.cu
-    test/distance/dist_l2_exp.cu
-    test/distance/dist_l2_unexp.cu
-    test/distance/dist_l2_sqrt_exp.cu
-    test/distance/dist_l_inf.cu
-    test/distance/dist_lp_unexp.cu
-    test/distance/dist_russell_rao.cu
-    test/distance/masked_nn.cu
-    test/distance/masked_nn_compress_to_bits.cu
-    test/distance/fused_l2_nn.cu
-    test/distance/gram.cu
-    LIB
-    EXPLICIT_INSTANTIATE_ONLY
-  )
-
-  ConfigureTest(
-    NAME
-    NEIGHBORS_TEST
-    PATH
-    test/neighbors/knn.cu
-    test/neighbors/fused_l2_knn.cu
-    test/neighbors/tiled_knn.cu
-    test/neighbors/haversine.cu
-    test/neighbors/ball_cover.cu
-    test/neighbors/epsilon_neighborhood.cu
-    test/neighbors/refine.cu
-    LIB
-    EXPLICIT_INSTANTIATE_ONLY
-  )
-
   ConfigureTest(
     NAME
     NEIGHBORS_ANN_CAGRA_TEST
@@ -156,70 +96,6 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
-  )
-
-  ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_IVF_TEST
-    PATH
-    test/neighbors/ann_ivf_flat/test_filter_float_int64_t.cu
-    test/neighbors/ann_ivf_flat/test_float_int64_t.cu
-    test/neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
-    test/neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_float_uint32_t.cu
-    test/neighbors/ann_ivf_pq/test_float_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_uint8_t_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_filter_float_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_filter_int8_t_int64_t.cu
-    LIB
-    EXPLICIT_INSTANTIATE_ONLY
-    GPUS
-    1
-    PERCENT
-    100
-  )
-
-  ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_NN_DESCENT_TEST
-    PATH
-    test/neighbors/ann_nn_descent/test_float_uint32_t.cu
-    test/neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
-    test/neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
-    LIB
-    EXPLICIT_INSTANTIATE_ONLY
-    GPUS
-    1
-    PERCENT
-    100
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_SELECTION_TEST PATH test/neighbors/selection.cu LIB EXPLICIT_INSTANTIATE_ONLY
-    GPUS 1 PERCENT 50
-  )
-
-  ConfigureTest(
-    NAME
-    STATS_TEST
-    PATH
-    test/stats/contingencyMatrix.cu
-    test/stats/cov.cu
-    test/stats/dispersion.cu
-    test/stats/entropy.cu
-    test/stats/histogram.cu
-    test/stats/homogeneity_score.cu
-    test/stats/information_criterion.cu
-    test/stats/kl_divergence.cu
-    test/stats/mutual_info_score.cu
-    test/stats/neighborhood_recall.cu
-    test/stats/r2_score.cu
-    test/stats/rand_index.cu
-    test/stats/silhouette_score.cu
-    test/stats/trustworthiness.cu
-    LIB
-    EXPLICIT_INSTANTIATE_ONLY
   )
 endif()
 
