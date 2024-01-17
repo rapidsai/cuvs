@@ -24,7 +24,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    clean            - remove all existing build artifacts and configuration (start over)
    libcuvs          - build the cuvs C++ code only. Also builds the C-wrapper library
                       around the C++ code.
-   cuvs        - build the cuvs Python package
+   cuvs             - build the cuvs Python package
    docs             - build the documentation
    tests            - build the tests
    bench-prims      - build micro-benchmarks for primitives
