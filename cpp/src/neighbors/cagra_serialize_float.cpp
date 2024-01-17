@@ -17,10 +17,8 @@
 #include <sstream>
 #include <string>
 
-#include <cuvs/neighbors/cagra.cuh>
-#include <cuvs/neighbors/cagra_types.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/neighbors/cagra_serialize.cuh>
 #include <raft_runtime/neighbors/cagra.hpp>
 
 namespace cuvs::neighbors::cagra {
@@ -58,8 +56,6 @@ namespace cuvs::neighbors::cagra {
   }
 
 CUVS_INST_CAGRA_SERIALIZE(float);
-CUVS_INST_CAGRA_SERIALIZE(int8_t);
-CUVS_INST_CAGRA_SERIALIZE(uint8_t);
 
 #undef CUVS_INST_CAGRA_SERIALIZE
 }  // namespace cuvs::neighbors::cagra

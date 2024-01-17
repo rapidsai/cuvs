@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/cagra.cuh>
-#include <cuvs/neighbors/cagra_types.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <raft_runtime/neighbors/cagra.hpp>
 
 namespace cuvs::neighbors::cagra {
@@ -32,9 +31,7 @@ namespace cuvs::neighbors::cagra {
       handle, params, *index.get_raft_index(), queries, neighbors, distances);    \
   }
 
-CUVS_INST_CAGRA_SEARCH(float, uint32_t);
 CUVS_INST_CAGRA_SEARCH(int8_t, uint32_t);
-CUVS_INST_CAGRA_SEARCH(uint8_t, uint32_t);
 
 #undef CUVS_INST_CAGRA_SEARCH
 

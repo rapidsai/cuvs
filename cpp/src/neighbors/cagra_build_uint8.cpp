@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/cagra.cuh>
-#include <cuvs/neighbors/cagra_types.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <raft_runtime/neighbors/cagra.hpp>
 
 namespace cuvs::neighbors::cagra {
@@ -57,28 +56,8 @@ namespace cuvs::neighbors::cagra {
       handle, params, dataset, *idx.get_raft_index());                              \
   }
 
-CUVS_INST_CAGRA_BUILD(float, uint32_t);
-CUVS_INST_CAGRA_BUILD(int8_t, uint32_t);
 CUVS_INST_CAGRA_BUILD(uint8_t, uint32_t);
 
 #undef CUVS_INST_CAGRA_BUILD
-
-#define CUVS_INST_CAGRA_OPTIMIZE(IdxT)                                                     \
-  void optimize_device(raft::resources const& handle,                                      \
-                       raft::device_matrix_view<IdxT, int64_t, raft::row_major> knn_graph, \
-                       raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)   \
-  {                                                                                        \
-    raft::runtime::neighbors::cagra::optimize_device(handle, knn_graph, new_graph);        \
-  }                                                                                        \
-  void optimize_host(raft::resources const& handle,                                        \
-                     raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,     \
-                     raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)     \
-  {                                                                                        \
-    raft::runtime::neighbors::cagra::optimize_host(handle, knn_graph, new_graph);          \
-  }
-
-CUVS_INST_CAGRA_OPTIMIZE(uint32_t);
-
-#undef CUVS_INST_CAGRA_OPTIMIZE
 
 }  // namespace cuvs::neighbors::cagra

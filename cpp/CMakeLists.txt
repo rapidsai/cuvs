@@ -352,9 +352,16 @@ add_library(
   # src/spatial/knn/detail/fused_l2_knn_int64_t_float.cu
   # src/spatial/knn/detail/fused_l2_knn_uint32_t_float.cu
 
-  src/neighbors/cagra_build.cu
-  src/neighbors/cagra_search.cu
-  src/neighbors/cagra_serialize.cu
+  src/neighbors/cagra_build_float.cpp
+  src/neighbors/cagra_build_int8.cpp
+  src/neighbors/cagra_build_uint8.cpp
+  src/neighbors/cagra_optimize.cpp
+  src/neighbors/cagra_search_float.cpp
+  src/neighbors/cagra_search_int8.cpp
+  src/neighbors/cagra_search_uint8.cpp
+  src/neighbors/cagra_serialize_float.cpp
+  src/neighbors/cagra_serialize_int8.cpp
+  src/neighbors/cagra_serialize_uint8.cpp
 )
 
 target_compile_options(

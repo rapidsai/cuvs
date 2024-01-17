@@ -19,7 +19,7 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
 
-#include <cuvs/neighbors/cagra.cuh>
+#include <cuvs/neighbors/cagra.hpp>
 
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>

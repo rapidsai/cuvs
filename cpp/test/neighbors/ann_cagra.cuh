@@ -23,8 +23,7 @@
 #include "naive_knn.cuh"
 
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/cagra.cuh>
-//#include <cuvs/neighbors/cagra_serialize.cuh>
+#include <cuvs/neighbors/cagra.hpp>
 //#include <cuvs/neighbors/sample_filter.cuh>
 #include <raft/neighbors/cagra.cuh>
 #include <raft/core/device_mdspan.hpp>
