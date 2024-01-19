@@ -111,15 +111,15 @@ void naive_knn(raft::resources const& handle,
       dist.data(), x + offset * dim, y, batch_size, input_len, dim, type);
 
     raft::matrix::detail::select_k<EvalT, IdxT>(handle,
-                                          dist.data(),
-                                          nullptr,
-                                          batch_size,
-                                          input_len,
-                                          static_cast<int>(k),
-                                          dist_topk + offset * k,
-                                          indices_topk + offset * k,
-                                          type != cuvs::distance::DistanceType::InnerProduct,
-                                          mr);
+                                                dist.data(),
+                                                nullptr,
+                                                batch_size,
+                                                input_len,
+                                                static_cast<int>(k),
+                                                dist_topk + offset * k,
+                                                indices_topk + offset * k,
+                                                type != cuvs::distance::DistanceType::InnerProduct,
+                                                mr);
   }
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 }
