@@ -57,7 +57,7 @@ outputs:
         - ninja
         - sysroot_{{ target_platform }} {{ sysroot_version }}
       host:
-        - {{ pin_subpackage('libraft-headers', exact=True) }}
+        - {{ pin_compatible('libraft', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
@@ -77,7 +77,7 @@ outputs:
         - libcusparse-dev
         {% endif %}
       run:
-        - {{ pin_subpackage('libraft-headers', exact=True) }}
+        - {{ pin_compatible('libraft', exact=True) }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
     about:
       home: https://rapids.ai/
@@ -108,7 +108,7 @@ outputs:
         - ninja
         - sysroot_{{ target_platform }} {{ sysroot_version }}
       host:
-        - {{ pin_subpackage('libraft-headers', exact=True) }}
+        - {{ pin_compatible('libraft', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
@@ -135,7 +135,7 @@ outputs:
         {% if cuda_major == "11" %}
         - cudatoolkit
         {% endif %}
-        - {{ pin_subpackage('libraft-headers', exact=True) }}
+        - {{ pin_compatible('libraft', exact=True) }}
         - gmock {{ gtest_version }}
         - gtest {{ gtest_version }}
     about:
@@ -167,7 +167,7 @@ outputs:
         - ninja
         - sysroot_{{ target_platform }} {{ sysroot_version }}
       host:
-        - {{ pin_subpackage('libraft-headers', exact=True) }}
+        - {{ pin_compatible('libraft', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
@@ -182,7 +182,7 @@ outputs:
         {% if cuda_major == "11" %}
         - cudatoolkit
         {% endif %}
-        - {{ pin_subpackage('libraft-headers', exact=True) }}
+        - {{ pin_compatible('libraft', exact=True) }}
     about:
       home: https://rapids.ai/
       license: Apache-2.0
