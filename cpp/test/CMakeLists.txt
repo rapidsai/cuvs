@@ -21,7 +21,7 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL LIB EXPLICIT_INSTANTIATE_ONLY NOCUDA)
+  set(options OPTIONAL NOCUDA)
   set(oneValueArgs NAME GPUS PERCENT)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
@@ -62,9 +62,6 @@ function(ConfigureTest)
     ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                          "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
-  if(_CUVS_TEST_EXPLICIT_INSTANTIATE_ONLY)
-    target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
-  endif()
   if(_CUVS_TEST_NOCUDA)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
   endif()
