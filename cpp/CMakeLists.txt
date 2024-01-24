@@ -57,6 +57,8 @@ option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_MICRO_BENCH "Build cuvs C++ micro benchmarks" OFF)
 option(BUILD_ANN_BENCH "Build cuvs ann benchmarks" OFF)
+option(BUILD_C_LIBRARY "Build raft C API library" OFF)
+option(BUILD_C_TESTS "Build raft C API tests" OFF)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
@@ -71,6 +73,7 @@ option(CUVS_NVTX "Enable nvtx markers" OFF)
 if((BUILD_TESTS
     OR BUILD_MICRO_BENCH
     OR BUILD_ANN_BENCH
+    OR BUILD_C_LIBRARY
    )
    AND NOT BUILD_CPU_ONLY
 )
@@ -80,6 +83,11 @@ endif()
 if(BUILD_CPU_ONLY)
   set(BUILD_SHARED_LIBS OFF)
   set(BUILD_TESTS OFF)
+  set(BUILD_C_LIBRARY OFF)
+endif()
+
+if(NOT BUILD_C_LIBRARY)
+  set(BUILD_C_TESTS OFF)
 endif()
 
 # Needed because GoogleBenchmark changes the state of FindThreads.cmake, causing subsequent runs to
@@ -175,7 +183,11 @@ if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
 endif()
 
-if(BUILD_TESTS)
+if(BUILD_C_LIBRARY)
+  include(cmake/thirdparty/get_dlpack.cmake)
+endif()
+
+if(BUILD_TESTS OR BUILD_C_TESTS)
   include(cmake/thirdparty/get_gtest.cmake)
 endif()
 
@@ -287,6 +299,35 @@ target_compile_options(
 target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 
 # ##################################################################################################
+# * cuvs_c -------------------------------------------------------------------------------
+if(BUILD_C_LIBRARY)
+  add_library(cuvs_c SHARED src/core/c_api.cpp src/neighbors/cagra_c.cpp)
+
+  add_library(cuvs::c_api ALIAS cuvs_c)
+
+  set_target_properties(
+    cuvs_c
+    PROPERTIES CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               POSITION_INDEPENDENT_CODE ON
+               EXPORT_NAME c_api
+  )
+
+  target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
+
+  target_include_directories(
+    cuvs_c
+    PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+    INTERFACE "$<INSTALL_INTERFACE:include>"
+  )
+
+  target_link_libraries(cuvs_c PUBLIC cuvs::cuvs)
+
+  # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
+  target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
+endif()
+
+# ##################################################################################################
 # * install targets-----------------------------------------------------------
 rapids_cmake_install_lib_dir(lib_dir)
 include(GNUInstallDirs)
@@ -305,17 +346,34 @@ install(
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+if(BUILD_C_LIBRARY)
+  install(
+    TARGETS cuvs_c
+    DESTINATION ${lib_dir}
+    COMPONENT c_api
+    EXPORT cuvs-c-exports
+  )
+endif()
+
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.hpp
   COMPONENT cuvs
   DESTINATION include/cuvs
 )
 
+if(TARGET cuvs_c)
+  list(APPEND cuvs_components c_api)
+  list(APPEND cuvs_export_sets cuvs-c-exports)
+  set(CUVS_C_TARGET cuvs_c)
+endif()
+
 # Use `rapids_export` for 22.04 as it will have COMPONENT support
 rapids_export(
   INSTALL cuvs
   EXPORT_SET cuvs-exports
-  GLOBAL_TARGETS cuvs
+  COMPONENTS ${cuvs_components}
+  COMPONENTS_EXPORT_SET ${cuvs_export_sets}
+  GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
   NAMESPACE cuvs::
 )
 
@@ -324,21 +382,26 @@ rapids_export(
 rapids_export(
   BUILD cuvs
   EXPORT_SET cuvs-exports
-  GLOBAL_TARGETS cuvs
+  COMPONENTS ${cuvs_components}
+  COMPONENTS_EXPORT_SET ${cuvs_export_sets}
+  GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
   NAMESPACE cuvs::
 )
 
 # ##################################################################################################
 # * shared test/bench headers ------------------------------------------------
 
-if(BUILD_TESTS OR BUILD_MICRO_BENCH)
+if(BUILD_TESTS
+   OR BUILD_MICRO_BENCH
+   OR BUILD_C_TESTS
+)
   include(internal/CMakeLists.txt)
 endif()
 
 # ##################################################################################################
 # * build test executable ----------------------------------------------------
 
-if(BUILD_TESTS)
+if(BUILD_TESTS OR BUILD_C_TESTS)
   include(test/CMakeLists.txt)
 endif()
 

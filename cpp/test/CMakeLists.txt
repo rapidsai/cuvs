@@ -21,7 +21,7 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL NOCUDA)
+  set(options OPTIONAL NOCUDA C_LIB)
   set(oneValueArgs NAME GPUS PERCENT)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
@@ -46,8 +46,14 @@ function(ConfigureTest)
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE cuvs raft::raft GTest::gtest GTest::gtest_main Threads::Threads
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:conda_env>
+    PRIVATE cuvs
+            raft::raft
+            GTest::gtest
+            GTest::gtest_main
+            Threads::Threads
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            $<TARGET_NAME_IF_EXISTS:conda_env>
+            $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
   )
   set_target_properties(
     ${TEST_NAME}
@@ -96,7 +102,21 @@ if(BUILD_TESTS)
   )
 endif()
 
+if(BUILD_C_TESTS)
+  ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
+
+  ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
+endif()
+
 # ##################################################################################################
 # Install tests ####################################################################################
 # ##################################################################################################
 rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
+
+if(BUILD_C_TESTS)
+  enable_language(C)
+
+  add_executable(cuvs_c_test test/core/c_api.c)
+
+  target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
+endif()
