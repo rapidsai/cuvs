@@ -46,6 +46,7 @@ function(find_and_configure_raft)
             "BUILD_TESTS OFF"
             "BUILD_PRIMS_BENCH OFF"
             "BUILD_ANN_BENCH OFF"
+            "RAFT_NVTX ${PKG_ENABLE_NVTX}"
             "RAFT_COMPILE_LIBRARY ${PKG_COMPILE_LIBRARY}"
             )
 endfunction()
@@ -58,4 +59,5 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         PINNED_TAG               ${RAFT_PINNED_TAG}
         COMPILE_LIBRARY          ON
         ENABLE_MNMG_DEPENDENCIES OFF
+        ENABLE_NVTX              OFF
 )
