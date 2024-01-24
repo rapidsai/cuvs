@@ -43,7 +43,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   cagra::index_params index_params;
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build<float, uint32_t>(dev_resources, index_params, dataset);
+  auto index = cagra::build(dev_resources, index_params, dataset);
 
   std::cout << "CAGRA index has " << index.size() << " vectors" << std::endl;
   std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
@@ -52,8 +52,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   // use default search parameters
   cagra::search_params search_params;
   // search K nearest neighbors
-  cagra::search<float, uint32_t>(
-    dev_resources, search_params, index, queries, neighbors.view(), distances.view());
+  cagra::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
   // raft::resource::sync_stream(dev_resources);

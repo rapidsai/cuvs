@@ -35,8 +35,8 @@ function(find_and_configure_raft)
     #-----------------------------------------------------
     rapids_cpm_find(raft ${PKG_VERSION}
             GLOBAL_TARGETS      raft::raft
-            BUILD_EXPORT_SET    cuvs-template-exports
-            INSTALL_EXPORT_SET  cuvs-template-exports
+            BUILD_EXPORT_SET    cuvs-exports
+            INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
             GIT_REPOSITORY https://github.com/${PKG_FORK}/raft.git
