@@ -176,6 +176,7 @@ outputs:
         - sysroot_{{ target_platform }} {{ sysroot_version }}
       host:
         - {{ pin_compatible('libraft', exact=True) }}
+        - {{ pin_compatible('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
@@ -203,6 +204,7 @@ outputs:
         - cudatoolkit
         {% endif %}
         - {{ pin_compatible('libraft', exact=True) }}
+        - {{ pin_compatible('libcuvs', exact=True) }}
         - gmock {{ gtest_version }}
         - gtest {{ gtest_version }}
     about:
