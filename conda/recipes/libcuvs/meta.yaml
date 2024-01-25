@@ -1,13 +1,13 @@
 # Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 # Usage:
-#   conda build . -c conda-forge -c nvidia -c rapidsai
-{% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
-{% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
-{% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
-{% set cuda_major = cuda_version.split('.')[0] %}
-{% set cuda_spec = ">=" + cuda_major ~ ",<" + (cuda_major | int + 1) ~ ".0a0" %} # i.e. >=11,<12.0a0
-{% set date_string = environ['RAPIDS_DATE_STRING'] %}
+  #   conda build . -c conda-forge -c nvidia -c rapidsai
+  {% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
+  {% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
+  {% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
+  {% set cuda_major = cuda_version.split('.')[0] %}
+  {% set cuda_spec = ">=" + cuda_major ~ ",<" + (cuda_major | int + 1) ~ ".0a0" %} # i.e. >=11,<12.0a0
+  {% set date_string = environ['RAPIDS_DATE_STRING'] %}
 
 package:
   name: libcuvs-split
@@ -87,7 +87,7 @@ outputs:
     version: {{ version }}
     script: build_libcuvs.sh
     build:
-      script_env: &script_env
+      script_env: *script_env
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
         - AWS_SESSION_TOKEN
