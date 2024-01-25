@@ -35,4 +35,4 @@ include(cmake/thirdparty/get_cuvs.cmake)
 
 # -------------- compile tasks ----------------- #
 add_executable(CAGRA_EXAMPLE src/cagra_example.cu)
-target_link_libraries(CAGRA_EXAMPLE PRIVATE cuvs::cuvs)
+target_link_libraries(CAGRA_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)

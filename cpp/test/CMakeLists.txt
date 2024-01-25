@@ -47,7 +47,7 @@ function(ConfigureTest)
   target_link_libraries(
     ${TEST_NAME}
     PRIVATE cuvs
-            raft::raft
+            cuvs::cuvs
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
