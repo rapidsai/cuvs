@@ -251,6 +251,7 @@ outputs:
         - cudatoolkit
         {% endif %}
         - {{ pin_compatible('libraft', exact=True) }}
+        - {{ pin_compatible('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
       license: Apache-2.0
