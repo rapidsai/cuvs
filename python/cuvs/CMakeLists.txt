@@ -42,7 +42,7 @@ option(CUVS_BUILD_WHEELS "Whether this build is generating a Python wheel." OFF)
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
   find_package(cuvs ${cuvs_version})
-  if(NOT TARGET cuvs::cuvs_lib)
+  if(NOT TARGET cuvs::cuvs)
     message(
       FATAL_ERROR
         "Building against a preexisting libcuvs library requires the compiled libcuvs to have been built!"
@@ -57,10 +57,6 @@ include(rapids-cython)
 
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
-  set(BUILD_PRIMS_BENCH OFF)
-  set(BUILD_ANN_BENCH OFF)
-  set(CUVS_COMPILE_LIBRARY ON)
-
   set(_exclude_from_all "")
   if(CUVS_BUILD_WHEELS)
     # Statically link dependencies if building wheels
@@ -75,7 +71,7 @@ if(NOT cuvs_FOUND)
   # pairwise_distance and random Cython libraries TODO: when we have a single 'compiled' cuvs
   # library, we shouldn't need this
   set(cython_lib_dir cuvs)
-  install(TARGETS cuvs_lib DESTINATION ${cython_lib_dir})
+  install(TARGETS cuvs DESTINATION ${cython_lib_dir})
 endif()
 
 rapids_cython_init()

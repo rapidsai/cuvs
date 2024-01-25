@@ -55,8 +55,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
-option(BUILD_MICRO_BENCH "Build cuvs C++ micro benchmarks" OFF)
-option(BUILD_ANN_BENCH "Build cuvs ann benchmarks" OFF)
 option(BUILD_C_LIBRARY "Build raft C API library" OFF)
 option(BUILD_C_TESTS "Build raft C API tests" OFF)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
@@ -70,13 +68,7 @@ option(DISABLE_DEPRECATION_WARNINGS "Disable deprecaction warnings " ON)
 option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 
-if((BUILD_TESTS
-    OR BUILD_MICRO_BENCH
-    OR BUILD_ANN_BENCH
-    OR BUILD_C_LIBRARY
-   )
-   AND NOT BUILD_CPU_ONLY
-)
+if((BUILD_TESTS OR BUILD_C_LIBRARY) AND NOT BUILD_CPU_ONLY)
 
 endif()
 
@@ -100,8 +92,6 @@ include(CMakeDependentOption)
 # nearest neighbors search on GPU" ON CUVS_COMPILE_LIBRARY OFF )
 
 message(VERBOSE "cuVS: Build cuVS unit-tests: ${BUILD_TESTS}")
-message(VERBOSE "cuVS: Building cuvs C++ benchmarks: ${BUILD_MICRO_BENCH}")
-message(VERBOSE "cuVS: Building ANN benchmarks: ${BUILD_ANN_BENCH}")
 message(VERBOSE "cuVS: Build CPU only components: ${BUILD_CPU_ONLY}")
 message(VERBOSE "cuVS: Enable detection of conda environment for dependencies: ${DETECT_CONDA_ENV}")
 message(VERBOSE "cuVS: Disable depreaction warnings " ${DISABLE_DEPRECATION_WARNINGS})
@@ -189,11 +179,6 @@ endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(cmake/thirdparty/get_gtest.cmake)
-endif()
-
-if(BUILD_MICRO_BENCH OR BUILD_ANN_BENCH)
-  include(${rapids-cmake-dir}/cpm/gbench.cmake)
-  rapids_cpm_gbench()
 endif()
 
 include(cmake/thirdparty/get_cutlass.cmake)
@@ -391,10 +376,7 @@ rapids_export(
 # ##################################################################################################
 # * shared test/bench headers ------------------------------------------------
 
-if(BUILD_TESTS
-   OR BUILD_MICRO_BENCH
-   OR BUILD_C_TESTS
-)
+if(BUILD_TESTS OR BUILD_C_TESTS)
   include(internal/CMakeLists.txt)
 endif()
 
@@ -403,18 +385,4 @@ endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(test/CMakeLists.txt)
-endif()
-
-# ##################################################################################################
-# * build benchmark executable -----------------------------------------------
-
-if(BUILD_MICRO_BENCH)
-  include(bench/micro/CMakeLists.txt)
-endif()
-
-# ##################################################################################################
-# * build ann benchmark executable -----------------------------------------------
-
-if(BUILD_ANN_BENCH)
-  include(bench/ann/CMakeLists.txt)
 endif()
