@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -13,8 +13,7 @@
 # =============================================================================
 
 # Set the list of Cython files to build
-set(cython_sources common.pyx refine.pyx brute_force.pyx)
-set(linked_libraries cuvs::cuvs cuvs::compiled)
+set(linked_libraries cuvs::cuvs)
 
 # Build all of the Cython targets
 rapids_cython_create_modules(
@@ -24,5 +23,3 @@ rapids_cython_create_modules(
 )
 
 add_subdirectory(cagra)
-add_subdirectory(ivf_flat)
-add_subdirectory(ivf_pq)

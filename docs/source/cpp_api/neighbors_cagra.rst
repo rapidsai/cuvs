@@ -9,23 +9,23 @@ Please note that the CAGRA implementation is currently experimental and the API 
    :language: c++
    :class: highlight
 
-``#include <raft/neighbors/cagra.cuh>``
+``#include <cuvs/neighbors/cagra.hpp>``
 
-namespace *raft::neighbors::cagra*
+namespace *cuvs::neighbors::cagra*
 
 .. doxygengroup:: cagra
-    :project: RAFT
+    :project: cuvs
     :members:
     :content-only:
 
 
 Serializer Methods
 ------------------
-``#include <raft/neighbors/cagra_serialize.cuh>``
+``#include <cuvs/neighbors/cagra_serialize.cuh>``
 
-namespace *raft::neighbors::cagra*
+namespace *cuvs::neighbors::cagra*
 
 .. doxygengroup:: cagra_serialize
-    :project: RAFT
+    :project: cuvs
     :members:
     :content-only:

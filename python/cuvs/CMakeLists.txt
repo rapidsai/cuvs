@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -18,8 +18,8 @@ include(../../fetch_rapids.cmake)
 
 set(cuvs_version 24.02.00)
 
-# We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco
-# dependency that enables CUDA unconditionally.
+# We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
+# that enables CUDA unconditionally.
 include(rapids-cuda)
 rapids_cuda_init_architectures(cuvs)
 
@@ -41,7 +41,7 @@ option(CUVS_BUILD_WHEELS "Whether this build is generating a Python wheel." OFF)
 
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
-  find_package(cuvs ${cuvs_version} REQUIRED COMPONENTS compiled)
+  find_package(cuvs ${cuvs_version})
   if(NOT TARGET cuvs::cuvs_lib)
     message(
       FATAL_ERROR
@@ -80,12 +80,7 @@ endif()
 
 rapids_cython_init()
 
-add_subdirectory(cuvs/common)
-add_subdirectory(cuvs/distance)
-add_subdirectory(cuvs/matrix)
 add_subdirectory(cuvs/neighbors)
-add_subdirectory(cuvs/random)
-add_subdirectory(cuvs/cluster)
 
 if(DEFINED cython_lib_dir)
   rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")

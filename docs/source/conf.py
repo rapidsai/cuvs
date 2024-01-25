@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2023, NVIDIA CORPORATION.
+# Copyright (c) 2018-2024, NVIDIA CORPORATION.
 
 import os
 import sys
@@ -36,9 +36,9 @@ extensions = [
     "sphinx_copybutton"
 ]
 
-breathe_default_project = "RAFT"
+breathe_default_project = "cuvs"
 breathe_projects = {
-    "RAFT": "../../cpp/doxygen/_xml/",
+    "cuvs": "../../cpp/doxygen/_xml/",
 }
 ipython_mplbackend = "str"
 
@@ -58,7 +58,7 @@ source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 master_doc = "index"
 
 # General information about the project.
-project = "raft"
+project = "cuvs"
 copyright = "2023, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
@@ -106,7 +106,7 @@ html_theme_options = {
     "external_links": [],
     # https://github.com/pydata/pydata-sphinx-theme/issues/1220
     "icon_links": [],
-    "github_url": "https://github.com/rapidsai/raft",
+    "github_url": "https://github.com/rapidsai/cuvs",
     "twitter_url": "https://twitter.com/rapidsai",
     "show_toc_level": 1,
     "navbar_align": "right",
@@ -122,7 +122,7 @@ html_js_files = []
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "raftdoc"
+htmlhelp_basename = "cuvsdoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -145,14 +145,14 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "raft.tex", "RAFT Documentation", "NVIDIA Corporation", "manual"),
+    (master_doc, "cuvs.tex", "cuVS Documentation", "NVIDIA Corporation", "manual"),
 ]
 
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "raft", "RAFT Documentation", [author], 1)]
+man_pages = [(master_doc, "cuvs", "cuVS Documentation", [author], 1)]
 
 # -- Options for Texinfo output -------------------------------------------
 
@@ -162,10 +162,10 @@ man_pages = [(master_doc, "raft", "RAFT Documentation", [author], 1)]
 texinfo_documents = [
     (
         master_doc,
-        "raft",
-        "RAFT Documentation",
+        "cuvs",
+        "cuVS Documentation",
         author,
-        "raft",
+        "cuvs",
         "One line description of project.",
         "Miscellaneous",
     ),
@@ -192,9 +192,9 @@ def setup(app):
 
 # The following is used by sphinx.ext.linkcode to provide links to github
 linkcode_resolve = make_linkcode_resolve(
-    "pylibraft",
-    "https://github.com/rapidsai/raft"
-    "raft/blob/{revision}/python/pylibraft"
+    "cuvs",
+    "https://github.com/rapidsai/cuvs"
+    "cuvs/blob/{revision}/python/cuvs"
     "{package}/{path}#L{lineno}",
 )
 
