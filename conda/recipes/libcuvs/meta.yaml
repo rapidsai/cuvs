@@ -16,9 +16,9 @@ source:
   path: ../../..
 
 outputs:
-  - name: libcuvs-static
+  - name: libcuvs
     version: {{ version }}
-    script: build_libcuvs_static.sh
+    script: build_libcuvs.sh
     build:
       script_env: &script_env
         - AWS_ACCESS_KEY_ID
@@ -37,55 +37,6 @@ outputs:
         - SCCACHE_S3_KEY_PREFIX=libraft-linux64 # [linux64]
         - SCCACHE_S3_USE_SSL
         - SCCACHE_S3_NO_CREDENTIALS
-      number: {{ GIT_DESCRIBE_NUMBER }}
-      string: cuda{{ cuda_major }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
-      ignore_run_exports_from:
-        {% if cuda_major == "11" %}
-        - {{ compiler('cuda11') }}
-        {% endif %}
-    requirements:
-      build:
-        - {{ compiler('c') }}
-        - {{ compiler('cxx') }}
-        {% if cuda_major == "11" %}
-        - {{ compiler('cuda11') }} ={{ cuda_version }}
-        {% else %}
-        - {{ compiler('cuda') }}
-        {% endif %}
-        - cuda-version ={{ cuda_version }}
-        - cmake {{ cmake_version }}
-        - ninja
-        - sysroot_{{ target_platform }} {{ sysroot_version }}
-      host:
-        - cuda-version ={{ cuda_version }}
-        {% if cuda_major == "11" %}
-        - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
-        - libcublas {{ cuda11_libcublas_host_version }}
-        - libcublas-dev {{ cuda11_libcublas_host_version }}
-        - libcurand {{ cuda11_libcurand_host_version }}
-        - libcurand-dev {{ cuda11_libcurand_host_version }}
-        - libcusolver {{ cuda11_libcusolver_host_version }}
-        - libcusolver-dev {{ cuda11_libcusolver_host_version }}
-        - libcusparse {{ cuda11_libcusparse_host_version }}
-        - libcusparse-dev {{ cuda11_libcusparse_host_version }}
-        {% else %}
-        - cuda-profiler-api
-        - libcublas-dev
-        - libcurand-dev
-        - libcusolver-dev
-        - libcusparse-dev
-        {% endif %}
-      run:
-        - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
-    about:
-      home: https://rapids.ai/
-      license: Apache-2.0
-      summary: libcuvs static library
-  - name: libcuvs
-    version: {{ version }}
-    script: build_libcuvs.sh
-    build:
-      script_env: *script_env
       number: {{ GIT_DESCRIBE_NUMBER }}
       string: cuda{{ cuda_major }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
       ignore_run_exports_from:
