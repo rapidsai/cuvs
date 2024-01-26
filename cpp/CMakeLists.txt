@@ -374,15 +374,9 @@ rapids_export(
 )
 
 # ##################################################################################################
-# * shared test/bench headers ------------------------------------------------
-
-if(BUILD_TESTS OR BUILD_C_TESTS)
-  include(internal/CMakeLists.txt)
-endif()
-
-# ##################################################################################################
 # * build test executable ----------------------------------------------------
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
+  include(internal/CMakeLists.txt)
   include(test/CMakeLists.txt)
 endif()
