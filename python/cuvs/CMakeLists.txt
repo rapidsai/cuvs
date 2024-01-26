@@ -37,8 +37,6 @@ option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulti
        OFF
 )
 
-option(CUVS_BUILD_WHEELS "Whether this build is generating a Python wheel." OFF)
-
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
   find_package(cuvs ${cuvs_version})
@@ -50,15 +48,9 @@ include(rapids-cython)
 
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
-  set(_exclude_from_all "")
-  if(CUVS_BUILD_WHEELS)
-    # Statically link dependencies if building wheels
-    set(CUDA_STATIC_RUNTIME ON)
-    # Don't install the cuvs C++ targets into wheels
-    set(_exclude_from_all EXCLUDE_FROM_ALL)
-  endif()
+  set(CUDA_STATIC_RUNTIME ON)
 
-  add_subdirectory(../../cpp cuvs-cpp ${_exclude_from_all})
+  add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 
   # When building the C++ libraries from source we must copy libcuvs.so alongside the
   # pairwise_distance and random Cython libraries TODO: when we have a single 'compiled' cuvs
