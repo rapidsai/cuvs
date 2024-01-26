@@ -21,10 +21,10 @@ set(cuvs_version 24.02.00)
 # We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
 # that enables CUDA unconditionally.
 include(rapids-cuda)
-rapids_cuda_init_architectures(cuvs)
+rapids_cuda_init_architectures(cuvs_py)
 
 project(
-  cuvs
+  cuvs_py
   VERSION ${cuvs_version}
   LANGUAGES # TODO: Building Python extension modules via the python_extension_module requires the C
             # language to be enabled here. The test project that is built in scikit-build to verify
@@ -67,16 +67,13 @@ if(NOT cuvs_FOUND)
 
   add_subdirectory(../../cpp cuvs-cpp ${_exclude_from_all})
 
-  # When building the C++ libraries from source we must copy libcuvs.so alongside the
-  # pairwise_distance and random Cython libraries TODO: when we have a single 'compiled' cuvs
-  # library, we shouldn't need this
-  set(cython_lib_dir cuvs)
+  # When building the C++ libraries from source we must copy libcuvs.so alongside the Cython
+  # libraries TODO: when we have a single 'compiled' cuvs library, we shouldn't need this
+  set(cython_lib_dir cuvs_py)
   install(TARGETS cuvs DESTINATION ${cython_lib_dir})
 endif()
 
 rapids_cython_init()
-
-add_subdirectory(cuvs/neighbors)
 
 if(DEFINED cython_lib_dir)
   rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")
