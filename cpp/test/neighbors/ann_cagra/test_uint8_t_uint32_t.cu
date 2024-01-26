@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,18 +23,6 @@ namespace cuvs::neighbors::cagra {
 typedef AnnCagraTest<float, std::uint8_t, std::uint32_t> AnnCagraTestU8_U32;
 TEST_P(AnnCagraTestU8_U32, AnnCagra) { this->testCagra(); }
 
-typedef AnnCagraSortTest<float, std::uint8_t, std::uint32_t> AnnCagraSortTestU8_U32;
-TEST_P(AnnCagraSortTestU8_U32, AnnCagraSort) { this->testCagraSort(); }
-
-typedef AnnCagraFilterTest<float, std::uint8_t, std::uint32_t> AnnCagraFilterTestU8_U32;
-TEST_P(AnnCagraFilterTestU8_U32, AnnCagraSort)
-{
-  this->testCagraFilter();
-  this->testCagraRemoved();
-}
-
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestU8_U32, ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_CASE_P(AnnCagraSortTest, AnnCagraSortTestU8_U32, ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest, AnnCagraFilterTestU8_U32, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::cagra

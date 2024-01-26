@@ -10,9 +10,9 @@ This directory (`CUVS_SOURCE/cpp/template`) can be copied directly in order to b
 
 CUVS can be integrated into an existing CMake project by copying the contents in the `configure rapids-cmake` and `configure cuvs` sections of the provided `CMakeLists.txt` into your project, along with `cmake/thirdparty/get_cuvs.cmake`. 
 
-Make sure to link against the appropriate Cmake targets. Use `cuvs::cuvs`to add make the headers available and `cuvs::compiled` when utilizing the shared library.
+Make sure to link against the appropriate Cmake targets. Use `cuvs::cuvs` to utilize the shared library.
 
 ```cmake
-target_link_libraries(your_app_target PRIVATE cuvs::cuvs cuvs::compiled)
+target_link_libraries(your_app_target PRIVATE cuvs::cuvs)
 ```
 

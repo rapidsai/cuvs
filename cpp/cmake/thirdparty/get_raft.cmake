@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -35,8 +35,8 @@ function(find_and_configure_raft)
     #-----------------------------------------------------
     rapids_cpm_find(raft ${PKG_VERSION}
             GLOBAL_TARGETS      raft::raft
-            BUILD_EXPORT_SET    cuvs-template-exports
-            INSTALL_EXPORT_SET  cuvs-template-exports
+            BUILD_EXPORT_SET    cuvs-exports
+            INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
             GIT_REPOSITORY https://github.com/${PKG_FORK}/raft.git
@@ -46,7 +46,7 @@ function(find_and_configure_raft)
             "BUILD_TESTS OFF"
             "BUILD_PRIMS_BENCH OFF"
             "BUILD_ANN_BENCH OFF"
-            "RAFT_NVTX   ${ENABLE_NVTX}"
+            "RAFT_NVTX ${PKG_ENABLE_NVTX}"
             "RAFT_COMPILE_LIBRARY ${PKG_COMPILE_LIBRARY}"
             )
 endfunction()

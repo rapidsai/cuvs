@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,18 @@
 #pragma once
 
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/spatial/knn/detail/ann_utils.cuh>
 #include <raft/core/device_mdarray.hpp>  // raft::make_device_matrix
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/detail/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 
-#include <cuvs_internal/neighbors/naive_knn.cuh>
+#include "naive_knn.cuh"
 
 #include "../test_utils.cuh"
 #include <gtest/gtest.h>
@@ -162,13 +162,13 @@ auto eval_recall(const std::vector<T>& expected_idx,
   auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, rows, cols);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
-  RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
+  /*RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,
                 total_count,
                 std::abs(error_margin * 100.0),
                 error_margin < 0 ? "above" : "below",
-                eps);
+                eps);*/
   if (actual_recall < min_recall - eps) {
     return testing::AssertionFailure()
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
@@ -199,8 +199,8 @@ auto calc_recall(const std::vector<T>& expected_idx,
         size_t idx    = i * cols + j;  // row major assumption!
         auto exp_idx  = expected_idx[idx];
         auto exp_dist = expected_dist[idx];
-        idx_dist_pair exp_kvp(exp_idx, exp_dist, raft::CompareApprox<DistT>(eps));
-        idx_dist_pair act_kvp(act_idx, act_dist, raft::CompareApprox<DistT>(eps));
+        idx_dist_pair exp_kvp(exp_idx, exp_dist, cuvs::CompareApprox<DistT>(eps));
+        idx_dist_pair act_kvp(act_idx, act_dist, cuvs::CompareApprox<DistT>(eps));
         if (exp_kvp == act_kvp) {
           match_count++;
           break;
@@ -227,6 +227,7 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
   auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, expected_dist, actual_dist, rows, cols, eps);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
+  /*
   RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,
@@ -234,6 +235,7 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
                 std::abs(error_margin * 100.0),
                 error_margin < 0 ? "above" : "below",
                 eps);
+  */
   if (actual_recall < min_recall - eps) {
     return testing::AssertionFailure()
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
@@ -263,9 +265,9 @@ auto eval_distances(raft::resources const& handle,
 
     raft::matrix::copy_rows<T, IdxT>(
       handle,
-      make_device_matrix_view<const T, IdxT>(x, k, n_cols),
+      raft::make_device_matrix_view<const T, IdxT>(x, k, n_cols),
       y.view(),
-      make_device_vector_view<const IdxT, IdxT>(neighbors + i * k, k));
+      raft::make_device_vector_view<const IdxT, IdxT>(neighbors + i * k, k));
 
     dim3 block_dim(16, 32, 1);
     auto grid_y =
@@ -273,7 +275,7 @@ auto eval_distances(raft::resources const& handle,
     dim3 grid_dim(raft::ceildiv<size_t>(n_rows, block_dim.x), grid_y, 1);
 
     naive_distance_kernel<DistT, T, IdxT>
-      <<<grid_dim, block_dim, 0, resource::get_cuda_stream(handle)>>>(
+      <<<grid_dim, block_dim, 0, raft::resource::get_cuda_stream(handle)>>>(
         naive_dist.data_handle(), queries + i * n_cols, y.data_handle(), 1, k, n_cols, metric);
 
     if (!devArrMatch(distances + i * k,
@@ -282,9 +284,9 @@ auto eval_distances(raft::resources const& handle,
                      CompareApprox<float>(eps))) {
       std::cout << n_rows << "x" << n_cols << ", " << k << std::endl;
       std::cout << "query " << i << std::endl;
-      print_vector(" indices", neighbors + i * k, k, std::cout);
-      print_vector("n dist", distances + i * k, k, std::cout);
-      print_vector("c dist", naive_dist.data_handle(), naive_dist.size(), std::cout);
+      raft::print_vector(" indices", neighbors + i * k, k, std::cout);
+      raft::print_vector("n dist", distances + i * k, k, std::cout);
+      raft::print_vector("c dist", naive_dist.data_handle(), naive_dist.size(), std::cout);
 
       return testing::AssertionFailure();
     }

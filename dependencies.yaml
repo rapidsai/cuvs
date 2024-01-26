@@ -18,17 +18,6 @@ files:
       - test_python_common
       - test_cuvs
       - cupy
-  bench_ann:
-    output: conda
-    matrix:
-      cuda: ["11.8", "12.0"]
-      arch: [x86_64, aarch64]
-    includes:
-      - build
-      - develop
-      - cudatoolkit
-      - nn_bench
-      - nn_bench_python
   test_cpp:
     output: none
     includes:
@@ -81,20 +70,6 @@ files:
       - test_python_common
       - test_cuvs
       - cupy
-  py_build_cuvs_bench:
-    output: pyproject
-    pyproject_dir: python/cuvs-bench
-    extras:
-      table: build-system
-    includes:
-      - build_wheels
-  py_run_cuvs_bench:
-    output: pyproject
-    pyproject_dir: python/cuvs-bench
-    extras:
-      table: project
-    includes:
-      - nn_bench_python
 channels:
   - rapidsai
   - rapidsai-nightly
@@ -194,26 +169,6 @@ dependencies:
         packages:
           - clang==16.0.6
           - clang-tools=16.0.6
-  nn_bench:
-    common:
-      - output_types: [conda, pyproject, requirements]
-        packages:
-          - hnswlib=0.7.0
-          - nlohmann_json>=3.11.2
-          - glog>=0.6.0
-          - h5py>=3.8.0
-          - benchmark>=1.8.2
-          - openblas
-          - *rmm_conda
-  nn_bench_python:
-    common:
-      - output_types: [conda]
-        packages:
-          - matplotlib
-          - pandas
-          - pyyaml
-          - pandas
-
   cudatoolkit:
     specific:
       - output_types: conda

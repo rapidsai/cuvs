@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.
+# Copyright (c) 2020-2024, NVIDIA CORPORATION.
 
 # cuvs build scripts
 
@@ -18,17 +18,15 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs cuvs docs tests template bench-prims bench-ann clean --uninstall  -v -g -n --compile-lib --compile-static-lib --allgpuarch --no-nvtx --cpu-only --show_depr_warn --incl-cache-stats --time -h"
-HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-prims=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
+VALIDARGS="clean libcuvs python docs tests template clean --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
    libcuvs          - build the cuvs C++ code only. Also builds the C-wrapper library
                       around the C++ code.
-   cuvs        - build the cuvs Python package
+   python           - build the cuvs Python package
    docs             - build the documentation
    tests            - build the tests
-   bench-prims      - build micro-benchmarks for primitives
-   bench-ann        - build end-to-end ann benchmarks
    template         - build the example CUVS application template
 
  and <flag> is:
@@ -36,12 +34,8 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    -g                          - build for debug
    -n                          - no install step
    --uninstall                 - uninstall files for specified targets which were built and installed prior
-   --compile-lib               - compile shared library for all components
    --compile-static-lib        - compile static library for all components
-   --cpu-only                  - build CPU only components without CUDA. Applies to bench-ann only currently.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
-   --limit-bench-prims         - semicolon-separated list of prims benchmark executables to compute (e.g. NEIGHBORS_MICRO_BENCH;CLUSTER_MICRO_BENCH)
-   --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;CUVS_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --show_depr_warn            - show cmake deprecation warnings
@@ -59,9 +53,8 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
 LIBCUVS_BUILD_DIR=${LIBCUVS_BUILD_DIR:=${REPODIR}/cpp/build}
 SPHINX_BUILD_DIR=${REPODIR}/docs
 DOXYGEN_BUILD_DIR=${REPODIR}/cpp/doxygen
-CUVS_DASK_BUILD_DIR=${REPODIR}/python/cuvs-dask/_skbuild
-PYLIBCUVS_BUILD_DIR=${REPODIR}/python/cuvs/_skbuild
-BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYLIBCUVS_BUILD_DIR} ${CUVS_DASK_BUILD_DIR}"
+PYTHON_BUILD_DIR=${REPODIR}/python/cuvs/_skbuild
+BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR} ${CUVS_DASK_BUILD_DIR}"
 
 # Set defaults for vars modified by flags to this script
 CMAKE_LOG_LEVEL=""
@@ -69,16 +62,12 @@ VERBOSE_FLAG=""
 BUILD_ALL_GPU_ARCH=0
 BUILD_TESTS=OFF
 BUILD_TYPE=Release
-BUILD_MICRO_BENCH=OFF
-BUILD_ANN_BENCH=OFF
-BUILD_CPU_ONLY=OFF
 COMPILE_LIBRARY=OFF
 INSTALL_TARGET=install
 BUILD_REPORT_METRICS=""
 BUILD_REPORT_INCL_CACHE_STATS=OFF
 
-TEST_TARGETS="CLUSTER_TEST;DISTANCE_TEST;NEIGHBORS_TEST;NEIGHBORS_ANN_CAGRA_TEST;NEIGHBORS_ANN_NN_DESCENT_TEST;NEIGHBORS_ANN_IVF_TEST"
-BENCH_TARGETS="CLUSTER_BENCH;NEIGHBORS_BENCH;DISTANCE_BENCH"
+TEST_TARGETS="NEIGHBORS_ANN_CAGRA_TEST"
 
 CACHE_ARGS=""
 NVTX=ON
@@ -158,36 +147,6 @@ function limitTests {
     fi
 }
 
-function limitBench {
-    # Check for option to limit the set of test binaries to build
-    if [[ -n $(echo $ARGS | { grep -E "\-\-limit\-bench-prims" || true; } ) ]]; then
-        # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
-        # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
-        # on the invalid option error
-        LIMIT_MICRO_BENCH_TARGETS=$(echo $ARGS | sed -e 's/.*--limit-bench-prims=//' -e 's/ .*//')
-        if [[ -n ${LIMIT_MICRO_BENCH_TARGETS} ]]; then
-            # Remove the full LIMIT_MICRO_BENCH_TARGETS argument from list of args so that it passes validArgs function
-            ARGS=${ARGS//--limit-bench-prims=$LIMIT_MICRO_BENCH_TARGETS/}
-            MICRO_BENCH_TARGETS=${LIMIT_MICRO_BENCH_TARGETS}
-        fi
-    fi
-}
-
-function limitAnnBench {
-    # Check for option to limit the set of test binaries to build
-    if [[ -n $(echo $ARGS | { grep -E "\-\-limit\-bench-ann" || true; } ) ]]; then
-        # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
-        # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
-        # on the invalid option error
-        LIMIT_ANN_BENCH_TARGETS=$(echo $ARGS | sed -e 's/.*--limit-bench-ann=//' -e 's/ .*//')
-        if [[ -n ${LIMIT_ANN_BENCH_TARGETS} ]]; then
-            # Remove the full LIMIT_TEST_TARGETS argument from list of args so that it passes validArgs function
-            ARGS=${ARGS//--limit-bench-ann=$LIMIT_ANN_BENCH_TARGETS/}
-            ANN_BENCH_TARGETS=${LIMIT_ANN_BENCH_TARGETS}
-        fi
-    fi
-}
-
 function buildMetrics {
     # Check for multiple build-metrics options
     if [[ $(echo $ARGS | { grep -Eo "\-\-build\-metrics" || true; } | wc -l ) -gt 1 ]]; then
@@ -217,8 +176,6 @@ if (( ${NUMARGS} != 0 )); then
     cmakeArgs
     cacheTool
     limitTests
-    limitBench
-    limitAnnBench
     buildMetrics
     for a in ${ARGS}; do
         if ! (echo " ${VALIDARGS} " | grep -q " ${a} "); then
@@ -304,15 +261,11 @@ if hasArg --allgpuarch; then
     BUILD_ALL_GPU_ARCH=1
 fi
 
-if hasArg --compile-lib || (( ${NUMARGS} == 0 )); then
-    COMPILE_LIBRARY=ON
-    CMAKE_TARGET="${CMAKE_TARGET};cuvs"
-fi
 
-#if hasArg --compile-static-lib || (( ${NUMARGS} == 0 )); then
-#    COMPILE_LIBRARY=ON
-#    CMAKE_TARGET="${CMAKE_TARGET};cuvs_lib_static"
-#fi
+# Append `-DFIND_CUVS_CPP=ON` to EXTRA_CMAKE_ARGS unless a user specified the option.
+if [[ "${EXTRA_CMAKE_ARGS}" != *"DFIND_CUVS_CPP"* ]]; then
+    EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS} -DFIND_CUVS_CPP=ON"
+fi
 
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
@@ -328,30 +281,6 @@ if hasArg tests || (( ${NUMARGS} == 0 )); then
           $CMAKE_TARGET == *"STATS_TEST"* ]]; then
       echo "-- Enabling compiled lib for gtests"
       COMPILE_LIBRARY=ON
-    fi
-fi
-
-if hasArg bench-prims || (( ${NUMARGS} == 0 )); then
-    BUILD_MICRO_BENCH=ON
-    CMAKE_TARGET="${CMAKE_TARGET};${MICRO_BENCH_TARGETS}"
-
-    # Force compile library when needed benchmark targets are specified
-    if [[ $CMAKE_TARGET == *"CLUSTER_MICRO_BENCH"* || \
-          $CMAKE_TARGET == *"NEIGHBORS_MICRO_BENCH"* ]]; then
-      echo "-- Enabling compiled lib for benchmarks"
-      COMPILE_LIBRARY=ON
-    fi
-fi
-
-if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
-    BUILD_ANN_BENCH=ON
-    CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
-    if hasArg --cpu-only; then
-        COMPILE_LIBRARY=OFF
-        BUILD_CPU_ONLY=ON
-        NVTX=OFF
-    else
-        COMPILE_LIBRARY=ON
     fi
 fi
 
@@ -398,6 +327,9 @@ fi
 ################################################################################
 # Configure for building all C++ targets
 if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+    COMPILE_LIBRARY=ON
+    CMAKE_TARGET="${CMAKE_TARGET};cuvs"
+
     if (( ${BUILD_ALL_GPU_ARCH} == 0 )); then
         CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
         echo "Building for the architecture of the GPU in the system..."
@@ -423,8 +355,6 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           -DCUDA_LOG_COMPILE_TIME=${LOG_COMPILE_TIME} \
           -DDISABLE_DEPRECATION_WARNINGS=${DISABLE_DEPRECATION_WARNINGS} \
           -DBUILD_TESTS=${BUILD_TESTS} \
-          -DBUILD_MICRO_BENCH=${BUILD_MICRO_BENCH} \
-          -DBUILD_ANN_BENCH=${BUILD_ANN_BENCH} \
           -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \
           ${CACHE_ARGS} \
@@ -486,22 +416,10 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
 fi
 
 # Build and (optionally) install the cuvs Python package
-if (( ${NUMARGS} == 0 )) || hasArg cuvs; then
+if (( ${NUMARGS} == 0 )) || hasArg python; then
     SKBUILD_CONFIGURE_OPTIONS="${SKBUILD_EXTRA_CMAKE_ARGS}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
         python -m pip install --no-build-isolation --no-deps ${REPODIR}/python/cuvs
-fi
-
-# Build and (optionally) install the cuvs-dask Python package
-if (( ${NUMARGS} == 0 )) || hasArg cuvs-dask; then
-    SKBUILD_CONFIGURE_OPTIONS="${SKBUILD_EXTRA_CMAKE_ARGS}" \
-        SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
-        python -m pip install --no-build-isolation --no-deps ${REPODIR}/python/cuvs-dask
-fi
-
-# Build and (optionally) install the cuvs-ann-bench Python package
-if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
-    python -m pip install --no-build-isolation --no-deps ${REPODIR}/python/cuvs-ann-bench -vvv
 fi
 
 if hasArg docs; then

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
 
-#include <cuvs/neighbors/cagra.cuh>
+#include <cuvs/neighbors/cagra.hpp>
 
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
@@ -43,7 +43,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   cagra::index_params index_params;
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build<float, uint32_t>(dev_resources, index_params, dataset);
+  auto index = cagra::build(dev_resources, index_params, dataset);
 
   std::cout << "CAGRA index has " << index.size() << " vectors" << std::endl;
   std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
@@ -52,8 +52,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   // use default search parameters
   cagra::search_params search_params;
   // search K nearest neighbors
-  cagra::search<float, uint32_t>(
-    dev_resources, search_params, index, queries, neighbors.view(), distances.view());
+  cagra::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
   // raft::resource::sync_stream(dev_resources);

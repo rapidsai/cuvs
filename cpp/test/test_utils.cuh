@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@
 #include <utility>
 #include <vector>
 
-namespace raft {
+namespace cuvs {
 
 /*
  * @brief Helper function to compare 2 device n-D arrays with custom comparison
@@ -255,7 +255,7 @@ void gen_uniform(const raft::resources& handle,
                  raft::random::RngState& rng,
                  IdxT len)
 {
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<T1> keys(len, stream);
   rmm::device_uvector<T2> values(len, stream);
 
@@ -327,4 +327,4 @@ inline std::vector<float> read_csv(std::string filename, bool skip_first_n_colum
   return result;
 }
 
-};  // end namespace raft
+};  // end namespace cuvs

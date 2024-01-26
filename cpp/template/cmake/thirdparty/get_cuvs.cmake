@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -17,18 +17,9 @@ set(CUVS_FORK "rapidsai")
 set(CUVS_PINNED_TAG "branch-${RAPIDS_VERSION}")
 
 function(find_and_configure_cuvs)
-    set(oneValueArgs VERSION FORK PINNED_TAG COMPILE_LIBRARY ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)
+    set(oneValueArgs VERSION FORK PINNED_TAG ENABLE_NVTX)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
-
-    set(CUVS_COMPONENTS "")
-    if(PKG_COMPILE_LIBRARY)
-        string(APPEND CUVS_COMPONENTS " compiled")
-    endif()
-
-    if(PKG_ENABLE_MNMG_DEPENDENCIES)
-        string(APPEND CUVS_COMPONENTS " distributed")
-    endif()
 
     #-----------------------------------------------------
     # Invoke CPM find_package()
@@ -37,17 +28,13 @@ function(find_and_configure_cuvs)
             GLOBAL_TARGETS      cuvs::cuvs
             BUILD_EXPORT_SET    cuvs-template-exports
             INSTALL_EXPORT_SET  cuvs-template-exports
-            COMPONENTS          ${CUVS_COMPONENTS}
             CPM_ARGS
             GIT_REPOSITORY https://github.com/${PKG_FORK}/cuvs.git
             GIT_TAG        ${PKG_PINNED_TAG}
             SOURCE_SUBDIR  cpp
             OPTIONS
             "BUILD_TESTS OFF"
-            "BUILD_PRIMS_BENCH OFF"
-            "BUILD_ANN_BENCH OFF"
-            "CUVS_NVTX   ${ENABLE_NVTX}"
-            "CUVS_COMPILE_LIBRARY ${PKG_COMPILE_LIBRARY}"
+            "CUVS_NVTX ${PKG_ENABLE_NVTX}"
             )
 endfunction()
 
@@ -57,7 +44,5 @@ endfunction()
 find_and_configure_cuvs(VERSION  ${CUVS_VERSION}.00
         FORK                     ${CUVS_FORK}
         PINNED_TAG               ${CUVS_PINNED_TAG}
-        COMPILE_LIBRARY          ON
-        ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
 )
