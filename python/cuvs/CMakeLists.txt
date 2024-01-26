@@ -34,7 +34,7 @@ project(
 )
 
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
-       ON
+       OFF
 )
 
 option(CUVS_BUILD_WHEELS "Whether this build is generating a Python wheel." OFF)
@@ -42,13 +42,6 @@ option(CUVS_BUILD_WHEELS "Whether this build is generating a Python wheel." OFF)
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
   find_package(cuvs ${cuvs_version})
-  if(NOT TARGET cuvs::cuvs)
-    message(
-      FATAL_ERROR
-        "Building against a preexisting libcuvs library requires the compiled libcuvs to have been built!"
-    )
-
-  endif()
 else()
   set(cuvs_FOUND OFF)
 endif()
