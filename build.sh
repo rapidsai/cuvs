@@ -262,10 +262,10 @@ if hasArg --allgpuarch; then
 fi
 
 
-#if hasArg --compile-static-lib || (( ${NUMARGS} == 0 )); then
-#    COMPILE_LIBRARY=ON
-#    CMAKE_TARGET="${CMAKE_TARGET};cuvs_lib_static"
-#fi
+# Append `-DFIND_CUVS_CPP=ON` to EXTRA_CMAKE_ARGS unless a user specified the option.
+if [[ "${EXTRA_CMAKE_ARGS}" != *"DFIND_CUVS_CPP"* ]]; then
+    EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS} -DFIND_CUVS_CPP=ON"
+fi
 
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
