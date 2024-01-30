@@ -46,14 +46,21 @@ enum cagraGraphBuildAlgo {
  */
 struct cagraIndexParams {
   /** Degree of input graph for pruning. */
-  size_t intermediate_graph_degree = 128;
+  size_t intermediate_graph_degree;
   /** Degree of output graph. */
-  size_t graph_degree = 64;
+  size_t graph_degree;
   /** ANN algorithm to build knn graph. */
-  cagraGraphBuildAlgo build_algo = IVF_PQ;
+  enum cagraGraphBuildAlgo build_algo;
   /** Number of Iterations to run if building with NN_DESCENT */
-  size_t nn_descent_niter = 20;
+  size_t nn_descent_niter;
 };
+
+typedef struct cagraIndexParams cagraIndexParams;
+
+/**
+ * @brief Default cagraIndexParams to use
+ */
+extern const cagraIndexParams cagraDefaultIndexParams;
 
 /**
  * @brief Enum to denote algorithm used to search CAGRA Index
@@ -78,49 +85,55 @@ enum cagraHashMode { HASH, SMALL, AUTO_HASH };
  * @brief Supplemental parameters to search CAGRA index
  *
  */
-typedef struct {
+struct cagraSearchParams {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
-  size_t max_queries = 0;
+  size_t max_queries;
 
   /** Number of intermediate search results retained during the search.
    *
    *  This is the main knob to adjust trade off between accuracy and search speed.
    *  Higher values improve the search accuracy.
    */
-  size_t itopk_size = 64;
+  size_t itopk_size;
 
   /** Upper limit of search iterations. Auto select when 0.*/
-  size_t max_iterations = 0;
+  size_t max_iterations;
 
   // In the following we list additional search parameters for fine tuning.
   // Reasonable default values are automatically chosen.
 
   /** Which search implementation to use. */
-  cagraSearchAlgo algo = AUTO;
+  enum cagraSearchAlgo algo;
 
   /** Number of threads used to calculate a single distance. 4, 8, 16, or 32. */
-  size_t team_size = 0;
+  size_t team_size;
 
   /** Number of graph nodes to select as the starting point for the search in each iteration. aka
    * search width?*/
-  size_t search_width = 1;
+  size_t search_width;
   /** Lower limit of search iterations. */
-  size_t min_iterations = 0;
+  size_t min_iterations;
 
   /** Thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when 0. */
-  size_t thread_block_size = 0;
+  size_t thread_block_size;
   /** Hashmap type. Auto selection when AUTO. */
-  cagraHashMode hashmap_mode = AUTO_HASH;
+  enum cagraHashMode hashmap_mode;
   /** Lower limit of hashmap bit length. More than 8. */
-  size_t hashmap_min_bitlen = 0;
+  size_t hashmap_min_bitlen;
   /** Upper limit of hashmap fill rate. More than 0.1, less than 0.9.*/
-  float hashmap_max_fill_rate = 0.5;
+  float hashmap_max_fill_rate;
 
   /** Number of iterations of initial random seed node selection. 1 or more. */
-  uint32_t num_random_samplings = 1;
+  uint32_t num_random_samplings;
   /** Bit mask used for initial random seed node selection. */
-  uint64_t rand_xor_mask = 0x128394;
-} cagraSearchParams;
+  uint64_t rand_xor_mask;
+};
+typedef struct cagraSearchParams cagraSearchParams;
+
+/**
+ * @brief Default cagraSearchParams to use
+ */
+extern const cagraSearchParams cagraDefaultSearchParams;
 
 /**
  * @brief Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
@@ -187,7 +200,7 @@ cuvsError_t cagraIndexDestroy(cagraIndex_t index);
  * @return cuvsError_t
  */
 cuvsError_t cagraBuild(cuvsResources_t res,
-                       cagraIndexParams params,
+                       struct cagraIndexParams params,
                        DLManagedTensor* dataset,
                        cagraIndex_t index);
 

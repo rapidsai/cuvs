@@ -60,7 +60,7 @@ TEST(CagraC, BuildSearch)
   cagraIndexCreate(&index);
 
   // build index
-  cagraIndexParams build_params;
+  cagraIndexParams build_params = cagraDefaultIndexParams;
   cagraBuild(res, build_params, &dataset_tensor, index);
 
   // create queries DLTensor
@@ -110,7 +110,7 @@ TEST(CagraC, BuildSearch)
   distances_tensor.dl_tensor.strides            = nullptr;
 
   // search index
-  cagraSearchParams search_params;
+  cagraSearchParams search_params = cagraDefaultSearchParams;
   cagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // verify output

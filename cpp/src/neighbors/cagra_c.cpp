@@ -201,3 +201,14 @@ extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
     return CUVS_ERROR;
   }
 }
+
+extern "C" const cagraSearchParams cagraDefaultSearchParams = {.itopk_size            = 64,
+                                                               .search_width          = 1,
+                                                               .hashmap_max_fill_rate = 0.5,
+                                                               .num_random_samplings  = 1,
+                                                               .rand_xor_mask         = 0x128394};
+
+extern "C" const cagraIndexParams cagraDefaultIndexParams = {.intermediate_graph_degree = 128,
+                                                             .graph_degree              = 64,
+                                                             .build_algo                = IVF_PQ,
+                                                             .nn_descent_niter          = 20};
