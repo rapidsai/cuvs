@@ -131,7 +131,7 @@ extern "C" cuvsError_t cagraIndexDestroy(cagraIndex_t index_c_ptr)
 }
 
 extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
-                                  cagraIndexParams_t params,
+                                  cuvsCagraIndexParams_t params,
                                   DLManagedTensor* dataset_tensor,
                                   cagraIndex_t index)
 {
@@ -159,7 +159,7 @@ extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
 }
 
 extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
-                                   cagraSearchParams_t params,
+                                   cuvsCagraSearchParams_t params,
                                    cagraIndex_t index_c_ptr,
                                    DLManagedTensor* queries_tensor,
                                    DLManagedTensor* neighbors_tensor,
@@ -202,7 +202,7 @@ extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
   }
 }
 
-extern "C" cuvsError_t cagraIndexParamsCreate(cagraIndexParams_t* params)
+extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 {
   try {
     *params = new cagraIndexParams{.intermediate_graph_degree = 128,
@@ -215,7 +215,7 @@ extern "C" cuvsError_t cagraIndexParamsCreate(cagraIndexParams_t* params)
   }
 }
 
-extern "C" cuvsError_t cagraIndexParamsDestroy(cagraIndexParams_t params)
+extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
 {
   try {
     delete params;
@@ -225,7 +225,7 @@ extern "C" cuvsError_t cagraIndexParamsDestroy(cagraIndexParams_t params)
   }
 }
 
-extern "C" cuvsError_t cagraSearchParamsCreate(cagraSearchParams_t* params)
+extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
 {
   try {
     *params = new cagraSearchParams{.itopk_size            = 64,
@@ -239,7 +239,7 @@ extern "C" cuvsError_t cagraSearchParamsCreate(cagraSearchParams_t* params)
   }
 }
 
-extern "C" cuvsError_t cagraSearchParamsDestroy(cagraSearchParams_t params)
+extern "C" cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params)
 {
   try {
     delete params;
