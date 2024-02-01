@@ -117,6 +117,8 @@ if(BUILD_C_TESTS)
   enable_language(C)
 
   add_executable(cuvs_c_test test/core/c_api.c)
-
   target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
+
+  add_executable(cuvs_c_neighbors_test test/neighbors/c_api.c)
+  target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
 endif()

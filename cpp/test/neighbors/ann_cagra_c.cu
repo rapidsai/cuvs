@@ -60,7 +60,8 @@ TEST(CagraC, BuildSearch)
   cagraIndexCreate(&index);
 
   // build index
-  cagraIndexParams build_params;
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
   cagraBuild(res, build_params, &dataset_tensor, index);
 
   // create queries DLTensor
@@ -110,7 +111,8 @@ TEST(CagraC, BuildSearch)
   distances_tensor.dl_tensor.strides            = nullptr;
 
   // search index
-  cagraSearchParams search_params;
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
   cagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // verify output
@@ -124,6 +126,8 @@ TEST(CagraC, BuildSearch)
   cudaFree(distances_d);
 
   // de-allocate index and res
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraIndexParamsDestroy(build_params);
   cagraIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }

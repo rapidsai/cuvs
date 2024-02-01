@@ -131,7 +131,7 @@ extern "C" cuvsError_t cagraIndexDestroy(cagraIndex_t index_c_ptr)
 }
 
 extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
-                                  cagraIndexParams params,
+                                  cuvsCagraIndexParams_t params,
                                   DLManagedTensor* dataset_tensor,
                                   cagraIndex_t index)
 {
@@ -139,13 +139,13 @@ extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr       = reinterpret_cast<uintptr_t>(_build<float>(res, params, dataset_tensor));
+      index->addr       = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
       index->dtype.code = kDLFloat;
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr       = reinterpret_cast<uintptr_t>(_build<int8_t>(res, params, dataset_tensor));
+      index->addr       = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
       index->dtype.code = kDLInt;
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr       = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, params, dataset_tensor));
+      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
       index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
@@ -159,7 +159,7 @@ extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
 }
 
 extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
-                                   cagraSearchParams params,
+                                   cuvsCagraSearchParams_t params,
                                    cagraIndex_t index_c_ptr,
                                    DLManagedTensor* queries_tensor,
                                    DLManagedTensor* neighbors_tensor,
@@ -186,16 +186,63 @@ extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
-      _search<float>(res, params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<float>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
-      _search<int8_t>(res, params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<int8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
-      _search<uint8_t>(res, params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<uint8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
                 queries.dtype.bits);
     }
+    return CUVS_SUCCESS;
+  } catch (...) {
+    return CUVS_ERROR;
+  }
+}
+
+extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
+{
+  try {
+    *params = new cagraIndexParams{.intermediate_graph_degree = 128,
+                                   .graph_degree              = 64,
+                                   .build_algo                = IVF_PQ,
+                                   .nn_descent_niter          = 20};
+    return CUVS_SUCCESS;
+  } catch (...) {
+    return CUVS_ERROR;
+  }
+}
+
+extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
+{
+  try {
+    delete params;
+    return CUVS_SUCCESS;
+  } catch (...) {
+    return CUVS_ERROR;
+  }
+}
+
+extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
+{
+  try {
+    *params = new cagraSearchParams{.itopk_size            = 64,
+                                    .search_width          = 1,
+                                    .hashmap_max_fill_rate = 0.5,
+                                    .num_random_samplings  = 1,
+                                    .rand_xor_mask         = 0x128394};
+    return CUVS_SUCCESS;
+  } catch (...) {
+    return CUVS_ERROR;
+  }
+}
+
+extern "C" cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params)
+{
+  try {
+    delete params;
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;
