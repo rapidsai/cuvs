@@ -168,7 +168,7 @@ typedef struct {
 
 } cuvsCagraIndex;
 
-typedef cagraIndex* cuvsCagraIndex_t;
+typedef cuvsCagraIndex* cuvsCagraIndex_t;
 
 /**
  * @brief Allocate CAGRA index
