@@ -22,11 +22,9 @@ PYTHON_CHANNEL=$(rapids-download-conda-from-s3 python)
 
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
-  --channel "${PYTHON_CHANNEL}" \
-  libcuvs \
-  libcuvs-headers \
-  cuvs \
-  raft-dask
+#  --channel "${PYTHON_CHANNEL}" \
+  libcuvs #\
+#  cuvs \
 
 export RAPIDS_VERSION_NUMBER="24.02"
 export RAPIDS_DOCS_DIR="$(mktemp -d)"
@@ -36,13 +34,13 @@ pushd cpp/doxygen
 doxygen Doxyfile
 popd
 
-rapids-logger "Build Python docs"
-pushd docs
-sphinx-build -b dirhtml source _html
-sphinx-build -b text source _text
-mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"{html,txt}
-mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
-mv _text/* "${RAPIDS_DOCS_DIR}/cuvs/txt"
-popd
+#rapids-logger "Build Python docs"
+#pushd docs
+#sphinx-build -b dirhtml source _html
+#sphinx-build -b text source _text
+#mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"{html,txt}
+#mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
+#mv _text/* "${RAPIDS_DOCS_DIR}/cuvs/txt"
+#popd
 
 rapids-upload-docs
