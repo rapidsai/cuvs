@@ -1,12 +1,12 @@
 [package]
 name = "cuvs"
-version = "0.1.0"
-edition = "2021"
-repository = "https://github.com/rapidsai/cuvs"
-homepage = "https://github.com/rapidsai/cuvs"
 description = "RAPIDS vector search library"
-authors = ["NVIDIA Corporation"]
-license = "Apache-2.0"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+license.workspace = true
 
 [dependencies]
 ffi = { package = "cuvs-sys", path = "../cuvs-sys" }

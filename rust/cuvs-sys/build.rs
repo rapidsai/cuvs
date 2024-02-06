@@ -97,7 +97,7 @@ fn main() {
         // generated)
         .must_use_type("cuvsError_t")
         // Only generate bindings for cuvs/cagra types and functions
-        .allowlist_type("(cuvs|cagra).*")
+        .allowlist_type("(cuvs|cagra|DL).*")
         .allowlist_function("(cuvs|cagra).*")
         .rustified_enum("(cuvs|cagra|DL).*")
         .generate()
