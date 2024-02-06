@@ -81,6 +81,8 @@ cagra::index_params index_params;
 auto index = cagra::build(res, index_params, dataset);
 ```
 
+For more example of the C++ APIs, refer to [cpp/examples](https://github.com/rapidsai/cuvs/tree/HEAD/cpp/examples) directory in the codebase.
+
 ### C API
 
 ```c
