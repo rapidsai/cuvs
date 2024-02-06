@@ -29,7 +29,6 @@ cuVS contains many algorithms for running approximate nearest neighbors and clus
 
 
 
-
 ## Installing cuVS
 
 ## Contributing
