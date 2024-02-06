@@ -1,6 +1,6 @@
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;cuVS: Vector Search and Clustering on the GPU</div>
 
-### NOTE: The vector search parts of the [RAPIDS RAFT](https://github.com/rapidsai/raft) library are being migrated over to cuVS. 
+### NOTE: We thank you for your patience while the vector search parts of the [RAPIDS RAFT](https://github.com/rapidsai/raft) library are being migrated over to cuVS. We plan for cuVS to become its own fully-featured library by August 2024 (release 24.08)
 
 ## Contents
 
@@ -23,7 +23,7 @@
 
 ## What is cuVS?
 
-cuVS contains many algorithms for running approximate nearest neighbors and clustering on the GPU.
+cuVS contains many algorithms for running approximate nearest neighbors and clustering on the GPU. 
 
 ## Getting Started
 

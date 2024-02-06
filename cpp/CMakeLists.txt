@@ -28,12 +28,12 @@ set(lang_list "CXX")
 
 if(NOT BUILD_CPU_ONLY)
   include(rapids-cuda)
-  rapids_cuda_init_architectures(cuVS)
+  rapids_cuda_init_architectures(CUVS)
   list(APPEND lang_list "CUDA")
 endif()
 
 project(
-  cuVS
+  CUVS
   VERSION ${CUVS_VERSION}
   LANGUAGES ${lang_list}
 )
