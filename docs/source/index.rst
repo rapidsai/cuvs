@@ -1,9 +1,5 @@
-cuVS: GPU-accelerated Vector Search
-===================================
-
-.. image:: ../../img/raft-tech-stack-vss.png
-  :width: 800
-  :alt: cuVS Tech Stack
+cuVS: Vector Search and Clustering on the GPU
+=============================================
 
 Useful Resources
 ################
@@ -19,7 +15,7 @@ Useful Resources
 What is cuVS?
 #############
 
-cuVS is a library for vector search on the GPU.
+cuVS is a library for vector search and clustering on the GPU.
 
 .. toctree::
    :maxdepth: 1

@@ -24,8 +24,8 @@ int main()
   // simple smoke test to make sure that we can compile the cagra_c.h API
   // using a c compiler. This isn't aiming to be a full test, just checking
   // that the exposed C-API is valid C code and doesn't contain C++ features
-  cagraIndex_t index;
-  cagraIndexCreate(&index);
-  cagraIndexDestroy(index);
+  cuvsCagraIndex_t index;
+  cuvsCagraIndexCreate(&index);
+  cuvsCagraIndexDestroy(index);
   return 0;
 }
