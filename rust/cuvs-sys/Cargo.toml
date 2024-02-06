@@ -1,0 +1,17 @@
+[package]
+name = "cuvs-sys"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/rapidsai/cuvs"
+homepage = "https://github.com/rapidsai/cuvs"
+description = "Low-level rust bindings to libcuvs"
+authors = ["NVIDIA Corporation"]
+license = "Apache-2.0"
+links = "cuvs"
+
+
+[dependencies]
+
+[build-dependencies]
+cmake = ">=0.1"
+bindgen = ">=0.69"

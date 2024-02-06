@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "cuvs",
+    "cuvs-sys",
+]
+resolver = "2"
