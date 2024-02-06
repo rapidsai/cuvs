@@ -195,7 +195,7 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra_c.h>
+ * #include <cuvs/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -244,7 +244,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra_c.h>
+ * #include <cuvs/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;

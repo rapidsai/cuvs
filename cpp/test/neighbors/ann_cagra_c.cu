@@ -19,7 +19,7 @@
 #include <dlpack/dlpack.h>
 
 #include <cstdint>
-#include <cuvs/neighbors/cagra_c.h>
+#include <cuvs/neighbors/cagra.h>
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
