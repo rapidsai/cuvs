@@ -188,6 +188,8 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/neighbors/brute_force.cpp
+
   src/neighbors/cagra_build_float.cpp
   src/neighbors/cagra_build_int8.cpp
   src/neighbors/cagra_build_uint8.cpp
