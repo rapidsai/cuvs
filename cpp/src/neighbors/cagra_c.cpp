@@ -24,8 +24,8 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/interop.hpp>
+#include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/cagra_c.h>
 
 namespace {
 
