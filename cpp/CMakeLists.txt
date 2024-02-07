@@ -198,6 +198,30 @@ add_library(
   src/neighbors/cagra_serialize_float.cpp
   src/neighbors/cagra_serialize_int8.cpp
   src/neighbors/cagra_serialize_uint8.cpp
+
+  src/neighbors/ivf_flat_build_float.cpp
+  src/neighbors/ivf_flat_build_int8.cpp
+  src/neighbors/ivf_flat_build_uint8.cpp
+  src/neighbors/ivf_flat_extend_float.cpp
+  src/neighbors/ivf_flat_extend_int8.cpp
+  src/neighbors/ivf_flat_extend_uint8.cpp
+  src/neighbors/ivf_flat_search_float.cpp
+  src/neighbors/ivf_flat_search_int8.cpp
+  src/neighbors/ivf_flat_search_uint8.cpp
+  src/neighbors/ivf_flat_serialize_float.cpp
+  src/neighbors/ivf_flat_serialize_int8.cpp
+  src/neighbors/ivf_flat_serialize_uint8.cpp
+
+  src/neighbors/ivf_pq_build_float.cpp
+  src/neighbors/ivf_pq_build_int8.cpp
+  src/neighbors/ivf_pq_build_uint8.cpp
+  src/neighbors/ivf_pq_extend_float.cpp
+  src/neighbors/ivf_pq_extend_int8.cpp
+  src/neighbors/ivf_pq_extend_uint8.cpp
+  src/neighbors/ivf_pq_search_float.cpp
+  src/neighbors/ivf_pq_search_int8.cpp
+  src/neighbors/ivf_pq_search_uint8.cpp
+  src/neighbors/ivf_pq_serialize.cpp
 )
 
 target_compile_options(
