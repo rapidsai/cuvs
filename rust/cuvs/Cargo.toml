@@ -10,3 +10,4 @@ license.workspace = true
 
 [dependencies]
 ffi = { package = "cuvs-sys", path = "../cuvs-sys" }
+ndarray = "0.15"

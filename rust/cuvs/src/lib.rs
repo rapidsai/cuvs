@@ -15,9 +15,9 @@
  */
 
 pub mod cagra;
+mod dlpack;
 mod error;
 mod resources;
-mod dlpack;
 
 pub use error::{Error, Result};
 pub use resources::Resources;
