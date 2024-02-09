@@ -26,7 +26,11 @@ namespace cuvs::neighbors::brute_force {
            raft::device_matrix_view<DATA_T, MATRIX_IDX_T, raft::row_major> distances,           \
            raft::distance::DistanceType metric,                                                 \
            std::optional<float> metric_arg,                                                     \
-           std::optional<IDX_T> global_id_offset);
+           std::optional<IDX_T> global_id_offset)                                               \
+  {                                                                                             \
+    raft::runtime::neighbors::brute_force::knn(handle, index, search, indices, distances,       \
+                                               metric, metric_arg, global_id_offset);           \
+  }
 
 RAFT_INST_BFKNN(int64_t, float, int64_t, raft::row_major, raft::row_major);
 

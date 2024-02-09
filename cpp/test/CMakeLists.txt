@@ -90,6 +90,17 @@ endfunction()
 if(BUILD_TESTS)
   ConfigureTest(
     NAME
+    NEIGHBORS_TEST
+    PATH
+    test/neighbors/brute_force.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
+  ConfigureTest(
+    NAME
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
     test/neighbors/ann_cagra/test_float_uint32_t.cu
