@@ -122,12 +122,17 @@ impl ManagedTensor {
 
             let mut ret = self.0.clone();
             ret.dl_tensor.data = device_data;
+            // call cudaFree automatically to clean up data
+            ret.deleter = Some(cuda_free_tensor);
             ret.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCUDA;
-            // TODO: do we need to set the device id here too?
-            // TODO: set deleter here to call cudaFree
+                
             Ok(ManagedTensor(ret))
         }
     }
+}
+
+unsafe extern "C" fn cuda_free_tensor(self_: *mut ffi::DLManagedTensor) {
+    let _ = ffi::cudaFree((*self_).dl_tensor.data);
 }
 
 impl Drop for ManagedTensor {
