@@ -22,25 +22,21 @@ pub type SearchAlgo = ffi::cagraSearchAlgo;
 pub type HashMode = ffi::cagraHashMode;
 
 /// Supplemental parameters to search CAGRA index
-pub struct SearchParams {
-    pub params: ffi::cuvsCagraSearchParams_t,
-}
+pub struct SearchParams(pub ffi::cuvsCagraSearchParams_t);
 
 impl SearchParams {
     pub fn new() -> Result<SearchParams> {
         unsafe {
             let mut params = core::mem::MaybeUninit::<ffi::cuvsCagraSearchParams_t>::uninit();
             check_cuvs(ffi::cuvsCagraSearchParamsCreate(params.as_mut_ptr()))?;
-            Ok(SearchParams {
-                params: params.assume_init(),
-            })
+            Ok(SearchParams(params.assume_init()))
         }
     }
 
     /// Maximum number of queries to search at the same time (batch size). Auto select when 0
     pub fn set_max_queries(self, max_queries: usize) -> SearchParams {
         unsafe {
-            (*self.params).max_queries = max_queries;
+            (*self.0).max_queries = max_queries;
         }
         self
     }
@@ -50,7 +46,7 @@ impl SearchParams {
     /// Higher values improve the search accuracy
     pub fn set_itopk_size(self, itopk_size: usize) -> SearchParams {
         unsafe {
-            (*self.params).itopk_size = itopk_size;
+            (*self.0).itopk_size = itopk_size;
         }
         self
     }
@@ -58,7 +54,7 @@ impl SearchParams {
     /// Upper limit of search iterations. Auto select when 0.
     pub fn set_max_iterations(self, max_iterations: usize) -> SearchParams {
         unsafe {
-            (*self.params).max_iterations = max_iterations;
+            (*self.0).max_iterations = max_iterations;
         }
         self
     }
@@ -66,7 +62,7 @@ impl SearchParams {
     /// Which search implementation to use.
     pub fn set_algo(self, algo: SearchAlgo) -> SearchParams {
         unsafe {
-            (*self.params).algo = algo;
+            (*self.0).algo = algo;
         }
         self
     }
@@ -74,7 +70,7 @@ impl SearchParams {
     /// Number of threads used to calculate a single distance. 4, 8, 16, or 32.
     pub fn set_team_size(self, team_size: usize) -> SearchParams {
         unsafe {
-            (*self.params).team_size = team_size;
+            (*self.0).team_size = team_size;
         }
         self
     }
@@ -82,7 +78,7 @@ impl SearchParams {
     /// Lower limit of search iterations.
     pub fn set_min_iterations(self, min_iterations: usize) -> SearchParams {
         unsafe {
-            (*self.params).min_iterations = min_iterations;
+            (*self.0).min_iterations = min_iterations;
         }
         self
     }
@@ -90,7 +86,7 @@ impl SearchParams {
     /// Thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when 0.
     pub fn set_thread_block_size(self, thread_block_size: usize) -> SearchParams {
         unsafe {
-            (*self.params).thread_block_size = thread_block_size;
+            (*self.0).thread_block_size = thread_block_size;
         }
         self
     }
@@ -98,7 +94,7 @@ impl SearchParams {
     /// Hashmap type. Auto selection when AUTO.
     pub fn set_hashmap_mode(self, hashmap_mode: HashMode) -> SearchParams {
         unsafe {
-            (*self.params).hashmap_mode = hashmap_mode;
+            (*self.0).hashmap_mode = hashmap_mode;
         }
         self
     }
@@ -106,7 +102,7 @@ impl SearchParams {
     /// Lower limit of hashmap bit length. More than 8.
     pub fn set_hashmap_min_bitlen(self, hashmap_min_bitlen: usize) -> SearchParams {
         unsafe {
-            (*self.params).hashmap_min_bitlen = hashmap_min_bitlen;
+            (*self.0).hashmap_min_bitlen = hashmap_min_bitlen;
         }
         self
     }
@@ -114,7 +110,7 @@ impl SearchParams {
     /// Upper limit of hashmap fill rate. More than 0.1, less than 0.9.
     pub fn set_hashmap_max_fill_rate(self, hashmap_max_fill_rate: f32) -> SearchParams {
         unsafe {
-            (*self.params).hashmap_max_fill_rate = hashmap_max_fill_rate;
+            (*self.0).hashmap_max_fill_rate = hashmap_max_fill_rate;
         }
         self
     }
@@ -122,7 +118,7 @@ impl SearchParams {
     /// Number of iterations of initial random seed node selection. 1 or more.
     pub fn set_num_random_samplings(self, num_random_samplings: u32) -> SearchParams {
         unsafe {
-            (*self.params).num_random_samplings = num_random_samplings;
+            (*self.0).num_random_samplings = num_random_samplings;
         }
         self
     }
@@ -130,7 +126,7 @@ impl SearchParams {
     /// Bit mask used for initial random seed node selection.
     pub fn set_rand_xor_mask(self, rand_xor_mask: u64) -> SearchParams {
         unsafe {
-            (*self.params).rand_xor_mask = rand_xor_mask;
+            (*self.0).rand_xor_mask = rand_xor_mask;
         }
         self
     }
@@ -140,15 +136,13 @@ impl fmt::Debug for SearchParams {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // custom debug trait here, default value will show the pointer address
         // for the inner params object which isn't that useful.
-        write!(f, "SearchParams {{ params: {:?} }}", unsafe {
-            *self.params
-        })
+        write!(f, "SearchParams {{ params: {:?} }}", unsafe { *self.0 })
     }
 }
 
 impl Drop for SearchParams {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraSearchParamsDestroy(self.params) }) {
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraSearchParamsDestroy(self.0) }) {
             write!(
                 stderr(),
                 "failed to call cuvsCagraSearchParamsDestroy {:?}",
@@ -165,6 +159,10 @@ mod tests {
 
     #[test]
     fn test_search_params() {
-        let params = SearchParams::new().unwrap();
+        let params = SearchParams::new().unwrap().set_itopk_size(128);
+
+        unsafe {
+            assert_eq!((*params.0).itopk_size, 128);
+        }
     }
 }

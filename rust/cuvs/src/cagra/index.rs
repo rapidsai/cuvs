@@ -16,7 +16,7 @@
 
 use std::io::{stderr, Write};
 
-use crate::cagra::IndexParams;
+use crate::cagra::{IndexParams, SearchParams};
 use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Result};
 use crate::resources::Resources;
@@ -28,12 +28,12 @@ pub struct Index {
 
 impl Index {
     /// Builds a new index
-    pub fn build(res: Resources, params: IndexParams, dataset: ManagedTensor) -> Result<Index> {
+    pub fn build(res: &Resources, params: &IndexParams, dataset: ManagedTensor) -> Result<Index> {
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cagraBuild(
-                res.res,
-                params.params,
+                res.0,
+                params.0,
                 dataset.as_ptr(),
                 index.index,
             ))?;
@@ -51,6 +51,26 @@ impl Index {
             })
         }
     }
+
+    pub fn search(
+        self,
+        res: &Resources,
+        params: &SearchParams,
+        queries: ManagedTensor,
+        neighbors: ManagedTensor,
+        distances: ManagedTensor,
+    ) -> Result<()> {
+        unsafe {
+            check_cuvs(ffi::cagraSearch(
+                res.0,
+                params.0,
+                self.index,
+                queries.as_ptr(),
+                neighbors.as_ptr(),
+                distances.as_ptr(),
+            ))
+        }
+    }
 }
 
 impl Drop for Index {
@@ -65,6 +85,9 @@ impl Drop for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ndarray::s;
+    use ndarray_rand::rand_distr::Uniform;
+    use ndarray_rand::RandomExt;
 
     #[test]
     fn test_create_empty_index() {
@@ -72,14 +95,35 @@ mod tests {
     }
 
     #[test]
-    fn test_build() {
+    fn test_index() {
         let res = Resources::new().unwrap();
         let params = IndexParams::new().unwrap();
 
-        // TODO: test a more exciting dataset
-        let arr = ndarray::Array::<f32, _>::zeros((128, 16));
-        let dataset = ManagedTensor::from_ndarray(arr);
+        let n_features = 16;
+        let dataset = ndarray::Array::<f32, _>::random((256, n_features), Uniform::new(0., 1.0));
+        let index = Index::build(&res, &params, ManagedTensor::from_ndarray(&dataset))
+            .expect("failed to create cagra index");
 
-        let index = Index::build(res, params, dataset).expect("failed to create cagra index");
+        // use the first 4 points from the dataset as queries : will test that we get them back
+        // as their own nearest neighbor
+        let n_queries = 4;
+        let queries = dataset.slice(s![0..n_queries, ..]);
+        let queries = ManagedTensor::from_ndarray(&queries).to_device().unwrap();
+
+        let k = 10;
+        let neighbors =
+            ManagedTensor::from_ndarray(&ndarray::Array::<u32, _>::zeros((n_queries, k)))
+                .to_device()
+                .unwrap();
+        let distances =
+            ManagedTensor::from_ndarray(&ndarray::Array::<f32, _>::zeros((n_queries, k)))
+                .to_device()
+                .unwrap();
+
+        let search_params = SearchParams::new().unwrap();
+
+        index
+            .search(&res, &search_params, queries, neighbors, distances)
+            .unwrap();
     }
 }

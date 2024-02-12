@@ -17,15 +17,21 @@
 use std::fmt;
 
 #[derive(Debug, Clone)]
-pub struct Error {
-    err: ffi::cuvsError_t,
+pub enum Error {
+    CudaError(ffi::cudaError_t),
+    CuvsError(ffi::cuvsError_t),
 }
+
+impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "cuvsError={:?}", self.err)
+        match self {
+            Error::CudaError(cuda_error) => write!(f, "cudaError={:?}", cuda_error),
+            Error::CuvsError(cuvs_error) => write!(f, "cuvsError={:?}", cuvs_error),
+        }
     }
 }
 
@@ -33,6 +39,13 @@ impl fmt::Display for Error {
 pub fn check_cuvs(err: ffi::cuvsError_t) -> Result<()> {
     match err {
         ffi::cuvsError_t::CUVS_SUCCESS => Ok(()),
-        _ => Err(Error { err }),
+        _ => Err(Error::CuvsError(err)),
+    }
+}
+
+pub fn check_cuda(err: ffi::cudaError_t) -> Result<()> {
+    match err {
+        ffi::cudaError::cudaSuccess => Ok(()),
+        _ => Err(Error::CudaError(err)),
     }
 }

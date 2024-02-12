@@ -39,6 +39,7 @@ fn main() {
         cuvs_build.display()
     );
     println!("cargo:rustc-link-lib=dylib=cuvs_c");
+    println!("cargo:rustc-link-lib=dylib=cudart");
 
     // we need some extra flags both to link against cuvs, and also to run bindgen
     // specifically we need to:
@@ -100,6 +101,10 @@ fn main() {
         .allowlist_type("(cuvs|cagra|DL).*")
         .allowlist_function("(cuvs|cagra).*")
         .rustified_enum("(cuvs|cagra|DL).*")
+        // also need some basic cuda mem functions
+        // (TODO: should we be adding in RMM support instead here?)
+        .allowlist_function("(cudaMalloc|cudaFree|cudaMemcpy)")
+        .rustified_enum("cudaError")
         .generate()
         .expect("Unable to generate cagra_c bindings")
         .write_to_file(out_path.join("cuvs_bindings.rs"))

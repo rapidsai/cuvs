@@ -21,25 +21,21 @@ use std::io::{stderr, Write};
 pub type BuildAlgo = ffi::cagraGraphBuildAlgo;
 
 /// Supplemental parameters to build CAGRA Index
-pub struct IndexParams {
-    pub params: ffi::cuvsCagraIndexParams_t,
-}
+pub struct IndexParams(pub ffi::cuvsCagraIndexParams_t);
 
 impl IndexParams {
     pub fn new() -> Result<IndexParams> {
         unsafe {
             let mut params = core::mem::MaybeUninit::<ffi::cuvsCagraIndexParams_t>::uninit();
             check_cuvs(ffi::cuvsCagraIndexParamsCreate(params.as_mut_ptr()))?;
-            Ok(IndexParams {
-                params: params.assume_init(),
-            })
+            Ok(IndexParams(params.assume_init()))
         }
     }
 
     /// Degree of input graph for pruning
     pub fn set_intermediate_graph_degree(self, intermediate_graph_degree: usize) -> IndexParams {
         unsafe {
-            (*self.params).intermediate_graph_degree = intermediate_graph_degree;
+            (*self.0).intermediate_graph_degree = intermediate_graph_degree;
         }
         self
     }
@@ -47,7 +43,7 @@ impl IndexParams {
     /// Degree of output graph
     pub fn set_graph_degree(self, graph_degree: usize) -> IndexParams {
         unsafe {
-            (*self.params).graph_degree = graph_degree;
+            (*self.0).graph_degree = graph_degree;
         }
         self
     }
@@ -55,7 +51,7 @@ impl IndexParams {
     /// ANN algorithm to build knn graph
     pub fn set_build_algo(self, build_algo: BuildAlgo) -> IndexParams {
         unsafe {
-            (*self.params).build_algo = build_algo;
+            (*self.0).build_algo = build_algo;
         }
         self
     }
@@ -63,7 +59,7 @@ impl IndexParams {
     /// Number of iterations to run if building with NN_DESCENT
     pub fn set_nn_descent_niter(self, nn_descent_niter: usize) -> IndexParams {
         unsafe {
-            (*self.params).nn_descent_niter = nn_descent_niter;
+            (*self.0).nn_descent_niter = nn_descent_niter;
         }
         self
     }
@@ -73,13 +69,13 @@ impl fmt::Debug for IndexParams {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // custom debug trait here, default value will show the pointer address
         // for the inner params object which isn't that useful.
-        write!(f, "IndexParams {{ params: {:?} }}", unsafe { *self.params })
+        write!(f, "IndexParams {{ params: {:?} }}", unsafe { *self.0 })
     }
 }
 
 impl Drop for IndexParams {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraIndexParamsDestroy(self.params) }) {
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraIndexParamsDestroy(self.0) }) {
             write!(
                 stderr(),
                 "failed to call cuvsCagraIndexParamsDestroy {:?}",
@@ -103,7 +99,12 @@ mod tests {
             .set_build_algo(BuildAlgo::NN_DESCENT)
             .set_nn_descent_niter(10);
 
-        // make sure the setters actually updated internal representation
-        assert_eq!(format!("{:?}", params), "IndexParams { params: cagraIndexParams { intermediate_graph_degree: 128, graph_degree: 16, build_algo: NN_DESCENT, nn_descent_niter: 10 } }");
+        // make sure the setters actually updated internal representation on the c-struct
+        unsafe {
+            assert_eq!((*params.0).graph_degree, 16);
+            assert_eq!((*params.0).intermediate_graph_degree, 128);
+            assert_eq!((*params.0).build_algo, BuildAlgo::NN_DESCENT);
+            assert_eq!((*params.0).nn_descent_niter, 10);
+        }
     }
 }

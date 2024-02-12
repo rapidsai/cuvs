@@ -18,9 +18,7 @@ use crate::error::{check_cuvs, Result};
 use std::io::{stderr, Write};
 
 #[derive(Debug)]
-pub struct Resources {
-    pub res: ffi::cuvsResources_t,
-}
+pub struct Resources(pub ffi::cuvsResources_t);
 
 impl Resources {
     pub fn new() -> Result<Resources> {
@@ -28,14 +26,14 @@ impl Resources {
         unsafe {
             check_cuvs(ffi::cuvsResourcesCreate(&mut res))?;
         }
-        Ok(Resources { res })
+        Ok(Resources(res))
     }
 }
 
 impl Drop for Resources {
     fn drop(&mut self) {
         unsafe {
-            if let Err(e) = check_cuvs(ffi::cuvsResourcesDestroy(self.res)) {
+            if let Err(e) = check_cuvs(ffi::cuvsResourcesDestroy(self.0)) {
                 write!(stderr(), "failed to call cuvsResourcesDestroy {:?}", e)
                     .expect("failed to write to stderr");
             }
