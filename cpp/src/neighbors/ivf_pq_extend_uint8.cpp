@@ -18,21 +18,23 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-#define CUVS_INST_IVF_PQ_EXTEND(T, IdxT)                                                              \
-  auto extend(raft::resources const& handle,                                                          \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,                   \
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,                  \
-              const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                                 \
-  {                                                                                                   \
-    return raft::runtime::neighbors::ivf_pq::extend(handle, new_vectors, new_indices, orig_index);    \
-  }                                                                                                   \
-                                                                                                      \
-  void extend(raft::resources const& handle,                                                          \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,                   \
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,                  \
-              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                              \
-  {                                                                                                   \
-    raft::runtime::neighbors::ivf_pq::extend(handle, new_vectors, new_indices, idx);                  \
+#define CUVS_INST_IVF_PQ_EXTEND(T, IdxT)                                                                                      \
+  auto extend(raft::resources const& handle,                                                                                  \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,                                           \
+              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,                                          \
+              const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                                                         \
+    -> cuvs::neighbors::ivf_pq::index<IdxT>                                                                                   \
+  {                                                                                                                           \
+    return cuvs::neighbors::ivf_pq::index<IdxT>(                                                                              \
+      std::move(raft::runtime::neighbors::ivf_pq::extend(handle, new_vectors, new_indices, *orig_index.get_raft_index())));   \
+  }                                                                                                                           \
+                                                                                                                              \
+  void extend(raft::resources const& handle,                                                                                  \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,                                           \
+              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,                                          \
+              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                                                      \
+  {                                                                                                                           \
+    raft::runtime::neighbors::ivf_pq::extend(handle, new_vectors, new_indices, idx->get_raft_index());                        \
   }
 
 CUVS_INST_IVF_PQ_EXTEND(uint8_t, int64_t);

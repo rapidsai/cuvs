@@ -18,18 +18,18 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-#define CUVS_INST_IVF_PQ_SERIALIZE(IdxT)                                      \
-  void serialize(raft::resources const& handle,                               \
-                 std::string& filename,                                       \
-                 const cuvs::neighbors::ivf_pq::index<IdxT>& index)           \
-  {                                                                           \
-    raft::runtime::neighbors::ivf_pq::serialize(handle, filename, index);     \
-  }                                                                           \
-  void deserialize(raft::resources const& handle,                             \
-                   const std::string& filename,                               \
-                   cuvs::neighbors::ivf_pq::index<IdxT>* index)               \
-  {                                                                           \
-    raft::runtime::neighbors::ivf_pq::deserialize(handle, filename, index);   \
+#define CUVS_INST_IVF_PQ_SERIALIZE(IdxT)                                                        \
+  void serialize(raft::resources const& handle,                                                 \
+                 std::string& filename,                                                         \
+                 const cuvs::neighbors::ivf_pq::index<IdxT>& index)                             \
+  {                                                                                             \
+    raft::runtime::neighbors::ivf_pq::serialize(handle, filename, *index.get_raft_index());     \
+  }                                                                                             \
+  void deserialize(raft::resources const& handle,                                               \
+                   const std::string& filename,                                                 \
+                   cuvs::neighbors::ivf_pq::index<IdxT>* index)                                 \
+  {                                                                                             \
+    raft::runtime::neighbors::ivf_pq::deserialize(handle, filename, index->get_raft_index());   \
   }
 
 CUVS_INST_IVF_PQ_SERIALIZE(int64_t);
