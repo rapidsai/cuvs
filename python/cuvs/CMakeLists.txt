@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
 include(../../fetch_rapids.cmake)
 
-set(cuvs_version 24.02.00)
+set(cuvs_version 24.04.00)
 
 # We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
 # that enables CUDA unconditionally.
