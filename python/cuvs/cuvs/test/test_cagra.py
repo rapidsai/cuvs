@@ -52,9 +52,9 @@ def run_cagra_build_search_test(
     )
 
     if array_type == "device":
-        index = cagra.build(build_params, dataset_device)
+        index = cagra.build_index(build_params, dataset_device)
     else:
-        index = cagra.build(build_params, dataset)
+        index = cagra.build_index(build_params, dataset)
 
     assert index.trained
 
@@ -175,118 +175,3 @@ def test_cagra_index_params(params):
         compare=False,
         build_algo=params["build_algo"],
     )
-
-
-@pytest.mark.parametrize(
-    "params",
-    [
-        {
-            "max_queries": 100,
-            "itopk_size": 32,
-            "max_iterations": 100,
-            "algo": "single_cta",
-            "team_size": 0,
-            "search_width": 1,
-            "min_iterations": 1,
-            "thread_block_size": 64,
-            "hashmap_mode": "hash",
-            "hashmap_min_bitlen": 0.2,
-            "hashmap_max_fill_rate": 0.5,
-            "num_random_samplings": 1,
-        },
-        {
-            "max_queries": 10,
-            "itopk_size": 128,
-            "max_iterations": 0,
-            "algo": "multi_cta",
-            "team_size": 8,
-            "search_width": 2,
-            "min_iterations": 10,
-            "thread_block_size": 0,
-            "hashmap_mode": "auto",
-            "hashmap_min_bitlen": 0.9,
-            "hashmap_max_fill_rate": 0.5,
-            "num_random_samplings": 10,
-        },
-        {
-            "max_queries": 0,
-            "itopk_size": 64,
-            "max_iterations": 0,
-            "algo": "multi_kernel",
-            "team_size": 16,
-            "search_width": 1,
-            "min_iterations": 0,
-            "thread_block_size": 0,
-            "hashmap_mode": "auto",
-            "hashmap_min_bitlen": 0,
-            "hashmap_max_fill_rate": 0.5,
-            "num_random_samplings": 1,
-        },
-        {
-            "max_queries": 0,
-            "itopk_size": 64,
-            "max_iterations": 0,
-            "algo": "auto",
-            "team_size": 32,
-            "search_width": 4,
-            "min_iterations": 0,
-            "thread_block_size": 0,
-            "hashmap_mode": "auto",
-            "hashmap_min_bitlen": 0,
-            "hashmap_max_fill_rate": 0.5,
-            "num_random_samplings": 1,
-        },
-    ],
-)
-def test_cagra_search_params(params):
-    # Note that inner_product tests use normalized input which we cannot
-    # represent in int8, therefore we test only sqeuclidean metric here.
-    run_cagra_build_search_test(search_params=params)
-
-
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.ubyte])
-@pytest.mark.parametrize("include_dataset", [True, False])
-def test_save_load(dtype, include_dataset):
-    n_rows = 10000
-    n_cols = 50
-    n_queries = 1000
-
-    dataset = generate_data((n_rows, n_cols), dtype)
-    dataset_device = device_ndarray(dataset)
-
-    build_params = cagra.IndexParams()
-    index = cagra.build(build_params, dataset_device)
-
-    assert index.trained
-    filename = "my_index.bin"
-    cagra.save(filename, index, include_dataset=include_dataset)
-    loaded_index = cagra.load(filename)
-
-    # if we didn't save the dataset with the index, we need to update the
-    # index with an already loaded copy
-    if not include_dataset:
-        loaded_index.update_dataset(dataset)
-
-    queries = generate_data((n_queries, n_cols), dtype)
-
-    queries_device = device_ndarray(queries)
-    search_params = cagra.SearchParams()
-    k = 10
-
-    distance_dev, neighbors_dev = cagra.search(
-        search_params, index, queries_device, k
-    )
-
-    neighbors = neighbors_dev.copy_to_host()
-    dist = distance_dev.copy_to_host()
-    del index
-
-    distance_dev, neighbors_dev = cagra.search(
-        search_params, loaded_index, queries_device, k
-    )
-
-    neighbors2 = neighbors_dev.copy_to_host()
-    dist2 = distance_dev.copy_to_host()
-
-    assert np.all(neighbors == neighbors2)
-    assert np.allclose(dist, dist2, rtol=1e-6)
