@@ -21,3 +21,4 @@ mod resources;
 
 pub use error::{Error, Result};
 pub use resources::Resources;
+pub use dlpack::ManagedTensor;
