@@ -15,6 +15,7 @@
  */
 
 use crate::error::{check_cuda, Result};
+use crate::resources::Resources;
 
 #[derive(Debug)]
 pub struct ManagedTensor(ffi::DLManagedTensor);
@@ -66,7 +67,7 @@ impl ManagedTensor {
         bytes
     }
 
-    pub fn to_device(&self) -> Result<ManagedTensor> {
+    pub fn to_device(&self, _res: &Resources) -> Result<ManagedTensor> {
         unsafe {
             let bytes = self.bytes();
             let mut device_data: *mut std::ffi::c_void = std::ptr::null_mut();
@@ -95,6 +96,7 @@ impl ManagedTensor {
         D: ndarray::Dimension,
     >(
         &self,
+        _res: &Resources,
         arr: &mut ndarray::ArrayBase<S, D>,
     ) -> Result<()> {
         unsafe {

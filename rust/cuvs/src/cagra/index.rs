@@ -105,15 +105,15 @@ mod tests {
         // CAGRA search API requires queries and outputs to be on device memory
         // copy query data over, and allocate new device memory for the distances/ neighbors
         // outputs
-        let queries = ManagedTensor::from_ndarray(&queries).to_device().unwrap();
+        let queries = ManagedTensor::from_ndarray(&queries).to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
         let neighbors = ManagedTensor::from_ndarray(&neighbors_host)
-            .to_device()
+            .to_device(&res)
             .unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
         let distances = ManagedTensor::from_ndarray(&distances_host)
-            .to_device()
+            .to_device(&res)
             .unwrap();
 
         let search_params = SearchParams::new().unwrap();
@@ -123,8 +123,8 @@ mod tests {
             .unwrap();
 
         // Copy back to host memory
-        distances.to_host(&mut distances_host).unwrap();
-        neighbors.to_host(&mut neighbors_host).unwrap();
+        distances.to_host(&res, &mut distances_host).unwrap();
+        neighbors.to_host(&res, &mut neighbors_host).unwrap();
 
         // nearest neighbors should be themselves, since queries are from the
         // dataset
