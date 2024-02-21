@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use cuvs::cagra::{IndexParams, SearchParams, Index};
-use cuvs::{ManagedTensor, Result, Resources};
+use cuvs::cagra::{Index, IndexParams, SearchParams};
+use cuvs::{ManagedTensor, Resources, Result};
 
 use ndarray::s;
 use ndarray_rand::rand_distr::Uniform;
@@ -33,9 +33,11 @@ fn cagra_example() -> Result<()> {
 
     // build the cagra index
     let build_params = IndexParams::new()?;
-    let index = Index::build(&res, &build_params, &ManagedTensor::from_ndarray(&dataset))?;
-    println!("Indexed {}x{} datapoints into cagra index", n_datapoints, n_features);
-
+    let index = Index::build(&res, &build_params, &dataset)?;
+    println!(
+        "Indexed {}x{} datapoints into cagra index",
+        n_datapoints, n_features
+    );
 
     // use the first 4 points from the dataset as queries : will test that we get them back
     // as their own nearest neighbor
@@ -47,12 +49,12 @@ fn cagra_example() -> Result<()> {
     // CAGRA search API requires queries and outputs to be on device memory
     // copy query data over, and allocate new device memory for the distances/ neighbors
     // outputs
-    let queries = ManagedTensor::from_ndarray(&queries).to_device(&res)?;
+    let queries = ManagedTensor::from(&queries).to_device(&res)?;
     let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-    let neighbors = ManagedTensor::from_ndarray(&neighbors_host).to_device(&res)?;
+    let neighbors = ManagedTensor::from(&neighbors_host).to_device(&res)?;
 
     let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-    let distances = ManagedTensor::from_ndarray(&distances_host).to_device(&res)?;
+    let distances = ManagedTensor::from(&distances_host).to_device(&res)?;
 
     let search_params = SearchParams::new()?;
 

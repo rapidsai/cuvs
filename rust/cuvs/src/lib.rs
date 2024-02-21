@@ -19,6 +19,6 @@ mod dlpack;
 mod error;
 mod resources;
 
+pub use dlpack::ManagedTensor;
 pub use error::{Error, Result};
 pub use resources::Resources;
-pub use dlpack::ManagedTensor;

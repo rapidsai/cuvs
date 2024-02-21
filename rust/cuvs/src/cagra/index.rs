@@ -26,7 +26,12 @@ pub struct Index(ffi::cagraIndex_t);
 
 impl Index {
     /// Builds a new index
-    pub fn build(res: &Resources, params: &IndexParams, dataset: &ManagedTensor) -> Result<Index> {
+    pub fn build<T: Into<ManagedTensor>>(
+        res: &Resources,
+        params: &IndexParams,
+        dataset: T,
+    ) -> Result<Index> {
+        let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
@@ -92,8 +97,8 @@ mod tests {
 
         // build the cagra index
         let build_params = IndexParams::new().unwrap();
-        let index = Index::build(&res, &build_params, &ManagedTensor::from_ndarray(&dataset))
-            .expect("failed to create cagra index");
+        let index =
+            Index::build(&res, &build_params, &dataset).expect("failed to create cagra index");
 
         // use the first 4 points from the dataset as queries : will test that we get them back
         // as their own nearest neighbor
@@ -105,14 +110,14 @@ mod tests {
         // CAGRA search API requires queries and outputs to be on device memory
         // copy query data over, and allocate new device memory for the distances/ neighbors
         // outputs
-        let queries = ManagedTensor::from_ndarray(&queries).to_device(&res).unwrap();
+        let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<u32, _>::zeros((n_queries, k));
-        let neighbors = ManagedTensor::from_ndarray(&neighbors_host)
+        let neighbors = ManagedTensor::from(&neighbors_host)
             .to_device(&res)
             .unwrap();
 
         let mut distances_host = ndarray::Array::<f32, _>::zeros((n_queries, k));
-        let distances = ManagedTensor::from_ndarray(&distances_host)
+        let distances = ManagedTensor::from(&distances_host)
             .to_device(&res)
             .unwrap();
 

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::convert::From;
+
 use crate::error::{check_cuda, Result};
 use crate::resources::Resources;
 
@@ -25,34 +27,6 @@ pub trait IntoDtype {
 }
 
 impl ManagedTensor {
-    /// Create a non-owning view of a Tensor from a ndarray
-    pub fn from_ndarray<T: IntoDtype, S: ndarray::RawData<Elem = T>, D: ndarray::Dimension>(
-        arr: &ndarray::ArrayBase<S, D>,
-    ) -> ManagedTensor {
-        // There is a draft PR out right now for creating dlpack directly from ndarray
-        // right now, but until its merged we have to implement ourselves
-        //https://github.com/rust-ndarray/ndarray/pull/1306/files
-        unsafe {
-            let mut ret = std::mem::MaybeUninit::<ffi::DLTensor>::uninit();
-            let tensor = ret.as_mut_ptr();
-            (*tensor).data = arr.as_ptr() as *mut std::os::raw::c_void;
-            (*tensor).device = ffi::DLDevice {
-                device_type: ffi::DLDeviceType::kDLCPU,
-                device_id: 0,
-            };
-            (*tensor).byte_offset = 0;
-            (*tensor).strides = std::ptr::null_mut(); // TODO: error if not rowmajor
-            (*tensor).ndim = arr.ndim() as i32;
-            (*tensor).shape = arr.shape().as_ptr() as *mut _;
-            (*tensor).dtype = T::ffi_dtype();
-            ManagedTensor(ffi::DLManagedTensor {
-                dl_tensor: ret.assume_init(),
-                manager_ctx: std::ptr::null_mut(),
-                deleter: None,
-            })
-        }
-    }
-
     pub fn as_ptr(&self) -> *mut ffi::DLManagedTensor {
         &self.0 as *const _ as *mut _
     }
@@ -117,6 +91,36 @@ unsafe extern "C" fn cuda_free_tensor(self_: *mut ffi::DLManagedTensor) {
     let _ = ffi::cudaFree((*self_).dl_tensor.data);
 }
 
+/// Create a non-owning view of a Tensor from a ndarray
+impl<T: IntoDtype, S: ndarray::RawData<Elem = T>, D: ndarray::Dimension>
+    From<&ndarray::ArrayBase<S, D>> for ManagedTensor
+{
+    fn from(arr: &ndarray::ArrayBase<S, D>) -> Self {
+        // There is a draft PR out right now for creating dlpack directly from ndarray
+        // right now, but until its merged we have to implement ourselves
+        //https://github.com/rust-ndarray/ndarray/pull/1306/files
+        unsafe {
+            let mut ret = std::mem::MaybeUninit::<ffi::DLTensor>::uninit();
+            let tensor = ret.as_mut_ptr();
+            (*tensor).data = arr.as_ptr() as *mut std::os::raw::c_void;
+            (*tensor).device = ffi::DLDevice {
+                device_type: ffi::DLDeviceType::kDLCPU,
+                device_id: 0,
+            };
+            (*tensor).byte_offset = 0;
+            (*tensor).strides = std::ptr::null_mut(); // TODO: error if not rowmajor
+            (*tensor).ndim = arr.ndim() as i32;
+            (*tensor).shape = arr.shape().as_ptr() as *mut _;
+            (*tensor).dtype = T::ffi_dtype();
+            ManagedTensor(ffi::DLManagedTensor {
+                dl_tensor: ret.assume_init(),
+                manager_ctx: std::ptr::null_mut(),
+                deleter: None,
+            })
+        }
+    }
+}
+
 impl Drop for ManagedTensor {
     fn drop(&mut self) {
         unsafe {
@@ -175,7 +179,7 @@ mod tests {
     fn test_from_ndarray() {
         let arr = ndarray::Array::<f32, _>::zeros((8, 4));
 
-        let tensor = unsafe { (*(ManagedTensor::from_ndarray(&arr).as_ptr())).dl_tensor };
+        let tensor = unsafe { (*(ManagedTensor::from(&arr).as_ptr())).dl_tensor };
 
         assert_eq!(tensor.ndim, 2);
 
