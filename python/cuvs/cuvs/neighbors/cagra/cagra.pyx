@@ -19,7 +19,7 @@ import numpy as np
 cimport cuvs.common.cydlpack
 
 from cuvs.common.temp_raft import auto_sync_resources
-from cuvs.common.cydlpack import dplack_c
+from cuvs.common cimport cydlpack
 
 from cython.operator cimport dereference as deref
 
@@ -32,9 +32,11 @@ from pylibraft.common import (
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-cimport cuvs.neighbors.cagra.c.cagra_c as cagra_c
-
 from pylibraft.neighbors.common import _check_input_array
+from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
+from pylibraft.common.handle cimport device_resources
+
+from libc.stdint cimport int8_t, int64_t, uint8_t, uint32_t, uint64_t, uintptr_t
 
 
 cdef class IndexParams:
@@ -59,7 +61,7 @@ cdef class IndexParams:
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
     """
-    cdef cagra_c.index_params params
+    cdef cagra_c.cagraIndexParams params
 
     def __init__(self, *,
                  metric="sqeuclidean",
@@ -101,23 +103,22 @@ cdef class IndexParams:
 
 
 cdef class Index:
-    cdef cagraIndex_t index
+    cdef cagra_c.cagraIndex_t index
 
     def __cinit__(self):
         cdef cuvsError_t index_create_status
-        index_create_status = cuvsCagraIndexCreate(&self.index)
+        index_create_status = cagra_c.cagraIndexCreate(&self.index)
         self.trained = False
 
-        if index_create_status == cagra_c.cuvsError_t.CUVS_ERROR:
+        if index_create_status == cuvsError_t.CUVS_ERROR:
             raise Exception("FAIL")
 
     def __dealloc__(self):
+        cdef cuvsError_t index_destroy_status
         if self.index is not NULL:
-            cdef cuvsError_t index_destroy_status
-            index_destroy_status = cagraIndexDestroy(&self.index)
-            if index_destroy_status == cagra_c.cuvsError_t.CUVS_ERROR:
+            index_destroy_status = cagra_c.cagraIndexDestroy(self.index)
+            if index_destroy_status == cuvsError_t.CUVS_ERROR:
                 raise Exception("FAIL")
-            del self.index
 
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
@@ -181,21 +182,21 @@ def build_index(IndexParams index_params, dataset, resources=None):
     if resources is None:
         resources = DeviceResources()
     cdef cuvsResources_t* resources_ = \
-        <cuvsResources_t*><size_t>handle.getHandle()
+        <cuvsResources_t*><size_t>resources.getHandle()
 
     cdef Index idx = Index()
+    cdef cuvsError_t build_status
+    cdef cydlpack.DLManagedTensor dataset_dlpack = cydlpack.dlpack_c(dataset_ai)
 
     with cuda_interruptible():
-        cdef cuvsError_t build_status
-
         build_status = cagra_c.cagraBuild(
             deref(resources_),
             index_params.params,
-            <DLManagedTensor*> &dplack_c(dataset_ai),
-            deref(idx.index)
+            &dataset_dlpack,
+            idx.index
         )
 
-        if index_destroy_status == cagra_c.cuvsError_t.CUVS_ERROR:
+        if build_status == cagra_c.cuvsError_t.CUVS_ERROR:
             raise RuntimeError("Index failed to build.")
         else:
             idx.trained = True
@@ -252,7 +253,7 @@ cdef class SearchParams:
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
     """
-    cdef cagra_c.search_params params
+    cdef cagra_c.cagraSearchParams params
 
     def __init__(self, *,
                  max_queries=0,
@@ -291,7 +292,7 @@ cdef class SearchParams:
         elif hashmap_mode == "small":
             self.params.hashmap_mode = cagra_c.cagraHashMode.SMALL
         elif hashmap_mode == "auto":
-            self.params.hashmap_mode = cagra_c.cagraHashMode.AUTO
+            self.params.hashmap_mode = cagra_c.cagraHashMode.AUTO_HASH
         else:
             raise ValueError("`hashmap_mode` value not supported.")
 
@@ -372,7 +373,7 @@ def search(SearchParams search_params,
            neighbors=None,
            distances=None,
            resources=None):
-     """
+    """
     Find the k nearest neighbors for each query.
 
     Parameters
@@ -424,7 +425,6 @@ def search(SearchParams search_params,
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
-
     if not index.trained:
         raise ValueError("Index need to be built before calling search.")
 
@@ -456,16 +456,19 @@ def search(SearchParams search_params,
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
 
-    cdef cagra_c.search_params params = search_params.params
+    cdef cagra_c.cagraSearchParams params = search_params.params
+    cdef cydlpack.DLManagedTensor queries_dlpack = cydlpack.dlpack_c(queries_cai)
+    cdef cydlpack.DLManagedTensor neighbors_dlpack = cydlpack.dlpack_c(neighbors_cai)
+    cdef cydlpack.DLManagedTensor distances_dlpack = cydlpack.dlpack_c(distances_cai)
 
     with cuda_interruptible():
         cagra_c.cagraSearch(
-            deref(resources_),
+            <cuvsResources_t> resources_,
             params,
-            deref(idx_float.index),
-            <DLManagedTensor*> &dplack_c(queries_cai),
-            <DLManagedTensor*> &dplack_c(neighbors_cai),
-            <DLManagedTensor*> &dplack_c(distances_cai)
+            index.index,
+            &queries_dlpack,
+            &neighbors_dlpack,
+            &distances_dlpack
         )
 
     return (distances, neighbors)

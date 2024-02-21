@@ -17,8 +17,10 @@
 
 import numpy as np
 
+from libc cimport stdlib
 
-cdef void deleter(DLManagedTensor* tensor):
+
+cdef void deleter(DLManagedTensor* tensor) noexcept:
     if tensor.manager_ctx is NULL:
         return
     stdlib.free(tensor.dl_tensor.shape)
@@ -69,7 +71,7 @@ cdef DLManagedTensor dlpack_c(ary):
     tensor.dtype = dtype
 
     dlm.dl_tensor = tensor
-    dlm.manager_ct = NULL
+    dlm.manager_ctx = NULL
     dlm.deleter = deleter
 
     return dlm

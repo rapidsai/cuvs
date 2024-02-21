@@ -13,9 +13,12 @@
 # limitations under the License.
 
 
-from cuvs.neighbors import cagra
+from .cagra import Index, IndexParams, SearchParams, build, load, save, search
 
 __all__ = [
-    "common",
-    "cagra"
+    "Index",
+    "IndexParams",
+    "SearchParams",
+    "build",
+    "search",
 ]

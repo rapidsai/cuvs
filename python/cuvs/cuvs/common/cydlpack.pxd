@@ -66,3 +66,4 @@ cdef extern from 'dlpack.h' nogil:
         void (*deleter)(DLManagedTensor*)  # noqa: E211
 
 
+cdef DLManagedTensor dlpack_c(ary)

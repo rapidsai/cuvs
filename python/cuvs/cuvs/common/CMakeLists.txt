@@ -13,7 +13,7 @@
 # =============================================================================
 
 # Set the list of Cython files to build
-set(cython_sources dlpack.pyx)
+set(cython_sources cydlpack.pyx)
 set(linked_libraries cuvs::cuvs)
 
 # Build all of the Cython targets

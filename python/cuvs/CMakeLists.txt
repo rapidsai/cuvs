@@ -37,14 +37,16 @@ option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulti
        OFF
 )
 
+message("- FIND_CUVS_CPP: ${FIND_CUVS_CPP}")
+
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
-  find_package(cuvs ${cuvs_version})
+  find_package(cuvs_c ${cuvs_version})
 else()
   set(cuvs_FOUND OFF)
 endif()
 
-include(rapids-cython)
+include(rapids-cython-core)
 
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
@@ -59,6 +61,9 @@ if(NOT cuvs_FOUND)
 endif()
 
 rapids_cython_init()
+
+add_subdirectory(cuvs/common)
+add_subdirectory(cuvs/neighbors)
 
 if(DEFINED cython_lib_dir)
   rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")

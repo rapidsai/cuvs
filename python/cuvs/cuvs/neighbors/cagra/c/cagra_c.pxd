@@ -15,22 +15,14 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport int8_t, int64_t, uint8_t, uint32_t, uint64_t
+from libc.stdint cimport int8_t, int64_t, uint8_t, uint32_t, uint64_t, uintptr_t
+
+from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
+
+from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 
 
-cdef extern from "cuvs/core/c_api.h"
-    ctypedef uintptr_t cuvsResources_t
-
-    ctypedef enum cuvsError_t:
-        CUVS_ERROR,
-        CUVS_SUCCESS
-
-    cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
-    cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
-    cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
-
-
-cdef extern from "cuvs/neighborscagra_c.h" nogil:
+cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
 
     ctypedef enum cagraGraphBuildAlgo:
         IVF_PQ
@@ -44,7 +36,7 @@ cdef extern from "cuvs/neighborscagra_c.h" nogil:
         size_t nn_descent_niter
 
 
-    ctypedef enum search_algo:
+    ctypedef enum cagraSearchAlgo:
         SINGLE_CTA,
         MULTI_CTA,
         MULTI_KERNEL,
@@ -81,7 +73,7 @@ cdef extern from "cuvs/neighborscagra_c.h" nogil:
     cuvsError_t cagraIndexDestroy(cagraIndex_t index)
 
     cuvsError_t cagraBuild(cuvsResources_t res,
-                           struct cagraIndexParams params,
+                           cagraIndexParams params,
                            DLManagedTensor* dataset,
                            cagraIndex_t index);
 
