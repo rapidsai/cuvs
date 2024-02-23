@@ -73,12 +73,12 @@ cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
     cuvsError_t cagraIndexDestroy(cagraIndex_t index)
 
     cuvsError_t cagraBuild(cuvsResources_t res,
-                           cagraIndexParams params,
+                           cagraIndexParams* params,
                            DLManagedTensor* dataset,
                            cagraIndex_t index);
 
     cuvsError_t cagraSearch(cuvsResources_t res,
-                            cagraSearchParams params,
+                            cagraSearchParams* params,
                             cagraIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,

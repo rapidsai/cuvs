@@ -13,14 +13,9 @@
 # limitations under the License.
 
 
-from .cagra import Index, IndexParams, SearchParams, build, load, save, search
+from .temp_raft import auto_sync_resources
+
 
 __all__ = [
-    "Index",
-    "IndexParams",
-    "SearchParams",
-    "build",
-    "load",
-    "save",
-    "search",
+    "auto_sync_resources"
 ]

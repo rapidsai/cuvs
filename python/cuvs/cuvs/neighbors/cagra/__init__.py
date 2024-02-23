@@ -13,12 +13,11 @@
 # limitations under the License.
 
 
-from .cagra import Index, IndexParams, SearchParams, build, load, save, search
+from .cagra import Index, IndexParams, SearchParams, build_index
 
 __all__ = [
     "Index",
     "IndexParams",
     "SearchParams",
-    "build",
-    "search",
+    "build_index",
 ]

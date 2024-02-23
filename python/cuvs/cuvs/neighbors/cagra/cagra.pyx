@@ -146,7 +146,7 @@ def build_index(IndexParams index_params, dataset, resources=None):
     index_params : IndexParams object
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
-    {handle_docstring}
+    {resources_docstring}
 
     Returns
     -------
@@ -187,11 +187,12 @@ def build_index(IndexParams index_params, dataset, resources=None):
     cdef Index idx = Index()
     cdef cuvsError_t build_status
     cdef cydlpack.DLManagedTensor dataset_dlpack = cydlpack.dlpack_c(dataset_ai)
+    cdef cagra_c.cagraIndexParams* params = &index_params.params
 
     with cuda_interruptible():
         build_status = cagra_c.cagraBuild(
             deref(resources_),
-            index_params.params,
+            params,
             &dataset_dlpack,
             idx.index
         )
@@ -363,112 +364,111 @@ cdef class SearchParams:
     def rand_xor_mask(self):
         return self.params.rand_xor_mask
 
+# @auto_sync_resources
+# @auto_convert_output
+# def search(SearchParams search_params,
+#            Index index,
+#            queries,
+#            k,
+#            neighbors=None,
+#            distances=None,
+#            resources=None):
+#     """
+#     Find the k nearest neighbors for each query.
 
-@auto_sync_resources
-@auto_convert_output
-def search(SearchParams search_params,
-           Index index,
-           queries,
-           k,
-           neighbors=None,
-           distances=None,
-           resources=None):
-    """
-    Find the k nearest neighbors for each query.
+#     Parameters
+#     ----------
+#     search_params : SearchParams
+#     index : Index
+#         Trained CAGRA index.
+#     queries : CUDA array interface compliant matrix shape (n_samples, dim)
+#         Supported dtype [float, int8, uint8]
+#     k : int
+#         The number of neighbors.
+#     neighbors : Optional CUDA array interface compliant matrix shape
+#                 (n_queries, k), dtype int64_t. If supplied, neighbor
+#                 indices will be written here in-place. (default None)
+#     distances : Optional CUDA array interface compliant matrix shape
+#                 (n_queries, k) If supplied, the distances to the
+#                 neighbors will be written here in-place. (default None)
+#     {resources_docstring}
 
-    Parameters
-    ----------
-    search_params : SearchParams
-    index : Index
-        Trained CAGRA index.
-    queries : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
-    k : int
-        The number of neighbors.
-    neighbors : Optional CUDA array interface compliant matrix shape
-                (n_queries, k), dtype int64_t. If supplied, neighbor
-                indices will be written here in-place. (default None)
-    distances : Optional CUDA array interface compliant matrix shape
-                (n_queries, k) If supplied, the distances to the
-                neighbors will be written here in-place. (default None)
-    {handle_docstring}
+#     Examples
+#     --------
+#     >>> import cupy as cp
+#     >>> from pylibraft.common import DeviceResources
+#     >>> from pylibraft.neighbors import cagra
+#     >>> n_samples = 50000
+#     >>> n_features = 50
+#     >>> n_queries = 1000
+#     >>> dataset = cp.random.random_sample((n_samples, n_features),
+#     ...                                   dtype=cp.float32)
+#     >>> # Build index
+#     >>> handle = DeviceResources()
+#     >>> index = cagra.build(cagra.IndexParams(), dataset, handle=handle)
+#     >>> # Search using the built index
+#     >>> queries = cp.random.random_sample((n_queries, n_features),
+#     ...                                   dtype=cp.float32)
+#     >>> k = 10
+#     >>> search_params = cagra.SearchParams(
+#     ...     max_queries=100,
+#     ...     itopk_size=64
+#     ... )
+#     >>> # Using a pooling allocator reduces overhead of temporary array
+#     >>> # creation during search. This is useful if multiple searches
+#     >>> # are performad with same query size.
+#     >>> distances, neighbors = cagra.search(search_params, index, queries,
+#     ...                                     k, handle=handle)
+#     >>> # pylibraft functions are often asynchronous so the
+#     >>> # handle needs to be explicitly synchronized
+#     >>> handle.sync()
+#     >>> neighbors = cp.asarray(neighbors)
+#     >>> distances = cp.asarray(distances)
+#     """
+#     if not index.trained:
+#         raise ValueError("Index need to be built before calling search.")
 
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from pylibraft.common import DeviceResources
-    >>> from pylibraft.neighbors import cagra
-    >>> n_samples = 50000
-    >>> n_features = 50
-    >>> n_queries = 1000
-    >>> dataset = cp.random.random_sample((n_samples, n_features),
-    ...                                   dtype=cp.float32)
-    >>> # Build index
-    >>> handle = DeviceResources()
-    >>> index = cagra.build(cagra.IndexParams(), dataset, handle=handle)
-    >>> # Search using the built index
-    >>> queries = cp.random.random_sample((n_queries, n_features),
-    ...                                   dtype=cp.float32)
-    >>> k = 10
-    >>> search_params = cagra.SearchParams(
-    ...     max_queries=100,
-    ...     itopk_size=64
-    ... )
-    >>> # Using a pooling allocator reduces overhead of temporary array
-    >>> # creation during search. This is useful if multiple searches
-    >>> # are performad with same query size.
-    >>> distances, neighbors = cagra.search(search_params, index, queries,
-    ...                                     k, handle=handle)
-    >>> # pylibraft functions are often asynchronous so the
-    >>> # handle needs to be explicitly synchronized
-    >>> handle.sync()
-    >>> neighbors = cp.asarray(neighbors)
-    >>> distances = cp.asarray(distances)
-    """
-    if not index.trained:
-        raise ValueError("Index need to be built before calling search.")
+#     if resources is None:
+#         resources = DeviceResources()
+#     cdef device_resources* resources_ = \
+#         <device_resources*><size_t>resources.getHandle()
 
-    if resources is None:
-        resources = DeviceResources()
-    cdef device_resources* resources_ = \
-        <device_resources*><size_t>resources.getHandle()
+#     # todo(dgd): we can make the check of dtype a parameter of wrap_array
+#     # in RAFT to make this a single call
+#     queries_cai = cai_wrapper(queries)
+#     _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
+#                                      np.dtype('ubyte')],
+#                        exp_cols=index.dim)
 
-    # todo(dgd): we can make the check of dtype a parameter of wrap_array
-    # in RAFT to make this a single call
-    queries_cai = cai_wrapper(queries)
-    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
-                                     np.dtype('ubyte')],
-                       exp_cols=index.dim)
+#     cdef uint32_t n_queries = queries_cai.shape[0]
 
-    cdef uint32_t n_queries = queries_cai.shape[0]
+#     if neighbors is None:
+#         neighbors = device_ndarray.empty((n_queries, k), dtype='uint32')
 
-    if neighbors is None:
-        neighbors = device_ndarray.empty((n_queries, k), dtype='uint32')
+#     neighbors_cai = cai_wrapper(neighbors)
+#     _check_input_array(neighbors_cai, [np.dtype('uint32')],
+#                        exp_rows=n_queries, exp_cols=k)
 
-    neighbors_cai = cai_wrapper(neighbors)
-    _check_input_array(neighbors_cai, [np.dtype('uint32')],
-                       exp_rows=n_queries, exp_cols=k)
+#     if distances is None:
+#         distances = device_ndarray.empty((n_queries, k), dtype='float32')
 
-    if distances is None:
-        distances = device_ndarray.empty((n_queries, k), dtype='float32')
+#     distances_cai = cai_wrapper(distances)
+#     _check_input_array(distances_cai, [np.dtype('float32')],
+#                        exp_rows=n_queries, exp_cols=k)
 
-    distances_cai = cai_wrapper(distances)
-    _check_input_array(distances_cai, [np.dtype('float32')],
-                       exp_rows=n_queries, exp_cols=k)
+#     cdef cagra_c.cagraSearchParams* params = &search_params.params
+#     cdef cydlpack.DLManagedTensor queries_dlpack = cydlpack.dlpack_c(queries_cai)
+#     cdef cydlpack.DLManagedTensor neighbors_dlpack = cydlpack.dlpack_c(neighbors_cai)
+#     cdef cydlpack.DLManagedTensor distances_dlpack = cydlpack.dlpack_c(distances_cai)
 
-    cdef cagra_c.cagraSearchParams params = search_params.params
-    cdef cydlpack.DLManagedTensor queries_dlpack = cydlpack.dlpack_c(queries_cai)
-    cdef cydlpack.DLManagedTensor neighbors_dlpack = cydlpack.dlpack_c(neighbors_cai)
-    cdef cydlpack.DLManagedTensor distances_dlpack = cydlpack.dlpack_c(distances_cai)
+#     with cuda_interruptible():
+#         cagra_c.cagraSearch(
+#             <cuvsResources_t> resources_,
+#             params,
+#             index.index,
+#             &queries_dlpack,
+#             &neighbors_dlpack,
+#             &distances_dlpack
+#         )
 
-    with cuda_interruptible():
-        cagra_c.cagraSearch(
-            <cuvsResources_t> resources_,
-            params,
-            index.index,
-            &queries_dlpack,
-            &neighbors_dlpack,
-            &distances_dlpack
-        )
-
-    return (distances, neighbors)
+#     return (distances, neighbors)
