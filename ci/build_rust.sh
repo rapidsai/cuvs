@@ -9,11 +9,10 @@ rapids-logger "Create test conda environment"
 
 rapids-dependency-file-generator \
   --output conda \
-  --file_key build \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" | tee env.yaml
 
-rapids-mamba-retry env create --force -f env.yaml -n build
-conda activate build
+rapids-mamba-retry env create --force -f env.yaml -n rust
+conda activate rust
 
 rapids-print-env
 
