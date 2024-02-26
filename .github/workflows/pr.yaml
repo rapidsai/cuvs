@@ -72,6 +72,16 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_docs.sh"
+  rust-build:
+  #  needs: cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.02
+    with:
+      arch: "amd64"
+      container_image: "rapidsai/ci-conda:latest"
+      node_type: "gpu-v100-latest-1"
+      run_script: "ci/build_rust.sh"
+      sha: ${{ inputs.sha }}
   wheel-build-cuvs:
     needs: checks
     secrets: inherit
