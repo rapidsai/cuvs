@@ -44,6 +44,11 @@ files:
       - cudatoolkit
       - docs
       - py_version
+  rust:
+    output: none
+    includes:
+      - build
+      - build_cuvs
   py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
