@@ -19,6 +19,7 @@ jobs:
       - conda-python-build
       - conda-python-tests
       - docs-build
+      - rust-build
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
