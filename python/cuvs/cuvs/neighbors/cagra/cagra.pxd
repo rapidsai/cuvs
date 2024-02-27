@@ -15,11 +15,17 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport int8_t, int64_t, uint8_t, uint32_t, uint64_t, uintptr_t
-
-from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
+from libc.stdint cimport (
+    int8_t,
+    int64_t,
+    uint8_t,
+    uint32_t,
+    uint64_t,
+    uintptr_t,
+)
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
+from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 
 
 cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
@@ -28,13 +34,11 @@ cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
         IVF_PQ
         NN_DESCENT
 
-
     ctypedef struct cagraIndexParams:
         size_t intermediate_graph_degree
         size_t graph_degree
         cagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
-
 
     ctypedef enum cagraSearchAlgo:
         SINGLE_CTA,
@@ -75,7 +79,7 @@ cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
     cuvsError_t cagraBuild(cuvsResources_t res,
                            cagraIndexParams* params,
                            DLManagedTensor* dataset,
-                           cagraIndex_t index);
+                           cagraIndex_t index)
 
     cuvsError_t cagraSearch(cuvsResources_t res,
                             cagraSearchParams* params,
@@ -83,4 +87,3 @@ cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
                             DLManagedTensor* distances)
-

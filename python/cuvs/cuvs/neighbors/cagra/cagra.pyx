@@ -16,12 +16,14 @@
 # cython: language_level=3
 
 import numpy as np
+
 cimport cuvs.common.cydlpack
 
 from cuvs.common.temp_raft import auto_sync_resources
-from cuvs.common cimport cydlpack
 
 from cython.operator cimport dereference as deref
+
+from cuvs.common cimport cydlpack
 
 from pylibraft.common import (
     DeviceResources,
@@ -31,12 +33,19 @@ from pylibraft.common import (
 )
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-
 from pylibraft.neighbors.common import _check_input_array
-from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
+
+from libc.stdint cimport (
+    int8_t,
+    int64_t,
+    uint8_t,
+    uint32_t,
+    uint64_t,
+    uintptr_t,
+)
 from pylibraft.common.handle cimport device_resources
 
-from libc.stdint cimport int8_t, int64_t, uint8_t, uint32_t, uint64_t, uintptr_t
+from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 
 
 cdef class IndexParams:
@@ -186,7 +195,8 @@ def build_index(IndexParams index_params, dataset, resources=None):
 
     cdef Index idx = Index()
     cdef cuvsError_t build_status
-    cdef cydlpack.DLManagedTensor dataset_dlpack = cydlpack.dlpack_c(dataset_ai)
+    cdef cydlpack.DLManagedTensor dataset_dlpack = \
+        cydlpack.dlpack_c(dataset_ai)
     cdef cagraIndexParams* params = &index_params.params
 
     with cuda_interruptible():
@@ -364,6 +374,7 @@ cdef class SearchParams:
     def rand_xor_mask(self):
         return self.params.rand_xor_mask
 
+
 @auto_sync_resources
 @auto_convert_output
 def search(SearchParams search_params,
@@ -457,9 +468,12 @@ def search(SearchParams search_params,
                        exp_rows=n_queries, exp_cols=k)
 
     cdef cagraSearchParams* params = &search_params.params
-    cdef cydlpack.DLManagedTensor queries_dlpack = cydlpack.dlpack_c(queries_cai)
-    cdef cydlpack.DLManagedTensor neighbors_dlpack = cydlpack.dlpack_c(neighbors_cai)
-    cdef cydlpack.DLManagedTensor distances_dlpack = cydlpack.dlpack_c(distances_cai)
+    cdef cydlpack.DLManagedTensor queries_dlpack = \
+        cydlpack.dlpack_c(queries_cai)
+    cdef cydlpack.DLManagedTensor neighbors_dlpack = \
+        cydlpack.dlpack_c(neighbors_cai)
+    cdef cydlpack.DLManagedTensor distances_dlpack = \
+        cydlpack.dlpack_c(distances_cai)
 
     with cuda_interruptible():
         cagraSearch(

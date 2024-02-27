@@ -16,8 +16,8 @@
 # cython: language_level=3
 
 
-from libc.stdint cimport uintptr_t
 from cuda.ccudart cimport cudaStream_t
+from libc.stdint cimport uintptr_t
 
 
 cdef extern from "cuvs/core/c_api.h":

@@ -15,10 +15,10 @@
 
 import numpy as np
 import pytest
+from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
-from pylibraft.common import device_ndarray
 from cuvs.neighbors import cagra
 from cuvs.test.ann_utils import calc_recall, generate_data
 

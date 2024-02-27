@@ -15,7 +15,4 @@
 
 from .temp_raft import auto_sync_resources
 
-
-__all__ = [
-    "auto_sync_resources"
-]
+__all__ = ["auto_sync_resources"]

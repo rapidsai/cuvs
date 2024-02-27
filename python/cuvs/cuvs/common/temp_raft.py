@@ -22,7 +22,6 @@ import functools
 
 from pylibraft.common import DeviceResources
 
-
 _resources_param_string = """
      handle : Optional RAFT resource handle for reusing CUDA resources.
         If a handle isn't supplied, CUDA resources will be

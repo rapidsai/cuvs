@@ -29,7 +29,7 @@ cdef void deleter(DLManagedTensor* tensor) noexcept:
 
 
 cdef DLManagedTensor dlpack_c(ary):
-    #todo(dgd): add checking options/parameters
+    # todo(dgd): add checking options/parameters
     cdef DLDeviceType dev_type
     cdef DLDevice dev
     cdef DLDataType dtype
@@ -64,7 +64,6 @@ cdef DLManagedTensor dlpack_c(ary):
         tensor_ptr = ary.__cuda_array_interface__["data"][0]
     else:
         tensor_ptr = ary.__array_interface__["data"][0]
-
 
     tensor.data = <void*> tensor_ptr
     tensor.device = dev

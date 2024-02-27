@@ -15,7 +15,4 @@
 
 from cuvs.neighbors import cagra
 
-__all__ = [
-    "common",
-    "cagra"
-]
+__all__ = ["common", "cagra"]
