@@ -317,6 +317,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - make
+          - libclang
           - rust
   build_wheels:
     common:
