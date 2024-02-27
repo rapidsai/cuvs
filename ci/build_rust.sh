@@ -29,6 +29,8 @@ rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   libcuvs 
 
+export LIBCLANG_PATH=/opt/conda/lib
+
 # build and test the rust bindings
 cd rust
 cargo test
