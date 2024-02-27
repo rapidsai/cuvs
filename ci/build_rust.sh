@@ -23,16 +23,13 @@ rapids-print-env
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
-PYTHON_CHANNEL=$(rapids-download-conda-from-s3 python)
 
 # installing libcuvs/libraft will speed up the rust build substantially
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
-  --channel "${PYTHON_CHANNEL}" \
   libcuvs \
   libcuvs-headers \
   cuvs \
-  raft-dask
 
 # install rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  -s -- -y

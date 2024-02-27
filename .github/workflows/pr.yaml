@@ -74,6 +74,7 @@ jobs:
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_docs.sh"
   rust-build:
+    needs: conda-cpp-build
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.02
     with:
