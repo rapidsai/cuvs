@@ -317,8 +317,10 @@ dependencies:
       - output_types: [conda]
         packages:
           - make
-          - libclang
           - rust
+          # clang/liblclang only needed for bindgen support
+          - clang  
+          - libclang
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
