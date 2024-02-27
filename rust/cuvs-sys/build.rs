@@ -83,6 +83,8 @@ fn main() {
     }
 
     // run bindgen to automatically create rust bindings for the cuvs c-api
+    /* TODO: this is causing some serious build headaches with CI, 
+    just checking in the built version for now
     bindgen::Builder::default()
         .header("cuvs_c_wrapper.h")
         .clang_arg("-I../../cpp/include")
@@ -109,4 +111,5 @@ fn main() {
         .expect("Unable to generate cagra_c bindings")
         .write_to_file(out_path.join("cuvs_bindings.rs"))
         .expect("Failed to write generated rust bindings");
+    */
 }

@@ -30,7 +30,7 @@ rapids-mamba-retry install \
   libcuvs  \
   libraft
 
-export LIBCLANG_PATH=/opt/conda/envs/rust/lib/
+# export LIBCLANG_PATH=/opt/conda/envs/rust/lib/
 
 # build and test the rust bindings
 cd rust
