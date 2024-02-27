@@ -27,9 +27,7 @@ CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
 # installing libcuvs/libraft will speed up the rust build substantially
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
-  libcuvs \
-  libcuvs-headers \
-  cuvs \
+  libcuvs 
 
 # install rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  -s -- -y
