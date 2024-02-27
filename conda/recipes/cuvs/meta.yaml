@@ -48,10 +48,9 @@ requirements:
     - cython >=3.0.0
     - pylibraft {{ version }}
     - libcuvs {{ version }}
-    - numpy >=1.21
     - python x.x
     - rmm ={{ minor_version }}
-    - scikit-build >=0.13.1
+    - scikit-build-core >=0.7.0
     - setuptools
   run:
     - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}

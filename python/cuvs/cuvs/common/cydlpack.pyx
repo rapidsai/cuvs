@@ -69,6 +69,7 @@ cdef DLManagedTensor dlpack_c(ary):
     tensor.data = <void*> tensor_ptr
     tensor.device = dev
     tensor.dtype = dtype
+    tensor.strides = NULL
 
     dlm.dl_tensor = tensor
     dlm.manager_ctx = NULL
