@@ -49,6 +49,8 @@ files:
     includes:
       - build
       - build_cuvs
+      - cudatoolkit
+      - rust
   py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -310,6 +312,12 @@ dependencies:
           - recommonmark
           - sphinx-copybutton
           - sphinx-markdown-tables
+  rust:
+    common:
+      - output_types: [conda]
+        packages:
+          - make
+          - rust
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
