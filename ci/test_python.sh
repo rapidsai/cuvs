@@ -20,7 +20,7 @@ set -u
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
-PYTHON_CHANNEL=$(rapids-download-conda-from-s3 python)
+#PYTHON_CHANNEL=$(rapids-download-conda-from-s3 python)
 
 RAPIDS_TESTS_DIR=${RAPIDS_TESTS_DIR:-"${PWD}/test-results"}
 RAPIDS_COVERAGE_DIR=${RAPIDS_COVERAGE_DIR:-"${PWD}/coverage-results"}
@@ -31,7 +31,7 @@ rapids-print-env
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   --channel "${PYTHON_CHANNEL}" \
-  libcuvs #cuvs
+  libcuvs cuvs
 
 rapids-logger "Check GPU usage"
 nvidia-smi
@@ -50,7 +50,6 @@ pytest \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
  test
-popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
