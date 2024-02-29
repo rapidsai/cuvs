@@ -22,7 +22,7 @@ set -eu
 rapids-print-env
 
 rapids-logger "Trying to find libclang"
-find / -name libclang.so
+find /opt/conda -name libclang.so
 export LIBCLANG_PATH=$(dirname $(find /opt/conda -name libclang.so | head -n 1))
 rapids-logger "LIBCLANG_PATH=$LIBCLANG_PATH"
 
