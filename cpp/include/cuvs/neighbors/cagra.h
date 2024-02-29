@@ -33,7 +33,7 @@ extern "C" {
  * @brief Enum to denote which ANN algorithm is used to build CAGRA graph
  *
  */
-enum cagraGraphBuildAlgo {
+enum cuvsCagraGraphBuildAlgo {
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
@@ -44,18 +44,18 @@ enum cagraGraphBuildAlgo {
  * @brief Supplemental parameters to build CAGRA Index
  *
  */
-struct cagraIndexParams {
+struct cuvsCagraIndexParams {
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree;
   /** Degree of output graph. */
   size_t graph_degree;
   /** ANN algorithm to build knn graph. */
-  enum cagraGraphBuildAlgo build_algo;
+  enum cuvsCagraGraphBuildAlgo build_algo;
   /** Number of Iterations to run if building with NN_DESCENT */
   size_t nn_descent_niter;
 };
 
-typedef struct cagraIndexParams* cuvsCagraIndexParams_t;
+typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
 
 /**
  * @brief Allocate CAGRA Index params, and populate with default values
@@ -77,7 +77,7 @@ cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index);
  * @brief Enum to denote algorithm used to search CAGRA Index
  *
  */
-enum cagraSearchAlgo {
+enum cuvsCagraSearchAlgo {
   /** For large batch sizes. */
   SINGLE_CTA,
   /** For small batch sizes. */
@@ -90,13 +90,13 @@ enum cagraSearchAlgo {
  * @brief Enum to denote Hash Mode used while searching CAGRA index
  *
  */
-enum cagraHashMode { HASH, SMALL, AUTO_HASH };
+enum cuvsCagraHashMode { HASH, SMALL, AUTO_HASH };
 
 /**
  * @brief Supplemental parameters to search CAGRA index
  *
  */
-struct cagraSearchParams {
+struct cuvsCagraSearchParams {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
   size_t max_queries;
 
@@ -114,7 +114,7 @@ struct cagraSearchParams {
   // Reasonable default values are automatically chosen.
 
   /** Which search implementation to use. */
-  enum cagraSearchAlgo algo;
+  enum cuvsCagraSearchAlgo algo;
 
   /** Number of threads used to calculate a single distance. 4, 8, 16, or 32. */
   size_t team_size;
@@ -128,7 +128,7 @@ struct cagraSearchParams {
   /** Thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when 0. */
   size_t thread_block_size;
   /** Hashmap type. Auto selection when AUTO. */
-  enum cagraHashMode hashmap_mode;
+  enum cuvsCagraHashMode hashmap_mode;
   /** Lower limit of hashmap bit length. More than 8. */
   size_t hashmap_min_bitlen;
   /** Upper limit of hashmap fill rate. More than 0.1, less than 0.9.*/
@@ -140,7 +140,7 @@ struct cagraSearchParams {
   uint64_t rand_xor_mask;
 };
 
-typedef struct cagraSearchParams* cuvsCagraSearchParams_t;
+typedef struct cuvsCagraSearchParams* cuvsCagraSearchParams_t;
 
 /**
  * @brief Allocate CAGRA search params, and populate with default values
@@ -166,24 +166,24 @@ typedef struct {
   uintptr_t addr;
   DLDataType dtype;
 
-} cagraIndex;
+} cuvsCagraIndex;
 
-typedef cagraIndex* cagraIndex_t;
+typedef cuvsCagraIndex* cuvsCagraIndex_t;
 
 /**
  * @brief Allocate CAGRA index
  *
- * @param[in] index cagraIndex_t to allocate
+ * @param[in] index cuvsCagraIndex_t to allocate
  * @return cagraError_t
  */
-cuvsError_t cagraIndexCreate(cagraIndex_t* index);
+cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 
 /**
  * @brief De-allocate CAGRA index
  *
- * @param[in] index cagraIndex_t to de-allocate
+ * @param[in] index cuvsCagraIndex_t to de-allocate
  */
-cuvsError_t cagraIndexDestroy(cagraIndex_t index);
+cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 
 /**
  * @brief Build a CAGRA index with a `DLManagedTensor` which has underlying
@@ -195,7 +195,7 @@ cuvsError_t cagraIndexDestroy(cagraIndex_t index);
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra_c.h>
+ * #include <cuvs/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -209,28 +209,28 @@ cuvsError_t cagraIndexDestroy(cagraIndex_t index);
  * cuvsError_t params_create_status = cuvsCagraIndexParamsCreate(&params);
  *
  * // Create CAGRA index
- * cagraIndex_t index;
- * cuvsError_t index_create_status = cagraIndexCreate(&index);
+ * cuvsCagraIndex_t index;
+ * cuvsError_t index_create_status = cuvsCagraIndexCreate(&index);
  *
  * // Build the CAGRA Index
- * cuvsError_t build_status = cagraBuild(res, params, &dataset, index);
+ * cuvsError_t build_status = cuvsCagraBuild(res, params, &dataset, index);
  *
  * // de-allocate `params`, `index` and `res`
  * cuvsError_t params_destroy_status = cuvsCagraIndexParamsDestroy(params);
- * cuvsError_t index_destroy_status = cagraIndexDestroy(index);
+ * cuvsError_t index_destroy_status = cuvsCagraIndexDestroy(index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsCagraIndexParams_t used to build CAGRA index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index cagraIndex_t Newly built CAGRA index
+ * @param[out] index cuvsCagraIndex_t Newly built CAGRA index
  * @return cuvsError_t
  */
-cuvsError_t cagraBuild(cuvsResources_t res,
-                       cuvsCagraIndexParams_t params,
-                       DLManagedTensor* dataset,
-                       cagraIndex_t index);
+cuvsError_t cuvsCagraBuild(cuvsResources_t res,
+                           cuvsCagraIndexParams_t params,
+                           DLManagedTensor* dataset,
+                           cuvsCagraIndex_t index);
 
 /**
  * @brief Search a CAGRA index with a `DLManagedTensor` which has underlying
@@ -244,7 +244,7 @@ cuvsError_t cagraBuild(cuvsResources_t res,
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra_c.h>
+ * #include <cuvs/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -259,8 +259,8 @@ cuvsError_t cagraBuild(cuvsResources_t res,
  * cuvsCagraSearchParams_t params;
  * cuvsError_t params_create_status = cuvsCagraSearchParamsCreate(&params);
  *
- * // Search the `index` built using `cagraBuild`
- * cuvsError_t search_status = cagraSearch(res, params, index, queries, neighbors, distances);
+ * // Search the `index` built using `cuvsCagraBuild`
+ * cuvsError_t search_status = cuvsCagraSearch(res, params, index, queries, neighbors, distances);
  *
  * // de-allocate `params` and `res`
  * cuvsError_t params_destroy_status = cuvsCagraSearchParamsDestroy(params);
@@ -269,17 +269,17 @@ cuvsError_t cagraBuild(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsCagraSearchParams_t used to search CAGRA index
- * @param[in] index cagraIndex which has been returned by `cagraBuild`
+ * @param[in] index cuvsCagraIndex which has been returned by `cuvsCagraBuild`
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
-cuvsError_t cagraSearch(cuvsResources_t res,
-                        cuvsCagraSearchParams_t params,
-                        cagraIndex_t index,
-                        DLManagedTensor* queries,
-                        DLManagedTensor* neighbors,
-                        DLManagedTensor* distances);
+cuvsError_t cuvsCagraSearch(cuvsResources_t res,
+                            cuvsCagraSearchParams_t params,
+                            cuvsCagraIndex_t index,
+                            DLManagedTensor* queries,
+                            DLManagedTensor* neighbors,
+                            DLManagedTensor* distances);
 
 #ifdef __cplusplus
 }
