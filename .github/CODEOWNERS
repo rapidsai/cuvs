@@ -4,12 +4,18 @@ cpp/               @rapidsai/cuvs-cpp-codeowners
 #python code owners
 python/            @rapidsai/cuvs-python-codeowners
 
-#cmake code owners
-**/CMakeLists.txt  @rapidsai/cuvs-cmake-codeowners
-**/cmake/          @rapidsai/cuvs-cmake-codeowners
-python/setup.py    @rapidsai/cuvs-cmake-codeowners
-build.sh           @rapidsai/cuvs-cmake-codeowners
-**/build.sh        @rapidsai/cuvs-cmake-codeowners
+#rust code owners
+rust/              @rapidsai/cuvs-rust-codeowners
+
+#docs code owners
+docs/              @rapidsai/cuvs-docs-codeowners
+
+#build code owners
+**/CMakeLists.txt  @rapidsai/cuvs-build-codeowners
+**/cmake/          @rapidsai/cuvs-build-codeowners
+python/setup.py    @rapidsai/cuvs-build-codeowners
+build.sh           @rapidsai/cuvs-build-codeowners
+**/build.sh        @rapidsai/cuvs-build-codeowners
 
 #build/ops code owners
 .github/           @rapidsai/ops-codeowners
