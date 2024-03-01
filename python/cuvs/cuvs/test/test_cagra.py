@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,8 +55,6 @@ def run_cagra_build_search_test(
         index = cagra.build_index(build_params, dataset_device)
     else:
         index = cagra.build_index(build_params, dataset)
-
-    assert index.trained
 
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]

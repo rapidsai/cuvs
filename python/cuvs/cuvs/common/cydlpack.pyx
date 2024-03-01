@@ -18,6 +18,7 @@
 import numpy as np
 
 from libc cimport stdlib
+from libc.stdint cimport uintptr_t
 
 
 cdef void deleter(DLManagedTensor* tensor) noexcept:
@@ -28,15 +29,16 @@ cdef void deleter(DLManagedTensor* tensor) noexcept:
     stdlib.free(tensor)
 
 
-cdef DLManagedTensor dlpack_c(ary):
+cdef DLManagedTensor* dlpack_c(ary):
     # todo(dgd): add checking options/parameters
     cdef DLDeviceType dev_type
     cdef DLDevice dev
     cdef DLDataType dtype
     cdef DLTensor tensor
-    cdef DLManagedTensor dlm
+    cdef DLManagedTensor* dlm = \
+        <DLManagedTensor*>stdlib.malloc(sizeof(DLManagedTensor))
 
-    if hasattr(ary, "__cuda_array_interface__"):
+    if ary.from_cai:
         dev_type = DLDeviceType.kDLCUDA
     else:
         dev_type = DLDeviceType.kDLCPU
@@ -51,24 +53,47 @@ cdef DLManagedTensor dlpack_c(ary):
     elif ary.dtype == np.float64:
         dtype.code = DLDataTypeCode.kDLFloat
         dtype.bits = 64
+    elif ary.dtype == np.int8:
+        dtype.code = DLDataTypeCode.kDLInt
+        dtype.bits = 8
     elif ary.dtype == np.int32:
         dtype.code = DLDataTypeCode.kDLInt
         dtype.bits = 32
     elif ary.dtype == np.int64:
-        dtype.code = DLDataTypeCode.kDLFloat
+        dtype.code = DLDataTypeCode.kDLInt
         dtype.bits = 64
-    elif ary.dtype == np.bool:
+    elif ary.dtype == np.uint8:
+        dtype.code = DLDataTypeCode.kDLUInt
+        dtype.bits = 8
+    elif ary.dtype == np.uint32:
+        dtype.code = DLDataTypeCode.kDLUInt
+        dtype.bits = 32
+    elif ary.dtype == np.uint64:
+        dtype.code = DLDataTypeCode.kDLUInt
+        dtype.bits = 64
+    elif ary.dtype == np.bool_:
         dtype.code = DLDataTypeCode.kDLFloat
+        dtype.bits = 8
 
-    if hasattr(ary, "__cuda_array_interface__"):
-        tensor_ptr = ary.__cuda_array_interface__["data"][0]
-    else:
-        tensor_ptr = ary.__array_interface__["data"][0]
+    dtype.lanes = 1
+
+    cdef size_t ndim = len(ary.shape)
+
+    cdef int64_t* shape = <int64_t*>stdlib.malloc(ndim * sizeof(int64_t))
+
+    for i in range(ndim):
+        shape[i] = ary.shape[i]
+
+    cdef uintptr_t tensor_ptr
+    tensor_ptr = <uintptr_t>ary.ai_["data"][0]
 
     tensor.data = <void*> tensor_ptr
     tensor.device = dev
     tensor.dtype = dtype
     tensor.strides = NULL
+    tensor.ndim = ndim
+    tensor.shape = shape
+    tensor.byte_offset = 0
 
     dlm.dl_tensor = tensor
     dlm.manager_ctx = NULL

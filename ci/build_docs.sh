@@ -24,7 +24,7 @@ rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   libcuvs
 
-export RAPIDS_VERSION_NUMBER="24.02"
+export RAPIDS_VERSION_NUMBER="24.04"
 export RAPIDS_DOCS_DIR="$(mktemp -d)"
 
 rapids-logger "Build CPP docs"

@@ -39,12 +39,12 @@ def auto_sync_resources(f):
 
     @functools.wraps(f)
     def wrapper(*args, resources=None, **kwargs):
-        sync_handle = resources is None
+        sync_resources = resources is None
         resources = resources if resources is not None else DeviceResources()
 
         ret_value = f(*args, resources=resources, **kwargs)
 
-        if sync_handle:
+        if sync_resources:
             resources.sync()
 
         return ret_value

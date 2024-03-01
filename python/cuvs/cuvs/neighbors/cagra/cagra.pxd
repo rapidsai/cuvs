@@ -28,62 +28,68 @@ from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 
 
-cdef extern from "cuvs/neighbors/cagra_c.h" nogil:
+cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
-    ctypedef enum cagraGraphBuildAlgo:
+    ctypedef enum cuvsCagraGraphBuildAlgo:
         IVF_PQ
         NN_DESCENT
 
-    ctypedef struct cagraIndexParams:
+    ctypedef struct cuvsCagraIndexParams:
         size_t intermediate_graph_degree
         size_t graph_degree
-        cagraGraphBuildAlgo build_algo
+        cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
 
-    ctypedef enum cagraSearchAlgo:
+    ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
+
+    ctypedef enum cuvsCagraSearchAlgo:
         SINGLE_CTA,
         MULTI_CTA,
         MULTI_KERNEL,
         AUTO
 
-    ctypedef enum cagraHashMode:
+    ctypedef enum cuvsCagraHashMode:
         HASH,
         SMALL,
         AUTO_HASH
 
-    ctypedef struct cagraSearchParams:
+    ctypedef struct cuvsCagraSearchParams:
         size_t max_queries
         size_t itopk_size
         size_t max_iterations
-        cagraSearchAlgo algo
+        cuvsCagraSearchAlgo algo
         size_t team_size
         size_t search_width
         size_t min_iterations
         size_t thread_block_size
-        cagraHashMode hashmap_mode
+        cuvsCagraHashMode hashmap_mode
         size_t hashmap_min_bitlen
         float hashmap_max_fill_rate
         uint32_t num_random_samplings
         uint64_t rand_xor_mask
 
-    ctypedef struct cagraIndex:
+    ctypedef struct cuvsCagraIndex:
         uintptr_t addr
         DLDataType dtype
 
-    ctypedef cagraIndex* cagraIndex_t
+    ctypedef cuvsCagraIndex* cuvsCagraIndex_t
 
-    cuvsError_t cagraIndexCreate(cagraIndex_t* index)
+    cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 
-    cuvsError_t cagraIndexDestroy(cagraIndex_t index)
+    cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index)
 
-    cuvsError_t cagraBuild(cuvsResources_t res,
-                           cagraIndexParams* params,
-                           DLManagedTensor* dataset,
-                           cagraIndex_t index)
+    cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 
-    cuvsError_t cagraSearch(cuvsResources_t res,
-                            cagraSearchParams* params,
-                            cagraIndex_t index,
-                            DLManagedTensor* queries,
-                            DLManagedTensor* neighbors,
-                            DLManagedTensor* distances)
+    cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
+
+    cuvsError_t cuvsCagraBuild(cuvsResources_t res,
+                               cuvsCagraIndexParams* params,
+                               DLManagedTensor* dataset,
+                               cuvsCagraIndex_t index) except +
+
+    cuvsError_t cuvsCagraSearch(cuvsResources_t res,
+                                cuvsCagraSearchParams* params,
+                                cuvsCagraIndex_t index,
+                                DLManagedTensor* queries,
+                                DLManagedTensor* neighbors,
+                                DLManagedTensor* distances) except +

@@ -53,7 +53,6 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     cuvs::neighbors::cagra::build_host(*res_ptr, build_params, mds, *index);
   }
-
   return index;
 }
 
@@ -153,6 +152,9 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                 dataset.dtype.bits);
     }
     return CUVS_SUCCESS;
+  } catch (const std::exception& ex) {
+    std::cerr << "Error occurred: " << ex.what() << std::endl;
+    return CUVS_ERROR;
   } catch (...) {
     return CUVS_ERROR;
   }
@@ -197,6 +199,8 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                 queries.dtype.bits);
     }
     return CUVS_SUCCESS;
+  } catch (const std::exception& ex) {
+    std::cerr << "Error occurred: " << ex.what() << std::endl;
   } catch (...) {
     return CUVS_ERROR;
   }

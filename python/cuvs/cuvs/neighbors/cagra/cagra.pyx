@@ -22,11 +22,13 @@ cimport cuvs.common.cydlpack
 from cuvs.common.temp_raft import auto_sync_resources
 
 from cython.operator cimport dereference as deref
+from libcpp cimport bool, cast
 
 from cuvs.common cimport cydlpack
 
 from pylibraft.common import (
     DeviceResources,
+    Stream,
     auto_convert_output,
     cai_wrapper,
     device_ndarray,
@@ -43,9 +45,12 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
-from pylibraft.common.handle cimport device_resources
 
-from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
+from cuvs.common.c_api cimport (
+    cuvsError_t,
+    cuvsResources_t,
+    cuvsResourcesCreate,
+)
 
 
 cdef class IndexParams:
@@ -70,7 +75,7 @@ cdef class IndexParams:
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
     """
-    cdef cagraIndexParams params
+    cdef cuvsCagraIndexParams* params
 
     def __init__(self, *,
                  metric="sqeuclidean",
@@ -78,6 +83,9 @@ cdef class IndexParams:
                  graph_degree=64,
                  build_algo="ivf_pq",
                  nn_descent_niter=20):
+
+        cuvsCagraIndexParamsCreate(&self.params)
+
         # todo (dgd): enable once other metrics are present
         # and exposed in cuVS C API
         # self.params.metric = _get_metric(metric)
@@ -85,9 +93,9 @@ cdef class IndexParams:
         self.params.intermediate_graph_degree = intermediate_graph_degree
         self.params.graph_degree = graph_degree
         if build_algo == "ivf_pq":
-            self.params.build_algo = cagraGraphBuildAlgo.IVF_PQ
+            self.params.build_algo = cuvsCagraGraphBuildAlgo.IVF_PQ
         elif build_algo == "nn_descent":
-            self.params.build_algo = cagraGraphBuildAlgo.NN_DESCENT
+            self.params.build_algo = cuvsCagraGraphBuildAlgo.NN_DESCENT
         self.params.nn_descent_niter = nn_descent_niter
 
     # @property
@@ -112,22 +120,27 @@ cdef class IndexParams:
 
 
 cdef class Index:
-    cdef cagraIndex_t index
+    cdef cuvsCagraIndex_t index
+    cdef bool trained
 
     def __cinit__(self):
         cdef cuvsError_t index_create_status
-        index_create_status = cagraIndexCreate(&self.index)
+        index_create_status = cuvsCagraIndexCreate(&self.index)
         self.trained = False
 
         if index_create_status == cuvsError_t.CUVS_ERROR:
-            raise Exception("FAIL")
+            raise RuntimeError("Failed to create index.")
 
     def __dealloc__(self):
         cdef cuvsError_t index_destroy_status
         if self.index is not NULL:
-            index_destroy_status = cagraIndexDestroy(self.index)
+            index_destroy_status = cuvsCagraIndexDestroy(self.index)
             if index_destroy_status == cuvsError_t.CUVS_ERROR:
-                raise Exception("FAIL")
+                raise Exception("Failed to deallocate index.")
+
+    @property
+    def trained(self):
+        return self.trained
 
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
@@ -165,19 +178,18 @@ def build_index(IndexParams index_params, dataset, resources=None):
     --------
 
     >>> import cupy as cp
-    >>> from pylibraft.neighbors import cagra
+    >>> from cuvs.neighbors import cagra
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_queries = 1000
     >>> k = 10
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
-    >>> handle = DeviceResources()
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build_index(build_params, dataset)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
     ...                                      index, dataset,
-    ...                                      k, handle=handle)
+    ...                                      k)
     >>> distances = cp.asarray(distances)
     >>> neighbors = cp.asarray(neighbors)
     """
@@ -188,22 +200,24 @@ def build_index(IndexParams index_params, dataset, resources=None):
     _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
                                     np.dtype('ubyte')])
 
-    if resources is None:
-        resources = DeviceResources()
-    cdef cuvsResources_t* resources_ = \
-        <cuvsResources_t*><size_t>resources.getHandle()
+    cdef cuvsResources_t res_
+    cdef cuvsError_t cstat
+
+    cstat = cuvsResourcesCreate(&res_)
+    if cstat == cuvsError_t.CUVS_ERROR:
+        raise RuntimeError("Error creating Device Reources.")
 
     cdef Index idx = Index()
     cdef cuvsError_t build_status
-    cdef cydlpack.DLManagedTensor dataset_dlpack = \
+    cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
-    cdef cagraIndexParams* params = &index_params.params
+    cdef cuvsCagraIndexParams* params = index_params.params
 
     with cuda_interruptible():
-        build_status = cagraBuild(
-            deref(resources_),
+        build_status = cuvsCagraBuild(
+            res_,
             params,
-            &dataset_dlpack,
+            dataset_dlpack,
             idx.index
         )
 
@@ -264,7 +278,7 @@ cdef class SearchParams:
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
     """
-    cdef cagraSearchParams params
+    cdef cuvsCagraSearchParams params
 
     def __init__(self, *,
                  max_queries=0,
@@ -284,13 +298,13 @@ cdef class SearchParams:
         self.params.itopk_size = itopk_size
         self.params.max_iterations = max_iterations
         if algo == "single_cta":
-            self.params.algo = cagraSearchAlgo.SINGLE_CTA
+            self.params.algo = cuvsCagraSearchAlgo.SINGLE_CTA
         elif algo == "multi_cta":
-            self.params.algo = cagraSearchAlgo.MULTI_CTA
+            self.params.algo = cuvsCagraSearchAlgo.MULTI_CTA
         elif algo == "multi_kernel":
-            self.params.algo = cagraSearchAlgo.MULTI_KERNEL
+            self.params.algo = cuvsCagraSearchAlgo.MULTI_KERNEL
         elif algo == "auto":
-            self.params.algo = cagraSearchAlgo.AUTO
+            self.params.algo = cuvsCagraSearchAlgo.AUTO
         else:
             raise ValueError("`algo` value not supported.")
 
@@ -299,11 +313,11 @@ cdef class SearchParams:
         self.params.min_iterations = min_iterations
         self.params.thread_block_size = thread_block_size
         if hashmap_mode == "hash":
-            self.params.hashmap_mode = cagraHashMode.HASH
+            self.params.hashmap_mode = cuvsCagraHashMode.HASH
         elif hashmap_mode == "small":
-            self.params.hashmap_mode = cagraHashMode.SMALL
+            self.params.hashmap_mode = cuvsCagraHashMode.SMALL
         elif hashmap_mode == "auto":
-            self.params.hashmap_mode = cagraHashMode.AUTO_HASH
+            self.params.hashmap_mode = cuvsCagraHashMode.AUTO_HASH
         else:
             raise ValueError("`hashmap_mode` value not supported.")
 
@@ -407,16 +421,14 @@ def search(SearchParams search_params,
     Examples
     --------
     >>> import cupy as cp
-    >>> from pylibraft.common import DeviceResources
-    >>> from pylibraft.neighbors import cagra
+    >>> from cuvs.neighbors import cagra
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_queries = 1000
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> handle = DeviceResources()
-    >>> index = cagra.build(cagra.IndexParams(), dataset, handle=handle)
+    >>> index = cagra.build_index(cagra.IndexParams(), dataset)
     >>> # Search using the built index
     >>> queries = cp.random.random_sample((n_queries, n_features),
     ...                                   dtype=cp.float32)
@@ -429,62 +441,62 @@ def search(SearchParams search_params,
     >>> # creation during search. This is useful if multiple searches
     >>> # are performad with same query size.
     >>> distances, neighbors = cagra.search(search_params, index, queries,
-    ...                                     k, handle=handle)
-    >>> # pylibraft functions are often asynchronous so the
-    >>> # handle needs to be explicitly synchronized
-    >>> handle.sync()
+    ...                                     k)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
     if not index.trained:
-        raise ValueError("Index need to be built before calling search.")
+        raise ValueError("Index needs to be built before calling search.")
 
-    if resources is None:
-        resources = DeviceResources()
-    cdef device_resources* resources_ = \
-        <device_resources*><size_t>resources.getHandle()
+    cdef cuvsResources_t res_
+    cdef cuvsError_t cstat
+
+    cstat = cuvsResourcesCreate(&res_)
+    if cstat == cuvsError_t.CUVS_ERROR:
+        raise RuntimeError("Error creating Device Reources.")
 
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
-    queries_cai = cai_wrapper(queries)
+    queries_cai = wrap_array(queries)
     _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
-                                     np.dtype('ubyte')],
-                       exp_cols=index.dim)
+                                     np.dtype('ubyte')])
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 
     if neighbors is None:
         neighbors = device_ndarray.empty((n_queries, k), dtype='uint32')
 
-    neighbors_cai = cai_wrapper(neighbors)
+    neighbors_cai = wrap_array(neighbors)
     _check_input_array(neighbors_cai, [np.dtype('uint32')],
                        exp_rows=n_queries, exp_cols=k)
 
     if distances is None:
         distances = device_ndarray.empty((n_queries, k), dtype='float32')
 
-    distances_cai = cai_wrapper(distances)
+    distances_cai = wrap_array(distances)
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
 
-    cdef cagraSearchParams* params = &search_params.params
-    cdef cydlpack.DLManagedTensor queries_dlpack = cydlpack.dlpack_c(queries_cai)
-    cdef cydlpack.DLManagedTensor neighbors_dlpack = cydlpack.dlpack_c(neighbors_cai)
-    cdef cydlpack.DLManagedTensor distances_dlpack = cydlpack.dlpack_c(distances_cai)
+    cdef cuvsCagraSearchParams* params = &search_params.params
+    cdef cuvsError_t search_status
+    cdef cydlpack.DLManagedTensor* queries_dlpack = \
+        cydlpack.dlpack_c(queries_cai)
+    cdef cydlpack.DLManagedTensor* neighbors_dlpack = \
+        cydlpack.dlpack_c(neighbors_cai)
+    cdef cydlpack.DLManagedTensor* distances_dlpack = \
+        cydlpack.dlpack_c(distances_cai)
 
     with cuda_interruptible():
-        cagraSearch(
-            deref(resources_),
+        search_status = cuvsCagraSearch(
+            res_,
             params,
             index.index,
-            &queries_dlpack,
-            &neighbors_dlpack,
-            &distances_dlpack
+            queries_dlpack,
+            neighbors_dlpack,
+            distances_dlpack
         )
 
-        if build_status == cuvsError_t.CUVS_ERROR:
-            raise RuntimeError("Index failed to build.")
-        else:
-            idx.trained = True
+        if search_status == cuvsError_t.CUVS_ERROR:
+            raise RuntimeError("Search failed.")
 
     return (distances, neighbors)
