@@ -188,8 +188,7 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
-  src/neighbors/brute_force.cpp
-
+  src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cpp
   src/neighbors/cagra_build_int8.cpp
   src/neighbors/cagra_build_uint8.cpp
@@ -200,7 +199,6 @@ add_library(
   src/neighbors/cagra_serialize_float.cpp
   src/neighbors/cagra_serialize_int8.cpp
   src/neighbors/cagra_serialize_uint8.cpp
-
   src/neighbors/ivf_flat_build_float.cpp
   src/neighbors/ivf_flat_build_int8.cpp
   src/neighbors/ivf_flat_build_uint8.cpp
@@ -213,7 +211,6 @@ add_library(
   src/neighbors/ivf_flat_serialize_float.cpp
   src/neighbors/ivf_flat_serialize_int8.cpp
   src/neighbors/ivf_flat_serialize_uint8.cpp
-
   src/neighbors/ivf_pq_build_float.cpp
   src/neighbors/ivf_pq_build_int8.cpp
   src/neighbors/ivf_pq_build_uint8.cpp

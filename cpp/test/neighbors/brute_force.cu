@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-#include <raft/distance/distance_types.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
 #include "../test_utils.cuh"
-
+#include <cuvs/neighbors/brute_force.hpp>
+#include <raft/distance/distance_types.hpp>
 
 namespace raft::neighbors::brute_force {
 struct KNNInputs {
@@ -72,13 +71,17 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
     raft::print_device_vector("Labels array: ", search_labels_.data(), rows_, std::cout);
     // #endif
 
-    auto index = raft::make_device_matrix_view<const T, IdxT, row_major>((const T*)(input_.data()), rows_, cols_);
-    auto search = raft::make_device_matrix_view<const T, IdxT, row_major>((const T*)(search_data_.data()), rows_, cols_);
+    auto index = raft::make_device_matrix_view<const T, IdxT, row_major>(
+      (const T*)(input_.data()), rows_, cols_);
+    auto search = raft::make_device_matrix_view<const T, IdxT, row_major>(
+      (const T*)(search_data_.data()), rows_, cols_);
     auto indices = raft::make_device_matrix_view<IdxT, IdxT, row_major>(indices_.data(), rows_, k_);
-    auto distances = raft::make_device_matrix_view<T, IdxT, row_major>(distances_.data(), rows_, k_);
+    auto distances =
+      raft::make_device_matrix_view<T, IdxT, row_major>(distances_.data(), rows_, k_);
 
-    auto metric = raft::distance::DistanceType::L2Unexpanded;
-    cuvs::neighbors::brute_force::knn(handle, index, search, indices, distances, metric, std::make_optional<IdxT>(0));
+    auto metric = cuvs::distance::DistanceType::L2Unexpanded;
+    auto idx    = cuvs::neighbors::brute_force::build(handle, index, metric);
+    cuvs::neighbors::brute_force::search(handle, idx, search, indices, distances);
 
     build_actual_output<<<raft::ceildiv(rows_ * k_, 32), 32, 0, stream>>>(
       actual_labels_.data(), rows_, k_, search_labels_.data(), indices_.data());
