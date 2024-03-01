@@ -6,4 +6,4 @@ set -euo pipefail
 # Set up skbuild options. Enable sccache in skbuild config options
 export SKBUILD_CONFIGURE_OPTIONS="-DCUVS_BUILD_WHEELS=ON -DDETECT_CONDA_ENV=OFF -DFIND_CUVS_CPP=OFF"
 
-#ci/build_wheel.sh cuvs python/cuvs
+ci/build_wheel.sh cuvs python/cuvs
