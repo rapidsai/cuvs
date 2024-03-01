@@ -37,11 +37,11 @@ dependencies:
 - numpydoc
 - pre-commit
 - pydata-sphinx-theme
-- pylibraft==24.2.*
+- pylibraft==24.4.*
 - pytest
 - pytest-cov
 - recommonmark
-- rmm==24.2.*
+- rmm==24.4.*
 - scikit-build-core[pyproject]>=0.7.0
 - scikit-learn
 - scipy
