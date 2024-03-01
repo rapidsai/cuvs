@@ -84,7 +84,7 @@ dependencies:
           - &cmake_ver cmake>=3.26.4
           - cython>=3.0.0
           - ninja
-          - scikit-build>=0.13.1
+          - "scikit-build-core[pyproject]>=0.7.0"
       - output_types: [conda]
         packages:
           - c-compiler
@@ -129,6 +129,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - &rmm_conda rmm==24.2.*
+          - &pylibraft_conda pylibraft==24.2.*
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -149,15 +150,17 @@ dependencies:
           - matrix: {cuda: "12.2"}
             packages: &build_cuvs_packages_cu12
               - &rmm_cu12 rmm-cu12==24.2.*
+              - &pylibraft_cu12 pylibraft-cu12==24.2.*
           - {matrix: {cuda: "12.1"}, packages: *build_cuvs_packages_cu12}
           - {matrix: {cuda: "12.0"}, packages: *build_cuvs_packages_cu12}
           - matrix: {cuda: "11.8"}
             packages: &build_cuvs_packages_cu11
               - &rmm_cu11 rmm-cu11==24.2.*
+              - &pylibraft_cu11 pylibraft-cu11==24.2.*
           - {matrix: {cuda: "11.5"}, packages: *build_cuvs_packages_cu11}
           - {matrix: {cuda: "11.4"}, packages: *build_cuvs_packages_cu11}
           - {matrix: {cuda: "11.2"}, packages: *build_cuvs_packages_cu11}
-          - {matrix: null, packages: [*rmm_conda] }
+          - {matrix: null, packages: [*rmm_conda, *pylibraft_conda] }
   checks:
     common:
       - output_types: [conda, requirements]
@@ -334,6 +337,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - *rmm_conda
+          - *pylibraft_conda
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -354,15 +358,17 @@ dependencies:
           - matrix: {cuda: "12.2"}
             packages: &run_cuvs_packages_cu12
               - *rmm_cu12
+              - *pylibraft_cu12
           - {matrix: {cuda: "12.1"}, packages: *run_cuvs_packages_cu12}
           - {matrix: {cuda: "12.0"}, packages: *run_cuvs_packages_cu12}
           - matrix: {cuda: "11.8"}
             packages: &run_cuvs_packages_cu11
               - *rmm_cu11
+              - *pylibraft_cu12
           - {matrix: {cuda: "11.5"}, packages: *run_cuvs_packages_cu11}
           - {matrix: {cuda: "11.4"}, packages: *run_cuvs_packages_cu11}
           - {matrix: {cuda: "11.2"}, packages: *run_cuvs_packages_cu11}
-          - {matrix: null, packages: [*rmm_conda]}
+          - {matrix: null, packages: [*rmm_conda, *pylibraft_conda]}
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]

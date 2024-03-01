@@ -41,11 +41,12 @@ dependencies:
 - nvcc_linux-64=11.8
 - pre-commit
 - pydata-sphinx-theme
+- pylibraft==24.2.*
 - pytest
 - pytest-cov
 - recommonmark
 - rmm==24.2.*
-- scikit-build>=0.13.1
+- scikit-build-core[pyproject]>=0.7.0
 - scikit-learn
 - scipy
 - sphinx-copybutton
