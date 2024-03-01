@@ -57,6 +57,8 @@ DEPENDENCIES=(
   cuvs
   cuvs-cu11
   cuvs-cu12
+  pylibraft-cu11
+  pylibraft-cu12
   rmm
   rmm-cu11
   rmm-cu12
