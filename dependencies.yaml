@@ -189,7 +189,7 @@ dependencies:
               - cuda-python>=11.7.1,<12.0a0
       - output_types: [requirements, pyproject]
         matrices:
-          - matrix: {cuda: "12.*"}
+          - matrix: {cuda: "12.2"}
             packages:
               - pylibraft-cu12==24.4.*
               - rmm-cu12==24.4.*
