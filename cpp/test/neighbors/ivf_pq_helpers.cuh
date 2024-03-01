@@ -23,7 +23,14 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace raft::neighbors::ivf_pq::helpers {
+#include <cuvs/neighbors/ivf_pq.hpp>
+
+namespace cuvs::neighbors::ivf_pq::helpers {
+
+using namespace raft;
+using namespace raft::neighbors;
+using namespace raft::neighbors::ivf_pq;
+
 /**
  * @defgroup ivf_pq_helpers Helper functions for manipulationg IVF PQ Index
  * @{
@@ -67,7 +74,7 @@ inline void unpack(
   uint32_t offset,
   device_matrix_view<uint8_t, uint32_t, row_major> codes)
 {
-  ivf_pq::detail::unpack_list_data(
+  raft::neighbors::ivf_pq::detail::unpack_list_data(
     codes, list_data, offset, pq_bits, resource::get_cuda_stream(res));
 }
 
@@ -100,7 +107,8 @@ inline void pack(
   uint32_t offset,
   device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> list_data)
 {
-  ivf_pq::detail::pack_list_data(list_data, codes, offset, pq_bits, resource::get_cuda_stream(res));
+  raft::neighbors::ivf_pq::detail::pack_list_data(
+    list_data, codes, offset, pq_bits, resource::get_cuda_stream(res));
 }
 }  // namespace codepacker
 
@@ -130,12 +138,13 @@ inline void pack(
  */
 template <typename IdxT>
 void pack_list_data(raft::resources const& res,
-                    index<IdxT>* index,
+                    cuvs::neighbors::ivf_pq::index<IdxT>* index,
                     device_matrix_view<const uint8_t, uint32_t, row_major> codes,
                     uint32_t label,
                     uint32_t offset)
 {
-  ivf_pq::detail::pack_list_data(res, index, codes, label, offset);
+  raft::neighbors::ivf_pq::detail::pack_list_data(
+    res, index->get_raft_index(), codes, label, offset);
 }
 
 /**
@@ -171,12 +180,13 @@ void pack_list_data(raft::resources const& res,
  */
 template <typename IdxT>
 void unpack_list_data(raft::resources const& res,
-                      const index<IdxT>& index,
+                      const cuvs::neighbors::ivf_pq::index<IdxT>& index,
                       device_matrix_view<uint8_t, uint32_t, row_major> out_codes,
                       uint32_t label,
                       uint32_t offset)
 {
-  return ivf_pq::detail::unpack_list_data<IdxT>(res, index, out_codes, label, offset);
+  return raft::neighbors::ivf_pq::detail::unpack_list_data<IdxT>(
+    res, *index.get_raft_index(), out_codes, label, offset);
 }
 
 /**
@@ -213,12 +223,13 @@ void unpack_list_data(raft::resources const& res,
  */
 template <typename IdxT>
 void unpack_list_data(raft::resources const& res,
-                      const index<IdxT>& index,
+                      const cuvs::neighbors::ivf_pq::index<IdxT>& index,
                       device_vector_view<const uint32_t> in_cluster_indices,
                       device_matrix_view<uint8_t, uint32_t, row_major> out_codes,
                       uint32_t label)
 {
-  return ivf_pq::detail::unpack_list_data<IdxT>(res, index, out_codes, label, in_cluster_indices);
+  return raft::neighbors::ivf_pq::detail::unpack_list_data<IdxT>(
+    res, index, out_codes, label, in_cluster_indices);
 }
 
 /**
@@ -255,12 +266,13 @@ void unpack_list_data(raft::resources const& res,
  */
 template <typename T, typename IdxT>
 void reconstruct_list_data(raft::resources const& res,
-                           const index<IdxT>& index,
+                           const cuvs::neighbors::ivf_pq::index<IdxT>& index,
                            device_matrix_view<T, uint32_t, row_major> out_vectors,
                            uint32_t label,
                            uint32_t offset)
 {
-  return ivf_pq::detail::reconstruct_list_data(res, index, out_vectors, label, offset);
+  return raft::neighbors::ivf_pq::detail::reconstruct_list_data(
+    res, *index.get_raft_index(), out_vectors, label, offset);
 }
 
 /**
@@ -299,12 +311,13 @@ void reconstruct_list_data(raft::resources const& res,
  */
 template <typename T, typename IdxT>
 void reconstruct_list_data(raft::resources const& res,
-                           const index<IdxT>& index,
+                           const cuvs::neighbors::ivf_pq::index<IdxT>& index,
                            device_vector_view<const uint32_t> in_cluster_indices,
                            device_matrix_view<T, uint32_t, row_major> out_vectors,
                            uint32_t label)
 {
-  return ivf_pq::detail::reconstruct_list_data(res, index, out_vectors, label, in_cluster_indices);
+  return raft::neighbors::ivf_pq::detail::reconstruct_list_data(
+    res, index, out_vectors, label, in_cluster_indices);
 }
 
 /**
@@ -338,12 +351,13 @@ void reconstruct_list_data(raft::resources const& res,
  */
 template <typename IdxT>
 void extend_list_with_codes(raft::resources const& res,
-                            index<IdxT>* index,
+                            cuvs::neighbors::ivf_pq::index<IdxT>* index,
                             device_matrix_view<const uint8_t, uint32_t, row_major> new_codes,
                             device_vector_view<const IdxT, uint32_t, row_major> new_indices,
                             uint32_t label)
 {
-  ivf_pq::detail::extend_list_with_codes(res, index, new_codes, new_indices, label);
+  raft::neighbors::ivf_pq::detail::extend_list_with_codes(
+    res, index->get_raft_index(), new_codes, new_indices, label);
 }
 
 /**
@@ -379,12 +393,13 @@ void extend_list_with_codes(raft::resources const& res,
  */
 template <typename T, typename IdxT>
 void extend_list(raft::resources const& res,
-                 index<IdxT>* index,
+                 cuvs::neighbors::ivf_pq::index<IdxT>* index,
                  device_matrix_view<const T, uint32_t, row_major> new_vectors,
                  device_vector_view<const IdxT, uint32_t, row_major> new_indices,
                  uint32_t label)
 {
-  ivf_pq::detail::extend_list(res, index, new_vectors, new_indices, label);
+  raft::neighbors::ivf_pq::detail::extend_list(
+    res, index->get_raft_index(), new_vectors, new_indices, label);
 }
 
 /**
@@ -402,10 +417,12 @@ void extend_list(raft::resources const& res,
  * @param[in] label the id of the target list (cluster).
  */
 template <typename IdxT>
-void erase_list(raft::resources const& res, index<IdxT>* index, uint32_t label)
+void erase_list(raft::resources const& res,
+                cuvs::neighbors::ivf_pq::index<IdxT>* index,
+                uint32_t label)
 {
-  ivf_pq::detail::erase_list(res, index, label);
+  raft::neighbors::ivf_pq::detail::erase_list(res, index->get_raft_index(), label);
 }
 
 /** @} */
-}  // namespace raft::neighbors::ivf_pq::helpers
+}  // namespace cuvs::neighbors::ivf_pq::helpers

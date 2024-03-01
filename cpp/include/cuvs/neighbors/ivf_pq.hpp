@@ -19,7 +19,6 @@
 #include "ann_types.hpp"
 #include <raft_runtime/neighbors/ivf_pq.hpp>
 
-
 namespace cuvs::neighbors::ivf_pq {
 
 /** A type for specifying how PQ codebooks are created. */
@@ -98,15 +97,14 @@ struct index_params : ann::index_params {
         .metric_arg        = this->metric_arg,
         .add_data_on_build = this->add_data_on_build,
       },
-      .n_lists = n_lists,
-      .kmeans_n_iters = kmeans_n_iters,
+      .n_lists                  = n_lists,
+      .kmeans_n_iters           = kmeans_n_iters,
       .kmeans_trainset_fraction = kmeans_trainset_fraction,
-      .pq_bits = pq_bits,
-      .pq_dim = pq_dim,
+      .pq_bits                  = pq_bits,
+      .pq_dim                   = pq_dim,
       .codebook_kind = static_cast<raft::neighbors::ivf_pq::codebook_gen>((int)this->codebook_kind),
-      .force_random_rotation = force_random_rotation,
-      .conservative_memory_allocation = conservative_memory_allocation
-    };
+      .force_random_rotation          = force_random_rotation,
+      .conservative_memory_allocation = conservative_memory_allocation};
   }
 };
 
@@ -152,12 +150,7 @@ struct search_params : ann::search_params {
   operator raft::neighbors::ivf_pq::search_params() const
   {
     raft::neighbors::ivf_pq::search_params result = {
-      {},
-      n_probes,
-      lut_dtype,
-      internal_distance_dtype,
-      preferred_shmem_carveout
-      };
+      {}, n_probes, lut_dtype, internal_distance_dtype, preferred_shmem_carveout};
     return result;
   }
 };
@@ -176,32 +169,34 @@ struct index : ann::index {
   ~index()                               = default;
 
   /** Construct an empty index. It needs to be trained and then populated. */
-  index(raft::resources const& handle,
-        raft::distance::DistanceType metric,
-        codebook_gen codebook_kind,
-        uint32_t n_lists,
-        uint32_t dim,
-        uint32_t pq_bits                    = 8,
-        uint32_t pq_dim                     = 0,
-        bool conservative_memory_allocation = false)
+  index(raft::resources const& handle, const index_params& params, uint32_t dim)
     : ann::index(),
-      raft_index_(handle, metric, codebook_kind, n_lists, dim,
-                  pq_bits, pq_dim, conservative_memory_allocation)
-  {}
+      raft_index_(std::make_unique<raft::neighbors::ivf_pq::index<IdxT>>(
+        handle,
+        static_cast<raft::distance::DistanceType>((int)params.metric),
+        static_cast<raft::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind),
+        params.n_lists,
+        dim,
+        params.pq_bits,
+        params.pq_dim,
+        params.conservative_memory_allocation))
+  {
+  }
 
   /** Build a cuvs IVF_PQ index from an existing RAFT IVF_PQ index. */
   index(raft::neighbors::ivf_pq::index<IdxT>&& raft_idx)
     : ann::index(),
       raft_index_(std::make_unique<raft::neighbors::ivf_pq::index<IdxT>>(std::move(raft_idx)))
-  {}
+  {
+  }
 
   /** Total length of the index. */
-  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
-  {
-    return raft_index_->size();
-  }
+  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT { return raft_index_->size(); }
   /** Dimensionality of the input data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return raft_index_->dim(); }
+  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
+  {
+    return raft_index_->dim();
+  }
   /**
    * Dimensionality of the cluster centers:
    * input data dim extended with vector norms and padded to 8 elems.
@@ -219,9 +214,15 @@ struct index : ann::index {
     return raft_index_->rot_dim();
   }
   /** The bit length of an encoded vector element after compression by PQ. */
-  [[nodiscard]] constexpr inline auto pq_bits() const noexcept -> uint32_t { return raft_index_->pq_bits(); }
+  [[nodiscard]] constexpr inline auto pq_bits() const noexcept -> uint32_t
+  {
+    return raft_index_->pq_bits();
+  }
   /** The dimensionality of an encoded vector after compression by PQ. */
-  [[nodiscard]] constexpr inline auto pq_dim() const noexcept -> uint32_t { return raft_index_->pq_dim(); }
+  [[nodiscard]] constexpr inline auto pq_dim() const noexcept -> uint32_t
+  {
+    return raft_index_->pq_dim();
+  }
   /** Dimensionality of a subspaces, i.e. the number of vector components mapped to a subspace */
   [[nodiscard]] constexpr inline auto pq_len() const noexcept -> uint32_t
   {
@@ -243,7 +244,10 @@ struct index : ann::index {
     return raft_index_->codebook_kind();
   }
   /** Number of clusters/inverted lists (first level quantization). */
-  [[nodiscard]] constexpr inline auto n_lists() const noexcept -> uint32_t { return raft_index_->n_lists(); }
+  [[nodiscard]] constexpr inline auto n_lists() const noexcept -> uint32_t
+  {
+    return raft_index_->n_lists();
+  }
   /**
    * Whether to use convervative memory allocation when extending the list (cluster) data
    * (see index_params.conservative_memory_allocation).
@@ -259,24 +263,12 @@ struct index : ann::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  inline auto pq_centers() noexcept
-  {
-    return raft_index_->pq_centers();
-  }
-  [[nodiscard]] inline auto pq_centers() const noexcept
-  {
-    return raft_index_->pq_centers();
-  }
+  inline auto pq_centers() noexcept { return raft_index_->pq_centers(); }
+  [[nodiscard]] inline auto pq_centers() const noexcept { return raft_index_->pq_centers(); }
 
   /** Lists' data and indices. */
-  inline auto lists() noexcept
-  {
-    return raft_index_->lists();
-  }
-  [[nodiscard]] inline auto lists() const noexcept
-  {
-    return raft_index_->lists();
-  }
+  inline auto lists() noexcept { return raft_index_->lists(); }
+  [[nodiscard]] inline auto lists() const noexcept { return raft_index_->lists(); }
 
   /** Pointers to the inverted lists (clusters) data  [n_lists]. */
   inline auto data_ptrs() noexcept -> raft::device_vector_view<uint8_t*, uint32_t, raft::row_major>
@@ -301,7 +293,8 @@ struct index : ann::index {
   }
 
   /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
-  inline auto rotation_matrix() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
+  inline auto rotation_matrix() noexcept
+    -> raft::device_matrix_view<float, uint32_t, raft::row_major>
   {
     return raft_index_->rotation_matrix();
   }
@@ -320,7 +313,8 @@ struct index : ann::index {
    *
    * This span is used during search to estimate the maximum size of the workspace.
    */
-  inline auto accum_sorted_sizes() noexcept -> raft::host_vector_view<IdxT, uint32_t, raft::row_major>
+  inline auto accum_sorted_sizes() noexcept
+    -> raft::host_vector_view<IdxT, uint32_t, raft::row_major>
   {
     return raft_index_->accum_sorted_sizes();
   }
@@ -367,55 +361,52 @@ struct index : ann::index {
   {
     return raft_index_.get();
   }
-  auto get_raft_index() -> raft::neighbors::ivf_pq::index<IdxT>*
-  {
-    return raft_index_.get();
-  }
+  auto get_raft_index() -> raft::neighbors::ivf_pq::index<IdxT>* { return raft_index_.get(); }
 
  private:
   std::unique_ptr<raft::neighbors::ivf_pq::index<IdxT>> raft_index_;
 };
 
-#define CUVS_IVF_PQ(T, IdxT)                                                                    \
-  auto build(raft::resources const& handle,                                                     \
-             const cuvs::neighbors::ivf_pq::index_params& params,                               \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)                  \
-    -> cuvs::neighbors::ivf_pq::index<IdxT>;                                                    \
-                                                                                                \
-  void build(raft::resources const& handle,                                                     \
-             const cuvs::neighbors::ivf_pq::index_params& params,                               \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                  \
-             cuvs::neighbors::ivf_pq::index<IdxT>* idx);                                        \
-                                                                                                \
-  auto extend(raft::resources const& handle,                                                    \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,             \
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,            \
-              const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                           \
-    -> cuvs::neighbors::ivf_pq::index<IdxT>;                                                    \
-                                                                                                \
-  void extend(raft::resources const& handle,                                                    \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,             \
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,            \
-              cuvs::neighbors::ivf_pq::index<IdxT>* idx);                                       \
-                                                                                                \
-  void search(raft::resources const& handle,                                                    \
-              const cuvs::neighbors::ivf_pq::search_params& params,                             \
-              cuvs::neighbors::ivf_pq::index<IdxT>& index,                                      \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,                 \
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,                  \
-              raft::device_matrix_view<float, IdxT, raft::row_major> distances);                \
-                                                                                                \
-  void serialize(raft::resources const& handle,                                                 \
-                 std::string& filename,                                                         \
-                 const cuvs::neighbors::ivf_pq::index<IdxT>& index);                            \
-                                                                                                \
-  void deserialize(raft::resources const& handle,                                               \
-                   const std::string& filename,                                                 \
+#define CUVS_IVF_PQ(T, IdxT)                                                         \
+  auto build(raft::resources const& handle,                                          \
+             const cuvs::neighbors::ivf_pq::index_params& params,                    \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)       \
+    ->cuvs::neighbors::ivf_pq::index<IdxT>;                                          \
+                                                                                     \
+  void build(raft::resources const& handle,                                          \
+             const cuvs::neighbors::ivf_pq::index_params& params,                    \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,       \
+             cuvs::neighbors::ivf_pq::index<IdxT>* idx);                             \
+                                                                                     \
+  auto extend(raft::resources const& handle,                                         \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \
+              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
+              const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                \
+    ->cuvs::neighbors::ivf_pq::index<IdxT>;                                          \
+                                                                                     \
+  void extend(raft::resources const& handle,                                         \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \
+              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
+              cuvs::neighbors::ivf_pq::index<IdxT>* idx);                            \
+                                                                                     \
+  void search(raft::resources const& handle,                                         \
+              const cuvs::neighbors::ivf_pq::search_params& params,                  \
+              cuvs::neighbors::ivf_pq::index<IdxT>& index,                           \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,      \
+              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,       \
+              raft::device_matrix_view<float, IdxT, raft::row_major> distances);     \
+                                                                                     \
+  void serialize(raft::resources const& handle,                                      \
+                 std::string& filename,                                              \
+                 const cuvs::neighbors::ivf_pq::index<IdxT>& index);                 \
+                                                                                     \
+  void deserialize(raft::resources const& handle,                                    \
+                   const std::string& filename,                                      \
                    cuvs::neighbors::ivf_pq::index<IdxT>* index);
 
-CUVS_IVF_PQ(float, uint64_t);
-CUVS_IVF_PQ(int8_t, uint64_t);
-CUVS_IVF_PQ(uint8_t, uint64_t);
+CUVS_IVF_PQ(float, int64_t);
+CUVS_IVF_PQ(int8_t, int64_t);
+CUVS_IVF_PQ(uint8_t, int64_t);
 
 #undef CUVS_IVF_PQ
 

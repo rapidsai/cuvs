@@ -17,15 +17,17 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
-#include "naive_knn.cuh"
 #include "ivf_pq_helpers.cuh"
+#include "naive_knn.cuh"
+#include <cuvs/neighbors/ivf_pq.hpp>
 
+#include <raft/neighbors/ivf_pq-inl.cuh>
 #include <raft/neighbors/sample_filter.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
 #include <thrust/sequence.h>
 
+namespace cuvs::neighbors::ivf_pq {
 
-namespace raft::neighbors::ivf_pq {
+using namespace raft;
 
 struct test_ivf_sample_filter {
   static constexpr unsigned offset = 300;
@@ -38,8 +40,8 @@ struct ivf_pq_inputs {
   uint32_t k                       = 32;
   std::optional<double> min_recall = std::nullopt;
 
-  ivf_pq::index_params index_params;
-  ivf_pq::search_params search_params;
+  cuvs::neighbors::ivf_pq::index_params index_params;
+  cuvs::neighbors::ivf_pq::search_params search_params;
 
   // Set some default parameters for tests
   ivf_pq_inputs()
@@ -79,7 +81,9 @@ inline auto operator<<(std::ostream& os, const ivf_pq_inputs& p) -> std::ostream
   PRINT_DIFF(.dim);
   PRINT_DIFF(.k);
   PRINT_DIFF_V(.min_recall, p.min_recall.value_or(0));
-  PRINT_DIFF_V(.index_params.metric, cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.index_params.metric)});
+  PRINT_DIFF_V(.index_params.metric,
+               cuvs::neighbors::print_metric{
+                 static_cast<cuvs::distance::DistanceType>((int)p.index_params.metric)});
   PRINT_DIFF(.index_params.metric_arg);
   PRINT_DIFF(.index_params.add_data_on_build);
   PRINT_DIFF(.index_params.n_lists);
@@ -173,16 +177,17 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(handle_,
-                                                   distances_naive_dev.data(),
-                                                   indices_naive_dev.data(),
-                                                   search_queries.data(),
-                                                   database.data(),
-                                                   ps.num_queries,
-                                                   ps.num_db_vecs,
-                                                   ps.dim,
-                                                   ps.k,
-                                                   static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
+    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
+      handle_,
+      distances_naive_dev.data(),
+      indices_naive_dev.data(),
+      search_queries.data(),
+      database.data(),
+      ps.num_queries,
+      ps.num_db_vecs,
+      ps.dim,
+      ps.k,
+      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
     distances_ref.resize(queries_size);
     update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
@@ -197,7 +202,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     auto index_view =
       raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
-    return ivf_pq::build<DataT, IdxT>(handle_, ipams, index_view);
+    return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
   }
 
   auto build_2_extends()
@@ -217,23 +222,26 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     auto database_view =
       raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
-    auto idx = ivf_pq::build<DataT, IdxT>(handle_, ipams, database_view);
+    auto idx = cuvs::neighbors::ivf_pq::build(handle_, ipams, database_view);
 
     auto vecs_2_view = raft::make_device_matrix_view<DataT, IdxT>(vecs_2, size_2, ps.dim);
     auto inds_2_view = raft::make_device_vector_view<IdxT, IdxT>(inds_2, size_2);
-    ivf_pq::extend<DataT, IdxT>(handle_, vecs_2_view, inds_2_view, &idx);
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_2_view, inds_2_view, &idx);
 
     auto vecs_1_view =
       raft::make_device_matrix_view<DataT, IdxT, row_major>(vecs_1, size_1, ps.dim);
     auto inds_1_view = raft::make_device_vector_view<const IdxT, IdxT>(inds_1, size_1);
-    ivf_pq::extend<DataT, IdxT>(handle_, vecs_1_view, inds_1_view, &idx);
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_1_view, inds_1_view, &idx);
     return idx;
   }
 
   auto build_serialize()
   {
-    ivf_pq::serialize<IdxT>(handle_, "ivf_pq_index", build_only());
-    return ivf_pq::deserialize<IdxT>(handle_, "ivf_pq_index");
+    std::string filename = "ivf_pq_index";
+    cuvs::neighbors::ivf_pq::serialize(handle_, filename, build_only());
+    cuvs::neighbors::ivf_pq::index<IdxT> index(handle_, ps.index_params, ps.dim);
+    cuvs::neighbors::ivf_pq::deserialize(handle_, filename, &index);
+    return index;
   }
 
   void check_reconstruction(const index<IdxT>& index,
@@ -252,7 +260,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto rec_data  = make_device_matrix<DataT>(handle_, n_take, dim);
     auto orig_data = make_device_matrix<DataT>(handle_, n_take, dim);
 
-    ivf_pq::helpers::reconstruct_list_data(handle_, index, rec_data.view(), label, n_skip);
+    cuvs::neighbors::ivf_pq::helpers::reconstruct_list_data(
+      handle_, index, rec_data.view(), label, n_skip);
 
     matrix::gather(database.data(),
                    IdxT{dim},
@@ -277,11 +286,12 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto indices   = make_device_vector<IdxT>(handle_, n_rows);
     copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    ivf_pq::helpers::reconstruct_list_data(handle_, *index, vectors_1.view(), label, 0);
-    ivf_pq::helpers::erase_list(handle_, index, label);
+    cuvs::neighbors::ivf_pq::helpers::reconstruct_list_data(
+      handle_, *index, vectors_1.view(), label, 0);
+    cuvs::neighbors::ivf_pq::helpers::erase_list(handle_, index, label);
     // NB: passing the type parameter because const->non-const implicit conversion of the mdspans
     // breaks type inference
-    ivf_pq::helpers::extend_list<EvalT, IdxT>(
+    cuvs::neighbors::ivf_pq::helpers::extend_list<EvalT, IdxT>(
       handle_, index, vectors_1.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
@@ -290,7 +300,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
          "corresponding cluster.";
 
     auto vectors_2 = make_device_matrix<EvalT>(handle_, n_rows, index->dim());
-    ivf_pq::helpers::reconstruct_list_data(handle_, *index, vectors_2.view(), label, 0);
+    cuvs::neighbors::ivf_pq::helpers::reconstruct_list_data(
+      handle_, *index, vectors_2.view(), label, 0);
     // The code search is unstable, and there's high chance of repeating values of the lvl-2 codes.
     // Hence, encoding-decoding chain often leads to altering both the PQ codes and the
     // reconstructed data.
@@ -309,17 +320,18 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto indices = make_device_vector<IdxT>(handle_, n_rows);
     copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    ivf_pq::helpers::unpack_list_data(handle_, *index, codes.view(), label, 0);
-    ivf_pq::helpers::erase_list(handle_, index, label);
-    ivf_pq::helpers::extend_list_with_codes<IdxT>(
+    cuvs::neighbors::ivf_pq::helpers::unpack_list_data(handle_, *index, codes.view(), label, 0);
+    cuvs::neighbors::ivf_pq::helpers::erase_list(handle_, index, label);
+    cuvs::neighbors::ivf_pq::helpers::extend_list_with_codes<IdxT>(
       handle_, index, codes.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
       << "The old list should have been shared and retained after ivf_pq index has erased the "
          "corresponding cluster.";
-    auto list_data_size = (n_rows / ivf_pq::kIndexGroupSize) * new_list->data.extent(1) *
-                          new_list->data.extent(2) * new_list->data.extent(3);
+    auto list_data_size = (n_rows / raft::neighbors::ivf_pq::kIndexGroupSize) *
+                          new_list->data.extent(1) * new_list->data.extent(2) *
+                          new_list->data.extent(3);
 
     ASSERT_TRUE(old_list->data.size() >= list_data_size);
     ASSERT_TRUE(new_list->data.size() >= list_data_size);
@@ -398,7 +410,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto dists_view = raft::make_device_matrix_view<EvalT, uint32_t>(
       distances_ivf_pq_dev.data(), ps.num_queries, ps.k);
 
-    ivf_pq::search<DataT, IdxT>(
+    cuvs::neighbors::ivf_pq::search(
       handle_, ps.search_params, index, query_view, inds_view, dists_view);
 
     update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
@@ -432,11 +444,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       for (uint32_t k = 0; k < ps.k; k++) {
         auto flat_i   = query_ix * ps.k + k;
         auto found_ix = indices_ivf_pq[flat_i];
-        if (found_ix == ivf_pq::kOutOfBoundsRecord<IdxT>) {
+        if (found_ix == raft::neighbors::ivf_pq::kOutOfBoundsRecord<IdxT>) {
           found_oob++;
           continue;
         }
-        ASSERT_NE(found_ix, ivf::kInvalidRecord<IdxT>)
+        ASSERT_NE(found_ix, raft::neighbors::ivf::kInvalidRecord<IdxT>)
           << "got an invalid record at query_ix = " << query_ix << ", k = " << k
           << " (distance = " << distances_ivf_pq[flat_i] << ")";
         ASSERT_LT(found_ix, ps.num_db_vecs)
@@ -518,16 +530,17 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(handle_,
-                                                   distances_naive_dev.data(),
-                                                   indices_naive_dev.data(),
-                                                   search_queries.data(),
-                                                   database.data() + test_ivf_sample_filter::offset * ps.dim,
-                                                   ps.num_queries,
-                                                   ps.num_db_vecs - test_ivf_sample_filter::offset,
-                                                   ps.dim,
-                                                   ps.k,
-                                                   static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
+    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
+      handle_,
+      distances_naive_dev.data(),
+      indices_naive_dev.data(),
+      search_queries.data(),
+      database.data() + test_ivf_sample_filter::offset * ps.dim,
+      ps.num_queries,
+      ps.num_db_vecs - test_ivf_sample_filter::offset,
+      ps.dim,
+      ps.k,
+      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
     raft::linalg::addScalar(indices_naive_dev.data(),
                             indices_naive_dev.data(),
                             IdxT(test_ivf_sample_filter::offset),
@@ -547,7 +560,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     auto index_view =
       raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
-    return ivf_pq::build<DataT, IdxT>(handle_, ipams, index_view);
+    return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
   }
 
   template <typename BuildIndex>
@@ -582,7 +595,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
       handle_, removed_indices.view(), ps.num_db_vecs);
-    ivf_pq::search_with_filtering<DataT, IdxT>(
+    raft::neighbors::ivf_pq::search_with_filtering<DataT, IdxT>(
       handle_,
       ps.search_params,
       index,
@@ -965,4 +978,4 @@ inline auto special_cases() -> test_cases_t
 #define INSTANTIATE(type, vals) \
   INSTANTIATE_TEST_SUITE_P(IvfPq, type, ::testing::ValuesIn(vals)); /* NOLINT */
 
-}  // namespace raft::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq
