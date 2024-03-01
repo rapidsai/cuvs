@@ -33,7 +33,7 @@ dependencies:
 - libcusparse-dev
 - nccl>=2.9.9
 - ninja
-- numpy>=1.21
+- numpy>=1.23
 - numpydoc
 - pre-commit
 - pydata-sphinx-theme

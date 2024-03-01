@@ -133,7 +133,7 @@ dependencies:
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
-          # This index is needed for cudf and rmm.
+          # This index is needed for pylibraft and rmm.
           - --extra-index-url=https://pypi.nvidia.com
           - --extra-index-url=https://pypi.anaconda.org/rapidsai-wheels-nightly/simple
     specific:
@@ -334,7 +334,7 @@ dependencies:
     common:
       - output_types: [conda, pyproject]
         packages:
-          - &numpy numpy>=1.21
+          - &numpy numpy>=1.23
       - output_types: [conda]
         packages:
           - *rmm_conda
@@ -344,6 +344,7 @@ dependencies:
           # pip recognizes the index as a global option for the requirements.txt file
           # This index is needed for cudf and rmm.
           - --extra-index-url=https://pypi.nvidia.com
+          - --extra-index-url=https://pypi.anaconda.org/rapidsai-wheels-nightly/simple
     specific:
       - output_types: [conda, requirements, pyproject]
         matrices:
