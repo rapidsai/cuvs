@@ -38,15 +38,8 @@ fi
 
 sed -r -i "s/rmm(.*)\"/rmm${PACKAGE_CUDA_SUFFIX}\1${alpha_spec}\"/g" ${pyproject_file}
 
-# if [[ $PACKAGE_CUDA_SUFFIX == "-cu12" ]]; then
-#     sed -i "s/cuda-python[<=>\.,0-9a]*/cuda-python>=12.0,<13.0a0/g" ${pyproject_file}
-#     sed -i "s/cupy-cuda11x/cupy-cuda12x/g" ${pyproject_file}
-# fi
-
-if [[ ${package_name} == "raft-dask" ]]; then
-    sed -r -i "s/pylibraft==(.*)\"/pylibraft${PACKAGE_CUDA_SUFFIX}==\1${alpha_spec}\"/g" ${pyproject_file}
-    sed -r -i "s/rmm==(.*)\"/rmm${PACKAGE_CUDA_SUFFIX}==\1${alpha_spec}\"/g" ${pyproject_file}
-fi
+sed -r -i "s/pylibraft==(.*)\"/pylibraft${PACKAGE_CUDA_SUFFIX}==\1${alpha_spec}\"/g" ${pyproject_file}
+sed -r -i "s/rmm==(.*)\"/rmm${PACKAGE_CUDA_SUFFIX}==\1${alpha_spec}\"/g" ${pyproject_file}
 
 cd "${package_dir}"
 
