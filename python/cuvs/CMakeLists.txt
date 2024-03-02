@@ -62,10 +62,8 @@ if(NOT cuvs_FOUND)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 
-  # When building the C++ libraries from source we must copy libcuvs.so alongside the Cython
-  # libraries TODO: when we have a single 'compiled' cuvs library, we shouldn't need this
   set(cython_lib_dir cuvs_py)
-  install(TARGETS cuvs DESTINATION ${cython_lib_dir})
+  install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
 endif()
 
 include(rapids-cython-core)
