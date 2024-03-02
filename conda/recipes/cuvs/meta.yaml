@@ -46,7 +46,7 @@ requirements:
     {% endif %}
     - cuda-version ={{ cuda_version }}
     - cython >=3.0.0
-    - pylibraft {{ version }}
+    - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
     - python x.x
     - rmm ={{ minor_version }}
@@ -57,7 +57,7 @@ requirements:
     {% if cuda_major == "11" %}
     - cudatoolkit
     {% endif %}
-    - pylibraft {{ version }}
+    - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
     - python x.x
     - rmm ={{ minor_version }}
