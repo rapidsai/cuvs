@@ -69,12 +69,6 @@ option(DISABLE_DEPRECATION_WARNINGS "Disable deprecaction warnings " ON)
 option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 
-# The options below allow incorporating libcuvs into another build process
-# without installing all its components. This is useful if total file size is
-# at a premium and we do not expect other consumers to use any APIs of the
-# dependency except those that are directly linked to by the dependent library.
-option(CUVS_EXCLUDE_RAFT_FROM_ALL "Exclude RAFT targets from cuVS's 'all' target" OFF)
-
 if((BUILD_TESTS OR BUILD_C_LIBRARY) AND NOT BUILD_CPU_ONLY)
 
 endif()
@@ -222,7 +216,16 @@ target_include_directories(
 
 if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
-  target_link_libraries(cuvs PUBLIC raft::raft raft::compiled nvidia::cutlass::cutlass)
+  target_link_libraries(cuvs
+        PUBLIC
+            rmm::rmm
+            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
+            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
+        PRIVATE
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled>
+            nvidia::cutlass::cutlass
+    )
 endif()
 
 # Endian detection

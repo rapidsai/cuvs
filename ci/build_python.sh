@@ -33,3 +33,5 @@ rapids-conda-retry mambabuild \
   --no-test \
   --channel "${CPP_CHANNEL}" \
   conda/recipes/cuvs
+
+rapids-upload-conda-to-s3 python

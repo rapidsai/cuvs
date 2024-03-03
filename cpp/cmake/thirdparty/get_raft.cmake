@@ -57,7 +57,6 @@ function(find_and_configure_raft)
               GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
               GIT_TAG               ${PKG_PINNED_TAG}
               SOURCE_SUBDIR         cpp
-              EXCLUDE_FROM_ALL      ${PKG_EXCLUDE_FROM_ALL}
               OPTIONS
               "BUILD_TESTS OFF"
               "BUILD_PRIMS_BENCH OFF"
@@ -74,8 +73,6 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         FORK                     ${RAFT_FORK}
         PINNED_TAG               ${RAFT_PINNED_TAG}
         COMPILE_LIBRARY          ON
-        USE_RAFT_STATIC          ${CUVS_USE_RAFT_STATIC}
-        EXCLUDE_FROM_ALL         ${CUVS_EXCLUDE_RAFT_FROM_ALL}
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
 )

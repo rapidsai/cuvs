@@ -63,9 +63,6 @@ if(NOT cuvs_FOUND)
   set(CUDA_STATIC_RUNTIME ON)
   set(CUVS_USE_RAFT_STATIC ON)
 
-  # Don't install the static libs into wheels
-  set(CUVS_EXCLUDE_RAFT_FROM_ALL ON)
-
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 
   set(cython_lib_dir cuvs_py)
