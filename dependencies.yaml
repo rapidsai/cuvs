@@ -378,3 +378,4 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - *pylibraft_conda
+          - scikit-learn

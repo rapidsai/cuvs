@@ -43,6 +43,7 @@ dependencies:
 - recommonmark
 - rmm==24.4.*
 - scikit-build-core>=0.7.0
+- scikit-learn
 - sphinx-copybutton
 - sphinx-markdown-tables
 - sysroot_linux-64==2.17
