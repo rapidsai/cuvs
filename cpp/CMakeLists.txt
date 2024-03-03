@@ -322,7 +322,6 @@ if(BUILD_C_LIBRARY)
             cuvs::cuvs
         PRIVATE
             $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static>
     )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
