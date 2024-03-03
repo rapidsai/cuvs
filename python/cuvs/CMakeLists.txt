@@ -65,7 +65,7 @@ if(NOT cuvs_FOUND)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 
-  set(cython_lib_dir cuvs_py)
+  set(cython_lib_dir cuvs)
   install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
 endif()
 
