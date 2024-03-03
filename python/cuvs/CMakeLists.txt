@@ -58,7 +58,13 @@ endif()
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY ON)
+
+  # Statically link dependencies if building wheels
   set(CUDA_STATIC_RUNTIME ON)
+  set(CUVS_USE_RAFT_STATIC ON)
+
+  # Don't install the static libs into wheels
+  set(CUML_EXCLUDE_RAFT_FROM_ALL ON)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 

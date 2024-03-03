@@ -46,7 +46,7 @@ requirements:
     {% endif %}
     - cuda-version ={{ cuda_version }}
     - cython >=3.0.0
-    - dlpack >= 0.8
+    - dlpack >=0.8
     - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
     - python x.x

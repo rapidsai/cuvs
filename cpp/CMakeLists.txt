@@ -62,11 +62,18 @@ option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
 option(CUDA_STATIC_RUNTIME "Statically link the CUDA toolkit runtime and libraries" OFF)
+option(CUVS_USE_RAFT_STATIC "Build and statically link the RAFT libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
 option(DISABLE_DEPRECATION_WARNINGS "Disable deprecaction warnings " ON)
 option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
+
+# The options below allow incorporating libcuvs into another build process
+# without installing all its components. This is useful if total file size is
+# at a premium and we do not expect other consumers to use any APIs of the
+# dependency except those that are directly linked to by the dependent library.
+option(CUVS_EXCLUDE_RAFT_FROM_ALL "Exclude RAFT targets from cuVS's 'all' target" OFF)
 
 if((BUILD_TESTS OR BUILD_C_LIBRARY) AND NOT BUILD_CPU_ONLY)
 
@@ -102,6 +109,7 @@ message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
 message(VERBOSE
         "cuVS: Statically link the CUDA toolkit runtime and libraries: ${CUDA_STATIC_RUNTIME}"
 )
+message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
 # Set RMM logging level
 set(RMM_LOGGING_LEVEL
