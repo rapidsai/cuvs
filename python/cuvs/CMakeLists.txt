@@ -64,7 +64,7 @@ if(NOT cuvs_FOUND)
   set(CUVS_USE_RAFT_STATIC ON)
 
   # Don't install the static libs into wheels
-  set(CUML_EXCLUDE_RAFT_FROM_ALL ON)
+  set(CUVS_EXCLUDE_RAFT_FROM_ALL ON)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 

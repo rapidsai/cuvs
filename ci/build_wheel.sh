@@ -47,7 +47,8 @@ fi
 cd "${package_dir}"
 
 # Hardcode the output dir
-python -m pip wheel . -w dist -vvv --no-deps --disable-pip-version-check
+SKBUILD_CMAKE_ARGS="-DDETECT_CONDA_ENV=OFF;-DDISABLE_DEPRECATION_WARNINGS=ON" \
+    python -m pip wheel . -w dist -vvv --no-deps --disable-pip-version-check
 
 mkdir -p final_dist
 python -m auditwheel repair -w final_dist dist/*
