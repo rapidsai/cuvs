@@ -42,6 +42,7 @@ message("- FIND_CUVS_CPP: ${FIND_CUVS_CPP}")
 include(../../fetch_rapids.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
+include(rapids-cython-core)
 include(rapids-export)
 include(rapids-find)
 
@@ -68,8 +69,6 @@ if(NOT cuvs_FOUND)
   set(cython_lib_dir cuvs)
   install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
 endif()
-
-include(rapids-cython-core)
 
 rapids_cython_init()
 

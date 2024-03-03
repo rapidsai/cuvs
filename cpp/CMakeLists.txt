@@ -280,11 +280,14 @@ endif()
 
 set_target_properties(
   cuvs
-  PROPERTIES CXX_STANDARD 17
-             CXX_STANDARD_REQUIRED ON
-             CUDA_STANDARD 17
-             CUDA_STANDARD_REQUIRED ON
-             POSITION_INDEPENDENT_CODE ON
+  PROPERTIES BUILD_RPATH                         "\$ORIGIN"
+             INSTALL_RPATH                       "\$ORIGIN"
+             CXX_STANDARD                        17
+             CXX_STANDARD_REQUIRED               ON
+             CUDA_STANDARD                       17
+             CUDA_STANDARD_REQUIRED              ON
+             INTERFACE_POSITION_INDEPENDENT_CODE ON
+             POSITION_INDEPENDENT_CODE           ON
 )
 
 target_compile_options(
@@ -303,10 +306,13 @@ if(BUILD_C_LIBRARY)
 
   set_target_properties(
     cuvs_c
-    PROPERTIES CXX_STANDARD 17
-               CXX_STANDARD_REQUIRED ON
-               POSITION_INDEPENDENT_CODE ON
-               EXPORT_NAME c_api
+    PROPERTIES BUILD_RPATH                         "\$ORIGIN"
+               INSTALL_RPATH                       "\$ORIGIN"
+               CXX_STANDARD                        17
+               CXX_STANDARD_REQUIRED               ON
+               POSITION_INDEPENDENT_CODE           ON
+               INTERFACE_POSITION_INDEPENDENT_CODE ON
+               EXPORT_NAME                         c_api
   )
 
   target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
