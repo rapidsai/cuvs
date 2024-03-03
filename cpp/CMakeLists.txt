@@ -317,7 +317,13 @@ if(BUILD_C_LIBRARY)
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
-  target_link_libraries(cuvs_c PUBLIC cuvs::cuvs)
+  target_link_libraries(cuvs_c
+        PUBLIC
+            cuvs::cuvs
+        PRIVATE
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled>
+    )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
   target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
