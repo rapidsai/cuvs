@@ -223,7 +223,7 @@ if(NOT BUILD_CPU_ONLY)
             $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
         PRIVATE
             $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static>
             nvidia::cutlass::cutlass
     )
 endif()
