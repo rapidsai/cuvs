@@ -10,8 +10,8 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
-set(RAPIDS_VERSION "24.02")
-set(CUVS_VERSION "24.02.00")
+set(RAPIDS_VERSION "24.04")
+set(CUVS_VERSION "24.04.00")
 
 cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 include(../fetch_rapids.cmake)
@@ -28,12 +28,12 @@ set(lang_list "CXX")
 
 if(NOT BUILD_CPU_ONLY)
   include(rapids-cuda)
-  rapids_cuda_init_architectures(cuVS)
+  rapids_cuda_init_architectures(CUVS)
   list(APPEND lang_list "CUDA")
 endif()
 
 project(
-  cuVS
+  CUVS
   VERSION ${CUVS_VERSION}
   LANGUAGES ${lang_list}
 )
@@ -62,6 +62,7 @@ option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
 option(CUDA_STATIC_RUNTIME "Statically link the CUDA toolkit runtime and libraries" OFF)
+option(CUVS_USE_RAFT_STATIC "Build and statically link the RAFT libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
 option(DISABLE_DEPRECATION_WARNINGS "Disable deprecaction warnings " ON)
@@ -102,6 +103,7 @@ message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
 message(VERBOSE
         "cuVS: Statically link the CUDA toolkit runtime and libraries: ${CUDA_STATIC_RUNTIME}"
 )
+message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
 # Set RMM logging level
 set(RMM_LOGGING_LEVEL
@@ -214,7 +216,16 @@ target_include_directories(
 
 if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
-  target_link_libraries(cuvs PUBLIC raft::raft raft::compiled nvidia::cutlass::cutlass)
+  target_link_libraries(cuvs
+        PUBLIC
+            rmm::rmm
+            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
+            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
+        PRIVATE
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static>
+            nvidia::cutlass::cutlass
+    )
 endif()
 
 # Endian detection
@@ -269,11 +280,14 @@ endif()
 
 set_target_properties(
   cuvs
-  PROPERTIES CXX_STANDARD 17
-             CXX_STANDARD_REQUIRED ON
-             CUDA_STANDARD 17
-             CUDA_STANDARD_REQUIRED ON
-             POSITION_INDEPENDENT_CODE ON
+  PROPERTIES BUILD_RPATH                         "\$ORIGIN"
+             INSTALL_RPATH                       "\$ORIGIN"
+             CXX_STANDARD                        17
+             CXX_STANDARD_REQUIRED               ON
+             CUDA_STANDARD                       17
+             CUDA_STANDARD_REQUIRED              ON
+             INTERFACE_POSITION_INDEPENDENT_CODE ON
+             POSITION_INDEPENDENT_CODE           ON
 )
 
 target_compile_options(
@@ -292,10 +306,13 @@ if(BUILD_C_LIBRARY)
 
   set_target_properties(
     cuvs_c
-    PROPERTIES CXX_STANDARD 17
-               CXX_STANDARD_REQUIRED ON
-               POSITION_INDEPENDENT_CODE ON
-               EXPORT_NAME c_api
+    PROPERTIES BUILD_RPATH                         "\$ORIGIN"
+               INSTALL_RPATH                       "\$ORIGIN"
+               CXX_STANDARD                        17
+               CXX_STANDARD_REQUIRED               ON
+               POSITION_INDEPENDENT_CODE           ON
+               INTERFACE_POSITION_INDEPENDENT_CODE ON
+               EXPORT_NAME                         c_api
   )
 
   target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
@@ -306,7 +323,12 @@ if(BUILD_C_LIBRARY)
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
-  target_link_libraries(cuvs_c PUBLIC cuvs::cuvs)
+  target_link_libraries(cuvs_c
+        PUBLIC
+            cuvs::cuvs
+        PRIVATE
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+    )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
   target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")

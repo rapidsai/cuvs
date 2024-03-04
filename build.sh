@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python docs tests template clean --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python docs tests examples clean --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -27,7 +27,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    python           - build the cuvs Python package
    docs             - build the documentation
    tests            - build the tests
-   template         - build the example CUVS application template
+   examples         - build the examples
 
  and <flag> is:
    -v                          - verbose build mode
@@ -60,7 +60,7 @@ BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR} ${CUVS_DASK_BUILD_DIR}"
 CMAKE_LOG_LEVEL=""
 VERBOSE_FLAG=""
 BUILD_ALL_GPU_ARCH=0
-BUILD_TESTS=OFF
+BUILD_TESTS=ON
 BUILD_TYPE=Release
 COMPILE_LIBRARY=OFF
 INSTALL_TARGET=install
@@ -305,6 +305,9 @@ if [[ ${CMAKE_TARGET} == "" ]]; then
 fi
 
 # Append `-DFIND_CUVS_CPP=ON` to EXTRA_CMAKE_ARGS unless a user specified the option.
+
+
+
 SKBUILD_EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS}"
 if [[ "${EXTRA_CMAKE_ARGS}" != *"DFIND_CUVS_CPP"* ]]; then
     SKBUILD_EXTRA_CMAKE_ARGS="${SKBUILD_EXTRA_CMAKE_ARGS} -DFIND_CUVS_CPP=ON"
@@ -433,10 +436,10 @@ if hasArg docs; then
 fi
 
 ################################################################################
-# Initiate build for example CUVS application template (if needed)
+# Initiate build for c++ examples (if needed)
 
-if hasArg template; then
-    pushd ${REPODIR}/cpp/template
+if hasArg examples; then
+    pushd ${REPODIR}/cpp/examples
     ./build.sh
     popd
 fi
