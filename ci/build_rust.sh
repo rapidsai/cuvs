@@ -21,10 +21,10 @@ set -eu
 
 rapids-print-env
 
-rapids-logger "Trying to find libclang"
-find /opt/conda -name libclang.so
+# we need to set up LIBCLANG_PATH to allow rust bindgen to work,
+# grab it from the conda env
 export LIBCLANG_PATH=$(dirname $(find /opt/conda -name libclang.so | head -n 1))
-rapids-logger "LIBCLANG_PATH=$LIBCLANG_PATH"
+echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
