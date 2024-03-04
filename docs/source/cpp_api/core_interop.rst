@@ -6,11 +6,11 @@ Interop
    :class: highlight
 
 
-``#include <raft/core/interop.hpp>``
+``#include <cuvs/core/interop.hpp>``
 
-namespace *raft::core*
+namespace *cuvs::core*
 
  .. doxygengroup:: interop
-     :project: RAFT
+     :project: cuvs
      :members:
      :content-only:

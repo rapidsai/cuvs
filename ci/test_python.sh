@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -43,14 +43,13 @@ set +e
 rapids-logger "pytest cuvs"
 pushd python/cuvs/cuvs
 pytest \
-  --cache-clear \
-  --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
-  --cov-config=../.coveragerc \
-  --cov=cuvs \
-  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
-  --cov-report=term \
-  test
-popd
+ --cache-clear \
+ --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
+ --cov-config=../.coveragerc \
+ --cov=cuvs \
+ --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
+ --cov-report=term \
+ test
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

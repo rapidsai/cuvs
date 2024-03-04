@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ python -m pip install $(echo ./dist/cuvs*.whl)[test]
 
 # Run smoke tests for aarch64 pull requests
 if [[ "$(arch)" == "aarch64" && "${RAPIDS_BUILD_TYPE}" == "pull-request" ]]; then
-    python ./ci/wheel_smoke_test_cuvs.py
+   python ./ci/wheel_smoke_test_cuvs.py
 else
-    python -m pytest ./python/cuvs/cuvs/test
+   python -m pytest ./python/cuvs/cuvs/test
 fi

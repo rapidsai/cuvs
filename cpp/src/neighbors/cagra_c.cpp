@@ -24,13 +24,13 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/interop.hpp>
+#include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/cagra_c.h>
 
 namespace {
 
 template <typename T>
-void* _build(cuvsResources_t res, cagraIndexParams params, DLManagedTensor* dataset_tensor)
+void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto dataset = dataset_tensor->dl_tensor;
 
@@ -53,14 +53,13 @@ void* _build(cuvsResources_t res, cagraIndexParams params, DLManagedTensor* data
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     cuvs::neighbors::cagra::build_host(*res_ptr, build_params, mds, *index);
   }
-
   return index;
 }
 
 template <typename T>
 void _search(cuvsResources_t res,
-             cagraSearchParams params,
-             cagraIndex index,
+             cuvsCagraSearchParams params,
+             cuvsCagraIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
              DLManagedTensor* distances_tensor)
@@ -95,17 +94,17 @@ void _search(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t cagraIndexCreate(cagraIndex_t* index)
+extern "C" cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 {
   try {
-    *index = new cagraIndex{};
+    *index = new cuvsCagraIndex{};
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;
   }
 }
 
-extern "C" cuvsError_t cagraIndexDestroy(cagraIndex_t index_c_ptr)
+extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
 {
   try {
     auto index = *index_c_ptr;
@@ -130,10 +129,10 @@ extern "C" cuvsError_t cagraIndexDestroy(cagraIndex_t index_c_ptr)
   }
 }
 
-extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
-                                  cuvsCagraIndexParams_t params,
-                                  DLManagedTensor* dataset_tensor,
-                                  cagraIndex_t index)
+extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
+                                      cuvsCagraIndexParams_t params,
+                                      DLManagedTensor* dataset_tensor,
+                                      cuvsCagraIndex_t index)
 {
   try {
     auto dataset = dataset_tensor->dl_tensor;
@@ -153,17 +152,20 @@ extern "C" cuvsError_t cagraBuild(cuvsResources_t res,
                 dataset.dtype.bits);
     }
     return CUVS_SUCCESS;
+  } catch (const std::exception& ex) {
+    std::cerr << "Error occurred: " << ex.what() << std::endl;
+    return CUVS_ERROR;
   } catch (...) {
     return CUVS_ERROR;
   }
 }
 
-extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
-                                   cuvsCagraSearchParams_t params,
-                                   cagraIndex_t index_c_ptr,
-                                   DLManagedTensor* queries_tensor,
-                                   DLManagedTensor* neighbors_tensor,
-                                   DLManagedTensor* distances_tensor)
+extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
+                                       cuvsCagraSearchParams_t params,
+                                       cuvsCagraIndex_t index_c_ptr,
+                                       DLManagedTensor* queries_tensor,
+                                       DLManagedTensor* neighbors_tensor,
+                                       DLManagedTensor* distances_tensor)
 {
   try {
     auto queries   = queries_tensor->dl_tensor;
@@ -197,6 +199,8 @@ extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
                 queries.dtype.bits);
     }
     return CUVS_SUCCESS;
+  } catch (const std::exception& ex) {
+    std::cerr << "Error occurred: " << ex.what() << std::endl;
   } catch (...) {
     return CUVS_ERROR;
   }
@@ -205,10 +209,10 @@ extern "C" cuvsError_t cagraSearch(cuvsResources_t res,
 extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 {
   try {
-    *params = new cagraIndexParams{.intermediate_graph_degree = 128,
-                                   .graph_degree              = 64,
-                                   .build_algo                = IVF_PQ,
-                                   .nn_descent_niter          = 20};
+    *params = new cuvsCagraIndexParams{.intermediate_graph_degree = 128,
+                                       .graph_degree              = 64,
+                                       .build_algo                = IVF_PQ,
+                                       .nn_descent_niter          = 20};
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;
@@ -228,11 +232,11 @@ extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params
 extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
 {
   try {
-    *params = new cagraSearchParams{.itopk_size            = 64,
-                                    .search_width          = 1,
-                                    .hashmap_max_fill_rate = 0.5,
-                                    .num_random_samplings  = 1,
-                                    .rand_xor_mask         = 0x128394};
+    *params = new cuvsCagraSearchParams{.itopk_size            = 64,
+                                        .search_width          = 1,
+                                        .hashmap_max_fill_rate = 0.5,
+                                        .num_random_samplings  = 1,
+                                        .rand_xor_mask         = 0x128394};
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;

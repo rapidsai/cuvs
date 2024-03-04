@@ -3,33 +3,34 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["11.8", "12.0"]
+      cuda: ["11.8", "12.2"]
       arch: [x86_64, aarch64]
     includes:
       - build
-      - build_cuvs
-      - cudatoolkit
+      - build_py_cuvs
+      - cuda
+      - cuda_version
       - develop
       - checks
       - build_wheels
       - test_libcuvs
       - docs
-      - run_cuvs
+      - run_py_cuvs
       - test_python_common
-      - test_cuvs
+      - test_py_cuvs
       - cupy
   test_cpp:
     output: none
     includes:
-      - cudatoolkit
+      - cuda_version
       - test_libcuvs
   test_python:
     output: none
     includes:
-      - cudatoolkit
+      - cuda_version
       - py_version
       - test_python_common
-      - test_cuvs
+      - test_py_cuvs
       - cupy
   checks:
     output: none
@@ -39,28 +40,27 @@ files:
   docs:
     output: none
     includes:
-      - test_cuvs
+      - cuda_version
       - cupy
-      - cudatoolkit
       - docs
       - py_version
-  py_build_cuvs:
+      - test_py_cuvs
+  py_build_py_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
       table: build-system
     includes:
       - build
-      - build_cuvs
-      - build_wheels
-  py_run_cuvs:
+      - build_py_cuvs
+  py_run_py_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
       table: project
     includes:
-      - run_cuvs
-  py_test_cuvs:
+      - run_py_cuvs
+  py_test_py_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -68,7 +68,7 @@ files:
       key: test
     includes:
       - test_python_common
-      - test_cuvs
+      - test_py_cuvs
       - cupy
 channels:
   - rapidsai
@@ -84,12 +84,15 @@ dependencies:
           - &cmake_ver cmake>=3.26.4
           - cython>=3.0.0
           - ninja
-          - scikit-build>=0.13.1
       - output_types: [conda]
         packages:
           - c-compiler
           - cxx-compiler
           - nccl>=2.9.9
+          - scikit-build-core>=0.7.0
+      - output_types: [requirements, pyproject]
+        packages:
+          - scikit-build-core[pyproject]>=0.7.0
     specific:
       - output_types: conda
         matrices:
@@ -105,8 +108,8 @@ dependencies:
               - sysroot_linux-aarch64==2.17
       - output_types: conda
         matrices:
-          - matrix: {cuda: "12.0"}
-            packages: [cuda-version=12.0, cuda-nvcc]
+          - matrix: {cuda: "12.*"}
+            packages: [cuda-nvcc]
           - matrix: {cuda: "11.8", arch: x86_64}
             packages: [nvcc_linux-64=11.8]
           - matrix: {cuda: "11.8", arch: aarch64}
@@ -124,21 +127,23 @@ dependencies:
           - matrix: {cuda: "11.2", arch: aarch64}
             packages: [nvcc_linux-aarch64=11.2]
 
-  build_cuvs:
+  build_py_cuvs:
     common:
       - output_types: [conda]
         packages:
-          - &rmm_conda rmm==24.2.*
+          - &rmm_conda rmm==24.4.*
+          - &pylibraft_conda pylibraft==24.4.*
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
           # This index is needed for rmm-cu{11,12}.
           - --extra-index-url=https://pypi.nvidia.com
+          - --extra-index-url=https://pypi.anaconda.org/rapidsai-wheels-nightly/simple
     specific:
       - output_types: [conda, requirements, pyproject]
         matrices:
           - matrix:
-              cuda: "12.0"
+              cuda: "12.*"
             packages:
               - &cuda_python12 cuda-python>=12.0,<13.0a0
           - matrix: # All CUDA 11 versions
@@ -146,18 +151,15 @@ dependencies:
               - &cuda_python11 cuda-python>=11.7.1,<12.0a0
       - output_types: [requirements, pyproject]
         matrices:
-          - matrix: {cuda: "12.2"}
-            packages: &build_cuvs_packages_cu12
-              - &rmm_cu12 rmm-cu12==24.2.*
-          - {matrix: {cuda: "12.1"}, packages: *build_cuvs_packages_cu12}
-          - {matrix: {cuda: "12.0"}, packages: *build_cuvs_packages_cu12}
-          - matrix: {cuda: "11.8"}
-            packages: &build_cuvs_packages_cu11
-              - &rmm_cu11 rmm-cu11==24.2.*
-          - {matrix: {cuda: "11.5"}, packages: *build_cuvs_packages_cu11}
-          - {matrix: {cuda: "11.4"}, packages: *build_cuvs_packages_cu11}
-          - {matrix: {cuda: "11.2"}, packages: *build_cuvs_packages_cu11}
-          - {matrix: null, packages: [*rmm_conda] }
+          - matrix: {cuda: "12.*"}
+            packages:
+              - &rmm_cu12 rmm-cu12==24.4.*
+              - &pylibraft_cu12 pylibraft-cu12==24.4.*
+          - matrix: {cuda: "11.*"}
+            packages:
+              - &rmm_cu11 rmm-cu11==24.4.*
+              - &pylibraft_cu11 pylibraft-cu11==24.4.*
+          - {matrix: null, packages: [*rmm_conda, *pylibraft_conda] }
   checks:
     common:
       - output_types: [conda, requirements]
@@ -169,14 +171,41 @@ dependencies:
         packages:
           - clang==16.0.6
           - clang-tools=16.0.6
-  cudatoolkit:
+  cuda_version:
     specific:
       - output_types: conda
         matrices:
           - matrix:
+              cuda: "11.2"
+            packages:
+              - cuda-version=11.2
+          - matrix:
+              cuda: "11.4"
+            packages:
+              - cuda-version=11.4
+          - matrix:
+              cuda: "11.5"
+            packages:
+              - cuda-version=11.5
+          - matrix:
+              cuda: "11.8"
+            packages:
+              - cuda-version=11.8
+          - matrix:
               cuda: "12.0"
             packages:
               - cuda-version=12.0
+          - matrix:
+              cuda: "12.2"
+            packages:
+              - cuda-version=12.2
+  cuda:
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              cuda: "12.*"
+            packages:
               - cuda-nvtx-dev
               - cuda-cudart-dev
               - cuda-profiler-api
@@ -187,7 +216,6 @@ dependencies:
           - matrix:
               cuda: "11.8"
             packages:
-              - cuda-version=11.8
               - cudatoolkit
               - cuda-nvtx=11.8
               - cuda-profiler-api=11.8.86
@@ -202,7 +230,6 @@ dependencies:
           - matrix:
               cuda: "11.5"
             packages:
-              - cuda-version=11.5
               - cudatoolkit
               - cuda-nvtx=11.5
               - cuda-profiler-api>=11.4.240,<=11.8.86 # use any `11.x` version since pkg is missing several CUDA/arch packages
@@ -217,7 +244,6 @@ dependencies:
           - matrix:
               cuda: "11.4"
             packages:
-              - cuda-version=11.4
               - cudatoolkit
               - &cudanvtx114 cuda-nvtx=11.4
               - cuda-profiler-api>=11.4.240,<=11.8.86 # use any `11.x` version since pkg is missing several CUDA/arch packages
@@ -232,7 +258,6 @@ dependencies:
           - matrix:
               cuda: "11.2"
             packages:
-              - cuda-version=11.2
               - cudatoolkit
               - *cudanvtx114
               - cuda-profiler-api>=11.4.240,<=11.8.86 # use any `11.x` version since pkg is missing several CUDA/arch packages
@@ -255,34 +280,12 @@ dependencies:
     specific:
       - output_types: [requirements, pyproject]
         matrices:
-          # All CUDA 12 + x86_64 versions
-          - matrix: {cuda: "12.2", arch: x86_64}
-            packages: &cupy_packages_cu12_x86_64
-              - &cupy_cu12_x86_64 cupy-cuda12x>=12.0.0
-          - {matrix: {cuda: "12.1", arch: x86_64}, packages: *cupy_packages_cu12_x86_64}
-          - {matrix: {cuda: "12.0", arch: x86_64}, packages: *cupy_packages_cu12_x86_64}
-          # All CUDA 12 + aarch64 versions
-          - matrix: {cuda: "12.2", arch: aarch64}
-            packages: &cupy_packages_cu12_aarch64
-              - &cupy_cu12_aarch64 cupy-cuda12x -f https://pip.cupy.dev/aarch64 # TODO: Verify that this works.
-          - {matrix: {cuda: "12.1", arch: aarch64}, packages: *cupy_packages_cu12_aarch64}
-          - {matrix: {cuda: "12.0", arch: aarch64}, packages: *cupy_packages_cu12_aarch64}
-
-          # All CUDA 11 + x86_64 versions
-          - matrix: {cuda: "11.8", arch: x86_64}
-            packages: &cupy_packages_cu11_x86_64
+          - matrix: {cuda: "12.*"}
+            packages:
+              - cupy-cuda12x>=12.0.0
+          - matrix: {cuda: "11.*"}
+            packages:
               - cupy-cuda11x>=12.0.0
-          - {matrix: {cuda: "11.5", arch: x86_64}, packages: *cupy_packages_cu11_x86_64}
-          - {matrix: {cuda: "11.4", arch: x86_64}, packages: *cupy_packages_cu11_x86_64}
-          - {matrix: {cuda: "11.2", arch: x86_64}, packages: *cupy_packages_cu11_x86_64}
-
-          # All CUDA 11 + aarch64 versions
-          - matrix: {cuda: "11.8", arch: aarch64}
-            packages: &cupy_packages_cu11_aarch64
-              - cupy-cuda11x -f https://pip.cupy.dev/aarch64 # TODO: Verify that this works.
-          - {matrix: {cuda: "11.5", arch: aarch64}, packages: *cupy_packages_cu11_aarch64}
-          - {matrix: {cuda: "11.4", arch: aarch64}, packages: *cupy_packages_cu11_aarch64}
-          - {matrix: {cuda: "11.2", arch: aarch64}, packages: *cupy_packages_cu11_aarch64}
           - {matrix: null, packages: [cupy-cuda11x>=12.0.0]}
 
   test_libcuvs:
@@ -324,26 +327,32 @@ dependencies:
             packages:
               - python=3.10
           - matrix:
+              py: "3.11"
             packages:
-              - python>=3.9,<3.11
-  run_cuvs:
+              - python=3.11
+          - matrix:
+            packages:
+              - python>=3.9,<3.12
+  run_py_cuvs:
     common:
       - output_types: [conda, pyproject]
         packages:
-          - &numpy numpy>=1.21
+          - &numpy numpy>=1.23
       - output_types: [conda]
         packages:
           - *rmm_conda
+          - *pylibraft_conda
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
           # This index is needed for cudf and rmm.
           - --extra-index-url=https://pypi.nvidia.com
+          - --extra-index-url=https://pypi.anaconda.org/rapidsai-wheels-nightly/simple
     specific:
       - output_types: [conda, requirements, pyproject]
         matrices:
           - matrix:
-              cuda: "12.0"
+              cuda: "12.*"
             packages:
               - *cuda_python12
           - matrix: # All CUDA 11 versions
@@ -351,27 +360,22 @@ dependencies:
               - *cuda_python11
       - output_types: [requirements, pyproject]
         matrices:
-          - matrix: {cuda: "12.2"}
-            packages: &run_cuvs_packages_cu12
-              - *rmm_cu12
-          - {matrix: {cuda: "12.1"}, packages: *run_cuvs_packages_cu12}
-          - {matrix: {cuda: "12.0"}, packages: *run_cuvs_packages_cu12}
-          - matrix: {cuda: "11.8"}
-            packages: &run_cuvs_packages_cu11
-              - *rmm_cu11
-          - {matrix: {cuda: "11.5"}, packages: *run_cuvs_packages_cu11}
-          - {matrix: {cuda: "11.4"}, packages: *run_cuvs_packages_cu11}
-          - {matrix: {cuda: "11.2"}, packages: *run_cuvs_packages_cu11}
+          - matrix: {cuda: "12.*"}
+            packages:
+              - *pylibraft_cu12
+          - matrix: {cuda: "11.*"}
+            packages:
+              - *pylibraft_cu11
           - {matrix: null, packages: [*rmm_conda]}
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - pytest
+          - pytest==7.*
           - pytest-cov
-  test_cuvs:
+  test_py_cuvs:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
+          - *pylibraft_conda
           - scikit-learn
-          - scipy
