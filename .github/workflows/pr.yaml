@@ -19,6 +19,7 @@ jobs:
       - conda-python-build
       - conda-python-tests
       - docs-build
+      - rust-build
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
@@ -72,6 +73,16 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_docs.sh"
+  rust-build:
+    needs: conda-cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.02
+    with:
+      build_type: pull-request
+      node_type: "gpu-v100-latest-1"
+      arch: "amd64"
+      container_image: "rapidsai/ci-conda:latest"
+      run_script: "ci/build_rust.sh"
   wheel-build-cuvs:
     needs: checks
     secrets: inherit

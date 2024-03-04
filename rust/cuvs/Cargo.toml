@@ -1,0 +1,16 @@
+[package]
+name = "cuvs"
+description = "RAPIDS vector search library"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ffi = { package = "cuvs-sys", path = "../cuvs-sys" }
+ndarray = "0.15"
+
+[dev-dependencies]
+ndarray-rand = "*"
