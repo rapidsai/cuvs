@@ -140,8 +140,8 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                   0.001,
                                   min_recall));
       {
-        ivf_flat::index_params index_params;
-        ivf_flat::search_params search_params;
+        cuvs::neighbors::ivf_flat::index_params index_params;
+        cuvs::neighbors::ivf_flat::search_params search_params;
         index_params.n_lists          = ps.nlist;
         index_params.metric           = ps.metric;
         index_params.adaptive_centers = ps.adaptive_centers;
@@ -151,14 +151,14 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         index_params.kmeans_trainset_fraction = 0.5;
         index_params.metric_arg               = 0;
 
-        ivf_flat::index<DataT, IdxT> idx(handle_, index_params, ps.dim);
-        ivf_flat::index<DataT, IdxT> index_2(handle_, index_params, ps.dim);
+        cuvs::neighbors::ivf_flat::index<DataT, IdxT> idx(handle_, index_params, ps.dim);
+        cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_2(handle_, index_params, ps.dim);
 
         // if (!ps.host_dataset) {
 
         auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
           (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-        idx = ivf_flat::build(handle_, index_params, database_view);
+        idx = cuvs::neighbors::ivf_flat::build(handle_, index_params, database_view);
         rmm::device_uvector<IdxT> vector_indices(ps.num_db_vecs, stream_);
         thrust::sequence(raft::resource::get_thrust_policy(handle_),
                          thrust::device_pointer_cast(vector_indices.data()),
@@ -171,7 +171,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           (const DataT*)database.data(), half_of_data, ps.dim);
 
         const std::optional<raft::device_vector_view<const IdxT, IdxT>> no_opt = std::nullopt;
-        index_2 = ivf_flat::extend(handle_, half_of_data_view, no_opt, idx);
+        index_2 = cuvs::neighbors::ivf_flat::extend(handle_, half_of_data_view, no_opt, idx);
 
         auto new_half_of_data_view = raft::make_device_matrix_view<const DataT, IdxT>(
           database.data() + half_of_data * ps.dim, IdxT(ps.num_db_vecs) - half_of_data, ps.dim);
@@ -179,11 +179,12 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto new_half_of_data_indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
           vector_indices.data() + half_of_data, IdxT(ps.num_db_vecs) - half_of_data);
 
-        ivf_flat::extend(handle_,
-                         new_half_of_data_view,
-                         std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(
-                           new_half_of_data_indices_view),
-                         &index_2);
+        cuvs::neighbors::ivf_flat::extend(
+          handle_,
+          new_half_of_data_view,
+          std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(
+            new_half_of_data_indices_view),
+          &index_2);
 
         /*
         } else {
@@ -225,17 +226,17 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
           distances_ivfflat_dev.data(), ps.num_queries, ps.k);
         const std::string filename = "ivf_flat_index";
-        ivf_flat::serialize_file(handle_, filename, index_2);
-        ivf_flat::index<DataT, IdxT> index_loaded(handle_, index_params, ps.dim);
-        ivf_flat::deserialize_file(handle_, filename, &index_loaded);
+        cuvs::neighbors::ivf_flat::serialize_file(handle_, filename, index_2);
+        cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_loaded(handle_, index_params, ps.dim);
+        cuvs::neighbors::ivf_flat::deserialize_file(handle_, filename, &index_loaded);
         ASSERT_EQ(index_2.size(), index_loaded.size());
 
-        ivf_flat::search(handle_,
-                         search_params,
-                         index_loaded,
-                         search_queries_view,
-                         indices_out_view,
-                         dists_out_view);
+        cuvs::neighbors::ivf_flat::search(handle_,
+                                          search_params,
+                                          index_loaded,
+                                          search_queries_view,
+                                          indices_out_view,
+                                          dists_out_view);
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);

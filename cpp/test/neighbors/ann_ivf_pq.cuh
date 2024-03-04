@@ -177,7 +177,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     size_t queries_size = size_t{ps.num_queries} * size_t{ps.k};
     rmm::device_uvector<EvalT> distances_naive_dev(queries_size, stream_);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-    cuvs::neighbors::naive_knn<EvalT, DataT, IdxT>(
+    cuvs::neighbors::naive_knn<EvalT, DataT, int64_t>(
       handle_,
       distances_naive_dev.data(),
       indices_naive_dev.data(),

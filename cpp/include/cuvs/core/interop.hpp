@@ -33,7 +33,7 @@ namespace cuvs::core {
  * @param[in] tensor DLTensor object to check underlying memory type
  * @return bool
  */
-bool is_dlpack_device_compatible(DLTensor tensor)
+inline bool is_dlpack_device_compatible(DLTensor tensor)
 {
   return detail::is_dlpack_device_compatible(tensor);
 }
@@ -46,7 +46,7 @@ bool is_dlpack_device_compatible(DLTensor tensor)
  * @param tensor DLTensor object to check underlying memory type
  * @return bool
  */
-bool is_dlpack_host_compatible(DLTensor tensor)
+inline bool is_dlpack_host_compatible(DLTensor tensor)
 {
   return detail::is_dlpack_host_compatible(tensor);
 }
@@ -72,7 +72,7 @@ bool is_dlpack_host_compatible(DLTensor tensor)
  * @return MdspanType
  */
 template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
-MdspanType from_dlpack(DLManagedTensor* managed_tensor)
+inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
 {
   return detail::from_dlpack<MdspanType>(managed_tensor);
 }
