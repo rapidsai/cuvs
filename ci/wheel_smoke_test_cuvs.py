@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,41 +13,30 @@
 # limitations under the License.
 #
 
+import cupy as cp
 import numpy as np
-from scipy.spatial.distance import cdist
 
-from pylibrat.common import Handle, Stream, device_ndarray
-from cuvs.distance import pairwise_distance
+from cuvs.neighbors import cagra
+from pylibraft.common import Stream, DeviceResources
 
 
 if __name__ == "__main__":
-    metric = "euclidean"
-    n_rows = 1337
-    n_cols = 1337
+    n_samples = 1000
+    n_features = 50
+    n_queries = 1000
+    k = 10
 
-    input1 = np.random.random_sample((n_rows, n_cols))
-    input1 = np.asarray(input1, order="C").astype(np.float64)
+    dataset = cp.random.random_sample((n_samples,
+                                       n_features)).astype(cp.float32)
 
-    output = np.zeros((n_rows, n_rows), dtype=np.float64)
+    build_params = cagra.IndexParams(metric="sqeuclidean",
+                                     build_algo="nn_descent")
 
-    expected = cdist(input1, input1, metric)
+    index = cagra.build_index(build_params, dataset)
 
-    expected[expected <= 1e-5] = 0.0
+    distances, neighbors = cagra.search(cagra.SearchParams(),
+                                          index, dataset,
+                                          k)
 
-    input1_device = device_ndarray(input1)
-    output_device = None
-
-    s2 = Stream()
-    handle = Handle(stream=s2)
-    ret_output = pairwise_distance(
-        input1_device, input1_device, output_device, metric, handle=handle
-    )
-    handle.sync()
-
-    output_device = ret_output
-
-    actual = output_device.copy_to_host()
-
-    actual[actual <= 1e-5] = 0.0
-
-    assert np.allclose(expected, actual, rtol=1e-4)
+    distances = cp.asarray(distances)
+    neighbors = cp.asarray(neighbors)

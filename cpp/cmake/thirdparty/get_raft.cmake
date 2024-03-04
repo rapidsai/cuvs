@@ -21,9 +21,24 @@ function(find_and_configure_raft)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
+    if(PKG_CLONE_ON_PIN AND NOT PKG_PINNED_TAG STREQUAL "branch-${CUML_BRANCH_VERSION_raft}")
+        message(STATUS "cuVS: RAFT pinned tag found: ${PKG_PINNED_TAG}. Cloning raft locally.")
+        set(CPM_DOWNLOAD_raft ON)
+    elseif(PKG_USE_RAFT_STATIC AND (NOT CPM_raft_SOURCE))
+        message(STATUS "cuVS: Cloning raft locally to build static libraries.")
+        set(CPM_DOWNLOAD_raft ON)
+    endif()
+
     set(RAFT_COMPONENTS "")
+
     if(PKG_COMPILE_LIBRARY)
+      if(NOT PKG_USE_RAFT_STATIC)
         string(APPEND RAFT_COMPONENTS " compiled")
+        set(RAFT_COMPILED_LIB raft::compiled PARENT_SCOPE)
+      else()
+        string(APPEND RAFT_COMPONENTS " compiled_static")
+        set(RAFT_COMPILED_LIB raft::compiled_static PARENT_SCOPE)
+      endif()
     endif()
 
     if(PKG_ENABLE_MNMG_DEPENDENCIES)
@@ -39,15 +54,15 @@ function(find_and_configure_raft)
             INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
-            GIT_REPOSITORY https://github.com/${PKG_FORK}/raft.git
-            GIT_TAG        ${PKG_PINNED_TAG}
-            SOURCE_SUBDIR  cpp
-            OPTIONS
-            "BUILD_TESTS OFF"
-            "BUILD_PRIMS_BENCH OFF"
-            "BUILD_ANN_BENCH OFF"
-            "RAFT_NVTX ${PKG_ENABLE_NVTX}"
-            "RAFT_COMPILE_LIBRARY ${PKG_COMPILE_LIBRARY}"
+              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
+              GIT_TAG               ${PKG_PINNED_TAG}
+              SOURCE_SUBDIR         cpp
+              OPTIONS
+              "BUILD_TESTS OFF"
+              "BUILD_PRIMS_BENCH OFF"
+              "BUILD_ANN_BENCH OFF"
+              "RAFT_NVTX ${PKG_ENABLE_NVTX}"
+              "RAFT_COMPILE_LIBRARY ${PKG_COMPILE_LIBRARY}"
             )
 endfunction()
 

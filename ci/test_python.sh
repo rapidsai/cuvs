@@ -31,7 +31,7 @@ rapids-print-env
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   --channel "${PYTHON_CHANNEL}" \
-  libcuvs #cuvs
+  libcuvs cuvs
 
 rapids-logger "Check GPU usage"
 nvidia-smi
@@ -40,17 +40,16 @@ EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-#rapids-logger "pytest cuvs"
-#pushd python/cuvs/cuvs
-#pytest \
-#  --cache-clear \
-#  --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
-#  --cov-config=../.coveragerc \
-#  --cov=cuvs \
-#  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
-#  --cov-report=term \
-#  test
-#popd
+rapids-logger "pytest cuvs"
+pushd python/cuvs/cuvs
+pytest \
+ --cache-clear \
+ --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
+ --cov-config=../.coveragerc \
+ --cov=cuvs \
+ --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
+ --cov-report=term \
+ test
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

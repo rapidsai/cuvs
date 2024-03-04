@@ -195,9 +195,9 @@ outputs:
       home: https://rapids.ai/
       license: Apache-2.0
       summary: libcuvs tests
-  - name: libcuvs-template
+  - name: libcuvs-examples
     version: {{ version }}
-    script: build_libcuvs_template.sh
+    script: build_libcuvs_examples.sh
     build:
       script_env: *script_env
       number: {{ GIT_DESCRIBE_NUMBER }}
@@ -241,4 +241,4 @@ outputs:
     about:
       home: https://rapids.ai/
       license: Apache-2.0
-      summary: libcuvs template
+      summary: libcuvs examples

@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
 include(../../fetch_rapids.cmake)
 
-set(cuvs_version 24.02.00)
+set(cuvs_version 24.04.00)
 
 # We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
 # that enables CUDA unconditionally.
@@ -37,28 +37,43 @@ option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulti
        OFF
 )
 
+message("- FIND_CUVS_CPP: ${FIND_CUVS_CPP}")
+
+include(../../fetch_rapids.cmake)
+include(rapids-cmake)
+include(rapids-cpm)
+include(rapids-cython-core)
+include(rapids-export)
+include(rapids-find)
+
+rapids_cpm_init()
+
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
   find_package(cuvs ${cuvs_version})
+  include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
 else()
   set(cuvs_FOUND OFF)
 endif()
 
-include(rapids-cython)
-
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
+  set(BUILD_C_LIBRARY ON)
+
+  # Statically link dependencies if building wheels
   set(CUDA_STATIC_RUNTIME ON)
+  set(CUVS_USE_RAFT_STATIC ON)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 
-  # When building the C++ libraries from source we must copy libcuvs.so alongside the Cython
-  # libraries TODO: when we have a single 'compiled' cuvs library, we shouldn't need this
-  set(cython_lib_dir cuvs_py)
-  install(TARGETS cuvs DESTINATION ${cython_lib_dir})
+  set(cython_lib_dir cuvs)
+  install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
 endif()
 
 rapids_cython_init()
+
+add_subdirectory(cuvs/common)
+add_subdirectory(cuvs/neighbors)
 
 if(DEFINED cython_lib_dir)
   rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")

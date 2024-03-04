@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 # Usage:
 #   conda build . -c conda-forge -c numba -c rapidsai -c pytorch
@@ -46,19 +46,19 @@ requirements:
     {% endif %}
     - cuda-version ={{ cuda_version }}
     - cython >=3.0.0
-    - pylibraft {{ version }}
+    - dlpack >=0.8
+    - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
-    - numpy >=1.21
     - python x.x
     - rmm ={{ minor_version }}
-    - scikit-build >=0.13.1
+    - scikit-build-core >=0.7.0
     - setuptools
   run:
     - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
     {% if cuda_major == "11" %}
     - cudatoolkit
     {% endif %}
-    - pylibraft {{ version }}
+    - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
     - python x.x
     - rmm ={{ minor_version }}

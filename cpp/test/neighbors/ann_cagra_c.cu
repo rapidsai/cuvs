@@ -19,7 +19,7 @@
 #include <dlpack/dlpack.h>
 
 #include <cstdint>
-#include <cuvs/neighbors/cagra_c.h>
+#include <cuvs/neighbors/cagra.h>
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
@@ -56,13 +56,13 @@ TEST(CagraC, BuildSearch)
   dataset_tensor.dl_tensor.strides            = nullptr;
 
   // create index
-  cagraIndex_t index;
-  cagraIndexCreate(&index);
+  cuvsCagraIndex_t index;
+  cuvsCagraIndexCreate(&index);
 
   // build index
   cuvsCagraIndexParams_t build_params;
   cuvsCagraIndexParamsCreate(&build_params);
-  cagraBuild(res, build_params, &dataset_tensor, index);
+  cuvsCagraBuild(res, build_params, &dataset_tensor, index);
 
   // create queries DLTensor
   float* queries_d;
@@ -113,7 +113,7 @@ TEST(CagraC, BuildSearch)
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // verify output
   ASSERT_TRUE(cuvs::devArrMatchHost(neighbors_exp, neighbors_d, 4, cuvs::Compare<uint32_t>()));
@@ -128,6 +128,6 @@ TEST(CagraC, BuildSearch)
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);
   cuvsCagraIndexParamsDestroy(build_params);
-  cagraIndexDestroy(index);
+  cuvsCagraIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }
