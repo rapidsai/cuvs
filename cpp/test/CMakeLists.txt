@@ -127,7 +127,7 @@ if(BUILD_C_TESTS)
 
   ConfigureTest(
     NAME IVF_FLAT_C_TEST PATH test/neighbors/run_ivf_flat_c.c test/neighbors/ann_ivf_flat_c.cu
-    C_LIB
+    test/neighbors/run_ivf_pq_c.c test/neighbors/ann_ivf_pq_c.cu C_LIB
   )
 endif()
 
