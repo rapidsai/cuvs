@@ -22,7 +22,7 @@ use crate::error::{check_cuvs, Result};
 use crate::resources::Resources;
 
 #[derive(Debug)]
-pub struct Index(ffi::cagraIndex_t);
+pub struct Index(ffi::cuvsCagraIndex_t);
 
 impl Index {
     /// Builds a new index
@@ -34,7 +34,7 @@ impl Index {
         let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
+            check_cuvs(ffi::cuvsCagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
         }
         Ok(index)
     }
@@ -42,8 +42,8 @@ impl Index {
     /// Creates a new empty index
     pub fn new() -> Result<Index> {
         unsafe {
-            let mut index = core::mem::MaybeUninit::<ffi::cagraIndex_t>::uninit();
-            check_cuvs(ffi::cagraIndexCreate(index.as_mut_ptr()))?;
+            let mut index = core::mem::MaybeUninit::<ffi::cuvsCagraIndex_t>::uninit();
+            check_cuvs(ffi::cuvsCagraIndexCreate(index.as_mut_ptr()))?;
             Ok(Index(index.assume_init()))
         }
     }
@@ -57,7 +57,7 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
-            check_cuvs(ffi::cagraSearch(
+            check_cuvs(ffi::cuvsCagraSearch(
                 res.0,
                 params.0,
                 self.0,
@@ -71,7 +71,7 @@ impl Index {
 
 impl Drop for Index {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cagraIndexDestroy(self.0) }) {
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsCagraIndexDestroy(self.0) }) {
             write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }

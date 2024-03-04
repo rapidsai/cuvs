@@ -33,13 +33,13 @@ mod tests {
     #[test]
     fn test_create_cagra_index() {
         unsafe {
-            let mut index = core::mem::MaybeUninit::<cagraIndex_t>::uninit();
+            let mut index = core::mem::MaybeUninit::<cuvsCagraIndex_t>::uninit();
             assert_eq!(
-                cagraIndexCreate(index.as_mut_ptr()),
+                cuvsCagraIndexCreate(index.as_mut_ptr()),
                 cuvsError_t::CUVS_SUCCESS
             );
             let index = index.assume_init();
-            assert_eq!(cagraIndexDestroy(index), cuvsError_t::CUVS_SUCCESS);
+            assert_eq!(cuvsCagraIndexDestroy(index), cuvsError_t::CUVS_SUCCESS);
         }
     }
 

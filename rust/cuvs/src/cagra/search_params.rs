@@ -18,8 +18,8 @@ use crate::error::{check_cuvs, Result};
 use std::fmt;
 use std::io::{stderr, Write};
 
-pub type SearchAlgo = ffi::cagraSearchAlgo;
-pub type HashMode = ffi::cagraHashMode;
+pub type SearchAlgo = ffi::cuvsCagraSearchAlgo;
+pub type HashMode = ffi::cuvsCagraHashMode;
 
 /// Supplemental parameters to search CAGRA index
 pub struct SearchParams(pub ffi::cuvsCagraSearchParams_t);

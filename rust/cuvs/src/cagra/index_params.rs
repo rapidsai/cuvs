@@ -18,7 +18,7 @@ use crate::error::{check_cuvs, Result};
 use std::fmt;
 use std::io::{stderr, Write};
 
-pub type BuildAlgo = ffi::cagraGraphBuildAlgo;
+pub type BuildAlgo = ffi::cuvsCagraGraphBuildAlgo;
 
 /// Supplemental parameters to build CAGRA Index
 pub struct IndexParams(pub ffi::cuvsCagraIndexParams_t);
