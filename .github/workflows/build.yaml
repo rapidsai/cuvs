@@ -34,6 +34,19 @@ jobs:
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
+  rust-build:
+    needs: cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.02
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      arch: "amd64"
+      date: ${{ inputs.date }}
+      container_image: "rapidsai/ci-conda:latest"
+      node_type: "gpu-v100-latest-1"
+      run_script: "ci/build_rust.sh"
+      sha: ${{ inputs.sha }}
   python-build:
     needs: [cpp-build]
     secrets: inherit

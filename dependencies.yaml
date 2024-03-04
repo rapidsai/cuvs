@@ -44,7 +44,12 @@ files:
       - cupy
       - docs
       - py_version
-      - test_py_cuvs
+  rust:
+    output: none
+    includes:
+      - build
+      - cuda
+      - rust
   py_build_py_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -308,6 +313,15 @@ dependencies:
           - recommonmark
           - sphinx-copybutton
           - sphinx-markdown-tables
+  rust:
+    common:
+      - output_types: [conda]
+        packages:
+          - make
+          - rust
+          # clang/liblclang only needed for bindgen support
+          - clang  
+          - libclang
   build_wheels:
     common:
       - output_types: [requirements, pyproject]

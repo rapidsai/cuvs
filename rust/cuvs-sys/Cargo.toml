@@ -1,0 +1,16 @@
+[package]
+name = "cuvs-sys"
+description = "Low-level rust bindings to libcuvs"
+links = "cuvs"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[build-dependencies]
+cmake = ">=0.1"
+bindgen = ">=0.69"

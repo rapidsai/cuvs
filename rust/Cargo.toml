@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "cuvs",
+    "cuvs-sys",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/rapidsai/cuvs"
+homepage = "https://github.com/rapidsai/cuvs"
+description = "RAPIDS vector search library"
+authors = ["NVIDIA Corporation"]
+license = "Apache-2.0"
+
