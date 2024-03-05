@@ -15,19 +15,23 @@
 #
 # cython: language_level=3
 
-
-from cuda.ccudart cimport cudaStream_t
-from libc.stdint cimport uintptr_t
+from cuvs.common.c_api cimport cuvsError_t, cuvsGetLastErrorText
 
 
-cdef extern from "cuvs/core/c_api.h":
-    ctypedef uintptr_t cuvsResources_t
+class CuvsException(Exception):
+    pass
 
-    ctypedef enum cuvsError_t:
-        CUVS_ERROR,
-        CUVS_SUCCESS
 
-    cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
-    cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
-    cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
-    const char * cuvsGetLastErrorText()
+def get_last_error_text():
+    """ returns the last error description from the cuvs c-api """
+    cdef const char* c_err = cuvsGetLastErrorText()
+    if c_err is NULL:
+        return
+    cdef bytes err = c_err
+    return err.decode("utf8")
+
+
+def check_cuvs(status: cuvsError_t):
+    """ Converts a status code into an exception """
+    if status == cuvsError_t.CUVS_ERROR:
+        raise CuvsException(get_last_error_text())

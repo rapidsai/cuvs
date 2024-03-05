@@ -69,7 +69,7 @@ impl fmt::Debug for IndexParams {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // custom debug trait here, default value will show the pointer address
         // for the inner params object which isn't that useful.
-        write!(f, "IndexParams {{ params: {:?} }}", unsafe { *self.0 })
+        write!(f, "IndexParams({:?})", unsafe { *self.0 })
     }
 }
 
