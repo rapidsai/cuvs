@@ -34,7 +34,12 @@ impl Index {
         let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsCagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
+            check_cuvs(ffi::cuvsCagraBuild(
+                res.0,
+                params.0,
+                dataset.as_ptr(),
+                index.0,
+            ))?;
         }
         Ok(index)
     }

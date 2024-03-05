@@ -23,6 +23,7 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
@@ -96,17 +97,12 @@ void _search(cuvsResources_t res,
 
 extern "C" cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 {
-  try {
-    *index = new cuvsCagraIndex{};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { *index = new cuvsCagraIndex{}; });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
     if (index.dtype.code == kDLFloat) {
@@ -123,10 +119,7 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
       delete index_ptr;
     }
     delete index_c_ptr;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
@@ -134,7 +127,7 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                       DLManagedTensor* dataset_tensor,
                                       cuvsCagraIndex_t index)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
@@ -151,13 +144,7 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                 dataset.dtype.code,
                 dataset.dtype.bits);
     }
-    return CUVS_SUCCESS;
-  } catch (const std::exception& ex) {
-    std::cerr << "Error occurred: " << ex.what() << std::endl;
-    return CUVS_ERROR;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
@@ -167,7 +154,7 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                                        DLManagedTensor* neighbors_tensor,
                                        DLManagedTensor* distances_tensor)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
     auto neighbors = neighbors_tensor->dl_tensor;
     auto distances = distances_tensor->dl_tensor;
@@ -198,57 +185,36 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                 queries.dtype.code,
                 queries.dtype.bits);
     }
-    return CUVS_SUCCESS;
-  } catch (const std::exception& ex) {
-    std::cerr << "Error occurred: " << ex.what() << std::endl;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     *params = new cuvsCagraIndexParams{.intermediate_graph_degree = 128,
                                        .graph_degree              = 64,
                                        .build_algo                = IVF_PQ,
                                        .nn_descent_niter          = 20};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
 {
-  try {
-    delete params;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
 extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     *params = new cuvsCagraSearchParams{.itopk_size            = 64,
                                         .search_width          = 1,
                                         .hashmap_max_fill_rate = 0.5,
                                         .num_random_samplings  = 1,
                                         .rand_xor_mask         = 0x128394};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params)
 {
-  try {
-    delete params;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }

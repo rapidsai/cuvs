@@ -16,46 +16,42 @@
 
 #include <cstdint>
 #include <cuvs/core/c_api.h>
+#include <cuvs/core/exceptions.hpp>
 #include <memory>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <rmm/cuda_stream_view.hpp>
+#include <thread>
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
 {
-  cuvsError_t status;
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto res_ptr = new raft::resources{};
     *res         = reinterpret_cast<uintptr_t>(res_ptr);
-    status       = CUVS_SUCCESS;
-  } catch (...) {
-    status = CUVS_ERROR;
-  }
-  return status;
+  });
 }
 
 extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
 {
-  cuvsError_t status;
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     delete res_ptr;
-    status = CUVS_SUCCESS;
-  } catch (...) {
-    status = CUVS_ERROR;
-  }
-  return status;
+  });
 }
 
 extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
 {
-  cuvsError_t status;
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     raft::resource::set_cuda_stream(*res_ptr, static_cast<rmm::cuda_stream_view>(stream));
-    status = CUVS_SUCCESS;
-  } catch (...) {
-    status = CUVS_ERROR;
-  }
-  return status;
+  });
 }
+
+thread_local std::string last_error_text = "";
+
+extern "C" const char* cuvsGetLastErrorText()
+{
+  return last_error_text.empty() ? NULL : last_error_text.c_str();
+}
+
+extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }
