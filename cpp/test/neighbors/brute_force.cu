@@ -18,7 +18,7 @@
 #include <cuvs/neighbors/brute_force.hpp>
 #include <raft/distance/distance_types.hpp>
 
-namespace raft::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 struct KNNInputs {
   std::vector<std::vector<float>> input;
   int k;
@@ -51,7 +51,7 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
  public:
   KNNTest()
     : params_(::testing::TestWithParam<KNNInputs>::GetParam()),
-      stream(resource::get_cuda_stream(handle)),
+      stream(raft::resource::get_cuda_stream(handle)),
       actual_labels_(0, stream),
       expected_labels_(0, stream),
       input_(0, stream),
@@ -71,13 +71,14 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
     raft::print_device_vector("Labels array: ", search_labels_.data(), rows_, std::cout);
     // #endif
 
-    auto index = raft::make_device_matrix_view<const T, IdxT, row_major>(
+    auto index = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
       (const T*)(input_.data()), rows_, cols_);
-    auto search = raft::make_device_matrix_view<const T, IdxT, row_major>(
+    auto search = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
       (const T*)(search_data_.data()), rows_, cols_);
-    auto indices = raft::make_device_matrix_view<IdxT, IdxT, row_major>(indices_.data(), rows_, k_);
+    auto indices =
+      raft::make_device_matrix_view<IdxT, IdxT, raft::row_major>(indices_.data(), rows_, k_);
     auto distances =
-      raft::make_device_matrix_view<T, IdxT, row_major>(distances_.data(), rows_, k_);
+      raft::make_device_matrix_view<T, IdxT, raft::row_major>(distances_.data(), rows_, k_);
 
     auto metric = cuvs::distance::DistanceType::L2Unexpanded;
     auto idx    = cuvs::neighbors::brute_force::build(handle, index, metric);
@@ -136,7 +137,7 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
     raft::copy(input_.data(), input_ptr, rows_ * cols_, stream);
     raft::copy(search_data_.data(), input_ptr, rows_ * cols_, stream);
     raft::copy(search_labels_.data(), labels_ptr, rows_, stream);
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
   }
 
  private:
@@ -178,4 +179,4 @@ typedef KNNTest<float, int64_t> KNNTestFint64_t;
 TEST_P(KNNTestFint64_t, BruteForce) { this->testBruteForce(); }
 
 INSTANTIATE_TEST_CASE_P(KNNTest, KNNTestFint64_t, ::testing::ValuesIn(inputs));
-}  // namespace raft::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force

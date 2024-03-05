@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ivf_pq_c.h>
+#include <cuvs/neighbors/ivf_pq.h>
 
 void run_ivf_pq(int64_t n_rows,
                 int64_t n_queries,
@@ -45,7 +45,7 @@ void run_ivf_pq(int64_t n_rows,
   dataset_tensor.dl_tensor.strides            = NULL;
 
   // create index
-  ivfPqIndex_t index;
+  cuvsIvfPqIndex_t index;
   ivfPqIndexCreate(&index);
 
   // build index

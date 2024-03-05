@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
+#include <cuda.h>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/random/rng.cuh>
 
 #include "ann_utils.cuh"
-#include <cuvs/neighbors/ivf_flat_c.h>
-
-#include <cuda.h>
+#include <cuvs/neighbors/ivf_flat.h>
 
 extern "C" void run_ivf_flat(int64_t n_rows,
                              int64_t n_queries,

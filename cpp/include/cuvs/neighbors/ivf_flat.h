@@ -17,13 +17,13 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance_types_c.h>
+#include <cuvs/distance/distance_types.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 /**
- * @defgroup ivfFlat_c C API for CUDA ANN Graph-based nearest neighbor search
+ * @defgroup IVF_FLAT C API for CUDA nearest neighbor search
  * @{
  */
 
@@ -126,31 +126,30 @@ cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
 cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
 
 /**
- * @brief Struct to hold address of cuvs::neighbors::ivfFlat::index and its active trained dtype
+ * @brief Struct to hold address of cuvs::neighbors::ivf_flat::index and its active trained dtype
  *
  */
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-
 } ivfFlatIndex;
 
-typedef ivfFlatIndex* ivfFlatIndex_t;
+typedef ivfFlatIndex* cuvsIvfFlatIndex_t;
 
 /**
  * @brief Allocate IVF_FLAT index
  *
- * @param[in] index ivfFlatIndex_t to allocate
+ * @param[in] index cuvsIvfFlatIndex_t to allocate
  * @return ivfFlatError_t
  */
-cuvsError_t ivfFlatIndexCreate(ivfFlatIndex_t* index);
+cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 
 /**
  * @brief De-allocate IVF_FLAT index
  *
- * @param[in] index ivfFlatIndex_t to de-allocate
+ * @param[in] index cuvsIvfFlatIndex_t to de-allocate
  */
-cuvsError_t ivfFlatIndexDestroy(ivfFlatIndex_t index);
+cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 
 /**
  * @brief Build a IVF_FLAT index with a `DLManagedTensor` which has underlying
@@ -162,7 +161,7 @@ cuvsError_t ivfFlatIndexDestroy(ivfFlatIndex_t index);
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/ivf_flat_c.h>
+ * #include <cuvs/neighbors/ivf_flat.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -176,7 +175,7 @@ cuvsError_t ivfFlatIndexDestroy(ivfFlatIndex_t index);
  * cuvsError_t params_create_status = cuvsIvfFlatIndexParamsCreate(&params);
  *
  * // Create IVF_FLAT index
- * ivfFlatIndex_t index;
+ * cuvsIvfFlatIndex_t index;
  * cuvsError_t index_create_status = ivfFlatIndexCreate(&index);
  *
  * // Build the IVF_FLAT Index
@@ -191,13 +190,13 @@ cuvsError_t ivfFlatIndexDestroy(ivfFlatIndex_t index);
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsIvfFlatIndexParams_t used to build IVF_FLAT index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index ivfFlatIndex_t Newly built IVF_FLAT index
+ * @param[out] index cuvsIvfFlatIndex_t Newly built IVF_FLAT index
  * @return cuvsError_t
  */
 cuvsError_t ivfFlatBuild(cuvsResources_t res,
                          cuvsIvfFlatIndexParams_t params,
                          DLManagedTensor* dataset,
-                         ivfFlatIndex_t index);
+                         cuvsIvfFlatIndex_t index);
 
 /**
  * @brief Search a IVF_FLAT index with a `DLManagedTensor` which has underlying
@@ -211,7 +210,7 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/ivf_flat_c.h>
+ * #include <cuvs/neighbors/ivf_flat.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -243,7 +242,7 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
  */
 cuvsError_t ivfFlatSearch(cuvsResources_t res,
                           cuvsIvfFlatSearchParams_t params,
-                          ivfFlatIndex_t index,
+                          cuvsIvfFlatIndex_t index,
                           DLManagedTensor* queries,
                           DLManagedTensor* neighbors,
                           DLManagedTensor* distances);

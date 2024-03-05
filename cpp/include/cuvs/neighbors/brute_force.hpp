@@ -17,7 +17,8 @@
 #pragma once
 
 #include "ann_types.hpp"
-#include <raft/neighbors/brute_force-inl.cuh>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/handle.hpp>
 
 namespace cuvs::neighbors::brute_force {
 
@@ -31,84 +32,30 @@ namespace cuvs::neighbors::brute_force {
 template <typename T>
 struct index : cuvs::neighbors::ann::index {
  public:
-  // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
-
-  /** Build a cuvs bruteforce index from an existing RAFT bruteforce index. */
-  index(raft::neighbors::brute_force::index<T>&& raft_idx)
-    : cuvs::neighbors::ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::brute_force::index<T>>(std::move(raft_idx)))
-  {
-  }
-
-  /** Distance metric used for retrieval */
-  [[nodiscard]] constexpr inline cuvs::distance::DistanceType metric() const noexcept
-  {
-    return raft_index_->metric_;
-  }
-
-  /** Total length of the index (number of vectors). */
-  [[nodiscard]] constexpr inline auto size() const noexcept
-  {
-    return raft_index_->dataset_view_.extent(0);
-  }
-
-  /** Dimensionality of the data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept
-  {
-    return raft_index_->dataset_view_.extent(1);
-  }
-
-  /** Dataset [size, dim] */
-  [[nodiscard]] inline auto dataset() const noexcept
-    -> raft::device_matrix_view<const T, int64_t, raft::row_major>
-  {
-    return raft_index_->dataset_view_;
-  }
-
-  /** Dataset norms */
-  [[nodiscard]] inline auto norms() const
-    -> raft::device_vector_view<const T, int64_t, raft::row_major>
-  {
-    return raft_index_->norms_view_.value();
-  }
-
-  /** Whether or not this index has dataset norms */
-  [[nodiscard]] inline bool has_norms() const noexcept
-  {
-    return raft_index_->norms_view_.has_value();
-  }
-
-  [[nodiscard]] inline T metric_arg() const noexcept { return raft_index_->metric_arg_; }
-
-  /**
-   * Replace the dataset with a new dataset.
-   */
+  cuvs::distance::DistanceType metric() const noexcept;
+  size_t size() const noexcept;
+  size_t dim() const noexcept;
+  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset() const noexcept;
+  raft::device_vector_view<const T, int64_t, raft::row_major> norms() const;
+  bool has_norms() const noexcept;
+  T metric_arg() const noexcept;
   void update_dataset(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
-  {
-    raft_index_->dataset_view_ = dataset;
-  }
-
-  auto get_raft_index() const -> const raft::neighbors::brute_force::index<T>*
-  {
-    return raft_index_.get();
-  }
-  auto get_raft_index() -> raft::neighbors::brute_force::index<T>* { return raft_index_.get(); }
+                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset);
 
  private:
-  std::unique_ptr<raft::neighbors::brute_force::index<T>> raft_index_;
+  std::unique_ptr<void*> raft_index_;
 };
 
 #define CUVS_INST_BFKNN(T, IdxT)                                                               \
   auto build(raft::resources const& res,                                                       \
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                 \
              cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded, \
-             float metric_arg                    = 0.0)                                        \
+             T metric_arg                        = 0)                                          \
     ->cuvs::neighbors::brute_force::index<T>;                                                  \
                                                                                                \
   void search(raft::resources const& res,                                                      \
@@ -118,5 +65,7 @@ struct index : cuvs::neighbors::ann::index {
               raft::device_matrix_view<T, IdxT, raft::row_major> distances);
 
 CUVS_INST_BFKNN(float, int64_t);
+// CUVS_INST_BFKNN(int8_t, int64_t);
+// CUVS_INST_BFKNN(uint8_t, int64_t);
 
 }  // namespace cuvs::neighbors::brute_force

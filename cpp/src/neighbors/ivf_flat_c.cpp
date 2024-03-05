@@ -24,8 +24,8 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/interop.hpp>
+#include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_flat_c.h>
 
 namespace {
 
@@ -84,7 +84,7 @@ void _search(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t ivfFlatIndexCreate(ivfFlatIndex_t* index)
+extern "C" cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
 {
   try {
     *index = new ivfFlatIndex{};
@@ -94,7 +94,7 @@ extern "C" cuvsError_t ivfFlatIndexCreate(ivfFlatIndex_t* index)
   }
 }
 
-extern "C" cuvsError_t ivfFlatIndexDestroy(ivfFlatIndex_t index_c_ptr)
+extern "C" cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
 {
   try {
     auto index = *index_c_ptr;
@@ -122,7 +122,7 @@ extern "C" cuvsError_t ivfFlatIndexDestroy(ivfFlatIndex_t index_c_ptr)
 extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
                                     cuvsIvfFlatIndexParams_t params,
                                     DLManagedTensor* dataset_tensor,
-                                    ivfFlatIndex_t index)
+                                    cuvsIvfFlatIndex_t index)
 {
   try {
     auto dataset = dataset_tensor->dl_tensor;
@@ -152,7 +152,7 @@ extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
 
 extern "C" cuvsError_t ivfFlatSearch(cuvsResources_t res,
                                      cuvsIvfFlatSearchParams_t params,
-                                     ivfFlatIndex_t index_c_ptr,
+                                     cuvsIvfFlatIndex_t index_c_ptr,
                                      DLManagedTensor* queries_tensor,
                                      DLManagedTensor* neighbors_tensor,
                                      DLManagedTensor* distances_tensor)

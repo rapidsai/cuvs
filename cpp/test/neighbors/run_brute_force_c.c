@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ivf_flat.h>
+#include <cuvs/neighbors/brute_force.h>
 
-void run_ivf_flat(int64_t n_rows,
-                  int64_t n_queries,
-                  int64_t n_dim,
-                  uint32_t n_neighbors,
-                  float* index_data,
-                  float* query_data,
-                  float* distances_data,
-                  int64_t* neighbors_data,
-                  enum DistanceType metric,
-                  size_t n_probes,
-                  size_t n_lists)
+void run_brute_force(int64_t n_rows,
+                     int64_t n_queries,
+                     int64_t n_dim,
+                     uint32_t n_neighbors,
+                     float* index_data,
+                     float* query_data,
+                     float* distances_data,
+                     int64_t* neighbors_data,
+                     enum DistanceType metric)
 {
   // create cuvsResources_t
   cuvsResources_t res;
@@ -45,15 +43,11 @@ void run_ivf_flat(int64_t n_rows,
   dataset_tensor.dl_tensor.strides            = NULL;
 
   // create index
-  cuvsIvfFlatIndex_t index;
-  ivfFlatIndexCreate(&index);
+  cuvsBruteForceIndex_t index;
+  bruteForceIndexCreate(&index);
 
   // build index
-  cuvsIvfFlatIndexParams_t build_params;
-  cuvsIvfFlatIndexParamsCreate(&build_params);
-  build_params->metric  = metric;
-  build_params->n_lists = n_lists;
-  ivfFlatBuild(res, build_params, &dataset_tensor, index);
+  bruteForceBuild(res, &dataset_tensor, metric, 0.0f, index);
 
   // create queries DLTensor
   DLManagedTensor queries_tensor;
@@ -92,14 +86,9 @@ void run_ivf_flat(int64_t n_rows,
   distances_tensor.dl_tensor.strides            = NULL;
 
   // search index
-  cuvsIvfFlatSearchParams_t search_params;
-  cuvsIvfFlatSearchParamsCreate(&search_params);
-  search_params->n_probes = n_probes;
-  ivfFlatSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  bruteForceSearch(res, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // de-allocate index and res
-  cuvsIvfFlatSearchParamsDestroy(search_params);
-  cuvsIvfFlatIndexParamsDestroy(build_params);
-  ivfFlatIndexDestroy(index);
+  bruteForceIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }

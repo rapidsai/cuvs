@@ -17,13 +17,13 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance_types_c.h>
+#include <cuvs/distance/distance_types.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 /**
- * @defgroup ivfPq_c C API for CUDA ANN Graph-based nearest neighbor search
+ * @defgroup IVF_PQ C API for CUDA nearest neighbor search
  * @{
  */
 
@@ -196,31 +196,30 @@ cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params);
 cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params);
 
 /**
- * @brief Struct to hold address of cuvs::neighbors::ivfPq::index and its active trained dtype
+ * @brief Struct to hold address of cuvs::neighbors::ivf_pq::index and its active trained dtype
  *
  */
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-
 } ivfPqIndex;
 
-typedef ivfPqIndex* ivfPqIndex_t;
+typedef ivfPqIndex* cuvsIvfPqIndex_t;
 
 /**
  * @brief Allocate IVF_PQ index
  *
- * @param[in] index ivfPqIndex_t to allocate
+ * @param[in] index cuvsIvfPqIndex_t to allocate
  * @return ivfPqError_t
  */
-cuvsError_t ivfPqIndexCreate(ivfPqIndex_t* index);
+cuvsError_t ivfPqIndexCreate(cuvsIvfPqIndex_t* index);
 
 /**
  * @brief De-allocate IVF_PQ index
  *
- * @param[in] index ivfPqIndex_t to de-allocate
+ * @param[in] index cuvsIvfPqIndex_t to de-allocate
  */
-cuvsError_t ivfPqIndexDestroy(ivfPqIndex_t index);
+cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index);
 
 /**
  * @brief Build a IVF_PQ index with a `DLManagedTensor` which has underlying
@@ -232,7 +231,7 @@ cuvsError_t ivfPqIndexDestroy(ivfPqIndex_t index);
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/ivf_pq_c.h>
+ * #include <cuvs/neighbors/ivf_pq.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -246,7 +245,7 @@ cuvsError_t ivfPqIndexDestroy(ivfPqIndex_t index);
  * cuvsError_t params_create_status = cuvsIvfPqIndexParamsCreate(&params);
  *
  * // Create IVF_PQ index
- * ivfPqIndex_t index;
+ * cuvsIvfPqIndex_t index;
  * cuvsError_t index_create_status = ivfPqIndexCreate(&index);
  *
  * // Build the IVF_PQ Index
@@ -261,13 +260,13 @@ cuvsError_t ivfPqIndexDestroy(ivfPqIndex_t index);
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsIvfPqIndexParams_t used to build IVF_PQ index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index ivfPqIndex_t Newly built IVF_PQ index
+ * @param[out] index cuvsIvfPqIndex_t Newly built IVF_PQ index
  * @return cuvsError_t
  */
 cuvsError_t ivfPqBuild(cuvsResources_t res,
                        cuvsIvfPqIndexParams_t params,
                        DLManagedTensor* dataset,
-                       ivfPqIndex_t index);
+                       cuvsIvfPqIndex_t index);
 
 /**
  * @brief Search a IVF_PQ index with a `DLManagedTensor` which has underlying
@@ -281,7 +280,7 @@ cuvsError_t ivfPqBuild(cuvsResources_t res,
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/ivf_pq_c.h>
+ * #include <cuvs/neighbors/ivf_pq.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -313,7 +312,7 @@ cuvsError_t ivfPqBuild(cuvsResources_t res,
  */
 cuvsError_t ivfPqSearch(cuvsResources_t res,
                         cuvsIvfPqSearchParams_t params,
-                        ivfPqIndex_t index,
+                        cuvsIvfPqIndex_t index,
                         DLManagedTensor* queries,
                         DLManagedTensor* neighbors,
                         DLManagedTensor* distances);

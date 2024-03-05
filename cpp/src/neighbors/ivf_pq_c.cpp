@@ -23,8 +23,8 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/interop.hpp>
+#include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_c.h>
 
 namespace {
 
@@ -90,7 +90,7 @@ void _search(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t ivfPqIndexCreate(ivfPqIndex_t* index)
+extern "C" cuvsError_t ivfPqIndexCreate(cuvsIvfPqIndex_t* index)
 {
   try {
     *index = new ivfPqIndex{};
@@ -100,7 +100,7 @@ extern "C" cuvsError_t ivfPqIndexCreate(ivfPqIndex_t* index)
   }
 }
 
-extern "C" cuvsError_t ivfPqIndexDestroy(ivfPqIndex_t index_c_ptr)
+extern "C" cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
 {
   try {
     auto index = *index_c_ptr;
@@ -117,7 +117,7 @@ extern "C" cuvsError_t ivfPqIndexDestroy(ivfPqIndex_t index_c_ptr)
 extern "C" cuvsError_t ivfPqBuild(cuvsResources_t res,
                                   cuvsIvfPqIndexParams_t params,
                                   DLManagedTensor* dataset_tensor,
-                                  ivfPqIndex_t index)
+                                  cuvsIvfPqIndex_t index)
 {
   try {
     auto dataset = dataset_tensor->dl_tensor;
@@ -140,7 +140,7 @@ extern "C" cuvsError_t ivfPqBuild(cuvsResources_t res,
 
 extern "C" cuvsError_t ivfPqSearch(cuvsResources_t res,
                                    cuvsIvfPqSearchParams_t params,
-                                   ivfPqIndex_t index_c_ptr,
+                                   cuvsIvfPqIndex_t index_c_ptr,
                                    DLManagedTensor* queries_tensor,
                                    DLManagedTensor* neighbors_tensor,
                                    DLManagedTensor* distances_tensor)

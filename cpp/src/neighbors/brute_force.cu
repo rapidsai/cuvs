@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/brute_force-inl.hpp>
 
 namespace cuvs::neighbors::brute_force {
 
@@ -22,7 +22,7 @@ namespace cuvs::neighbors::brute_force {
   auto build(raft::resources const& res,                                                         \
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                   \
              cuvs::distance::DistanceType metric,                                                \
-             float metric_arg)                                                                   \
+             T metric_arg)                                                                       \
     ->cuvs::neighbors::brute_force::index<T>                                                     \
   {                                                                                              \
     return cuvs::neighbors::brute_force::index<T>(std::move(raft::neighbors::brute_force::build( \
@@ -37,9 +37,13 @@ namespace cuvs::neighbors::brute_force {
   {                                                                                              \
     raft::neighbors::brute_force::search(                                                        \
       res, *idx.get_raft_index(), queries, neighbors, distances);                                \
-  }
+  }                                                                                              \
+                                                                                                 \
+  template struct cuvs::neighbors::brute_force::index<T>;
 
 CUVS_INST_BFKNN(float, int64_t);
+// CUVS_INST_BFKNN(int8_t, int64_t);
+// CUVS_INST_BFKNN(uint8_t, int64_t);
 
 #undef CUVS_INST_BFKNN
 

@@ -20,19 +20,17 @@
 #include <raft/random/rng.cuh>
 
 #include "ann_utils.cuh"
-#include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/neighbors/brute_force.h>
 
-extern "C" void run_ivf_pq(int64_t n_rows,
-                           int64_t n_queries,
-                           int64_t n_dim,
-                           uint32_t n_neighbors,
-                           float* index_data,
-                           float* query_data,
-                           float* distances_data,
-                           int64_t* neighbors_data,
-                           enum DistanceType metric,
-                           size_t n_probes,
-                           size_t n_lists);
+extern "C" void run_brute_force(int64_t n_rows,
+                                int64_t n_queries,
+                                int64_t n_dim,
+                                uint32_t n_neighbors,
+                                float* index_data,
+                                float* query_data,
+                                float* distances_data,
+                                int64_t* neighbors_data,
+                                enum DistanceType metric);
 
 template <typename T>
 void generate_random_data(T* devPtr, size_t size)
@@ -51,9 +49,7 @@ void recall_eval(T* query_data,
                  size_t n_rows,
                  size_t n_dim,
                  size_t n_neighbors,
-                 DistanceType metric,
-                 size_t n_probes,
-                 size_t n_lists)
+                 DistanceType metric)
 {
   raft::handle_t handle;
   auto distances_ref = raft::make_device_matrix<T, IdxT>(handle, n_queries, n_neighbors);
@@ -83,7 +79,7 @@ void recall_eval(T* query_data,
   raft::copy(distances_ref_h.data(), distances_ref.data_handle(), size, stream);
 
   // verify output
-  double min_recall = static_cast<double>(n_probes) / static_cast<double>(n_lists);
+  double min_recall = 0.95;
   ASSERT_TRUE(cuvs::neighbors::eval_neighbours(neighbors_ref_h,
                                                neighbors_h,
                                                distances_ref_h,
@@ -94,7 +90,7 @@ void recall_eval(T* query_data,
                                                min_recall));
 };
 
-TEST(IvfPqC, BuildSearch)
+TEST(BruteForceC, BuildSearch)
 {
   int64_t n_rows       = 8096;
   int64_t n_queries    = 128;
@@ -102,8 +98,6 @@ TEST(IvfPqC, BuildSearch)
   uint32_t n_neighbors = 8;
 
   enum DistanceType metric = L2Expanded;
-  size_t n_probes          = 20;
-  size_t n_lists           = 1024;
 
   float *index_data, *query_data, *distances_data;
   int64_t* neighbors_data;
@@ -115,17 +109,15 @@ TEST(IvfPqC, BuildSearch)
   generate_random_data(index_data, n_rows * n_dim);
   generate_random_data(query_data, n_queries * n_dim);
 
-  run_ivf_pq(n_rows,
-             n_queries,
-             n_dim,
-             n_neighbors,
-             index_data,
-             query_data,
-             distances_data,
-             neighbors_data,
-             metric,
-             n_probes,
-             n_lists);
+  run_brute_force(n_rows,
+                  n_queries,
+                  n_dim,
+                  n_neighbors,
+                  index_data,
+                  query_data,
+                  distances_data,
+                  neighbors_data,
+                  metric);
 
   recall_eval(query_data,
               index_data,
@@ -135,9 +127,7 @@ TEST(IvfPqC, BuildSearch)
               n_rows,
               n_dim,
               n_neighbors,
-              metric,
-              n_probes,
-              n_lists);
+              metric);
 
   // delete device memory
   cudaFree(index_data);
