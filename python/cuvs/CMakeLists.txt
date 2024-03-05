@@ -50,7 +50,7 @@ rapids_cpm_init()
 
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
-  find_package(cuvs ${cuvs_version})
+  find_package(cuvs ${cuvs_version} REQUIRED)
   include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
 else()
   set(cuvs_FOUND OFF)
