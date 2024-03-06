@@ -37,7 +37,7 @@ project(
 # - User Options  --------------------------------------------------------------
 
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
-       ON
+       OFF
 )
 
 message("CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}")
