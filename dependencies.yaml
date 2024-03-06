@@ -88,7 +88,6 @@ dependencies:
         packages:
           - &cmake_ver cmake>=3.26.4
           - cython>=3.0.0
-          - dlpack>=0.8,<1.0
           - ninja
       - output_types: [conda]
         packages:
@@ -139,6 +138,7 @@ dependencies:
         packages:
           - &rmm_conda rmm==24.4.*
           - &pylibraft_conda pylibraft==24.4.*
+          - dlpack>=0.8,<1.0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
