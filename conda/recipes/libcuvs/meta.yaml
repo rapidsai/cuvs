@@ -274,6 +274,7 @@ outputs:
         - libcublas {{ cuda11_libcublas_host_version }}
         - libcublas-dev {{ cuda11_libcublas_host_version }}
         {% else %}
+        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         {% endif %}

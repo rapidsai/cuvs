@@ -321,7 +321,7 @@ dependencies:
           - make
           - rust
           # clang/liblclang only needed for bindgen support
-          - clang  
+          - clang
           - libclang
   build_wheels:
     common:
@@ -381,7 +381,7 @@ dependencies:
           - matrix: {cuda: "11.*"}
             packages:
               - *pylibraft_cu11
-          - {matrix: null, packages: [*rmm_conda]}
+          - {matrix: null, packages: [*pylibraft_conda]}
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -392,5 +392,4 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - *pylibraft_conda
           - scikit-learn
