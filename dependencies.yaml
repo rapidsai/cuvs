@@ -47,6 +47,7 @@ files:
   rust:
     output: none
     includes:
+      - cuda_version
       - build
       - cuda
       - rust
