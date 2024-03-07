@@ -6,3 +6,5 @@ Python API Documentation
 
 .. toctree::
    :maxdepth: 4
+
+   python_api/neighbors.rst

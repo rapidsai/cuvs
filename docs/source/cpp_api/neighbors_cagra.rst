@@ -15,15 +15,3 @@ namespace *cuvs::neighbors::cagra*
     :project: cuvs
     :members:
     :content-only:
-
-
-Serializer Methods
-------------------
-``#include <cuvs/neighbors/cagra_serialize.cuh>``
-
-namespace *cuvs::neighbors::cagra*
-
-.. doxygengroup:: cagra_serialize
-    :project: cuvs
-    :members:
-    :content-only:
