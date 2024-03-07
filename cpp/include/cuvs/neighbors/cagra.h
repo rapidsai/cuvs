@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 /**
- * @defgroup cagra_c C API for CUDA ANN Graph-based nearest neighbor search
+ * @defgroup cagra_c_index_params C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
 
@@ -72,6 +72,15 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_search_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
 
 /**
  * @brief Enum to denote algorithm used to search CAGRA Index
@@ -159,6 +168,15 @@ cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params);
 cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params);
 
 /**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_index C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+
+/**
  * @brief Struct to hold address of cuvs::neighbors::cagra::index and its active trained dtype
  *
  */
@@ -184,6 +202,15 @@ cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
  * @param[in] index cuvsCagraIndex_t to de-allocate
  */
 cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_index_build C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
 
 /**
  * @brief Build a CAGRA index with a `DLManagedTensor` which has underlying
@@ -232,6 +259,14 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
 
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_index_search C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
 /**
  * @brief Search a CAGRA index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.

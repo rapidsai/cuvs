@@ -10,7 +10,44 @@ CAGRA is a graph-based nearest neighbors algorithm that was built from the groun
 
 ``#include <raft/neighbors/cagra.h>``
 
-.. doxygengroup:: cagra_c
+Index build parameters
+----------------------
+
+.. doxygengroup:: cagra_c_index_params
     :project: cuvs
     :members:
     :content-only:
+
+Index search parameters
+-----------------------
+
+.. doxygengroup:: cagra_c_search_params
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index
+-----
+
+.. doxygengroup:: cagra_c_index
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index build
+-----------
+
+.. doxygengroup:: cagra_c_index_build
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index search
+------------
+
+.. doxygengroup:: cagra_c_index_search
+    :project: cuvs
+    :members:
+    :content-only:
+
+
