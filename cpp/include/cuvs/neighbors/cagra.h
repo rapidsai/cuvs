@@ -20,14 +20,14 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @defgroup cagra_c C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * @brief Enum to denote which ANN algorithm is used to build CAGRA graph
@@ -71,7 +71,7 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
  * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index);
+cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
 
 /**
  * @brief Enum to denote algorithm used to search CAGRA Index
@@ -281,10 +281,10 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             DLManagedTensor* neighbors,
                             DLManagedTensor* distances);
 
-#ifdef __cplusplus
-}
-#endif
-
 /**
  * @}
  */
+
+#ifdef __cplusplus
+}
+#endif

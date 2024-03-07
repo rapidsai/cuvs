@@ -16,18 +16,17 @@
 
 #pragma once
 
+#include <cuda_runtime.h>
 #include <stdint.h>
 
-#include <cuda_runtime.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @defgroup c_api C API Core Types and Functions
  * @{
  */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * @brief An opaque C handle for C++ type `raft::resources`
@@ -77,8 +76,9 @@ const char* cuvsGetLastErrorText();
  *        clears any previously seen error message.
  */
 void cuvsSetLastErrorText(const char* error);
+
+/** @} */
+
 #ifdef __cplusplus
 }
 #endif
-
-/** @} */

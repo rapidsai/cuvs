@@ -5,7 +5,6 @@ Interop
    :language: c++
    :class: highlight
 
-
 ``#include <cuvs/core/interop.hpp>``
 
 namespace *cuvs::core*
