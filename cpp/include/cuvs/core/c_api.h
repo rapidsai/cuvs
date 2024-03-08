@@ -24,7 +24,30 @@ extern "C" {
 #endif
 
 /**
- * @defgroup c_api C API Core Types and Functions
+ * @defgroup error_c cuVS Error Messages
+ * @{
+ */
+/**
+ * @brief An enum denoting return values for function calls
+ *
+ */
+typedef enum { CUVS_ERROR, CUVS_SUCCESS } cuvsError_t;
+
+/** @brief Returns a string describing the last seen error on this thread, or
+ *         NULL if the last function succeeded.
+ */
+const char* cuvsGetLastErrorText();
+
+/**
+ * @brief Sets a string describing an error seen on the thread. Passing NULL
+ *        clears any previously seen error message.
+ */
+void cuvsSetLastErrorText(const char* error);
+
+/** @} */
+
+/**
+ * @defgroup resources_c cuVS Resources Handle
  * @{
  */
 
@@ -33,12 +56,6 @@ extern "C" {
  *
  */
 typedef uintptr_t cuvsResources_t;
-
-/**
- * @brief An enum denoting return values for function calls
- *
- */
-typedef enum { CUVS_ERROR, CUVS_SUCCESS } cuvsError_t;
 
 /**
  * @brief Create an Initialized opaque C handle for C++ type `raft::resources`
@@ -65,17 +82,6 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
  * @return cuvsError_t
  */
 cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
-
-/** @brief Returns a string describing the last seen error on this thread, or
- *         NULL if the last function succeeded.
- */
-const char* cuvsGetLastErrorText();
-
-/**
- * @brief Sets a string describing an error seen on the thread. Passing NULL
- *        clears any previously seen error message.
- */
-void cuvsSetLastErrorText(const char* error);
 
 /** @} */
 

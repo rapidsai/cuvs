@@ -7,18 +7,30 @@ CAGRA is a graph-based nearest neighbors algorithm that was built from the groun
    :language: python
    :class: highlight
 
-Index configuration parameters
-------------------------------
+Index build parameters
+----------------------
 
 .. autoclass:: cuvs.neighbors.cagra.IndexParams
     :members:
 
+Index search parameters
+-----------------------
+
 .. autoclass:: cuvs.neighbors.cagra.SearchParams
     :members:
 
-Index build and search
-----------------------
+Index
+-----
+
+.. autoclass:: cuvs.neighbors.cagra.Index
+    :members:
+
+Index build
+-----------
 
 .. autofunction:: cuvs.neighbors.cagra.build_index
+
+Index search
+------------
 
 .. autofunction:: cuvs.neighbors.cagra.search

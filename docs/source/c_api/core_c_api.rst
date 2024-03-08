@@ -1,15 +1,24 @@
 Core Routines
 =============
 
-
-
 .. role:: py(code)
    :language: c
    :class: highlight
 
 ``#include <cuvs/core/c_api.h>``
 
-.. doxygengroup:: c_api
+Resources Handle
+----------------
+
+.. doxygengroup:: resources_c
+    :project: cuvs
+    :members:
+    :content-only:
+
+Error Handling
+--------------
+
+.. doxygengroup:: error_c
     :project: cuvs
     :members:
     :content-only:
