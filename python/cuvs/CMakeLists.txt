@@ -37,7 +37,6 @@ option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulti
 
 message("- FIND_CUVS_CPP: ${FIND_CUVS_CPP}")
 
-include(../../fetch_rapids.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cython-core)
