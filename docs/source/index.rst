@@ -24,7 +24,6 @@ cuVS is a library for vector search and clustering on the GPU.
    quick_start.md
    build.md
    api_docs.rst
-   developer_guide.md
    contributing.md
 
 

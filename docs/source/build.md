@@ -1,8 +1,6 @@
 **# Installation
 
-The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. These 
-
-Both the C++ and Python APIs require CMake to build from source.
+The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. This guide outlines how to install the pre-compiled packages, build it from source, and use it in downstream applications. 
 
 ## Table of Contents
 
@@ -25,10 +23,6 @@ Both the C++ and Python APIs require CMake to build from source.
 - [Build Documentation](#build-documentation)
 - [Use cuVS in your application](#use-cuvs-in-your-application)
 
-[//]: # (- [Using cuVS in downstream projects]&#40;#using-raft-c-in-downstream-projects&#41;)
-
-[//]: # (  - [CMake targets]&#40;#cmake-targets&#41;_)
-
 ------
 
 ## Installing Pre-compiled Packages
@@ -39,17 +33,17 @@ The easiest way to install the pre-compiled C, C++, and Python packages is throu
 
 #### C++ Package
 ```bash
-mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=11.8
+mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.0
 ```
 
 #### C Package
 ```bash
-mamba install -c rapidsai -c conda-forge -c nvidia libcuvs_c cuda-version=11.8
+mamba install -c rapidsai -c conda-forge -c nvidia libcuvs_c cuda-version=12.0
 ```
 
 #### Python Package
 ```bash
-mamba install -c rapidsai -c conda-forge -c nvidia pycuvs cuda-version=11.8
+mamba install -c rapidsai -c conda-forge -c nvidia pycuvs cuda-version=12.0
 ```
 
 ### Python through Pip
@@ -66,7 +60,7 @@ And CUDA 12 packages:
 pip install pycuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 ```
 
-Note: these packages statically links the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code. 
+Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code. 
 
 ### Rust through crates.io
 
@@ -124,10 +118,10 @@ Compile the C and C++ Googletests using the `tests` target in `build.sh`.
 
 The tests will be written to the build directory, which is `cpp/build/` by default, and they will be named `*_TEST`.
 
-It can take sometime to compile all of the tests. You can build individual tests by providing a semicolon-separated list to the `--limit-tests` option in `build.sh`. Make sure to pass the `-n` flag so the tests are not installed.
+It can take some time to compile all of the tests. You can build individual tests by providing a semicolon-separated list to the `--limit-tests` option in `build.sh`. Make sure to pass the `-n` flag so the tests are not installed.
 
 ```bash
-./build.sh libcuvs tests -n --limit-tests=NEIGHBORS_TEST;CLUSTER_TEST
+./build.sh libcuvs tests -n --limit-tests=NEIGHBORS_TEST;CAGRA_C_TEST
 ```
 
 ### Python library
