@@ -8,29 +8,29 @@ CAGRA is a graph-based nearest neighbors algorithm that was built from the groun
    :class: highlight
 
 Index build parameters
-----------------------
+######################
 
 .. autoclass:: cuvs.neighbors.cagra.IndexParams
     :members:
 
 Index search parameters
------------------------
+#######################
 
 .. autoclass:: cuvs.neighbors.cagra.SearchParams
     :members:
 
 Index
------
+#####
 
 .. autoclass:: cuvs.neighbors.cagra.Index
     :members:
 
 Index build
------------
+###########
 
 .. autofunction:: cuvs.neighbors.cagra.build_index
 
 Index search
-------------
+############
 
 .. autofunction:: cuvs.neighbors.cagra.search

@@ -23,11 +23,11 @@ from github_link import make_linkcode_resolve  # noqa
 # ones.
 extensions = [
     "numpydoc",
+    "sphinx.ext.linkcode",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
-    "sphinx.ext.linkcode",
     "IPython.sphinxext.ipython_console_highlighting",
     "IPython.sphinxext.ipython_directive",
     "breathe",
@@ -59,7 +59,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "cuvs"
-copyright = "2023, NVIDIA Corporation"
+copyright = "2024, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
 # The version info for the project you're documenting, acts as replacement for
@@ -193,8 +193,8 @@ def setup(app):
 # The following is used by sphinx.ext.linkcode to provide links to github
 linkcode_resolve = make_linkcode_resolve(
     "cuvs",
-    "https://github.com/rapidsai/cuvs"
-    "cuvs/blob/{revision}/python/cuvs"
+    "https://github.com/rapidsai/cuvs/"
+    "blob/{revision}/python/cuvs/cuvs/"
     "{package}/{path}#L{lineno}",
 )
 

@@ -77,6 +77,7 @@ cdef class IndexParams:
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
     """
+
     cdef cuvsCagraIndexParams* params
 
     def __init__(self, *,
@@ -122,6 +123,11 @@ cdef class IndexParams:
 
 
 cdef class Index:
+    """
+    CAGRA index object. This object stores the trained CAGRA index state
+    which can be used to perform nearest neighbors searches.
+    """
+
     cdef cuvsCagraIndex_t index
     cdef bool trained
 
@@ -268,6 +274,7 @@ cdef class SearchParams:
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
     """
+
     cdef cuvsCagraSearchParams params
 
     def __init__(self, *,
