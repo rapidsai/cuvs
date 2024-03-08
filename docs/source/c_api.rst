@@ -1,6 +1,6 @@
-~~~~~
-C API
-~~~~~
+~~~~~~~~~~~~~~~~~~~
+C API Documentation
+~~~~~~~~~~~~~~~~~~~
 
 .. _api:
 
@@ -8,4 +8,4 @@ C API
    :maxdepth: 4
 
    c_api/core_c_api.rst
-   c_api/neighbors_cagra_c.rst
+   c_api/neighbors.rst

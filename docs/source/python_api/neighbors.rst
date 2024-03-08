@@ -2,7 +2,7 @@ Nearest Neighbors
 =================
 
 .. role:: py(code)
-   :language: c++
+   :language: python
    :class: highlight
 
 .. toctree::

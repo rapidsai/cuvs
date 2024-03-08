@@ -403,7 +403,7 @@ fi
 # Initiate build for c++ examples (if needed)
 
 if hasArg examples; then
-    pushd ${REPODIR}/cpp/examples
+    pushd ${REPODIR}/examples/cpp
     ./build.sh
     popd
 fi

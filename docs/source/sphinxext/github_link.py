@@ -96,7 +96,7 @@ def _linkcode_resolve(domain, info, package, url_fmt, revision):
             # fn is expected to be the absolute path.
             fn = os.path.relpath(source_file, start=package)
             print("{}:{}".format(
-                os.path.abspath(os.path.join("..", "python", "cuml", fn)),
+                os.path.abspath(os.path.join("..", "python", "cuvs", fn)),
                 lineno))
         else:
             return
