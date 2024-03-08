@@ -47,6 +47,7 @@ files:
   rust:
     output: none
     includes:
+      - cuda_version
       - build
       - cuda
       - rust
@@ -138,6 +139,7 @@ dependencies:
         packages:
           - &rmm_conda rmm==24.4.*
           - &pylibraft_conda pylibraft==24.4.*
+          - dlpack>=0.8,<1.0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -320,7 +322,7 @@ dependencies:
           - make
           - rust
           # clang/liblclang only needed for bindgen support
-          - clang  
+          - clang
           - libclang
   build_wheels:
     common:
@@ -380,7 +382,7 @@ dependencies:
           - matrix: {cuda: "11.*"}
             packages:
               - *pylibraft_cu11
-          - {matrix: null, packages: [*rmm_conda]}
+          - {matrix: null, packages: [*pylibraft_conda]}
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -391,5 +393,4 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - *pylibraft_conda
           - scikit-learn
