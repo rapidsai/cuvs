@@ -1,4 +1,4 @@
-# Installation
+**# Installation
 
 The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. This guide outlines how to install the pre-compiled packages, build it from source, and use it in downstream applications. 
 
