@@ -45,7 +45,7 @@ typedef bruteForceIndex* cuvsBruteForceIndex_t;
  * @brief Allocate BRUTEFORCE index
  *
  * @param[in] index cuvsBruteForceIndex_t to allocate
- * @return bruteForceError_t
+ * @return cuvsError_t
  */
 cuvsError_t bruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 

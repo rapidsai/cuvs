@@ -115,14 +115,7 @@ extern "C" cuvsError_t bruteForceBuild(cuvsResources_t res,
       index->addr =
         reinterpret_cast<uintptr_t>(_build<float>(res, dataset_tensor, metric, metric_arg));
       index->dtype.code = kDLFloat;
-    }
-    /* else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, dataset_tensor, metric,
-    metric_arg)); index->dtype.code = kDLInt; } else if (dataset.dtype.code == kDLUInt &&
-    dataset.dtype.bits == 8) { index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res,
-    dataset_tensor, metric, metric_arg)); index->dtype.code = kDLUInt;
-    } */
-    else {
+    } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
                 dataset.dtype.bits);
@@ -161,13 +154,7 @@ extern "C" cuvsError_t bruteForceSearch(cuvsResources_t res,
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _search<float>(res, index, queries_tensor, neighbors_tensor, distances_tensor);
-    }
-    /* else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
-      _search<int8_t>(res, index, queries_tensor, neighbors_tensor, distances_tensor);
-    } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
-      _search<uint8_t>(res, index, queries_tensor, neighbors_tensor, distances_tensor);
-    } */
-    else {
+    } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
                 queries.dtype.bits);

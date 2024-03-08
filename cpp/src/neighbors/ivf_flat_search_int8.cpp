@@ -18,20 +18,20 @@
 
 namespace cuvs::neighbors::ivf_flat {
 
-#define CUVS_INST_IVF_FLAT_SEARCH(T, IdxT)                                                \
-  void search(raft::resources const& handle,                                              \
-              const cuvs::neighbors::ivf_flat::search_params& params,                     \
-              cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                           \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,           \
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,            \
-              raft::device_matrix_view<float, IdxT, raft::row_major> distances)           \
-  {                                                                                       \
-    raft::runtime::neighbors::ivf_flat::search(handle, params, *index.get_raft_index(),   \
-                                               queries, neighbors, distances);            \
+#define CUVS_INST_IVF_FLAT_SEARCH(T, IdxT)                                      \
+  void search(raft::resources const& handle,                                    \
+              const cuvs::neighbors::ivf_flat::search_params& params,           \
+              cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                 \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \
+              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \
+              raft::device_matrix_view<float, IdxT, raft::row_major> distances) \
+  {                                                                             \
+    raft::runtime::neighbors::ivf_flat::search(                                 \
+      handle, params, *index.get_raft_index(), queries, neighbors, distances);  \
   }
 
 CUVS_INST_IVF_FLAT_SEARCH(int8_t, int64_t);
 
 #undef CUVS_INST_IVF_FLAT_SEARCH
 
-}   // namespace cuvs::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat

@@ -18,26 +18,26 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-#define CUVS_INST_IVF_PQ_BUILD(T, IdxT)                                                       \
-  auto build(raft::resources const& handle,                                                   \
-             const cuvs::neighbors::ivf_pq::index_params& params,                             \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)                \
-      -> cuvs::neighbors::ivf_pq::index<IdxT>                                                 \
-  {                                                                                           \
-    return cuvs::neighbors::ivf_pq::index<IdxT>(                                              \
-      std::move(raft::runtime::neighbors::ivf_pq::build(handle, params, dataset)));           \
-  }                                                                                           \
-                                                                                              \
-  void build(raft::resources const& handle,                                                   \
-             const cuvs::neighbors::ivf_pq::index_params& params,                             \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                \
-             cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                       \
-  {                                                                                           \
-    raft::runtime::neighbors::ivf_pq::build(handle, params, dataset, idx->get_raft_index());  \
+#define CUVS_INST_IVF_PQ_BUILD(T, IdxT)                                                      \
+  auto build(raft::resources const& handle,                                                  \
+             const cuvs::neighbors::ivf_pq::index_params& params,                            \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)               \
+    ->cuvs::neighbors::ivf_pq::index<IdxT>                                                   \
+  {                                                                                          \
+    return cuvs::neighbors::ivf_pq::index<IdxT>(                                             \
+      std::move(raft::runtime::neighbors::ivf_pq::build(handle, params, dataset)));          \
+  }                                                                                          \
+                                                                                             \
+  void build(raft::resources const& handle,                                                  \
+             const cuvs::neighbors::ivf_pq::index_params& params,                            \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,               \
+             cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                      \
+  {                                                                                          \
+    raft::runtime::neighbors::ivf_pq::build(handle, params, dataset, idx->get_raft_index()); \
   }
 
 CUVS_INST_IVF_PQ_BUILD(uint8_t, int64_t);
 
 #undef CUVS_INST_IVF_PQ_BUILD
 
-}   // namespace cuvs::neighbors::ivf_pq
+}  // namespace cuvs::neighbors::ivf_pq
