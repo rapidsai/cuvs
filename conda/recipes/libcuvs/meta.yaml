@@ -1,13 +1,12 @@
 # Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 # Usage:
-  #   conda build . -c conda-forge -c nvidia -c rapidsai
-  {% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
-  {% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
-  {% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
-  {% set cuda_major = cuda_version.split('.')[0] %}
-  {% set cuda_spec = ">=" + cuda_major ~ ",<" + (cuda_major | int + 1) ~ ".0a0" %} # i.e. >=11,<12.0a0
-  {% set date_string = environ['RAPIDS_DATE_STRING'] %}
+#   conda build . -c conda-forge -c nvidia -c rapidsai
+{% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
+{% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
+{% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
+{% set cuda_major = cuda_version.split('.')[0] %}
+{% set date_string = environ['RAPIDS_DATE_STRING'] %}
 
 package:
   name: libcuvs-split
@@ -42,6 +41,13 @@ outputs:
       ignore_run_exports_from:
         {% if cuda_major == "11" %}
         - {{ compiler('cuda11') }}
+        {% else %}
+        - {{ compiler('cuda') }}
+        - cuda-cudart-dev
+        - libcublas-dev
+        - libcurand-dev
+        - libcusolver-dev
+        - libcusparse-dev
         {% endif %}
     requirements:
       build:
@@ -70,6 +76,7 @@ outputs:
         - libcusparse {{ cuda11_libcusparse_host_version }}
         - libcusparse-dev {{ cuda11_libcusparse_host_version }}
         {% else %}
+        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -79,6 +86,13 @@ outputs:
       run:
         - libraft ={{ minor_version }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
+        {% if cuda_major != "11" %}
+        - cuda-cudart
+        - libcublas
+        - libcurand
+        - libcusolver
+        - libcusparse
+        {% endif %}
     about:
       home: https://rapids.ai/
       license: Apache-2.0
@@ -93,6 +107,13 @@ outputs:
       ignore_run_exports_from:
         {% if cuda_major == "11" %}
         - {{ compiler('cuda11') }}
+        {% else %}
+        - {{ compiler('cuda') }}
+        - cuda-cudart-dev
+        - libcublas-dev
+        - libcurand-dev
+        - libcusolver-dev
+        - libcusparse-dev
         {% endif %}
     requirements:
       build:
@@ -121,6 +142,7 @@ outputs:
         - libcusparse {{ cuda11_libcusparse_host_version }}
         - libcusparse-dev {{ cuda11_libcusparse_host_version }}
         {% else %}
+        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
@@ -130,6 +152,13 @@ outputs:
       run:
         - libraft ={{ minor_version }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
+        {% if cuda_major != "11" %}
+        - cuda-cudart
+        - libcublas
+        - libcurand
+        - libcusolver
+        - libcusparse
+        {% endif %}
     about:
       home: https://rapids.ai/
       license: Apache-2.0
@@ -144,6 +173,13 @@ outputs:
       ignore_run_exports_from:
         {% if cuda_major == "11" %}
         - {{ compiler('cuda11') }}
+        {% else %}
+        - {{ compiler('cuda') }}
+        - cuda-cudart-dev
+        - libcublas-dev
+        - libcurand-dev
+        - libcusolver-dev
+        - libcusparse-dev
         {% endif %}
     requirements:
       build:
@@ -160,7 +196,7 @@ outputs:
         - sysroot_{{ target_platform }} {{ sysroot_version }}
       host:
         - libraft ={{ minor_version }}
-        - libcuvs ={{ minor_version }}
+        - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
@@ -186,9 +222,15 @@ outputs:
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
         {% if cuda_major == "11" %}
         - cudatoolkit
+        {% else %}
+        - cuda-cudart
+        - libcublas
+        - libcurand
+        - libcusolver
+        - libcusparse
         {% endif %}
         - libraft ={{ minor_version }}
-        - libcuvs ={{ minor_version }}
+        - {{ pin_subpackage('libcuvs', exact=True) }}
         - gmock {{ gtest_version }}
         - gtest {{ gtest_version }}
     about:
@@ -205,6 +247,10 @@ outputs:
       ignore_run_exports_from:
         {% if cuda_major == "11" %}
         - {{ compiler('cuda11') }}
+        {% else %}
+        - {{ compiler('cuda') }}
+        - cuda-cudart-dev
+        - libcublas-dev
         {% endif %}
     requirements:
       build:
@@ -221,13 +267,14 @@ outputs:
         - sysroot_{{ target_platform }} {{ sysroot_version }}
       host:
         - libraft ={{ minor_version }}
-        - libcuvs ={{ minor_version }}
+        - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
         - libcublas {{ cuda11_libcublas_host_version }}
         - libcublas-dev {{ cuda11_libcublas_host_version }}
         {% else %}
+        - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
         {% endif %}
@@ -235,9 +282,12 @@ outputs:
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
         {% if cuda_major == "11" %}
         - cudatoolkit
+        {% else %}
+        - cuda-cudart
+        - libcublas
         {% endif %}
         - libraft ={{ minor_version }}
-        - libcuvs ={{ minor_version }}
+        - {{ pin_subpackage('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
       license: Apache-2.0
