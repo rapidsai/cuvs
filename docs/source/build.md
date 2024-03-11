@@ -1,4 +1,4 @@
-**# Installation
+# Installation
 
 The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. This guide outlines how to install the pre-compiled packages, build it from source, and use it in downstream applications. 
 
@@ -43,7 +43,7 @@ mamba install -c rapidsai -c conda-forge -c nvidia libcuvs_c cuda-version=12.0
 
 #### Python Package
 ```bash
-mamba install -c rapidsai -c conda-forge -c nvidia pycuvs cuda-version=12.0
+mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.0
 ```
 
 ### Python through Pip
@@ -52,12 +52,12 @@ The cuVS Python package can also be [installed through pip](https://rapids.ai/pi
 
 For CUDA 11 packages:
 ```bash
-pip install pycuvs-cu11 --extra-index-url=https://pypi.nvidia.com
+pip install cuvs-cu11 --extra-index-url=https://pypi.nvidia.com
 ```
 
 And CUDA 12 packages:
 ```bash
-pip install pycuvs-cu12 --extra-index-url=https://pypi.nvidia.com
+pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 ```
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code. 

@@ -6,10 +6,10 @@ This guide is meant to provide a quick-start primer for using the various differ
 
 - [Resource management](#resource-management)
 - [Memory management](#memory-management)
-- [Multi-dimensional array formats and interoperability](#multi-dimensional-array-formats-and-interoperability)
-  - [C++ multi-dimensional span (mdspan)](#c-multi-dimensional-span-mdspan)
-  - [DLPack](#dlpack)
-  - [CUDA array interface](#cuda-array-interface)
+- [Interoperability](#multi-dimensional-array-formats-and-interoperability)
+  - [DLPack (C)](#dlpack-c)
+  - [Multi-dimensional span (C++)](#multi-dimensional-span-c)
+  - [CUDA array interface (Python)](#cuda-array-interface-python)
 - [Working with ANN indexes](#working-with-ann-indexes)
   - [Building an index](#building-an-index)
   - [Searching an index](#searching-an-index)
@@ -20,15 +20,22 @@ This guide is meant to provide a quick-start primer for using the various differ
 
 ## Resource management
 
+cuVS uses 
+
 ## Memory management
 
 cuVS relies heavily on the [RMM](https://github.com/rapidsai/rmm) library which eases the burden of configuring different allocation strategies globally across the libraries that use it.
 
 ## Multi-dimensional array formats and interoperability
 
-### C++ multi-dimensional span (mdspan)
 
-Most of the C++ APIs in cuVS accept  [mdspan](https://arxiv.org/abs/2010.06474) multi-dimensional array view for representing data in higher dimensions similar to the `ndarray` in the Numpy Python library. RAFT also contains the corresponding owning `mdarray` structure, which simplifies the allocation and management of multi-dimensional data in both host and device (GPU) memory.
+### DLPack
+
+
+
+### Multi-dimensional span (C++)
+
+cuVS is built on top of the GPU-accelerated machine learning and data mining primitives in the [RAFT](https://github.com/rapidsai/raft) library. Most of the C++ APIs in cuVS accept [mdspan](https://arxiv.org/abs/2010.06474) multi-dimensional array view for representing data in higher dimensions similar to the `ndarray` in the Numpy Python library. RAFT also contains the corresponding owning `mdarray` structure, which simplifies the allocation and management of multi-dimensional data in both host and device (GPU) memory.
 
 The `mdarray` is an owning object that forms a convenience layer over RMM and can be constructed in RAFT using a number of different helper functions:
 
@@ -44,7 +51,6 @@ auto matrix = raft::make_device_matrix<float>(handle, n_rows, n_cols);
 ```
 
 The `mdspan` is a lightweight non-owning view that can wrap around any pointer, maintaining shape, layout, and indexing information for accessing elements.
-
 
 We can construct `mdspan` instances directly from the above `mdarray` instances:
 
@@ -86,32 +92,12 @@ auto vector_view = raft::make_host_vector_view(vector.data_handle(), vector.exte
 auto matrix_view = raft::make_host_matrix_view(matrix.data_handle(), matrix.extent(0), matrix.extent(1));
 ```
 
-And `managed` variants:
+Please refer to RAFT's `mdspan` [documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/mdspan/) to learn more. 
 
-```c++
-#include <raft/core/device_mdspan.hpp>
-
-int n_rows = 10;
-int n_cols = 10;
-
-auto matrix = raft::make_managed_mdspan(managed_ptr, raft::make_matrix_extents(n_rows, n_cols));
-```
-
-You can also create strided mdspans:
-
-```c++
-
-#include <raft/core/device_mdspan.hpp>
-
-int n_elements = 10;
-int stride = 10;
-
-auto vector = raft::make_device_vector_view(vector_ptr, raft::make_vector_strided_layout(n_elements, stride));
-```
-
-### DLPack
 
 ### CUDA array interface
+
+
 
 ## Working with ANN indexes
 
