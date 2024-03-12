@@ -3,7 +3,7 @@ cuVS API Basics
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :caption: Table of contents:
 
    `Memory management`_
    `Resource management`_
@@ -88,4 +88,3 @@ Python
 
 Rust
 ^^^^
-

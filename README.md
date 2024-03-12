@@ -8,13 +8,12 @@
 4. [Getting Started](#getting-started)
 5. [Contributing](#contributing)
 6. [References](#references)
-
+`
 ## Useful Resources
 
-- [cuVS Reference Documentation](https://docs.rapids.ai/api/cuvs/stable/): API Documentation.
-- [cuVS Getting Started](./docs/source/quick_start.md): Getting started with RAFT.
-- [Build and Install cuVS](./docs/source/build.md): Instructions for installing and building cuVS.
-- [Example Notebooks](./notebooks): Example jupyer notebooks
+- [API Reference Documentation](https://docs.rapids.ai/api/cuvs/nightly/api_docs): API Documentation.
+- [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Getting started with RAFT.
+- [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
 - [RAPIDS Community](https://rapids.ai/community.html): Get help, contribute, and collaborate.
 - [GitHub repository](https://github.com/rapidsai/cuvs): Download the cuVS source code.
 - [Issue tracker](https://github.com/rapidsai/cuvs/issues): Report issues or request features.
