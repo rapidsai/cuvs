@@ -1,9 +1,9 @@
 # Integrations
 
-FAISS
+In addition to using cuVS through any one of its different language APIs 
 
-Milvus
+## FAISS
 
-Kinetica
+## Milvus
 
-Lucene
+## Kinetica

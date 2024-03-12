@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide is meant to provide a quick-start primer for using the various different APIs and tools used in the cuVS software development kit. 
+This guide provides an initial starting point for using the various different features and APIs in the cuVS software development kit.
 
 ## Table of Contents
 

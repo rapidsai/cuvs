@@ -315,7 +315,6 @@ dependencies:
           - recommonmark
           - sphinx-copybutton
           - sphinx-markdown-tables
-          - sphinxcontrib
   rust:
     common:
       - output_types: [conda]
