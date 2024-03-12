@@ -9,6 +9,7 @@ channels:
 dependencies:
 - breathe
 - c-compiler
+- clang
 - clang-tools=16.0.6
 - clang==16.0.6
 - cmake>=3.26.4
@@ -28,10 +29,12 @@ dependencies:
 - graphviz
 - gtest>=1.13.0
 - ipython
+- libclang
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
+- make
 - nccl>=2.9.9
 - ninja
 - numpy>=1.23
@@ -43,6 +46,7 @@ dependencies:
 - pytest==7.*
 - recommonmark
 - rmm==24.4.*
+- rust
 - scikit-build-core>=0.7.0
 - scikit-learn
 - sphinx-copybutton
