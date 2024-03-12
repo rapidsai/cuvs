@@ -1,4 +1,4 @@
-# Quick Start
+# Getting Started
 
 This guide is meant to provide a quick-start primer for using the various different APIs and tools used in the cuVS software development kit. 
 
