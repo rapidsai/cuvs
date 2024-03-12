@@ -14,7 +14,7 @@ RMM currently has APIs for C++ and Python.
 C++
 ^^^
 
-Here's an example of configuring RMM to use a pool allocator in C++ (derived from the RMM example [here](https://github.com/rapidsai/rmm?tab=readme-ov-file#example)):
+Here's an example of configuring RMM to use a pool allocator in C++ (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#example>`_):
 
 .. code-block:: c++
 
@@ -29,7 +29,7 @@ Here's an example of configuring RMM to use a pool allocator in C++ (derived fro
 Python
 ^^^^^^
 
-And the corresponding code in Python (derived from the RMM example [here](https://github.com/rapidsai/rmm?tab=readme-ov-file#memoryresource-objects)):
+And the corresponding code in Python (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#memoryresource-objects>`_):
 
 .. code-block:: python
 
@@ -44,9 +44,9 @@ And the corresponding code in Python (derived from the RMM example [here](https:
 Resource management
 -------------------
 
-cuVS uses an API from the [RAFT](https://github.com/rapidsai/raft) library of ML and data mining primitives to centralize and reuse expensive resources, such as memory management. The below code examples demonstrate how to create these resources for use throughout this guide.
+cuVS uses an API from the `RAFT <https://github.com/rapidsai/raft>`_ library of ML and data mining primitives to centralize and reuse expensive resources, such as memory management. The below code examples demonstrate how to create these resources for use throughout this guide.
 
-See RAFT's [resource API documentation](https://docs.rapids.ai/api/raft/nightly/cpp_api/core_resources/) for more information.
+See RAFT's `resource API documentation <https://docs.rapids.ai/api/raft/nightly/cpp_api/core_resources/>`_ for more information.
 
 C
 ^
