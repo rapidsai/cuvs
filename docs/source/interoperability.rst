@@ -4,6 +4,38 @@ Interoperability
 DLPack (C)
 ^^^^^^^^^^
 
+Approximate-Nearest-Neighbor Indexes provide an interface to build and search an index via a C API. [DLPack](https://github.com/dmlc/dlpack/blob/main/README.md), a tensor interface framework, is used as the standard to interact with our C API.
+
+Representing a tensor with DLPack is simple, as it is a POD struct that stores information about the tensor at runtime.
+
+.. code-block:: c
+
+    #include <dlpack/dlpack.h>
+
+    // Create data representation in host memory
+    float dataset[2][1] = {{0.2, 0.1}};
+    // copy data to device memory
+    float *dataset_dev;
+    cudaMalloc(&dataset_dev, sizeof(float) * 2 * 1);
+    cudaMemcpy(dataset_dev, dataset, sizeof(float) * 2 * 1, cudaMemcpyDefault);
+
+    // Use DLPack for representing the data as a tensor
+    DLManagedTensor dataset_tensor;
+    dataset_tensor.dl_tensor.data               = dataset;
+    dataset_tensor.dl_tensor.device.device_type = kDLCPU;
+    dataset_tensor.dl_tensor.ndim               = 2;
+    dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+    dataset_tensor.dl_tensor.dtype.bits         = 32;
+    dataset_tensor.dl_tensor.dtype.lanes        = 1;
+    int64_t dataset_shape[2]                    = {2, 1};
+    dataset_tensor.dl_tensor.shape              = dataset_shape;
+    dataset_tensor.dl_tensor.strides            = nullptr;
+
+    // free memory after use
+    cudaFree(dataset_dev);
+
+Please refer to cuVS C API [documentation](c_api.rst) to learn more.
+
 Multi-dimensional span (C++)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
