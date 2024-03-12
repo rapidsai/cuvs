@@ -12,19 +12,27 @@ rapids-dependency-file-generator \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" | tee env.yaml
 
 rapids-mamba-retry env create --force -f env.yaml -n docs
+
+# seeing failures on activating the environment here on unbound locals
+# apply workaround from https://github.com/conda/conda/issues/8186#issuecomment-532874667
+set +eu
 conda activate docs
+set -eu
 
 rapids-print-env
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
-#PYTHON_CHANNEL=$(rapids-download-conda-from-s3 python)
+PYTHON_CHANNEL=$(rapids-download-conda-from-s3 python)
 
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
-  libcuvs
+  --channel "${PYTHON_CHANNEL}" \
+  libcuvs cuvs
 
-export RAPIDS_VERSION_NUMBER="24.04"
+export RAPIDS_VERSION="$(rapids-version)"
+export RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
+export RAPIDS_VERSION_NUMBER="$RAPIDS_VERSION_MAJOR_MINOR"
 export RAPIDS_DOCS_DIR="$(mktemp -d)"
 
 rapids-logger "Build CPP docs"

@@ -17,10 +17,14 @@
 use crate::error::{check_cuvs, Result};
 use std::io::{stderr, Write};
 
+/// Resources are objects that are shared between function calls,
+/// and includes things like CUDA streams, cuBLAS handles and other
+/// resources that are expensive to create.
 #[derive(Debug)]
 pub struct Resources(pub ffi::cuvsResources_t);
 
 impl Resources {
+    /// Returns a new Resources object
     pub fn new() -> Result<Resources> {
         let mut res: ffi::cuvsResources_t = 0;
         unsafe {
