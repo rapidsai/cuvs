@@ -22,7 +22,7 @@ Representing a tensor with DLPack is simple, as it is a POD struct that stores i
     // Use DLPack for representing the data as a tensor
     DLManagedTensor dataset_tensor;
     dataset_tensor.dl_tensor.data               = dataset;
-    dataset_tensor.dl_tensor.device.device_type = kDLCPU;
+    dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
     dataset_tensor.dl_tensor.ndim               = 2;
     dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
     dataset_tensor.dl_tensor.dtype.bits         = 32;
