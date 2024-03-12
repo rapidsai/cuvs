@@ -44,6 +44,8 @@ files:
       - cupy
       - docs
       - py_version
+      - rust
+      - build
   rust:
     output: none
     includes:

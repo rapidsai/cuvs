@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+//! cuVS: Rust bindings for Vector Search on the GPU
+//!
+//! This crate provides Rust bindings for cuVS, allowing you to run
+//! approximate nearest neighbors search on the GPU.
+
 pub mod cagra;
 mod dlpack;
 mod error;
