@@ -19,6 +19,7 @@ files:
       - test_python_common
       - test_py_cuvs
       - cupy
+      - rust
   test_cpp:
     output: none
     includes:
