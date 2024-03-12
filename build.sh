@@ -391,6 +391,9 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
         python -m pip install --no-build-isolation --no-deps -vvv ${REPODIR}/python/cuvs
 fi
 
+export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
+export RAPIDS_VERSION_MAJOR_MINOR="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2/' "${REPODIR}/VERSION")"
+
 if hasArg docs; then
     set -x
     cd ${DOXYGEN_BUILD_DIR}
