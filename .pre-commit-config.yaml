@@ -107,7 +107,7 @@ repos:
           - id: verify-copyright
             files: |
               (?x)
-                  [.](cmake|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx)$|
+                  [.](cmake|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs)$|
                   CMakeLists[.]txt$|
                   CMakeLists_standalone[.]txt$|
                   meta[.]yaml$|
