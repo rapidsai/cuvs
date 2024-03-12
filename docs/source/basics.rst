@@ -1,12 +1,8 @@
 cuVS API Basics
 ===============
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Table of contents:
-
-   `Memory management`_
-   `Resource management`_
+- `Memory management`_
+- `Resource management`_
 
 Memory management
 -----------------

@@ -5,7 +5,7 @@ This guide provides an initial starting point of the basic concepts and using th
 
 .. toctree::
    :maxdepth: 1
-   :caption: Table of contents:
+   :caption: Contents:
     
    basics.rst
    interoperability.rst
