@@ -24,6 +24,7 @@ pub type BuildAlgo = ffi::cuvsCagraGraphBuildAlgo;
 pub struct IndexParams(pub ffi::cuvsCagraIndexParams_t);
 
 impl IndexParams {
+    /// Returns a new IndexParams
     pub fn new() -> Result<IndexParams> {
         unsafe {
             let mut params = core::mem::MaybeUninit::<ffi::cuvsCagraIndexParams_t>::uninit();

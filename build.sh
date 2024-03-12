@@ -54,6 +54,7 @@ LIBCUVS_BUILD_DIR=${LIBCUVS_BUILD_DIR:=${REPODIR}/cpp/build}
 SPHINX_BUILD_DIR=${REPODIR}/docs
 DOXYGEN_BUILD_DIR=${REPODIR}/cpp/doxygen
 PYTHON_BUILD_DIR=${REPODIR}/python/cuvs/_skbuild
+RUST_BUILD_DIR=${REPODIR}/rust
 BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR}"
 
 # Set defaults for vars modified by flags to this script
@@ -398,6 +399,9 @@ if hasArg docs; then
     set -x
     cd ${DOXYGEN_BUILD_DIR}
     doxygen Doxyfile
+    cd ${RUST_BUILD_DIR}
+    cargo doc -p cuvs --no-deps
+    rsync -av ${RUST_BUILD_DIR}/target/doc/ ${SPHINX_BUILD_DIR}/source/_static/rust
     cd ${SPHINX_BUILD_DIR}
     sphinx-build -b html source _html
 fi

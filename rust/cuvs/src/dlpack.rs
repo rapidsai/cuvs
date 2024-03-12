@@ -19,6 +19,8 @@ use std::convert::From;
 use crate::error::{check_cuda, Result};
 use crate::resources::Resources;
 
+/// ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
+/// This lets you pass matrices in device or host memory into cuvs.
 #[derive(Debug)]
 pub struct ManagedTensor(ffi::DLManagedTensor);
 
@@ -41,6 +43,8 @@ impl ManagedTensor {
         bytes
     }
 
+    /// Creates a new ManagedTensor on the current GPU device, and copies
+    /// the data into it.
     pub fn to_device(&self, _res: &Resources) -> Result<ManagedTensor> {
         unsafe {
             let bytes = self.bytes();
@@ -64,6 +68,8 @@ impl ManagedTensor {
             Ok(ManagedTensor(ret))
         }
     }
+
+    /// Copies data from device memory into host memory
     pub fn to_host<
         T: IntoDtype,
         S: ndarray::RawData<Elem = T> + ndarray::RawDataMut,
