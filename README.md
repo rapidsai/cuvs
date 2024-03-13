@@ -2,19 +2,23 @@
 
 ## Contents
 
-1. [Useful Resources](#useful-resources)
-2. [What is cuVS?](#what-is-cuvs)
-3. [Installing cuVS](#installing)
-4. [Getting Started](#getting-started)
-5. [Contributing](#contributing)
-6. [References](#references)
-`
+- [ cuVS: Vector Search and Clustering on the GPU](#cuvs-vector-search-and-clustering-on-the-gpu)
+  - [Contents](#contents)
+  - [Useful Resources](#useful-resources)
+  - [What is cuVS?](#what-is-cuvs)
+  - [Installing cuVS](#installing-cuvs)
+    - [Stable release](#stable-release)
+    - [Nightlies](#nightlies)
+  - [Getting Started](#getting-started)
+    - [Python API](#python-api)
+    - [C++ API](#c-api)
+    - [C API](#c-api-1)
+    - [Rust API](#rust-api)
+  - [Contributing](#contributing)
+  - [References](#references)
 ## Useful Resources
 
-<<<<<<< HEAD
 - [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
-=======
->>>>>>> origin/dlpack-docs
 - [API Reference Documentation](https://docs.rapids.ai/api/cuvs/nightly/api_docs): API Documentation.
 - [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Getting started with RAFT.
 - [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
@@ -35,9 +39,9 @@ cuVS contains state-of-the-art implementations of several algorithms for running
 
 cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python). Different packages are available for the different languages supported by cuVS:
 
-| Python | C++ | C | Rust |
-|--------|-----|---|------|
-| `pycuvs`| `libcuvs` | `libcuvs_c` | `cuvs-rs` |
+| Python   | C++       | C           | Rust      |
+| -------- | --------- | ----------- | --------- |
+| `pycuvs` | `libcuvs` | `libcuvs_c` | `cuvs-rs` |
 
 ### Stable release
 

@@ -3,11 +3,6 @@ Integrations
 
 Aside from using cuVS directly, it can be consumed through a number of sdk and vector database integrations.
 
-<<<<<<< HEAD
-- `FAISS`_
-- `Milvus`_
-- `Kinetica`_
-=======
 .. toctree::
    :maxdepth: 1
    :caption: Table of contents:
@@ -15,7 +10,6 @@ Aside from using cuVS directly, it can be consumed through a number of sdk and v
    `FAISS`_
    `Milvus`_
    `Kinetica`_
->>>>>>> origin/dlpack-docs
 
 FAISS
 -----

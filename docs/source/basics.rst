@@ -1,17 +1,12 @@
 cuVS API Basics
 ===============
 
-<<<<<<< HEAD
 .. toctree::
    :maxdepth: 1
    :caption: Table of contents:
 
    `Memory management`_
    `Resource management`_
-=======
-- `Memory management`_
-- `Resource management`_
->>>>>>> upstream/branch-24.04
 
 Memory management
 -----------------
@@ -23,11 +18,7 @@ RMM currently has APIs for C++ and Python.
 C++
 ^^^
 
-<<<<<<< HEAD
-Here's an example of configuring RMM to use a pool allocator in C++ (derived from the RMM example [here](https://github.com/rapidsai/rmm?tab=readme-ov-file#example)):
-=======
 Here's an example of configuring RMM to use a pool allocator in C++ (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#example>`_):
->>>>>>> upstream/branch-24.04
 
 .. code-block:: c++
 
@@ -42,11 +33,7 @@ Here's an example of configuring RMM to use a pool allocator in C++ (derived fro
 Python
 ^^^^^^
 
-<<<<<<< HEAD
-And the corresponding code in Python (derived from the RMM example [here](https://github.com/rapidsai/rmm?tab=readme-ov-file#memoryresource-objects)):
-=======
 And the corresponding code in Python (derived from the RMM example `here <https://github.com/rapidsai/rmm?tab=readme-ov-file#memoryresource-objects>`_):
->>>>>>> upstream/branch-24.04
 
 .. code-block:: python
 
