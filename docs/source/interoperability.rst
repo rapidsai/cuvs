@@ -8,6 +8,8 @@ Approximate-Nearest-Neighbor Indexes provide an interface to build and search an
 
 Representing a tensor with DLPack is simple, as it is a POD struct that stores information about the tensor at runtime. At the moment, `DLManagedTensor` from DLPack v0.8 is compatible with out C API however we will soon upgrade to `DLManagedTensorVersioned` from DLPack v1.0 as it will help us maintain ABI and API compatibility.
 
+Here's an example on how to represent device memory using `DLManagedTensor`:
+
 .. code-block:: c
 
     #include <dlpack/dlpack.h>
@@ -39,7 +41,7 @@ Please refer to cuVS C API [documentation](c_api.rst) to learn more.
 Multi-dimensional span (C++)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-cuVS is built on top of the GPU-accelerated machine learning and data mining primitives in the [RAFT](https://github.com/rapidsai/raft) library. Most of the C++ APIs in cuVS accept [mdspan](https://arxiv.org/abs/2010.06474) multi-dimensional array view for representing data in higher dimensions similar to the `ndarray` in the Numpy Python library. RAFT also contains the corresponding owning `mdarray` structure, which simplifies the allocation and management of multi-dimensional data in both host and device (GPU) memory.
+cuVS is built on top of the GPU-accelerated machine learning and data mining primitives in the `RAFT <https://github.com/rapidsai/raft>`_ library. Most of the C++ APIs in cuVS accept `mdspan <https://arxiv.org/abs/2010.06474>`_ multi-dimensional array view for representing data in higher dimensions similar to the `ndarray` in the Numpy Python library. RAFT also contains the corresponding owning `mdarray` structure, which simplifies the allocation and management of multi-dimensional data in both host and device (GPU) memory.
 
 The `mdarray` is an owning object that forms a convenience layer over RMM and can be constructed in RAFT using a number of different helper functions:
 
@@ -97,7 +99,7 @@ Of course, RAFT's `mdspan`/`mdarray` APIs aren't just limited to the `device`. Y
     auto vector_view = raft::make_host_vector_view(vector.data_handle(), vector.extent(0));
     auto matrix_view = raft::make_host_matrix_view(matrix.data_handle(), matrix.extent(0), matrix.extent(1));
 
-Please refer to RAFT's `mdspan` [documentation](https://docs.rapids.ai/api/raft/stable/cpp_api/mdspan/) to learn more.
+Please refer to RAFT's `mdspan` `documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/mdspan/>`_ to learn more.
 
 
 CUDA array interface (Python)
