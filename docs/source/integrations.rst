@@ -3,10 +3,6 @@ Integrations
 
 Aside from using cuVS directly, it can be consumed through a number of sdk and vector database integrations.
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Table of contents:
-
    `FAISS`_
    `Milvus`_
    `Kinetica`_
