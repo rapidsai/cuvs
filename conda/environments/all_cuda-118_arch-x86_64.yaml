@@ -40,7 +40,7 @@ dependencies:
 - make
 - nccl>=2.9.9
 - ninja
-- numpy>=1.23
+- numpy>=1.23,<2.0a0
 - numpydoc
 - nvcc_linux-64=11.8
 - pre-commit
