@@ -8,9 +8,10 @@
 4. [Getting Started](#getting-started)
 5. [Contributing](#contributing)
 6. [References](#references)
-`
+
 ## Useful Resources
 
+- [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
 - [API Reference Documentation](https://docs.rapids.ai/api/cuvs/nightly/api_docs): API Documentation.
 - [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Getting started with RAFT.
 - [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
