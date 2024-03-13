@@ -4,9 +4,9 @@ Interoperability
 DLPack (C)
 ^^^^^^^^^^
 
-Approximate-Nearest-Neighbor Indexes provide an interface to build and search an index via a C API. [DLPack](https://github.com/dmlc/dlpack/blob/main/README.md), a tensor interface framework, is used as the standard to interact with our C API.
+Approximate-Nearest-Neighbor Indexes provide an interface to build and search an index via a C API. [DLPack v0.8](https://github.com/dmlc/dlpack/blob/main/README.md), a tensor interface framework, is used as the standard to interact with our C API.
 
-Representing a tensor with DLPack is simple, as it is a POD struct that stores information about the tensor at runtime.
+Representing a tensor with DLPack is simple, as it is a POD struct that stores information about the tensor at runtime. At the moment, `DLManagedTensor` from DLPack v0.8 is compatible with out C API however we will soon upgrade to `DLManagedTensorVersioned` from DLPack v1.0 as it will help us maintain ABI and API compatibility.
 
 .. code-block:: c
 
