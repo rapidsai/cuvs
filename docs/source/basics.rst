@@ -84,3 +84,7 @@ Python
 
 Rust
 ^^^^
+
+.. code-block:: rust
+
+    let res = cuvs::Resources::new()?;
