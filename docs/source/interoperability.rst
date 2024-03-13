@@ -36,7 +36,7 @@ Here's an example on how to represent device memory using `DLManagedTensor`:
     // free memory after use
     cudaFree(dataset_dev);
 
-Please refer to cuVS C API [documentation](c_api.rst) to learn more.
+Please refer to cuVS C API `documentation <c_api.rst>`_ to learn more.
 
 Multi-dimensional span (C++)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

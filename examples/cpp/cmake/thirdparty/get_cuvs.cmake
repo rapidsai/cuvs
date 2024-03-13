@@ -28,11 +28,13 @@ function(find_and_configure_cuvs)
             GLOBAL_TARGETS      cuvs::cuvs
             BUILD_EXPORT_SET    cuvs-template-exports
             INSTALL_EXPORT_SET  cuvs-template-exports
+            COMPONENTS c_api
             CPM_ARGS
             GIT_REPOSITORY https://github.com/${PKG_FORK}/cuvs.git
             GIT_TAG        ${PKG_PINNED_TAG}
             SOURCE_SUBDIR  cpp
             OPTIONS
+            "BUILD_C_LIBRARY ON"
             "BUILD_TESTS OFF"
             "CUVS_NVTX ${PKG_ENABLE_NVTX}"
             )
