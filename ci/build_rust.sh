@@ -36,5 +36,4 @@ rapids-mamba-retry install \
   libraft
 
 # build and test the rust bindings
-cd rust
-cargo test
+source ./build.sh rust

@@ -397,6 +397,7 @@ fi
 if (( ${NUMARGS} == 0 )) || hasArg rust; then
     cd ${REPODIR}/rust
     cargo build --examples --lib
+    cargo test
 fi
 
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
