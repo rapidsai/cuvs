@@ -35,5 +35,5 @@ rapids-mamba-retry install \
   libcuvs  \
   libraft
 
-# build and test the rust bindings
-source ./build.sh rust
+export EXTRA_CMAKE_ARGS=""
+bash ./build.sh rust
