@@ -1,8 +1,8 @@
 cuVS API Basics
 ===============
 
-   `Memory management`_
-   `Resource management`_
+- `Memory management`_
+- `Resource management`_
 
 Memory management
 -----------------
