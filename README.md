@@ -16,6 +16,7 @@
     - [Rust API](#rust-api)
   - [Contributing](#contributing)
   - [References](#references)
+
 ## Useful Resources
 
 - [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
