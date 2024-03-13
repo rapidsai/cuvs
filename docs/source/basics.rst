@@ -87,4 +87,4 @@ Rust
 
 .. code-block:: rust
 
-    let res = cuvs::Resources::new()?;
+    let res = cuvs::Resources::new()?;	
