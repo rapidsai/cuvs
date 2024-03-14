@@ -14,42 +14,39 @@
  * limitations under the License.
  */
 
-#include <cstdint>
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_resources.hpp>
-#include <raft/core/resource/cuda_stream.hpp>
-#include <raft/random/make_blobs.cuh>
-
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/cagra.h>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <dlpack/dlpack.h>
 
-#include "common.cuh"
-#include "dlpack/dlpack.h"
+#include <cuda_runtime.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-void cagra_build_search_simple(
-    raft::device_resources const &dev_resources,
-    raft::device_matrix_view<const float, int64_t> dataset_mds,
-    raft::device_matrix_view<const float, int64_t> queries_mds) {
+float dataset[4][2] = {{0.74021935, 0.9209938},
+                       {0.03902049, 0.9689629},
+                       {0.92514056, 0.4463501},
+                       {0.6673192, 0.10993068}};
+float queries[4][2] = {{0.48216683, 0.0428398},
+                       {0.5084142, 0.6545497},
+                       {0.51260436, 0.2643005},
+                       {0.05198065, 0.5789965}};
 
-  int64_t n_rows = dataset_mds.extent(0);
-  int64_t n_cols = dataset_mds.extent(1);
-  int64_t topk = 12;
-  int64_t n_queries = queries_mds.extent(0);
+void cagra_build_search_simple() {
+
+  int64_t n_rows = 4;
+  int64_t n_cols = 2;
+  int64_t topk = 2;
+  int64_t n_queries = 4;
 
   // Create a cuvsResources_t object
   cuvsResources_t res;
   cuvsResourcesCreate(&res);
 
-  cuvsStreamSet(res, raft::resource::get_cuda_stream(dev_resources));
-
   // Use DLPack to represent `dataset` as a tensor
   DLManagedTensor dataset_tensor;
-  dataset_tensor.dl_tensor.data =
-      const_cast<float *>(dataset_mds.data_handle());
-  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  dataset_tensor.dl_tensor.data = dataset;
+  dataset_tensor.dl_tensor.device.device_type = kDLCPU;
   dataset_tensor.dl_tensor.ndim = 2;
   dataset_tensor.dl_tensor.dtype.code = kDLFloat;
   dataset_tensor.dl_tensor.dtype.bits = 32;
@@ -67,16 +64,18 @@ void cagra_build_search_simple(
 
   cuvsCagraBuild(res, index_params, &dataset_tensor, index);
 
-  // Allocate memory for `neighbors` and `distances` output
+  // Allocate memory for `queries`, `neighbors` and `distances` output
   uint32_t *neighbors;
-  float *distances;
-  cudaMalloc(&neighbors, sizeof(uint32_t) * n_queries * topk);
-  cudaMalloc(&distances, sizeof(float) * n_queries * topk);
+  float *distances, *queries_d;
+  cudaMalloc((void**) &queries_d, sizeof(float) * n_queries * n_cols);
+  cudaMalloc((void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
+  cudaMalloc((void**) &distances, sizeof(float) * n_queries * topk);
 
   // Use DLPack to represent `queries`, `neighbors` and `distances` as tensors
+  cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault);
+
   DLManagedTensor queries_tensor;
-  queries_tensor.dl_tensor.data =
-      const_cast<float *>(queries_mds.data_handle());
+  queries_tensor.dl_tensor.data = queries_d;
   queries_tensor.dl_tensor.device.device_type = kDLCUDA;
   queries_tensor.dl_tensor.ndim = 2;
   queries_tensor.dl_tensor.dtype.code = kDLFloat;
@@ -116,14 +115,22 @@ void cagra_build_search_simple(
                   &distances_tensor);
 
   // print results
-  raft::resource::sync_stream(dev_resources);
-  auto neighbors_mds = raft::make_device_matrix_view<uint32_t, int64_t>(
-      neighbors, n_queries, topk);
-  auto distances_mds =
-      raft::make_device_matrix_view<float, int64_t>(distances, n_queries, topk);
-  print_results(dev_resources, neighbors_mds, distances_mds);
+  uint32_t *neighbors_h =
+      (uint32_t *)malloc(sizeof(uint32_t) * n_queries * topk);
+  float *distances_h = (float *)malloc(sizeof(float) * n_queries * topk);
+  cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk,
+             cudaMemcpyDefault);
+  cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk,
+             cudaMemcpyDefault);
+  printf("Query 0 neighbor indices: =[%d, %d]\n", neighbors_h[0],
+         neighbors_h[1]);
+  printf("Query 0 neighbor distances: =[%f, %f]\n", distances_h[0],
+         distances_h[1]);
 
   // Free or destroy all allocations
+  free(neighbors_h);
+  free(distances_h);
+
   cuvsCagraSearchParamsDestroy(search_params);
 
   cudaFree(neighbors);
@@ -135,34 +142,6 @@ void cagra_build_search_simple(
 }
 
 int main() {
-  raft::device_resources dev_resources;
-
-  // Set pool memory resource with 1 GiB initial pool size. All allocations use
-  // the same pool.
-  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-      rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  rmm::mr::set_current_device_resource(&pool_mr);
-
-  // Alternatively, one could define a pool allocator for temporary arrays (used
-  // within RAFT algorithms). In that case only the internal arrays would use
-  // the pool, any other allocation uses the default RMM memory resource. Here
-  // is how to change the workspace memory resource to a pool with 2 GiB upper
-  // limit. raft::resource::set_workspace_to_pool_resource(dev_resources, 2 *
-  // 1024 * 1024 * 1024ull);
-
-  // Create input arrays.
-  int64_t n_samples = 10000;
-  int64_t n_dim = 90;
-  int64_t n_queries = 10;
-  auto dataset =
-      raft::make_device_matrix<float, int64_t>(dev_resources, n_samples, n_dim);
-  auto queries =
-      raft::make_device_matrix<float, int64_t>(dev_resources, n_queries, n_dim);
-  generate_dataset(dev_resources, dataset.view(), queries.view());
-  raft::resource::sync_stream(dev_resources);
-
   // Simple build and search example.
-  cagra_build_search_simple(dev_resources,
-                            raft::make_const_mdspan(dataset.view()),
-                            raft::make_const_mdspan(queries.view()));
+  cagra_build_search_simple();
 }

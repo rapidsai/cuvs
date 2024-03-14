@@ -18,22 +18,18 @@ cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 include(../cmake/thirdparty/fetch_rapids.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
-include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
 # ------------- configure project --------------#
 
-rapids_cuda_init_architectures(test_cuvs)
-
-project(test_cuvs LANGUAGES CXX CUDA)
+project(test_cuvs_c LANGUAGES C CXX CUDA)
 
 # ------------- configure cuvs -----------------#
 
 rapids_cpm_init()
-set(BUILD_CUVS_C_LIBRARY OFF)
+set(BUILD_CUVS_C_LIBRARY ON)
 include(../cmake/thirdparty/get_cuvs.cmake)
 
-# -------------- compile tasks ----------------- #
-add_executable(CAGRA_EXAMPLE src/cagra_example.cu)
-target_link_libraries(CAGRA_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
+add_executable(CAGRA_C_EXAMPLE src/cagra_c_example.c)
+target_link_libraries(CAGRA_C_EXAMPLE PRIVATE cuvs::c_api $<TARGET_NAME_IF_EXISTS:conda_env>)
