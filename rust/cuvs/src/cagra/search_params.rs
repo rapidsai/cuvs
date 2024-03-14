@@ -25,6 +25,7 @@ pub type HashMode = ffi::cuvsCagraHashMode;
 pub struct SearchParams(pub ffi::cuvsCagraSearchParams_t);
 
 impl SearchParams {
+    /// Returns a new SearchParams object
     pub fn new() -> Result<SearchParams> {
         unsafe {
             let mut params = core::mem::MaybeUninit::<ffi::cuvsCagraSearchParams_t>::uninit();

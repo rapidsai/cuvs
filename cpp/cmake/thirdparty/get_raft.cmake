@@ -11,10 +11,10 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
-# Use RAPIDS_VERSION from cmake/thirdparty/fetch_rapids.cmake
-set(RAFT_VERSION "${RAPIDS_VERSION}")
+# Use RAPIDS_VERSION_MAJOR_MINOR from rapids_config.cmake
+set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
 set(RAFT_FORK "rapidsai")
-set(RAFT_PINNED_TAG "branch-${RAPIDS_VERSION}")
+set(RAFT_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
 
 function(find_and_configure_raft)
     set(oneValueArgs VERSION FORK PINNED_TAG COMPILE_LIBRARY ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)

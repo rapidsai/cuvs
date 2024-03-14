@@ -1,5 +1,12 @@
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;cuVS: Vector Search and Clustering on the GPU</div>
 
+> [!note]
+> cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai) library of data mining primitives. RAPIDS RAFT currently contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms in cuVS. We are in the process of migrating the algorithms from RAFT to cuVS, but if you are unsure of which to use, please consider the following:
+> 1. RAFT contains C++ and Python APIs for all of the approximate nearest neighbors and clustering algorithms.
+> 2. cuVS contains a growing support for different languages, including C, C++, Python, and Rust. We will be adding more language support to cuVS in the future but will not be improving the language support for RAFT.
+> 3. Once all of RAFT's approximate nearest neighbors and clustering algorithms are moved to cuVS, the RAFT APIs will be deprecated and eventually removed altogether. Once removed, RAFT will become a lightweight header-only library. In the meantime, there's no harm in using RAFT if support for additional languages is not needed.
+
+
 ## Contents
 
 1. [Useful Resources](#useful-resources)
@@ -11,10 +18,10 @@
 
 ## Useful Resources
 
-- [cuVS Reference Documentation](https://docs.rapids.ai/api/cuvs/stable/): API Documentation.
-- [cuVS Getting Started](./docs/source/quick_start.md): Getting started with RAFT.
-- [Build and Install cuVS](./docs/source/build.md): Instructions for installing and building cuVS.
-- [Example Notebooks](./notebooks): Example jupyer notebooks
+- [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
+- [API Reference Documentation](https://docs.rapids.ai/api/cuvs/nightly/api_docs): API Documentation.
+- [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Getting started with RAFT.
+- [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
 - [RAPIDS Community](https://rapids.ai/community.html): Get help, contribute, and collaborate.
 - [GitHub repository](https://github.com/rapidsai/cuvs): Download the cuVS source code.
 - [Issue tracker](https://github.com/rapidsai/cuvs/issues): Report issues or request features.
@@ -23,18 +30,13 @@
 
 cuVS contains state-of-the-art implementations of several algorithms for running approximate nearest neighbors and clustering on the GPU. It can be used directly or through the various databases and other libraries that have integrated it. The primary goal of cuVS is to simplify the use of GPUs for vector similarity search and clustering.
 
-**Please note** that cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai) library of data mining primitives. RAPIDS RAFT currently contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms in cuVS. We are in the process of migrating the algorithms from RAFT to cuVS, but if you are unsure of which to use, please consider the following:
-1. RAFT contains C++ and Python APIs for all of the approximate nearest neighbors and clustering algorithms.
-2. cuVS contains a growing support for different languages, including C, C++, Python, and Rust. We will be adding more language support to cuVS in the future but will not be improving the language support for RAFT.
-3. Once all of RAFT's approximate nearest neighbors and clustering algorithms are moved to cuVS, the RAFT APIs will be deprecated and eventually removed altogether. Once removed, RAFT will become a lightweight header-only library. In the meantime, there's no harm in using RAFT if support for additional languages is not needed.
-
 ## Installing cuVS
 
 cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python). Different packages are available for the different languages supported by cuVS:
 
-| Python | C++ | C | Rust |
-|--------|-----|---|------|
-| `pycuvs`| `libcuvs` | `libcuvs_c` | `cuvs-rs` |
+| Python | C++ | C |
+|--------|-----|---|
+| `pycuvs`| `libcuvs` | `libcuvs_c` |
 
 ### Stable release
 
@@ -170,7 +172,7 @@ fn cagra_example() -> Result<()> {
 
 ## Contributing
 
-If you are interested in contributing to the cuVS library, please read our [Contributing guidelines](docs/source/contributing.md). Refer to the [Developer Guide](docs/source/developer_guide.md) for details on the developer guidelines, workflows, and principals.
+If you are interested in contributing to the cuVS library, please read our [Contributing guidelines](docs/source/contributing.md). Refer to the [Developer Guide](docs/source/developer_guide.md) for details on the developer guidelines, workflows, and principles.
 
 ## References
 
