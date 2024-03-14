@@ -18,13 +18,14 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python docs tests examples clean --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust docs tests examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
    libcuvs          - build the cuvs C++ code only. Also builds the C-wrapper library
                       around the C++ code.
    python           - build the cuvs Python package
+   rust             - build the cuvs Rust bindings
    docs             - build the documentation
    tests            - build the tests
    examples         - build the examples
@@ -54,8 +55,8 @@ LIBCUVS_BUILD_DIR=${LIBCUVS_BUILD_DIR:=${REPODIR}/cpp/build}
 SPHINX_BUILD_DIR=${REPODIR}/docs
 DOXYGEN_BUILD_DIR=${REPODIR}/cpp/doxygen
 PYTHON_BUILD_DIR=${REPODIR}/python/cuvs/_skbuild
-RUST_BUILD_DIR=${REPODIR}/rust
-BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR}"
+RUST_BUILD_DIR=${REPODIR}/rust/target
+BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR} ${RUST_BUILD_DIR}"
 
 # Set defaults for vars modified by flags to this script
 CMAKE_LOG_LEVEL=""
@@ -77,6 +78,7 @@ CLEAN=0
 UNINSTALL=0
 DISABLE_DEPRECATION_WARNINGS=ON
 CMAKE_TARGET=""
+EXTRA_CMAKE_ARGS=""
 
 # Set defaults for vars that may not have been defined externally
 INSTALL_PREFIX=${INSTALL_PREFIX:=${PREFIX:=${CONDA_PREFIX:=$LIBCUVS_BUILD_DIR/install}}}
@@ -392,6 +394,13 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
         python -m pip install --no-build-isolation --no-deps -vvv ${REPODIR}/python/cuvs
 fi
 
+# Build the cuvs Rust bindings
+if (( ${NUMARGS} == 0 )) || hasArg rust; then
+    cd ${REPODIR}/rust
+    cargo build --examples --lib
+    cargo test
+fi
+
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
 export RAPIDS_VERSION_MAJOR_MINOR="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2/' "${REPODIR}/VERSION")"
 
@@ -399,11 +408,11 @@ if hasArg docs; then
     set -x
     cd ${DOXYGEN_BUILD_DIR}
     doxygen Doxyfile
-    cd ${RUST_BUILD_DIR}
-    cargo doc -p cuvs --no-deps
-    rsync -av ${RUST_BUILD_DIR}/target/doc/ ${SPHINX_BUILD_DIR}/source/_static/rust
     cd ${SPHINX_BUILD_DIR}
     sphinx-build -b html source _html
+    cd ${REPODIR}/rust
+    cargo doc -p cuvs --no-deps
+    rsync -av ${RUST_BUILD_DIR}/doc/ ${SPHINX_BUILD_DIR}/_html/_static/rust
 fi
 
 ################################################################################

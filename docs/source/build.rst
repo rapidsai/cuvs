@@ -168,6 +168,12 @@ The Python packages can also be uninstalled using the `build.sh` script:
 Rust library
 ^^^^^^^^^^^^
 
+The Rust bindings can be built with
+
+.. code-block:: bash
+
+    ./build.sh rust
+
 Using CMake directly
 ^^^^^^^^^^^^^^^^^^^^
 

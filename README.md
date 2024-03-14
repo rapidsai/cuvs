@@ -34,9 +34,9 @@ cuVS contains state-of-the-art implementations of several algorithms for running
 
 cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python). Different packages are available for the different languages supported by cuVS:
 
-| Python | C++ | C | Rust |
-|--------|-----|---|------|
-| `pycuvs`| `libcuvs` | `libcuvs_c` | `cuvs-rs` |
+| Python | C++ | C |
+|--------|-----|---|
+| `pycuvs`| `libcuvs` | `libcuvs_c` |
 
 ### Stable release
 
@@ -172,7 +172,7 @@ fn cagra_example() -> Result<()> {
 
 ## Contributing
 
-If you are interested in contributing to the cuVS library, please read our [Contributing guidelines](docs/source/contributing.md). Refer to the [Developer Guide](docs/source/developer_guide.md) for details on the developer guidelines, workflows, and principals.
+If you are interested in contributing to the cuVS library, please read our [Contributing guidelines](docs/source/contributing.md). Refer to the [Developer Guide](docs/source/developer_guide.md) for details on the developer guidelines, workflows, and principles.
 
 ## References
 
