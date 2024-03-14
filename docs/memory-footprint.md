@@ -64,7 +64,7 @@ $$
 
 Simple approximate formula:
 
-$$\approx n_\text{vectors} \times (pq_\text{dim} * pq_\text{bits} / 8 + \text{sizeof}(IdxT)) + O(n_\text{clusters})$$
+$$\approx n_\text{vectors} \times (pq_\text{dim} \times pq_\text{bits} / 8 + \text{sizeof}(IdxT)) + O(n_\text{clusters})$$
 
 The encoded data in the interleaved form:
 
@@ -78,8 +78,8 @@ $$ \text{Indices} \approx n_\text{vectors} \times \text{sizeof}(IdxT) $$
 
 Codebooks:
 
-$$ = 4 \times pq_\text{dim} \times pq_\text{len} \times 2^pq_\text{bits} \textsf{ // per-subspace (default)} $$
-$$ = 4 * n_\text{clusters} \times pq_\text{len} \times 2^pq_\text{bits} \textsf{ // per-cluster} $$
+$$ = 4 \times pq_\text{dim} \times pq_\text{len} \times 2^{pq_\text{bits}} \textsf{ // per-subspace (default)} $$
+$$ = 4 \times n_\text{clusters} \times pq_\text{len} \times 2^{pq_\text{bits}} \textsf{ // per-cluster} $$
 
 Extras:
 
@@ -93,7 +93,7 @@ $$\approx O(n_\text{clusters}) $$
 
 When used with refinement, the original data must be available:
 
-$$ n_\text{vectors} \times \text{dim} \times \text{sizeof(T)} $$
+$$ n_\text{vectors} \times \text{dim} \times \text{sizeof}(T) $$
 
 #### SEARCH: Formula for peak memory usage (device):
 
