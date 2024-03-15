@@ -29,6 +29,7 @@ project(test_cuvs_c LANGUAGES C CXX CUDA)
 
 rapids_cpm_init()
 set(BUILD_CUVS_C_LIBRARY ON)
+include(../cmake/thirdparty/get_dlpack.cmake)
 include(../cmake/thirdparty/get_cuvs.cmake)
 
 add_executable(CAGRA_C_EXAMPLE src/cagra_c_example.c)
