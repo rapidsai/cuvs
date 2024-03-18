@@ -215,6 +215,7 @@ add_library(
   src/neighbors/ivf_flat_serialize_float.cpp
   src/neighbors/ivf_flat_serialize_int8.cpp
   src/neighbors/ivf_flat_serialize_uint8.cpp
+  src/neighbors/ivf_pq_index.cpp
   src/neighbors/ivf_pq_build_float.cpp
   src/neighbors/ivf_pq_build_int8.cpp
   src/neighbors/ivf_pq_build_uint8.cpp

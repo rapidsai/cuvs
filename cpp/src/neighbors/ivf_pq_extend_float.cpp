@@ -15,6 +15,7 @@
  */
 
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <raft_runtime/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
 

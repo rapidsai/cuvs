@@ -17,7 +17,7 @@
 #pragma once
 
 #include "ann_types.hpp"
-#include <raft_runtime/neighbors/ivf_pq.hpp>
+#include <raft/neighbors/ivf_pq_types.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
 
@@ -155,213 +155,58 @@ struct search_params : ann::search_params {
   }
 };
 
+template <typename IdxT, typename SizeT = uint32_t>
+using list_data = raft::neighbors::ivf_pq::list_data<IdxT, SizeT>;
+
 template <typename IdxT>
 struct index : ann::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
+  using pq_centers_extents = typename raft::neighbors::ivf_pq::index<IdxT>::pq_centers_extents;
+
  public:
-  // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
+  index(raft::resources const& handle, const index_params& params, uint32_t dim);
+  index(raft::neighbors::ivf_pq::index<IdxT>&& raft_idx);
 
-  /** Construct an empty index. It needs to be trained and then populated. */
-  index(raft::resources const& handle, const index_params& params, uint32_t dim)
-    : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::ivf_pq::index<IdxT>>(
-        handle,
-        static_cast<raft::distance::DistanceType>((int)params.metric),
-        static_cast<raft::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind),
-        params.n_lists,
-        dim,
-        params.pq_bits,
-        params.pq_dim,
-        params.conservative_memory_allocation))
-  {
-  }
-
-  /** Build a cuvs IVF_PQ index from an existing RAFT IVF_PQ index. */
-  index(raft::neighbors::ivf_pq::index<IdxT>&& raft_idx)
-    : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::ivf_pq::index<IdxT>>(std::move(raft_idx)))
-  {
-  }
-
-  /** Total length of the index. */
-  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT { return raft_index_->size(); }
-  /** Dimensionality of the input data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
-  {
-    return raft_index_->dim();
-  }
-  /**
-   * Dimensionality of the cluster centers:
-   * input data dim extended with vector norms and padded to 8 elems.
-   */
-  [[nodiscard]] constexpr inline auto dim_ext() const noexcept -> uint32_t
-  {
-    return raft_index_->dim_ext();
-  }
-  /**
-   * Dimensionality of the data after transforming it for PQ processing
-   * (rotated and augmented to be muplitple of `pq_dim`).
-   */
-  [[nodiscard]] constexpr inline auto rot_dim() const noexcept -> uint32_t
-  {
-    return raft_index_->rot_dim();
-  }
-  /** The bit length of an encoded vector element after compression by PQ. */
-  [[nodiscard]] constexpr inline auto pq_bits() const noexcept -> uint32_t
-  {
-    return raft_index_->pq_bits();
-  }
-  /** The dimensionality of an encoded vector after compression by PQ. */
-  [[nodiscard]] constexpr inline auto pq_dim() const noexcept -> uint32_t
-  {
-    return raft_index_->pq_dim();
-  }
-  /** Dimensionality of a subspaces, i.e. the number of vector components mapped to a subspace */
-  [[nodiscard]] constexpr inline auto pq_len() const noexcept -> uint32_t
-  {
-    return raft_index_->pq_len();
-  }
-  /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
-  [[nodiscard]] constexpr inline auto pq_book_size() const noexcept -> uint32_t
-  {
-    return raft_index_->pq_book_size();
-  }
-  /** Distance metric used for clustering. */
-  [[nodiscard]] constexpr inline auto metric() const noexcept -> raft::distance::DistanceType
-  {
-    return raft_index_->metric();
-  }
-  /** How PQ codebooks are created. */
-  [[nodiscard]] constexpr inline auto codebook_kind() const noexcept -> codebook_gen
-  {
-    return raft_index_->codebook_kind();
-  }
-  /** Number of clusters/inverted lists (first level quantization). */
-  [[nodiscard]] constexpr inline auto n_lists() const noexcept -> uint32_t
-  {
-    return raft_index_->n_lists();
-  }
-  /**
-   * Whether to use convervative memory allocation when extending the list (cluster) data
-   * (see index_params.conservative_memory_allocation).
-   */
-  [[nodiscard]] constexpr inline auto conservative_memory_allocation() const noexcept -> bool
-  {
-    return raft_index_->conservative_memory_allocation();
-  }
-
-  /**
-   * PQ cluster centers
-   *
-   *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
-   *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
-   */
-  inline auto pq_centers() noexcept { return raft_index_->pq_centers(); }
-  [[nodiscard]] inline auto pq_centers() const noexcept { return raft_index_->pq_centers(); }
-
-  /** Lists' data and indices. */
-  inline auto lists() noexcept { return raft_index_->lists(); }
-  [[nodiscard]] inline auto lists() const noexcept { return raft_index_->lists(); }
-
-  /** Pointers to the inverted lists (clusters) data  [n_lists]. */
-  inline auto data_ptrs() noexcept -> raft::device_vector_view<uint8_t*, uint32_t, raft::row_major>
-  {
-    return raft_index_->data_ptrs();
-  }
-  [[nodiscard]] inline auto data_ptrs() const noexcept
-    -> raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major>
-  {
-    return raft_index_->data_ptrs();
-  }
-
-  /** Pointers to the inverted lists (clusters) indices  [n_lists]. */
-  inline auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t, raft::row_major>
-  {
-    return raft_index_->inds_ptrs();
-  }
-  [[nodiscard]] inline auto inds_ptrs() const noexcept
-    -> raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major>
-  {
-    return raft_index_->inds_ptrs();
-  }
-
-  /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
-  inline auto rotation_matrix() noexcept
-    -> raft::device_matrix_view<float, uint32_t, raft::row_major>
-  {
-    return raft_index_->rotation_matrix();
-  }
-  [[nodiscard]] inline auto rotation_matrix() const noexcept
-    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
-  {
-    return raft_index_->rotation_matrix();
-  }
-
-  /**
-   * Accumulated list sizes, sorted in descending order [n_lists + 1].
-   * The last value contains the total length of the index.
-   * The value at index zero is always zero.
-   *
-   * That is, the content of this span is as if the `list_sizes` was sorted and then accumulated.
-   *
-   * This span is used during search to estimate the maximum size of the workspace.
-   */
-  inline auto accum_sorted_sizes() noexcept
-    -> raft::host_vector_view<IdxT, uint32_t, raft::row_major>
-  {
-    return raft_index_->accum_sorted_sizes();
-  }
-  [[nodiscard]] inline auto accum_sorted_sizes() const noexcept
-    -> raft::host_vector_view<const IdxT, uint32_t, raft::row_major>
-  {
-    return raft_index_->accum_sorted_sizes();
-  }
-
-  /** Sizes of the lists [n_lists]. */
-  inline auto list_sizes() noexcept -> raft::device_vector_view<uint32_t, uint32_t, raft::row_major>
-  {
-    return raft_index_->list_sizes();
-  }
-  [[nodiscard]] inline auto list_sizes() const noexcept
-    -> raft::device_vector_view<const uint32_t, uint32_t, raft::row_major>
-  {
-    return raft_index_->list_sizes();
-  }
-
-  /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
-  inline auto centers() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
-  {
-    return raft_index_->centers();
-  }
-  [[nodiscard]] inline auto centers() const noexcept
-    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
-  {
-    return raft_index_->centers();
-  }
-
-  /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  inline auto centers_rot() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
-  {
-    return raft_index_->centers_rot();
-  }
-  [[nodiscard]] inline auto centers_rot() const noexcept
-    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
-  {
-    return raft_index_->centers_rot();
-  }
-
-  auto get_raft_index() const -> const raft::neighbors::ivf_pq::index<IdxT>*
-  {
-    return raft_index_.get();
-  }
-  auto get_raft_index() -> raft::neighbors::ivf_pq::index<IdxT>* { return raft_index_.get(); }
+  IdxT size() const noexcept;
+  uint32_t dim() const noexcept;
+  uint32_t dim_ext() const noexcept;
+  uint32_t rot_dim() const noexcept;
+  uint32_t pq_bits() const noexcept;
+  uint32_t pq_dim() const noexcept;
+  uint32_t pq_len() const noexcept;
+  uint32_t pq_book_size() const noexcept;
+  cuvs::distance::DistanceType metric() const noexcept;
+  codebook_gen codebook_kind() const noexcept;
+  uint32_t n_lists() const noexcept;
+  bool conservative_memory_allocation() const noexcept;
+  raft::mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
+  raft::mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept;
+  std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept;
+  const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept;
+  raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs() noexcept;
+  raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> data_ptrs()
+    const noexcept;
+  raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept;
+  raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> inds_ptrs() const noexcept;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept;
+  raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept;
+  raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes() const noexcept;
+  raft::device_vector_view<uint32_t, uint32_t, raft::row_major> list_sizes() noexcept;
+  raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes() const noexcept;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept;
+  const raft::neighbors::ivf_pq::index<IdxT>* get_raft_index() const;
+  raft::neighbors::ivf_pq::index<IdxT>* get_raft_index();
 
  private:
   std::unique_ptr<raft::neighbors::ivf_pq::index<IdxT>> raft_index_;
