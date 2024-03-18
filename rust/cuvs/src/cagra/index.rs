@@ -21,11 +21,18 @@ use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Result};
 use crate::resources::Resources;
 
+/// CAGRA ANN Index
 #[derive(Debug)]
 pub struct Index(ffi::cuvsCagraIndex_t);
 
 impl Index {
-    /// Builds a new index
+    /// Builds a new Index from the dataset for efficient search.
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `params` - Parameters for building the index
+    /// * `dataset` - A row-major matrix on either the host or device to index
     pub fn build<T: Into<ManagedTensor>>(
         res: &Resources,
         params: &IndexParams,
@@ -34,7 +41,12 @@ impl Index {
         let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsCagraBuild(res.0, params.0, dataset.as_ptr(), index.0))?;
+            check_cuvs(ffi::cuvsCagraBuild(
+                res.0,
+                params.0,
+                dataset.as_ptr(),
+                index.0,
+            ))?;
         }
         Ok(index)
     }
@@ -48,6 +60,15 @@ impl Index {
         }
     }
 
+    /// Perform a Approximate Nearest Neighbors search on the Index
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - Resources to use
+    /// * `params` - Parameters to use in searching the index
+    /// * `queries` - A matrix in device memory to query for
+    /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
+    /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
     pub fn search(
         self,
         res: &Resources,

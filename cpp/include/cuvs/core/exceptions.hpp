@@ -14,16 +14,32 @@
  * limitations under the License.
  */
 
-//! cuVS: Rust bindings for Vector Search on the GPU
-//!
-//! This crate provides Rust bindings for cuVS, allowing you to run
-//! approximate nearest neighbors search on the GPU.
+#pragma once
 
-pub mod cagra;
-mod dlpack;
-mod error;
-mod resources;
+#include "c_api.h"
 
-pub use dlpack::ManagedTensor;
-pub use error::{Error, Result};
-pub use resources::Resources;
+#include <exception>
+
+namespace cuvs::core {
+
+/**
+ * @brief Translates C++ exceptions into cuvs C-API error codes
+ */
+template <typename Fn>
+cuvsError_t translate_exceptions(Fn func)
+{
+  cuvsError_t status;
+  try {
+    func();
+    status = CUVS_SUCCESS;
+    cuvsSetLastErrorText(NULL);
+  } catch (const std::exception& e) {
+    cuvsSetLastErrorText(e.what());
+    status = CUVS_ERROR;
+  } catch (...) {
+    cuvsSetLastErrorText("unknown exception");
+    status = CUVS_ERROR;
+  }
+  return status;
+}
+}  // namespace cuvs::core

@@ -2,11 +2,13 @@ Nearest Neighbors
 =================
 
 .. role:: py(code)
-   :language: c++
+   :language: c
    :class: highlight
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   neighbors_cagra.rst
+
+
+   neighbors_cagra_c.rst

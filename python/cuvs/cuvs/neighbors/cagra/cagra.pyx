@@ -52,6 +52,8 @@ from cuvs.common.c_api cimport (
     cuvsResourcesCreate,
 )
 
+from cuvs.common.exceptions import check_cuvs
+
 
 cdef class IndexParams:
     """
@@ -75,6 +77,7 @@ cdef class IndexParams:
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
     """
+
     cdef cuvsCagraIndexParams* params
 
     def __init__(self, *,
@@ -120,23 +123,22 @@ cdef class IndexParams:
 
 
 cdef class Index:
+    """
+    CAGRA index object. This object stores the trained CAGRA index state
+    which can be used to perform nearest neighbors searches.
+    """
+
     cdef cuvsCagraIndex_t index
     cdef bool trained
 
     def __cinit__(self):
-        cdef cuvsError_t index_create_status
-        index_create_status = cuvsCagraIndexCreate(&self.index)
         self.trained = False
-
-        if index_create_status == cuvsError_t.CUVS_ERROR:
-            raise RuntimeError("Failed to create index.")
+        check_cuvs(cuvsCagraIndexCreate(&self.index))
 
     def __dealloc__(self):
         cdef cuvsError_t index_destroy_status
         if self.index is not NULL:
-            index_destroy_status = cuvsCagraIndexDestroy(self.index)
-            if index_destroy_status == cuvsError_t.CUVS_ERROR:
-                raise Exception("Failed to deallocate index.")
+            check_cuvs(cuvsCagraIndexDestroy(self.index))
 
     @property
     def trained(self):
@@ -203,9 +205,7 @@ def build_index(IndexParams index_params, dataset, resources=None):
     cdef cuvsResources_t res_
     cdef cuvsError_t cstat
 
-    cstat = cuvsResourcesCreate(&res_)
-    if cstat == cuvsError_t.CUVS_ERROR:
-        raise RuntimeError("Error creating Device Reources.")
+    check_cuvs(cuvsResourcesCreate(&res_))
 
     cdef Index idx = Index()
     cdef cuvsError_t build_status
@@ -214,17 +214,13 @@ def build_index(IndexParams index_params, dataset, resources=None):
     cdef cuvsCagraIndexParams* params = index_params.params
 
     with cuda_interruptible():
-        build_status = cuvsCagraBuild(
+        check_cuvs(cuvsCagraBuild(
             res_,
             params,
             dataset_dlpack,
             idx.index
-        )
-
-        if build_status == cuvsError_t.CUVS_ERROR:
-            raise RuntimeError("Index failed to build.")
-        else:
-            idx.trained = True
+        ))
+        idx.trained = True
 
     return idx
 
@@ -278,6 +274,7 @@ cdef class SearchParams:
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
     """
+
     cdef cuvsCagraSearchParams params
 
     def __init__(self, *,
@@ -451,9 +448,7 @@ def search(SearchParams search_params,
     cdef cuvsResources_t res_
     cdef cuvsError_t cstat
 
-    cstat = cuvsResourcesCreate(&res_)
-    if cstat == cuvsError_t.CUVS_ERROR:
-        raise RuntimeError("Error creating Device Reources.")
+    check_cuvs(cuvsResourcesCreate(&res_))
 
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
@@ -487,16 +482,13 @@ def search(SearchParams search_params,
         cydlpack.dlpack_c(distances_cai)
 
     with cuda_interruptible():
-        search_status = cuvsCagraSearch(
+        check_cuvs(cuvsCagraSearch(
             res_,
             params,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
             distances_dlpack
-        )
-
-        if search_status == cuvsError_t.CUVS_ERROR:
-            raise RuntimeError("Search failed.")
+        ))
 
     return (distances, neighbors)

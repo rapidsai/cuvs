@@ -17,12 +17,19 @@
 use std::fmt;
 
 #[derive(Debug, Clone)]
+pub struct CuvsError {
+    code: ffi::cuvsError_t,
+    text: String,
+}
+
+#[derive(Debug, Clone)]
 pub enum Error {
     CudaError(ffi::cudaError_t),
-    CuvsError(ffi::cuvsError_t),
+    CuvsError(CuvsError),
 }
 
 impl std::error::Error for Error {}
+impl std::error::Error for CuvsError {}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -35,11 +42,26 @@ impl fmt::Display for Error {
     }
 }
 
+impl fmt::Display for CuvsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}:{}", self.code, self.text)
+    }
+}
+
 /// Simple wrapper to convert a cuvsError_t into a Result
 pub fn check_cuvs(err: ffi::cuvsError_t) -> Result<()> {
     match err {
         ffi::cuvsError_t::CUVS_SUCCESS => Ok(()),
-        _ => Err(Error::CuvsError(err)),
+        _ => {
+            // get a description of the error from cuvs
+            let cstr = unsafe {
+                let text_ptr = ffi::cuvsGetLastErrorText();
+                std::ffi::CStr::from_ptr(text_ptr)
+            };
+            let text = std::string::String::from_utf8_lossy(cstr.to_bytes()).to_string();
+
+            Err(Error::CuvsError(CuvsError { code: err, text }))
+        }
     }
 }
 

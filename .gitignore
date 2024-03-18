@@ -61,6 +61,7 @@ _xml
 # sphinx
 _html
 _text
+docs/source/_static/rust
 
 # clang tooling
 compile_commands.json

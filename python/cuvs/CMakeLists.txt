@@ -14,9 +14,7 @@
 
 cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
-include(../../fetch_rapids.cmake)
-
-set(cuvs_version 24.04.00)
+include(../../rapids_config.cmake)
 
 # We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
 # that enables CUDA unconditionally.
@@ -25,7 +23,7 @@ rapids_cuda_init_architectures(cuvs_py)
 
 project(
   cuvs_py
-  VERSION ${cuvs_version}
+  VERSION "${RAPIDS_VERSION}"
   LANGUAGES # TODO: Building Python extension modules via the python_extension_module requires the C
             # language to be enabled here. The test project that is built in scikit-build to verify
             # various linking options for the python library is hardcoded to build with C, so until
@@ -33,13 +31,18 @@ project(
             C CXX CUDA
 )
 
+################################################################################
+# - User Options  --------------------------------------------------------------
+
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
        OFF
 )
 
-message("- FIND_CUVS_CPP: ${FIND_CUVS_CPP}")
+message("CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}")
 
-include(../../fetch_rapids.cmake)
+################################################################################
+# - Process User Options  ------------------------------------------------------
+
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cython-core)
@@ -50,7 +53,7 @@ rapids_cpm_init()
 
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
-  find_package(cuvs ${cuvs_version})
+  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED)
   include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
 else()
   set(cuvs_FOUND OFF)
@@ -69,6 +72,9 @@ if(NOT cuvs_FOUND)
   set(cython_lib_dir cuvs)
   install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
 endif()
+
+################################################################################
+# - Build Cython artifacts -----------------------------------------------------
 
 rapids_cython_init()
 
