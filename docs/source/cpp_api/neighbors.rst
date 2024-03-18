@@ -10,3 +10,4 @@ Nearest Neighbors
    :caption: Contents:
 
    neighbors_cagra.rst
+   neighbors_ivf_flat.rst

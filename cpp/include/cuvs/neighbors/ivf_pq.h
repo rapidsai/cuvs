@@ -121,18 +121,18 @@ typedef struct ivfPqIndexParams* cuvsIvfPqIndexParams_t;
 /**
  * @brief Allocate IVF_PQ Index params, and populate with default values
  *
- * @param[in] params cuvsIvfPqIndexParams_t to allocate
+ * @param[in] index_params cuvsIvfPqIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params);
+cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* index_params);
 
 /**
  * @brief De-allocate IVF_PQ Index params
  *
- * @param[in] params
+ * @param[in] index_params
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index);
+cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index_params);
 
 /**
  * @brief Supplemental parameters to search IVF_PQ index

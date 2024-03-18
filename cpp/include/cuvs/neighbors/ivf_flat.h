@@ -23,7 +23,7 @@
 #include <stdint.h>
 
 /**
- * @defgroup IVF_FLAT C API for CUDA nearest neighbor search
+ * @defgroup ivf_flat_c_index_params IVF-Flat index build parameters
  * @{
  */
 
@@ -85,19 +85,26 @@ typedef struct ivfFlatIndexParams* cuvsIvfFlatIndexParams_t;
 /**
  * @brief Allocate IVF_FLAT Index params, and populate with default values
  *
- * @param[in] params cuvsIvfFlatIndexParams_t to allocate
+ * @param[in] index_params cuvsIvfFlatIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* params);
+cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* index_params);
 
 /**
  * @brief De-allocate IVF_FLAT Index params
  *
- * @param[in] params
+ * @param[in] index_params
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index);
+cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_flat_c_search_params IVF-Flat index search parameters
+ * @{
+ */
 /**
  * @brief Supplemental parameters to search IVF_FLAT index
  *
@@ -124,7 +131,14 @@ cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_flat_c_index IVF-Flat index
+ * @{
+ */
 /**
  * @brief Struct to hold address of cuvs::neighbors::ivf_flat::index and its active trained dtype
  *
@@ -150,7 +164,14 @@ cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
  * @param[in] index cuvsIvfFlatIndex_t to de-allocate
  */
 cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_flat_c_index_build IVF-Flat index build
+ * @{
+ */
 /**
  * @brief Build a IVF_FLAT index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
@@ -197,7 +218,14 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
                          cuvsIvfFlatIndexParams_t params,
                          DLManagedTensor* dataset,
                          cuvsIvfFlatIndex_t index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_flat_c_index_search IVF-Flat index search
+ * @{
+ */
 /**
  * @brief Search a IVF_FLAT index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.
@@ -246,11 +274,10 @@ cuvsError_t ivfFlatSearch(cuvsResources_t res,
                           DLManagedTensor* queries,
                           DLManagedTensor* neighbors,
                           DLManagedTensor* distances);
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }
 #endif
-
-/**
- * @}
- */
