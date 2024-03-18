@@ -6,7 +6,7 @@ Useful Resources
 
 .. _cuvs_reference: https://docs.rapids.ai/api/cuvs/stable/
 
-- `Example Notebooks <https://github.com/rapidsai/cuvs/tree/HEAD/notebooks>`_: Example Jupyter notebooks
+- `Example Notebooks <https://github.com/rapidsai/cuvs/tree/HEAD/exmples>`_: Self-contained Code examples
 - `RAPIDS Community <https://rapids.ai/community.html>`_: Get help, contribute, and collaborate.
 - `GitHub repository <https://github.com/rapidsai/cuvs>`_: Download the cuVS source code.
 - `Issue tracker <https://github.com/rapidsai/cuvs/issues>`_: Report issues or request features.
@@ -21,8 +21,9 @@ cuVS is a library for vector search and clustering on the GPU.
    :maxdepth: 1
    :caption: Contents:
 
-   quick_start.md
+   getting_started.rst
    build.md
+   integrations.rst
    api_docs.rst
    contributing.md
 

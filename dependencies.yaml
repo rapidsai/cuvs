@@ -19,6 +19,7 @@ files:
       - test_python_common
       - test_py_cuvs
       - cupy
+      - rust
   test_cpp:
     output: none
     includes:
@@ -44,6 +45,8 @@ files:
       - cupy
       - docs
       - py_version
+      - rust
+      - build
   rust:
     output: none
     includes:
@@ -353,7 +356,7 @@ dependencies:
     common:
       - output_types: [conda, pyproject]
         packages:
-          - &numpy numpy>=1.23
+          - &numpy numpy>=1.23,<2.0a0
       - output_types: [conda]
         packages:
           - *rmm_conda
