@@ -14,31 +14,36 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/brute_force-inl.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
+#include <raft/neighbors/brute_force-inl.cuh>
 
 namespace cuvs::neighbors::brute_force {
 
-#define CUVS_INST_BFKNN(T, IdxT)                                                                 \
-  auto build(raft::resources const& res,                                                         \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                   \
-             cuvs::distance::DistanceType metric,                                                \
-             T metric_arg)                                                                       \
-    ->cuvs::neighbors::brute_force::index<T>                                                     \
-  {                                                                                              \
-    return cuvs::neighbors::brute_force::index<T>(std::move(raft::neighbors::brute_force::build( \
-      res, dataset, static_cast<raft::distance::DistanceType>(metric), metric_arg)));            \
-  }                                                                                              \
-                                                                                                 \
-  void search(raft::resources const& res,                                                        \
-              const cuvs::neighbors::brute_force::index<T>& idx,                                 \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,                  \
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,                   \
-              raft::device_matrix_view<T, IdxT, raft::row_major> distances)                      \
-  {                                                                                              \
-    raft::neighbors::brute_force::search(                                                        \
-      res, *idx.get_raft_index(), queries, neighbors, distances);                                \
-  }                                                                                              \
-                                                                                                 \
+#define CUVS_INST_BFKNN(T, IdxT)                                                             \
+  auto build(raft::resources const& res,                                                     \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,               \
+             cuvs::distance::DistanceType metric,                                            \
+             T metric_arg)                                                                   \
+    ->cuvs::neighbors::brute_force::index<T>                                                 \
+  {                                                                                          \
+    auto index_on_stack = raft::neighbors::brute_force::build(                               \
+      res, dataset, static_cast<raft::distance::DistanceType>(metric), metric_arg);          \
+    auto index_on_heap =                                                                     \
+      new raft::neighbors::brute_force::index<float>(std::move(index_on_stack));             \
+    return cuvs::neighbors::brute_force::index<float>(index_on_heap);                        \
+  }                                                                                          \
+                                                                                             \
+  void search(raft::resources const& res,                                                    \
+              const cuvs::neighbors::brute_force::index<T>& idx,                             \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,              \
+              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,               \
+              raft::device_matrix_view<T, IdxT, raft::row_major> distances)                  \
+  {                                                                                          \
+    auto raft_idx =                                                                          \
+      reinterpret_cast<const raft::neighbors::brute_force::index<T>*>(idx.get_raft_index()); \
+    raft::neighbors::brute_force::search(res, *raft_idx, queries, neighbors, distances);     \
+  }                                                                                          \
+                                                                                             \
   template struct cuvs::neighbors::brute_force::index<T>;
 
 CUVS_INST_BFKNN(float, int64_t);

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ann_types.hpp"
+#include <cuvs/neighbors/ann_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 
@@ -29,14 +30,17 @@ namespace cuvs::neighbors::brute_force {
  *
  * @tparam T data element type
  */
+
 template <typename T>
 struct index : cuvs::neighbors::ann::index {
  public:
-  index(const index&)                    = delete;
-  index(index&&)                         = default;
-  auto operator=(const index&) -> index& = delete;
-  auto operator=(index&&) -> index&      = default;
-  ~index()                               = default;
+  index(const index&)            = delete;
+  index(index&&)                 = default;
+  index& operator=(const index&) = delete;
+  index& operator=(index&&)      = default;
+  ~index()                       = default;
+  index(void* raft_index);
+
   cuvs::distance::DistanceType metric() const noexcept;
   size_t size() const noexcept;
   size_t dim() const noexcept;
@@ -44,8 +48,8 @@ struct index : cuvs::neighbors::ann::index {
   raft::device_vector_view<const T, int64_t, raft::row_major> norms() const;
   bool has_norms() const noexcept;
   T metric_arg() const noexcept;
-  void update_dataset(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset);
+  const void* get_raft_index() const;
+  void* get_raft_index();
 
  private:
   std::unique_ptr<void*> raft_index_;
