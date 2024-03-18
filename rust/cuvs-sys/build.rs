@@ -101,9 +101,8 @@ fn main() {
         .allowlist_type("(cuvs|cagra|DL).*")
         .allowlist_function("(cuvs|cagra).*")
         .rustified_enum("(cuvs|cagra|DL).*")
-        // also need some basic cuda mem functions
-        // (TODO: should we be adding in RMM support instead here?)
-        .allowlist_function("(cudaMalloc|cudaFree|cudaMemcpy)")
+        // also need some basic cuda mem functions for copying data
+        .allowlist_function("(cudaMemcpyAsync|cudaMemcpy)")
         .rustified_enum("cudaError")
         .generate()
         .expect("Unable to generate cagra_c bindings")
