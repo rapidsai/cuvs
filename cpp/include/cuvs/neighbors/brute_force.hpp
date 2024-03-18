@@ -17,9 +17,9 @@
 #pragma once
 
 #include "ann_types.hpp"
+#include <cuvs/neighbors/ann_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
-#include <cuvs/neighbors/ann_types.hpp>
 
 namespace cuvs::neighbors::brute_force {
 
@@ -55,21 +55,15 @@ struct index : cuvs::neighbors::ann::index {
   std::unique_ptr<void*> raft_index_;
 };
 
-#define CUVS_INST_BFKNN(T, IdxT)                                                               \
-  auto build(raft::resources const& res,                                                       \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                 \
-             cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded, \
-             T metric_arg                        = 0)                                          \
-    ->cuvs::neighbors::brute_force::index<T>;                                                  \
-                                                                                               \
-  void search(raft::resources const& res,                                                      \
-              const cuvs::neighbors::brute_force::index<T>& idx,                               \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,                \
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,                 \
-              raft::device_matrix_view<T, IdxT, raft::row_major> distances);
+auto build(raft::resources const& res,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded,
+           float metric_arg                    = 0) -> cuvs::neighbors::brute_force::index<float>;
 
-CUVS_INST_BFKNN(float, int64_t);
-// CUVS_INST_BFKNN(int8_t, int64_t);
-// CUVS_INST_BFKNN(uint8_t, int64_t);
+void search(raft::resources const& res,
+            const cuvs::neighbors::brute_force::index<float>& idx,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
 }  // namespace cuvs::neighbors::brute_force

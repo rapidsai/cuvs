@@ -86,97 +86,178 @@ struct index : ann::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  public:
-    index(const index&)                   = delete;
-    index(index&&)                        = default;
-    index& operator=(const index&)        = delete;
-    index& operator=(index&&)             = default;
-    ~index()                              = default;
-    index(raft::resources const& res, const index_params& params, uint32_t dim);
-    index(raft::resources const& res,
-          cuvs::distance::DistanceType metric,
-          uint32_t n_lists,
-          bool adaptive_centers,
-          bool conservative_memory_allocation,
-          uint32_t dim);
-    index(raft::neighbors::ivf_flat::index<T, IdxT>&& raft_idx);
+ public:
+  index(const index&)            = delete;
+  index(index&&)                 = default;
+  index& operator=(const index&) = delete;
+  index& operator=(index&&)      = default;
+  ~index()                       = default;
+  index(raft::resources const& res, const index_params& params, uint32_t dim);
+  index(raft::resources const& res,
+        cuvs::distance::DistanceType metric,
+        uint32_t n_lists,
+        bool adaptive_centers,
+        bool conservative_memory_allocation,
+        uint32_t dim);
+  index(raft::neighbors::ivf_flat::index<T, IdxT>&& raft_idx);
 
-    uint32_t veclen() const noexcept;
-    cuvs::distance::DistanceType metric() const noexcept;
-    bool adaptive_centers() const noexcept;
-    raft::device_vector_view<uint32_t, uint32_t> list_sizes() noexcept;
-    raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
-    raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
-    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
-    std::optional<raft::device_vector_view<float, uint32_t>> center_norms() noexcept;
-    std::optional<raft::device_vector_view<const float, uint32_t>> center_norms() const noexcept;
-    IdxT size() const noexcept;
-    uint32_t dim() const noexcept;
-    uint32_t n_lists() const noexcept;
-    raft::device_vector_view<T*, uint32_t> data_ptrs() noexcept;
-    raft::device_vector_view<T* const, uint32_t> data_ptrs() const noexcept;
-    raft::device_vector_view<IdxT*, uint32_t> inds_ptrs() noexcept;
-    raft::device_vector_view<IdxT* const, uint32_t> inds_ptrs() const noexcept;
-    bool conservative_memory_allocation() const noexcept;
-    std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists() noexcept;
-    const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists() const noexcept;
-    const raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() const;
-    raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index();
+  uint32_t veclen() const noexcept;
+  cuvs::distance::DistanceType metric() const noexcept;
+  bool adaptive_centers() const noexcept;
+  raft::device_vector_view<uint32_t, uint32_t> list_sizes() noexcept;
+  raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+  std::optional<raft::device_vector_view<float, uint32_t>> center_norms() noexcept;
+  std::optional<raft::device_vector_view<const float, uint32_t>> center_norms() const noexcept;
+  IdxT size() const noexcept;
+  uint32_t dim() const noexcept;
+  uint32_t n_lists() const noexcept;
+  raft::device_vector_view<T*, uint32_t> data_ptrs() noexcept;
+  raft::device_vector_view<T* const, uint32_t> data_ptrs() const noexcept;
+  raft::device_vector_view<IdxT*, uint32_t> inds_ptrs() noexcept;
+  raft::device_vector_view<IdxT* const, uint32_t> inds_ptrs() const noexcept;
+  bool conservative_memory_allocation() const noexcept;
+  std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists() noexcept;
+  const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists()
+    const noexcept;
+  const raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() const;
+  raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index();
 
-  private:
-    std::unique_ptr<raft::neighbors::ivf_flat::index<T, IdxT>> raft_index_;
+ private:
+  std::unique_ptr<raft::neighbors::ivf_flat::index<T, IdxT>> raft_index_;
 };
 
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& params,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_flat::index<float, int64_t>;
 
-#define CUVS_IVF_FLAT(T, IdxT)                                                       \
-  auto build(raft::resources const& handle,                                          \
-             const cuvs::neighbors::ivf_flat::index_params& params,                  \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)       \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                                     \
-                                                                                     \
-  void build(raft::resources const& handle,                                          \
-             const cuvs::neighbors::ivf_flat::index_params& params,                  \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,       \
-             cuvs::neighbors::ivf_flat::index<T, IdxT>& idx);                        \
-                                                                                     \
-  auto extend(raft::resources const& handle,                                         \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
-              const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)           \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>;                                     \
-                                                                                     \
-  void extend(raft::resources const& handle,                                         \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
-              cuvs::neighbors::ivf_flat::index<T, IdxT>* idx);                       \
-                                                                                     \
-  void search(raft::resources const& handle,                                         \
-              const cuvs::neighbors::ivf_flat::search_params& params,                \
-              cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                      \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,      \
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,       \
-              raft::device_matrix_view<float, IdxT, raft::row_major> distances);     \
-                                                                                     \
-  void serialize_file(raft::resources const& handle,                                 \
-                      const std::string& filename,                                   \
-                      const cuvs::neighbors::ivf_flat::index<T, IdxT>& index);       \
-                                                                                     \
-  void deserialize_file(raft::resources const& handle,                               \
-                        const std::string& filename,                                 \
-                        cuvs::neighbors::ivf_flat::index<T, IdxT>* index);           \
-                                                                                     \
-  void serialize(raft::resources const& handle,                                      \
-                 std::string& str,                                                   \
-                 const cuvs::neighbors::ivf_flat::index<T, IdxT>& index);            \
-                                                                                     \
-  void deserialize(raft::resources const& handle,                                    \
-                   const std::string& str,                                           \
-                   cuvs::neighbors::ivf_flat::index<T, IdxT>* index);
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& params,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_flat::index<float, int64_t>& idx);
 
-CUVS_IVF_FLAT(float, int64_t);
-CUVS_IVF_FLAT(int8_t, int64_t);
-CUVS_IVF_FLAT(uint8_t, int64_t);
+auto extend(raft::resources const& handle,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            const cuvs::neighbors::ivf_flat::index<float, int64_t>& orig_index)
+  -> cuvs::neighbors::ivf_flat::index<float, int64_t>;
 
-#undef CUVS_IVF_FLAT
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_flat::index<float, int64_t>* idx);
+
+void search(raft::resources const& handle,
+            const cuvs::neighbors::ivf_flat::search_params& params,
+            cuvs::neighbors::ivf_flat::index<float, int64_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+void serialize_file(raft::resources const& handle,
+                    const std::string& filename,
+                    const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
+
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
+
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
+
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
+
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& params,
+           raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_flat::index<int8_t, int64_t>;
+
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& params,
+           raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& idx);
+
+auto extend(raft::resources const& handle,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& orig_index)
+  -> cuvs::neighbors::ivf_flat::index<int8_t, int64_t>;
+
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* idx);
+
+void search(raft::resources const& handle,
+            const cuvs::neighbors::ivf_flat::search_params& params,
+            cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+void serialize_file(raft::resources const& handle,
+                    const std::string& filename,
+                    const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
+
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
+
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
+
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
+
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& params,
+           raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_flat::index_params& params,
+           raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx);
+
+auto extend(raft::resources const& handle,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& orig_index)
+  -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
+
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* idx);
+
+void search(raft::resources const& handle,
+            const cuvs::neighbors::ivf_flat::search_params& params,
+            cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+void serialize_file(raft::resources const& handle,
+                    const std::string& filename,
+                    const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
+
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
+
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
+
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 
 }  // namespace cuvs::neighbors::ivf_flat
