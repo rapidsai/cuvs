@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <raft_runtime/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
 namespace cuvs::neighbors::ivf_flat {

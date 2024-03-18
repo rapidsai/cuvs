@@ -17,7 +17,7 @@
 #pragma once
 
 #include "ann_types.hpp"
-#include <raft_runtime/neighbors/ivf_flat.hpp>
+#include <raft/neighbors/ivf_flat_types.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -81,203 +81,52 @@ struct search_params : ann::search_params {
   }
 };
 
-/**
- * @brief IVF-flat index.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices in the source dataset
- *
- */
 template <typename T, typename IdxT>
 struct index : ann::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
- public:
-  // Don't allow copying the index for performance reasons (try avoiding copying data)
-  index(const index&)                    = delete;
-  index(index&&)                         = default;
-  auto operator=(const index&) -> index& = delete;
-  auto operator=(index&&) -> index&      = default;
-  ~index()                               = default;
+  public:
+    index(const index&)                   = delete;
+    index(index&&)                        = default;
+    index& operator=(const index&)        = delete;
+    index& operator=(index&&)             = default;
+    ~index()                              = default;
+    index(raft::resources const& res, const index_params& params, uint32_t dim);
+    index(raft::resources const& res,
+          cuvs::distance::DistanceType metric,
+          uint32_t n_lists,
+          bool adaptive_centers,
+          bool conservative_memory_allocation,
+          uint32_t dim);
+    index(raft::neighbors::ivf_flat::index<T, IdxT>&& raft_idx);
 
-  /** Construct an empty index. */
-  index(raft::resources const& res, const index_params& params, uint32_t dim)
-    : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::ivf_flat::index<T, IdxT>>(
-        res,
-        static_cast<raft::distance::DistanceType>((int)params.metric),
-        params.n_lists,
-        params.adaptive_centers,
-        params.conservative_memory_allocation,
-        dim))
-  {
-  }
+    uint32_t veclen() const noexcept;
+    cuvs::distance::DistanceType metric() const noexcept;
+    bool adaptive_centers() const noexcept;
+    raft::device_vector_view<uint32_t, uint32_t> list_sizes() noexcept;
+    raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
+    raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+    std::optional<raft::device_vector_view<float, uint32_t>> center_norms() noexcept;
+    std::optional<raft::device_vector_view<const float, uint32_t>> center_norms() const noexcept;
+    IdxT size() const noexcept;
+    uint32_t dim() const noexcept;
+    uint32_t n_lists() const noexcept;
+    raft::device_vector_view<T*, uint32_t> data_ptrs() noexcept;
+    raft::device_vector_view<T* const, uint32_t> data_ptrs() const noexcept;
+    raft::device_vector_view<IdxT*, uint32_t> inds_ptrs() noexcept;
+    raft::device_vector_view<IdxT* const, uint32_t> inds_ptrs() const noexcept;
+    bool conservative_memory_allocation() const noexcept;
+    std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists() noexcept;
+    const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists() const noexcept;
+    const raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() const;
+    raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index();
 
-  /** Construct an empty index. It needs to be trained and then populated. */
-  index(raft::resources const& res,
-        cuvs::distance::DistanceType metric,
-        uint32_t n_lists,
-        bool adaptive_centers,
-        bool conservative_memory_allocation,
-        uint32_t dim)
-    : ann::index(),
-      raft_index_(res,
-                  static_cast<raft::distance::DistanceType>((int)metric),
-                  n_lists,
-                  adaptive_centers,
-                  conservative_memory_allocation,
-                  dim)
-  {
-  }
-
-  /** Build a cuvs IVF_FLAT index from an existing RAFT IVF_FLAT index. */
-  index(raft::neighbors::ivf_flat::index<T, IdxT>&& raft_idx)
-    : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::ivf_flat::index<T, IdxT>>(std::move(raft_idx)))
-  {
-  }
-
-  /**
-   * Vectorized load/store size in elements, determines the size of interleaved data chunks.
-   *
-   * TODO: in theory, we can lift this to the template parameter and keep it at hardware maximum
-   * possible value by padding the `dim` of the data https://github.com/rapidsai/raft/issues/711
-   */
-  [[nodiscard]] constexpr inline auto veclen() const noexcept -> uint32_t
-  {
-    return raft_index_->veclen();
-  }
-  /** Distance metric used for clustering. */
-  [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
-  {
-    return static_cast<cuvs::distance::DistanceType>((int)raft_index_->metric());
-  }
-  /** Whether `centers()` change upon extending the index (ivf_pq::extend). */
-  [[nodiscard]] constexpr inline auto adaptive_centers() const noexcept -> bool
-  {
-    return raft_index_->adaptive_centers();
-  }
-  /**
-   * Inverted list data [size, dim].
-   *
-   * The data consists of the dataset rows, grouped by their labels (into clusters/lists).
-   * Within each list (cluster), the data is grouped into blocks of `kIndexGroupSize` interleaved
-   * vectors. Note, the total index length is slightly larger than the source dataset length,
-   * because each cluster is padded by `kIndexGroupSize` elements.
-   *
-   * Interleaving pattern:
-   * within groups of `kIndexGroupSize` rows, the data is interleaved with the block size equal to
-   * `veclen * sizeof(T)`. That is, a chunk of `veclen` consecutive components of one row is
-   * followed by a chunk of the same size of the next row, and so on.
-   *
-   * __Example__: veclen = 2, dim = 6, kIndexGroupSize = 32, list_size = 31
-   *
-   *     x[ 0, 0], x[ 0, 1], x[ 1, 0], x[ 1, 1], ... x[14, 0], x[14, 1], x[15, 0], x[15, 1],
-   *     x[16, 0], x[16, 1], x[17, 0], x[17, 1], ... x[30, 0], x[30, 1],    -    ,    -    ,
-   *     x[ 0, 2], x[ 0, 3], x[ 1, 2], x[ 1, 3], ... x[14, 2], x[14, 3], x[15, 2], x[15, 3],
-   *     x[16, 2], x[16, 3], x[17, 2], x[17, 3], ... x[30, 2], x[30, 3],    -    ,    -    ,
-   *     x[ 0, 4], x[ 0, 5], x[ 1, 4], x[ 1, 5], ... x[14, 4], x[14, 5], x[15, 4], x[15, 5],
-   *     x[16, 4], x[16, 5], x[17, 4], x[17, 5], ... x[30, 4], x[30, 5],    -    ,    -    ,
-   *
-   */
-  /** Sizes of the lists (clusters) [n_lists]
-   * NB: This may differ from the actual list size if the shared lists have been extended by another
-   * index
-   */
-  inline auto list_sizes() noexcept -> raft::device_vector_view<uint32_t, uint32_t>
-  {
-    return raft_index_->list_sizes();
-  }
-  [[nodiscard]] inline auto list_sizes() const noexcept
-    -> raft::device_vector_view<const uint32_t, uint32_t>
-  {
-    return raft_index_->list_sizes();
-  }
-
-  /** k-means cluster centers corresponding to the lists [n_lists, dim] */
-  inline auto centers() noexcept -> raft::device_matrix_view<float, uint32_t, raft::row_major>
-  {
-    return raft_index_->centers();
-  }
-  [[nodiscard]] inline auto centers() const noexcept
-    -> raft::device_matrix_view<const float, uint32_t, raft::row_major>
-  {
-    return raft_index_->centers();
-  }
-
-  /**
-   * (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
-   *
-   * NB: this may be empty if the index is empty or if the metric does not require the center norms
-   * calculation.
-   */
-  inline auto center_norms() noexcept -> std::optional<raft::device_vector_view<float, uint32_t>>
-  {
-    return raft_index_->center_norms();
-  }
-  [[nodiscard]] inline auto center_norms() const noexcept
-    -> std::optional<raft::device_vector_view<const float, uint32_t>>
-  {
-    return raft_index_->center_norms();
-  }
-
-  /** Total length of the index. */
-  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT { return raft_index_->size(); }
-  /** Dimensionality of the data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
-  {
-    return raft_index_->dim();
-  }
-  /** Number of clusters/inverted lists. */
-  [[nodiscard]] constexpr inline auto n_lists() const noexcept -> uint32_t
-  {
-    return raft_index_->n_lists();
-  }
-
-  /** Pointers to the inverted lists (clusters) data  [n_lists]. */
-  inline auto data_ptrs() noexcept -> raft::device_vector_view<T*, uint32_t>
-  {
-    return raft_index_->data_ptrs();
-  }
-  [[nodiscard]] inline auto data_ptrs() const noexcept
-    -> raft::device_vector_view<T* const, uint32_t>
-  {
-    return raft_index_->data_ptrs();
-  }
-
-  /** Pointers to the inverted lists (clusters) indices  [n_lists]. */
-  inline auto inds_ptrs() noexcept -> raft::device_vector_view<IdxT*, uint32_t>
-  {
-    return raft_index_->inds_ptrs();
-  }
-  [[nodiscard]] inline auto inds_ptrs() const noexcept
-    -> raft::device_vector_view<IdxT* const, uint32_t>
-  {
-    return raft_index_->inds_ptrs();
-  }
-  /**
-   * Whether to use convervative memory allocation when extending the list (cluster) data
-   * (see index_params.conservative_memory_allocation).
-   */
-  [[nodiscard]] constexpr inline auto conservative_memory_allocation() const noexcept -> bool
-  {
-    return raft_index_->conservative_memory_allocation();
-  }
-
-  /** Lists' data and indices. */
-  inline auto lists() noexcept { return raft_index_->lists(); }
-  [[nodiscard]] inline auto lists() const noexcept { return raft_index_->lists(); }
-
-  auto get_raft_index() const -> const raft::neighbors::ivf_flat::index<T, IdxT>*
-  {
-    return raft_index_.get();
-  }
-  auto get_raft_index() -> raft::neighbors::ivf_flat::index<T, IdxT>* { return raft_index_.get(); }
-
- private:
-  std::unique_ptr<raft::neighbors::ivf_flat::index<T, IdxT>> raft_index_;
+  private:
+    std::unique_ptr<raft::neighbors::ivf_flat::index<T, IdxT>> raft_index_;
 };
+
 
 #define CUVS_IVF_FLAT(T, IdxT)                                                       \
   auto build(raft::resources const& handle,                                          \

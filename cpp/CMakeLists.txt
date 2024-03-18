@@ -202,6 +202,7 @@ add_library(
   src/neighbors/cagra_serialize_float.cpp
   src/neighbors/cagra_serialize_int8.cpp
   src/neighbors/cagra_serialize_uint8.cpp
+  src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat_build_float.cpp
   src/neighbors/ivf_flat_build_int8.cpp
   src/neighbors/ivf_flat_build_uint8.cpp

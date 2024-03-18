@@ -17,9 +17,9 @@
 #pragma once
 
 #include "ann_types.hpp"
-#include <cuvs/neighbors/ann_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
+#include <cuvs/neighbors/ann_types.hpp>
 
 namespace cuvs::neighbors::brute_force {
 

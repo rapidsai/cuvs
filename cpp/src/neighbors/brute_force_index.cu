@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/brute_force.hpp>
 #include <raft/neighbors/brute_force-inl.cuh>
+#include <cuvs/neighbors/brute_force.hpp>
 
 namespace cuvs::neighbors::brute_force {
 
@@ -92,6 +92,7 @@ void* index<T>::get_raft_index()
 {
   return raft_index_.get();
 }
+
 
 template struct index<float>;
 
