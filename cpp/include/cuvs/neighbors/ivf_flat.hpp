@@ -98,6 +98,13 @@ struct search_params : ann::search_params {
  * @defgroup ivf_flat_cpp_index IVF-Flat index
  * @{
  */
+/**
+ * @brief IVF-flat index.
+ *
+ * @tparam T data element type
+ * @tparam IdxT type of the indices in the source dataset
+ *
+ */
 template <typename T, typename IdxT>
 struct index : ann::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,

@@ -21,15 +21,14 @@
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
-/**
- * @defgroup bruteforce C API for CUDA nearest neighbor search
- * @{
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/**
+ * @defgroup bruteforce_c_index Bruteforce index
+ * @{
+ */
 /**
  * @brief Struct to hold address of cuvs::neighbors::brute_force::index and its active trained dtype
  *
@@ -55,7 +54,14 @@ cuvsError_t bruteForceIndexCreate(cuvsBruteForceIndex_t* index);
  * @param[in] index cuvsBruteForceIndex_t to de-allocate
  */
 cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup bruteforce_c_index_build Bruteforce index build
+ * @{
+ */
 /**
  * @brief Build a BRUTEFORCE index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
@@ -99,7 +105,14 @@ cuvsError_t bruteForceBuild(cuvsResources_t res,
                             enum DistanceType metric,
                             float metric_arg,
                             cuvsBruteForceIndex_t index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup bruteforce_c_index_search Bruteforce index search
+ * @{
+ */
 /**
  * @brief Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.
@@ -141,11 +154,10 @@ cuvsError_t bruteForceSearch(cuvsResources_t res,
                              DLManagedTensor* queries,
                              DLManagedTensor* neighbors,
                              DLManagedTensor* distances);
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }
 #endif
-
-/**
- * @}
- */

@@ -48,5 +48,3 @@ Index search
     :project: cuvs
     :members:
     :content-only:
-
-
