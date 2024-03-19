@@ -35,5 +35,4 @@ rapids-mamba-retry install \
   libcuvs  \
   libraft
 
-export EXTRA_CMAKE_ARGS=""
 bash ./build.sh rust
