@@ -233,7 +233,7 @@ struct index : ann::index {
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -280,7 +280,7 @@ void build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -327,7 +327,7 @@ void build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
@@ -386,15 +386,15 @@ void build(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
- *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+ *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
  *   // fill the index with the data
  *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
- *   auto index = ivf_flat::extend(handle, index_empty, no_op, dataset);
+ *   auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
  * @endcode
  *
  * @param[in] handle
@@ -417,7 +417,7 @@ auto extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -450,7 +450,7 @@ void extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -458,7 +458,7 @@ void extend(raft::resources const& handle,
  *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
  *   // fill the index with the data
  *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
- *   auto index = ivf_flat::extend(handle, index_empty, no_op, dataset);
+ *   auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
  * @endcode
  *
  * @param[in] handle
@@ -481,7 +481,7 @@ auto extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -514,7 +514,7 @@ void extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -522,7 +522,7 @@ void extend(raft::resources const& handle,
  *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
  *   // fill the index with the data
  *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
- *   auto index = ivf_flat::extend(handle, index_empty, no_op, dataset);
+ *   auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
  * @endcode
  *
  * @param[in] handle
@@ -545,7 +545,7 @@ auto extend(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace raft::neighbors;
+ *   using namespace cuvs::neighbors;
  *   ivf_flat::index_params index_params;
  *   index_params.add_data_on_build = false;      // don't populate index on build
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
@@ -701,9 +701,21 @@ void search(raft::resources const& handle,
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = ivf_flat::build(...);`
+ * cuvs::serialize_file(handle, filename, index);
+ * @endcode
+ *
  * @param[in] handle the raft handle
- * @param[in] filename the filename for saving the index
- * @param[in] index IVF-PQ index
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-Flat index
  *
  */
 void serialize_file(raft::resources const& handle,
@@ -711,13 +723,107 @@ void serialize_file(raft::resources const& handle,
                     const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 
 /**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * using T    = float; // data element type
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index with `ivf_pq::index<T, IdxT> index(handle, index_params, dim);`
+ * cuvs::deserialize_file(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[in] index IVF-Flat index
+ *
+ */
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
+
+/**
+ * Write the index to an output string
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output string
+ * std::string str;
+ * // create an index with `auto index = ivf_flat::build(...);`
+ * cuvs::serialize(handle, str, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[out] str output string
+ * @param[in] index IVF-Flat index
+ *
+ */
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
+
+/**
+ * Load index from input string
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input string
+ * std::string str;
+ * using T    = float; // data element type
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index with `ivf_pq::index<T, IdxT> index(handle, index_params, dim);`
+ * auto index = cuvs::deserialize(handle, str, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str output string
+ * @param[in] index IVF-Flat index
+ *
+ */
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
+
+/**
  * Save the index to file.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = ivf_flat::build(...);`
+ * cuvs::serialize_file(handle, filename, index);
+ * @endcode
+ *
  * @param[in] handle the raft handle
- * @param[in] filename the filename for saving the index
- * @param[in] index IVF-PQ index
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-Flat index
  *
  */
 void serialize_file(raft::resources const& handle,
@@ -725,13 +831,107 @@ void serialize_file(raft::resources const& handle,
                     const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
 /**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * using T    = float; // data element type
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index with `ivf_pq::index<T, IdxT> index(handle, index_params, dim);`
+ * cuvs::deserialize_file(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[in] index IVF-Flat index
+ *
+ */
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
+
+/**
+ * Write the index to an output string
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output string
+ * std::string str;
+ * // create an index with `auto index = ivf_flat::build(...);`
+ * cuvs::serialize(handle, str, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[out] str output string
+ * @param[in] index IVF-Flat index
+ *
+ */
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
+
+/**
+ * Load index from input string
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input string
+ * std::string str;
+ * using T    = float; // data element type
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index with `ivf_pq::index<T, IdxT> index(handle, index_params, dim);`
+ * auto index = cuvs::deserialize(handle, str, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str output string
+ * @param[in] index IVF-Flat index
+ *
+ */
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
+
+/**
  * Save the index to file.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = ivf_flat::build(...);`
+ * cuvs::serialize_file(handle, filename, index);
+ * @endcode
+ *
  * @param[in] handle the raft handle
- * @param[in] filename the filename for saving the index
- * @param[in] index IVF-PQ index
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-Flat index
  *
  */
 void serialize_file(raft::resources const& handle,
@@ -743,37 +943,23 @@ void serialize_file(raft::resources const& handle,
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
- * @param[in] handle the raft handle
- * @param[in] filename the name of the file that stores the index
- * @param[in] index IVF-PQ index
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
  *
- */
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
-
-/**
- * Load index from file.
+ * raft::resources handle;
  *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @param[in] handle the raft handle
- * @param[in] filename the name of the file that stores the index
- * @param[in] index IVF-PQ index
- *
- */
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
-
-/**
- * Load index from file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * using T    = float; // data element type
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index with `ivf_pq::index<T, IdxT> index(handle, index_params, dim);`
+ * cuvs::deserialize_file(handle, filename, &index);
+ * @endcode
  *
  * @param[in] handle the raft handle
  * @param[in] filename the name of the file that stores the index
- * @param[in] index IVF-PQ index
+ * @param[in] index IVF-Flat index
  *
  */
 void deserialize_file(raft::resources const& handle,
@@ -781,41 +967,25 @@ void deserialize_file(raft::resources const& handle,
                       cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 
 /**
- * Save the index to file.
+ * Write the index to an output string
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
- * @param[in] handle the raft handle
- * @param[in] str the filename for saving the index
- * @param[in] index IVF-PQ index
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
  *
- */
-void serialize(raft::resources const& handle,
-               std::string& str,
-               const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
-
-/**
- * Save the index to file.
+ * raft::resources handle;
  *
- * Experimental, both the API and the serialization format are subject to change.
+ * // create an output string
+ * std::string str;
+ * // create an index with `auto index = ivf_flat::build(...);`
+ * cuvs::serialize(handle, str, index);
+ * @endcode
  *
  * @param[in] handle the raft handle
- * @param[in] str the filename for saving the index
- * @param[in] index IVF-PQ index
- *
- */
-void serialize(raft::resources const& handle,
-               std::string& str,
-               const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
-
-/**
- * Save the index to file.
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @param[in] handle the raft handle
- * @param[in] str the filename for saving the index
- * @param[in] index IVF-PQ index
+ * @param[out] str output string
+ * @param[in] index IVF-Flat index
  *
  */
 void serialize(raft::resources const& handle,
@@ -823,46 +993,33 @@ void serialize(raft::resources const& handle,
                const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
 /**
- * Load index from file.
+ * Load index from input string
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
- * @param[in] handle the raft handle
- * @param[in] str the name of the file that stores the index
- * @param[in] index IVF-PQ index
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/ivf_flat.hpp>
  *
- */
-void deserialize(raft::resources const& handle,
-                 const std::string& str,
-                 cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
-
-/**
- * Load index from file.
+ * raft::resources handle;
  *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @param[in] handle the raft handle
- * @param[in] str the name of the file that stores the index
- * @param[in] index IVF-PQ index
- *
- */
-void deserialize(raft::resources const& handle,
-                 const std::string& str,
-                 cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
-
-/**
- * Load index from file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * // create an input string
+ * std::string str;
+ * using T    = float; // data element type
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index with `ivf_pq::index<T, IdxT> index(handle, index_params, dim);`
+ * auto index = cuvs::deserialize(handle, str, &index);
+ * @endcode
  *
  * @param[in] handle the raft handle
- * @param[in] str the name of the file that stores the index
- * @param[in] index IVF-PQ index
+ * @param[in] str output string
+ * @param[in] index IVF-Flat index
  *
  */
 void deserialize(raft::resources const& handle,
                  const std::string& str,
                  cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
+
 /**
  * @}
  */
