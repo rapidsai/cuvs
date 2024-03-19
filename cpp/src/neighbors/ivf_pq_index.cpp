@@ -232,18 +232,6 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ce
   return raft_index_->centers_rot();
 }
 
-template <typename IdxT>
-const raft::neighbors::ivf_pq::index<IdxT>* index<IdxT>::get_raft_index() const
-{
-  return raft_index_.get();
-}
-
-template <typename IdxT>
-raft::neighbors::ivf_pq::index<IdxT>* index<IdxT>::get_raft_index()
-{
-  return raft_index_.get();
-}
-
 template struct index<int64_t>;
 
 }  // namespace cuvs::neighbors::ivf_pq

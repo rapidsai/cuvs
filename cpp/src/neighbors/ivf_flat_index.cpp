@@ -28,13 +28,15 @@ index<T, IdxT>::index(raft::resources const& res, const index_params& params, ui
       params.adaptive_centers,
       params.conservative_memory_allocation,
       dim))
-{}
+{
+}
 
 template <typename T, typename IdxT>
 index<T, IdxT>::index(raft::neighbors::ivf_flat::index<T, IdxT>&& raft_idx)
   : ann::index(),
     raft_index_(std::make_unique<raft::neighbors::ivf_flat::index<T, IdxT>>(std::move(raft_idx)))
-{}
+{
+}
 
 template <typename T, typename IdxT>
 uint32_t index<T, IdxT>::veclen() const noexcept
@@ -73,7 +75,8 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> index<T, IdxT>::cente
 }
 
 template <typename T, typename IdxT>
-raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>::centers() const noexcept
+raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>::centers()
+  const noexcept
 {
   return raft_index_->centers();
 }
@@ -85,7 +88,8 @@ std::optional<raft::device_vector_view<float, uint32_t>> index<T, IdxT>::center_
 }
 
 template <typename T, typename IdxT>
-std::optional<raft::device_vector_view<const float, uint32_t>> index<T, IdxT>::center_norms() const noexcept
+std::optional<raft::device_vector_view<const float, uint32_t>> index<T, IdxT>::center_norms()
+  const noexcept
 {
   return raft_index_->center_norms();
 }
@@ -139,29 +143,18 @@ bool index<T, IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename T, typename IdxT>
-std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& index<T, IdxT>::lists() noexcept
+std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>&
+index<T, IdxT>::lists() noexcept
 {
   return raft_index_->lists();
 }
 
 template <typename T, typename IdxT>
-const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& index<T, IdxT>::lists() const noexcept
+const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>&
+index<T, IdxT>::lists() const noexcept
 {
   return raft_index_->lists();
 }
-
-template <typename T, typename IdxT>
-const raft::neighbors::ivf_flat::index<T, IdxT>* index<T, IdxT>::get_raft_index() const
-{
-  return raft_index_.get();
-}
-
-template <typename T, typename IdxT>
-raft::neighbors::ivf_flat::index<T, IdxT>* index<T, IdxT>::get_raft_index()
-{
-  return raft_index_.get();
-}
-
 
 template struct index<float, int64_t>;
 template struct index<int8_t, int64_t>;

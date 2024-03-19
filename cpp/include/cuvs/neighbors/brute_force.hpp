@@ -48,8 +48,9 @@ struct index : cuvs::neighbors::ann::index {
   raft::device_vector_view<const T, int64_t, raft::row_major> norms() const;
   bool has_norms() const noexcept;
   T metric_arg() const noexcept;
-  const void* get_raft_index() const;
-  void* get_raft_index();
+
+  // Get pointer to underlying RAFT index, not meant to be used outside of cuVS
+  inline const void* get_raft_index() const noexcept { return raft_index_.get(); }
 
  private:
   std::unique_ptr<void*> raft_index_;

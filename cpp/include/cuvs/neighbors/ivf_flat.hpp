@@ -200,8 +200,15 @@ struct index : ann::index {
   const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists()
     const noexcept;
 
-  const raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() const;
-  raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index();
+  // Get pointer to underlying RAFT index, not meant to be used outside of cuVS
+  inline raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() noexcept
+  {
+    return raft_index_.get();
+  }
+  inline const raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() const noexcept
+  {
+    return raft_index_.get();
+  }
 
  private:
   std::unique_ptr<raft::neighbors::ivf_flat::index<T, IdxT>> raft_index_;

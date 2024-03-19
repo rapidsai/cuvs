@@ -1,5 +1,5 @@
 IVF-Flat
-=====
+========
 
 The IVF-Flat method is an ANN algorithm. It uses an inverted file index (IVF) with unmodified (that is, flat) vectors. This algorithm provides simple knobs to reduce the overall search space and to trade-off accuracy for speed.
 
@@ -44,7 +44,7 @@ Index build
     :content-only:
 
 Index extend
------------
+------------
 
 .. doxygengroup:: ivf_flat_cpp_index_extend
     :project: cuvs
@@ -60,7 +60,7 @@ Index search
     :content-only:
 
 Index serialize
-------------
+---------------
 
 .. doxygengroup:: ivf_flat_cpp_serialize
     :project: cuvs

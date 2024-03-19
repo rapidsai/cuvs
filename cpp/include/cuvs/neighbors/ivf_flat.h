@@ -22,15 +22,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/**
- * @defgroup ivf_flat_c_index_params IVF-Flat index build parameters
- * @{
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/**
+ * @defgroup ivf_flat_c_index_params IVF-Flat index build parameters
+ * @{
+ */
 /**
  * @brief Supplemental parameters to build IVF_FLAT Index
  *

@@ -22,16 +22,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/**
- * @defgroup IVF_PQ C API for CUDA nearest neighbor search
- * @{
- */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** A type for specifying how PQ codebooks are created. */
+/**
+ * @defgroup ivf_pq_c_index_params IVF-PQ index build parameters
+ * @{
+ */
+/**
+ * @brief A type for specifying how PQ codebooks are created
+ *
+ */
 enum codebook_gen {  // NOLINT
   PER_SUBSPACE = 0,  // NOLINT
   PER_CLUSTER  = 1,  // NOLINT
@@ -133,7 +135,14 @@ cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* index_params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index_params);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_pq_c_search_params IVF-PQ index search parameters
+ * @{
+ */
 /**
  * @brief Supplemental parameters to search IVF_PQ index
  *
@@ -194,7 +203,14 @@ cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_pq_c_index IVF-PQ index
+ * @{
+ */
 /**
  * @brief Struct to hold address of cuvs::neighbors::ivf_pq::index and its active trained dtype
  *
@@ -220,7 +236,14 @@ cuvsError_t ivfPqIndexCreate(cuvsIvfPqIndex_t* index);
  * @param[in] index cuvsIvfPqIndex_t to de-allocate
  */
 cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_pq_c_index_build IVF-PQ index build
+ * @{
+ */
 /**
  * @brief Build a IVF_PQ index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
@@ -267,7 +290,14 @@ cuvsError_t ivfPqBuild(cuvsResources_t res,
                        cuvsIvfPqIndexParams_t params,
                        DLManagedTensor* dataset,
                        cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup ivf_pq_c_index_search IVF-PQ index search
+ * @{
+ */
 /**
  * @brief Search a IVF_PQ index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.
@@ -316,11 +346,10 @@ cuvsError_t ivfPqSearch(cuvsResources_t res,
                         DLManagedTensor* queries,
                         DLManagedTensor* neighbors,
                         DLManagedTensor* distances);
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }
 #endif
-
-/**
- * @}
- */
