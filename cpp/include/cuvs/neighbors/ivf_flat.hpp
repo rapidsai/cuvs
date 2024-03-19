@@ -228,33 +228,144 @@ struct index : ann::index {
  * @defgroup ivf_flat_cpp_index_build IVF-Flat index build
  * @{
  */
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_flat::build(handle, dataset, index_params);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-flat index
+ */
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_flat::index_params& params,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_flat::index<float, int64_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+ *   ivf_flat::build(handle, dataset, index_params, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_flat::index
+ *
+ */
 void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_flat::index_params& params,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_flat::index<float, int64_t>& idx);
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_flat::build(handle, dataset, index_params);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-flat index
+ */
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_flat::index_params& params,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_flat::index<int8_t, int64_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+ *   ivf_flat::build(handle, dataset, index_params, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_flat::index
+ *
+ */
 void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_flat::index_params& params,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& idx);
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_flat::build(handle, dataset, index_params);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-flat index
+ */
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_flat::index_params& params,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+ *   ivf_flat::build(handle, dataset, index_params, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::device_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_flat::index
+ *
+ */
 void build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_flat::index_params& params,
+           const cuvs::neighbors::ivf_flat::index_params& index_params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx);
 /**
@@ -265,34 +376,194 @@ void build(raft::resources const& handle,
  * @defgroup ivf_flat_cpp_index_extend IVF-Flat index extend
  * @{
  */
+
+/**
+ * @brief Build a new index containing the data of the original plus new extra vectors.
+ *
+ * Implementation note:
+ *    The new data is clustered according to existing kmeans clusters, then the cluster
+ *    centers are adjusted to match the newly labeled data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   ivf_flat::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   auto index = ivf_flat::extend(handle, index_empty, no_op, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
+ * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] idx original index
+ *
+ * @return the constructed extended ivf-flat index
+ */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_flat::index<float, int64_t>& orig_index)
+            const cuvs::neighbors::ivf_flat::index<float, int64_t>& idx)
   -> cuvs::neighbors::ivf_flat::index<float, int64_t>;
 
+/**
+ * @brief Extend the index in-place with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   ivf_flat::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+ * @endcode
+ *
+ *
+ * @param[in] handle
+ * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
+ * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to index, to be overwritten in-place
+ */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_flat::index<float, int64_t>* idx);
 
+/**
+ * @brief Build a new index containing the data of the original plus new extra vectors.
+ *
+ * Implementation note:
+ *    The new data is clustered according to existing kmeans clusters, then the cluster
+ *    centers are adjusted to match the newly labeled data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   ivf_flat::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   auto index = ivf_flat::extend(handle, index_empty, no_op, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
+ * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] idx original index
+ *
+ * @return the constructed extended ivf-flat index
+ */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& orig_index)
+            const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& idx)
   -> cuvs::neighbors::ivf_flat::index<int8_t, int64_t>;
 
+/**
+ * @brief Extend the index in-place with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   ivf_flat::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+ * @endcode
+ *
+ *
+ * @param[in] handle
+ * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
+ * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to index, to be overwritten in-place
+ */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* idx);
 
+/**
+ * @brief Build a new index containing the data of the original plus new extra vectors.
+ *
+ * Implementation note:
+ *    The new data is clustered according to existing kmeans clusters, then the cluster
+ *    centers are adjusted to match the newly labeled data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   ivf_flat::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   auto index = ivf_flat::extend(handle, index_empty, no_op, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
+ * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[in] idx original index
+ *
+ * @return the constructed extended ivf-flat index
+ */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
-            const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& orig_index)
+            const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& idx)
   -> cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>;
 
+/**
+ * @brief Extend the index in-place with the new data.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   ivf_flat::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // fill the index with the data
+ *   std::optional<raft::device_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   ivf_flat::extend(handle, dataset, no_opt, &index_empty);
+ * @endcode
+ *
+ *
+ * @param[in] handle
+ * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
+ * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx pointer to index, to be overwritten in-place
+ */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
@@ -305,6 +576,37 @@ void extend(raft::resources const& handle,
  * @defgroup ivf_flat_cpp_index_search IVF-Flat index search
  * @{
  */
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`:
+ * @code{.cpp}
+ *   ...
+ *   // use default search parameters
+ *   ivf_flat::search_params search_params;
+ *   // Use the same allocator across multiple searches to reduce the number of
+ *   // cuda memory allocations
+ *   ivf_flat::search(handle, search_params, index, queries1, out_inds1, out_dists1);
+ *   ivf_flat::search(handle, search_params, index, queries2, out_inds2, out_dists2);
+ *   ivf_flat::search(handle, search_params, index, queries3, out_inds3, out_dists3);
+ *   ...
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] index ivf-flat constructed index
+ * @param[in] queries raft::device_matrix_view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors raft::device_matrix_view to the indices of the neighbors in the source
+ * dataset [n_queries, k]
+ * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
+ * [n_queries, k]
+ */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             cuvs::neighbors::ivf_flat::index<float, int64_t>& index,
@@ -312,6 +614,36 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`:
+ * @code{.cpp}
+ *   ...
+ *   // use default search parameters
+ *   ivf_flat::search_params search_params;
+ *   // Use the same allocator across multiple searches to reduce the number of
+ *   // cuda memory allocations
+ *   ivf_flat::search(handle, search_params, index, queries1, out_inds1, out_dists1);
+ *   ivf_flat::search(handle, search_params, index, queries2, out_inds2, out_dists2);
+ *   ivf_flat::search(handle, search_params, index, queries3, out_inds3, out_dists3);
+ *   ...
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] index ivf-flat constructed index
+ * @param[in] queries raft::device_matrix_view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors raft::device_matrix_view to the indices of the neighbors in the source
+ * dataset [n_queries, k]
+ * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
+ * [n_queries, k]
+ */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index,
@@ -319,6 +651,36 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`:
+ * @code{.cpp}
+ *   ...
+ *   // use default search parameters
+ *   ivf_flat::search_params search_params;
+ *   // Use the same allocator across multiple searches to reduce the number of
+ *   // cuda memory allocations
+ *   ivf_flat::search(handle, search_params, index, queries1, out_inds1, out_dists1);
+ *   ivf_flat::search(handle, search_params, index, queries2, out_inds2, out_dists2);
+ *   ivf_flat::search(handle, search_params, index, queries3, out_inds3, out_dists3);
+ *   ...
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] index ivf-flat constructed index
+ * @param[in] queries raft::device_matrix_view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors raft::device_matrix_view to the indices of the neighbors in the source
+ * dataset [n_queries, k]
+ * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
+ * [n_queries, k]
+ */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index,
@@ -333,50 +695,171 @@ void search(raft::resources const& handle,
  * @defgroup ivf_flat_cpp_serialize IVF-Flat index serialize
  * @{
  */
+
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the filename for saving the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void serialize_file(raft::resources const& handle,
                     const std::string& filename,
                     const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the filename for saving the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void serialize_file(raft::resources const& handle,
                     const std::string& filename,
                     const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the filename for saving the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void serialize_file(raft::resources const& handle,
                     const std::string& filename,
                     const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void deserialize_file(raft::resources const& handle,
                       const std::string& filename,
                       cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void deserialize_file(raft::resources const& handle,
                       const std::string& filename,
                       cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void deserialize_file(raft::resources const& handle,
                       const std::string& filename,
                       cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the filename for saving the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void serialize(raft::resources const& handle,
                std::string& str,
                const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the filename for saving the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void serialize(raft::resources const& handle,
                std::string& str,
                const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the filename for saving the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void serialize(raft::resources const& handle,
                std::string& str,
                const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the name of the file that stores the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void deserialize(raft::resources const& handle,
                  const std::string& str,
                  cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the name of the file that stores the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void deserialize(raft::resources const& handle,
                  const std::string& str,
                  cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the name of the file that stores the index
+ * @param[in] index IVF-PQ index
+ *
+ */
 void deserialize(raft::resources const& handle,
                  const std::string& str,
                  cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
