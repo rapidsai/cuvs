@@ -31,7 +31,7 @@ extern "C" {
  * @{
  */
 /**
- * @brief Supplemental parameters to build IVF_FLAT Index
+ * @brief Supplemental parameters to build IVF-Flat Index
  *
  */
 struct ivfFlatIndexParams {
@@ -82,7 +82,7 @@ struct ivfFlatIndexParams {
 typedef struct ivfFlatIndexParams* cuvsIvfFlatIndexParams_t;
 
 /**
- * @brief Allocate IVF_FLAT Index params, and populate with default values
+ * @brief Allocate IVF-Flat Index params, and populate with default values
  *
  * @param[in] index_params cuvsIvfFlatIndexParams_t to allocate
  * @return cuvsError_t
@@ -90,7 +90,7 @@ typedef struct ivfFlatIndexParams* cuvsIvfFlatIndexParams_t;
 cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* index_params);
 
 /**
- * @brief De-allocate IVF_FLAT Index params
+ * @brief De-allocate IVF-Flat Index params
  *
  * @param[in] index_params
  * @return cuvsError_t
@@ -105,7 +105,7 @@ cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params)
  * @{
  */
 /**
- * @brief Supplemental parameters to search IVF_FLAT index
+ * @brief Supplemental parameters to search IVF-Flat index
  *
  */
 struct ivfFlatSearchParams {
@@ -116,7 +116,7 @@ struct ivfFlatSearchParams {
 typedef struct ivfFlatSearchParams* cuvsIvfFlatSearchParams_t;
 
 /**
- * @brief Allocate IVF_FLAT search params, and populate with default values
+ * @brief Allocate IVF-Flat search params, and populate with default values
  *
  * @param[in] params cuvsIvfFlatSearchParams_t to allocate
  * @return cuvsError_t
@@ -124,7 +124,7 @@ typedef struct ivfFlatSearchParams* cuvsIvfFlatSearchParams_t;
 cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params);
 
 /**
- * @brief De-allocate IVF_FLAT search params
+ * @brief De-allocate IVF-Flat search params
  *
  * @param[in] params
  * @return cuvsError_t
@@ -150,7 +150,7 @@ typedef struct {
 typedef ivfFlatIndex* cuvsIvfFlatIndex_t;
 
 /**
- * @brief Allocate IVF_FLAT index
+ * @brief Allocate IVF-Flat index
  *
  * @param[in] index cuvsIvfFlatIndex_t to allocate
  * @return ivfFlatError_t
@@ -158,7 +158,7 @@ typedef ivfFlatIndex* cuvsIvfFlatIndex_t;
 cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 
 /**
- * @brief De-allocate IVF_FLAT index
+ * @brief De-allocate IVF-Flat index
  *
  * @param[in] index cuvsIvfFlatIndex_t to de-allocate
  */
@@ -172,7 +172,7 @@ cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
  * @{
  */
 /**
- * @brief Build a IVF_FLAT index with a `DLManagedTensor` which has underlying
+ * @brief Build a IVF-Flat index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
@@ -191,30 +191,30 @@ cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
  * DLManagedTensor dataset;
  *
  * // Create default index params
- * cuvsIvfFlatIndexParams_t params;
- * cuvsError_t params_create_status = cuvsIvfFlatIndexParamsCreate(&params);
+ * cuvsIvfFlatIndexParams_t index_params;
+ * cuvsError_t params_create_status = cuvsIvfFlatIndexParamsCreate(&index_params);
  *
- * // Create IVF_FLAT index
+ * // Create IVF-Flat index
  * cuvsIvfFlatIndex_t index;
  * cuvsError_t index_create_status = ivfFlatIndexCreate(&index);
  *
- * // Build the IVF_FLAT Index
- * cuvsError_t build_status = ivfFlatBuild(res, params, &dataset, index);
+ * // Build the IVF-Flat Index
+ * cuvsError_t build_status = ivfFlatBuild(res, index_params, &dataset, index);
  *
- * // de-allocate `params`, `index` and `res`
- * cuvsError_t params_destroy_status = cuvsIvfFlatIndexParamsDestroy(params);
+ * // de-allocate `index_params`, `index` and `res`
+ * cuvsError_t params_destroy_status = cuvsIvfFlatIndexParamsDestroy(index_params);
  * cuvsError_t index_destroy_status = ivfFlatIndexDestroy(index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsIvfFlatIndexParams_t used to build IVF_FLAT index
+ * @param[in] index_params cuvsIvfFlatIndexParams_t used to build IVF-Flat index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index cuvsIvfFlatIndex_t Newly built IVF_FLAT index
+ * @param[out] index cuvsIvfFlatIndex_t Newly built IVF-Flat index
  * @return cuvsError_t
  */
 cuvsError_t ivfFlatBuild(cuvsResources_t res,
-                         cuvsIvfFlatIndexParams_t params,
+                         cuvsIvfFlatIndexParams_t index_params,
                          DLManagedTensor* dataset,
                          cuvsIvfFlatIndex_t index);
 /**
@@ -226,12 +226,12 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
  * @{
  */
 /**
- * @brief Search a IVF_FLAT index with a `DLManagedTensor` which has underlying
+ * @brief Search a IVF-Flat index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.
- *        It is also important to note that the IVF_FLAT Index must have been built
+ *        It is also important to note that the IVF-Flat Index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
@@ -249,26 +249,27 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
  * DLManagedTensor neighbors;
  *
  * // Create default search params
- * cuvsIvfFlatSearchParams_t params;
- * cuvsError_t params_create_status = cuvsIvfFlatSearchParamsCreate(&params);
+ * cuvsIvfFlatSearchParams_t search_params;
+ * cuvsError_t params_create_status = cuvsIvfFlatSearchParamsCreate(&search_params);
  *
  * // Search the `index` built using `ivfFlatBuild`
- * cuvsError_t search_status = ivfFlatSearch(res, params, index, queries, neighbors, distances);
+ * cuvsError_t search_status = ivfFlatSearch(res, search_params, index, &queries, &neighbors,
+ * &distances);
  *
- * // de-allocate `params` and `res`
- * cuvsError_t params_destroy_status = cuvsIvfFlatSearchParamsDestroy(params);
+ * // de-allocate `search_params` and `res`
+ * cuvsError_t params_destroy_status = cuvsIvfFlatSearchParamsDestroy(search_params);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsIvfFlatSearchParams_t used to search IVF_FLAT index
+ * @param[in] search_params cuvsIvfFlatSearchParams_t used to search IVF-Flat index
  * @param[in] index ivfFlatIndex which has been returned by `ivfFlatBuild`
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
 cuvsError_t ivfFlatSearch(cuvsResources_t res,
-                          cuvsIvfFlatSearchParams_t params,
+                          cuvsIvfFlatSearchParams_t search_params,
                           cuvsIvfFlatIndex_t index,
                           DLManagedTensor* queries,
                           DLManagedTensor* neighbors,

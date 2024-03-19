@@ -40,7 +40,7 @@ enum codebook_gen {  // NOLINT
 };
 
 /**
- * @brief Supplemental parameters to build IVF_PQ Index
+ * @brief Supplemental parameters to build IVF-PQ Index
  *
  */
 struct ivfPqIndexParams {
@@ -121,7 +121,7 @@ struct ivfPqIndexParams {
 typedef struct ivfPqIndexParams* cuvsIvfPqIndexParams_t;
 
 /**
- * @brief Allocate IVF_PQ Index params, and populate with default values
+ * @brief Allocate IVF-PQ Index params, and populate with default values
  *
  * @param[in] index_params cuvsIvfPqIndexParams_t to allocate
  * @return cuvsError_t
@@ -129,7 +129,7 @@ typedef struct ivfPqIndexParams* cuvsIvfPqIndexParams_t;
 cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* index_params);
 
 /**
- * @brief De-allocate IVF_PQ Index params
+ * @brief De-allocate IVF-PQ Index params
  *
  * @param[in] index_params
  * @return cuvsError_t
@@ -144,7 +144,7 @@ cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t index_params);
  * @{
  */
 /**
- * @brief Supplemental parameters to search IVF_PQ index
+ * @brief Supplemental parameters to search IVF-PQ index
  *
  */
 struct ivfPqSearchParams {
@@ -189,7 +189,7 @@ struct ivfPqSearchParams {
 typedef struct ivfPqSearchParams* cuvsIvfPqSearchParams_t;
 
 /**
- * @brief Allocate IVF_PQ search params, and populate with default values
+ * @brief Allocate IVF-PQ search params, and populate with default values
  *
  * @param[in] params cuvsIvfPqSearchParams_t to allocate
  * @return cuvsError_t
@@ -197,7 +197,7 @@ typedef struct ivfPqSearchParams* cuvsIvfPqSearchParams_t;
 cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params);
 
 /**
- * @brief De-allocate IVF_PQ search params
+ * @brief De-allocate IVF-PQ search params
  *
  * @param[in] params
  * @return cuvsError_t
@@ -223,7 +223,7 @@ typedef struct {
 typedef ivfPqIndex* cuvsIvfPqIndex_t;
 
 /**
- * @brief Allocate IVF_PQ index
+ * @brief Allocate IVF-PQ index
  *
  * @param[in] index cuvsIvfPqIndex_t to allocate
  * @return ivfPqError_t
@@ -231,7 +231,7 @@ typedef ivfPqIndex* cuvsIvfPqIndex_t;
 cuvsError_t ivfPqIndexCreate(cuvsIvfPqIndex_t* index);
 
 /**
- * @brief De-allocate IVF_PQ index
+ * @brief De-allocate IVF-PQ index
  *
  * @param[in] index cuvsIvfPqIndex_t to de-allocate
  */
@@ -245,7 +245,7 @@ cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index);
  * @{
  */
 /**
- * @brief Build a IVF_PQ index with a `DLManagedTensor` which has underlying
+ * @brief Build a IVF-PQ index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
@@ -264,26 +264,26 @@ cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index);
  * DLManagedTensor dataset;
  *
  * // Create default index params
- * cuvsIvfPqIndexParams_t params;
- * cuvsError_t params_create_status = cuvsIvfPqIndexParamsCreate(&params);
+ * cuvsIvfPqIndexParams_t index_params;
+ * cuvsError_t params_create_status = cuvsIvfPqIndexParamsCreate(&index_params);
  *
- * // Create IVF_PQ index
+ * // Create IVF-PQ index
  * cuvsIvfPqIndex_t index;
  * cuvsError_t index_create_status = ivfPqIndexCreate(&index);
  *
- * // Build the IVF_PQ Index
- * cuvsError_t build_status = ivfPqBuild(res, params, &dataset, index);
+ * // Build the IVF-PQ Index
+ * cuvsError_t build_status = ivfPqBuild(res, index_params, &dataset, index);
  *
- * // de-allocate `params`, `index` and `res`
- * cuvsError_t params_destroy_status = cuvsIvfPqIndexParamsDestroy(params);
+ * // de-allocate `index_params`, `index` and `res`
+ * cuvsError_t params_destroy_status = cuvsIvfPqIndexParamsDestroy(index_params);
  * cuvsError_t index_destroy_status = ivfPqIndexDestroy(index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsIvfPqIndexParams_t used to build IVF_PQ index
+ * @param[in] params cuvsIvfPqIndexParams_t used to build IVF-PQ index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index cuvsIvfPqIndex_t Newly built IVF_PQ index
+ * @param[out] index cuvsIvfPqIndex_t Newly built IVF-PQ index
  * @return cuvsError_t
  */
 cuvsError_t ivfPqBuild(cuvsResources_t res,
@@ -299,12 +299,12 @@ cuvsError_t ivfPqBuild(cuvsResources_t res,
  * @{
  */
 /**
- * @brief Search a IVF_PQ index with a `DLManagedTensor` which has underlying
+ * @brief Search a IVF-PQ index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.
- *        It is also important to note that the IVF_PQ Index must have been built
+ *        It is also important to note that the IVF-PQ Index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
@@ -322,26 +322,27 @@ cuvsError_t ivfPqBuild(cuvsResources_t res,
  * DLManagedTensor neighbors;
  *
  * // Create default search params
- * cuvsIvfPqSearchParams_t params;
- * cuvsError_t params_create_status = cuvsIvfPqSearchParamsCreate(&params);
+ * cuvsIvfPqSearchParams_t search_params;
+ * cuvsError_t params_create_status = cuvsIvfPqSearchParamsCreate(&search_params);
  *
  * // Search the `index` built using `ivfPqBuild`
- * cuvsError_t search_status = ivfPqSearch(res, params, index, queries, neighbors, distances);
+ * cuvsError_t search_status = ivfPqSearch(res, search_params, index, &queries, &neighbors,
+ * &distances);
  *
- * // de-allocate `params` and `res`
- * cuvsError_t params_destroy_status = cuvsIvfPqSearchParamsDestroy(params);
+ * // de-allocate `search_params` and `res`
+ * cuvsError_t params_destroy_status = cuvsIvfPqSearchParamsDestroy(search_params);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsIvfPqSearchParams_t used to search IVF_PQ index
+ * @param[in] search_params cuvsIvfPqSearchParams_t used to search IVF-PQ index
  * @param[in] index ivfPqIndex which has been returned by `ivfPqBuild`
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
 cuvsError_t ivfPqSearch(cuvsResources_t res,
-                        cuvsIvfPqSearchParams_t params,
+                        cuvsIvfPqSearchParams_t search_params,
                         cuvsIvfPqIndex_t index,
                         DLManagedTensor* queries,
                         DLManagedTensor* neighbors,

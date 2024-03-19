@@ -88,7 +88,7 @@ cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  * // Build the BRUTEFORCE Index
  * cuvsError_t build_status = bruteForceBuild(res, &dataset_tensor, L2Expanded, 0.f, index);
  *
- * // de-allocate `params`, `index` and `res`
+ * // de-allocate `index` and `res`
  * cuvsError_t index_destroy_status = bruteForceIndexDestroy(index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
@@ -116,10 +116,10 @@ cuvsError_t bruteForceBuild(cuvsResources_t res,
 /**
  * @brief Search a BRUTEFORCE index with a `DLManagedTensor` which has underlying
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`.
- *        It is also important to note that the BRUTEFORCE Index must have been built
+ *        It is also important to note that the BRUTEFORCE index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
- * queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        queries.dl_tensor.dtype.code` Types for input are:
+ *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
@@ -137,9 +137,9 @@ cuvsError_t bruteForceBuild(cuvsResources_t res,
  * DLManagedTensor neighbors;
  *
  * // Search the `index` built using `bruteForceBuild`
- * cuvsError_t search_status = bruteForceSearch(res, index, queries, neighbors, distances);
+ * cuvsError_t search_status = bruteForceSearch(res, index, &queries, &neighbors, &distances);
  *
- * // de-allocate `params` and `res`
+ * // de-allocate `res`
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
