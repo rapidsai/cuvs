@@ -824,7 +824,7 @@ void search(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * // create an index with `auto index = ivf_pq::build(...);`
- * raft::serialize(handle, filename, index);
+ * cuvs::serialize(handle, filename, index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -850,7 +850,7 @@ void serialize(raft::resources const& handle,
  * std::string filename("/path/to/index");
  * using IdxT = int64_t; // type of the index
  * // create an empty index with `ivf_pq::index<IdxT> index(handle, index_params, dim);`
- * raft::deserialize(handle, filename, &index);
+ * cuvs::deserialize(handle, filename, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
