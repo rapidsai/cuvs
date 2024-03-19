@@ -200,28 +200,28 @@ add_library(
   src/neighbors/cagra_serialize_int8.cpp
   src/neighbors/cagra_serialize_uint8.cpp
   src/neighbors/ivf_flat_index.cpp
-  src/neighbors/ivf_flat_build_float.cpp
-  src/neighbors/ivf_flat_build_int8.cpp
-  src/neighbors/ivf_flat_build_uint8.cpp
-  src/neighbors/ivf_flat_extend_float.cpp
-  src/neighbors/ivf_flat_extend_int8.cpp
-  src/neighbors/ivf_flat_extend_uint8.cpp
-  src/neighbors/ivf_flat_search_float.cpp
-  src/neighbors/ivf_flat_search_int8.cpp
-  src/neighbors/ivf_flat_search_uint8.cpp
-  src/neighbors/ivf_flat_serialize_float.cpp
-  src/neighbors/ivf_flat_serialize_int8.cpp
-  src/neighbors/ivf_flat_serialize_uint8.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_extend_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_extend_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_extend_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cpp
   src/neighbors/ivf_pq_index.cpp
-  src/neighbors/ivf_pq_build_float.cpp
-  src/neighbors/ivf_pq_build_int8.cpp
-  src/neighbors/ivf_pq_build_uint8.cpp
-  src/neighbors/ivf_pq_extend_float.cpp
-  src/neighbors/ivf_pq_extend_int8.cpp
-  src/neighbors/ivf_pq_extend_uint8.cpp
-  src/neighbors/ivf_pq_search_float.cpp
-  src/neighbors/ivf_pq_search_int8.cpp
-  src/neighbors/ivf_pq_search_uint8.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_float_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_int8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_uint8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_extend_float_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_extend_int8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_extend_uint8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_search_float_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_search_int8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_search_uint8_t_int64_t.cpp
   src/neighbors/ivf_pq_serialize.cpp
 )
 
@@ -239,16 +239,13 @@ target_include_directories(
 
 if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
-  target_link_libraries(cuvs
-        PUBLIC
-            rmm::rmm
-            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
-            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
-        PRIVATE
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static>
-            nvidia::cutlass::cutlass
-    )
+  target_link_libraries(
+    cuvs
+    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
+           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
+    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
+  )
 endif()
 
 # Endian detection
@@ -303,14 +300,14 @@ endif()
 
 set_target_properties(
   cuvs
-  PROPERTIES BUILD_RPATH                         "\$ORIGIN"
-             INSTALL_RPATH                       "\$ORIGIN"
-             CXX_STANDARD                        17
-             CXX_STANDARD_REQUIRED               ON
-             CUDA_STANDARD                       17
-             CUDA_STANDARD_REQUIRED              ON
+  PROPERTIES BUILD_RPATH "\$ORIGIN"
+             INSTALL_RPATH "\$ORIGIN"
+             CXX_STANDARD 17
+             CXX_STANDARD_REQUIRED ON
+             CUDA_STANDARD 17
+             CUDA_STANDARD_REQUIRED ON
              INTERFACE_POSITION_INDEPENDENT_CODE ON
-             POSITION_INDEPENDENT_CODE           ON
+             POSITION_INDEPENDENT_CODE ON
 )
 
 target_compile_options(
@@ -324,24 +321,21 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 # * cuvs_c -------------------------------------------------------------------------------
 if(BUILD_C_LIBRARY)
   add_library(
-    cuvs_c SHARED src/core/c_api.cpp
-                  src/neighbors/brute_force_c.cpp
-                  src/neighbors/ivf_flat_c.cpp
-                  src/neighbors/ivf_pq_c.cpp
-                  src/neighbors/cagra_c.cpp
+    cuvs_c SHARED src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
+                  src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
 
   set_target_properties(
     cuvs_c
-    PROPERTIES BUILD_RPATH                         "\$ORIGIN"
-               INSTALL_RPATH                       "\$ORIGIN"
-               CXX_STANDARD                        17
-               CXX_STANDARD_REQUIRED               ON
-               POSITION_INDEPENDENT_CODE           ON
+    PROPERTIES BUILD_RPATH "\$ORIGIN"
+               INSTALL_RPATH "\$ORIGIN"
+               CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               POSITION_INDEPENDENT_CODE ON
                INTERFACE_POSITION_INDEPENDENT_CODE ON
-               EXPORT_NAME                         c_api
+               EXPORT_NAME c_api
   )
 
   target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
@@ -352,12 +346,11 @@ if(BUILD_C_LIBRARY)
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
-  target_link_libraries(cuvs_c
-        PUBLIC
-            cuvs::cuvs
-        PRIVATE
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-    )
+  target_link_libraries(
+    cuvs_c
+    PUBLIC cuvs::cuvs
+    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+  )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
   target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
