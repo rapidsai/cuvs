@@ -67,16 +67,17 @@ impl ManagedTensor {
         D: ndarray::Dimension,
     >(
         &self,
-        _res: &Resources,
+        res: &Resources,
         arr: &mut ndarray::ArrayBase<S, D>,
     ) -> Result<()> {
         unsafe {
             let bytes = dl_tensor_bytes(&self.0.dl_tensor);
-            check_cuda(ffi::cudaMemcpy(
+            check_cuda(ffi::cudaMemcpyAsync(
                 arr.as_mut_ptr() as *mut std::ffi::c_void,
                 self.0.dl_tensor.data,
                 bytes,
                 ffi::cudaMemcpyKind_cudaMemcpyDefault,
+                res.get_cuda_stream()?,
             ))?;
             Ok(())
         }
@@ -164,6 +165,16 @@ impl IntoDtype for i32 {
         ffi::DLDataType {
             code: ffi::DLDataTypeCode::kDLInt as _,
             bits: 32,
+            lanes: 1,
+        }
+    }
+}
+
+impl IntoDtype for i64 {
+    fn ffi_dtype() -> ffi::DLDataType {
+        ffi::DLDataType {
+            code: ffi::DLDataTypeCode::kDLInt as _,
+            bits: 64,
             lanes: 1,
         }
     }
