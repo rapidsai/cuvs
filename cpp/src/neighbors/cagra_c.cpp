@@ -162,14 +162,14 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(queries),
                  "queries should have device compatible memory");
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(neighbors),
-                 "queries should have device compatible memory");
+                 "neighbors should have device compatible memory");
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(distances),
-                 "queries should have device compatible memory");
+                 "distances should have device compatible memory");
 
     RAFT_EXPECTS(neighbors.dtype.code == kDLUInt && neighbors.dtype.bits == 32,
                  "neighbors should be of type uint32_t");
     RAFT_EXPECTS(distances.dtype.code == kDLFloat && neighbors.dtype.bits == 32,
-                 "neighbors should be of type float32");
+                 "distances should be of type float32");
 
     auto index = *index_c_ptr;
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
