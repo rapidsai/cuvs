@@ -67,9 +67,9 @@ void cagra_build_search_simple() {
   // Allocate memory for `queries`, `neighbors` and `distances` output
   uint32_t *neighbors;
   float *distances, *queries_d;
-  cudaMalloc((void**) &queries_d, sizeof(float) * n_queries * n_cols);
-  cudaMalloc((void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
-  cudaMalloc((void**) &distances, sizeof(float) * n_queries * topk);
+  cuvsRMMAlloc(res, (void**) &queries_d, sizeof(float) * n_queries * n_cols);
+  cuvsRMMAlloc(res, (void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
+  cuvsRMMAlloc(res, (void**) &distances, sizeof(float) * n_queries * topk);
 
   // Use DLPack to represent `queries`, `neighbors` and `distances` as tensors
   cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault);
@@ -133,8 +133,9 @@ void cagra_build_search_simple() {
 
   cuvsCagraSearchParamsDestroy(search_params);
 
-  cudaFree(neighbors);
-  cudaFree(distances);
+  cuvsRMMFree(res, distances, sizeof(float) * n_queries * topk);
+  cuvsRMMFree(res, neighbors, sizeof(uint32_t) * n_queries * topk);
+  cuvsRMMFree(res, queries_d, sizeof(float) * n_queries * n_cols);
 
   cuvsCagraIndexDestroy(index);
   cuvsCagraIndexParamsDestroy(index_params);
