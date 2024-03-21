@@ -52,12 +52,12 @@ void* _build(cuvsResources_t res,
 
   if (cparams.has_value()) {
     auto compression_params                        = cuvs::neighbors::cagra::vpq_params();
-    compression_params.pq_bits                     = cparams->pq_bits();
-    compression_params.pq_dim                      = cparams->pq_dim();
-    compression_params.vq_n_centers                = cparams->vq_n_centers();
-    compression_params.kmeans_n_iters              = cparams->kmeans_n_iters();
-    compression_params.vq_kmeans_trainset_fraction = cparams->vq_kmeans_trainset_fraction();
-    compression_params.pq_kmeans_trainset_fraction = cparams->pq_kmeans_trainset_fraction();
+    compression_params.pq_bits                     = cparams->pq_bits;
+    compression_params.pq_dim                      = cparams->pq_dim;
+    compression_params.vq_n_centers                = cparams->vq_n_centers;
+    compression_params.kmeans_n_iters              = cparams->kmeans_n_iters;
+    compression_params.vq_kmeans_trainset_fraction = cparams->vq_kmeans_trainset_fraction;
+    compression_params.pq_kmeans_trainset_fraction = cparams->pq_kmeans_trainset_fraction;
     build_params.compression.emplace(compression_params);
   }
 
