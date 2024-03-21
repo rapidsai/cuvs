@@ -52,10 +52,8 @@ cdef class Index:
     cdef cuvsBruteForceIndex_t index
     cdef bool trained
 
-    def __cinit__(self, metric="sqeuclidean", metric_arg=2.0):
+    def __cinit__(self):
         self.trained = False
-        self.metric = metric
-        self.metric_arg = metric_arg
         check_cuvs(cuvsBruteForceIndexCreate(&self.index))
 
     def __dealloc__(self):
@@ -67,7 +65,7 @@ cdef class Index:
         return self.trained
 
     def __repr__(self):
-        return "Index(type=BruteForce, metric={})" % self.metric
+        return "Index(type=BruteForce)"
 
 
 @auto_sync_resources
@@ -114,10 +112,10 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     cdef cuvsResources_t res_
     check_cuvs(cuvsResourcesCreate(&res_))
 
-    cdef Index idx = Index(metric=metric, metric_arg=metric_arg)
+    cdef DistanceType c_metric = <DistanceType>DISTANCE_TYPES[metric]
+    cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
-    cdef DistanceType c_metric = <DistanceType>DISTANCE_TYPES[metric]
 
     with cuda_interruptible():
         check_cuvs(cuvsBruteForceBuild(
