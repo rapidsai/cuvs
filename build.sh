@@ -419,7 +419,7 @@ fi
 # Initiate build for c++ examples (if needed)
 
 if hasArg examples; then
-    pushd ${REPODIR}/examples/cpp
+    pushd ${REPODIR}/examples
     ./build.sh
     popd
 fi
