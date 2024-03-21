@@ -19,7 +19,7 @@ import numpy as np
 
 cimport cuvs.common.cydlpack
 
-from cuvs.common.Resources import auto_sync_resources
+from cuvs.common.resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libc.stdint cimport uint32_t

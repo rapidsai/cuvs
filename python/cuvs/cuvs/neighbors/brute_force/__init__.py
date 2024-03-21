@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from .brute_force import Index, build, search
+from .brute_force import FlatIndex, build, search
 
-__all__ = ["Index", "build", "search"]
+__all__ = ["FlatIndex", "build", "search"]
