@@ -9,4 +9,7 @@ Nearest Neighbors
    :maxdepth: 2
    :caption: Contents:
 
+   neighbors_bruteforce.rst
+   neighbors_ivf_flat.rst
+   neighbors_ivf_pq.rst
    neighbors_cagra.rst
