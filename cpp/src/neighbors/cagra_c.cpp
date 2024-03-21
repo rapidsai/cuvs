@@ -157,7 +157,8 @@ extern "C" cuvsError_t cuvsCagraBuildCompressed(cuvsResources_t res,
         reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, cparams, dataset_tensor));
       index->dtype.code = kDLInt;
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
+      index->addr =
+        reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, cparams, dataset_tensor));
       index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
