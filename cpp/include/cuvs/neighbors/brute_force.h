@@ -36,9 +36,9 @@ extern "C" {
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-} bruteForceIndex;
+} cuvsBruteForceIndex;
 
-typedef bruteForceIndex* cuvsBruteForceIndex_t;
+typedef cuvsBruteForceIndex* cuvsBruteForceIndex_t;
 
 /**
  * @brief Allocate BRUTEFORCE index
@@ -46,14 +46,14 @@ typedef bruteForceIndex* cuvsBruteForceIndex_t;
  * @param[in] index cuvsBruteForceIndex_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t bruteForceIndexCreate(cuvsBruteForceIndex_t* index);
+cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index);
 
 /**
  * @brief De-allocate BRUTEFORCE index
  *
  * @param[in] index cuvsBruteForceIndex_t to de-allocate
  */
-cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index);
+cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
 /**
  * @}
  */
@@ -83,13 +83,13 @@ cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  *
  * // Create BRUTEFORCE index
  * cuvsBruteForceIndex_t index;
- * cuvsError_t index_create_status = bruteForceIndexCreate(&index);
+ * cuvsError_t index_create_status = cuvsBruteForceIndexCreate(&index);
  *
  * // Build the BRUTEFORCE Index
- * cuvsError_t build_status = bruteForceBuild(res, &dataset_tensor, L2Expanded, 0.f, index);
+ * cuvsError_t build_status = cuvsBruteForceBuild(res, &dataset_tensor, L2Expanded, 0.f, index);
  *
  * // de-allocate `index` and `res`
- * cuvsError_t index_destroy_status = bruteForceIndexDestroy(index);
+ * cuvsError_t index_destroy_status = cuvsBruteForceIndexDestroy(index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
@@ -100,11 +100,11 @@ cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  * @param[out] index cuvsBruteForceIndex_t Newly built BRUTEFORCE index
  * @return cuvsError_t
  */
-cuvsError_t bruteForceBuild(cuvsResources_t res,
-                            DLManagedTensor* dataset,
-                            enum DistanceType metric,
-                            float metric_arg,
-                            cuvsBruteForceIndex_t index);
+cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
+                                DLManagedTensor* dataset,
+                                enum DistanceType metric,
+                                float metric_arg,
+                                cuvsBruteForceIndex_t index);
 /**
  * @}
  */
@@ -136,24 +136,24 @@ cuvsError_t bruteForceBuild(cuvsResources_t res,
  * DLManagedTensor queries;
  * DLManagedTensor neighbors;
  *
- * // Search the `index` built using `bruteForceBuild`
- * cuvsError_t search_status = bruteForceSearch(res, index, &queries, &neighbors, &distances);
+ * // Search the `index` built using `cuvsBruteForceBuild`
+ * cuvsError_t search_status = cuvsBruteForceSearch(res, index, &queries, &neighbors, &distances);
  *
  * // de-allocate `res`
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] index bruteForceIndex which has been returned by `bruteForceBuild`
+ * @param[in] index cuvsBruteForceIndex which has been returned by `cuvsBruteForceBuild`
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
-cuvsError_t bruteForceSearch(cuvsResources_t res,
-                             cuvsBruteForceIndex_t index,
-                             DLManagedTensor* queries,
-                             DLManagedTensor* neighbors,
-                             DLManagedTensor* distances);
+cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
+                                 cuvsBruteForceIndex_t index,
+                                 DLManagedTensor* queries,
+                                 DLManagedTensor* neighbors,
+                                 DLManagedTensor* distances);
 /**
  * @}
  */

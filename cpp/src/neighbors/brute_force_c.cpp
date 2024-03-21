@@ -23,6 +23,7 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/brute_force.hpp>
@@ -49,7 +50,7 @@ void* _build(cuvsResources_t res,
 
 template <typename T>
 void _search(cuvsResources_t res,
-             bruteForceIndex index,
+             cuvsBruteForceIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
              DLManagedTensor* distances_tensor)
@@ -70,19 +71,14 @@ void _search(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t bruteForceIndexCreate(cuvsBruteForceIndex_t* index)
+extern "C" cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index)
 {
-  try {
-    *index = new bruteForceIndex{};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { *index = new cuvsBruteForceIndex{}; });
 }
 
-extern "C" cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_ptr)
+extern "C" cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_ptr)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
     if (index.dtype.code == kDLFloat) {
@@ -96,19 +92,16 @@ extern "C" cuvsError_t bruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_ptr)
       delete index_ptr;
     }
     delete index_c_ptr;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
-extern "C" cuvsError_t bruteForceBuild(cuvsResources_t res,
-                                       DLManagedTensor* dataset_tensor,
-                                       enum DistanceType metric,
-                                       float metric_arg,
-                                       cuvsBruteForceIndex_t index)
+extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
+                                           DLManagedTensor* dataset_tensor,
+                                           enum DistanceType metric,
+                                           float metric_arg,
+                                           cuvsBruteForceIndex_t index)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
@@ -120,19 +113,16 @@ extern "C" cuvsError_t bruteForceBuild(cuvsResources_t res,
                 dataset.dtype.code,
                 dataset.dtype.bits);
     }
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
-extern "C" cuvsError_t bruteForceSearch(cuvsResources_t res,
-                                        cuvsBruteForceIndex_t index_c_ptr,
-                                        DLManagedTensor* queries_tensor,
-                                        DLManagedTensor* neighbors_tensor,
-                                        DLManagedTensor* distances_tensor)
+extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
+                                            cuvsBruteForceIndex_t index_c_ptr,
+                                            DLManagedTensor* queries_tensor,
+                                            DLManagedTensor* neighbors_tensor,
+                                            DLManagedTensor* distances_tensor)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
     auto neighbors = neighbors_tensor->dl_tensor;
     auto distances = distances_tensor->dl_tensor;
@@ -159,9 +149,5 @@ extern "C" cuvsError_t bruteForceSearch(cuvsResources_t res,
                 queries.dtype.code,
                 queries.dtype.bits);
     }
-
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }

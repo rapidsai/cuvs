@@ -17,4 +17,5 @@
 // wrapper file containing all the C-API's we should automatically be creating rust
 // bindings for
 #include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/cagra.h>

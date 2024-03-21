@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -12,5 +12,14 @@
 # the License.
 # =============================================================================
 
-add_subdirectory(brute_force)
-add_subdirectory(cagra)
+# Set the list of Cython files to build
+set(cython_sources brute_force.pyx)
+set(linked_libraries cuvs::cuvs cuvs_c)
+
+# Build all of the Cython targets
+rapids_cython_create_modules(
+  CXX
+  SOURCE_FILES "${cython_sources}"
+  LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX
+                   neighbors_brute_force_
+)

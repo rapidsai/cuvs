@@ -23,6 +23,7 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -86,17 +87,12 @@ void _search(cuvsResources_t res,
 
 extern "C" cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
 {
-  try {
-    *index = new ivfFlatIndex{};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { *index = new ivfFlatIndex{}; });
 }
 
 extern "C" cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
     if (index.dtype.code == kDLFloat) {
@@ -113,10 +109,7 @@ extern "C" cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
       delete index_ptr;
     }
     delete index_c_ptr;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
@@ -124,7 +117,7 @@ extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
                                     DLManagedTensor* dataset_tensor,
                                     cuvsIvfFlatIndex_t index)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
@@ -144,10 +137,7 @@ extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
                 dataset.dtype.code,
                 dataset.dtype.bits);
     }
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t ivfFlatSearch(cuvsResources_t res,
@@ -157,7 +147,7 @@ extern "C" cuvsError_t ivfFlatSearch(cuvsResources_t res,
                                      DLManagedTensor* neighbors_tensor,
                                      DLManagedTensor* distances_tensor)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
     auto neighbors = neighbors_tensor->dl_tensor;
     auto distances = distances_tensor->dl_tensor;
@@ -191,16 +181,12 @@ extern "C" cuvsError_t ivfFlatSearch(cuvsResources_t res,
                 queries.dtype.code,
                 queries.dtype.bits);
     }
-
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* params)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     *params = new ivfFlatIndexParams{.metric                         = L2Expanded,
                                      .metric_arg                     = 2.0f,
                                      .add_data_on_build              = true,
@@ -209,38 +195,21 @@ extern "C" cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* pa
                                      .kmeans_trainset_fraction       = 0.5,
                                      .adaptive_centers               = false,
                                      .conservative_memory_allocation = false};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t params)
 {
-  try {
-    delete params;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
 extern "C" cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params)
 {
-  try {
-    *params = new ivfFlatSearchParams{.n_probes = 20};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions(
+    [=] { *params = new ivfFlatSearchParams{.n_probes = 20}; });
 }
 
 extern "C" cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params)
 {
-  try {
-    delete params;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }
