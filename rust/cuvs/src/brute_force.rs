@@ -63,7 +63,7 @@ impl Index {
         }
     }
 
-    /// Perform a Approximate Nearest Neighbors search on the Index
+    /// Perform a Nearest Neighbors search on the Index
     ///
     /// # Arguments
     ///
