@@ -35,7 +35,7 @@ namespace {
 template <typename T>
 void* _build(cuvsResources_t res,
              cuvsCagraIndexParams params,
-             std::optional<cuvsCagraCompressionParams_t> cparams,
+             std::optional<cuvsCagraCompressionParams> cparams,
              DLManagedTensor* dataset_tensor)
 {
   auto dataset = dataset_tensor->dl_tensor;
