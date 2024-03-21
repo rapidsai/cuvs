@@ -23,9 +23,9 @@ use crate::resources::Resources;
 
 /// Brute Force KNN Index
 #[derive(Debug)]
-pub struct FlatIndex(ffi::cuvsBruteForceIndex_t);
+pub struct Index(ffi::cuvsBruteForceIndex_t);
 
-impl FlatIndex {
+impl Index {
     /// Builds a new Brute Force KNN Index from the dataset for efficient search.
     ///
     /// # Arguments
@@ -39,9 +39,9 @@ impl FlatIndex {
         metric: DistanceType,
         metric_arg: Option<f32>,
         dataset: T,
-    ) -> Result<FlatIndex> {
+    ) -> Result<Index> {
         let dataset: ManagedTensor = dataset.into();
-        let index = FlatIndex::new()?;
+        let index = Index::new()?;
         unsafe {
             check_cuvs(ffi::cuvsBruteForceBuild(
                 res.0,
@@ -55,11 +55,11 @@ impl FlatIndex {
     }
 
     /// Creates a new empty index
-    pub fn new() -> Result<FlatIndex> {
+    pub fn new() -> Result<Index> {
         unsafe {
             let mut index = std::mem::MaybeUninit::<ffi::cuvsBruteForceIndex_t>::uninit();
             check_cuvs(ffi::cuvsBruteForceIndexCreate(index.as_mut_ptr()))?;
-            Ok(FlatIndex(index.assume_init()))
+            Ok(Index(index.assume_init()))
         }
     }
 
@@ -90,7 +90,7 @@ impl FlatIndex {
     }
 }
 
-impl Drop for FlatIndex {
+impl Drop for Index {
     fn drop(&mut self) {
         if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.0) }) {
             write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
@@ -123,7 +123,7 @@ mod tests {
 
         // build the brute force index
         let index =
-            FlatIndex::build(&res, metric, None, dataset).expect("failed to create brute force index");
+            Index::build(&res, metric, None, dataset).expect("failed to create brute force index");
 
         res.sync_stream().unwrap();
         

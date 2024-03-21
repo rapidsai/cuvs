@@ -39,7 +39,7 @@ from cuvs.common.c_api cimport cuvsResources_t
 from cuvs.common.exceptions import check_cuvs
 
 
-cdef class FlatIndex:
+cdef class Index:
     """
     Brute Force index object. This object stores the trained Brute Force
     which can be used to perform nearest neighbors searches.
@@ -61,7 +61,7 @@ cdef class FlatIndex:
         return self.trained
 
     def __repr__(self):
-        return "FlatIndex(type=BruteForce)"
+        return "Index(type=BruteForce)"
 
 
 @auto_sync_resources
@@ -81,7 +81,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
 
     Returns
     -------
-    index: cuvs.neighbors.brute_force.FlatIndex
+    index: cuvs.neighbors.brute_force.Index
 
     Examples
     --------
@@ -106,7 +106,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef DistanceType c_metric = <DistanceType>DISTANCE_TYPES[metric]
-    cdef FlatIndex idx = FlatIndex()
+    cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
 
@@ -125,7 +125,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
 
 @auto_sync_resources
 @auto_convert_output
-def search(FlatIndex index,
+def search(Index index,
            queries,
            k,
            neighbors=None,
@@ -136,7 +136,7 @@ def search(FlatIndex index,
 
     Parameters
     ----------
-    index : FlatIndex
+    index : Index
         Trained Brute Force index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
