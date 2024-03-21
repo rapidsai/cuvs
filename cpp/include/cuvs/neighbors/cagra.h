@@ -325,11 +325,11 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[out] index cuvsCagraIndex_t Newly built CAGRA index
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraBuild(cuvsResources_t res,
-                           cuvsCagraIndexParams_t params,
-                           cuvsCagraCompressionParams_t compression_params,
-                           DLManagedTensor* dataset,
-                           cuvsCagraIndex_t index);
+cuvsError_t cuvsCagraBuildCompressed(cuvsResources_t res,
+                                     cuvsCagraIndexParams_t params,
+                                     cuvsCagraCompressionParams_t compression_params,
+                                     DLManagedTensor* dataset,
+                                     cuvsCagraIndex_t index);
 
 /**
  * @}

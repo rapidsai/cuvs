@@ -138,11 +138,11 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
-                                      cuvsCagraIndexParams_t params,
-                                      cuvsCagraCompressionParams_t compression_params,
-                                      DLManagedTensor* dataset_tensor,
-                                      cuvsCagraIndex_t index)
+extern "C" cuvsError_t cuvsCagraBuildCompressed(cuvsResources_t res,
+                                                cuvsCagraIndexParams_t params,
+                                                cuvsCagraCompressionParams_t compression_params,
+                                                DLManagedTensor* dataset_tensor,
+                                                cuvsCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -172,7 +172,7 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                       DLManagedTensor* dataset_tensor,
                                       cuvsCagraIndex_t index)
 {
-  return cuvsCagraBuild(res, params, nullptr, dataset_tensor, index);
+  return cuvsCagraBuildCompressed(res, params, nullptr, dataset_tensor, index);
 }
 
 extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
