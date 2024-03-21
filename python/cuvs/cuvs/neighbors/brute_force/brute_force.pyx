@@ -19,7 +19,7 @@ import numpy as np
 
 cimport cuvs.common.cydlpack
 
-from cuvs.common.temp_raft import auto_sync_resources
+from cuvs.common.Resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libc.stdint cimport uint32_t
@@ -34,16 +34,12 @@ from pylibraft.common.interruptible import cuda_interruptible
 from pylibraft.distance.pairwise_distance import DISTANCE_TYPES
 from pylibraft.neighbors.common import _check_input_array
 
-from cuvs.common.c_api cimport (
-    cuvsResources_t,
-    cuvsResourcesCreate,
-    cuvsResourcesDestroy,
-)
+from cuvs.common.c_api cimport cuvsResources_t
 
 from cuvs.common.exceptions import check_cuvs
 
 
-cdef class Index:
+cdef class FlatIndex:
     """
     Brute Force index object. This object stores the trained Brute Force
     which can be used to perform nearest neighbors searches.
@@ -65,7 +61,7 @@ cdef class Index:
         return self.trained
 
     def __repr__(self):
-        return "Index(type=BruteForce)"
+        return "FlatIndex(type=BruteForce)"
 
 
 @auto_sync_resources
@@ -85,7 +81,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
 
     Returns
     -------
-    index: cuvs.neighbors.brute_force.Index
+    index: cuvs.neighbors.brute_force.FlatIndex
 
     Examples
     --------
@@ -107,19 +103,16 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     dataset_ai = wrap_array(dataset)
     _check_input_array(dataset_ai, [np.dtype('float32')])
 
-    # TODO(benfred): remove once https://github.com/rapidsai/cuvs/pull/58
-    # is merged
-    cdef cuvsResources_t res_
-    check_cuvs(cuvsResourcesCreate(&res_))
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef DistanceType c_metric = <DistanceType>DISTANCE_TYPES[metric]
-    cdef Index idx = Index()
+    cdef FlatIndex idx = FlatIndex()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
 
     with cuda_interruptible():
         check_cuvs(cuvsBruteForceBuild(
-            res_,
+            res,
             dataset_dlpack,
             c_metric,
             <float>metric_arg,
@@ -132,7 +125,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
 
 @auto_sync_resources
 @auto_convert_output
-def search(Index index,
+def search(FlatIndex index,
            queries,
            k,
            neighbors=None,
@@ -143,7 +136,7 @@ def search(Index index,
 
     Parameters
     ----------
-    index : Index
+    index : FlatIndex
         Trained Brute Force index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
@@ -182,9 +175,7 @@ def search(Index index,
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")
 
-    cdef cuvsResources_t res_
-
-    check_cuvs(cuvsResourcesCreate(&res_))
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     queries_cai = wrap_array(queries)
     _check_input_array(queries_cai, [np.dtype('float32')])
@@ -215,7 +206,7 @@ def search(Index index,
 
     with cuda_interruptible():
         check_cuvs(cuvsBruteForceSearch(
-            res_,
+            res,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
