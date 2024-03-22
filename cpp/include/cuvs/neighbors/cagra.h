@@ -40,39 +40,6 @@ enum cuvsCagraGraphBuildAlgo {
   NN_DESCENT
 };
 
-/**
- * @brief Supplemental parameters to build CAGRA Index
- *
- */
-struct cuvsCagraIndexParams {
-  /** Degree of input graph for pruning. */
-  size_t intermediate_graph_degree;
-  /** Degree of output graph. */
-  size_t graph_degree;
-  /** ANN algorithm to build knn graph. */
-  enum cuvsCagraGraphBuildAlgo build_algo;
-  /** Number of Iterations to run if building with NN_DESCENT */
-  size_t nn_descent_niter;
-};
-
-typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
-
-/**
- * @brief Allocate CAGRA Index params, and populate with default values
- *
- * @param[in] params cuvsCagraIndexParams_t to allocate
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
-
-/**
- * @brief De-allocate CAGRA Index params
- *
- * @param[in] params
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
-
 /** Parameters for VPQ compression. */
 struct cuvsCagraCompressionParams {
   /**
@@ -111,6 +78,45 @@ struct cuvsCagraCompressionParams {
 };
 
 typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
+
+/**
+ * @brief Supplemental parameters to build CAGRA Index
+ *
+ */
+struct cuvsCagraIndexParams {
+  /** Degree of input graph for pruning. */
+  size_t intermediate_graph_degree;
+  /** Degree of output graph. */
+  size_t graph_degree;
+  /** ANN algorithm to build knn graph. */
+  enum cuvsCagraGraphBuildAlgo build_algo;
+  /** Number of Iterations to run if building with NN_DESCENT */
+  size_t nn_descent_niter;
+  /**
+   * Optional: specify compression parameters if compression is desired.
+   *
+   * NOTE: this is experimental new API, consider it unsafe.
+   */
+  cuvsCagraCompressionParams_t compression;
+};
+
+typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
+
+/**
+ * @brief Allocate CAGRA Index params, and populate with default values
+ *
+ * @param[in] params cuvsCagraIndexParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
+
+/**
+ * @brief De-allocate CAGRA Index params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
 
 /**
  * @brief Allocate CAGRA Compression params, and populate with default values
@@ -313,23 +319,6 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            cuvsCagraIndexParams_t params,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
-
-/**
- * @brief Build a CAGRA index with compression
- *
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsCagraIndexParams_t used to build CAGRA index
- * @param[in] compression_params cuvsCagraCompressionParams_t used to compress the input dataset for
- * CAGRA index
- * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index cuvsCagraIndex_t Newly built CAGRA index
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraBuildCompressed(cuvsResources_t res,
-                                     cuvsCagraIndexParams_t params,
-                                     cuvsCagraCompressionParams_t compression_params,
-                                     DLManagedTensor* dataset,
-                                     cuvsCagraIndex_t index);
 
 /**
  * @}

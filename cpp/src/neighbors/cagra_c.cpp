@@ -28,15 +28,10 @@
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
 
-#include <optional>
-
 namespace {
 
 template <typename T>
-void* _build(cuvsResources_t res,
-             cuvsCagraIndexParams params,
-             std::optional<cuvsCagraCompressionParams> cparams,
-             DLManagedTensor* dataset_tensor)
+void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto dataset = dataset_tensor->dl_tensor;
 
@@ -50,7 +45,7 @@ void* _build(cuvsResources_t res,
     static_cast<cuvs::neighbors::cagra::graph_build_algo>(params.build_algo);
   build_params.nn_descent_niter = params.nn_descent_niter;
 
-  if (cparams.has_value()) {
+  if (auto* cparams = params.compression; cparams != nullptr) {
     auto compression_params                        = cuvs::neighbors::cagra::vpq_params();
     compression_params.pq_bits                     = cparams->pq_bits;
     compression_params.pq_dim                      = cparams->pq_dim;
@@ -138,27 +133,21 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraBuildCompressed(cuvsResources_t res,
-                                                cuvsCagraIndexParams_t params,
-                                                cuvsCagraCompressionParams_t compression_params,
-                                                DLManagedTensor* dataset_tensor,
-                                                cuvsCagraIndex_t index)
+extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
+                                      cuvsCagraIndexParams_t params,
+                                      DLManagedTensor* dataset_tensor,
+                                      cuvsCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
-    auto cparams =
-      compression_params == nullptr ? std::nullopt : std::make_optional(*compression_params);
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_build<float>(res, *params, cparams, dataset_tensor));
+      index->addr       = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
       index->dtype.code = kDLFloat;
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, cparams, dataset_tensor));
+      index->addr       = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
       index->dtype.code = kDLInt;
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, cparams, dataset_tensor));
+      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
       index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
@@ -166,14 +155,6 @@ extern "C" cuvsError_t cuvsCagraBuildCompressed(cuvsResources_t res,
                 dataset.dtype.bits);
     }
   });
-}
-
-extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
-                                      cuvsCagraIndexParams_t params,
-                                      DLManagedTensor* dataset_tensor,
-                                      cuvsCagraIndex_t index)
-{
-  return cuvsCagraBuildCompressed(res, params, nullptr, dataset_tensor, index);
 }
 
 extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
