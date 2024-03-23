@@ -425,8 +425,10 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
     for (uint32_t vq_n_centers : {100, 1000}) {
       for (auto input : inputs2) {
-        input.compression.emplace(
-          vpq_params{.pq_dim = input.dim / pq_len, .vq_n_centers = vq_n_centers});
+        vpq_params ps{};
+        ps.pq_dim       = input.dim / pq_len;
+        ps.vq_n_centers = vq_n_centers;
+        input.compression.emplace(ps);
         inputs.push_back(input);
       }
     }
