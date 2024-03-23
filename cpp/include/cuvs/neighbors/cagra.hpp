@@ -25,6 +25,8 @@
 #include <raft/neighbors/cagra_types.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <optional>
+
 namespace cuvs::neighbors::cagra {
 /**
  * @defgroup cagra_cpp_index_params CAGRA index build parameters
@@ -42,6 +44,54 @@ enum class graph_build_algo {
   NN_DESCENT
 };
 
+/** Parameters for VPQ compression. */
+struct vpq_params {
+  /**
+   * The bit length of the vector element after compression by PQ.
+   *
+   * Possible values: [4, 5, 6, 7, 8].
+   *
+   * Hint: the smaller the 'pq_bits', the smaller the index size and the better the search
+   * performance, but the lower the recall.
+   */
+  uint32_t pq_bits = 8;
+  /**
+   * The dimensionality of the vector after compression by PQ.
+   * When zero, an optimal value is selected using a heuristic.
+   *
+   * TODO: at the moment `dim` must be a multiple `pq_dim`.
+   */
+  uint32_t pq_dim = 0;
+  /**
+   * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  uint32_t vq_n_centers = 0;
+  /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
+  uint32_t kmeans_n_iters = 25;
+  /**
+   * The fraction of data to use during iterative kmeans building (VQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double vq_kmeans_trainset_fraction = 0;
+  /**
+   * The fraction of data to use during iterative kmeans building (PQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double pq_kmeans_trainset_fraction = 0;
+
+  /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
+  operator raft::neighbors::vpq_params() const
+  {
+    return {.pq_bits                     = pq_bits,
+            .pq_dim                      = pq_dim,
+            .vq_n_centers                = vq_n_centers,
+            .kmeans_n_iters              = kmeans_n_iters,
+            .vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction,
+            .pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction};
+  }
+};
+
 struct index_params : ann::index_params {
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree = 128;
@@ -51,6 +101,12 @@ struct index_params : ann::index_params {
   graph_build_algo build_algo = graph_build_algo::IVF_PQ;
   /** Number of Iterations to run if building with NN_DESCENT */
   size_t nn_descent_niter = 20;
+  /**
+   * Specify compression parameters if compression is desired.
+   *
+   * NOTE: this is experimental new API, consider it unsafe.
+   */
+  std::optional<vpq_params> compression = std::nullopt;
 
   /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
   operator raft::neighbors::cagra::index_params() const
@@ -64,7 +120,8 @@ struct index_params : ann::index_params {
       .intermediate_graph_degree = intermediate_graph_degree,
       .graph_degree              = graph_degree,
       .build_algo       = static_cast<raft::neighbors::cagra::graph_build_algo>((int)build_algo),
-      .nn_descent_niter = nn_descent_niter};
+      .nn_descent_niter = nn_descent_niter,
+      .compression      = compression};
   }
 };
 
