@@ -16,19 +16,21 @@ CUVS_REPO_REL=""
 EXTRA_CMAKE_ARGS=""
 set -e
 
+# Root of examples
+EXAMPLES_DIR=$(dirname "$(realpath "$0")")
 
 if [[ ${CUVS_REPO_REL} != "" ]]; then
   CUVS_REPO_PATH="`readlink -f \"${CUVS_REPO_REL}\"`"
   EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS} -DCPM_cuvs_SOURCE=${CUVS_REPO_PATH}"
+else
+  LIB_BUILD_DIR=${LIB_BUILD_DIR:-$(readlink -f "${EXAMPLES_DIR}/../cpp/build")}
+  EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS} -Dcuvs_ROOT=${LIB_BUILD_DIR}"
 fi
 
 if [ "$1" == "clean" ]; then
   rm -rf build
   exit 0
 fi
-
-# Root of examples
-EXAMPLES_DIR=$(dirname "$(realpath "$0")")
 
 ################################################################################
 # Add individual libcudf examples build scripts down below
