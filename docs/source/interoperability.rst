@@ -18,7 +18,7 @@ Here's an example on how to represent device memory using `DLManagedTensor`:
     float dataset[2][1] = {{0.2, 0.1}};
     // copy data to device memory
     float *dataset_dev;
-    cudaMalloc(&dataset_dev, sizeof(float) * 2 * 1);
+    cuvsRMMAlloc(&dataset_dev, sizeof(float) * 2 * 1);
     cudaMemcpy(dataset_dev, dataset, sizeof(float) * 2 * 1, cudaMemcpyDefault);
 
     // Use DLPack for representing the data as a tensor
@@ -34,7 +34,7 @@ Here's an example on how to represent device memory using `DLManagedTensor`:
     dataset_tensor.dl_tensor.strides            = nullptr;
 
     // free memory after use
-    cudaFree(dataset_dev);
+    cuvsRMMFree(dataset_dev);
 
 Please refer to cuVS C API `documentation <c_api.rst>`_ to learn more.
 
