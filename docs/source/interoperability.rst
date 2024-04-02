@@ -4,6 +4,40 @@ Interoperability
 DLPack (C)
 ^^^^^^^^^^
 
+Approximate nearest neighbor (ANN) indexes provide an interface to build and search an index via a C API. [DLPack v0.8](https://github.com/dmlc/dlpack/blob/main/README.md), a tensor interface framework, is used as the standard to interact with our C API.
+
+Representing a tensor with DLPack is simple, as it is a POD struct that stores information about the tensor at runtime. At the moment, `DLManagedTensor` from DLPack v0.8 is compatible with out C API however we will soon upgrade to `DLManagedTensorVersioned` from DLPack v1.0 as it will help us maintain ABI and API compatibility.
+
+Here's an example on how to represent device memory using `DLManagedTensor`:
+
+.. code-block:: c
+
+    #include <dlpack/dlpack.h>
+
+    // Create data representation in host memory
+    float dataset[2][1] = {{0.2, 0.1}};
+    // copy data to device memory
+    float *dataset_dev;
+    cuvsRMMAlloc(&dataset_dev, sizeof(float) * 2 * 1);
+    cudaMemcpy(dataset_dev, dataset, sizeof(float) * 2 * 1, cudaMemcpyDefault);
+
+    // Use DLPack for representing the data as a tensor
+    DLManagedTensor dataset_tensor;
+    dataset_tensor.dl_tensor.data               = dataset;
+    dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+    dataset_tensor.dl_tensor.ndim               = 2;
+    dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+    dataset_tensor.dl_tensor.dtype.bits         = 32;
+    dataset_tensor.dl_tensor.dtype.lanes        = 1;
+    int64_t dataset_shape[2]                    = {2, 1};
+    dataset_tensor.dl_tensor.shape              = dataset_shape;
+    dataset_tensor.dl_tensor.strides            = nullptr;
+
+    // free memory after use
+    cuvsRMMFree(dataset_dev);
+
+Please refer to cuVS C API `documentation <c_api.rst>`_ to learn more.
+
 Multi-dimensional span (C++)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
