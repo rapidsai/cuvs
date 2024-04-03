@@ -13,45 +13,45 @@
 # =============================================================================
 
 if(DISABLE_DEPRECATION_WARNINGS)
-  list(APPEND RAFT_CXX_FLAGS -Wno-deprecated-declarations)
-  list(APPEND RAFT_CUDA_FLAGS -Xcompiler=-Wno-deprecated-declarations)
+  list(APPEND CUVS_CXX_FLAGS -Wno-deprecated-declarations)
+  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=-Wno-deprecated-declarations)
 endif()
 
 # Be very strict when compiling with GCC as host compiler (and thus more lenient when compiling with
 # clang)
 if(CMAKE_COMPILER_IS_GNUCXX)
-  list(APPEND RAFT_CXX_FLAGS -Wall -Werror -Wno-unknown-pragmas -Wno-error=deprecated-declarations)
-  list(APPEND RAFT_CUDA_FLAGS -Xcompiler=-Wall,-Werror,-Wno-error=deprecated-declarations)
+  list(APPEND CUVS_CXX_FLAGS -Wall -Werror -Wno-unknown-pragmas -Wno-error=deprecated-declarations)
+  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=-Wall,-Werror,-Wno-error=deprecated-declarations)
 
   # set warnings as errors
   if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11.2.0)
-    list(APPEND RAFT_CUDA_FLAGS -Werror=all-warnings)
+    list(APPEND CUVS_CUDA_FLAGS -Werror=all-warnings)
   endif()
 endif()
 
 if(CUDA_LOG_COMPILE_TIME)
-  list(APPEND RAFT_CUDA_FLAGS "--time=nvcc_compile_log.csv")
+  list(APPEND CUVS_CUDA_FLAGS "--time=nvcc_compile_log.csv")
 endif()
 
-list(APPEND RAFT_CUDA_FLAGS --expt-extended-lambda --expt-relaxed-constexpr)
-list(APPEND RAFT_CXX_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
-list(APPEND RAFT_CUDA_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
+list(APPEND CUVS_CUDA_FLAGS --expt-extended-lambda --expt-relaxed-constexpr)
+list(APPEND CUVS_CXX_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
+list(APPEND CUVS_CUDA_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
 # make sure we produce smallest binary size
-list(APPEND RAFT_CUDA_FLAGS -Xfatbin=-compress-all)
+list(APPEND CUVS_CUDA_FLAGS -Xfatbin=-compress-all)
 
 # Option to enable line info in CUDA device compilation to allow introspection when profiling /
 # memchecking
 if(CUDA_ENABLE_LINEINFO)
-  list(APPEND RAFT_CUDA_FLAGS -lineinfo)
+  list(APPEND CUVS_CUDA_FLAGS -lineinfo)
 endif()
 
 if(OpenMP_FOUND)
-  list(APPEND RAFT_CUDA_FLAGS -Xcompiler=${OpenMP_CXX_FLAGS})
+  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=${OpenMP_CXX_FLAGS})
 endif()
 
 # Debug options
 if(CMAKE_BUILD_TYPE MATCHES Debug)
   message(VERBOSE "RAFT: Building with debugging flags")
-  list(APPEND RAFT_CUDA_FLAGS -G -Xcompiler=-rdynamic)
-  list(APPEND RAFT_CUDA_FLAGS -Xptxas --suppress-stack-size-warning)
+  list(APPEND CUVS_CUDA_FLAGS -G -Xcompiler=-rdynamic)
+  list(APPEND CUVS_CUDA_FLAGS -Xptxas --suppress-stack-size-warning)
 endif()
