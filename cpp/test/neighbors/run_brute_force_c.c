@@ -44,10 +44,10 @@ void run_brute_force(int64_t n_rows,
 
   // create index
   cuvsBruteForceIndex_t index;
-  bruteForceIndexCreate(&index);
+  cuvsBruteForceIndexCreate(&index);
 
   // build index
-  bruteForceBuild(res, &dataset_tensor, metric, 0.0f, index);
+  cuvsBruteForceBuild(res, &dataset_tensor, metric, 0.0f, index);
 
   // create queries DLTensor
   DLManagedTensor queries_tensor;
@@ -86,9 +86,9 @@ void run_brute_force(int64_t n_rows,
   distances_tensor.dl_tensor.strides            = NULL;
 
   // search index
-  bruteForceSearch(res, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsBruteForceSearch(res, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // de-allocate index and res
-  bruteForceIndexDestroy(index);
+  cuvsBruteForceIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }

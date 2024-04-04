@@ -14,17 +14,4 @@
  * limitations under the License.
  */
 
-//! cuVS: Rust bindings for Vector Search on the GPU
-//!
-//! This crate provides Rust bindings for cuVS, allowing you to run
-//! approximate nearest neighbors search on the GPU.
-pub mod brute_force;
-pub mod cagra;
-pub mod distance_type;
-mod dlpack;
-mod error;
-mod resources;
-
-pub use dlpack::ManagedTensor;
-pub use error::{Error, Result};
-pub use resources::Resources;
+pub type DistanceType = ffi::DistanceType;
