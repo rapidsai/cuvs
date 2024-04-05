@@ -106,8 +106,7 @@ mod tests {
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
 
-    #[test]
-    fn test_cagra_index() {
+    fn test_cagra(build_params: IndexParams) {
         let res = Resources::new().unwrap();
 
         // Create a new random dataset to index
@@ -117,7 +116,6 @@ mod tests {
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
         // build the cagra index
-        let build_params = IndexParams::new().unwrap();
         let index =
             Index::build(&res, &build_params, &dataset).expect("failed to create cagra index");
 
@@ -158,5 +156,19 @@ mod tests {
         assert_eq!(neighbors_host[[1, 0]], 1);
         assert_eq!(neighbors_host[[2, 0]], 2);
         assert_eq!(neighbors_host[[3, 0]], 3);
+    }
+
+    #[test]
+    fn test_cagra_index() {
+        let build_params = IndexParams::new().unwrap();
+        test_cagra(build_params);
+    }
+
+    #[test]
+    fn test_cagra_compression() {
+        use crate::cagra::CompressionParams;
+        let build_params = IndexParams::new().unwrap()
+            .set_compression(CompressionParams::new().unwrap());
+        test_cagra(build_params);
     }
 }
