@@ -5,7 +5,9 @@ Aside from using cuVS directly, it can be consumed through a number of sdk and v
 
 - `FAISS`_
 - `Milvus`_
+- `Lucene` _
 - `Kinetica`_
+
 
 FAISS
 -----
@@ -30,6 +32,14 @@ In version 2.3, Milvus released support for IVF-Flat and IVF-PQ indexes on the G
 The GPU indexes can be enabled by using the index types prefixed with `GPU_`, as outlined in the `Milvus index build guide <https://milvus.io/docs/build_index.md#Prepare-index-parameter>`_.
 
 Milvus will be migrating their GPU support from RAFT to cuVS as we continue to move the vector search algorithms out of RAFT and into cuVS.
+
+
+Lucene
+------
+
+An experimental Lucene connector for cuVS enables GPU-accelerated vector search indexes through Lucene. Initial benchmarks are showing that this connector can drastically improve the performance of both indexing and search in Lucene. This connector will continue to be improved over time and any interested developers are encouraged to contribute.
+
+Install and evaluate the `lucene-cuvs` connector on `Github <https://github.com/SearchScale/lucene-cuvs>`_.
 
 
 Kinetica
