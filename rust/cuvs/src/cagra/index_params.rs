@@ -27,7 +27,7 @@ impl IndexParams {
     /// Returns a new IndexParams
     pub fn new() -> Result<IndexParams> {
         unsafe {
-            let mut params = core::mem::MaybeUninit::<ffi::cuvsCagraIndexParams_t>::uninit();
+            let mut params = std::mem::MaybeUninit::<ffi::cuvsCagraIndexParams_t>::uninit();
             check_cuvs(ffi::cuvsCagraIndexParamsCreate(params.as_mut_ptr()))?;
             Ok(IndexParams(params.assume_init()))
         }

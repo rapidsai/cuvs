@@ -32,6 +32,25 @@ impl Resources {
         }
         Ok(Resources(res))
     }
+
+    /// Sets the current cuda stream
+    pub fn set_cuda_stream(&self, stream: ffi::cudaStream_t) -> Result<()> {
+        unsafe { check_cuvs(ffi::cuvsStreamSet(self.0, stream)) }
+    }
+
+    /// Gets the current cuda stream
+    pub fn get_cuda_stream(&self) -> Result<ffi::cudaStream_t> {
+        unsafe {
+            let mut stream = std::mem::MaybeUninit::<ffi::cudaStream_t>::uninit();
+            check_cuvs(ffi::cuvsStreamGet(self.0, stream.as_mut_ptr()))?;
+            Ok(stream.assume_init())
+        }
+    }
+
+    /// Syncs the current cuda stream
+    pub fn sync_stream(&self) -> Result<()> {
+        unsafe { check_cuvs(ffi::cuvsStreamSync(self.0)) }
+    }
 }
 
 impl Drop for Resources {
