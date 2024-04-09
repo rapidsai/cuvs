@@ -38,6 +38,7 @@ def run_cagra_build_search_test(
     inplace=True,
     add_data_on_build=True,
     search_params={},
+    compression=None,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -49,6 +50,7 @@ def run_cagra_build_search_test(
         intermediate_graph_degree=intermediate_graph_degree,
         graph_degree=graph_degree,
         build_algo=build_algo,
+        compression=compression,
     )
 
     if array_type == "device":
@@ -172,4 +174,12 @@ def test_cagra_index_params(params):
         intermediate_graph_degree=params["intermediate_graph_degree"],
         compare=False,
         build_algo=params["build_algo"],
+    )
+
+
+def test_cagra_vpq_compression():
+    dim = 64
+    pq_len = 2
+    run_cagra_build_search_test(
+        n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
     )

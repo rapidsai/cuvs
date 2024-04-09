@@ -34,11 +34,22 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         IVF_PQ
         NN_DESCENT
 
+    ctypedef struct cuvsCagraCompressionParams:
+        uint32_t pq_bits
+        uint32_t pq_dim
+        uint32_t vq_n_centers
+        uint32_t kmeans_n_iters
+        double vq_kmeans_trainset_fraction
+        double pq_kmeans_trainset_fraction
+
+    ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
+
     ctypedef struct cuvsCagraIndexParams:
         size_t intermediate_graph_degree
         size_t graph_degree
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
+        cuvsCagraCompressionParams_t compression
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
 
@@ -73,6 +84,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         DLDataType dtype
 
     ctypedef cuvsCagraIndex* cuvsCagraIndex_t
+
+    cuvsError_t cuvsCagraCompressionParamsCreate(
+        cuvsCagraCompressionParams_t* params)
+
+    cuvsError_t cuvsCagraCompressionParamsDestroy(
+        cuvsCagraCompressionParams_t index)
 
     cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 
