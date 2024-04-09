@@ -19,20 +19,14 @@ import numpy as np
 
 cimport cuvs.common.cydlpack
 
-from cuvs.common.temp_raft import auto_sync_resources
+from cuvs.common.resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libcpp cimport bool, cast
 
 from cuvs.common cimport cydlpack
 
-from pylibraft.common import (
-    DeviceResources,
-    Stream,
-    auto_convert_output,
-    cai_wrapper,
-    device_ndarray,
-)
+from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 from pylibraft.neighbors.common import _check_input_array
@@ -44,12 +38,6 @@ from libc.stdint cimport (
     uint32_t,
     uint64_t,
     uintptr_t,
-)
-
-from cuvs.common.c_api cimport (
-    cuvsError_t,
-    cuvsResources_t,
-    cuvsResourcesCreate,
 )
 
 from cuvs.common.exceptions import check_cuvs
@@ -86,7 +74,6 @@ cdef class IndexParams:
                  graph_degree=64,
                  build_algo="ivf_pq",
                  nn_descent_niter=20):
-
         cuvsCagraIndexParamsCreate(&self.params)
 
         # todo (dgd): enable once other metrics are present
@@ -136,7 +123,6 @@ cdef class Index:
         check_cuvs(cuvsCagraIndexCreate(&self.index))
 
     def __dealloc__(self):
-        cdef cuvsError_t index_destroy_status
         if self.index is not NULL:
             check_cuvs(cuvsCagraIndexDestroy(self.index))
 
@@ -202,20 +188,17 @@ def build_index(IndexParams index_params, dataset, resources=None):
     _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
                                     np.dtype('ubyte')])
 
-    cdef cuvsResources_t res_
-    cdef cuvsError_t cstat
-
-    check_cuvs(cuvsResourcesCreate(&res_))
-
     cdef Index idx = Index()
     cdef cuvsError_t build_status
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
     cdef cuvsCagraIndexParams* params = index_params.params
 
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
     with cuda_interruptible():
         check_cuvs(cuvsCagraBuild(
-            res_,
+            res,
             params,
             dataset_dlpack,
             idx.index
@@ -445,11 +428,6 @@ def search(SearchParams search_params,
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")
 
-    cdef cuvsResources_t res_
-    cdef cuvsError_t cstat
-
-    check_cuvs(cuvsResourcesCreate(&res_))
-
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
     queries_cai = wrap_array(queries)
@@ -480,10 +458,11 @@ def search(SearchParams search_params,
         cydlpack.dlpack_c(neighbors_cai)
     cdef cydlpack.DLManagedTensor* distances_dlpack = \
         cydlpack.dlpack_c(distances_cai)
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     with cuda_interruptible():
         check_cuvs(cuvsCagraSearch(
-            res_,
+            res,
             params,
             index.index,
             queries_dlpack,

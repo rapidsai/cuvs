@@ -98,12 +98,11 @@ fn main() {
         // generated)
         .must_use_type("cuvsError_t")
         // Only generate bindings for cuvs/cagra types and functions
-        .allowlist_type("(cuvs|cagra|DL).*")
-        .allowlist_function("(cuvs|cagra).*")
-        .rustified_enum("(cuvs|cagra|DL).*")
-        // also need some basic cuda mem functions
-        // (TODO: should we be adding in RMM support instead here?)
-        .allowlist_function("(cudaMalloc|cudaFree|cudaMemcpy)")
+        .allowlist_type("(cuvs|bruteForce|cagra|DL).*")
+        .allowlist_function("(cuvs|bruteForce|cagra).*")
+        .rustified_enum("(cuvs|cagra|DL|DistanceType).*")
+        // also need some basic cuda mem functions for copying data
+        .allowlist_function("(cudaMemcpyAsync|cudaMemcpy)")
         .rustified_enum("cudaError")
         .generate()
         .expect("Unable to generate cagra_c bindings")

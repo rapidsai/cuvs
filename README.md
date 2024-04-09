@@ -11,7 +11,7 @@
 
 1. [Useful Resources](#useful-resources)
 2. [What is cuVS?](#what-is-cuvs)
-3. [Installing cuVS](#installing)
+3. [Installing cuVS](#installing-cuvs)
 4. [Getting Started](#getting-started)
 5. [Contributing](#contributing)
 6. [References](#references)

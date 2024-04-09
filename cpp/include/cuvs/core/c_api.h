@@ -83,6 +83,50 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
  */
 cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 
+/**
+ * @brief Get the cudaStream_t from a cuvsResources_t t
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[out] stream cudaStream_t stream to queue CUDA kernels
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
+
+/**
+ * @brief Syncs the current CUDA stream on the resources object
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsStreamSync(cuvsResources_t res);
+/** @} */
+
+/**
+ * @defgroup memory_c cuVS Memory Allocation
+ * @{
+ */
+
+/**
+ * @brief Allocates device memory using RMM
+ *
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[out] ptr Pointer to allocated device memory
+ * @param[in] bytes Size in bytes to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
+
+/**
+ * @brief Deallocates device memory using RMM
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] ptr Pointer to allocated device memory to free
+ * @param[in] bytes Size in bytes to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
+
 /** @} */
 
 #ifdef __cplusplus
