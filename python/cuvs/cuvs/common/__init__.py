@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from .temp_raft import auto_sync_resources
+from .resources import Resources, auto_sync_resources
 
-__all__ = ["auto_sync_resources"]
+__all__ = ["auto_sync_resources", "Resources"]

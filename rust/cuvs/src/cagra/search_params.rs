@@ -28,7 +28,7 @@ impl SearchParams {
     /// Returns a new SearchParams object
     pub fn new() -> Result<SearchParams> {
         unsafe {
-            let mut params = core::mem::MaybeUninit::<ffi::cuvsCagraSearchParams_t>::uninit();
+            let mut params = std::mem::MaybeUninit::<ffi::cuvsCagraSearchParams_t>::uninit();
             check_cuvs(ffi::cuvsCagraSearchParamsCreate(params.as_mut_ptr()))?;
             Ok(SearchParams(params.assume_init()))
         }

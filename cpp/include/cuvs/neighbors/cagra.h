@@ -40,6 +40,45 @@ enum cuvsCagraGraphBuildAlgo {
   NN_DESCENT
 };
 
+/** Parameters for VPQ compression. */
+struct cuvsCagraCompressionParams {
+  /**
+   * The bit length of the vector element after compression by PQ.
+   *
+   * Possible values: [4, 5, 6, 7, 8].
+   *
+   * Hint: the smaller the 'pq_bits', the smaller the index size and the better the search
+   * performance, but the lower the recall.
+   */
+  uint32_t pq_bits;
+  /**
+   * The dimensionality of the vector after compression by PQ.
+   * When zero, an optimal value is selected using a heuristic.
+   *
+   * TODO: at the moment `dim` must be a multiple `pq_dim`.
+   */
+  uint32_t pq_dim;
+  /**
+   * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  uint32_t vq_n_centers;
+  /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
+  uint32_t kmeans_n_iters;
+  /**
+   * The fraction of data to use during iterative kmeans building (VQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double vq_kmeans_trainset_fraction;
+  /**
+   * The fraction of data to use during iterative kmeans building (PQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double pq_kmeans_trainset_fraction;
+};
+
+typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
+
 /**
  * @brief Supplemental parameters to build CAGRA Index
  *
@@ -53,6 +92,12 @@ struct cuvsCagraIndexParams {
   enum cuvsCagraGraphBuildAlgo build_algo;
   /** Number of Iterations to run if building with NN_DESCENT */
   size_t nn_descent_niter;
+  /**
+   * Optional: specify compression parameters if compression is desired.
+   *
+   * NOTE: this is experimental new API, consider it unsafe.
+   */
+  cuvsCagraCompressionParams_t compression;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -72,6 +117,22 @@ cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params);
+
+/**
+ * @brief Allocate CAGRA Compression params, and populate with default values
+ *
+ * @param[in] params cuvsCagraCompressionParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params);
+
+/**
+ * @brief De-allocate CAGRA Compression params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
 
 /**
  * @}
@@ -273,7 +334,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *        It is also important to note that the CAGRA Index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *

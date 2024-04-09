@@ -30,4 +30,5 @@ cdef extern from "cuvs/core/c_api.h":
     cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
     cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
     cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
+    cuvsError_t cuvsStreamSync(cuvsResources_t res)
     const char * cuvsGetLastErrorText()

@@ -1,5 +1,5 @@
-#=============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+#
+# Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#=============================================================================
+#
+# cython: language_level=3
 
-function(find_and_configure_rmm)
-    include(${rapids-cmake-dir}/cpm/rmm.cmake)
-    rapids_cpm_rmm(BUILD_EXPORT_SET cuvs-exports
-                   INSTALL_EXPORT_SET  cuvs-exports)
-endfunction()
+from cuvs.common.c_api cimport cuvsResources_t
 
-find_and_configure_rmm()
+
+cdef class Resources:
+    cdef cuvsResources_t c_obj
