@@ -14,7 +14,7 @@
 
 # Set the list of Cython files to build
 set(cython_sources cydlpack.pyx exceptions.pyx)
-set(linked_libraries cuvs::cuvs cuvs_c)
+set(linked_libraries cuvs::cuvs cuvs::c_api)
 
 # Build all of the Cython targets
 rapids_cython_create_modules(
