@@ -31,17 +31,19 @@ project(
             C CXX CUDA
 )
 
-################################################################################
-# - User Options  --------------------------------------------------------------
+# ##################################################################################################
+# * User Options  --------------------------------------------------------------
 
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
        OFF
 )
 
-message("CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}")
+message(
+  "CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}"
+)
 
-################################################################################
-# - Process User Options  ------------------------------------------------------
+# ##################################################################################################
+# * Process User Options  ------------------------------------------------------
 
 include(rapids-cmake)
 include(rapids-cpm)
@@ -53,7 +55,7 @@ rapids_cpm_init()
 
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
-  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED)
+  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
   include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
 else()
   set(cuvs_FOUND OFF)
@@ -73,8 +75,8 @@ if(NOT cuvs_FOUND)
   install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
 endif()
 
-################################################################################
-# - Build Cython artifacts -----------------------------------------------------
+# ##################################################################################################
+# * Build Cython artifacts -----------------------------------------------------
 
 rapids_cython_init()
 
