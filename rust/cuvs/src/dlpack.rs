@@ -16,7 +16,7 @@
 
 use std::convert::From;
 
-use crate::error::{check_cuda, Result};
+use crate::error::{check_cuda, check_cuvs, Result};
 use crate::resources::Resources;
 
 /// ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
@@ -33,36 +33,27 @@ impl ManagedTensor {
         &self.0 as *const _ as *mut _
     }
 
-    fn bytes(&self) -> usize {
-        // figure out how many bytes to allocate
-        let mut bytes: usize = 1;
-        for x in 0..self.0.dl_tensor.ndim {
-            bytes *= unsafe { (*self.0.dl_tensor.shape.add(x as usize)) as usize };
-        }
-        bytes *= (self.0.dl_tensor.dtype.bits / 8) as usize;
-        bytes
-    }
-
     /// Creates a new ManagedTensor on the current GPU device, and copies
     /// the data into it.
-    pub fn to_device(&self, _res: &Resources) -> Result<ManagedTensor> {
+    pub fn to_device(&self, res: &Resources) -> Result<ManagedTensor> {
         unsafe {
-            let bytes = self.bytes();
+            let bytes = dl_tensor_bytes(&self.0.dl_tensor);
             let mut device_data: *mut std::ffi::c_void = std::ptr::null_mut();
 
             // allocate storage, copy over
-            check_cuda(ffi::cudaMalloc(&mut device_data as *mut _, bytes))?;
-            check_cuda(ffi::cudaMemcpy(
+            check_cuvs(ffi::cuvsRMMAlloc(res.0, &mut device_data as *mut _, bytes))?;
+
+            check_cuda(ffi::cudaMemcpyAsync(
                 device_data,
                 self.0.dl_tensor.data,
                 bytes,
                 ffi::cudaMemcpyKind_cudaMemcpyDefault,
+                res.get_cuda_stream()?,
             ))?;
 
             let mut ret = self.0.clone();
             ret.dl_tensor.data = device_data;
-            // call cudaFree automatically to clean up data
-            ret.deleter = Some(cuda_free_tensor);
+            ret.deleter = Some(rmm_free_tensor);
             ret.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCUDA;
 
             Ok(ManagedTensor(ret))
@@ -76,25 +67,37 @@ impl ManagedTensor {
         D: ndarray::Dimension,
     >(
         &self,
-        _res: &Resources,
+        res: &Resources,
         arr: &mut ndarray::ArrayBase<S, D>,
     ) -> Result<()> {
         unsafe {
-            let bytes = self.bytes();
-            check_cuda(ffi::cudaMemcpy(
+            let bytes = dl_tensor_bytes(&self.0.dl_tensor);
+            check_cuda(ffi::cudaMemcpyAsync(
                 arr.as_mut_ptr() as *mut std::ffi::c_void,
                 self.0.dl_tensor.data,
                 bytes,
                 ffi::cudaMemcpyKind_cudaMemcpyDefault,
+                res.get_cuda_stream()?,
             ))?;
-
             Ok(())
         }
     }
 }
 
-unsafe extern "C" fn cuda_free_tensor(self_: *mut ffi::DLManagedTensor) {
-    let _ = ffi::cudaFree((*self_).dl_tensor.data);
+/// Figures out how many bytes are in a DLTensor
+fn dl_tensor_bytes(tensor: &ffi::DLTensor) -> usize {
+    let mut bytes: usize = 1;
+    for dim in 0..tensor.ndim {
+        bytes *= unsafe { (*tensor.shape.add(dim as usize)) as usize };
+    }
+    bytes *= (tensor.dtype.bits / 8) as usize;
+    bytes
+}
+
+unsafe extern "C" fn rmm_free_tensor(self_: *mut ffi::DLManagedTensor) {
+    let bytes = dl_tensor_bytes(&(*self_).dl_tensor);
+    let res = Resources::new().unwrap();
+    let _ = ffi::cuvsRMMFree(res.0, (*self_).dl_tensor.data as *mut _, bytes);
 }
 
 /// Create a non-owning view of a Tensor from a ndarray
@@ -162,6 +165,16 @@ impl IntoDtype for i32 {
         ffi::DLDataType {
             code: ffi::DLDataTypeCode::kDLInt as _,
             bits: 32,
+            lanes: 1,
+        }
+    }
+}
+
+impl IntoDtype for i64 {
+    fn ffi_dtype() -> ffi::DLDataType {
+        ffi::DLDataType {
+            code: ffi::DLDataTypeCode::kDLInt as _,
+            bits: 64,
             lanes: 1,
         }
     }

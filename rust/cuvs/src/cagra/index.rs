@@ -54,7 +54,7 @@ impl Index {
     /// Creates a new empty index
     pub fn new() -> Result<Index> {
         unsafe {
-            let mut index = core::mem::MaybeUninit::<ffi::cuvsCagraIndex_t>::uninit();
+            let mut index = std::mem::MaybeUninit::<ffi::cuvsCagraIndex_t>::uninit();
             check_cuvs(ffi::cuvsCagraIndexCreate(index.as_mut_ptr()))?;
             Ok(Index(index.assume_init()))
         }
