@@ -187,6 +187,8 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/neighbors/brute_force_index.cu
+  src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cpp
   src/neighbors/cagra_build_int8.cpp
   src/neighbors/cagra_build_uint8.cpp
@@ -197,6 +199,30 @@ add_library(
   src/neighbors/cagra_serialize_float.cpp
   src/neighbors/cagra_serialize_int8.cpp
   src/neighbors/cagra_serialize_uint8.cpp
+  src/neighbors/ivf_flat_index.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_extend_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_extend_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_extend_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cpp
+  src/neighbors/ivf_pq_index.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_float_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_int8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_uint8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_extend_float_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_extend_int8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_extend_uint8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_search_float_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_search_int8_t_int64_t.cpp
+  src/neighbors/ivf_pq/ivf_pq_search_uint8_t_int64_t.cpp
+  src/neighbors/ivf_pq_serialize.cpp
 )
 
 target_compile_options(
@@ -297,7 +323,14 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 # ##################################################################################################
 # * cuvs_c -------------------------------------------------------------------------------
 if(BUILD_C_LIBRARY)
-  add_library(cuvs_c SHARED src/core/c_api.cpp src/neighbors/cagra_c.cpp)
+  add_library(
+    cuvs_c SHARED
+    src/core/c_api.cpp
+    src/neighbors/brute_force_c.cpp
+    src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp
+    src/neighbors/cagra_c.cpp
+  )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
 
