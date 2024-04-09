@@ -45,6 +45,17 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
     static_cast<cuvs::neighbors::cagra::graph_build_algo>(params.build_algo);
   build_params.nn_descent_niter = params.nn_descent_niter;
 
+  if (auto* cparams = params.compression; cparams != nullptr) {
+    auto compression_params                        = cuvs::neighbors::cagra::vpq_params();
+    compression_params.pq_bits                     = cparams->pq_bits;
+    compression_params.pq_dim                      = cparams->pq_dim;
+    compression_params.vq_n_centers                = cparams->vq_n_centers;
+    compression_params.kmeans_n_iters              = cparams->kmeans_n_iters;
+    compression_params.vq_kmeans_trainset_fraction = cparams->vq_kmeans_trainset_fraction;
+    compression_params.pq_kmeans_trainset_fraction = cparams->pq_kmeans_trainset_fraction;
+    build_params.compression.emplace(compression_params);
+  }
+
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
@@ -129,7 +140,6 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
-
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr       = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
       index->dtype.code = kDLFloat;
@@ -162,14 +172,14 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(queries),
                  "queries should have device compatible memory");
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(neighbors),
-                 "queries should have device compatible memory");
+                 "neighbors should have device compatible memory");
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(distances),
-                 "queries should have device compatible memory");
+                 "distances should have device compatible memory");
 
     RAFT_EXPECTS(neighbors.dtype.code == kDLUInt && neighbors.dtype.bits == 32,
                  "neighbors should be of type uint32_t");
     RAFT_EXPECTS(distances.dtype.code == kDLFloat && neighbors.dtype.bits == 32,
-                 "neighbors should be of type float32");
+                 "distances should be of type float32");
 
     auto index = *index_c_ptr;
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
@@ -199,6 +209,25 @@ extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params
 }
 
 extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto ps = cuvs::neighbors::cagra::vpq_params();
+    *params =
+      new cuvsCagraCompressionParams{.pq_bits                     = ps.pq_bits,
+                                     .pq_dim                      = ps.pq_dim,
+                                     .vq_n_centers                = ps.vq_n_centers,
+                                     .kmeans_n_iters              = ps.kmeans_n_iters,
+                                     .vq_kmeans_trainset_fraction = ps.vq_kmeans_trainset_fraction,
+                                     .pq_kmeans_trainset_fraction = ps.pq_kmeans_trainset_fraction};
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }

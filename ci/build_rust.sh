@@ -11,7 +11,7 @@ rapids-dependency-file-generator \
   --file_key rust \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" | tee env.yaml
 
-rapids-mamba-retry env create --force -f env.yaml -n rust
+rapids-mamba-retry env create --yes -f env.yaml -n rust
 
 # seeing failures on activating the environment here on unbound locals
 # apply workaround from https://github.com/conda/conda/issues/8186#issuecomment-532874667
@@ -35,5 +35,4 @@ rapids-mamba-retry install \
   libcuvs  \
   libraft
 
-export EXTRA_CMAKE_ARGS=""
 bash ./build.sh rust

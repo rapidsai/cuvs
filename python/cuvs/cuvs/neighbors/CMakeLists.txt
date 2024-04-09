@@ -12,4 +12,5 @@
 # the License.
 # =============================================================================
 
+add_subdirectory(brute_force)
 add_subdirectory(cagra)

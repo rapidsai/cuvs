@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
 # ------------- configure rapids-cmake --------------#
 
-include(cmake/thirdparty/fetch_rapids.cmake)
+include(../cmake/thirdparty/fetch_rapids.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-cuda)
@@ -31,8 +31,12 @@ project(test_cuvs LANGUAGES CXX CUDA)
 # ------------- configure cuvs -----------------#
 
 rapids_cpm_init()
-include(cmake/thirdparty/get_cuvs.cmake)
+set(BUILD_CUVS_C_LIBRARY OFF)
+include(../cmake/thirdparty/get_cuvs.cmake)
 
 # -------------- compile tasks ----------------- #
 add_executable(CAGRA_EXAMPLE src/cagra_example.cu)
+
+# `$<TARGET_NAME_IF_EXISTS:conda_env>` is a generator expression that ensures that targets
+# are installed in a conda environment, if one exists
 target_link_libraries(CAGRA_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)

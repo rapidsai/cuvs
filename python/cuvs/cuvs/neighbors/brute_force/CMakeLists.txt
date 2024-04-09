@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -12,11 +12,14 @@
 # the License.
 # =============================================================================
 
-# Use CPM to find or clone fmt
-function(find_and_configure_fmt)
+# Set the list of Cython files to build
+set(cython_sources brute_force.pyx)
+set(linked_libraries cuvs::cuvs cuvs::c_api)
 
-    include(${rapids-cmake-dir}/cpm/fmt.cmake)
-    rapids_cpm_fmt(INSTALL_EXPORT_SET rmm-exports BUILD_EXPORT_SET rmm-exports)
-endfunction()
-
-find_and_configure_fmt()
+# Build all of the Cython targets
+rapids_cython_create_modules(
+  CXX
+  SOURCE_FILES "${cython_sources}"
+  LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX
+                   neighbors_brute_force_
+)

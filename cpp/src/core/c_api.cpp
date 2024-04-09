@@ -21,6 +21,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <rmm/cuda_stream_view.hpp>
+#include <rmm/mr/device/per_device_resource.hpp>
 #include <thread>
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
@@ -44,6 +45,40 @@ extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     raft::resource::set_cuda_stream(*res_ptr, static_cast<rmm::cuda_stream_view>(stream));
+  });
+}
+
+extern "C" cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    *stream      = raft::resource::get_cuda_stream(*res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    raft::resource::sync_stream(*res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    auto mr      = rmm::mr::get_current_device_resource();
+    *ptr         = mr->allocate(bytes, raft::resource::get_cuda_stream(*res_ptr));
+  });
+}
+
+extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    auto mr      = rmm::mr::get_current_device_resource();
+    mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
   });
 }
 

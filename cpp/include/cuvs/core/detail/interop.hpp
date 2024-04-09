@@ -53,20 +53,20 @@ DLDataType data_type_to_DLDataType()
   }
 }
 
-bool is_dlpack_device_compatible(DLTensor tensor)
+inline bool is_dlpack_device_compatible(DLTensor tensor)
 {
   return tensor.device.device_type == kDLCUDAManaged || tensor.device.device_type == kDLCUDAHost ||
          tensor.device.device_type == kDLCUDA;
 }
 
-bool is_dlpack_host_compatible(DLTensor tensor)
+inline bool is_dlpack_host_compatible(DLTensor tensor)
 {
   return tensor.device.device_type == kDLCUDAManaged || tensor.device.device_type == kDLCUDAHost ||
          tensor.device.device_type == kDLCPU;
 }
 
 template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
-MdspanType from_dlpack(DLManagedTensor* managed_tensor)
+inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
 {
   auto tensor = managed_tensor->dl_tensor;
 
