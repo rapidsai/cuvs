@@ -10,8 +10,8 @@
   },
   "hostRequirements": {"gpu": "optional"},
   "features": {
-    "ghcr.io/rapidsai/devcontainers/features/ucx:24.2": {"version": "1.14.1"},
-    "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils:24.2": {}
+    "ghcr.io/rapidsai/devcontainers/features/ucx:24.4": {"version": "1.14.1"},
+    "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils:24.4": {}
   },
   "overrideFeatureInstallOrder": [
     "ghcr.io/rapidsai/devcontainers/features/ucx",
