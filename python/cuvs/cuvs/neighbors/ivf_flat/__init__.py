@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from cuvs.neighbors import brute_force, cagra, ivf_flat
+from .ivf_flat import Index, IndexParams, SearchParams, build, search
 
-__all__ = ["brute_force", "cagra", "ivf_flat"]
+__all__ = ["Index", "IndexParams", "SearchParams", "build", "search"]

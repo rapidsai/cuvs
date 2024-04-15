@@ -90,6 +90,8 @@ def _find_doctests_in_obj(obj, finder=None, criteria=None):
 # doctests for here
 DOC_STRINGS = list(_find_doctests_in_obj(cuvs.neighbors))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.cagra))
+DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.brute_force))
+DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.ivf_flat))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.common))
 
 

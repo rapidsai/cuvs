@@ -46,14 +46,14 @@ void run_ivf_flat(int64_t n_rows,
 
   // create index
   cuvsIvfFlatIndex_t index;
-  ivfFlatIndexCreate(&index);
+  cuvsIvfFlatIndexCreate(&index);
 
   // build index
   cuvsIvfFlatIndexParams_t build_params;
   cuvsIvfFlatIndexParamsCreate(&build_params);
   build_params->metric  = metric;
   build_params->n_lists = n_lists;
-  ivfFlatBuild(res, build_params, &dataset_tensor, index);
+  cuvsIvfFlatBuild(res, build_params, &dataset_tensor, index);
 
   // create queries DLTensor
   DLManagedTensor queries_tensor;
@@ -95,11 +95,12 @@ void run_ivf_flat(int64_t n_rows,
   cuvsIvfFlatSearchParams_t search_params;
   cuvsIvfFlatSearchParamsCreate(&search_params);
   search_params->n_probes = n_probes;
-  ivfFlatSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsIvfFlatSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // de-allocate index and res
   cuvsIvfFlatSearchParamsDestroy(search_params);
   cuvsIvfFlatIndexParamsDestroy(build_params);
-  ivfFlatIndexDestroy(index);
+  cuvsIvfFlatIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }
