@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ann_utils.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
+#include <cuvs/neighbors/ivf_pq_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
-#include <cuvs/neighbors/ivf_pq_types.hpp>
-#include <cuvs/neighbors/ann_utils.cuh>
 
 #include <cstdio>
 

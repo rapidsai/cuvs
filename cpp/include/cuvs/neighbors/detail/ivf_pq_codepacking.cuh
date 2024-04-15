@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_pq_types.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/integer_utils.hpp>
@@ -27,10 +27,10 @@
 
 #include <variant>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 /** A chunk of PQ-encoded vector managed by one CUDA thread. */
-using pq_vec_t = TxN_t<uint8_t, kIndexGroupVecLen>::io_t;
+using pq_vec_t = raft::TxN_t<uint8_t, kIndexGroupVecLen>::io_t;
 
 /**
  * This type mimics the `uint8_t&` for the indexing operator of `bitfield_view_t`.
@@ -58,8 +58,8 @@ struct bitfield_ref_t {
       pair |= static_cast<uint16_t>(ptr[1]) << 8;
       pair &= ~(static_cast<uint16_t>(kMask) << offset);
       pair |= static_cast<uint16_t>(code) << offset;
-      ptr[0] = static_cast<uint8_t>(Pow2<256>::mod(pair));
-      ptr[1] = static_cast<uint8_t>(Pow2<256>::div(pair));
+      ptr[0] = static_cast<uint8_t>(raft::Pow2<256>::mod(pair));
+      ptr[1] = static_cast<uint8_t>(raft::Pow2<256>::div(pair));
     } else {
       ptr[0] = (ptr[0] & ~(kMask << offset)) | (code << offset);
     }
@@ -80,7 +80,8 @@ struct bitfield_view_t {
   constexpr auto operator[](uint32_t i) -> bitfield_ref_t<Bits>
   {
     uint32_t bit_offset = i * Bits;
-    return bitfield_ref_t<Bits>{raw + Pow2<8>::div(bit_offset), Pow2<8>::mod(bit_offset)};
+    return bitfield_ref_t<Bits>{raw + raft::Pow2<8>::div(bit_offset),
+                                raft::Pow2<8>::mod(bit_offset)};
   }
 };
 
@@ -99,13 +100,14 @@ struct bitfield_view_t {
  */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_vector(
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
+  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
   uint32_t in_ix,
   uint32_t out_ix,
   uint32_t pq_dim,
   Action action)
 {
-  using group_align         = Pow2<kIndexGroupSize>;
+  using group_align         = raft::Pow2<kIndexGroupSize>;
   const uint32_t group_ix   = group_align::div(in_ix);
   const uint32_t ingroup_ix = group_align::mod(in_ix);
 
@@ -141,15 +143,16 @@ __device__ void run_on_vector(
  */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
 __device__ void write_vector(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> out_list_data,
+  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    out_list_data,
   uint32_t out_ix,
   IdxT in_ix,
   uint32_t pq_dim,
   Action action)
 {
-  const uint32_t lane_id = Pow2<SubWarpSize>::mod(threadIdx.x);
+  const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(threadIdx.x);
 
-  using group_align         = Pow2<kIndexGroupSize>;
+  using group_align         = raft::Pow2<kIndexGroupSize>;
   const uint32_t group_ix   = group_align::div(out_ix);
   const uint32_t ingroup_ix = group_align::mod(out_ix);
 
@@ -176,7 +179,8 @@ __device__ void write_vector(
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_list(
-  device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> in_list_data,
+  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    in_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,
   uint32_t pq_dim,
@@ -193,13 +197,14 @@ __device__ void run_on_list(
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename Action>
 __device__ void write_list(
-  device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, row_major> out_list_data,
+  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    out_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,
   uint32_t pq_dim,
   Action action)
 {
-  using subwarp_align = Pow2<SubWarpSize>;
+  using subwarp_align = raft::Pow2<SubWarpSize>;
   uint32_t stride     = subwarp_align::div(blockDim.x);
   uint32_t ix         = subwarp_align::div(threadIdx.x + blockDim.x * blockIdx.x);
   for (; ix < len; ix += stride) {
@@ -210,4 +215,4 @@ __device__ void write_list(
   }
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

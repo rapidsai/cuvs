@@ -21,7 +21,7 @@
 
 #include <cub/cub.cuh>
 
-namespace raft::neighbors::ivf::detail {
+namespace cuvs::neighbors::ivf::detail {
 
 /**
  * Default value returned by `search` when the `n_probes` is too small and top-k is too large.
@@ -33,8 +33,8 @@ constexpr static IdxT kOutOfBoundsRecord = std::numeric_limits<IdxT>::max();
 
 template <typename T, typename IdxT, bool Ascending = true>
 struct dummy_block_sort_t {
-  using queue_t =
-    matrix::detail::select::warpsort::warp_sort_distributed<WarpSize, Ascending, T, IdxT>;
+  using queue_t = raft::matrix::detail::select::warpsort::
+    warp_sort_distributed<raft::WarpSize, Ascending, T, IdxT>;
   template <typename... Args>
   __device__ dummy_block_sort_t(int k, Args...){};
 };
@@ -61,7 +61,7 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   chunk_indices += n_probes * blockIdx.x;
 
   // block scan
-  const uint32_t n_probes_aligned = Pow2<BlockDim>::roundUp(n_probes);
+  const uint32_t n_probes_aligned = raft::Pow2<BlockDim>::roundUp(n_probes);
   uint32_t total                  = 0;
   for (uint32_t probe_ix = threadIdx.x; probe_ix < n_probes_aligned; probe_ix += BlockDim) {
     auto label = probe_ix < n_probes ? clusters_to_probe[probe_ix] : 0u;
@@ -104,7 +104,7 @@ struct calc_chunk_indices {
   template <int BlockDim>
   static auto try_block_dim(uint32_t n_probes, uint32_t n_queries) -> configured
   {
-    if constexpr (BlockDim >= WarpSize * 2) {
+    if constexpr (BlockDim >= raft::WarpSize * 2) {
       if (BlockDim >= n_probes * 2) { return try_block_dim<(BlockDim / 2)>(n_probes, n_queries); }
     }
     return {reinterpret_cast<void*>(calc_chunk_indices_kernel<BlockDim>),
@@ -225,7 +225,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
     case distance::DistanceType::L2Unexpanded:
     case distance::DistanceType::L2Expanded: {
       if (scaling_factor != 1.0) {
-        linalg::unaryOp(
+        raft::linalg::unaryOp(
           out,
           in,
           len,
@@ -233,37 +233,37 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
                            raft::cast_op<ScoreOutT>{}),
           stream);
       } else if (needs_cast || needs_copy) {
-        linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
       }
     } break;
     case distance::DistanceType::L2SqrtUnexpanded:
     case distance::DistanceType::L2SqrtExpanded: {
       if (scaling_factor != 1.0) {
-        linalg::unaryOp(out,
-                        in,
-                        len,
-                        raft::compose_op{raft::mul_const_op<ScoreOutT>{scaling_factor},
-                                         raft::sqrt_op{},
-                                         raft::cast_op<ScoreOutT>{}},
-                        stream);
+        raft::linalg::unaryOp(out,
+                              in,
+                              len,
+                              raft::compose_op{raft::mul_const_op<ScoreOutT>{scaling_factor},
+                                               raft::sqrt_op{},
+                                               raft::cast_op<ScoreOutT>{}},
+                              stream);
       } else if (needs_cast) {
-        linalg::unaryOp(
+        raft::linalg::unaryOp(
           out, in, len, raft::compose_op{raft::sqrt_op{}, raft::cast_op<ScoreOutT>{}}, stream);
       } else {
-        linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
+        raft::linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
       }
     } break;
     case distance::DistanceType::InnerProduct: {
       float factor = (account_for_max_close ? -1.0 : 1.0) * scaling_factor * scaling_factor;
       if (factor != 1.0) {
-        linalg::unaryOp(
+        raft::linalg::unaryOp(
           out,
           in,
           len,
           raft::compose_op(raft::mul_const_op<ScoreOutT>{factor}, raft::cast_op<ScoreOutT>{}),
           stream);
       } else if (needs_cast || needs_copy) {
-        linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
+        raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
       }
     } break;
     default: RAFT_FAIL("Unexpected metric.");
@@ -274,8 +274,8 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
 template <typename Index>
 void recompute_internal_state(const raft::resources& res, Index& index)
 {
-  auto stream  = resource::get_cuda_stream(res);
-  auto tmp_res = resource::get_workspace_resource(res);
+  auto stream  = raft::resource::get_cuda_stream(res);
+  auto tmp_res = raft::resource::get_workspace_resource(res);
   rmm::device_uvector<uint32_t> sorted_sizes(index.n_lists(), stream, tmp_res);
 
   // Actualize the list pointers
@@ -285,8 +285,8 @@ void recompute_internal_state(const raft::resources& res, Index& index)
     auto& list          = index.lists()[label];
     const auto data_ptr = list ? list->data.data_handle() : nullptr;
     const auto inds_ptr = list ? list->indices.data_handle() : nullptr;
-    copy(&data_ptrs(label), &data_ptr, 1, stream);
-    copy(&inds_ptrs(label), &inds_ptr, 1, stream);
+    raft::copy(&data_ptrs(label), &data_ptr, 1, stream);
+    raft::copy(&inds_ptrs(label), &inds_ptr, 1, stream);
   }
 
   // Sort the cluster sizes in the descending order.
@@ -312,8 +312,8 @@ void recompute_internal_state(const raft::resources& res, Index& index)
                                            stream);
   // copy the results to CPU
   std::vector<uint32_t> sorted_sizes_host(index.n_lists());
-  copy(sorted_sizes_host.data(), sorted_sizes.data(), index.n_lists(), stream);
-  resource::sync_stream(res);
+  raft::copy(sorted_sizes_host.data(), sorted_sizes.data(), index.n_lists(), stream);
+  raft::resource::sync_stream(res);
 
   // accumulate the sorted cluster sizes
   auto accum_sorted_sizes = index.accum_sorted_sizes();
@@ -323,4 +323,4 @@ void recompute_internal_state(const raft::resources& res, Index& index)
   }
 }
 
-}  // namespace raft::neighbors::ivf::detail
+}  // namespace cuvs::neighbors::ivf::detail

@@ -37,8 +37,8 @@ header = """/*
  *
  */
 
+#include "ivf_pq_build.cuh"
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft_runtime/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
 """
@@ -60,8 +60,7 @@ build_macro = """
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)               \\
     ->cuvs::neighbors::ivf_pq::index<IdxT>                                                   \\
   {                                                                                          \\
-    return cuvs::neighbors::ivf_pq::index<IdxT>(                                             \\
-      std::move(raft::runtime::neighbors::ivf_pq::build(handle, params, dataset)));          \\
+    return cuvs::neighbors::ivf_pq::detail::build(handle, params, dataset);                  \\
   }                                                                                          \\
                                                                                              \\
   void build(raft::resources const& handle,                                                  \\
@@ -69,7 +68,7 @@ build_macro = """
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,               \\
              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                      \\
   {                                                                                          \\
-    raft::runtime::neighbors::ivf_pq::build(handle, params, dataset, idx->get_raft_index()); \\
+    cuvs::neighbors::ivf_pq::detail::build(handle, params, dataset, idx);                    \\
   }
 """
 
@@ -127,7 +126,7 @@ macros = dict(
 
 for type_path, (T, IdxT) in types.items():
     for macro_path, macro in macros.items():
-        path = f"ivf_pq_{macro_path}_{type_path}.cpp"
+        path = f"ivf_pq_{macro_path}_{type_path}.cu"
         with open(path, "w") as f:
             f.write(header)
             f.write(macro["definition"])
