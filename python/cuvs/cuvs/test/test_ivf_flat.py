@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     h ttp://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +29,6 @@ def run_ivf_flat_build_search_test(
     n_queries=100,
     k=10,
     dtype=np.float32,
-    # TODO: figure out which IndexParams we need to set
     metric="euclidean",
     compare=True,
     inplace=True,
@@ -55,7 +54,6 @@ def run_ivf_flat_build_search_test(
     out_dist_device = device_ndarray(out_dist) if inplace else None
 
     search_params = ivf_flat.SearchParams(**search_params)
-    return
 
     ret_output = ivf_flat.search(
         search_params,
@@ -93,8 +91,12 @@ def run_ivf_flat_build_search_test(
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32])
-def test_ivf_flat_dataset_dtype_host_device(dtype, inplace):
+@pytest.mark.parametrize(
+    "metric", ["sqeuclidean", "inner_product", "euclidean"]
+)
+def test_ivf_flat(inplace, dtype, metric):
     run_ivf_flat_build_search_test(
         dtype=dtype,
         inplace=inplace,
+        metric=metric,
     )
