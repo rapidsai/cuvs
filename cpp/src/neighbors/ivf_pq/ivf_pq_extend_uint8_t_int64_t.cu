@@ -24,7 +24,8 @@
  */
 
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft_runtime/neighbors/ivf_pq.hpp>
+
+#include "ivf_pq_build.cuh"
 
 namespace cuvs::neighbors::ivf_pq {
 
@@ -35,9 +36,8 @@ namespace cuvs::neighbors::ivf_pq {
               const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                \
     ->cuvs::neighbors::ivf_pq::index<IdxT>                                           \
   {                                                                                  \
-    return cuvs::neighbors::ivf_pq::index<IdxT>(                                     \
-      std::move(raft::runtime::neighbors::ivf_pq::extend(                            \
-        handle, new_vectors, new_indices, *orig_index.get_raft_index())));           \
+    return cuvs::neighbors::ivf_pq::detail::extend(                                  \
+      handle, new_vectors, new_indices, orig_index);                                 \
   }                                                                                  \
                                                                                      \
   void extend(raft::resources const& handle,                                         \
@@ -45,9 +45,9 @@ namespace cuvs::neighbors::ivf_pq {
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
               cuvs::neighbors::ivf_pq::index<IdxT>* idx)                             \
   {                                                                                  \
-    raft::runtime::neighbors::ivf_pq::extend(                                        \
-      handle, new_vectors, new_indices, idx->get_raft_index());                      \
-  }
+    cuvs::neighbors::ivf_pq::detail::extend(                                         \
+      handle, new_vectors, new_indices, idx);                                        \
+  }             
 CUVS_INST_IVF_PQ_EXTEND(uint8_t, int64_t);
 
 #undef CUVS_INST_IVF_PQ_EXTEND

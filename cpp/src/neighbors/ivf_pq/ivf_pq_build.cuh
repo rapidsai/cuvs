@@ -18,7 +18,6 @@
 
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/detail/ivf_common.cuh>
-#include <cuvs/neighbors/detail/ivf_pq_codepacking.cuh>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
@@ -58,6 +57,8 @@
 
 #include <memory>
 #include <variant>
+
+#include "ivf_pq_codepacking.cuh"
 
 namespace cuvs::neighbors::ivf_pq::detail {
 using namespace raft::spatial::knn::detail;  // NOLINT
@@ -1880,5 +1881,49 @@ void build(raft::resources const& handle,
   IdxT n_rows = dataset.extent(0);
   IdxT dim    = dataset.extent(1);
   *index      = build(handle, params, dataset.data_handle(), n_rows, dim);
+}
+
+template <typename T, typename IdxT>
+auto extend(raft::resources const& handle,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
+            const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
+{
+  ASSERT(new_vectors.extent(1) == orig_index.dim(),
+         "new_vectors should have the same dimension as the index");
+
+  IdxT n_rows = new_vectors.extent(0);
+  if (new_indices.has_value()) {
+    ASSERT(n_rows == new_indices.value().extent(0),
+           "new_vectors and new_indices have different number of rows");
+  }
+
+  return extend(handle,
+                orig_index,
+                new_vectors.data_handle(),
+                new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                n_rows);
+}
+
+template <typename T, typename IdxT>
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
+            index<IdxT>* index)
+{
+  ASSERT(new_vectors.extent(1) == index->dim(),
+         "new_vectors should have the same dimension as the index");
+
+  IdxT n_rows = new_vectors.extent(0);
+  if (new_indices.has_value()) {
+    ASSERT(n_rows == new_indices.value().extent(0),
+           "new_vectors and new_indices have different number of rows");
+  }
+
+  *index = extend(handle,
+                  *index,
+                  new_vectors.data_handle(),
+                  new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                  n_rows);
 }
 }  // namespace cuvs::neighbors::ivf_pq::detail

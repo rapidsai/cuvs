@@ -37,9 +37,17 @@ header = """/*
  *
  */
 
-#include "ivf_pq_build.cuh"
 #include <cuvs/neighbors/ivf_pq.hpp>
+"""
 
+build_include_macro = """
+#include "ivf_pq_build.cuh"
+"""
+search_include_macro = """
+#include "ivf_pq_search.cuh"
+"""
+
+namespace_macro = """
 namespace cuvs::neighbors::ivf_pq {
 """
 
@@ -80,9 +88,8 @@ extend_macro = """
               const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                \\
     ->cuvs::neighbors::ivf_pq::index<IdxT>                                           \\
   {                                                                                  \\
-    return cuvs::neighbors::ivf_pq::index<IdxT>(                                     \\
-      std::move(raft::runtime::neighbors::ivf_pq::extend(                            \\
-        handle, new_vectors, new_indices, *orig_index.get_raft_index())));           \\
+    return cuvs::neighbors::ivf_pq::detail::extend(                                  \\
+      handle, new_vectors, new_indices, orig_index);                                 \\
   }                                                                                  \\
                                                                                      \\
   void extend(raft::resources const& handle,                                         \\
@@ -90,8 +97,8 @@ extend_macro = """
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
               cuvs::neighbors::ivf_pq::index<IdxT>* idx)                             \\
   {                                                                                  \\
-    raft::runtime::neighbors::ivf_pq::extend(                                        \\
-      handle, new_vectors, new_indices, idx->get_raft_index());                      \\
+    cuvs::neighbors::ivf_pq::detail::extend(                                         \\
+      handle, new_vectors, new_indices, idx);                                        \\
   }             
 """
 
@@ -104,21 +111,24 @@ search_macro = """
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \\
               raft::device_matrix_view<float, IdxT, raft::row_major> distances) \\
   {                                                                             \\
-    raft::runtime::neighbors::ivf_pq::search(                                   \\
-      handle, params, *index.get_raft_index(), queries, neighbors, distances);  \\
+    cuvs::neighbors::ivf_pq::detail::search(                                   \\
+      handle, params, index, queries, neighbors, distances);  \\
   }
 """
 
 macros = dict(
     build=dict(
+        include=build_include_macro,
         definition=build_macro,
         name="CUVS_INST_IVF_PQ_BUILD",
     ),
     extend=dict(
+        include=build_include_macro,
         definition=extend_macro,
         name="CUVS_INST_IVF_PQ_EXTEND",
     ),
     search=dict(
+        include=search_include_macro,
         definition=search_macro,
         name="CUVS_INST_IVF_PQ_SEARCH",
     ),
@@ -129,6 +139,8 @@ for type_path, (T, IdxT) in types.items():
         path = f"ivf_pq_{macro_path}_{type_path}.cu"
         with open(path, "w") as f:
             f.write(header)
+            f.write(macro['include'])
+            f.write(namespace_macro)
             f.write(macro["definition"])
             f.write(f"{macro['name']}({T}, {IdxT});\n\n")
             f.write(f"#undef {macro['name']}\n")
