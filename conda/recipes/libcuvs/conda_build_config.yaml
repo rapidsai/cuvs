@@ -19,9 +19,6 @@ cmake_version:
 nccl_version:
   - ">=2.9.9"
 
-gtest_version:
-  - ">=1.13.0"
-
 h5py_version:
   - ">=3.8.0"
 
