@@ -75,8 +75,8 @@ cdef class IndexParams:
         to add new vectors to the index.
     adaptive_centers : bool, default = False
         By default (adaptive_centers = False), the cluster centers are
-        trained in `ivf_flat::build`, and and never modified in
-        `ivf_flat::extend`. The alternative behavior (adaptive_centers
+        trained in `ivf_flat.build`, and and never modified in
+        `ivf_flat.extend`. The alternative behavior (adaptive_centers
         = true) is to update the cluster centers for new data when it is
         added. In this case, `index.centers()` are always exactly the
         centroids of the data in the corresponding clusters. The drawback
