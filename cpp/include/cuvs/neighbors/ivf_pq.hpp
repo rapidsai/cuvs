@@ -176,7 +176,7 @@ struct list_spec {
    *    , kIndexGroupVecLen
    *    ].
    */
-  using list_extents = std::experimental::
+  using list_extents = raft::
     extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
 
   SizeT align_max;
@@ -345,8 +345,8 @@ struct index : ann::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  raft::mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
-  raft::mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept;
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
+  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept;
 
   /** Lists' data and indices. */
   std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept;

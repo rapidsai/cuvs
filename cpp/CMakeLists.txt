@@ -216,13 +216,14 @@ add_library(
   src/neighbors/ivf_pq/ivf_pq_build_float_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_build_int8_t_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_build_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_deserialize.cu
   src/neighbors/ivf_pq/ivf_pq_extend_float_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_extend_int8_t_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_extend_uint8_t_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_search_float_int64_t.cpp
   src/neighbors/ivf_pq/ivf_pq_search_int8_t_int64_t.cpp
   src/neighbors/ivf_pq/ivf_pq_search_uint8_t_int64_t.cpp
-  src/neighbors/ivf_pq_serialize.cpp
+  src/neighbors/ivf_pq/ivf_pq_serialize.cu
 )
 
 target_compile_options(

@@ -16,19 +16,20 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
-#include <raft/neighbors/detail/ivf_pq_build.cuh>
-#include <raft/neighbors/ivf_list.hpp>
-#include <raft/neighbors/ivf_pq_types.hpp>
+
+#include "ivf_pq_build.cuh"
 
 #include <fstream>
 #include <memory>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 // Serialization version
 // No backward compatibility yet; that is, can't add additional fields without breaking
@@ -56,29 +57,30 @@ void serialize(raft::resources const& handle_, std::ostream& os, const index<Idx
                  static_cast<int>(index.pq_dim()),
                  static_cast<int>(index.pq_bits()));
 
-  serialize_scalar(handle_, os, kSerializationVersion);
-  serialize_scalar(handle_, os, index.size());
-  serialize_scalar(handle_, os, index.dim());
-  serialize_scalar(handle_, os, index.pq_bits());
-  serialize_scalar(handle_, os, index.pq_dim());
-  serialize_scalar(handle_, os, index.conservative_memory_allocation());
+  raft::serialize_scalar(handle_, os, kSerializationVersion);
+  raft::serialize_scalar(handle_, os, index.size());
+  raft::serialize_scalar(handle_, os, index.dim());
+  raft::serialize_scalar(handle_, os, index.pq_bits());
+  raft::serialize_scalar(handle_, os, index.pq_dim());
+  raft::serialize_scalar(handle_, os, index.conservative_memory_allocation());
 
-  serialize_scalar(handle_, os, index.metric());
-  serialize_scalar(handle_, os, index.codebook_kind());
-  serialize_scalar(handle_, os, index.n_lists());
+  raft::serialize_scalar(handle_, os, index.metric());
+  raft::serialize_scalar(handle_, os, index.codebook_kind());
+  raft::serialize_scalar(handle_, os, index.n_lists());
 
-  serialize_mdspan(handle_, os, index.pq_centers());
-  serialize_mdspan(handle_, os, index.centers());
-  serialize_mdspan(handle_, os, index.centers_rot());
-  serialize_mdspan(handle_, os, index.rotation_matrix());
+  raft::serialize_mdspan(handle_, os, index.pq_centers());
+  raft::serialize_mdspan(handle_, os, index.centers());
+  raft::serialize_mdspan(handle_, os, index.centers_rot());
+  raft::serialize_mdspan(handle_, os, index.rotation_matrix());
 
-  auto sizes_host = make_host_mdarray<uint32_t, uint32_t, row_major>(index.list_sizes().extents());
-  copy(sizes_host.data_handle(),
-       index.list_sizes().data_handle(),
-       sizes_host.size(),
-       resource::get_cuda_stream(handle_));
-  resource::sync_stream(handle_);
-  serialize_mdspan(handle_, os, sizes_host.view());
+  auto sizes_host =
+    raft::make_host_mdarray<uint32_t, uint32_t, raft::row_major>(index.list_sizes().extents());
+  raft::copy(sizes_host.data_handle(),
+             index.list_sizes().data_handle(),
+             sizes_host.size(),
+             raft::resource::get_cuda_stream(handle_));
+  raft::resource::sync_stream(handle_);
+  raft::serialize_mdspan(handle_, os, sizes_host.view());
   auto list_store_spec = list_spec<uint32_t, IdxT>{index.pq_bits(), index.pq_dim(), true};
   for (uint32_t label = 0; label < index.n_lists(); label++) {
     ivf::serialize_list(handle_, os, index.lists()[label], list_store_spec, sizes_host(label));
@@ -122,19 +124,19 @@ void serialize(raft::resources const& handle_,
 template <typename IdxT>
 auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT>
 {
-  auto ver = deserialize_scalar<int>(handle_, is);
+  auto ver = raft::deserialize_scalar<int>(handle_, is);
   if (ver != kSerializationVersion) {
     RAFT_FAIL("serialization version mismatch %d vs. %d", ver, kSerializationVersion);
   }
-  auto n_rows  = deserialize_scalar<IdxT>(handle_, is);
-  auto dim     = deserialize_scalar<std::uint32_t>(handle_, is);
-  auto pq_bits = deserialize_scalar<std::uint32_t>(handle_, is);
-  auto pq_dim  = deserialize_scalar<std::uint32_t>(handle_, is);
-  auto cma     = deserialize_scalar<bool>(handle_, is);
+  auto n_rows  = raft::deserialize_scalar<IdxT>(handle_, is);
+  auto dim     = raft::deserialize_scalar<std::uint32_t>(handle_, is);
+  auto pq_bits = raft::deserialize_scalar<std::uint32_t>(handle_, is);
+  auto pq_dim  = raft::deserialize_scalar<std::uint32_t>(handle_, is);
+  auto cma     = raft::deserialize_scalar<bool>(handle_, is);
 
-  auto metric        = deserialize_scalar<raft::distance::DistanceType>(handle_, is);
-  auto codebook_kind = deserialize_scalar<raft::neighbors::ivf_pq::codebook_gen>(handle_, is);
-  auto n_lists       = deserialize_scalar<std::uint32_t>(handle_, is);
+  auto metric        = raft::deserialize_scalar<cuvs::distance::DistanceType>(handle_, is);
+  auto codebook_kind = raft::deserialize_scalar<cuvs::neighbors::ivf_pq::codebook_gen>(handle_, is);
+  auto n_lists       = raft::deserialize_scalar<std::uint32_t>(handle_, is);
 
   RAFT_LOG_DEBUG("n_rows %zu, dim %d, pq_dim %d, pq_bits %d, n_lists %d",
                  static_cast<std::size_t>(n_rows),
@@ -143,21 +145,21 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  auto index = raft::neighbors::ivf_pq::index<IdxT>(
+  auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
-  deserialize_mdspan(handle_, is, index.pq_centers());
-  deserialize_mdspan(handle_, is, index.centers());
-  deserialize_mdspan(handle_, is, index.centers_rot());
-  deserialize_mdspan(handle_, is, index.rotation_matrix());
-  deserialize_mdspan(handle_, is, index.list_sizes());
+  raft::deserialize_mdspan(handle_, is, index.pq_centers());
+  raft::deserialize_mdspan(handle_, is, index.centers());
+  raft::deserialize_mdspan(handle_, is, index.centers_rot());
+  raft::deserialize_mdspan(handle_, is, index.rotation_matrix());
+  raft::deserialize_mdspan(handle_, is, index.list_sizes());
   auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};
   auto list_store_spec  = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, true};
   for (auto& list : index.lists()) {
     ivf::deserialize_list(handle_, is, list, list_store_spec, list_device_spec);
   }
 
-  resource::sync_stream(handle_);
+  raft::resource::sync_stream(handle_);
 
   ivf::detail::recompute_internal_state(handle_, index);
 
@@ -187,4 +189,4 @@ auto deserialize(raft::resources const& handle_, const std::string& filename) ->
   return index;
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

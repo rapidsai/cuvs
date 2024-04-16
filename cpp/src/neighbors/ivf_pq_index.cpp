@@ -134,17 +134,18 @@ bool index<IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename IdxT>
-raft::
-  mdspan<float, typename cuvs::neighbors::ivf_pq::index<IdxT>::pq_centers_extents, raft::row_major>
-  index<IdxT>::pq_centers() noexcept
+raft::device_mdspan<float,
+                    typename cuvs::neighbors::ivf_pq::index<IdxT>::pq_centers_extents,
+                    raft::row_major>
+index<IdxT>::pq_centers() noexcept
 {
   return pq_centers_.view();
 }
 
 template <typename IdxT>
-raft::mdspan<const float,
-             typename cuvs::neighbors::ivf_pq::index<IdxT>::pq_centers_extents,
-             raft::row_major>
+raft::device_mdspan<const float,
+                    typename cuvs::neighbors::ivf_pq::index<IdxT>::pq_centers_extents,
+                    raft::row_major>
 index<IdxT>::pq_centers() const noexcept
 {
   return pq_centers_.view();
