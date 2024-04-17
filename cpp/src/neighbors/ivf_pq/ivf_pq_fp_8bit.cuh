@@ -16,24 +16,15 @@
 
 #pragma once
 
+#include <cuvs/neighbors/ivf_pq.hpp>
+
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/linalg/gemm.cuh>
-#include <raft/linalg/map.cuh>
-#include <raft/linalg/unary_op.cuh>
-#include <raft/matrix/detail/select_k.cuh>
-#include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/cuda_utils.cuh>
-#include <raft/util/device_atomics.cuh>
-#include <raft/util/device_loads_stores.cuh>
-#include <raft/util/pow2_utils.cuh>
 #include <raft/util/vectorized.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -42,9 +33,7 @@
 #include <cub/cub.cuh>
 #include <cuda_fp16.h>
 
-#include <optional>
-
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 /** 8-bit floating-point storage type.
  *
@@ -122,4 +111,4 @@ struct fp_8bit {
   }
 };
 
-}  // namespace raft::neighbors::ivf_pq::detail
+}  // namespace cuvs::neighbors::ivf_pq::detail

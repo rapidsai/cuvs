@@ -216,6 +216,34 @@ add_library(
   src/neighbors/ivf_pq/ivf_pq_build_float_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_build_int8_t_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_build_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_false.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_true.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_half.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_half.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_float.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_false.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_true.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_false_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_true_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_half_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_half_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_float_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_false_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_true_filt32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_false_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_true_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_half_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_half_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_float_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_false_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_true_bitset32.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_false_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_true_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_half_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_half_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_float_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
   src/neighbors/ivf_pq/ivf_pq_deserialize.cu
   src/neighbors/ivf_pq/ivf_pq_extend_float_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_extend_int8_t_int64_t.cu
