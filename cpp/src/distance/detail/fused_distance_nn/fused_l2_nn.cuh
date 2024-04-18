@@ -62,7 +62,7 @@ void fusedL2NNImpl(OutT* min,
   dim3 blk(P::Nthreads);
   auto nblks            = raft::ceildiv<int>(m, P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  typedef KeyValuePair<IdxT, DataT> KVPair;
+  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
 
   RAFT_CUDA_TRY(cudaMemsetAsync(workspace, 0, sizeof(int) * m, stream));
   if (initOutBuffer) {
@@ -97,7 +97,7 @@ void fusedL2NNImpl(OutT* min,
 
   if (cutlass_range.contains(runtime_arch)) {
     // If device is SM_80 or later, use CUTLASS-based kernel.
-    using L2Op                  = raft::distance::detail::ops::l2_exp_cutlass_op<DataT, DataT>;
+    using L2Op                  = cuvs::distance::detail::ops::l2_exp_cutlass_op<DataT, DataT>;
     using kvp_cg_min_reduce_op_ = kvp_cg_min_reduce_op<DataT, IdxT, OutT>;
     kvp_cg_min_reduce_op_ cg_reduce_op;
     L2Op L2_dist_op(sqrt);

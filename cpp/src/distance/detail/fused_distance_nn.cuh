@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include "../distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
-#include "../fused_distance_nn/cutlass_base.cuh"
-#include "../fused_distance_nn/fused_cosine_nn.cuh"
-#include "../fused_distance_nn/fused_l2_nn.cuh"
-#include "../fused_distance_nn/helper_structs.cuh"
-#include "../fused_distance_nn/simt_kernel.cuh"
-#include "../pairwise_distance_base.cuh"  // PairwiseDistances
+#include "distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
+#include "fused_distance_nn/cutlass_base.cuh"
+#include "fused_distance_nn/fused_cosine_nn.cuh"
+#include "fused_distance_nn/fused_l2_nn.cuh"
+#include "fused_distance_nn/helper_structs.cuh"
+#include "fused_distance_nn/simt_kernel.cuh"
+#include "pairwise_distance_base.cuh"  // PairwiseDistances
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
@@ -58,7 +58,7 @@ void fusedDistanceNNImpl(OutT* min,
                          bool sqrt,
                          bool initOutBuffer,
                          bool isRowMajor,
-                         raft::distance::DistanceType metric,
+                         cuvs::distance::DistanceType metric,
                          float metric_arg,
                          cudaStream_t stream)
 {
@@ -68,7 +68,7 @@ void fusedDistanceNNImpl(OutT* min,
   dim3 blk(P::Nthreads);
   auto nblks            = raft::ceildiv<int>(m, P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  typedef KeyValuePair<IdxT, DataT> KVPair;
+  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
 
   RAFT_CUDA_TRY(cudaMemsetAsync(workspace, 0, sizeof(int) * m, stream));
   if (initOutBuffer) {
@@ -78,12 +78,12 @@ void fusedDistanceNNImpl(OutT* min,
   }
 
   switch (metric) {
-    case raft::distance::DistanceType::CosineExpanded:
+    case cuvs::distance::DistanceType::CosineExpanded:
       fusedCosineNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
         min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
       break;
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded:
       // initOutBuffer is take care by fusedDistanceNNImpl() so we set it false to fusedL2NNImpl.
       fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
         min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);

@@ -29,7 +29,7 @@
 #include "pairwise_distance_epilogue_elementwise.h"
 #include "pairwise_distance_gemm.h"
 
-#include "../distance_ops/cutlass.cuh"
+#include "distance_ops/cutlass.cuh"
 #include <raft/util/cutlass_utils.cuh>
 
 #include <rmm/device_uvector.hpp>

@@ -20,7 +20,7 @@
  * This file defines rbf_fin_op, which is used in GramMatrixBase.
  *
  * This struct has been moved to a separate file, so that it is cheap to include
- * in distance/distance-ext.cuh, where an instance of raft::distance::distance
+ * in distance/distance-ext.cuh, where an instance of cuvs::distance::distance
  * with the rbf_fin_op is instantiated.
  *
  */

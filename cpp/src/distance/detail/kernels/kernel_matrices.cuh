@@ -755,7 +755,7 @@ class RBFKernel : public GramMatrixBase<math_t> {
     raft::resources handle;
     resource::set_cuda_stream(handle, stream);
 
-    raft::distance::distance<raft::distance::DistanceType::L2Unexpanded,
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2Unexpanded,
                              math_t,
                              math_t,
                              math_t,

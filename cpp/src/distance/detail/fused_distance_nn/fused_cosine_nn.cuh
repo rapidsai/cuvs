@@ -60,7 +60,7 @@ void fusedCosineNN(OutT* min,
 
   dim3 blk(P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
-  typedef KeyValuePair<IdxT, DataT> KVPair;
+  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
 
   namespace arch = raft::util::arch;
   using AccT     = DataT;
@@ -87,7 +87,7 @@ void fusedCosineNN(OutT* min,
 
   if (cutlass_range.contains(runtime_arch)) {
     // If device is SM_80 or later, use CUTLASS-based kernel.
-    using cosineOp              = raft::distance::detail::ops::cosine_cutlass_op<DataT, DataT>;
+    using cosineOp              = cuvs::distance::detail::ops::cosine_cutlass_op<DataT, DataT>;
     using kvp_cg_min_reduce_op_ = kvp_cg_min_reduce_op<DataT, IdxT, OutT>;
     kvp_cg_min_reduce_op_ cg_reduce_op;
     cosineOp cosine_dist_op;

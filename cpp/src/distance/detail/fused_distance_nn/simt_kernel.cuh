@@ -86,7 +86,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
 #if __CUDA_ARCH__ < 800
   extern __shared__ char smem[];
 
-  typedef KeyValuePair<IdxT, DataT> KVPair;
+  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
   KVPair val[P::AccRowsPerTh];
 #pragma unroll
   for (int i = 0; i < P::AccRowsPerTh; ++i) {

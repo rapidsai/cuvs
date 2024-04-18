@@ -65,6 +65,8 @@ gmem.
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 
+#include <raft/core/kvp.hpp>
+
 #include <cutlass/arch/arch.h>
 #include <cutlass/arch/memory.h>
 #include <cutlass/array.h>

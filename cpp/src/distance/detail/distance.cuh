@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "../distance_ops/all_ops.cuh"
-#include "../pairwise_matrix/dispatch.cuh"
-#include "../pairwise_matrix/dispatch_sm60.cuh"
-#include "../pairwise_matrix/dispatch_sm80.cuh"
+#include "distance_ops/all_ops.cuh"
+#include "pairwise_matrix/dispatch.cuh"
+#include "pairwise_matrix/dispatch_sm60.cuh"
+#include "pairwise_matrix/dispatch_sm80.cuh"
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -689,7 +689,7 @@ void distance_impl(raft::resources const& handle,
  * as follows:  <pre>OutType fin_op(AccType in, int g_idx);</pre>. If one needs
  * any other parameters, feel free to pass them via closure.
  */
-template <raft::distance::DistanceType distanceType,
+template <cuvs::distance::DistanceType distanceType,
           typename InType,
           typename AccType,
           typename OutType,
@@ -748,7 +748,7 @@ void distance(raft::resources const& handle,
  * @param stream cuda stream
  * @param isRowMajor whether the matrices are row-major or col-major
  */
-template <raft::distance::DistanceType distanceType,
+template <cuvs::distance::DistanceType distanceType,
           typename InType,
           typename AccType,
           typename OutType,
@@ -787,7 +787,7 @@ void distance(raft::resources const& handle,
  * @note If the specified distanceType doesn't need the workspace at all, it
  * returns 0.
  */
-template <raft::distance::DistanceType distanceType,
+template <cuvs::distance::DistanceType distanceType,
           typename InType,
           typename AccType,
           typename OutType,
@@ -795,10 +795,10 @@ template <raft::distance::DistanceType distanceType,
 size_t getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, Index_ k)
 {
   size_t worksize             = 0;
-  constexpr bool is_allocated = (distanceType <= raft::distance::DistanceType::CosineExpanded) ||
-                                (distanceType == raft::distance::DistanceType::CorrelationExpanded);
+  constexpr bool is_allocated = (distanceType <= cuvs::distance::DistanceType::CosineExpanded) ||
+                                (distanceType == cuvs::distance::DistanceType::CorrelationExpanded);
   constexpr int numOfBuffers =
-    (distanceType == raft::distance::DistanceType::CorrelationExpanded) ? 2 : 1;
+    (distanceType == cuvs::distance::DistanceType::CorrelationExpanded) ? 2 : 1;
 
   if (is_allocated) {
     // TODO : when X == Y allocate std::max(m, n) instead of m + n when column major input

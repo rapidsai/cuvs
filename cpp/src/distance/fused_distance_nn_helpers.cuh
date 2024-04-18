@@ -44,7 +44,7 @@ template <typename DataT, typename OutT, typename IdxT, typename ReduceOpT>
 void initialize(raft::resources const& handle, OutT* min, IdxT m, DataT maxVal, ReduceOpT redOp)
 {
   detail::initialize<DataT, OutT, IdxT, ReduceOpT>(
-    min, m, maxVal, redOp, resource::get_cuda_stream(handle));
+    min, m, maxVal, redOp, raft::resource::get_cuda_stream(handle));
 }
 
 }  // namespace cuvs::distance

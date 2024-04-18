@@ -410,7 +410,7 @@ void distance(raft::resources const& handle,
   RAFT_EXPECTS(x.is_exhaustive(), "Input x must be contiguous.");
   RAFT_EXPECTS(y.is_exhaustive(), "Input y must be contiguous.");
 
-  constexpr auto is_rowmajor = std::is_same_v<layout, layout_c_contiguous>;
+  constexpr auto is_rowmajor = std::is_same_v<layout, raft::layout_c_contiguous>;
 
   distance<DistT, DataT, AccT, OutT, IdxT>(handle,
                                            x.data_handle(),
@@ -435,11 +435,11 @@ void distance(raft::resources const& handle,
  * @param metric distance metric
  * @param metric_arg metric argument (used for Minkowski distance)
  */
-template <typename Type, typename layout = layout_c_contiguous, typename IdxT = int>
+template <typename Type, typename layout = raft::layout_c_contiguous, typename IdxT = int>
 void pairwise_distance(raft::resources const& handle,
-                       device_matrix_view<Type, IdxT, layout> const x,
-                       device_matrix_view<Type, IdxT, layout> const y,
-                       device_matrix_view<Type, IdxT, layout> dist,
+                       raft::device_matrix_view<Type, IdxT, layout> const x,
+                       raft::device_matrix_view<Type, IdxT, layout> const y,
+                       raft::device_matrix_view<Type, IdxT, layout> dist,
                        cuvs::distance::DistanceType metric,
                        Type metric_arg = 2.0f)
 {
@@ -455,7 +455,7 @@ void pairwise_distance(raft::resources const& handle,
   RAFT_EXPECTS(y.is_exhaustive(), "Input y must be contiguous.");
   RAFT_EXPECTS(dist.is_exhaustive(), "Output must be contiguous.");
 
-  constexpr auto rowmajor = std::is_same_v<layout, layout_c_contiguous>;
+  constexpr auto rowmajor = std::is_same_v<layout, raft::layout_c_contiguous>;
 
   auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<char> workspace(0, stream);
