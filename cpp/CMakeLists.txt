@@ -216,7 +216,6 @@ add_library(
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
   src/distance/distance.cu
-  src/distance/fused_l2_nn.cu
   src/distance/fused_distance_nn.cu
   src/neighbors/brute_force_index.cu
   src/neighbors/brute_force.cu
