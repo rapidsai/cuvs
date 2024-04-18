@@ -16,6 +16,12 @@
 
 #pragma once
 
+#include "ivf_pq_compute_similarity.cuh"
+#include "ivf_pq_fp_8bit.cuh"
+#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/neighbors/detail/ivf_common.cuh>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/sample_filter.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -26,17 +32,11 @@
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_k.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/neighbors/detail/ivf_common.cuh>
-#include <raft/neighbors/detail/ivf_pq_compute_similarity.cuh>
-#include <raft/neighbors/detail/ivf_pq_fp_8bit.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -53,7 +53,7 @@
 
 #include <optional>
 
-namespace raft::neighbors::ivf_pq::detail {
+namespace cuvs::neighbors::ivf_pq::detail {
 
 using namespace raft::spatial::knn::detail;  // NOLINT
 
@@ -73,18 +73,18 @@ void select_clusters(raft::resources const& handle,
                      uint32_t n_lists,
                      uint32_t dim,
                      uint32_t dim_ext,
-                     raft::distance::DistanceType metric,
+                     cuvs::distance::DistanceType metric,
                      const T* queries,              // [n_queries, dim]
                      const float* cluster_centers,  // [n_lists, dim_ext]
                      rmm::mr::device_memory_resource* mr)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_pq::search::select_clusters(n_probes = %u, n_queries = %u, n_lists = %u, dim = %u)",
     n_probes,
     n_queries,
     n_lists,
     dim);
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
   /* NOTE[qc_distances]
 
   We compute query-center distances to choose the clusters to probe.
@@ -107,14 +107,14 @@ void select_clusters(raft::resources const& handle,
  */
   float norm_factor;
   switch (metric) {
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
-    case raft::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
+    case cuvs::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
   auto float_queries_view =
     raft::make_device_vector_view<float, uint32_t>(float_queries, dim_ext * n_queries);
-  linalg::map_offset(
+  raft::linalg::map_offset(
     handle, float_queries_view, [queries, dim, dim_ext, norm_factor] __device__(uint32_t ix) {
       uint32_t col = ix % dim_ext;
       uint32_t row = ix / dim_ext;
@@ -125,47 +125,47 @@ void select_clusters(raft::resources const& handle,
   float beta;
   uint32_t gemm_k = dim;
   switch (metric) {
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2Expanded: {
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2Expanded: {
       alpha  = -2.0;
       beta   = 0.0;
       gemm_k = dim + 1;
       RAFT_EXPECTS(gemm_k <= dim_ext, "unexpected gemm_k or dim_ext");
     } break;
-    case raft::distance::DistanceType::InnerProduct: {
+    case cuvs::distance::DistanceType::InnerProduct: {
       alpha = -1.0;
       beta  = 0.0;
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
   rmm::device_uvector<float> qc_distances(n_queries * n_lists, stream, mr);
-  linalg::gemm(handle,
-               true,
-               false,
-               n_lists,
-               n_queries,
-               gemm_k,
-               &alpha,
-               cluster_centers,
-               dim_ext,
-               float_queries,
-               dim_ext,
-               &beta,
-               qc_distances.data(),
-               n_lists,
-               stream);
+  raft::linalg::gemm(handle,
+                     true,
+                     false,
+                     n_lists,
+                     n_queries,
+                     gemm_k,
+                     &alpha,
+                     cluster_centers,
+                     dim_ext,
+                     float_queries,
+                     dim_ext,
+                     &beta,
+                     qc_distances.data(),
+                     n_lists,
+                     stream);
 
   // Select neighbor clusters for each query.
   rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
-  matrix::detail::select_k<float, uint32_t>(handle,
-                                            qc_distances.data(),
-                                            nullptr,
-                                            n_queries,
-                                            n_lists,
-                                            n_probes,
-                                            cluster_dists.data(),
-                                            clusters_to_probe,
-                                            true);
+  raft::matrix::detail::select_k<float, uint32_t>(handle,
+                                                  qc_distances.data(),
+                                                  nullptr,
+                                                  n_queries,
+                                                  n_lists,
+                                                  n_probes,
+                                                  cluster_dists.data(),
+                                                  clusters_to_probe,
+                                                  true);
 }
 
 /**
@@ -234,10 +234,10 @@ template <typename OutT, typename LutT, typename IvfSampleFilterT>
 struct search_kernel_cache {
   /** Number of matmul invocations to cache. */
   static constexpr size_t kDefaultSize = 100;
-  cache::lru<search_kernel_key,
-             search_kernel_key_hash,
-             std::equal_to<>,
-             selected<OutT, LutT, IvfSampleFilterT>>
+  raft::cache::lru<search_kernel_key,
+                   search_kernel_key_hash,
+                   std::equal_to<>,
+                   selected<OutT, LutT, IvfSampleFilterT>>
     value{kDefaultSize};
 };
 
@@ -265,14 +265,14 @@ void ivfpq_search_worker(raft::resources const& handle,
                          double preferred_shmem_carveout,
                          IvfSampleFilterT sample_filter)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_pq::search-worker(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,
     n_probes,
     topK,
     index.dim());
-  auto stream = resource::get_cuda_stream(handle);
-  auto mr     = resource::get_workspace_resource(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
+  auto mr     = raft::resource::get_workspace_resource(handle);
 
   bool manage_local_topk         = is_local_topk_feasible(topK, n_probes, n_queries);
   auto topk_len                  = manage_local_topk ? n_probes * topK : max_samples;
@@ -320,13 +320,13 @@ void ivfpq_search_worker(raft::resources const& handle,
     // of a cluster by processing the cluster at the same time as much as
     // possible.
     index_list_sorted_buf.resize(n_queries_probes, stream);
-    auto index_list_buf =
-      make_device_mdarray<uint32_t>(handle, mr, make_extents<uint32_t>(n_queries_probes));
+    auto index_list_buf = raft::make_device_mdarray<uint32_t>(
+      handle, mr, raft::make_extents<uint32_t>(n_queries_probes));
     rmm::device_uvector<uint32_t> cluster_labels_out(n_queries_probes, stream, mr);
     auto index_list   = index_list_buf.data_handle();
     index_list_sorted = index_list_sorted_buf.data();
 
-    linalg::map_offset(handle, index_list_buf.view(), identity_op{});
+    raft::linalg::map_offset(handle, index_list_buf.view(), raft::identity_op{});
 
     int begin_bit             = 0;
     int end_bit               = sizeof(uint32_t) * 8;
@@ -384,11 +384,11 @@ void ivfpq_search_worker(raft::resources const& handle,
                                n_probes,
                                topK};
   auto& cache =
-    resource::get_custom_resource<search_kernel_cache<ScoreT, LutT, IvfSampleFilterT>>(handle)
+    raft::resource::get_custom_resource<search_kernel_cache<ScoreT, LutT, IvfSampleFilterT>>(handle)
       ->value;
   if (!cache.get(search_key, &search_instance)) {
     search_instance = compute_similarity_select<ScoreT, LutT, IvfSampleFilterT>(
-      resource::get_device_properties(handle),
+      raft::resource::get_device_properties(handle),
       manage_local_topk,
       coresidency,
       preferred_shmem_carveout,
@@ -402,12 +402,12 @@ void ivfpq_search_worker(raft::resources const& handle,
   }
 
   rmm::device_uvector<LutT> device_lut(search_instance.device_lut_size, stream, mr);
-  std::optional<device_vector<float>> query_kths_buf{std::nullopt};
+  std::optional<raft::device_vector<float>> query_kths_buf{std::nullopt};
   float* query_kths = nullptr;
   if (manage_local_topk) {
     query_kths_buf.emplace(
-      make_device_mdarray<float>(handle, mr, make_extents<uint32_t>(n_queries)));
-    linalg::map(
+      raft::make_device_mdarray<float>(handle, mr, raft::make_extents<uint32_t>(n_queries)));
+    raft::linalg::map(
       handle,
       query_kths_buf->view(),
       raft::const_op<float>{ivf::detail::dummy_block_sort_t<ScoreT, IdxT>::queue_t::kDummy});
@@ -439,18 +439,19 @@ void ivfpq_search_worker(raft::resources const& handle,
 
   // Select topk vectors for each query
   rmm::device_uvector<ScoreT> topk_dists(n_queries * topK, stream, mr);
-  matrix::detail::select_k<ScoreT, uint32_t>(handle,
-                                             distances_buf.data(),
-                                             neighbors_ptr,
-                                             n_queries,
-                                             topk_len,
-                                             topK,
-                                             topk_dists.data(),
-                                             neighbors_uint32,
-                                             true,
-                                             false,
-                                             matrix::SelectAlgo::kAuto,
-                                             manage_local_topk ? nullptr : num_samples.data());
+  raft::matrix::detail::select_k<ScoreT, uint32_t>(
+    handle,
+    distances_buf.data(),
+    neighbors_ptr,
+    n_queries,
+    topk_len,
+    topK,
+    topk_dists.data(),
+    neighbors_uint32,
+    true,
+    false,
+    raft::matrix::SelectAlgo::kAuto,
+    manage_local_topk ? nullptr : num_samples.data());
 
   // Postprocessing
   ivf::detail::postprocess_distances(
@@ -504,7 +505,7 @@ struct ivfpq_search {
   {
     bool signed_metric = false;
     switch (metric) {
-      case raft::distance::DistanceType::InnerProduct: signed_metric = true; break;
+      case cuvs::distance::DistanceType::InnerProduct: signed_metric = true; break;
       default: break;
     }
 
@@ -552,8 +553,8 @@ inline auto get_max_batch_size(raft::resources const& res,
                                uint32_t n_queries,
                                uint32_t max_samples) -> uint32_t
 {
-  uint32_t max_batch_size         = n_queries;
-  uint32_t n_ctas_total           = resource::get_device_properties(res).multiProcessorCount * 2;
+  uint32_t max_batch_size = n_queries;
+  uint32_t n_ctas_total   = raft::resource::get_device_properties(res).multiProcessorCount * 2;
   uint32_t n_ctas_total_per_batch = n_ctas_total / max_batch_size;
   float utilization               = float(n_ctas_total_per_batch * max_batch_size) / n_ctas_total;
   if (n_ctas_total_per_batch > 1 || (n_ctas_total_per_batch == 1 && utilization < 0.6)) {
@@ -570,9 +571,9 @@ inline auto get_max_batch_size(raft::resources const& res,
     return static_cast<uint64_t>(bs) *
            (other + (is_local_topk_feasible(k, n_probes, bs) ? buffers_fused : buffers_non_fused));
   };
-  auto max_ws_size = resource::get_workspace_free_bytes(res);
+  auto max_ws_size = raft::resource::get_workspace_free_bytes(res);
   if (ws_size(max_batch_size) > max_ws_size) {
-    uint32_t smaller_batch_size = bound_by_power_of_two(max_batch_size);
+    uint32_t smaller_batch_size = raft::bound_by_power_of_two(max_batch_size);
     // gradually reduce the batch size until we fit into the max size limit.
     while (smaller_batch_size > 1 && ws_size(smaller_batch_size) > max_ws_size) {
       smaller_batch_size >>= 1;
@@ -585,7 +586,7 @@ inline auto get_max_batch_size(raft::resources const& res,
 /** See raft::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = raft::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 inline void search(raft::resources const& handle,
                    const search_params& params,
                    const index<IdxT>& index,
@@ -599,7 +600,7 @@ inline void search(raft::resources const& handle,
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "Unsupported element type.");
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "ivf_pq::search(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,
     params.n_probes,
@@ -627,7 +628,7 @@ inline void search(raft::resources const& handle,
     default: RAFT_FAIL("all pointers must be accessible from the device.");
   }
 
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   auto dim      = index.dim();
   auto dim_ext  = index.dim_ext();
@@ -635,13 +636,13 @@ inline void search(raft::resources const& handle,
 
   uint32_t max_samples = 0;
   {
-    IdxT ms = Pow2<128>::roundUp(index.accum_sorted_sizes()(n_probes));
+    IdxT ms = raft::Pow2<128>::roundUp(index.accum_sorted_sizes()(n_probes));
     RAFT_EXPECTS(ms <= IdxT(std::numeric_limits<uint32_t>::max()),
                  "The maximum sample size is too big.");
     max_samples = ms;
   }
 
-  auto mr = resource::get_workspace_resource(handle);
+  auto mr = raft::resource::get_workspace_resource(handle);
 
   // Maximum number of query vectors to search at the same time.
   const auto max_queries = std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), 4096);
@@ -651,13 +652,13 @@ inline void search(raft::resources const& handle,
   rmm::device_uvector<float> rot_queries(max_queries * index.rot_dim(), stream, mr);
   rmm::device_uvector<uint32_t> clusters_to_probe(max_queries * n_probes, stream, mr);
 
-  auto filter_adapter = raft::neighbors::filtering::ivf_to_sample_filter(
+  auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
   auto search_instance = ivfpq_search<IdxT, decltype(filter_adapter)>::fun(params, index.metric());
 
   for (uint32_t offset_q = 0; offset_q < n_queries; offset_q += max_queries) {
     uint32_t queries_batch = min(max_queries, n_queries - offset_q);
-    common::nvtx::range<common::nvtx::domain::raft> batch_scope(
+    raft::common::nvtx::range<raft::common::nvtx::domain::raft> batch_scope(
       "ivf_pq::search-batch(queries: %u - %u)", offset_q, offset_q + queries_batch);
 
     select_clusters(handle,
@@ -676,21 +677,21 @@ inline void search(raft::resources const& handle,
     // Rotate queries
     float alpha = 1.0;
     float beta  = 0.0;
-    linalg::gemm(handle,
-                 true,
-                 false,
-                 index.rot_dim(),
-                 queries_batch,
-                 dim,
-                 &alpha,
-                 index.rotation_matrix().data_handle(),
-                 dim,
-                 float_queries.data(),
-                 dim_ext,
-                 &beta,
-                 rot_queries.data(),
-                 index.rot_dim(),
-                 stream);
+    raft::linalg::gemm(handle,
+                       true,
+                       false,
+                       index.rot_dim(),
+                       queries_batch,
+                       dim,
+                       &alpha,
+                       index.rotation_matrix().data_handle(),
+                       dim,
+                       float_queries.data(),
+                       dim_ext,
+                       &beta,
+                       rot_queries.data(),
+                       index.rot_dim(),
+                       stream);
 
     for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
       uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);
@@ -716,4 +717,80 @@ inline void search(raft::resources const& handle,
   }
 }
 
-}  // namespace raft::neighbors::ivf_pq::detail
+/**
+ * @brief Search ANN using the constructed index with the given filter.
+ *
+ * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ * The exact size of the temporary buffer depends on multiple factors and is an implementation
+ * detail. However, you can safely specify a small initial size for the memory pool, so that only a
+ * few allocations happen to grow it during the first invocations of the `search`.
+ *
+ * @tparam T data element type
+ * @tparam IdxT type of the indices
+ * @tparam IvfSampleFilterT Device filter function, with the signature
+ *         `(uint32_t query_ix, uint32 cluster_ix, uint32_t sample_ix) -> bool` or
+ *         `(uint32_t query_ix, uint32 sample_ix) -> bool`
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] idx ivf-pq constructed index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter a device filter function that greenlights samples for a given query.
+ */
+template <typename T, typename IdxT, typename IvfSampleFilterT>
+void search_with_filtering(raft::resources const& handle,
+                           const search_params& params,
+                           const index<IdxT>& idx,
+                           raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+                           raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+                           raft::device_matrix_view<float, IdxT, raft::row_major> distances,
+                           IvfSampleFilterT sample_filter = IvfSampleFilterT{})
+{
+  RAFT_EXPECTS(
+    queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
+    "Number of rows in output neighbors and distances matrices must equal the number of queries.");
+
+  RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1),
+               "Number of columns in output neighbors and distances matrices must equal k");
+
+  RAFT_EXPECTS(queries.extent(1) == idx.dim(),
+               "Number of query dimensions should equal number of dimensions in the index.");
+
+  std::uint32_t k = neighbors.extent(1);
+  search(handle,
+         params,
+         idx,
+         queries.data_handle(),
+         queries.extent(0),
+         k,
+         neighbors.data_handle(),
+         distances.data_handle(),
+         sample_filter);
+}
+
+template <typename T, typename IdxT>
+void search(raft::resources const& handle,
+            const search_params& params,
+            const index<IdxT>& idx,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+            raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+            raft::device_matrix_view<float, IdxT, raft::row_major> distances)
+{
+  search_with_filtering(handle,
+                        params,
+                        idx,
+                        queries,
+                        neighbors,
+                        distances,
+                        cuvs::neighbors::filtering::none_ivf_sample_filter{});
+}
+}  // namespace cuvs::neighbors::ivf_pq::detail

@@ -189,7 +189,7 @@ struct non_cuda_build_error : public cuvs::core::exception {
  * Macro to append error message to first argument.
  * This should only be called in contexts where it is OK to throw exceptions!
  */
-#define SET_ERROR_MSG(msg, location_prefix, fmt, ...)                                            \
+#define CUVS_SET_ERROR_MSG(msg, location_prefix, fmt, ...)                                       \
   do {                                                                                           \
     int size1 = std::snprintf(nullptr, 0, "%s", location_prefix);                                \
     int size2 = std::snprintf(nullptr, 0, "file=%s line=%d: ", __FILE__, __LINE__);              \
@@ -218,13 +218,13 @@ struct non_cuda_build_error : public cuvs::core::exception {
  * optional format tagas
  * @throw cuvs::core::logic_error if the condition evaluates to false.
  */
-#define CUVS_EXPECTS(cond, fmt, ...)                              \
-  do {                                                            \
-    if (!(cond)) {                                                \
-      std::string msg{};                                          \
-      SET_ERROR_MSG(msg, "CUVS failure at ", fmt, ##__VA_ARGS__); \
-      throw cuvs::core::logic_error(msg);                         \
-    }                                                             \
+#define CUVS_EXPECTS(cond, fmt, ...)                                   \
+  do {                                                                 \
+    if (!(cond)) {                                                     \
+      std::string msg{};                                               \
+      CUVS_SET_ERROR_MSG(msg, "CUVS failure at ", fmt, ##__VA_ARGS__); \
+      throw cuvs::core::logic_error(msg);                              \
+    }                                                                  \
   } while (0)
 
 /**
@@ -234,11 +234,11 @@ struct non_cuda_build_error : public cuvs::core::exception {
  * optional format tagas
  * @throw always throws cuvs::core::logic_error
  */
-#define CUVS_FAIL(fmt, ...)                                     \
-  do {                                                          \
-    std::string msg{};                                          \
-    SET_ERROR_MSG(msg, "CUVS failure at ", fmt, ##__VA_ARGS__); \
-    throw cuvs::core::logic_error(msg);                         \
+#define CUVS_FAIL(fmt, ...)                                          \
+  do {                                                               \
+    std::string msg{};                                               \
+    CUVS_SET_ERROR_MSG(msg, "CUVS failure at ", fmt, ##__VA_ARGS__); \
+    throw cuvs::core::logic_error(msg);                              \
   } while (0)
 
 /**

@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
-#include <cuvs/neighbors/detail/ivf_common.cuh>    // dummy_block_sort_t
-#include <cuvs/neighbors/ivf_pq.hpp>         // codebook_gen
-#include <cuvs/neighbors/sample_filter.hpp>  // none_ivf_sample_filter
+#include <cuvs/distance/distance_types.hpp>      // cuvs::distance::DistanceType
+#include <cuvs/neighbors/detail/ivf_common.cuh>  // dummy_block_sort_t
+#include <cuvs/neighbors/ivf_pq.hpp>             // codebook_gen
+#include <cuvs/neighbors/sample_filter.hpp>      // none_ivf_sample_filter
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
-#include <raft/util/cuda_rt_essentials.hpp>        // RAFT_CUDA_TRY
-#include <raft/util/device_atomics.cuh>            // raft::atomicMin
-#include <raft/util/pow2_utils.cuh>                // raft::Pow2
-#include <raft/util/vectorized.cuh>                // raft::TxN_t
+#include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
+#include <raft/util/device_atomics.cuh>      // raft::atomicMin
+#include <raft/util/pow2_utils.cuh>          // raft::Pow2
+#include <raft/util/vectorized.cuh>          // raft::TxN_t
 
 #include <rmm/cuda_stream_view.hpp>  // rmm::cuda_stream_view
 
@@ -449,7 +449,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     uint32_t n_samples            = chunk_indices[probe_ix] - sample_offset;
     uint32_t n_samples_aligned    = group_align::roundUp(n_samples);
     constexpr uint32_t kChunkSize = (kIndexGroupVecLen * 8u) / PqBits;
-    uint32_t pq_line_width        = raft::div_rounding_up_unsafe(pq_dim, kChunkSize) * kIndexGroupVecLen;
+    uint32_t pq_line_width = raft::div_rounding_up_unsafe(pq_dim, kChunkSize) * kIndexGroupVecLen;
     auto pq_thread_data = pq_dataset[label] + group_align::roundDown(threadIdx.x) * pq_line_width +
                           group_align::mod(threadIdx.x) * vec_align::Value;
     pq_line_width *= blockDim.x;
@@ -734,11 +734,10 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
 
     [[nodiscard]] auto operator()(uint32_t n_threads) const -> size_t
     {
-      return manage_local_topk
-               ? raft::matrix::detail::select::warpsort::template calc_smem_size_for_block_wide<OutT,
-                                                                                          uint32_t>(
-                   n_threads / subwarp_size, topk)
-               : 0;
+      return manage_local_topk ? raft::matrix::detail::select::warpsort::
+                                   template calc_smem_size_for_block_wide<OutT, uint32_t>(
+                                     n_threads / subwarp_size, topk)
+                               : 0;
     }
   } ltk_reduce_mem{manage_local_topk, topk};
 
@@ -833,7 +832,8 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
     // Get the theoretical maximum possible number of threads per block
     cudaFuncAttributes kernel_attrs;
     RAFT_CUDA_TRY(cudaFuncGetAttributes(&kernel_attrs, kernel));
-    uint32_t n_threads = raft::round_down_safe<uint32_t>(kernel_attrs.maxThreadsPerBlock, n_threads_gty);
+    uint32_t n_threads =
+      raft::round_down_safe<uint32_t>(kernel_attrs.maxThreadsPerBlock, n_threads_gty);
 
     // Actual required shmem depens on the number of threads
     size_t smem_size = smem_size_f(n_threads);

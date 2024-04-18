@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "ivf_pq_compute_similarity_impl.cuh"
 #include "ivf_pq_fp_8bit.cuh"  // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
 #include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
