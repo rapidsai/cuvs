@@ -51,7 +51,7 @@ void pairwise_matrix_dispatch(OpT distance_op,
 
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
-  extern template void raft::distance::detail::                                        \
+  extern template void cuvs::distance::detail::                                        \
     pairwise_matrix_dispatch<OpT<DataT, AccT, IdxT>, DataT, AccT, OutT, FinOpT, IdxT>( \
       OpT<DataT, AccT, IdxT> distance_op,                                              \
       IdxT m,                                                                          \
@@ -78,113 +78,113 @@ void pairwise_matrix_dispatch(OpT distance_op,
 // The following two instances are used in the RBF kernel object. Note the use of int64_t for the
 // index type.
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_unexp_distance_op,
+  cuvs::distance::detail::ops::l2_unexp_distance_op,
   float,
   float,
   float,
-  raft::distance::kernels::detail::rbf_fin_op<float>,
+  cuvs::distance::kernels::detail::rbf_fin_op<float>,
   int64_t);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_unexp_distance_op,
+  cuvs::distance::detail::ops::l2_unexp_distance_op,
   double,
   double,
   double,
-  raft::distance::kernels::detail::rbf_fin_op<double>,
+  cuvs::distance::kernels::detail::rbf_fin_op<double>,
   int64_t);
 
 // Rest of instances
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::canberra_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::canberra_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::canberra_distance_op,
+  cuvs::distance::detail::ops::canberra_distance_op,
   double,
   double,
   double,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::correlation_distance_op,
+  cuvs::distance::detail::ops::correlation_distance_op,
   float,
   float,
   float,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::correlation_distance_op,
+  cuvs::distance::detail::ops::correlation_distance_op,
   double,
   double,
   double,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::cosine_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::cosine_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::cosine_distance_op, double, double, double, raft::identity_op, int);
+  cuvs::distance::detail::ops::cosine_distance_op, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::hamming_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::hamming_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::hamming_distance_op, double, double, double, raft::identity_op, int);
+  cuvs::distance::detail::ops::hamming_distance_op, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::hellinger_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::hellinger_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::hellinger_distance_op,
+  cuvs::distance::detail::ops::hellinger_distance_op,
   double,
   double,
   double,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::jensen_shannon_distance_op,
+  cuvs::distance::detail::ops::jensen_shannon_distance_op,
   float,
   float,
   float,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::jensen_shannon_distance_op,
+  cuvs::distance::detail::ops::jensen_shannon_distance_op,
   double,
   double,
   double,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::kl_divergence_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::kl_divergence_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::kl_divergence_op, double, double, double, raft::identity_op, int);
+  cuvs::distance::detail::ops::kl_divergence_op, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l1_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::l1_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l1_distance_op, double, double, double, raft::identity_op, int);
+  cuvs::distance::detail::ops::l1_distance_op, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_exp_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::l2_exp_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_exp_distance_op, double, double, double, raft::identity_op, int);
+  cuvs::distance::detail::ops::l2_exp_distance_op, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_unexp_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::l2_unexp_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l2_unexp_distance_op,
+  cuvs::distance::detail::ops::l2_unexp_distance_op,
   double,
   double,
   double,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l_inf_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::l_inf_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::l_inf_distance_op, double, double, double, raft::identity_op, int);
+  cuvs::distance::detail::ops::l_inf_distance_op, double, double, double, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::lp_unexp_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::lp_unexp_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::lp_unexp_distance_op,
+  cuvs::distance::detail::ops::lp_unexp_distance_op,
   double,
   double,
   double,
   raft::identity_op,
   int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::russel_rao_distance_op, float, float, float, raft::identity_op, int);
+  cuvs::distance::detail::ops::russel_rao_distance_op, float, float, float, raft::identity_op, int);
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  raft::distance::detail::ops::russel_rao_distance_op,
+  cuvs::distance::detail::ops::russel_rao_distance_op,
   double,
   double,
   double,

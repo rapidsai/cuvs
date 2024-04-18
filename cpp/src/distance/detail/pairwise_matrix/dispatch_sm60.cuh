@@ -15,9 +15,9 @@
  */
 #pragma once
 
-#include "../pairwise_matrix/dispatch_layout.cuh"  // dispatch_layout
-#include "../pairwise_matrix/kernel_sm60.cuh"      // pairwise_matrix_sm60_wrapper
-#include <raft/linalg/contractions.cuh>            // raft::linalg::Policy4x4
+#include "dispatch_layout.cuh"           // dispatch_layout
+#include "kernel_sm60.cuh"               // pairwise_matrix_sm60_wrapper
+#include <raft/linalg/contractions.cuh>  // raft::linalg::Policy4x4
 
 #include <algorithm>  // std::min
 

@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include "../pairwise_matrix/params.cuh"  // pairwise_matrix_params
-#include <raft/core/error.hpp>            // RAFT_EXPECTS
+#include "params.cuh"           // pairwise_matrix_params
+#include <raft/core/error.hpp>  // RAFT_EXPECTS
 
 #include <algorithm>    // std::min
 #include <cstdint>      // size_t

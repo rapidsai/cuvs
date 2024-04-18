@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../pairwise_distance_base.cuh"  // PairwiseDistances
-#include "../pairwise_matrix/params.cuh"  // pairwise_matrix_params
+#include "params.cuh"                     // pairwise_matrix_params
 #include <raft/core/operators.hpp>        // raft::void_op
 #include <raft/util/arch.cuh>             // raft::util::arch::SM_compute_arch
 

@@ -25,9 +25,9 @@
  *
  * 2. Provide concise function templates that can be instantiated in
  *    src/distance/detail/pairwise_matrix/. Previously,
- *    raft::distance::detail::distance was instantiated. The function
+ *    cuvs::distance::detail::distance was instantiated. The function
  *    necessarily required a large set of include files, which slowed down the
- *    build. The raft::distance::detail::pairwise_matrix_arch_dispatch functions
+ *    build. The cuvs::distance::detail::pairwise_matrix_arch_dispatch functions
  *    do not require as large an include files set, which speeds up the build.
  */
 

@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include "../pairwise_distance_cutlass_base.cuh"   // cutlassDistanceKernel
-#include "../pairwise_matrix/dispatch_layout.cuh"  // dispatch_layout
+#include "../pairwise_distance_cutlass_base.cuh"  // cutlassDistanceKernel
+#include "dispatch_layout.cuh"                    // dispatch_layout
 
 #include <algorithm>  // std::min
 
