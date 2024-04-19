@@ -493,6 +493,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   std::vector<IdxT> indices_ref;              // NOLINT
   std::vector<EvalT> distances_ref;           // NOLINT
 };
+/*
+TODO Mickael: Add search_with_filtering to libcuvs API
 
 template <typename EvalT, typename DataT, typename IdxT>
 class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
@@ -651,7 +653,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   std::vector<IdxT> indices_ref;              // NOLINT
   std::vector<EvalT> distances_ref;           // NOLINT
 };
-
+*/
 /* Test cases */
 using test_cases_t = std::vector<ivf_pq_inputs>;
 
