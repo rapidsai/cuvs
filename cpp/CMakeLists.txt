@@ -177,7 +177,8 @@ if(BUILD_C_LIBRARY)
 endif()
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
-  include(cmake/thirdparty/get_gtest.cmake)
+  include(${rapids-cmake-dir}/cpm/gtest.cmake)
+  rapids_cpm_gtest(BUILD_STATIC)
 endif()
 
 include(cmake/thirdparty/get_cutlass.cmake)
