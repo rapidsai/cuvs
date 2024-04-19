@@ -46,14 +46,14 @@ void run_ivf_pq(int64_t n_rows,
 
   // create index
   cuvsIvfPqIndex_t index;
-  ivfPqIndexCreate(&index);
+  cuvsIvfPqIndexCreate(&index);
 
   // build index
   cuvsIvfPqIndexParams_t build_params;
   cuvsIvfPqIndexParamsCreate(&build_params);
   build_params->metric  = metric;
   build_params->n_lists = n_lists;
-  ivfPqBuild(res, build_params, &dataset_tensor, index);
+  cuvsIvfPqBuild(res, build_params, &dataset_tensor, index);
 
   // create queries DLTensor
   DLManagedTensor queries_tensor;
@@ -95,11 +95,11 @@ void run_ivf_pq(int64_t n_rows,
   cuvsIvfPqSearchParams_t search_params;
   cuvsIvfPqSearchParamsCreate(&search_params);
   search_params->n_probes = n_probes;
-  ivfPqSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsIvfPqSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // de-allocate index and res
   cuvsIvfPqSearchParamsDestroy(search_params);
   cuvsIvfPqIndexParamsDestroy(build_params);
-  ivfPqIndexDestroy(index);
+  cuvsIvfPqIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }
