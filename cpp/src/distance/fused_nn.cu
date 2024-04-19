@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fused_distance_nn-inl.cuh"
+#include "fused_nn-inl.cuh"
 #include <raft/core/kvp.hpp>  // raft::KeyValuePair
 
 #include <cstdint>  // int64_t

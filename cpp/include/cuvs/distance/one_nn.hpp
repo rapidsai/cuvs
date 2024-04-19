@@ -45,17 +45,17 @@ namespace cuvs::distance {
  * @param[in]  isRowMajor    whether the input/output is row or column major.
  * @param[in]  metric_arg    power argument for distances like Minkowski (not supported for now)
  */
-void fused_distance_nn_min_arg(raft::resources const& handle,
-                               int* min,
-                               const float* x,
-                               const float* y,
-                               int m,
-                               int n,
-                               int k,
-                               bool sqrt,
-                               cuvs::distance::DistanceType metric,
-                               bool isRowMajor,
-                               float metric_arg);
+void one_nn_argmin(raft::resources const& handle,
+                   int* min,
+                   const float* x,
+                   const float* y,
+                   int m,
+                   int n,
+                   int k,
+                   bool sqrt,
+                   cuvs::distance::DistanceType metric,
+                   bool isRowMajor,
+                   float metric_arg);
 
 /** @} */  // end group fused_distance_nn_min_arg_runtime
 
