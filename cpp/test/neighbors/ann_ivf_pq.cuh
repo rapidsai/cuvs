@@ -21,8 +21,8 @@
 #include "naive_knn.cuh"
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include <raft/neighbors/ivf_pq-inl.cuh>
-#include <raft/neighbors/sample_filter.cuh>
+#include <cuvs/neighbors/bitset_filter.cuh>
+#include <cuvs/neighbors/sample_filter.hpp>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_pq {
@@ -329,7 +329,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ASSERT_NE(old_list.get(), new_list.get())
       << "The old list should have been shared and retained after ivf_pq index has erased the "
          "corresponding cluster.";
-    auto list_data_size = (n_rows / raft::neighbors::ivf_pq::kIndexGroupSize) *
+    auto list_data_size = (n_rows / cuvs::neighbors::ivf_pq::kIndexGroupSize) *
                           new_list->data.extent(1) * new_list->data.extent(2) *
                           new_list->data.extent(3);
 
@@ -444,11 +444,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       for (uint32_t k = 0; k < ps.k; k++) {
         auto flat_i   = query_ix * ps.k + k;
         auto found_ix = indices_ivf_pq[flat_i];
-        if (found_ix == raft::neighbors::ivf_pq::kOutOfBoundsRecord<IdxT>) {
+        if (found_ix == cuvs::neighbors::ivf_pq::kOutOfBoundsRecord<IdxT>) {
           found_oob++;
           continue;
         }
-        ASSERT_NE(found_ix, raft::neighbors::ivf::kInvalidRecord<IdxT>)
+        ASSERT_NE(found_ix, cuvs::neighbors::ivf::kInvalidRecord<IdxT>)
           << "got an invalid record at query_ix = " << query_ix << ", k = " << k
           << " (distance = " << distances_ivf_pq[flat_i] << ")";
         ASSERT_LT(found_ix, ps.num_db_vecs)
@@ -595,14 +595,14 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
       handle_, removed_indices.view(), ps.num_db_vecs);
-    raft::neighbors::ivf_pq::search_with_filtering<DataT, IdxT>(
+    cuvs::neighbors::ivf_pq::search_with_filtering<DataT, IdxT>(
       handle_,
       ps.search_params,
       index,
       query_view,
       inds_view,
       dists_view,
-      raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
     update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);

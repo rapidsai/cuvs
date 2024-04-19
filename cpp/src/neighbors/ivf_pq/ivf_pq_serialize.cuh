@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -23,8 +24,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
-
-#include "ivf_pq_build.cuh"
 
 #include <fstream>
 #include <memory>

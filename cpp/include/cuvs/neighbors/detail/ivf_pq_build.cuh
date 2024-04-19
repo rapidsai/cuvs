@@ -18,6 +18,7 @@
 
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/detail/ivf_common.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_codepacking.cuh>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
@@ -57,8 +58,6 @@
 
 #include <memory>
 #include <variant>
-
-#include "ivf_pq_codepacking.cuh"
 
 namespace cuvs::neighbors::ivf_pq::detail {
 using namespace raft::spatial::knn::detail;  // NOLINT
