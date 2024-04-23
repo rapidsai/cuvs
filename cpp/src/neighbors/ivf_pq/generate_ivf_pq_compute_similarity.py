@@ -87,10 +87,6 @@ declaration_macro = """
 
 none_filter_int64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
                     "<int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>"
-none_filter_int32 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                    "<uint32_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>"
-bitset_filter32 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                  "<uint32_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA uint32_t>>"
 bitset_filter64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
                   "<int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>"
 
@@ -102,20 +98,6 @@ types = dict(
     float_float= ("float", "float", none_filter_int64),
     float_fp8_false=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int64),
     float_fp8_true=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int64),
-    half_fp8_false_filt32=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int32),
-    half_fp8_true_filt32=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int32),
-    half_half_filt32=("half", "half", none_filter_int32),
-    float_half_filt32=("float", "half", none_filter_int32),
-    float_float_filt32= ("float", "float", none_filter_int32),
-    float_fp8_false_filt32=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int32),
-    float_fp8_true_filt32=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int32),
-    half_fp8_false_bitset32=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter32),
-    half_fp8_true_bitset32=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter32),
-    half_half_bitset32=("half", "half", bitset_filter32),
-    float_half_bitset32=("float", "half", bitset_filter32),
-    float_float_bitset32= ("float", "float", bitset_filter32),
-    float_fp8_false_bitset32=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter32),
-    float_fp8_true_bitset32=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter32),
     half_fp8_false_bitset64=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter64),
     half_fp8_true_bitset64=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter64),
     half_half_bitset64=("half", "half", bitset_filter64),
