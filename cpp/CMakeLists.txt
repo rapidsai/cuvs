@@ -34,6 +34,7 @@ project(
   VERSION "${RAPIDS_VERSION}"
   LANGUAGES ${lang_list}
 )
+set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.hpp)
