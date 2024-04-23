@@ -188,6 +188,7 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/core/bitset.cu
   src/neighbors/brute_force_index.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cpp
@@ -252,6 +253,9 @@ add_library(
   src/neighbors/ivf_pq/ivf_pq_search_float_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_search_int8_t_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_search_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_with_filter_float_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_with_filter_int8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_with_filter_uint8_t_int64_t.cu
   src/neighbors/ivf_pq/ivf_pq_serialize.cu
 )
 

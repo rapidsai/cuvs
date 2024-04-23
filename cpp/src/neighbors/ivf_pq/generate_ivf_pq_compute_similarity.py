@@ -36,7 +36,6 @@ header = """/*
 
 #include "ivf_pq_compute_similarity_impl.cuh"
 #include "ivf_pq_fp_8bit.cuh"
-#include <cuvs/neighbors/bitset_filter.cuh>
 #include <cuvs/neighbors/sample_filter.hpp>
 """
 

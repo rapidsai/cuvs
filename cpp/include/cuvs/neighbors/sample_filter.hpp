@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cuvs/core/bitset.hpp>
 #include <raft/core/detail/macros.hpp>
 
 #include <cstddef>
@@ -94,6 +95,31 @@ struct ivf_to_sample_filter {
     }
   }
 };
+
+/**
+ * @brief Filter an index with a bitset
+ *
+ * @tparam index_t Indexing type
+ */
+template <typename bitset_t, typename index_t>
+struct bitset_filter {
+  // View of the bitset to use as a filter
+  const cuvs::core::bitset_view<bitset_t, index_t> bitset_view_;
+
+  bitset_filter(const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
+    : bitset_view_{bitset_for_filtering}
+  {
+  }
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample
+    const uint32_t sample_ix) const
+  {
+    return bitset_view_.test(sample_ix);
+  }
+};
+
 /**
  * If the filtering depends on the index of a sample, then the following
  * filter template can be used:

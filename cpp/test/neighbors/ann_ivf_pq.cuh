@@ -21,7 +21,6 @@
 #include "naive_knn.cuh"
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include <cuvs/neighbors/bitset_filter.cuh>
 #include <cuvs/neighbors/sample_filter.hpp>
 #include <thrust/sequence.h>
 
@@ -493,8 +492,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   std::vector<IdxT> indices_ref;              // NOLINT
   std::vector<EvalT> distances_ref;           // NOLINT
 };
-/*
-TODO Mickael: Add search_with_filtering to libcuvs API
 
 template <typename EvalT, typename DataT, typename IdxT>
 class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
@@ -590,14 +587,14 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto removed_indices =
       raft::make_device_vector<IdxT, int64_t>(handle_, test_ivf_sample_filter::offset);
     thrust::sequence(
-      resource::get_thrust_policy(handle_),
+      raft::resource::get_thrust_policy(handle_),
       thrust::device_pointer_cast(removed_indices.data_handle()),
       thrust::device_pointer_cast(removed_indices.data_handle() + test_ivf_sample_filter::offset));
-    resource::sync_stream(handle_);
+    raft::resource::sync_stream(handle_);
 
-    raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
+    cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
       handle_, removed_indices.view(), ps.num_db_vecs);
-    cuvs::neighbors::ivf_pq::search_with_filtering<DataT, IdxT>(
+    cuvs::neighbors::ivf_pq::search_with_filtering(
       handle_,
       ps.search_params,
       index,
@@ -606,9 +603,9 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       dists_view,
       cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
-    update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
-    update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
-    resource::sync_stream(handle_);
+    raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
+    raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
 
     // A very conservative lower bound on recall
     double min_recall =
@@ -653,7 +650,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   std::vector<IdxT> indices_ref;              // NOLINT
   std::vector<EvalT> distances_ref;           // NOLINT
 };
-*/
+
 /* Test cases */
 using test_cases_t = std::vector<ivf_pq_inputs>;
 
