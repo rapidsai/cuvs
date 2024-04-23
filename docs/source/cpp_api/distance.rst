@@ -17,3 +17,16 @@ namespace *cuvs::distance*
 
 .. doxygenenum:: cuvs::distance::DistanceType
    :project: cuvs
+
+
+Pairwise Distances
+------------------
+
+``include <cuvs/distance/pairwise_distance.hpp>``
+
+namespace *cuvs::distance*
+
+.. doxygengroup:: pairwise_distance
+    :project: cuvs
+    :members:
+    :content-only:

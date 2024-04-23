@@ -649,7 +649,6 @@ class BigMatrixDistanceTest : public ::testing::Test {
     raft::common::nvtx::range fun_scope(
       "test::%s/%s", testInfo->test_suite_name(), testInfo->name());
 
-    constexpr bool row_major   = true;
     constexpr float metric_arg = 0.0f;
     auto x_v = raft::make_device_matrix_view<float, int, raft::layout_c_contiguous>(x.data(), m, k);
     auto dist_v =
