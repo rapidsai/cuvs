@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstdint>
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
@@ -63,9 +64,9 @@ namespace cuvs::distance {
  */
 void pairwise_distance(
   raft::resources const& handle,
-  raft::device_matrix_view<const float, int, raft::layout_c_contiguous> const x,
-  raft::device_matrix_view<const float, int, raft::layout_c_contiguous> const y,
-  raft::device_matrix_view<float, int, raft::layout_c_contiguous> dist,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const x,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_c_contiguous> const y,
+  raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous> dist,
   cuvs::distance::DistanceType metric,
   float metric_arg = 2.0f);
 
@@ -107,9 +108,9 @@ void pairwise_distance(
  */
 void pairwise_distance(
   raft::resources const& handle,
-  raft::device_matrix_view<const double, int, raft::layout_c_contiguous> const x,
-  raft::device_matrix_view<const double, int, raft::layout_c_contiguous> const y,
-  raft::device_matrix_view<double, int, raft::layout_c_contiguous> dist,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const x,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_c_contiguous> const y,
+  raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous> dist,
   cuvs::distance::DistanceType metric,
   double metric_arg = 2.0f);
 
@@ -151,9 +152,9 @@ void pairwise_distance(
  */
 void pairwise_distance(
   raft::resources const& handle,
-  raft::device_matrix_view<const float, int, raft::layout_f_contiguous> const x,
-  raft::device_matrix_view<const float, int, raft::layout_f_contiguous> const y,
-  raft::device_matrix_view<float, int, raft::layout_f_contiguous> dist,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const x,
+  raft::device_matrix_view<const float, std::int64_t, raft::layout_f_contiguous> const y,
+  raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
   cuvs::distance::DistanceType metric,
   float metric_arg = 2.0f);
 /**
@@ -194,9 +195,9 @@ void pairwise_distance(
  */
 void pairwise_distance(
   raft::resources const& handle,
-  raft::device_matrix_view<const double, int, raft::layout_f_contiguous> const x,
-  raft::device_matrix_view<const double, int, raft::layout_f_contiguous> const y,
-  raft::device_matrix_view<double, int, raft::layout_f_contiguous> dist,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const x,
+  raft::device_matrix_view<const double, std::int64_t, raft::layout_f_contiguous> const y,
+  raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous> dist,
   cuvs::distance::DistanceType metric,
   double metric_arg = 2.0f);
 
