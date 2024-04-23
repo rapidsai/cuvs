@@ -394,8 +394,8 @@ template <cuvs::distance::DistanceType DistT,
           typename layout = raft::layout_c_contiguous,
           typename IdxT   = int>
 void distance(raft::resources const& handle,
-              raft::device_matrix_view<DataT, IdxT, layout> const x,
-              raft::device_matrix_view<DataT, IdxT, layout> const y,
+              raft::device_matrix_view<const DataT, IdxT, layout> const x,
+              raft::device_matrix_view<const DataT, IdxT, layout> const y,
               raft::device_matrix_view<OutT, IdxT, layout> dist,
               DataT metric_arg = 2.0f)
 {
@@ -437,8 +437,8 @@ void distance(raft::resources const& handle,
  */
 template <typename Type, typename layout = raft::layout_c_contiguous, typename IdxT = int>
 void pairwise_distance(raft::resources const& handle,
-                       raft::device_matrix_view<Type, IdxT, layout> const x,
-                       raft::device_matrix_view<Type, IdxT, layout> const y,
+                       raft::device_matrix_view<const Type, IdxT, layout> const x,
+                       raft::device_matrix_view<const Type, IdxT, layout> const y,
                        raft::device_matrix_view<Type, IdxT, layout> dist,
                        cuvs::distance::DistanceType metric,
                        Type metric_arg = 2.0f)

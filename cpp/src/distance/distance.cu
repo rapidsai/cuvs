@@ -628,8 +628,8 @@ instantiate_raft_distance_pairwise_distance(double, int);
 #define instantiate_raft_distance_distance(DistT, DataT, AccT, OutT, layout, IdxT) \
   template void cuvs::distance::distance<DistT, DataT, AccT, OutT, layout, IdxT>(  \
     raft::resources const& handle,                                                 \
-    raft::device_matrix_view<DataT, IdxT, layout> const x,                         \
-    raft::device_matrix_view<DataT, IdxT, layout> const y,                         \
+    raft::device_matrix_view<const DataT, IdxT, layout> const x,                   \
+    raft::device_matrix_view<const DataT, IdxT, layout> const y,                   \
     raft::device_matrix_view<OutT, IdxT, layout> dist,                             \
     DataT metric_arg)
 
@@ -920,8 +920,8 @@ instantiate_raft_distance_distance(cuvs::distance::DistanceType::RusselRaoExpand
 #define instantiate_raft_distance_pairwise_distance(DataT, layout, IdxT) \
   template void cuvs::distance::pairwise_distance(                       \
     raft::resources const& handle,                                       \
-    raft::device_matrix_view<DataT, IdxT, layout> const x,               \
-    raft::device_matrix_view<DataT, IdxT, layout> const y,               \
+    raft::device_matrix_view<const DataT, IdxT, layout> const x,         \
+    raft::device_matrix_view<const DataT, IdxT, layout> const y,         \
     raft::device_matrix_view<DataT, IdxT, layout> dist,                  \
     cuvs::distance::DistanceType metric,                                 \
     DataT metric_arg)
