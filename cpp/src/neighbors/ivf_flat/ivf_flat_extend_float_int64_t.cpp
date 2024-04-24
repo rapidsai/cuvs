@@ -24,7 +24,6 @@
  */
 
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <raft_runtime/neighbors/ivf_flat.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -36,8 +35,8 @@ namespace cuvs::neighbors::ivf_flat {
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                      \
   {                                                                                  \
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                \
-      std::move(raft::runtime::neighbors::ivf_flat::extend(                          \
-        handle, new_vectors, new_indices, *orig_index.get_raft_index())));           \
+      std::move(cuvs::neighbors::ivf_flat::extend(                          \
+        handle, new_vectors, new_indices, orig_index)));           \
   }                                                                                  \
                                                                                      \
   void extend(raft::resources const& handle,                                         \
@@ -45,9 +44,9 @@ namespace cuvs::neighbors::ivf_flat {
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \
               cuvs::neighbors::ivf_flat::index<T, IdxT>* idx)                        \
   {                                                                                  \
-    raft::runtime::neighbors::ivf_flat::extend(                                      \
-      handle, new_vectors, new_indices, idx->get_raft_index());                      \
-  }
+    cuvs::neighbors::ivf_flat::extend(                                      \
+      handle, new_vectors, new_indices, idx);                      \
+  }                 
 CUVS_INST_IVF_FLAT_EXTEND(float, int64_t);
 
 #undef CUVS_INST_IVF_FLAT_EXTEND

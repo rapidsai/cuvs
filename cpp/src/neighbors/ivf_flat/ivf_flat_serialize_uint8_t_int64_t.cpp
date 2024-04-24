@@ -24,7 +24,6 @@
  */
 
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <raft_runtime/neighbors/ivf_flat.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -33,29 +32,29 @@ namespace cuvs::neighbors::ivf_flat {
                       const std::string& filename,                                                 \
                       const cuvs::neighbors::ivf_flat::index<T, IdxT>& index)                      \
   {                                                                                                \
-    raft::runtime::neighbors::ivf_flat::serialize_file(handle, filename, *index.get_raft_index()); \
+    cuvs::neighbors::ivf_flat::serialize_file(handle, filename, index); \
   }                                                                                                \
                                                                                                    \
   void deserialize_file(raft::resources const& handle,                                             \
                         const std::string& filename,                                               \
                         cuvs::neighbors::ivf_flat::index<T, IdxT>* index)                          \
   {                                                                                                \
-    raft::runtime::neighbors::ivf_flat::deserialize_file(                                          \
-      handle, filename, index->get_raft_index());                                                  \
+    cuvs::neighbors::ivf_flat::deserialize_file(                                          \
+      handle, filename, index);                                                  \
   }                                                                                                \
                                                                                                    \
   void serialize(raft::resources const& handle,                                                    \
                  std::string& str,                                                                 \
                  const cuvs::neighbors::ivf_flat::index<T, IdxT>& index)                           \
   {                                                                                                \
-    raft::runtime::neighbors::ivf_flat::serialize(handle, str, *index.get_raft_index());           \
+    cuvs::neighbors::ivf_flat::serialize(handle, str, index);           \
   }                                                                                                \
                                                                                                    \
   void deserialize(raft::resources const& handle,                                                  \
                    const std::string& str,                                                         \
                    cuvs::neighbors::ivf_flat::index<T, IdxT>* index)                               \
   {                                                                                                \
-    raft::runtime::neighbors::ivf_flat::deserialize(handle, str, index->get_raft_index());         \
+    cuvs::neighbors::ivf_flat::deserialize(handle, str, index);         \
   }
 CUVS_INST_IVF_FLAT_SERIALIZE(uint8_t, int64_t);
 

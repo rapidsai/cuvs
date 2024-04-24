@@ -24,7 +24,6 @@
  */
 
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <raft_runtime/neighbors/ivf_flat.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -36,8 +35,8 @@ namespace cuvs::neighbors::ivf_flat {
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \
               raft::device_matrix_view<float, IdxT, raft::row_major> distances) \
   {                                                                             \
-    raft::runtime::neighbors::ivf_flat::search(                                 \
-      handle, params, *index.get_raft_index(), queries, neighbors, distances);  \
+    cuvs::neighbors::ivf_flat::search(                                 \
+      handle, params, index, queries, neighbors, distances);  \
   }
 CUVS_INST_IVF_FLAT_SEARCH(uint8_t, int64_t);
 

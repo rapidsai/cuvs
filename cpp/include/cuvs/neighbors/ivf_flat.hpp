@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ann_types.hpp"
+#include "ivf_list.hpp"
 #include <raft/neighbors/ivf_flat_types.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
@@ -24,6 +25,10 @@ namespace cuvs::neighbors::ivf_flat {
  * @defgroup ivf_flat_cpp_index_params IVF-Flat index build parameters
  * @{
  */
+
+/** Size of the interleaved group (see `index::data` description). */
+constexpr static uint32_t kIndexGroupSize = 32;
+
 struct index_params : ann::index_params {
   /** The number of inverted lists (clusters) */
   uint32_t n_lists = 1024;
@@ -90,6 +95,44 @@ struct search_params : ann::search_params {
     return result;
   }
 };
+
+static_assert(std::is_aggregate_v<index_params>);
+static_assert(std::is_aggregate_v<search_params>);
+
+template <typename SizeT, typename ValueT, typename IdxT>
+struct list_spec {
+  using value_type   = ValueT;
+  using list_extents = raft::matrix_extent<SizeT>;
+  using index_type   = IdxT;
+
+  SizeT align_max;
+  SizeT align_min;
+  uint32_t dim;
+
+  constexpr list_spec(uint32_t dim, bool conservative_memory_allocation)
+    : dim(dim),
+      align_min(kIndexGroupSize),
+      align_max(conservative_memory_allocation ? kIndexGroupSize : 1024)
+  {
+  }
+
+  // Allow casting between different size-types (for safer size and offset calculations)
+  template <typename OtherSizeT>
+  constexpr explicit list_spec(const list_spec<OtherSizeT, ValueT, IdxT>& other_spec)
+    : dim{other_spec.dim}, align_min{other_spec.align_min}, align_max{other_spec.align_max}
+  {
+  }
+
+  /** Determine the extents of an array enough to hold a given amount of data. */
+  constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
+  {
+    return raft::make_extents<SizeT>(n_rows, dim);
+  }
+};
+
+template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
+using list_data = ivf::list<list_spec, SizeT, ValueT, IdxT>;
+
 /**
  * @}
  */
