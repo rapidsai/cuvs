@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <raft/core/device_mdspan.hpp>
-#include <raft/core/resources.hpp>
 #include <cuvs/neighbors/detail/ivf_flat_build.cuh>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/resources.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
 namespace cuvs::neighbors::ivf_flat::helpers {
@@ -62,7 +62,8 @@ void pack(
   raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
   uint32_t veclen,
   uint32_t offset,
-  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major> list_data)
+  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data)
 {
   cuvs::neighbors::ivf_flat::detail::pack_list_data<T, IdxT>(res, codes, veclen, offset, list_data);
 }
@@ -98,7 +99,8 @@ void pack(
 template <typename T, typename IdxT>
 void unpack(
   raft::resources const& res,
-  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major> list_data,
+  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data,
   uint32_t veclen,
   uint32_t offset,
   raft::device_matrix_view<T, uint32_t, raft::row_major> codes)

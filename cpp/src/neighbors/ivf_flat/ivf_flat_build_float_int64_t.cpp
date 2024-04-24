@@ -27,22 +27,22 @@
 
 namespace cuvs::neighbors::ivf_flat {
 
-#define CUVS_INST_IVF_FLAT_BUILD(T, IdxT)                                                      \
-  auto build(raft::resources const& handle,                                                    \
-             const cuvs::neighbors::ivf_flat::index_params& params,                            \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)                 \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                \
-  {                                                                                            \
-    return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                          \
-      std::move(cuvs::neighbors::ivf_flat::build(handle, params, dataset)));          \
-  }                                                                                            \
-                                                                                               \
-  void build(raft::resources const& handle,                                                    \
-             const cuvs::neighbors::ivf_flat::index_params& params,                            \
-             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                 \
-             cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                                   \
-  {                                                                                            \
-    cuvs::neighbors::ivf_flat::build(handle, params, dataset, idx); \
+#define CUVS_INST_IVF_FLAT_BUILD(T, IdxT)                                      \
+  auto build(raft::resources const& handle,                                    \
+             const cuvs::neighbors::ivf_flat::index_params& params,            \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset) \
+    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                \
+  {                                                                            \
+    return cuvs::neighbors::ivf_flat::index<T, IdxT>(                          \
+      std::move(cuvs::neighbors::ivf_flat::build(handle, params, dataset)));   \
+  }                                                                            \
+                                                                               \
+  void build(raft::resources const& handle,                                    \
+             const cuvs::neighbors::ivf_flat::index_params& params,            \
+             raft::device_matrix_view<const T, IdxT, raft::row_major> dataset, \
+             cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                   \
+  {                                                                            \
+    cuvs::neighbors::ivf_flat::build(handle, params, dataset, idx);            \
   }
 CUVS_INST_IVF_FLAT_BUILD(float, int64_t);
 

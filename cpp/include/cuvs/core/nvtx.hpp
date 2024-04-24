@@ -18,17 +18,17 @@
 #include <raft/core/nvtx.hpp>
 
 namespace cuvs::common::nvtx {
-    namespace domain {
-        /** @brief The default NVTX domain. */
+namespace domain {
+/** @brief The default NVTX domain. */
 struct app {
   static constexpr char const* name{"application"};
 };
 
-    /** @brief This NVTX domain is supposed to be used within cuvs.  */
-    struct cuvs {
-        static constexpr const char* name = "cuvs";
-    };
-    } // namespace domain
+/** @brief This NVTX domain is supposed to be used within cuvs.  */
+struct cuvs {
+  static constexpr const char* name = "cuvs";
+};
+}  // namespace domain
 
 /**
  * @brief Push a named NVTX range.
@@ -64,7 +64,7 @@ inline void pop_range()
   raft::common::nvtx::detail::pop_range<Domain>();
 }
 
-    /**
+/**
  * @brief Push a named NVTX range that would be popped at the end of the object lifetime.
  *
  * Refer to \ref Usage for the usage examples.
