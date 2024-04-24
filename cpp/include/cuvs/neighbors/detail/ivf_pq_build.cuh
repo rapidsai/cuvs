@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cuvs/core/nvtx.hpp>
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/detail/ivf_common.cuh>
 #include <cuvs/neighbors/detail/ivf_pq_codepacking.cuh>
@@ -25,7 +26,6 @@
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -126,7 +126,7 @@ inline void make_rotation_matrix(raft::resources const& handle,
                                  float* rotation_matrix,
                                  raft::random::RngState rng = raft::random::RngState(7ULL))
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::make_rotation_matrix(%u * %u)", n_rows, n_cols);
   auto stream  = raft::resource::get_cuda_stream(handle);
   bool inplace = n_rows == n_cols;
@@ -413,7 +413,7 @@ void train_per_subset(raft::resources const& handle,
   rmm::device_uvector<uint32_t> pq_cluster_sizes(index.pq_book_size(), stream, device_memory);
 
   for (uint32_t j = 0; j < index.pq_dim(); j++) {
-    raft::common::nvtx::range<raft::common::nvtx::domain::raft> pq_per_subspace_scope(
+    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> pq_per_subspace_scope(
       "ivf_pq::build::per_subspace[%u]", j);
 
     // Get the rotated cluster centers for each training vector.
@@ -512,7 +512,7 @@ void train_per_cluster(raft::resources const& handle,
   for (uint32_t l = 0; l < index.n_lists(); l++) {
     auto cluster_size = cluster_sizes.data()[l];
     if (cluster_size == 0) continue;
-    raft::common::nvtx::range<raft::common::nvtx::domain::raft> pq_per_cluster_scope(
+    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> pq_per_cluster_scope(
       "ivf_pq::build::per_cluster[%u](size = %u)", l, cluster_size);
 
     select_residuals(handle,
@@ -1530,7 +1530,7 @@ void extend(raft::resources const& handle,
             const IdxT* new_indices,
             IdxT n_rows)
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::extend(%zu, %u)", size_t(n_rows), index->dim());
 
   auto stream           = raft::resource::get_cuda_stream(handle);
@@ -1709,7 +1709,7 @@ auto build(raft::resources const& handle,
            IdxT n_rows,
            uint32_t dim) -> index<IdxT>
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::build(%zu, %u)", size_t(n_rows), dim);
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,

@@ -22,7 +22,6 @@
 #include <cuvs/neighbors/ivf_pq.hpp>         // cuvs::neighbors::ivf_pq::codebook_gen
 #include <cuvs/neighbors/sample_filter.hpp>  // none_ivf_sample_filter
 #include <raft/core/detail/macros.hpp>       // RAFT_WEAK_FUNCTION
-#include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
 #include <rmm/cuda_stream_view.hpp>          // rmm::cuda_stream_view
 
 #include <cuda_fp16.h>  // __half
@@ -62,7 +61,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       IvfSampleFilterT sample_filter,
                                       LutT* lut_scores,
                                       OutT* _out_scores,
-                                      uint32_t* _out_indices) RAFT_EXPLICIT;
+                                      uint32_t* _out_indices);
 
 // The signature of the kernel defined by a minimal set of template parameters
 template <typename OutT, typename LutT, typename IvfSampleFilterT>
@@ -101,7 +100,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                             IvfSampleFilterT sample_filter,
                             LutT* lut_scores,
                             OutT* _out_scores,
-                            uint32_t* _out_indices) RAFT_EXPLICIT;
+                            uint32_t* _out_indices);
 
 /**
  * Use heuristics to choose an optimal instance of the search kernel.
@@ -128,7 +127,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                uint32_t n_queries,
                                uint32_t n_probes,
                                uint32_t topk)
-  -> selected<OutT, LutT, IvfSampleFilterT> RAFT_EXPLICIT;
+  -> selected<OutT, LutT, IvfSampleFilterT>;
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
 
