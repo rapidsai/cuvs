@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "ivf_common.cuh>"
+#include "ivf_common.cuh"
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/sample_filter.hpp>
 
