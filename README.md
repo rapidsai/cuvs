@@ -1,7 +1,7 @@
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;cuVS: Vector Search and Clustering on the GPU</div>
 
 > [!note]
-> cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai) library of data mining primitives. RAPIDS RAFT currently contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms in cuVS. We are in the process of migrating the algorithms from RAFT to cuVS, but if you are unsure of which to use, please consider the following:
+> cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai/raft) library of data mining primitives. RAPIDS RAFT currently contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms in cuVS. We are in the process of migrating the algorithms from RAFT to cuVS, but if you are unsure of which to use, please consider the following:
 > 1. RAFT contains C++ and Python APIs for all of the approximate nearest neighbors and clustering algorithms.
 > 2. cuVS contains a growing support for different languages, including C, C++, Python, and Rust. We will be adding more language support to cuVS in the future but will not be improving the language support for RAFT.
 > 3. Once all of RAFT's approximate nearest neighbors and clustering algorithms are moved to cuVS, the RAFT APIs will be deprecated and eventually removed altogether. Once removed, RAFT will become a lightweight header-only library. In the meantime, there's no harm in using RAFT if support for additional languages is not needed.
