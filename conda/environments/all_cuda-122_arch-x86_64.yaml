@@ -32,12 +32,12 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
+- libnvjitlink
 - make
 - nccl>=2.9.9
 - ninja
 - numpy>=1.23,<2.0a0
 - numpydoc
-- nvjitlink
 - pre-commit
 - pydata-sphinx-theme
 - pylibraft==24.6.*
