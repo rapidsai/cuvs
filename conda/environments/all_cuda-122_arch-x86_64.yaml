@@ -37,6 +37,7 @@ dependencies:
 - ninja
 - numpy>=1.23,<2.0a0
 - numpydoc
+- nvjitlink
 - pre-commit
 - pydata-sphinx-theme
 - pylibraft==24.6.*
