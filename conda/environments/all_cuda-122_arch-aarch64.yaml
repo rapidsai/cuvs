@@ -32,7 +32,6 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- libnvjitlink
 - make
 - nccl>=2.9.9
 - ninja

@@ -220,7 +220,6 @@ dependencies:
               - cuda-nvtx-dev
               - cuda-cudart-dev
               - cuda-profiler-api
-              - libnvjitlink
               - libcublas-dev
               - libcurand-dev
               - libcusolver-dev
