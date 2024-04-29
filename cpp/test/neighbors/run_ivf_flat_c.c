@@ -24,7 +24,7 @@ void run_ivf_flat(int64_t n_rows,
                   float* query_data,
                   float* distances_data,
                   int64_t* neighbors_data,
-                  enum DistanceType metric,
+                  cuvsDistanceType metric,
                   size_t n_probes,
                   size_t n_lists)
 {
