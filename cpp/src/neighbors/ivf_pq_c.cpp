@@ -29,7 +29,7 @@
 namespace {
 
 template <typename IdxT>
-void* _build(cuvsResources_t res, ivfPqIndexParams params, DLManagedTensor* dataset_tensor)
+void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -62,8 +62,8 @@ void* _build(cuvsResources_t res, ivfPqIndexParams params, DLManagedTensor* data
 
 template <typename IdxT>
 void _search(cuvsResources_t res,
-             ivfPqSearchParams params,
-             ivfPqIndex index,
+             cuvsIvfPqSearchParams params,
+             cuvsIvfPqIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
              DLManagedTensor* distances_tensor)
@@ -90,17 +90,17 @@ void _search(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t ivfPqIndexCreate(cuvsIvfPqIndex_t* index)
+extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
 {
   try {
-    *index = new ivfPqIndex{};
+    *index = new cuvsIvfPqIndex{};
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;
   }
 }
 
-extern "C" cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
+extern "C" cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
 {
   try {
     auto index = *index_c_ptr;
@@ -114,10 +114,10 @@ extern "C" cuvsError_t ivfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
   }
 }
 
-extern "C" cuvsError_t ivfPqBuild(cuvsResources_t res,
-                                  cuvsIvfPqIndexParams_t params,
-                                  DLManagedTensor* dataset_tensor,
-                                  cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
+                                      cuvsIvfPqIndexParams_t params,
+                                      DLManagedTensor* dataset_tensor,
+                                      cuvsIvfPqIndex_t index)
 {
   try {
     auto dataset = dataset_tensor->dl_tensor;
@@ -138,12 +138,12 @@ extern "C" cuvsError_t ivfPqBuild(cuvsResources_t res,
   }
 }
 
-extern "C" cuvsError_t ivfPqSearch(cuvsResources_t res,
-                                   cuvsIvfPqSearchParams_t params,
-                                   cuvsIvfPqIndex_t index_c_ptr,
-                                   DLManagedTensor* queries_tensor,
-                                   DLManagedTensor* neighbors_tensor,
-                                   DLManagedTensor* distances_tensor)
+extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
+                                       cuvsIvfPqSearchParams_t params,
+                                       cuvsIvfPqIndex_t index_c_ptr,
+                                       DLManagedTensor* queries_tensor,
+                                       DLManagedTensor* neighbors_tensor,
+                                       DLManagedTensor* distances_tensor)
 {
   try {
     auto queries   = queries_tensor->dl_tensor;
@@ -184,17 +184,17 @@ extern "C" cuvsError_t ivfPqSearch(cuvsResources_t res,
 extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params)
 {
   try {
-    *params = new ivfPqIndexParams{.metric                         = L2Expanded,
-                                   .metric_arg                     = 2.0f,
-                                   .add_data_on_build              = true,
-                                   .n_lists                        = 1024,
-                                   .kmeans_n_iters                 = 20,
-                                   .kmeans_trainset_fraction       = 0.5,
-                                   .pq_bits                        = 8,
-                                   .pq_dim                         = 0,
-                                   .codebook_kind                  = codebook_gen::PER_SUBSPACE,
-                                   .force_random_rotation          = false,
-                                   .conservative_memory_allocation = false};
+    *params = new cuvsIvfPqIndexParams{.metric                         = L2Expanded,
+                                       .metric_arg                     = 2.0f,
+                                       .add_data_on_build              = true,
+                                       .n_lists                        = 1024,
+                                       .kmeans_n_iters                 = 20,
+                                       .kmeans_trainset_fraction       = 0.5,
+                                       .pq_bits                        = 8,
+                                       .pq_dim                         = 0,
+                                       .codebook_kind                  = codebook_gen::PER_SUBSPACE,
+                                       .force_random_rotation          = false,
+                                       .conservative_memory_allocation = false};
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;
@@ -214,10 +214,10 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t params
 extern "C" cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params)
 {
   try {
-    *params = new ivfPqSearchParams{.n_probes                 = 20,
-                                    .lut_dtype                = CUDA_R_32F,
-                                    .internal_distance_dtype  = CUDA_R_32F,
-                                    .preferred_shmem_carveout = 1.0};
+    *params = new cuvsIvfPqSearchParams{.n_probes                 = 20,
+                                        .lut_dtype                = CUDA_R_32F,
+                                        .internal_distance_dtype  = CUDA_R_32F,
+                                        .preferred_shmem_carveout = 1.0};
     return CUVS_SUCCESS;
   } catch (...) {
     return CUVS_ERROR;

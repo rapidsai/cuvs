@@ -153,7 +153,7 @@ typedef ivfFlatIndex* cuvsIvfFlatIndex_t;
  * @brief Allocate IVF-Flat index
  *
  * @param[in] index cuvsIvfFlatIndex_t to allocate
- * @return ivfFlatError_t
+ * @return cuvsError_t
  */
 cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 

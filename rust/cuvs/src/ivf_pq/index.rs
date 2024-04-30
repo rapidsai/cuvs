@@ -13,42 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//! Brute Force KNN
 
 use std::io::{stderr, Write};
 
-use crate::distance_type::DistanceType;
 use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Result};
+use crate::ivf_pq::{IndexParams, SearchParams};
 use crate::resources::Resources;
 
-/// Brute Force KNN Index
+/// Ivf-Pq ANN Index
 #[derive(Debug)]
-pub struct Index(ffi::cuvsBruteForceIndex_t);
+pub struct Index(ffi::cuvsIvfPqIndex_t);
 
 impl Index {
-    /// Builds a new Brute Force KNN Index from the dataset for efficient search.
+    /// Builds a new Index from the dataset for efficient search.
     ///
     /// # Arguments
     ///
     /// * `res` - Resources to use
-    /// * `metric` - DistanceType to use for building the index
-    /// * `metric_arg` - Optional value of `p` for Minkowski distances
+    /// * `params` - Parameters for building the index
     /// * `dataset` - A row-major matrix on either the host or device to index
     pub fn build<T: Into<ManagedTensor>>(
         res: &Resources,
-        metric: DistanceType,
-        metric_arg: Option<f32>,
+        params: &IndexParams,
         dataset: T,
     ) -> Result<Index> {
         let dataset: ManagedTensor = dataset.into();
         let index = Index::new()?;
         unsafe {
-            check_cuvs(ffi::cuvsBruteForceBuild(
+            check_cuvs(ffi::cuvsIvfPqBuild(
                 res.0,
+                params.0,
                 dataset.as_ptr(),
-                metric,
-                metric_arg.unwrap_or(2.0),
                 index.0,
             ))?;
         }
@@ -58,30 +54,33 @@ impl Index {
     /// Creates a new empty index
     pub fn new() -> Result<Index> {
         unsafe {
-            let mut index = std::mem::MaybeUninit::<ffi::cuvsBruteForceIndex_t>::uninit();
-            check_cuvs(ffi::cuvsBruteForceIndexCreate(index.as_mut_ptr()))?;
+            let mut index = std::mem::MaybeUninit::<ffi::cuvsIvfPqIndex_t>::uninit();
+            check_cuvs(ffi::cuvsIvfPqIndexCreate(index.as_mut_ptr()))?;
             Ok(Index(index.assume_init()))
         }
     }
 
-    /// Perform a Nearest Neighbors search on the Index
+    /// Perform a Approximate Nearest Neighbors search on the Index
     ///
     /// # Arguments
     ///
     /// * `res` - Resources to use
+    /// * `params` - Parameters to use in searching the index
     /// * `queries` - A matrix in device memory to query for
     /// * `neighbors` - Matrix in device memory that receives the indices of the nearest neighbors
     /// * `distances` - Matrix in device memory that receives the distances of the nearest neighbors
     pub fn search(
         self,
         res: &Resources,
+        params: &SearchParams,
         queries: &ManagedTensor,
         neighbors: &ManagedTensor,
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
-            check_cuvs(ffi::cuvsBruteForceSearch(
+            check_cuvs(ffi::cuvsIvfPqSearch(
                 res.0,
+                params.0,
                 self.0,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
@@ -93,8 +92,8 @@ impl Index {
 
 impl Drop for Index {
     fn drop(&mut self) {
-        if let Err(e) = check_cuvs(unsafe { ffi::cuvsBruteForceIndexDestroy(self.0) }) {
-            write!(stderr(), "failed to call cagraIndexDestroy {:?}", e)
+        if let Err(e) = check_cuvs(unsafe { ffi::cuvsIvfPqIndexDestroy(self.0) }) {
+            write!(stderr(), "failed to call cuvsIvfPqIndexDestroy {:?}", e)
                 .expect("failed to write to stderr");
         }
     }
@@ -107,35 +106,34 @@ mod tests {
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
 
-    fn test_bfknn(metric: DistanceType) {
+    #[test]
+    fn test_ivf_pq() {
+        let build_params = IndexParams::new().unwrap().set_n_lists(64);
+
         let res = Resources::new().unwrap();
 
         // Create a new random dataset to index
-        let n_datapoints = 16;
-        let n_features = 8;
-        let dataset_host =
+        let n_datapoints = 1024;
+        let n_features = 16;
+        let dataset =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let dataset = ManagedTensor::from(&dataset_host)
-            .to_device(&res)
-            .unwrap();
+        let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
 
-        println!("dataset {:#?}", dataset_host);
-
-        // build the brute force index
-        let index =
-            Index::build(&res, metric, None, dataset).expect("failed to create brute force index");
-
-        res.sync_stream().unwrap();
+        // build the ivf-pq index
+        let index = Index::build(&res, &build_params, dataset_device)
+            .expect("failed to create ivf-pq index");
 
         // use the first 4 points from the dataset as queries : will test that we get them back
         // as their own nearest neighbor
         let n_queries = 4;
-        let queries = dataset_host.slice(s![0..n_queries, ..]);
+        let queries = dataset.slice(s![0..n_queries, ..]);
 
-        let k = 4;
+        let k = 10;
 
-        println!("queries! {:#?}", queries);
+        // Ivf-Pq search API requires queries and outputs to be on device memory
+        // copy query data over, and allocate new device memory for the distances/ neighbors
+        // outputs
         let queries = ManagedTensor::from(&queries).to_device(&res).unwrap();
         let mut neighbors_host = ndarray::Array::<i64, _>::zeros((n_queries, k));
         let neighbors = ManagedTensor::from(&neighbors_host)
@@ -147,17 +145,15 @@ mod tests {
             .to_device(&res)
             .unwrap();
 
+        let search_params = SearchParams::new().unwrap();
+
         index
-            .search(&res, &queries, &neighbors, &distances)
+            .search(&res, &search_params, &queries, &neighbors, &distances)
             .unwrap();
 
         // Copy back to host memory
         distances.to_host(&res, &mut distances_host).unwrap();
         neighbors.to_host(&res, &mut neighbors_host).unwrap();
-        res.sync_stream().unwrap();
-
-        println!("distances {:#?}", distances_host);
-        println!("neighbors {:#?}", neighbors_host);
 
         // nearest neighbors should be themselves, since queries are from the
         // dataset
@@ -165,17 +161,5 @@ mod tests {
         assert_eq!(neighbors_host[[1, 0]], 1);
         assert_eq!(neighbors_host[[2, 0]], 2);
         assert_eq!(neighbors_host[[3, 0]], 3);
-    }
-
-/*
-    #[test]
-    fn test_cosine() {
-        test_bfknn(DistanceType::CosineExpanded);
-    }
-*/
-
-    #[test]
-    fn test_l2() {
-        test_bfknn(DistanceType::L2Expanded);
     }
 }

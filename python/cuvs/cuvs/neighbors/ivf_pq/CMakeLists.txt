@@ -12,6 +12,13 @@
 # the License.
 # =============================================================================
 
-add_subdirectory(brute_force)
-add_subdirectory(cagra)
-add_subdirectory(ivf_pq)
+# Set the list of Cython files to build
+set(cython_sources ivf_pq.pyx)
+set(linked_libraries cuvs::cuvs cuvs::c_api)
+
+# Build all of the Cython targets
+rapids_cython_create_modules(
+  CXX
+  SOURCE_FILES "${cython_sources}"
+  LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX neighbors_pq_
+)

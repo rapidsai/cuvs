@@ -68,8 +68,6 @@ cdef class Index:
 def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     """
     Build the Brute Force index from the dataset for efficient search.
-    The following distance metrics are supported:
-        - L2
 
     Parameters
     ----------
@@ -167,7 +165,7 @@ def search(Index index,
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
-    >>> # are performad with same query size.
+    >>> # are performed with same query size.
     >>> distances, neighbors = brute_force.search(index, queries, k)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)

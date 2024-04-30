@@ -23,6 +23,7 @@ pub mod cagra;
 pub mod distance_type;
 mod dlpack;
 mod error;
+pub mod ivf_pq;
 mod resources;
 
 pub use dlpack::ManagedTensor;
