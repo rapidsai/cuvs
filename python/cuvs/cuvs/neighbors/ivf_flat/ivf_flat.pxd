@@ -20,13 +20,13 @@ from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
-from cuvs.distance_type cimport DistanceType
+from cuvs.distance_type cimport cuvsDistanceType
 
 
 cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
 
     ctypedef struct cuvsIvfFlatIndexParams:
-        DistanceType metric
+        cuvsDistanceType metric
         float metric_arg
         bool add_data_on_build
         uint32_t n_lists

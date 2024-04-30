@@ -25,7 +25,7 @@ from cython.operator cimport dereference as deref
 from libcpp cimport bool, cast
 
 from cuvs.common cimport cydlpack
-from cuvs.distance_type cimport DistanceType
+from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
@@ -105,7 +105,7 @@ cdef class IndexParams:
                  add_data_on_build=True,
                  conservative_memory_allocation=False):
         self._metric = metric
-        self.params.metric = <DistanceType>DISTANCE_TYPES[metric]
+        self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
         self.params.add_data_on_build = add_data_on_build
         self.params.n_lists = n_lists
