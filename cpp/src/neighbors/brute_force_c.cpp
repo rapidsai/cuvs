@@ -33,7 +33,7 @@ namespace {
 template <typename T>
 void* _build(cuvsResources_t res,
              DLManagedTensor* dataset_tensor,
-             enum DistanceType metric,
+             cuvsDistanceType metric,
              T metric_arg)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -97,7 +97,7 @@ extern "C" cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_
 
 extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
                                            DLManagedTensor* dataset_tensor,
-                                           enum DistanceType metric,
+                                           cuvsDistanceType metric,
                                            float metric_arg,
                                            cuvsBruteForceIndex_t index)
 {

@@ -30,7 +30,7 @@ extern "C" void run_ivf_flat(int64_t n_rows,
                              float* query_data,
                              float* distances_data,
                              int64_t* neighbors_data,
-                             enum DistanceType metric,
+                             cuvsDistanceType metric,
                              size_t n_probes,
                              size_t n_lists);
 
@@ -51,7 +51,7 @@ void recall_eval(T* query_data,
                  size_t n_rows,
                  size_t n_dim,
                  size_t n_neighbors,
-                 DistanceType metric,
+                 cuvsDistanceType metric,
                  size_t n_probes,
                  size_t n_lists)
 {
@@ -101,9 +101,9 @@ TEST(IvfFlatC, BuildSearch)
   int64_t n_dim        = 32;
   uint32_t n_neighbors = 8;
 
-  enum DistanceType metric = L2Expanded;
-  size_t n_probes          = 20;
-  size_t n_lists           = 1024;
+  cuvsDistanceType metric = L2Expanded;
+  size_t n_probes         = 20;
+  size_t n_lists          = 1024;
 
   float *index_data, *query_data, *distances_data;
   int64_t* neighbors_data;

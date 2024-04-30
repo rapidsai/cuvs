@@ -45,7 +45,7 @@ enum codebook_gen {  // NOLINT
  */
 struct cuvsIvfPqIndexParams {
   /** Distance type. */
-  enum DistanceType metric;
+  cuvsDistanceType metric;
   /** The argument used by some distance metrics. */
   float metric_arg;
   /**
