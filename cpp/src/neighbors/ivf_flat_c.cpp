@@ -31,7 +31,7 @@
 namespace {
 
 template <typename T, typename IdxT>
-void* _build(cuvsResources_t res, ivfFlatIndexParams params, DLManagedTensor* dataset_tensor)
+void* _build(cuvsResources_t res, cuvsIvfFlatIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
@@ -60,8 +60,8 @@ void* _build(cuvsResources_t res, ivfFlatIndexParams params, DLManagedTensor* da
 
 template <typename T, typename IdxT>
 void _search(cuvsResources_t res,
-             ivfFlatSearchParams params,
-             ivfFlatIndex index,
+             cuvsIvfFlatSearchParams params,
+             cuvsIvfFlatIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
              DLManagedTensor* distances_tensor)
@@ -85,12 +85,12 @@ void _search(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
+extern "C" cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
 {
-  return cuvs::core::translate_exceptions([=] { *index = new ivfFlatIndex{}; });
+  return cuvs::core::translate_exceptions([=] { *index = new cuvsIvfFlatIndex{}; });
 }
 
-extern "C" cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
+extern "C" cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
@@ -112,10 +112,10 @@ extern "C" cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
-                                    cuvsIvfFlatIndexParams_t params,
-                                    DLManagedTensor* dataset_tensor,
-                                    cuvsIvfFlatIndex_t index)
+extern "C" cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
+                                        cuvsIvfFlatIndexParams_t params,
+                                        DLManagedTensor* dataset_tensor,
+                                        cuvsIvfFlatIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -140,12 +140,12 @@ extern "C" cuvsError_t ivfFlatBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t ivfFlatSearch(cuvsResources_t res,
-                                     cuvsIvfFlatSearchParams_t params,
-                                     cuvsIvfFlatIndex_t index_c_ptr,
-                                     DLManagedTensor* queries_tensor,
-                                     DLManagedTensor* neighbors_tensor,
-                                     DLManagedTensor* distances_tensor)
+extern "C" cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
+                                         cuvsIvfFlatSearchParams_t params,
+                                         cuvsIvfFlatIndex_t index_c_ptr,
+                                         DLManagedTensor* queries_tensor,
+                                         DLManagedTensor* neighbors_tensor,
+                                         DLManagedTensor* distances_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -187,14 +187,14 @@ extern "C" cuvsError_t ivfFlatSearch(cuvsResources_t res,
 extern "C" cuvsError_t cuvsIvfFlatIndexParamsCreate(cuvsIvfFlatIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new ivfFlatIndexParams{.metric                         = L2Expanded,
-                                     .metric_arg                     = 2.0f,
-                                     .add_data_on_build              = true,
-                                     .n_lists                        = 1024,
-                                     .kmeans_n_iters                 = 20,
-                                     .kmeans_trainset_fraction       = 0.5,
-                                     .adaptive_centers               = false,
-                                     .conservative_memory_allocation = false};
+    *params = new cuvsIvfFlatIndexParams{.metric                         = L2Expanded,
+                                         .metric_arg                     = 2.0f,
+                                         .add_data_on_build              = true,
+                                         .n_lists                        = 1024,
+                                         .kmeans_n_iters                 = 20,
+                                         .kmeans_trainset_fraction       = 0.5,
+                                         .adaptive_centers               = false,
+                                         .conservative_memory_allocation = false};
   });
 }
 
@@ -206,7 +206,7 @@ extern "C" cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t pa
 extern "C" cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* params)
 {
   return cuvs::core::translate_exceptions(
-    [=] { *params = new ivfFlatSearchParams{.n_probes = 20}; });
+    [=] { *params = new cuvsIvfFlatSearchParams{.n_probes = 20}; });
 }
 
 extern "C" cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params)

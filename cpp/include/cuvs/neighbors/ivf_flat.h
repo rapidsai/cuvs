@@ -34,7 +34,7 @@ extern "C" {
  * @brief Supplemental parameters to build IVF-Flat Index
  *
  */
-struct ivfFlatIndexParams {
+struct cuvsIvfFlatIndexParams {
   /** Distance type. */
   cuvsDistanceType metric;
   /** The argument used by some distance metrics. */
@@ -79,7 +79,7 @@ struct ivfFlatIndexParams {
   bool conservative_memory_allocation;
 };
 
-typedef struct ivfFlatIndexParams* cuvsIvfFlatIndexParams_t;
+typedef struct cuvsIvfFlatIndexParams* cuvsIvfFlatIndexParams_t;
 
 /**
  * @brief Allocate IVF-Flat Index params, and populate with default values
@@ -108,12 +108,12 @@ cuvsError_t cuvsIvfFlatIndexParamsDestroy(cuvsIvfFlatIndexParams_t index_params)
  * @brief Supplemental parameters to search IVF-Flat index
  *
  */
-struct ivfFlatSearchParams {
+struct cuvsIvfFlatSearchParams {
   /** The number of clusters to search. */
   uint32_t n_probes;
 };
 
-typedef struct ivfFlatSearchParams* cuvsIvfFlatSearchParams_t;
+typedef struct cuvsIvfFlatSearchParams* cuvsIvfFlatSearchParams_t;
 
 /**
  * @brief Allocate IVF-Flat search params, and populate with default values
@@ -145,9 +145,9 @@ cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params);
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
-} ivfFlatIndex;
+} cuvsIvfFlatIndex;
 
-typedef ivfFlatIndex* cuvsIvfFlatIndex_t;
+typedef cuvsIvfFlatIndex* cuvsIvfFlatIndex_t;
 
 /**
  * @brief Allocate IVF-Flat index
@@ -155,14 +155,14 @@ typedef ivfFlatIndex* cuvsIvfFlatIndex_t;
  * @param[in] index cuvsIvfFlatIndex_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t ivfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
+cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 
 /**
  * @brief De-allocate IVF-Flat index
  *
  * @param[in] index cuvsIvfFlatIndex_t to de-allocate
  */
-cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
+cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 /**
  * @}
  */
@@ -196,14 +196,14 @@ cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
  *
  * // Create IVF-Flat index
  * cuvsIvfFlatIndex_t index;
- * cuvsError_t index_create_status = ivfFlatIndexCreate(&index);
+ * cuvsError_t index_create_status = cuvsIvfFlatIndexCreate(&index);
  *
  * // Build the IVF-Flat Index
- * cuvsError_t build_status = ivfFlatBuild(res, index_params, &dataset, index);
+ * cuvsError_t build_status = cuvsIvfFlatBuild(res, index_params, &dataset, index);
  *
  * // de-allocate `index_params`, `index` and `res`
  * cuvsError_t params_destroy_status = cuvsIvfFlatIndexParamsDestroy(index_params);
- * cuvsError_t index_destroy_status = ivfFlatIndexDestroy(index);
+ * cuvsError_t index_destroy_status = cuvsIvfFlatIndexDestroy(index);
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
  * @endcode
  *
@@ -213,10 +213,10 @@ cuvsError_t ivfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
  * @param[out] index cuvsIvfFlatIndex_t Newly built IVF-Flat index
  * @return cuvsError_t
  */
-cuvsError_t ivfFlatBuild(cuvsResources_t res,
-                         cuvsIvfFlatIndexParams_t index_params,
-                         DLManagedTensor* dataset,
-                         cuvsIvfFlatIndex_t index);
+cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
+                             cuvsIvfFlatIndexParams_t index_params,
+                             DLManagedTensor* dataset,
+                             cuvsIvfFlatIndex_t index);
 /**
  * @}
  */
@@ -253,7 +253,7 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
  * cuvsError_t params_create_status = cuvsIvfFlatSearchParamsCreate(&search_params);
  *
  * // Search the `index` built using `ivfFlatBuild`
- * cuvsError_t search_status = ivfFlatSearch(res, search_params, index, &queries, &neighbors,
+ * cuvsError_t search_status = cuvsIvfFlatSearch(res, search_params, index, &queries, &neighbors,
  * &distances);
  *
  * // de-allocate `search_params` and `res`
@@ -268,12 +268,12 @@ cuvsError_t ivfFlatBuild(cuvsResources_t res,
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
  */
-cuvsError_t ivfFlatSearch(cuvsResources_t res,
-                          cuvsIvfFlatSearchParams_t search_params,
-                          cuvsIvfFlatIndex_t index,
-                          DLManagedTensor* queries,
-                          DLManagedTensor* neighbors,
-                          DLManagedTensor* distances);
+cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
+                              cuvsIvfFlatSearchParams_t search_params,
+                              cuvsIvfFlatIndex_t index,
+                              DLManagedTensor* queries,
+                              DLManagedTensor* neighbors,
+                              DLManagedTensor* distances);
 /**
  * @}
  */
