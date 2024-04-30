@@ -222,14 +222,15 @@ def build(IndexParams index_params, dataset, resources=None):
 
     Parameters
     ----------
-    index_params : IndexParams object
+    index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
+        Parameters on how to build the index
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
     {resources_docstring}
 
     Returns
     -------
-    index: cuvs.ivf_pq.Index
+    index: :py:class:`cuvs.neighbors.ivf_pq.Index`
 
     Examples
     --------
@@ -349,8 +350,9 @@ def search(SearchParams search_params,
 
     Parameters
     ----------
-    search_params : SearchParams
-    index : Index
+    search_params : :py:class:`cuvs.neighbors.ivf_pq.SearchParams`
+        Parameters on how to search the index
+    index : :py:class:`cuvs.neighbors.ivf_pq.Index`
         Trained IvfPq index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
