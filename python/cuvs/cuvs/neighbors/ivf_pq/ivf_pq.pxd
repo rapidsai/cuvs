@@ -20,7 +20,7 @@ from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
-from cuvs.distance_type cimport DistanceType
+from cuvs.distance_type cimport cuvsDistanceType
 
 
 cdef extern from "library_types.h":
@@ -39,7 +39,7 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         PER_CLUSTER
 
     ctypedef struct cuvsIvfPqIndexParams:
-        DistanceType metric
+        cuvsDistanceType metric
         float metric_arg
         bool add_data_on_build
         uint32_t n_lists
