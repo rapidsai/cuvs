@@ -83,27 +83,35 @@ struct print_metric {
 inline auto operator<<(std::ostream& os, const print_metric& p) -> std::ostream&
 {
   switch (p.value) {
-    case cuvs::distance::L2Expanded: os << "distance::L2Expanded"; break;
-    case cuvs::distance::L2SqrtExpanded: os << "distance::L2SqrtExpanded"; break;
-    case cuvs::distance::CosineExpanded: os << "distance::CosineExpanded"; break;
-    case cuvs::distance::L1: os << "distance::L1"; break;
-    case cuvs::distance::L2Unexpanded: os << "distance::L2Unexpanded"; break;
-    case cuvs::distance::L2SqrtUnexpanded: os << "distance::L2SqrtUnexpanded"; break;
-    case cuvs::distance::InnerProduct: os << "distance::InnerProduct"; break;
-    case cuvs::distance::Linf: os << "distance::Linf"; break;
-    case cuvs::distance::Canberra: os << "distance::Canberra"; break;
-    case cuvs::distance::LpUnexpanded: os << "distance::LpUnexpanded"; break;
-    case cuvs::distance::CorrelationExpanded: os << "distance::CorrelationExpanded"; break;
-    case cuvs::distance::JaccardExpanded: os << "distance::JaccardExpanded"; break;
-    case cuvs::distance::HellingerExpanded: os << "distance::HellingerExpanded"; break;
-    case cuvs::distance::Haversine: os << "distance::Haversine"; break;
-    case cuvs::distance::BrayCurtis: os << "distance::BrayCurtis"; break;
-    case cuvs::distance::JensenShannon: os << "distance::JensenShannon"; break;
-    case cuvs::distance::HammingUnexpanded: os << "distance::HammingUnexpanded"; break;
-    case cuvs::distance::KLDivergence: os << "distance::KLDivergence"; break;
-    case cuvs::distance::RusselRaoExpanded: os << "distance::RusselRaoExpanded"; break;
-    case cuvs::distance::DiceExpanded: os << "distance::DiceExpanded"; break;
-    case cuvs::distance::Precomputed: os << "distance::Precomputed"; break;
+    case cuvs::distance::DistanceType::L2Expanded: os << "distance::L2Expanded"; break;
+    case cuvs::distance::DistanceType::L2SqrtExpanded: os << "distance::L2SqrtExpanded"; break;
+    case cuvs::distance::DistanceType::CosineExpanded: os << "distance::CosineExpanded"; break;
+    case cuvs::distance::DistanceType::L1: os << "distance::L1"; break;
+    case cuvs::distance::DistanceType::L2Unexpanded: os << "distance::L2Unexpanded"; break;
+    case cuvs::distance::DistanceType::L2SqrtUnexpanded: os << "distance::L2SqrtUnexpanded"; break;
+    case cuvs::distance::DistanceType::InnerProduct: os << "distance::InnerProduct"; break;
+    case cuvs::distance::DistanceType::Linf: os << "distance::Linf"; break;
+    case cuvs::distance::DistanceType::Canberra: os << "distance::Canberra"; break;
+    case cuvs::distance::DistanceType::LpUnexpanded: os << "distance::LpUnexpanded"; break;
+    case cuvs::distance::DistanceType::CorrelationExpanded:
+      os << "distance::CorrelationExpanded";
+      break;
+    case cuvs::distance::DistanceType::JaccardExpanded: os << "distance::JaccardExpanded"; break;
+    case cuvs::distance::DistanceType::HellingerExpanded:
+      os << "distance::HellingerExpanded";
+      break;
+    case cuvs::distance::DistanceType::Haversine: os << "distance::Haversine"; break;
+    case cuvs::distance::DistanceType::BrayCurtis: os << "distance::BrayCurtis"; break;
+    case cuvs::distance::DistanceType::JensenShannon: os << "distance::JensenShannon"; break;
+    case cuvs::distance::DistanceType::HammingUnexpanded:
+      os << "distance::HammingUnexpanded";
+      break;
+    case cuvs::distance::DistanceType::KLDivergence: os << "distance::KLDivergence"; break;
+    case cuvs::distance::DistanceType::RusselRaoExpanded:
+      os << "distance::RusselRaoExpanded";
+      break;
+    case cuvs::distance::DistanceType::DiceExpanded: os << "distance::DiceExpanded"; break;
+    case cuvs::distance::DistanceType::Precomputed: os << "distance::Precomputed"; break;
     default: RAFT_FAIL("unreachable code");
   }
   return os;

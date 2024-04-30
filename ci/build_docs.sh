@@ -40,10 +40,17 @@ pushd cpp/doxygen
 doxygen Doxyfile
 popd
 
+rapids-logger "Build Rust docs"
+pushd rust
+export LIBCLANG_PATH=$(dirname $(find /opt/conda -name libclang.so | head -n 1))
+cargo doc -p cuvs --no-deps
+popd
+
 rapids-logger "Build Python docs"
 pushd docs
 sphinx-build -b dirhtml source _html
 sphinx-build -b text source _text
+mv ../rust/target/doc ./_html/_static/rust
 mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"{html,txt}
 mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
 mv _text/* "${RAPIDS_DOCS_DIR}/cuvs/txt"

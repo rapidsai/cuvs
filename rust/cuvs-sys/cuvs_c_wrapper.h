@@ -20,3 +20,4 @@
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/ivf_pq.h>

@@ -36,7 +36,7 @@ extern "C" {
  */
 struct cuvsIvfFlatIndexParams {
   /** Distance type. */
-  enum DistanceType metric;
+  cuvsDistanceType metric;
   /** The argument used by some distance metrics. */
   float metric_arg;
   /**
@@ -153,7 +153,7 @@ typedef cuvsIvfFlatIndex* cuvsIvfFlatIndex_t;
  * @brief Allocate IVF-Flat index
  *
  * @param[in] index cuvsIvfFlatIndex_t to allocate
- * @return ivfFlatError_t
+ * @return cuvsError_t
  */
 cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 

@@ -24,7 +24,7 @@ void run_brute_force(int64_t n_rows,
                      float* query_data,
                      float* distances_data,
                      int64_t* neighbors_data,
-                     enum DistanceType metric)
+                     cuvsDistanceType metric)
 {
   // create cuvsResources_t
   cuvsResources_t res;

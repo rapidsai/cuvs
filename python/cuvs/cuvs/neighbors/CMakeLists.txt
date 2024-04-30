@@ -15,3 +15,4 @@
 add_subdirectory(brute_force)
 add_subdirectory(cagra)
 add_subdirectory(ivf_flat)
+add_subdirectory(ivf_pq)
