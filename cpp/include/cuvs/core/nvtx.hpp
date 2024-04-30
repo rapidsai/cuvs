@@ -18,8 +18,8 @@
 #include <raft/core/nvtx.hpp>
 
 namespace cuvs::common::nvtx::domain {
-    /** @brief This NVTX domain is supposed to be used within cuvs.  */
-    struct cuvs {
-        static constexpr const char* name = "cuvs";
-    };
+/** @brief This NVTX domain is supposed to be used within cuvs.  */
+struct cuvs {
+  static constexpr const char* name = "cuvs";
+};
 };  // namespace cuvs::common::nvtx::domain

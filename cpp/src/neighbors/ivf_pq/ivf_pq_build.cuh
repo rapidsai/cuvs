@@ -16,10 +16,13 @@
 
 #pragma once
 
+#include "../ivf_common.cuh"
+#include "../ivf_list.cuh"
+#include "ivf_pq_codepacking.cuh"
+#include "ivf_pq_list.cuh"
 #include <cuvs/core/nvtx.hpp>
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/detail/ivf_common.cuh>
-#include <cuvs/neighbors/detail/ivf_pq_codepacking.cuh>
+#include <cuvs/neighbors/detail/ivf_pq_helpers.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
@@ -107,53 +110,6 @@ void copy_warped(T* out,
   dim3 blocks(raft::div_rounding_up_safe<size_t>(n_rows, kBlockDim / raft::WarpSize), 1, 1);
   copy_warped_kernel<kBlockDim, T, S>
     <<<blocks, threads, 0, stream>>>(out, ld_out, in, ld_in, n_cols, n_rows);
-}
-
-/**
- * @brief Fill-in a random orthogonal transformation matrix.
- *
- * @param handle
- * @param force_random_rotation
- * @param n_rows
- * @param n_cols
- * @param[out] rotation_matrix device pointer to a row-major matrix of size [n_rows, n_cols].
- * @param rng random number generator state
- */
-inline void make_rotation_matrix(raft::resources const& handle,
-                                 bool force_random_rotation,
-                                 uint32_t n_rows,
-                                 uint32_t n_cols,
-                                 float* rotation_matrix,
-                                 raft::random::RngState rng = raft::random::RngState(7ULL))
-{
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "ivf_pq::make_rotation_matrix(%u * %u)", n_rows, n_cols);
-  auto stream  = raft::resource::get_cuda_stream(handle);
-  bool inplace = n_rows == n_cols;
-  uint32_t n   = std::max(n_rows, n_cols);
-  if (force_random_rotation || !inplace) {
-    rmm::device_uvector<float> buf(inplace ? 0 : n * n, stream);
-    float* mat = inplace ? rotation_matrix : buf.data();
-    raft::random::normal(handle, rng, mat, n * n, 0.0f, 1.0f);
-    raft::linalg::detail::qrGetQ_inplace(handle, mat, n, n, stream);
-    if (!inplace) {
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(rotation_matrix,
-                                      sizeof(float) * n_cols,
-                                      mat,
-                                      sizeof(float) * n,
-                                      sizeof(float) * n_cols,
-                                      n_rows,
-                                      cudaMemcpyDefault,
-                                      stream));
-    }
-  } else {
-    uint32_t stride = n + 1;
-    auto rotation_matrix_view =
-      raft::make_device_vector_view<float, uint32_t>(rotation_matrix, n * n);
-    raft::linalg::map_offset(handle, rotation_matrix_view, [stride] __device__(uint32_t i) {
-      return static_cast<float>(i % stride == 0u);
-    });
-  }
 }
 
 /**
@@ -1435,7 +1391,7 @@ void extend_list_with_codes(
   // Allocate memory and write indices
   auto offset = extend_list_prepare(res, index, new_indices, label);
   // Pack the data
-  pack_list_data<IdxT>(res, index, new_codes, label, offset);
+  helpers::codepacker::pack_list_data(res, index, new_codes, label, offset);
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(res, *index);
 }
@@ -1822,13 +1778,13 @@ auto build(raft::resources const& handle,
                                             utils::mapping<float>());
 
     // Make rotation matrix
-    make_rotation_matrix(handle,
-                         params.force_random_rotation,
-                         index.rot_dim(),
-                         index.dim(),
-                         index.rotation_matrix().data_handle());
+    helpers::make_rotation_matrix(handle,
+                                  params.force_random_rotation,
+                                  index.rot_dim(),
+                                  index.dim(),
+                                  index.rotation_matrix().data_handle());
 
-    set_centers(handle, &index, cluster_centers);
+    helpers::set_centers(handle, &index, cluster_centers);
 
     // Train PQ codebooks
     switch (index.codebook_kind()) {

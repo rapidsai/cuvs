@@ -126,8 +126,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                uint32_t precomp_data_count,
                                uint32_t n_queries,
                                uint32_t n_probes,
-                               uint32_t topk)
-  -> selected<OutT, LutT, IvfSampleFilterT>;
+                               uint32_t topk) -> selected<OutT, LutT, IvfSampleFilterT>;
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
 

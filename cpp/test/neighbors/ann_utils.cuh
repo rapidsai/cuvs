@@ -37,6 +37,8 @@
 
 namespace cuvs::neighbors {
 
+using raft::RAFT_NAME; // For logging
+
 struct print_dtype {
   cudaDataType_t value;
 };
@@ -190,13 +192,13 @@ auto eval_recall(const std::vector<T>& expected_idx,
   auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, rows, cols);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
-  /*RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
+  RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,
                 total_count,
                 std::abs(error_margin * 100.0),
                 error_margin < 0 ? "above" : "below",
-                eps);*/
+                eps);
   if (actual_recall < min_recall - eps) {
     return testing::AssertionFailure()
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
@@ -259,7 +261,7 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
   auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, expected_dist, actual_dist, rows, cols, eps);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
-  /*
+
   RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,
@@ -267,7 +269,7 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
                 std::abs(error_margin * 100.0),
                 error_margin < 0 ? "above" : "below",
                 eps);
-  */
+
   if (actual_recall < min_recall - eps) {
     return testing::AssertionFailure()
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
