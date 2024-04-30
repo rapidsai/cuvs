@@ -50,10 +50,11 @@ cdef class IndexParams:
     Parameters to build index for IvfFlat nearest neighbor search
 
     Parameters
-    ---------
+    ----------
     n_lists : int, default = 1024
         The number of clusters used in the coarse quantizer.
-    metric : string denoting the metric type, default="sqeuclidean"
+    metric : str, default = "sqeuclidean"
+        String denoting the metric type.
         Valid values for metric: ["sqeuclidean", "inner_product",
         "euclidean"], where
             - sqeuclidean is the euclidean distance without the square root
@@ -64,6 +65,10 @@ cdef class IndexParams:
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
         building.
+        The default setting is often fine, but this parameter can be decreased
+        to improve training time wih larger trainset fractions (10M+ vectors)
+        or increased for smaller trainset fractions (very small number of
+        vectors) to improve recall.
     kmeans_trainset_fraction : int, default = 0.5
         If kmeans_trainset_fraction is less than 1, then the dataset is
         subsampled, and only n_samples * kmeans_trainset_fraction rows
@@ -179,14 +184,14 @@ def build(IndexParams index_params, dataset, resources=None):
 
     Parameters
     ----------
-    index_params : IndexParams object
+    index_params : :py:class:`cuvs.neighbors.ivf_flat.IndexParams`
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
     {resources_docstring}
 
     Returns
     -------
-    index: cuvs.ivf_flat.Index
+    index: py:class:`cuvs.neighbors.ivf_flat.Index`
 
     Examples
     --------
@@ -272,8 +277,8 @@ def search(SearchParams search_params,
 
     Parameters
     ----------
-    search_params : SearchParams
-    index : Index
+    search_params : py:class:`cuvs.neighbors.ivf_flat.SearchParams`
+    index : py:class:`cuvs.neighbors.ivf_flat.Index`
         Trained IvfFlat index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int8, uint8]
