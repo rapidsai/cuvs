@@ -25,9 +25,7 @@ dependencies:
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
 - gcc_linux-64=11.*
-- gmock>=1.13.0
 - graphviz
-- gtest>=1.13.0
 - ipython
 - libclang
 - libcublas-dev

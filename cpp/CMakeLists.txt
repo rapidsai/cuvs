@@ -188,6 +188,35 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_rbf.cu
+  src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  src/distance/distance.cu
+  src/distance/pairwise_distance.cu
   src/neighbors/brute_force_index.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cpp
@@ -240,16 +269,13 @@ target_include_directories(
 
 if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
-  target_link_libraries(cuvs
-        PUBLIC
-            rmm::rmm
-            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
-            $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
-        PRIVATE
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static>
-            nvidia::cutlass::cutlass
-    )
+  target_link_libraries(
+    cuvs
+    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
+           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
+    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
+  )
 endif()
 
 # Endian detection
@@ -304,14 +330,14 @@ endif()
 
 set_target_properties(
   cuvs
-  PROPERTIES BUILD_RPATH                         "\$ORIGIN"
-             INSTALL_RPATH                       "\$ORIGIN"
-             CXX_STANDARD                        17
-             CXX_STANDARD_REQUIRED               ON
-             CUDA_STANDARD                       17
-             CUDA_STANDARD_REQUIRED              ON
+  PROPERTIES BUILD_RPATH "\$ORIGIN"
+             INSTALL_RPATH "\$ORIGIN"
+             CXX_STANDARD 17
+             CXX_STANDARD_REQUIRED ON
+             CUDA_STANDARD 17
+             CUDA_STANDARD_REQUIRED ON
              INTERFACE_POSITION_INDEPENDENT_CODE ON
-             POSITION_INDEPENDENT_CODE           ON
+             POSITION_INDEPENDENT_CODE ON
 )
 
 target_compile_options(
@@ -325,25 +351,21 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 # * cuvs_c -------------------------------------------------------------------------------
 if(BUILD_C_LIBRARY)
   add_library(
-    cuvs_c SHARED
-    src/core/c_api.cpp
-    src/neighbors/brute_force_c.cpp
-    src/neighbors/ivf_flat_c.cpp
-    src/neighbors/ivf_pq_c.cpp
-    src/neighbors/cagra_c.cpp
+    cuvs_c SHARED src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
+                  src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
 
   set_target_properties(
     cuvs_c
-    PROPERTIES BUILD_RPATH                         "\$ORIGIN"
-               INSTALL_RPATH                       "\$ORIGIN"
-               CXX_STANDARD                        17
-               CXX_STANDARD_REQUIRED               ON
-               POSITION_INDEPENDENT_CODE           ON
+    PROPERTIES BUILD_RPATH "\$ORIGIN"
+               INSTALL_RPATH "\$ORIGIN"
+               CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               POSITION_INDEPENDENT_CODE ON
                INTERFACE_POSITION_INDEPENDENT_CODE ON
-               EXPORT_NAME                         c_api
+               EXPORT_NAME c_api
   )
 
   target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
@@ -354,12 +376,11 @@ if(BUILD_C_LIBRARY)
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
-  target_link_libraries(cuvs_c
-        PUBLIC
-            cuvs::cuvs
-        PRIVATE
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-    )
+  target_link_libraries(
+    cuvs_c
+    PUBLIC cuvs::cuvs
+    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+  )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
   target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
