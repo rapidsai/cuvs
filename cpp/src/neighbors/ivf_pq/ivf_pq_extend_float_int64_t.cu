@@ -23,8 +23,9 @@
  *
  */
 
-#include <cuvs/neighbors/detail/ivf_pq_build.cuh>
 #include <cuvs/neighbors/ivf_pq.hpp>
+
+#include "ivf_pq_build.cuh"
 
 namespace cuvs::neighbors::ivf_pq {
 

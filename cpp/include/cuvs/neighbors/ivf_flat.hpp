@@ -18,7 +18,6 @@
 
 #include "ann_types.hpp"
 #include "ivf_list.hpp"
-#include <raft/neighbors/ivf_flat_types.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 /**
@@ -59,22 +58,6 @@ struct index_params : ann::index_params {
    * flag to `true` if you prefer to use as little GPU memory for the database as possible.
    */
   bool conservative_memory_allocation = false;
-
-  /** Build a raft IVF_FLAT index params from an existing cuvs IVF_FLAT index params. */
-  operator raft::neighbors::ivf_flat::index_params() const
-  {
-    return raft::neighbors::ivf_flat::index_params{
-      {
-        .metric            = static_cast<raft::distance::DistanceType>((int)this->metric),
-        .metric_arg        = this->metric_arg,
-        .add_data_on_build = this->add_data_on_build,
-      },
-      .n_lists                        = n_lists,
-      .kmeans_n_iters                 = kmeans_n_iters,
-      .kmeans_trainset_fraction       = kmeans_trainset_fraction,
-      .adaptive_centers               = adaptive_centers,
-      .conservative_memory_allocation = conservative_memory_allocation};
-  }
 };
 /**
  * @}
@@ -87,13 +70,6 @@ struct index_params : ann::index_params {
 struct search_params : ann::search_params {
   /** The number of clusters to search. */
   uint32_t n_probes = 20;
-
-  /** Build a raft IVF_FLAT search params from an existing cuvs IVF_FLAT search params. */
-  operator raft::neighbors::ivf_flat::search_params() const
-  {
-    raft::neighbors::ivf_flat::search_params result = {{}, n_probes};
-    return result;
-  }
 };
 
 static_assert(std::is_aggregate_v<index_params>);
@@ -168,7 +144,6 @@ struct index : ann::index {
         bool adaptive_centers,
         bool conservative_memory_allocation,
         uint32_t dim);
-  index(raft::neighbors::ivf_flat::index<T, IdxT>&& raft_idx);
 
   /**
    * Vectorized load/store size in elements, determines the size of interleaved data chunks.
@@ -224,6 +199,19 @@ struct index : ann::index {
   std::optional<raft::device_vector_view<float, uint32_t>> center_norms() noexcept;
   std::optional<raft::device_vector_view<const float, uint32_t>> center_norms() const noexcept;
 
+  /**
+   * Accumulated list sizes, sorted in descending order [n_lists + 1].
+   * The last value contains the total length of the index.
+   * The value at index zero is always zero.
+   *
+   * That is, the content of this span is as if the `list_sizes` was sorted and then accumulated.
+   *
+   * This span is used during search to estimate the maximum size of the workspace.
+   */
+  auto accum_sorted_sizes() noexcept -> raft::host_vector_view<IdxT, uint32_t>;
+  [[nodiscard]] auto accum_sorted_sizes() const noexcept
+    -> raft::host_vector_view<const IdxT, uint32_t>;
+
   /** Total length of the index. */
   IdxT size() const noexcept;
 
@@ -245,23 +233,44 @@ struct index : ann::index {
    */
   bool conservative_memory_allocation() const noexcept;
 
-  /** Lists' data and indices. */
-  std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists() noexcept;
-  const std::vector<std::shared_ptr<raft::neighbors::ivf_flat::list_data<T, IdxT>>>& lists()
-    const noexcept;
+  void allocate_center_norms(raft::resources const& res);
 
-  // Get pointer to underlying RAFT index, not meant to be used outside of cuVS
-  inline raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() noexcept
-  {
-    return raft_index_.get();
-  }
-  inline const raft::neighbors::ivf_flat::index<T, IdxT>* get_raft_index() const noexcept
-  {
-    return raft_index_.get();
-  }
+  /** Lists' data and indices. */
+  std::vector<std::shared_ptr<list_data<T, IdxT>>>& lists() noexcept;
+  const std::vector<std::shared_ptr<list_data<T, IdxT>>>& lists() const noexcept;
+
+  void check_consistency();
 
  private:
-  std::unique_ptr<raft::neighbors::ivf_flat::index<T, IdxT>> raft_index_;
+  /**
+   * TODO: in theory, we can lift this to the template parameter and keep it at hardware maximum
+   * possible value by padding the `dim` of the data https://github.com/rapidsai/raft/issues/711
+   */
+  uint32_t veclen_;
+  cuvs::distance::DistanceType metric_;
+  bool adaptive_centers_;
+  bool conservative_memory_allocation_;
+  std::vector<std::shared_ptr<list_data<T, IdxT>>> lists_;
+  raft::device_vector<uint32_t, uint32_t> list_sizes_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
+  std::optional<raft::device_vector<float, uint32_t>> center_norms_;
+
+  // Computed members
+  raft::device_vector<T*, uint32_t> data_ptrs_;
+  raft::device_vector<IdxT*, uint32_t> inds_ptrs_;
+  raft::host_vector<IdxT, uint32_t> accum_sorted_sizes_;
+
+  static auto calculate_veclen(uint32_t dim) -> uint32_t
+  {
+    // TODO: consider padding the dimensions and fixing veclen to its maximum possible value as a
+    // template parameter (https://github.com/rapidsai/raft/issues/711)
+
+    // NOTE: keep this consistent with the select_interleaved_scan_kernel logic
+    // in detail/ivf_flat_interleaved_scan-inl.cuh.
+    uint32_t veclen = std::max<uint32_t>(1, 16 / sizeof(T));
+    if (dim % veclen != 0) { veclen = 1; }
+    return veclen;
+  }
 };
 /**
  * @}

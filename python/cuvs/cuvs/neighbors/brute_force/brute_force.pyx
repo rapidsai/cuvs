@@ -26,7 +26,7 @@ from libc.stdint cimport uint32_t
 from libcpp cimport bool
 
 from cuvs.common cimport cydlpack
-from cuvs.distance_type cimport DistanceType
+from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
@@ -68,8 +68,6 @@ cdef class Index:
 def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     """
     Build the Brute Force index from the dataset for efficient search.
-    The following distance metrics are supported:
-        - L2
 
     Parameters
     ----------
@@ -105,7 +103,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
-    cdef DistanceType c_metric = <DistanceType>DISTANCE_TYPES[metric]
+    cdef cuvsDistanceType c_metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
     cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
@@ -167,7 +165,7 @@ def search(Index index,
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
-    >>> # are performad with same query size.
+    >>> # are performed with same query size.
     >>> distances, neighbors = brute_force.search(index, queries, k)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)

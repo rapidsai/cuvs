@@ -25,6 +25,8 @@
 
 #include <cuvs/neighbors/ivf_flat.hpp>
 
+#include "ivf_flat_search.cuh"
+
 namespace cuvs::neighbors::ivf_flat {
 
 #define CUVS_INST_IVF_FLAT_SEARCH(T, IdxT)                                      \
@@ -35,8 +37,8 @@ namespace cuvs::neighbors::ivf_flat {
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \
               raft::device_matrix_view<float, IdxT, raft::row_major> distances) \
   {                                                                             \
-    cuvs::neighbors::ivf_flat::search(                                 \
-      handle, params, index, queries, neighbors, distances);  \
+    cuvs::neighbors::ivf_flat::detail::search(                                  \
+      handle, params, index, queries, neighbors, distances);                    \
   }
 CUVS_INST_IVF_FLAT_SEARCH(int8_t, int64_t);
 

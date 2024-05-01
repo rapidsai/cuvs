@@ -25,6 +25,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
 
@@ -185,34 +186,14 @@ struct list_spec {
   uint32_t pq_bits;
   uint32_t pq_dim;
 
-  constexpr list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation)
-    : pq_bits(pq_bits),
-      pq_dim(pq_dim),
-      align_min(kIndexGroupSize),
-      align_max(conservative_memory_allocation ? kIndexGroupSize : 1024)
-  {
-  }
+  constexpr list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation);
 
   // Allow casting between different size-types (for safer size and offset calculations)
   template <typename OtherSizeT>
-  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT>& other_spec)
-    : pq_bits{other_spec.pq_bits},
-      pq_dim{other_spec.pq_dim},
-      align_min{other_spec.align_min},
-      align_max{other_spec.align_max}
-  {
-  }
+  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT>& other_spec);
 
   /** Determine the extents of an array enough to hold a given amount of data. */
-  constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
-  {
-    // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
-    auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
-    return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
-                                     raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
-                                     kIndexGroupSize,
-                                     kIndexGroupVecLen);
-  }
+  constexpr list_extents make_list_extents(SizeT n_rows) const;
 };
 
 template <typename IdxT, typename SizeT = uint32_t>

@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-pub type DistanceType = ffi::DistanceType;
+pub type DistanceType = ffi::cuvsDistanceType;
