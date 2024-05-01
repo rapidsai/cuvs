@@ -21,8 +21,10 @@
 pub mod brute_force;
 pub mod cagra;
 pub mod distance_type;
+pub mod ivf_flat;
 mod dlpack;
 mod error;
+pub mod ivf_pq;
 mod resources;
 
 pub use dlpack::ManagedTensor;

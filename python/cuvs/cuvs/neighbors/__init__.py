@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from cuvs.neighbors import cagra
+from cuvs.neighbors import brute_force, cagra, ivf_flat, ivf_pq
 
-__all__ = ["common", "cagra"]
+__all__ = ["brute_force", "cagra", "ivf_flat", "ivf_pq"]
