@@ -162,7 +162,7 @@ macros = dict(
 
 for type_path, (T, IdxT) in types.items():
     for macro_path, macro in macros.items():
-        path = f"ivf_flat_{macro_path}_{type_path}.cpp"
+        path = f"ivf_flat_{macro_path}_{type_path}.cu"
         with open(path, "w") as f:
             f.write(header)
             f.write(macro["definition"])
