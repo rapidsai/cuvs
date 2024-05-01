@@ -135,29 +135,17 @@ if(BUILD_C_TESTS)
   ConfigureTest(NAME CORE_TEST PATH test/core/bitset.cu C_LIB)
 
   ConfigureTest(
-    NAME
-    BRUTEFORCE_C_TEST
-    PATH
-    test/neighbors/run_brute_force_c.c
-    test/neighbors/brute_force_c.cu
+    NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME
-    IVF_FLAT_C_TEST
-    PATH
-    test/neighbors/run_ivf_flat_c.c
-    test/neighbors/ann_ivf_flat_c.cu
+    NAME IVF_FLAT_C_TEST PATH test/neighbors/run_ivf_flat_c.c test/neighbors/ann_ivf_flat_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME
-    IVF_PQ_C_TEST
-    PATH
-    test/neighbors/run_ivf_pq_c.c
-    test/neighbors/ann_ivf_pq_c.cu C_LIB
+    NAME IVF_PQ_C_TEST PATH test/neighbors/run_ivf_pq_c.c test/neighbors/ann_ivf_pq_c.cu C_LIB
   )
 
   ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
