@@ -18,11 +18,14 @@
 
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/host_mdarray.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
+
+#include "../dataset_serialize.hpp"
 
 #include <raft/neighbors/detail/dataset_serialize.hpp>
 
@@ -51,7 +54,7 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_,
                bool include_dataset)
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope("cagra::serialize");
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::serialize");
 
   RAFT_LOG_DEBUG(
     "Saving CAGRA index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
@@ -60,19 +63,19 @@ void serialize(raft::resources const& res,
   dtype_string.resize(4);
   os << dtype_string;
 
-  serialize_scalar(res, os, serialization_version);
-  serialize_scalar(res, os, index_.size());
-  serialize_scalar(res, os, index_.dim());
-  serialize_scalar(res, os, index_.graph_degree());
-  serialize_scalar(res, os, index_.metric());
-  serialize_mdspan(res, os, index_.graph());
+  raft::serialize_scalar(res, os, serialization_version);
+  raft::serialize_scalar(res, os, index_.size());
+  raft::serialize_scalar(res, os, index_.dim());
+  raft::serialize_scalar(res, os, index_.graph_degree());
+  raft::serialize_scalar(res, os, index_.metric());
+  raft::serialize_mdspan(res, os, index_.graph());
 
   include_dataset &= (index_.data().n_rows() > 0);
 
-  serialize_scalar(res, os, include_dataset);
+  raft::serialize_scalar(res, os, include_dataset);
   if (include_dataset) {
     RAFT_LOG_INFO("Saving CAGRA index with dataset");
-    neighbors::detail::serialize(res, os, index_.data());
+    detail::serialize(res, os, index_.data());
   } else {
     RAFT_LOG_DEBUG("Saving CAGRA index WITHOUT dataset");
   }
@@ -100,7 +103,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 {
   // static_assert(std::is_same_v<IdxT, int> or std::is_same_v<IdxT, uint32_t>,
   //               "An hnswlib index can only be trained with int32 or uint32 IdxT");
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope("cagra::serialize");
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::serialize");
   RAFT_LOG_DEBUG("Saving CAGRA index to hnswlib format, size %zu, dim %u",
                  static_cast<size_t>(index_.size()),
                  index_.dim());
@@ -150,7 +153,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 
   auto dataset = index_.dataset();
   // Remove padding before saving the dataset
-  auto host_dataset = make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
+  auto host_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
                                   sizeof(T) * host_dataset.extent(1),
                                   dataset.data_handle(),
@@ -158,8 +161,8 @@ void serialize_to_hnswlib(raft::resources const& res,
                                   sizeof(T) * host_dataset.extent(1),
                                   dataset.extent(0),
                                   cudaMemcpyDefault,
-                                  resource::get_cuda_stream(res)));
-  resource::sync_stream(res);
+                                  raft::resource::get_cuda_stream(res)));
+  raft::resource::sync_stream(res);
 
   auto graph = index_.graph();
   auto host_graph =
@@ -168,7 +171,7 @@ void serialize_to_hnswlib(raft::resources const& res,
              graph.data_handle(),
              graph.size(),
              raft::resource::get_cuda_stream(res));
-  resource::sync_stream(res);
+  raft::resource::sync_stream(res);
 
   // Write one dataset and graph row at a time
   for (std::size_t i = 0; i < index_.size(); i++) {
@@ -229,29 +232,27 @@ void serialize_to_hnswlib(raft::resources const& res,
 template <typename T, typename IdxT>
 auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
 {
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope("cagra::deserialize");
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::deserialize");
 
   char dtype_string[4];
   is.read(dtype_string, 4);
 
-  auto ver = deserialize_scalar<int>(res, is);
+  auto ver = raft::deserialize_scalar<int>(res, is);
   if (ver != serialization_version) {
     RAFT_FAIL("serialization version mismatch, expected %d, got %d ", serialization_version, ver);
   }
-  auto n_rows       = deserialize_scalar<IdxT>(res, is);
-  auto dim          = deserialize_scalar<std::uint32_t>(res, is);
-  auto graph_degree = deserialize_scalar<std::uint32_t>(res, is);
-  auto metric       = deserialize_scalar<cuvs::distance::DistanceType>(res, is);
+  auto n_rows       = raft::deserialize_scalar<IdxT>(res, is);
+  auto dim          = raft::deserialize_scalar<std::uint32_t>(res, is);
+  auto graph_degree = raft::deserialize_scalar<std::uint32_t>(res, is);
+  auto metric       = raft::deserialize_scalar<cuvs::distance::DistanceType>(res, is);
 
   auto graph = raft::make_host_matrix<IdxT, int64_t>(n_rows, graph_degree);
   deserialize_mdspan(res, is, graph.view());
 
   index<T, IdxT> idx(res, metric);
   idx.update_graph(res, raft::make_const_mdspan(graph.view()));
-  bool has_dataset = deserialize_scalar<bool>(res, is);
-  if (has_dataset) {
-    idx.update_dataset(res, neighbors::detail::deserialize_dataset<int64_t>(res, is));
-  }
+  bool has_dataset = raft::deserialize_scalar<bool>(res, is);
+  if (has_dataset) { idx.update_dataset(res, detail::deserialize_dataset<int64_t>(res, is)); }
   return idx;
 }
 

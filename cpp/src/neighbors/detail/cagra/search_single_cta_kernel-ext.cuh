@@ -31,7 +31,8 @@ template <unsigned TEAM_SIZE,
           typename SAMPLE_FILTER_T>
 void select_and_run(  // raft::resources const& res,
   DATASET_DESCRIPTOR_T dataset_desc,
-  raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, row_major> graph,
+  raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, raft::row_major>
+    graph,
   typename DATASET_DESCRIPTOR_T::INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
@@ -68,7 +69,7 @@ void select_and_run(  // raft::resources const& res,
     SAMPLE_FILTER_T>(                                                                           \
     cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<DATA_T, INDEX_T, DISTANCE_T>  \
       dataset,                                                                                  \
-    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,                          \
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,                    \
     INDEX_T* const topk_indices_ptr,                                                            \
     DISTANCE_T* const topk_distances_ptr,                                                       \
     const DATA_T* const queries_ptr,                                                            \
@@ -154,7 +155,7 @@ instantiate_single_cta_select_and_run(
                                                                  PQ_CODE_BOOK_DIM,              \
                                                                  DISTANCE_T,                    \
                                                                  INDEX_T> dataset,              \
-    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,                          \
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,                    \
     INDEX_T* const topk_indices_ptr,                                                            \
     DISTANCE_T* const topk_distances_ptr,                                                       \
     const DATA_T* const queries_ptr,                                                            \

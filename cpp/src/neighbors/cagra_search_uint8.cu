@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
+#include "cagra.cuh"
 #include <cuvs/neighbors/cagra.hpp>
-#include <raft_runtime/neighbors/cagra.hpp>
 
 namespace cuvs::neighbors::cagra {
 
@@ -27,7 +27,7 @@ namespace cuvs::neighbors::cagra {
               raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,  \
               raft::device_matrix_view<float, int64_t, raft::row_major> distances) \
   {                                                                                \
-    raft::runtime::neighbors::cagra::search(                                       \
+    cuvs::neighbors::cagra::search(                                                \
       handle, params, *index.get_raft_index(), queries, neighbors, distances);     \
   }
 

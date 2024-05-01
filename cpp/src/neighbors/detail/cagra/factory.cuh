@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "search_multi_cta_inst.cuh"
+#include "search_multi_cta.cuh"
 #include "search_multi_kernel.cuh"
 #include "search_plan.cuh"
-#include "search_single_cta_inst.cuh"
+#include "search_single_cta.cuh"
 
 #include <raft/neighbors/sample_filter_types.hpp>
 

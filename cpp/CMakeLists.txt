@@ -219,16 +219,16 @@ add_library(
   src/distance/pairwise_distance.cu
   src/neighbors/brute_force_index.cu
   src/neighbors/brute_force.cu
-  src/neighbors/cagra_build_float.cpp
-  src/neighbors/cagra_build_int8.cpp
-  src/neighbors/cagra_build_uint8.cpp
-  src/neighbors/cagra_optimize.cpp
-  src/neighbors/cagra_search_float.cpp
-  src/neighbors/cagra_search_int8.cpp
-  src/neighbors/cagra_search_uint8.cpp
-  src/neighbors/cagra_serialize_float.cpp
-  src/neighbors/cagra_serialize_int8.cpp
-  src/neighbors/cagra_serialize_uint8.cpp
+  src/neighbors/cagra_build_float.cu
+  src/neighbors/cagra_build_int8.cu
+  src/neighbors/cagra_build_uint8.cu
+  src/neighbors/cagra_optimize.cu
+  src/neighbors/cagra_search_float.cu
+  src/neighbors/cagra_search_int8.cu
+  src/neighbors/cagra_search_uint8.cu
+  src/neighbors/cagra_serialize_float.cu
+  src/neighbors/cagra_serialize_int8.cu
+  src/neighbors/cagra_serialize_uint8.cu
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_float_int64_t.cpp
   src/neighbors/ivf_flat/ivf_flat_build_int8_t_int64_t.cpp

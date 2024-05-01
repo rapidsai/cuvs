@@ -20,8 +20,11 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
+#include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
 #include <optional>
@@ -78,17 +81,6 @@ struct vpq_params {
    * When zero, an optimal value is selected using a heuristic.
    */
   double pq_kmeans_trainset_fraction = 0;
-
-  /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
-  operator cuvs::neighbors::vpq_params() const
-  {
-    return {.pq_bits                     = pq_bits,
-            .pq_dim                      = pq_dim,
-            .vq_n_centers                = vq_n_centers,
-            .kmeans_n_iters              = kmeans_n_iters,
-            .vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction,
-            .pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction};
-  }
 };
 
 struct index_params : ann::index_params {
@@ -193,13 +185,7 @@ static_assert(std::is_aggregate_v<search_params>);
  *
  */
 template <typename T, typename IdxT>
-struct index : ann::index {
-  /** Build a cuvs CAGRA index from an existing RAFT CAGRA index. */
-  index(cuvs::neighbors::cagra::index<T, IdxT>&& raft_idx)
-    : ann::index(),
-      raft_index_{std::make_unique<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(raft_idx))}
-  {
-  }
+struct index : cuvs::neighbors::ann::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 

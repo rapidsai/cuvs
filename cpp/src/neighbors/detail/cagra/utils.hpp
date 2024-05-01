@@ -177,7 +177,8 @@ struct gen_index_msb_1_mask {
 template <typename T, typename IdxT>
 class device_matrix_view_from_host {
  public:
-  device_matrix_view_from_host(raft::resources const& res, host_matrix_view<T, IdxT> host_view)
+  device_matrix_view_from_host(raft::resources const& res,
+                               raft::host_matrix_view<T, IdxT> host_view)
     : host_view_(host_view)
   {
     cudaPointerAttributes attr;
@@ -195,9 +196,10 @@ class device_matrix_view_from_host {
     }
   }
 
-  device_matrix_view<T, IdxT> view()
+  raft::device_matrix_view<T, IdxT> view()
   {
-    return make_device_matrix_view<T, IdxT>(device_ptr, host_view_.extent(0), host_view_.extent(1));
+    return raft::make_device_matrix_view<T, IdxT>(
+      device_ptr, host_view_.extent(0), host_view_.extent(1));
   }
 
   T* data_handle() { return device_ptr; }
@@ -205,8 +207,8 @@ class device_matrix_view_from_host {
   bool allocated_memory() const { return device_mem_.has_value(); }
 
  private:
-  std::optional<device_matrix<T, IdxT>> device_mem_;
-  host_matrix_view<T, IdxT> host_view_;
+  std::optional<raft::device_matrix<T, IdxT>> device_mem_;
+  raft::host_matrix_view<T, IdxT> host_view_;
   T* device_ptr;
 };
 
@@ -224,7 +226,8 @@ class device_matrix_view_from_host {
 template <typename T, typename IdxT>
 class host_matrix_view_from_device {
  public:
-  host_matrix_view_from_device(raft::resources const& res, device_matrix_view<T, IdxT> device_view)
+  host_matrix_view_from_device(raft::resources const& res,
+                               raft::device_matrix_view<T, IdxT> device_view)
     : device_view_(device_view)
   {
     cudaPointerAttributes attr;
@@ -242,7 +245,7 @@ class host_matrix_view_from_device {
     }
   }
 
-  host_matrix_view<T, IdxT> view()
+  raft::host_matrix_view<T, IdxT> view()
   {
     return make_host_matrix_view<T, IdxT>(host_ptr, device_view_.extent(0), device_view_.extent(1));
   }
@@ -252,31 +255,34 @@ class host_matrix_view_from_device {
   bool allocated_memory() const { return host_mem_.has_value(); }
 
  private:
-  std::optional<host_matrix<T, IdxT>> host_mem_;
-  device_matrix_view<T, IdxT> device_view_;
+  std::optional<raft::host_matrix<T, IdxT>> host_mem_;
+  raft::device_matrix_view<T, IdxT> device_view_;
   T* host_ptr;
 };
 
 // Copy matrix src to dst. pad rows with 0 if necessary to make them 16 byte aligned.
 template <typename T, typename data_accessor>
-void copy_with_padding(raft::resources const& res,
-                       raft::device_matrix<T, int64_t, row_major>& dst,
-                       mdspan<const T, matrix_extent<int64_t>, row_major, data_accessor> src,
-                       rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
+void copy_with_padding(
+  raft::resources const& res,
+  raft::device_matrix<T, int64_t, raft::row_major>& dst,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> src,
+  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
 {
   size_t padded_dim = round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
 
   if ((dst.extent(0) != src.extent(0)) || (static_cast<size_t>(dst.extent(1)) != padded_dim)) {
     // clear existing memory before allocating to prevent OOM errors on large datasets
-    if (dst.size()) { dst = make_device_matrix<T, int64_t>(res, 0, 0); }
-    dst = make_device_mdarray<T>(res, mr, make_extents<int64_t>(src.extent(0), padded_dim));
+    if (dst.size()) { dst = raft::make_device_matrix<T, int64_t>(res, 0, 0); }
+    dst =
+      raft::make_device_mdarray<T>(res, mr, raft::make_extents<int64_t>(src.extent(0), padded_dim));
   }
   if (dst.extent(1) == src.extent(1)) {
-    raft::copy(dst.data_handle(), src.data_handle(), src.size(), resource::get_cuda_stream(res));
+    raft::copy(
+      dst.data_handle(), src.data_handle(), src.size(), raft::resource::get_cuda_stream(res));
   } else {
     // copy with padding
     RAFT_CUDA_TRY(cudaMemsetAsync(
-      dst.data_handle(), 0, dst.size() * sizeof(T), resource::get_cuda_stream(res)));
+      dst.data_handle(), 0, dst.size() * sizeof(T), raft::resource::get_cuda_stream(res)));
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
                                     sizeof(T) * dst.extent(1),
                                     src.data_handle(),
@@ -284,7 +290,7 @@ void copy_with_padding(raft::resources const& res,
                                     sizeof(T) * src.extent(1),
                                     src.extent(0),
                                     cudaMemcpyDefault,
-                                    resource::get_cuda_stream(res)));
+                                    raft::resource::get_cuda_stream(res)));
   }
 }
 }  // namespace cuvs::neighbors::cagra::detail

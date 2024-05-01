@@ -32,7 +32,7 @@
 
 #include <raft/matrix/select_k.cuh>
 
-#include <raft/neighbors/sample_filter_types.hpp>
+#include "../../sample_filter_types.hpp"
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include <raft/spatial/knn/detail/ann_utils.cuh>
@@ -838,7 +838,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
 
   void operator()(raft::resources const& res,
                   DATASET_DESCRIPTOR_T dataset_desc,
-                  raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,
+                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
                   INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
                   DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
@@ -1077,7 +1077,7 @@ struct search<TEAM_SIZE,
 
   void operator()(raft::resources const& res,
                   DATASET_DESCRIPTOR_T dataset_desc,
-                  raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,
+                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
                   INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
                   DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]

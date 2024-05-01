@@ -15,9 +15,9 @@
  */
 #pragma once
 
+#include "../../sample_filter_types.hpp"  // none_cagra_sample_filter
 #include "compute_distance_vpq.cuh"
-#include <raft/neighbors/sample_filter_types.hpp>  // none_cagra_sample_filter
-#include <raft/util/raft_explicit.hpp>             // RAFT_EXPLICIT
+#include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #include <cuda_fp16.h>
 
@@ -32,7 +32,8 @@ template <unsigned TEAM_SIZE,
           class SAMPLE_FILTER_T>
 void select_and_run(
   DATASET_DESCRIPTOR_T dataset_desc,
-  raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, row_major> graph,
+  raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, raft::row_major>
+    graph,
   typename DATASET_DESCRIPTOR_T::INDEX_T* const topk_indices_ptr,
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const topk_distances_ptr,
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,
@@ -67,7 +68,7 @@ void select_and_run(
     SAMPLE_FILTER_T>(                                                                           \
     cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<DATA_T, INDEX_T, DISTANCE_T>  \
       dataset_desc,                                                                             \
-    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,                          \
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,                    \
     INDEX_T* const topk_indices_ptr,                                                            \
     DISTANCE_T* const topk_distances_ptr,                                                       \
     const DATA_T* const queries_ptr,                                                            \
@@ -152,7 +153,7 @@ instantiate_kernel_selection(
                                                                  PQ_CODE_BOOK_DIM,              \
                                                                  DISTANCE_T,                    \
                                                                  INDEX_T> dataset_desc,         \
-    raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,                          \
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,                    \
     INDEX_T* const topk_indices_ptr,                                                            \
     DISTANCE_T* const topk_distances_ptr,                                                       \
     const DATA_T* const queries_ptr,                                                            \

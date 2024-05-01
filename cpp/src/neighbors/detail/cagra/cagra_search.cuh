@@ -90,10 +90,14 @@ void search_main_core(
   raft::resources const& res,
   search_params params,
   DatasetDescriptorT dataset_desc,
-  raft::device_matrix_view<const typename DatasetDescriptorT::INDEX_T, int64_t, row_major> graph,
-  raft::device_matrix_view<const typename DatasetDescriptorT::DATA_T, int64_t, row_major> queries,
-  raft::device_matrix_view<typename DatasetDescriptorT::INDEX_T, int64_t, row_major> neighbors,
-  raft::device_matrix_view<typename DatasetDescriptorT::DISTANCE_T, int64_t, row_major> distances,
+  raft::device_matrix_view<const typename DatasetDescriptorT::INDEX_T, int64_t, raft::row_major>
+    graph,
+  raft::device_matrix_view<const typename DatasetDescriptorT::DATA_T, int64_t, raft::row_major>
+    queries,
+  raft::device_matrix_view<typename DatasetDescriptorT::INDEX_T, int64_t, raft::row_major>
+    neighbors,
+  raft::device_matrix_view<typename DatasetDescriptorT::DISTANCE_T, int64_t, raft::row_major>
+    distances,
   CagraSampleFilterT sample_filter    = CagraSampleFilterT(),
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 {
@@ -167,10 +171,10 @@ void launch_vpq_search_main_core(
   raft::resources const& res,
   const vpq_dataset<DatasetT, DatasetIdxT>* vpq_dset,
   search_params params,
-  raft::device_matrix_view<const InternalIdxT, int64_t, row_major> graph,
-  raft::device_matrix_view<const T, int64_t, row_major> queries,
-  raft::device_matrix_view<InternalIdxT, int64_t, row_major> neighbors,
-  raft::device_matrix_view<DistanceT, int64_t, row_major> distances,
+  raft::device_matrix_view<const InternalIdxT, int64_t, raft::row_major> graph,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
   CagraSampleFilterT sample_filter,
   const cuvs::distance::DistanceType metric)
 {
@@ -255,13 +259,13 @@ template <typename T,
 void search_main(raft::resources const& res,
                  search_params params,
                  const index<T, IdxT>& index,
-                 raft::device_matrix_view<const T, int64_t, row_major> queries,
-                 raft::device_matrix_view<InternalIdxT, int64_t, row_major> neighbors,
-                 raft::device_matrix_view<DistanceT, int64_t, row_major> distances,
+                 raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+                 raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
+                 raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
   const auto& graph   = index.graph();
-  auto graph_internal = raft::make_device_matrix_view<const InternalIdxT, int64_t, row_major>(
+  auto graph_internal = raft::make_device_matrix_view<const InternalIdxT, int64_t, raft::row_major>(
     reinterpret_cast<const InternalIdxT*>(graph.data_handle()), graph.extent(0), graph.extent(1));
 
   // n_rows has the same type as the dataset index (the array extents type)

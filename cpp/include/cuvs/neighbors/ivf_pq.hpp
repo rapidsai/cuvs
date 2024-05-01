@@ -110,6 +110,36 @@ struct index_params : ann::index_params {
       .force_random_rotation          = force_random_rotation,
       .conservative_memory_allocation = conservative_memory_allocation};
   }
+
+  /**
+   * Creates index_params based on shape of the input dataset.
+   * Usage example:
+   * @code{.cpp}
+   *   using namespace raft::neighbors;
+   *   raft::resources res;
+   *   // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+   *   ivf_pq::index_params index_params =
+   *     ivf_pq::index_params::from_dataset(dataset.view(), raft::distance::InnerProduct);
+   *   // modify/update index_params as needed
+   *   index_params.add_data_on_build = true;
+   * @endcode
+   */
+  template <typename DataT, typename Accessor>
+  static index_params from_dataset(
+    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+  {
+    index_params params;
+    params.n_lists =
+      dataset.extent(0) < 4 * 2500 ? 4 : static_cast<uint32_t>(std::sqrt(dataset.extent(0)));
+    params.pq_dim =
+      raft::round_up_safe(static_cast<uint32_t>(dataset.extent(1) / 4), static_cast<uint32_t>(8));
+    params.pq_bits                  = 8;
+    params.kmeans_trainset_fraction = dataset.extent(0) < 10000 ? 1 : 0.1;
+    params.metric                   = metric;
+    return params;
+  }
 };
 /**
  * @}

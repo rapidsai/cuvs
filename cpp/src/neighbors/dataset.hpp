@@ -59,7 +59,7 @@ template <typename DataT, typename IdxT>
 struct strided_dataset : public dataset<IdxT> {
   using index_type = IdxT;
   using value_type = DataT;
-  using view_type  = device_matrix_view<const value_type, index_type, layout_stride>;
+  using view_type  = raft::device_matrix_view<const value_type, index_type, raft::layout_stride>;
   [[nodiscard]] auto n_rows() const noexcept -> index_type final { return view().extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final
   {
@@ -92,7 +92,7 @@ struct owning_dataset : public strided_dataset<DataT, IdxT> {
   using value_type = DataT;
   using typename strided_dataset<value_type, index_type>::view_type;
   using storage_type =
-    mdarray<value_type, matrix_extent<index_type>, LayoutPolicy, ContainerPolicy>;
+    raft::mdarray<value_type, raft::matrix_extent<index_type>, LayoutPolicy, ContainerPolicy>;
   using mapping_type = typename view_type::mapping_type;
   storage_type data;
   mapping_type view_mapping;
@@ -135,9 +135,9 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   using index_type   = typename SrcT::index_type;
   using layout_type  = typename SrcT::layout_type;
   static_assert(extents_type::rank() == 2, "The input must be a matrix.");
-  static_assert(std::is_same_v<layout_type, layout_right> ||
-                  std::is_same_v<layout_type, layout_right_padded<value_type>> ||
-                  std::is_same_v<layout_type, layout_stride>,
+  static_assert(std::is_same_v<layout_type, raft::layout_right> ||
+                  std::is_same_v<layout_type, raft::layout_right_padded<value_type>> ||
+                  std::is_same_v<layout_type, raft::layout_stride>,
                 "The input must be row-major");
   RAFT_EXPECTS(src.extent(1) <= required_stride,
                "The input row length must be not larger than the desired stride.");
@@ -152,13 +152,14 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   if (device_accessible && row_major && stride_matches) {
     // Everything matches: make a non-owning dataset
     return std::make_unique<non_owning_dataset<value_type, index_type>>(
-      make_device_strided_matrix_view<const value_type, index_type>(
+      raft::make_device_strided_matrix_view<const value_type, index_type>(
         device_ptr, src.extent(0), src.extent(1), required_stride));
   }
   // Something is wrong: have to make a copy and produce an owning dataset
   auto out_layout =
-    make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
-  auto out_array = make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
+    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+  auto out_array =
+    raft::make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
 
   using out_mdarray_type          = decltype(out_array);
   using out_layout_type           = typename out_mdarray_type::layout_type;
@@ -169,7 +170,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   RAFT_CUDA_TRY(cudaMemsetAsync(out_array.data_handle(),
                                 0,
                                 out_array.size() * sizeof(value_type),
-                                resource::get_cuda_stream(res)));
+                                raft::resource::get_cuda_stream(res)));
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(out_array.data_handle(),
                                   sizeof(value_type) * required_stride,
                                   src.data_handle(),
@@ -177,7 +178,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
                                   sizeof(value_type) * src.extent(1),
                                   src.extent(0),
                                   cudaMemcpyDefault,
-                                  resource::get_cuda_stream(res)));
+                                  raft::resource::get_cuda_stream(res)));
 
   return std::make_unique<out_owning_type>(std::move(out_array), out_layout);
 }
@@ -258,15 +259,15 @@ struct vpq_params {
 template <typename MathT, typename IdxT>
 struct vpq_dataset : public dataset<IdxT> {
   /** Vector Quantization codebook - "coarse cluster centers". */
-  device_matrix<MathT, uint32_t, row_major> vq_code_book;
+  raft::device_matrix<MathT, uint32_t, raft::row_major> vq_code_book;
   /** Product Quantization codebook - "fine cluster centers".  */
-  device_matrix<MathT, uint32_t, row_major> pq_code_book;
+  raft::device_matrix<MathT, uint32_t, raft::row_major> pq_code_book;
   /** Compressed dataset.  */
-  device_matrix<uint8_t, IdxT, row_major> data;
+  raft::device_matrix<uint8_t, IdxT, raft::row_major> data;
 
-  vpq_dataset(device_matrix<MathT, uint32_t, row_major>&& vq_code_book,
-              device_matrix<MathT, uint32_t, row_major>&& pq_code_book,
-              device_matrix<uint8_t, IdxT, row_major>&& data)
+  vpq_dataset(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq_code_book,
+              raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq_code_book,
+              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data)
     : vq_code_book{std::move(vq_code_book)},
       pq_code_book{std::move(pq_code_book)},
       data{std::move(data)}

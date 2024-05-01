@@ -94,9 +94,9 @@ RAFT_KERNEL kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, data
     const IdxT dstNode = knn_graph[k + static_cast<uint64_t>(graph_degree) * srcNode];
     float dist         = 0.0;
     for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
-      float diff = spatial::knn::detail::utils::mapping<float>{}(
+      float diff = raft::spatial::knn::detail::utils::mapping<float>{}(
                      dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) -
-                   spatial::knn::detail::utils::mapping<float>{}(
+                   raft::spatial::knn::detail::utils::mapping<float>{}(
                      dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
       dist += diff * diff;
     }
@@ -229,15 +229,17 @@ void shift_array(T* array, uint64_t num)
 }
 }  // namespace
 
-template <typename DataT,
-          typename IdxT = uint32_t,
-          typename d_accessor =
-            host_device_accessor<std::experimental::default_accessor<DataT>, memory_type::device>,
-          typename g_accessor =
-            host_device_accessor<std::experimental::default_accessor<IdxT>, memory_type::host>>
-void sort_knn_graph(raft::resources const& res,
-                    mdspan<const DataT, matrix_extent<int64_t>, row_major, d_accessor> dataset,
-                    mdspan<IdxT, matrix_extent<int64_t>, row_major, g_accessor> knn_graph)
+template <
+  typename DataT,
+  typename IdxT       = uint32_t,
+  typename d_accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
+                                                   raft::memory_type::device>,
+  typename g_accessor =
+    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+void sort_knn_graph(
+  raft::resources const& res,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor> dataset,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph)
 {
   RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                "dataset size is expected to have the same number of graph index size");
@@ -261,12 +263,12 @@ void sort_knn_graph(raft::resources const& res,
   raft::copy(d_dataset.data_handle(),
              dataset_ptr,
              dataset_size * dataset_dim,
-             resource::get_cuda_stream(res));
+             raft::resource::get_cuda_stream(res));
 
   raft::copy(d_input_graph.data_handle(),
              input_graph_ptr,
              graph_size * input_graph_degree,
-             resource::get_cuda_stream(res));
+             raft::resource::get_cuda_stream(res));
 
   void (*kernel_sort)(
     const DataT* const, const IdxT, const uint32_t, IdxT* const, const uint32_t, const uint32_t);
@@ -300,31 +302,33 @@ void sort_knn_graph(raft::resources const& res,
   const auto grid_size           = (graph_size + num_warps_per_block - 1) / num_warps_per_block;
 
   RAFT_LOG_DEBUG(".");
-  kernel_sort<<<grid_size, block_size, 0, resource::get_cuda_stream(res)>>>(
+  kernel_sort<<<grid_size, block_size, 0, raft::resource::get_cuda_stream(res)>>>(
     d_dataset.data_handle(),
     dataset_size,
     dataset_dim,
     d_input_graph.data_handle(),
     graph_size,
     input_graph_degree);
-  resource::sync_stream(res);
+  raft::resource::sync_stream(res);
   RAFT_LOG_DEBUG(".");
   raft::copy(input_graph_ptr,
              d_input_graph.data_handle(),
              graph_size * input_graph_degree,
-             resource::get_cuda_stream(res));
+             raft::resource::get_cuda_stream(res));
   RAFT_LOG_DEBUG("\n");
 
   const double time_sort_end = cur_time();
   RAFT_LOG_DEBUG("# Sorting kNN graph time: %.1lf sec\n", time_sort_end - time_sort_start);
 }
 
-template <typename IdxT = uint32_t,
-          typename g_accessor =
-            host_device_accessor<std::experimental::default_accessor<IdxT>, memory_type::host>>
-void optimize(raft::resources const& res,
-              mdspan<IdxT, matrix_extent<int64_t>, row_major, g_accessor> knn_graph,
-              raft::host_matrix_view<IdxT, int64_t, row_major> new_graph)
+template <
+  typename IdxT = uint32_t,
+  typename g_accessor =
+    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+void optimize(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
@@ -349,13 +353,13 @@ void optimize(raft::resources const& res,
     RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
                                   0xff,
                                   graph_size * input_graph_degree * sizeof(uint8_t),
-                                  resource::get_cuda_stream(res)));
+                                  raft::resource::get_cuda_stream(res)));
 
     auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
     RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
                                   0x00,
                                   graph_size * sizeof(uint32_t),
-                                  resource::get_cuda_stream(res)));
+                                  raft::resource::get_cuda_stream(res)));
 
     auto dev_stats  = raft::make_device_vector<uint64_t>(res, 2);
     auto host_stats = raft::make_host_vector<uint64_t>(2);
@@ -396,11 +400,11 @@ void optimize(raft::resources const& res,
     const dim3 blocks_prune(batch_size, 1, 1);
 
     RAFT_CUDA_TRY(cudaMemsetAsync(
-      dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, resource::get_cuda_stream(res)));
+      dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
 
     for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
       kern_prune<MAX_DEGREE, IdxT>
-        <<<blocks_prune, threads_prune, 0, resource::get_cuda_stream(res)>>>(
+        <<<blocks_prune, threads_prune, 0, raft::resource::get_cuda_stream(res)>>>(
           d_input_graph.data_handle(),
           graph_size,
           input_graph_degree,
@@ -410,18 +414,18 @@ void optimize(raft::resources const& res,
           d_detour_count.data_handle(),
           d_num_no_detour_edges.data_handle(),
           dev_stats.data_handle());
-      resource::sync_stream(res);
+      raft::resource::sync_stream(res);
       RAFT_LOG_DEBUG(
         "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
         (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
     }
-    resource::sync_stream(res);
+    raft::resource::sync_stream(res);
     RAFT_LOG_DEBUG("\n");
 
     host_matrix_view_from_device<uint8_t, int64_t> detour_count(res, d_detour_count.view());
 
     raft::copy(
-      host_stats.data_handle(), dev_stats.data_handle(), 2, resource::get_cuda_stream(res));
+      host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
     const auto num_keep = host_stats.data_handle()[0];
     const auto num_full = host_stats.data_handle()[1];
 
@@ -469,13 +473,13 @@ void optimize(raft::resources const& res,
     RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph.data_handle(),
                                   0xff,
                                   graph_size * output_graph_degree * sizeof(IdxT),
-                                  resource::get_cuda_stream(res)));
+                                  raft::resource::get_cuda_stream(res)));
 
     auto d_rev_graph_count = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
     RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph_count.data_handle(),
                                   0x00,
                                   graph_size * sizeof(uint32_t),
-                                  resource::get_cuda_stream(res)));
+                                  raft::resource::get_cuda_stream(res)));
 
     auto dest_nodes   = raft::make_host_vector<IdxT, int64_t>(graph_size);
     auto d_dest_nodes = raft::make_device_vector<IdxT, int64_t>(res, graph_size);
@@ -485,7 +489,7 @@ void optimize(raft::resources const& res,
       for (uint64_t i = 0; i < graph_size; i++) {
         dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
       }
-      resource::sync_stream(res);
+      raft::resource::sync_stream(res);
 
       raft::copy(d_dest_nodes.data_handle(),
                  dest_nodes.data_handle(),
@@ -494,7 +498,7 @@ void optimize(raft::resources const& res,
 
       dim3 threads(256, 1, 1);
       dim3 blocks(1024, 1, 1);
-      kern_make_rev_graph<<<blocks, threads, 0, resource::get_cuda_stream(res)>>>(
+      kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
         d_dest_nodes.data_handle(),
         d_rev_graph.data_handle(),
         d_rev_graph_count.data_handle(),
@@ -503,19 +507,19 @@ void optimize(raft::resources const& res,
       RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
     }
 
-    resource::sync_stream(res);
+    raft::resource::sync_stream(res);
     RAFT_LOG_DEBUG("\n");
 
     if (d_rev_graph.allocated_memory()) {
       raft::copy(rev_graph.data_handle(),
                  d_rev_graph.data_handle(),
                  graph_size * output_graph_degree,
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
     }
     raft::copy(rev_graph_count.data_handle(),
                d_rev_graph_count.data_handle(),
                graph_size,
-               resource::get_cuda_stream(res));
+               raft::resource::get_cuda_stream(res));
 
     const double time_make_end = cur_time();
     RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf sec", time_make_end - time_make_start);

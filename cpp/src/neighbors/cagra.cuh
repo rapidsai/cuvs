@@ -82,7 +82,7 @@ namespace cuvs::neighbors::cagra {
 template <typename DataT, typename IdxT, typename accessor>
 void build_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   std::optional<float> refine_rate                   = std::nullopt,
   std::optional<ivf_pq::index_params> build_params   = std::nullopt,
@@ -144,11 +144,11 @@ void build_knn_graph(
  */
 template <typename DataT,
           typename IdxT     = uint32_t,
-          typename accessor = host_device_accessor<std::experimental::default_accessor<DataT>,
-                                                   raft::memory_type::device>>
+          typename accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
+                                                         raft::memory_type::device>>
 void build_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, matrix_extent<int64_t>, raft::row_major, accessor> dataset,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   raft::neighbors::experimental::nn_descent::index_params build_params)
 {
@@ -186,16 +186,17 @@ void build_knn_graph(
  * @param[in,out] knn_graph a matrix view (host or device) of the input knn graph [n_rows,
  * knn_graph_degree]
  */
-template <typename DataT,
-          typename IdxT       = uint32_t,
-          typename d_accessor = host_device_accessor<std::experimental::default_accessor<DataT>,
-                                                     raft::memory_type::device>,
-          typename g_accessor = host_device_accessor<std::experimental::default_accessor<IdxT>,
-                                                     raft::memory_type::host>>
+template <
+  typename DataT,
+  typename IdxT       = uint32_t,
+  typename d_accessor = raft::host_device_accessor<std::experimental::default_accessor<DataT>,
+                                                   raft::memory_type::device>,
+  typename g_accessor =
+    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
-  raft::mdspan<const DataT, matrix_extent<int64_t>, raft::row_major, d_accessor> dataset,
-  raft::mdspan<IdxT, matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph)
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor> dataset,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -228,12 +229,14 @@ void sort_knn_graph(
  * knn_graph_degree]
  * @param[out] new_graph a host matrix view of the optimized knn graph [n_rows, graph_degree]
  */
-template <typename IdxT       = uint32_t,
-          typename g_accessor = host_device_accessor<std::experimental::default_accessor<IdxT>,
-                                                     raft::memory_type::host>>
-void optimize(raft::resources const& res,
-              raft::mdspan<IdxT, matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
-              raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
+template <
+  typename IdxT = uint32_t,
+  typename g_accessor =
+    raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
+void optimize(
+  raft::resources const& res,
+  raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
 {
   detail::optimize(res, knn_graph, new_graph);
 }
@@ -279,13 +282,13 @@ void optimize(raft::resources const& res,
  * @return the constructed cagra index
  */
 template <typename T,
-          typename IdxT = uint32_t,
-          typename Accessor =
-            host_device_accessor<std::experimental::default_accessor<T>, raft::memory_type::host>>
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
-  raft::mdspan<const T, matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
   return detail::build<T, IdxT, Accessor>(res, params, dataset);
 }

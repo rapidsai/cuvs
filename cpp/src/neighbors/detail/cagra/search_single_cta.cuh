@@ -213,7 +213,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
 
   void operator()(raft::resources const& res,
                   DATASET_DESCRIPTOR_T dataset_desc,
-                  raft::device_matrix_view<const INDEX_T, int64_t, row_major> graph,
+                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
                   INDEX_T* const result_indices_ptr,       // [num_queries, topk]
                   DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]

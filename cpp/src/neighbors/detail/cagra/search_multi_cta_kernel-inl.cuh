@@ -31,7 +31,7 @@
 
 #include <cuvs/distance/distance_types.hpp>
 
-#include <raft/neighbors/sample_filter_types.hpp>
+#include "../../sample_filter_types.hpp"
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include <raft/spatial/knn/detail/ann_utils.cuh>
@@ -446,7 +446,8 @@ template <unsigned TEAM_SIZE,
           typename SAMPLE_FILTER_T>
 void select_and_run(
   DATASET_DESCRIPTOR_T dataset_desc,
-  raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, row_major> graph,
+  raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, raft::row_major>
+    graph,
   typename DATASET_DESCRIPTOR_T::INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]

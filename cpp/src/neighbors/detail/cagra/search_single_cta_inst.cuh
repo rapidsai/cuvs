@@ -22,7 +22,8 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
 #define instantiate_kernel_selection(TEAM_SIZE, MAX_DATASET_DIM, DATASET_DESC_T, SAMPLE_FILTER_T) \
   template void select_and_run<TEAM_SIZE, MAX_DATASET_DIM, DATASET_DESC_T, SAMPLE_FILTER_T>(      \
     DATASET_DESC_T dataset_desc,                                                                  \
-    raft::device_matrix_view<const typename DATASET_DESC_T::INDEX_T, int64_t, row_major> graph,   \
+    raft::device_matrix_view<const typename DATASET_DESC_T::INDEX_T, int64_t, raft::row_major>    \
+      graph,                                                                                      \
     typename DATASET_DESC_T::INDEX_T* const topk_indices_ptr,                                     \
     typename DATASET_DESC_T::DISTANCE_T* const topk_distances_ptr,                                \
     const typename DATASET_DESC_T::DATA_T* const queries_ptr,                                     \
