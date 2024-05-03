@@ -34,6 +34,7 @@ project(
   VERSION "${RAPIDS_VERSION}"
   LANGUAGES ${lang_list}
 )
+set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.hpp)
@@ -188,6 +189,7 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/core/bitset.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
@@ -243,16 +245,35 @@ add_library(
   src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cpp
   src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cpp
   src/neighbors/ivf_pq_index.cpp
-  src/neighbors/ivf_pq/ivf_pq_build_float_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_build_int8_t_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_build_uint8_t_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_extend_float_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_extend_int8_t_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_extend_uint8_t_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_search_float_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_search_int8_t_int64_t.cpp
-  src/neighbors/ivf_pq/ivf_pq_search_uint8_t_int64_t.cpp
-  src/neighbors/ivf_pq_serialize.cpp
+  src/neighbors/ivf_pq/ivf_pq_build_common.cu
+  src/neighbors/ivf_pq/ivf_pq_build_float_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_build_int8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_build_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_false.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_true.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_half.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_half.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_float.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_false.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_true.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_false_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_fp8_true_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_half_half_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_half_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_float_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
+  src/neighbors/ivf_pq/ivf_pq_deserialize.cu
+  src/neighbors/ivf_pq/ivf_pq_extend_float_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_extend_int8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_extend_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_float_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_int8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_with_filter_float_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_with_filter_int8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_search_with_filter_uint8_t_int64_t.cu
+  src/neighbors/ivf_pq/ivf_pq_serialize.cu
 )
 
 target_compile_options(

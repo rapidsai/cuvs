@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//! Brute Force KNN
 
 use std::io::{stderr, Write};
 
@@ -126,7 +127,7 @@ mod tests {
             Index::build(&res, metric, None, dataset).expect("failed to create brute force index");
 
         res.sync_stream().unwrap();
-        
+
         // use the first 4 points from the dataset as queries : will test that we get them back
         // as their own nearest neighbor
         let n_queries = 4;
