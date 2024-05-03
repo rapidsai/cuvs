@@ -90,12 +90,12 @@ void build_knn_graph(
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
-  auto knn_graph_internal = make_host_matrix_view<internal_IdxT, int64_t>(
+  auto knn_graph_internal = raft::make_host_matrix_view<internal_IdxT, int64_t>(
     reinterpret_cast<internal_IdxT*>(knn_graph.data_handle()),
     knn_graph.extent(0),
     knn_graph.extent(1));
   auto dataset_internal =
-    raft::mdspan<const DataT, matrix_extent<int64_t>, raft::row_major, accessor>(
+    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
   cagra::detail::build_knn_graph(
@@ -201,15 +201,16 @@ void sort_knn_graph(
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
   using g_accessor_internal =
-    host_device_accessor<std::experimental::default_accessor<internal_IdxT>, g_accessor::mem_type>;
+    raft::host_device_accessor<std::experimental::default_accessor<internal_IdxT>,
+                               g_accessor::mem_type>;
   auto knn_graph_internal =
-    raft::mdspan<internal_IdxT, matrix_extent<int64_t>, raft::row_major, g_accessor_internal>(
+    raft::mdspan<internal_IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor_internal>(
       reinterpret_cast<internal_IdxT*>(knn_graph.data_handle()),
       knn_graph.extent(0),
       knn_graph.extent(1));
 
   auto dataset_internal =
-    raft::mdspan<const DataT, matrix_extent<int64_t>, raft::row_major, d_accessor>(
+    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
   cagra::detail::graph::sort_knn_graph(res, dataset_internal, knn_graph_internal);

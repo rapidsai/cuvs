@@ -27,16 +27,15 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 
-#include <raft/neighbors/detail/refine.cuh>
+#include <cuvs/distance/distance_types.hpp>
 
-// TODO: Fixme- fix once ivfpq is moved over
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 // TODO: Fixme- this needs to be migrated
+#include "../../ivf_pq/ivf_pq_build.cuh"
+#include "../../refine.cuh"
 #include <raft/neighbors/nn_descent.cuh>
-#include <raft/neighbors/refine.cuh>
 
 // TODO: This shouldn't be calling spatial/knn APIs
 #include <raft/spatial/knn/detail/ann_utils.cuh>
@@ -46,6 +45,8 @@
 #include <chrono>
 #include <cstdio>
 #include <vector>
+
+static const std::string RAFT_NAME = "raft";
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -69,7 +70,9 @@ void build_knn_graph(
     size_t(dataset.extent(1)),
     node_degree);
 
-  if (!build_params) { build_params = ivf_pq::index_params::from_dataset(dataset); }
+  if (!build_params) {
+    build_params = cuvs::neighbors::ivf_pq::index_params::from_dataset(dataset);
+  }
 
   // Make model name
   const std::string model_name = [&]() {
@@ -89,14 +92,14 @@ void build_knn_graph(
   }();
 
   RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
-  auto index = raft::neighbors::ivf_pq::build<DataT, int64_t>(
+  auto index = cuvs::neighbors::ivf_pq::detail::build<DataT, int64_t>(
     res, *build_params, dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
   //
   // search top (k + 1) neighbors
   //
   if (!search_params) {
-    search_params            = ivf_pq::search_params{};
+    search_params            = cuvs::neighbors::ivf_pq::search_params{};
     search_params->n_probes  = std::min<IdxT>(dataset.extent(1) * 2, build_params->n_lists);
     search_params->lut_dtype = CUDA_R_8U;
     search_params->internal_distance_dtype = CUDA_R_32F;
@@ -134,7 +137,7 @@ void build_knn_graph(
     dataset.data_handle(),
     dataset.extent(0),
     dataset.extent(1),
-    max_batch_size,
+    (int64_t)max_batch_size,
     raft::resource::get_cuda_stream(res),
     device_memory);
 
@@ -151,16 +154,17 @@ void build_knn_graph(
     auto distances_view = raft::make_device_matrix_view<float, uint32_t>(
       distances.data_handle(), batch.size(), distances.extent(1));
 
-    ivf_pq::search(res, *search_params, index, queries_view, neighbors_view, distances_view);
-    if constexpr (is_host_mdspan_v<decltype(dataset)>) {
+    cuvs::neighbors::ivf_pq::search(
+      res, *search_params, index, queries_view, neighbors_view, distances_view);
+    if constexpr (raft::is_host_mdspan_v<decltype(dataset)>) {
       raft::copy(neighbors_host.data_handle(),
                  neighbors.data_handle(),
                  neighbors_view.size(),
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
       raft::copy(queries_host.data_handle(),
                  batch.data(),
                  queries_view.size(),
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
       auto queries_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
         queries_host.data_handle(), batch.size(), batch.row_width());
       auto neighbors_host_view = raft::make_host_matrix_view<const int64_t, int64_t>(
@@ -171,12 +175,13 @@ void build_knn_graph(
         refined_distances_host.data_handle(), batch.size(), top_k);
       raft::resource::sync_stream(res);
 
-      detail::refine_host<int64_t, DataT, float, int64_t>(dataset,
-                                                          queries_host_view,
-                                                          neighbors_host_view,
-                                                          refined_neighbors_host_view,
-                                                          refined_distances_host_view,
-                                                          build_params->metric);
+      cuvs::neighbors::detail::refine_host<int64_t, DataT, float, int64_t>(
+        dataset,
+        queries_host_view,
+        neighbors_host_view,
+        refined_neighbors_host_view,
+        refined_distances_host_view,
+        build_params->metric);
     } else {
       auto neighbor_candidates_view = raft::make_device_matrix_view<const int64_t, uint64_t>(
         neighbors.data_handle(), batch.size(), gpu_top_k);
@@ -187,18 +192,19 @@ void build_knn_graph(
 
       auto dataset_view = raft::make_device_matrix_view<const DataT, int64_t>(
         dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-      detail::refine_device<int64_t, DataT, float, int64_t>(res,
-                                                            dataset_view,
-                                                            queries_view,
-                                                            neighbor_candidates_view,
-                                                            refined_neighbors_view,
-                                                            refined_distances_view,
-                                                            build_params->metric);
+      cuvs::neighbors::detail::refine_device<int64_t, DataT, float, int64_t>(
+        res,
+        dataset_view,
+        queries_view,
+        neighbor_candidates_view,
+        refined_neighbors_view,
+        refined_distances_view,
+        build_params->metric);
       raft::copy(refined_neighbors_host.data_handle(),
                  refined_neighbors_view.data_handle(),
                  refined_neighbors_view.size(),
-                 resource::get_cuda_stream(res));
-      resource::sync_stream(res);
+                 raft::resource::get_cuda_stream(res));
+      raft::resource::sync_stream(res);
     }
     // omit itself & write out
     // TODO(tfeher): do this in parallel with GPU processing of next batch
@@ -254,7 +260,8 @@ void build_knn_graph(
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
   using g_accessor_internal =
-    host_device_accessor<std::experimental::default_accessor<internal_IdxT>, g_accessor::mem_type>;
+    raft::host_device_accessor<std::experimental::default_accessor<internal_IdxT>,
+                               g_accessor::mem_type>;
 
   auto knn_graph_internal =
     raft::mdspan<internal_IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor_internal>(
@@ -262,7 +269,7 @@ void build_knn_graph(
       nn_descent_idx.graph().extent(0),
       nn_descent_idx.graph().extent(1));
 
-  graph::sort_knn_graph(res, dataset, knn_graph_internal);
+  cuvs::neighbors::cagra::detail::graph::sort_knn_graph(res, dataset, knn_graph_internal);
 }
 
 template <
@@ -363,7 +370,8 @@ index<T, IdxT> build(
       idx.update_dataset(
         res,
         // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
-        neighbors::vpq_build<decltype(dataset), half, int64_t>(res, *params.compression, dataset));
+        cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
+          res, *params.compression, dataset));
       return idx;
     }
     return index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));

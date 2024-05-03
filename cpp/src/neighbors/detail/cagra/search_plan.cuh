@@ -18,8 +18,8 @@
 
 #include "hashmap.hpp"
 
+#include <cuvs/neighbors/sample_filter.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/neighbors/sample_filter_types.hpp>
 // #include "search_single_cta_inst.cuh"
 // #include "topk_for_cagra/topk_core.cuh"
 
@@ -108,16 +108,16 @@ struct search_plan_impl : public search_plan_impl_base {
                    uint32_t topk,
                    cuvs::distance::DistanceType metric)
     : search_plan_impl_base(params, dim, graph_degree, topk, metric),
-      hashmap(0, resource::get_cuda_stream(res)),
-      num_executed_iterations(0, resource::get_cuda_stream(res)),
-      dev_seed(0, resource::get_cuda_stream(res)),
+      hashmap(0, raft::resource::get_cuda_stream(res)),
+      num_executed_iterations(0, raft::resource::get_cuda_stream(res)),
+      dev_seed(0, raft::resource::get_cuda_stream(res)),
       num_seeds(0)
   {
     adjust_search_params();
     check_params();
     calc_hashmap_params(res);
     set_dataset_block_and_team_size(dim);
-    num_executed_iterations.resize(max_queries, resource::get_cuda_stream(res));
+    num_executed_iterations.resize(max_queries, raft::resource::get_cuda_stream(res));
     RAFT_LOG_DEBUG("# algo = %d", static_cast<int>(algo));
   }
 

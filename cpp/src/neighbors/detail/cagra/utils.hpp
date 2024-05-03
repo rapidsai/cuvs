@@ -191,7 +191,7 @@ class device_matrix_view_from_host {
       raft::copy(device_mem_->data_handle(),
                  host_view.data_handle(),
                  host_view.extent(0) * host_view.extent(1),
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
       device_ptr = device_mem_->data_handle();
     }
   }
@@ -240,14 +240,15 @@ class host_matrix_view_from_device {
       raft::copy(host_mem_->data_handle(),
                  device_view.data_handle(),
                  device_view.extent(0) * device_view.extent(1),
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
       host_ptr = host_mem_->data_handle();
     }
   }
 
   raft::host_matrix_view<T, IdxT> view()
   {
-    return make_host_matrix_view<T, IdxT>(host_ptr, device_view_.extent(0), device_view_.extent(1));
+    return raft::make_host_matrix_view<T, IdxT>(
+      host_ptr, device_view_.extent(0), device_view_.extent(1));
   }
 
   T* data_handle() { return host_ptr; }
@@ -268,7 +269,7 @@ void copy_with_padding(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> src,
   rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
 {
-  size_t padded_dim = round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
+  size_t padded_dim = raft::round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
 
   if ((dst.extent(0) != src.extent(0)) || (static_cast<size_t>(dst.extent(1)) != padded_dim)) {
     // clear existing memory before allocating to prevent OOM errors on large datasets

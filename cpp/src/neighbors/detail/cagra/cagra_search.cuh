@@ -32,9 +32,9 @@
 #include <cuvs/neighbors/cagra.hpp>
 
 // TODO: Fix these when ivf methods are moved over
-#include <raft/neighbors/detail/ivf_common.cuh>
-#include <raft/neighbors/detail/ivf_pq_search.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
+#include "../../ivf_common.cuh"
+#include "../../ivf_pq/ivf_pq_search.cuh"
+#include <cuvs/neighbors/sample_filter.hpp>
 
 // TODO: This shouldn't be calling spatial/knn apis
 #include <raft/spatial/knn/detail/ann_utils.cuh>
@@ -110,12 +110,12 @@ void search_main_core(
   RAFT_EXPECTS(queries.extent(1) == dataset_desc.dim, "Queries and index dim must match");
   const uint32_t topk = neighbors.extent(1);
 
-  cudaDeviceProp deviceProp = resource::get_device_properties(res);
+  cudaDeviceProp deviceProp = raft::resource::get_device_properties(res);
   if (params.max_queries == 0) {
     params.max_queries = std::min<size_t>(queries.extent(0), deviceProp.maxGridSize[1]);
   }
 
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "cagra::search(max_queries = %u, k = %u, dim = %zu)",
     params.max_queries,
     topk,
@@ -322,16 +322,16 @@ void search_main(raft::resources const& res,
   const DistanceT* dist_in = distances.data_handle();
   // We're converting the data from T to DistanceT during distance computation
   // and divide the values by kDivisor. Here we restore the original scale.
-  constexpr float kScale = spatial::knn::detail::utils::config<T>::kDivisor /
-                           spatial::knn::detail::utils::config<DistanceT>::kDivisor;
-  ivf::detail::postprocess_distances(dist_out,
-                                     dist_in,
-                                     index.metric(),
-                                     distances.extent(0),
-                                     distances.extent(1),
-                                     kScale,
-                                     true,
-                                     resource::get_cuda_stream(res));
+  constexpr float kScale = raft::spatial::knn::detail::utils::config<T>::kDivisor /
+                           raft::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
+  cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
+                                                      dist_in,
+                                                      index.metric(),
+                                                      distances.extent(0),
+                                                      distances.extent(1),
+                                                      kScale,
+                                                      true,
+                                                      raft::resource::get_cuda_stream(res));
 }
 /** @} */  // end group cagra
 

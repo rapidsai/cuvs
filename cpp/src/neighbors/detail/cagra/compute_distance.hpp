@@ -86,17 +86,19 @@ _RAFT_DEVICE void compute_distance_to_random_nodes(
 
       DISTANCE_T norm2;
       switch (metric) {
-        case cuvs::distance::L2Expanded:
-          norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                           TEAM_SIZE,
-                                                           cuvs::distance::L2Expanded>(
-            query_buffer, seed_index, valid_i);
+        case cuvs::distance::DistanceType::L2Expanded:
+          norm2 =
+            dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
+                                                     TEAM_SIZE,
+                                                     cuvs::distance::DistanceType::L2Expanded>(
+              query_buffer, seed_index, valid_i);
           break;
-        case cuvs::distance::InnerProduct:
-          norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                           TEAM_SIZE,
-                                                           cuvs::distance::InnerProduct>(
-            query_buffer, seed_index, valid_i);
+        case cuvs::distance::DistanceType::InnerProduct:
+          norm2 =
+            dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
+                                                     TEAM_SIZE,
+                                                     cuvs::distance::DistanceType::InnerProduct>(
+              query_buffer, seed_index, valid_i);
           break;
         default: break;
       }
@@ -176,17 +178,18 @@ _RAFT_DEVICE void compute_distance_to_child_nodes(
 
     DISTANCE_T norm2;
     switch (metric) {
-      case cuvs::distance::L2Expanded:
-        norm2 =
-          dataset_desc
-            .template compute_similarity<DATASET_BLOCK_DIM, TEAM_SIZE, cuvs::distance::L2Expanded>(
-              query_buffer, child_id, child_id != invalid_index);
-        break;
-      case cuvs::distance::InnerProduct:
+      case cuvs::distance::DistanceType::L2Expanded:
         norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
                                                          TEAM_SIZE,
-                                                         cuvs::distance::InnerProduct>(
+                                                         cuvs::distance::DistanceType::L2Expanded>(
           query_buffer, child_id, child_id != invalid_index);
+        break;
+      case cuvs::distance::DistanceType::InnerProduct:
+        norm2 =
+          dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
+                                                   TEAM_SIZE,
+                                                   cuvs::distance::DistanceType::InnerProduct>(
+            query_buffer, child_id, child_id != invalid_index);
         break;
       default: break;
     }
@@ -248,7 +251,8 @@ struct standard_dataset_descriptor_t
     for (unsigned i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
       unsigned j = device::swizzling(i);
       if (i < dim) {
-        smem_query_ptr[j] = spatial::knn::detail::utils::mapping<QUERY_T>{}(dmem_query_ptr[i]);
+        smem_query_ptr[j] =
+          raft::spatial::knn::detail::utils::mapping<QUERY_T>{}(dmem_query_ptr[i]);
       } else {
         smem_query_ptr[j] = 0.0;
       }
@@ -304,7 +308,7 @@ struct standard_dataset_descriptor_t
             // - The data buffer has to be also padded with zeros.
             DISTANCE_T d = query_ptr[device::swizzling(kv)];
             norm2 += dist_op<DISTANCE_T, METRIC>(
-              d, spatial::knn::detail::utils::mapping<float>{}(dl_buff[e].val.data[v]));
+              d, raft::spatial::knn::detail::utils::mapping<float>{}(dl_buff[e].val.data[v]));
           }
         }
       }

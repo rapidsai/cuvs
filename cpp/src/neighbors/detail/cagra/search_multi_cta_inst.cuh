@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "../../sample_filter_types.hpp"
 #include "search_multi_cta_kernel-inl.cuh"
+#include <cuvs/neighbors/sample_filter.hpp>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 

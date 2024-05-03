@@ -25,15 +25,15 @@
 
 #include <algorithm>
 
-namespace raft::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename DC, typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host_impl(
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,
-  raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,
-  raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,
-  raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances)
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
+  raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
+  raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances)
 {
   size_t n_queries = queries.extent(0);
   size_t n_rows    = dataset.extent(0);
@@ -41,7 +41,7 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
   size_t orig_k    = neighbor_candidates.extent(1);
   size_t refined_k = indices.extent(1);
 
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "neighbors::refine_host(%zu, %zu -> %zu)", n_queries, orig_k, refined_k);
 
   auto suggested_n_threads = std::max(1, std::min(omp_get_num_procs(), omp_get_max_threads()));
@@ -165,11 +165,11 @@ struct distance_comp_inner {
  */
 template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host(
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> dataset,
-  raft::host_matrix_view<const DataT, ExtentsT, row_major> queries,
-  raft::host_matrix_view<const IdxT, ExtentsT, row_major> neighbor_candidates,
-  raft::host_matrix_view<IdxT, ExtentsT, row_major> indices,
-  raft::host_matrix_view<DistanceT, ExtentsT, row_major> distances,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
+  raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> queries,
+  raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
+  raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
+  raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,
   distance::DistanceType metric = distance::DistanceType::L2Unexpanded)
 {
   refine_check_input(dataset.extents(),
@@ -180,14 +180,14 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
                      metric);
 
   switch (metric) {
-    case raft::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2Expanded:
       return refine_host_impl<distance_comp_l2>(
         dataset, queries, neighbor_candidates, indices, distances);
-    case raft::distance::DistanceType::InnerProduct:
+    case cuvs::distance::DistanceType::InnerProduct:
       return refine_host_impl<distance_comp_inner>(
         dataset, queries, neighbor_candidates, indices, distances);
     default: throw raft::logic_error("Unsupported metric");
   }
 }
 
-}  // namespace raft::neighbors::detail
+}  // namespace cuvs::neighbors::detail

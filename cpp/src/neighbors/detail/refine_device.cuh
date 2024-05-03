@@ -17,6 +17,7 @@
 #pragma once
 
 #include "refine_common.hpp"
+#include <cuvs/neighbors/sample_filter.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
@@ -26,7 +27,6 @@
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/neighbors/detail/ivf_flat_build.cuh>
 #include <raft/neighbors/detail/ivf_flat_interleaved_scan.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
 #include <thrust/sequence.h>
@@ -56,7 +56,7 @@ void refine_device(
                "k must be less than topk::kMaxCapacity (%d).",
                raft::matrix::detail::select::warpsort::kMaxCapacity);
 
-  common::nvtx::range<common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "neighbors::refine(%zu, %u)", size_t(n_queries), uint32_t(n_candidates));
 
   refine_check_input(dataset.extents(),
@@ -75,14 +75,14 @@ void refine_device(
   // - We run IVF flat search with n_probes=1 to select the best k elements of the candidates.
   rmm::device_uvector<uint32_t> fake_coarse_idx(n_queries, raft::resource::get_cuda_stream(handle));
 
-  thrust::sequence(resource::get_thrust_policy(handle),
+  thrust::sequence(raft::resource::get_thrust_policy(handle),
                    fake_coarse_idx.data(),
                    fake_coarse_idx.data() + n_queries);
 
-  cuvs::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
-    handle, metric, n_queries, false, true, dim);
+  raft::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
+    handle, raft::distance::DistanceType(metric), n_queries, false, true, dim);
 
-  cuvs::neighbors::ivf_flat::detail::fill_refinement_index(handle,
+  raft::neighbors::ivf_flat::detail::fill_refinement_index(handle,
                                                            &refinement_index,
                                                            dataset.data_handle(),
                                                            neighbor_candidates.data_handle(),
@@ -96,7 +96,7 @@ void refine_device(
   rmm::device_uvector<uint32_t> chunk_index(n_queries, raft::resource::get_cuda_stream(handle));
 
   // we know that each cluster has exactly n_candidates entries
-  thrust::fill(resource::get_thrust_policy(handle),
+  thrust::fill(raft::resource::get_thrust_policy(handle),
                chunk_index.data(),
                chunk_index.data() + n_queries,
                uint32_t(n_candidates));
@@ -118,13 +118,13 @@ void refine_device(
            fake_coarse_idx.data(),
            static_cast<uint32_t>(n_queries),
            0,
-           refinement_index.metric(),
+           raft::distance::DistanceType(refinement_index.metric()),
            1,
            k,
            0,
            chunk_index.data(),
-           raft::distance::is_min_close(metric),
-           cuvs::neighbors::filtering::none_ivf_sample_filter(),
+           raft::distance::is_min_close(raft::distance::DistanceType(metric)),
+           raft::neighbors::filtering::none_ivf_sample_filter(),
            neighbors_uint32,
            distances.data_handle(),
            grid_dim_x,

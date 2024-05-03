@@ -21,6 +21,8 @@
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 
+#include <raft/core/logger-ext.hpp>
+
 #include <cuda_fp16.h>
 
 #include <fstream>
@@ -60,7 +62,7 @@ void serialize(const raft::resources& res,
                                   sizeof(DataT) * dim,
                                   n_rows,
                                   cudaMemcpyDefault,
-                                  resource::get_cuda_stream(res)));
+                                  raft::resource::get_cuda_stream(res)));
   raft::resource::sync_stream(res);
   raft::serialize_mdspan(res, os, dst.view());
 }
@@ -171,10 +173,10 @@ template <typename IdxT>
 auto deserialize_dataset(raft::resources const& res, std::istream& is)
   -> std::unique_ptr<dataset<IdxT>>
 {
-  switch (deserialize_scalar<dataset_instance_tag>(res, is)) {
+  switch (raft::deserialize_scalar<dataset_instance_tag>(res, is)) {
     case kSerializeEmptyDataset: return deserialize_empty<IdxT>(res, is);
     case kSerializeStridedDataset:
-      switch (deserialize_scalar<cudaDataType_t>(res, is)) {
+      switch (raft::deserialize_scalar<cudaDataType_t>(res, is)) {
         case CUDA_R_32F: return deserialize_strided<float, IdxT>(res, is);
         case CUDA_R_16F: return deserialize_strided<half, IdxT>(res, is);
         case CUDA_R_8I: return deserialize_strided<int8_t, IdxT>(res, is);
@@ -182,7 +184,7 @@ auto deserialize_dataset(raft::resources const& res, std::istream& is)
         default: break;
       }
     case kSerializeVPQDataset:
-      switch (deserialize_scalar<cudaDataType_t>(res, is)) {
+      switch (raft::deserialize_scalar<cudaDataType_t>(res, is)) {
         case CUDA_R_32F: return deserialize_vpq<float, IdxT>(res, is);
         case CUDA_R_16F: return deserialize_vpq<half, IdxT>(res, is);
         default: break;

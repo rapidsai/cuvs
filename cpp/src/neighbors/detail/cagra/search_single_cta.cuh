@@ -172,7 +172,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
 
       // Increase block size to improve GPU occupancy when batch size
       // is small, that is, number of queries is low.
-      cudaDeviceProp deviceProp = resource::get_device_properties(res);
+      cudaDeviceProp deviceProp = raft::resource::get_device_properties(res);
       RAFT_LOG_DEBUG("# multiProcessorCount: %d", deviceProp.multiProcessorCount);
       while ((block_size < max_block_size) &&
              (graph_degree * search_width * team_size >= block_size * 2) &&
@@ -206,7 +206,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
     hashmap_size = 0;
     if (small_hash_bitlen == 0) {
       hashmap_size = sizeof(INDEX_T) * max_queries * hashmap::get_size(hash_bitlen);
-      hashmap.resize(hashmap_size, resource::get_cuda_stream(res));
+      hashmap.resize(hashmap_size, raft::resource::get_cuda_stream(res));
     }
     RAFT_LOG_DEBUG("# hashmap_size: %lu", hashmap_size);
   }
@@ -223,7 +223,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
                   uint32_t topk,
                   SAMPLE_FILTER_T sample_filter)
   {
-    cudaStream_t stream = resource::get_cuda_stream(res);
+    cudaStream_t stream = raft::resource::get_cuda_stream(res);
     select_and_run<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T>(
       dataset_desc,
       graph,

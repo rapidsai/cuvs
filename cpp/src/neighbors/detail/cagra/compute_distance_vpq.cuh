@@ -97,7 +97,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<half, DIS
                              QUERY_T* const smem_query_ptr,
                              const std::uint32_t query_smem_buffer_length)
   {
-    constexpr spatial::knn::detail::utils::mapping<half> mapping{};
+    constexpr raft::spatial::knn::detail::utils::mapping<half> mapping{};
     for (unsigned i = threadIdx.x * 2; i < dim; i += blockDim.x * 2) {
       half2 buf2{0, 0};
       if (i < dim) { buf2.x = mapping(dmem_query_ptr[i]); }

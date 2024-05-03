@@ -31,7 +31,7 @@
 
 #include <cuvs/distance/distance_types.hpp>
 
-#include "../../sample_filter_types.hpp"
+#include <cuvs/neighbors/sample_filter.hpp>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include <raft/spatial/knn/detail/ann_utils.cuh>

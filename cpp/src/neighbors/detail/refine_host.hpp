@@ -15,10 +15,5 @@
  */
 #pragma once
 
-#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
-#include "refine_host-inl.hpp"
-#endif
-
-#ifdef RAFT_COMPILED
 #include "refine_host-ext.hpp"
-#endif
+#include "refine_host-inl.hpp"

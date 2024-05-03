@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include "detail/refine.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/refine.cuh>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 
-namespace raft::neighbors {
+namespace cuvs::neighbors {
 
 /**
  * @defgroup ann_refine Approximate Nearest Neighbors Refinement
@@ -68,12 +68,12 @@ namespace raft::neighbors {
  */
 template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
 void refine(raft::resources const& handle,
-            raft::device_matrix_view<const data_t, matrix_idx, row_major> dataset,
-            raft::device_matrix_view<const data_t, matrix_idx, row_major> queries,
-            raft::device_matrix_view<const idx_t, matrix_idx, row_major> neighbor_candidates,
-            raft::device_matrix_view<idx_t, matrix_idx, row_major> indices,
-            raft::device_matrix_view<distance_t, matrix_idx, row_major> distances,
-            distance::DistanceType metric = distance::DistanceType::L2Unexpanded)
+            raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
+            raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
+            raft::device_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
+            raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
+            raft::device_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   detail::refine_device(handle, dataset, queries, neighbor_candidates, indices, distances, metric);
 }
@@ -90,15 +90,15 @@ void refine(raft::resources const& handle,
  */
 template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
 void refine(raft::resources const& handle,
-            raft::host_matrix_view<const data_t, matrix_idx, row_major> dataset,
-            raft::host_matrix_view<const data_t, matrix_idx, row_major> queries,
-            raft::host_matrix_view<const idx_t, matrix_idx, row_major> neighbor_candidates,
-            raft::host_matrix_view<idx_t, matrix_idx, row_major> indices,
-            raft::host_matrix_view<distance_t, matrix_idx, row_major> distances,
-            distance::DistanceType metric = distance::DistanceType::L2Unexpanded)
+            raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
+            raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
+            raft::host_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
+            raft::host_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
 {
   detail::refine_host(dataset, queries, neighbor_candidates, indices, distances, metric);
 }
 
 /** @} */  // end group ann_refine
-}  // namespace raft::neighbors
+}  // namespace cuvs::neighbors

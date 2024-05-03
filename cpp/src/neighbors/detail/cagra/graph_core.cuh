@@ -494,7 +494,7 @@ void optimize(
       raft::copy(d_dest_nodes.data_handle(),
                  dest_nodes.data_handle(),
                  graph_size,
-                 resource::get_cuda_stream(res));
+                 raft::resource::get_cuda_stream(res));
 
       dim3 threads(256, 1, 1);
       dim3 blocks(1024, 1, 1);

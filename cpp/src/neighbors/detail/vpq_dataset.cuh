@@ -17,6 +17,7 @@
 
 #include "../dataset.hpp"
 
+#include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -24,8 +25,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/neighbors/detail/ivf_pq_build.cuh>  // pq_bits-bitfield
-#include <raft/spatial/knn/detail/ann_utils.cuh>   // utils::mapping etc
+#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping etc
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
@@ -311,7 +311,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   if (lane_id == 0) { *out_label_ptr = vq_label; }
 
   auto* out_codes_ptr = reinterpret_cast<uint8_t*>(out_label_ptr + 1);
-  raft::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
+  cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
     uint8_t code = compute_code<kSubWarpSize>(dataset, vq_centers, pq_centers, row_ix, j, vq_label);
@@ -393,14 +393,14 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
   auto vq_code_book = raft::make_device_mdarray<NewMathT>(res, src.vq_code_book.extents());
   auto pq_code_book = raft::make_device_mdarray<NewMathT>(res, src.pq_code_book.extents());
 
-  linalg::map(res,
-              vq_code_book.view(),
-              raft::spatial::knn::detail::utils::mapping<NewMathT>{},
-              raft::make_const_mdspan(src.vq_code_book.view()));
-  linalg::map(res,
-              pq_code_book.view(),
-              raft::spatial::knn::detail::utils::mapping<NewMathT>{},
-              raft::make_const_mdspan(src.pq_code_book.view()));
+  raft::linalg::map(res,
+                    vq_code_book.view(),
+                    raft::spatial::knn::detail::utils::mapping<NewMathT>{},
+                    raft::make_const_mdspan(src.vq_code_book.view()));
+  raft::linalg::map(res,
+                    pq_code_book.view(),
+                    raft::spatial::knn::detail::utils::mapping<NewMathT>{},
+                    raft::make_const_mdspan(src.pq_code_book.view()));
   return vpq_dataset<NewMathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};
 }

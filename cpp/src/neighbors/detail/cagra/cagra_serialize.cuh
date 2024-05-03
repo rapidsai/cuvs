@@ -34,6 +34,7 @@
 #include <fstream>
 #include <type_traits>
 
+static const std::string RAFT_NAME = "raft";
 namespace cuvs::neighbors::cagra::detail {
 
 constexpr int serialization_version = 4;
@@ -252,7 +253,9 @@ auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
   index<T, IdxT> idx(res, metric);
   idx.update_graph(res, raft::make_const_mdspan(graph.view()));
   bool has_dataset = raft::deserialize_scalar<bool>(res, is);
-  if (has_dataset) { idx.update_dataset(res, detail::deserialize_dataset<int64_t>(res, is)); }
+  if (has_dataset) {
+    idx.update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
+  }
   return idx;
 }
 

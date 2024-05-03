@@ -32,7 +32,7 @@
 
 #include <raft/matrix/select_k.cuh>
 
-#include "../../sample_filter_types.hpp"
+#include <cuvs/neighbors/sample_filter.hpp>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include <raft/spatial/knn/detail/ann_utils.cuh>
@@ -125,7 +125,7 @@ RAFT_KERNEL random_pickup_kernel(
   for (uint32_t i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
     unsigned j = device::swizzling(i);
     if (i < dataset_desc.dim) {
-      query_buffer[j] = spatial::knn::detail::utils::mapping<float>{}(
+      query_buffer[j] = raft::spatial::knn::detail::utils::mapping<float>{}(
         (queries_ptr + query_id * dataset_desc.dim)[i]);
     } else {
       query_buffer[j] = 0.0;
@@ -366,8 +366,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   for (uint32_t i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
     unsigned j = device::swizzling(i);
     if (i < dataset_desc.dim) {
-      query_buffer[j] =
-        spatial::knn::detail::utils::mapping<float>{}((query_ptr + query_id * dataset_desc.dim)[i]);
+      query_buffer[j] = raft::spatial::knn::detail::utils::mapping<float>{}(
+        (query_ptr + query_id * dataset_desc.dim)[i]);
     } else {
       query_buffer[j] = 0.0;
     }
@@ -560,7 +560,7 @@ void apply_filter(INDEX_T* const result_indices_ptr,
                   cudaStream_t cuda_stream)
 {
   const std::uint32_t block_size = 256;
-  const std::uint32_t grid_size  = ceildiv(num_queries * result_buffer_size, block_size);
+  const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);
 
   apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(result_indices_ptr,
                                                                  result_distances_ptr,
@@ -705,16 +705,16 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
          cuvs::distance::DistanceType metric)
     : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>(
         res, params, dim, graph_degree, topk, metric),
-      result_indices(0, resource::get_cuda_stream(res)),
-      result_distances(0, resource::get_cuda_stream(res)),
-      parent_node_list(0, resource::get_cuda_stream(res)),
-      topk_hint(0, resource::get_cuda_stream(res)),
-      topk_workspace(0, resource::get_cuda_stream(res)),
-      terminate_flag(resource::get_cuda_stream(res)),
-      input_keys_storage(0, resource::get_cuda_stream(res)),
-      output_keys_storage(0, resource::get_cuda_stream(res)),
-      input_values_storage(0, resource::get_cuda_stream(res)),
-      output_values_storage(0, resource::get_cuda_stream(res))
+      result_indices(0, raft::resource::get_cuda_stream(res)),
+      result_distances(0, raft::resource::get_cuda_stream(res)),
+      parent_node_list(0, raft::resource::get_cuda_stream(res)),
+      topk_hint(0, raft::resource::get_cuda_stream(res)),
+      topk_workspace(0, raft::resource::get_cuda_stream(res)),
+      terminate_flag(raft::resource::get_cuda_stream(res)),
+      input_keys_storage(0, raft::resource::get_cuda_stream(res)),
+      output_keys_storage(0, raft::resource::get_cuda_stream(res)),
+      input_values_storage(0, raft::resource::get_cuda_stream(res)),
+      output_values_storage(0, raft::resource::get_cuda_stream(res))
   {
     set_params(res);
   }
@@ -727,19 +727,19 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
     result_buffer_size            = itopk_size + (search_width * graph_degree);
     result_buffer_allocation_size = result_buffer_size + itopk_size;
     result_indices.resize(result_buffer_allocation_size * max_queries,
-                          resource::get_cuda_stream(res));
+                          raft::resource::get_cuda_stream(res));
     result_distances.resize(result_buffer_allocation_size * max_queries,
-                            resource::get_cuda_stream(res));
+                            raft::resource::get_cuda_stream(res));
 
-    parent_node_list.resize(max_queries * search_width, resource::get_cuda_stream(res));
-    topk_hint.resize(max_queries, resource::get_cuda_stream(res));
+    parent_node_list.resize(max_queries * search_width, raft::resource::get_cuda_stream(res));
+    topk_hint.resize(max_queries, raft::resource::get_cuda_stream(res));
 
     size_t topk_workspace_size = _cuann_find_topk_bufferSize(
       itopk_size, max_queries, result_buffer_size, utils::get_cuda_data_type<DATA_T>());
     RAFT_LOG_DEBUG("# topk_workspace_size: %lu", topk_workspace_size);
-    topk_workspace.resize(topk_workspace_size, resource::get_cuda_stream(res));
+    topk_workspace.resize(topk_workspace_size, raft::resource::get_cuda_stream(res));
 
-    hashmap.resize(hashmap_size, resource::get_cuda_stream(res));
+    hashmap.resize(hashmap_size, raft::resource::get_cuda_stream(res));
   }
 
   ~search() {}
@@ -760,7 +760,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
                          bool sort,
                          uint32_t* hints)
   {
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
 
     // _cuann_find_topk right now is limited to a max-k of 1024.
     // RAFT has a matrix::select_k function - which handles arbitrary sized values of k,
@@ -849,7 +849,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
                   SAMPLE_FILTER_T sample_filter)
   {
     // Init hashmap
-    cudaStream_t stream      = resource::get_cuda_stream(res);
+    cudaStream_t stream      = raft::resource::get_cuda_stream(res);
     const uint32_t hash_size = hashmap::get_size(hash_bitlen);
     set_value_batch(
       hashmap.data(), hash_size, utils::get_max_value<INDEX_T>(), hash_size, num_queries, stream);

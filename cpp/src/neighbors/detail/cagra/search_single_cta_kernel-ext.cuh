@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "../../sample_filter_types.hpp"
+#include <cuvs/neighbors/sample_filter.hpp>
 #include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #include <cuda_fp16.h>
