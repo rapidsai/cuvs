@@ -111,7 +111,7 @@ auto transform_data(const raft::resources& res, DatasetT dataset)
 
   raft::linalg::map(res,
                     result.view(),
-                    raft::spatial::knn::detail::utils::mapping<T>{},
+                    cuvs::spatial::knn::detail::utils::mapping<T>{},
                     raft::make_const_mdspan(dataset.view()));
 
   return result;
@@ -147,7 +147,7 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
     kmeans_params,
     vq_trainset_view,
     vq_centers_view,
-    raft::spatial::knn::detail::utils::mapping<MathT>{});
+    cuvs::spatial::knn::detail::utils::mapping<MathT>{});
 
   return vq_centers;
 }
@@ -179,7 +179,7 @@ auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCen
       vq_dataset_view,
       vq_centers_view,
       vq_labels.view(),
-      raft::spatial::knn::detail::utils::mapping<kmeans_math_type>{});
+      cuvs::spatial::knn::detail::utils::mapping<kmeans_math_type>{});
 
   return vq_labels;
 }
@@ -248,7 +248,7 @@ __device__ auto compute_code(
   uint32_t j,
   LabelT vq_label) -> uint8_t
 {
-  auto data_mapping = raft::spatial::knn::detail::utils::mapping<MathT>{};
+  auto data_mapping = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
   uint32_t lane_id  = raft::Pow2<SubWarpSize>::mod(raft::laneId());
 
   const uint32_t pq_book_size = pq_centers.extent(0);
@@ -363,7 +363,7 @@ auto process_and_fill_codes(
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }(pq_bits);
-  for (const auto& batch : raft::spatial::knn::detail::utils::batch_load_iterator(
+  for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator(
          dataset.data_handle(),
          n_rows,
          dim,
@@ -395,11 +395,11 @@ auto vpq_convert_math_type(const raft::resources& res, vpq_dataset<OldMathT, Idx
 
   raft::linalg::map(res,
                     vq_code_book.view(),
-                    raft::spatial::knn::detail::utils::mapping<NewMathT>{},
+                    cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.vq_code_book.view()));
   raft::linalg::map(res,
                     pq_code_book.view(),
-                    raft::spatial::knn::detail::utils::mapping<NewMathT>{},
+                    cuvs::spatial::knn::detail::utils::mapping<NewMathT>{},
                     raft::make_const_mdspan(src.pq_code_book.view()));
   return vpq_dataset<NewMathT, IdxT>{
     std::move(vq_code_book), std::move(pq_code_book), std::move(src.data)};

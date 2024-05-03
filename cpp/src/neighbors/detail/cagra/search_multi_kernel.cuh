@@ -125,7 +125,7 @@ RAFT_KERNEL random_pickup_kernel(
   for (uint32_t i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
     unsigned j = device::swizzling(i);
     if (i < dataset_desc.dim) {
-      query_buffer[j] = raft::spatial::knn::detail::utils::mapping<float>{}(
+      query_buffer[j] = cuvs::spatial::knn::detail::utils::mapping<float>{}(
         (queries_ptr + query_id * dataset_desc.dim)[i]);
     } else {
       query_buffer[j] = 0.0;
@@ -366,7 +366,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   for (uint32_t i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
     unsigned j = device::swizzling(i);
     if (i < dataset_desc.dim) {
-      query_buffer[j] = raft::spatial::knn::detail::utils::mapping<float>{}(
+      query_buffer[j] = cuvs::spatial::knn::detail::utils::mapping<float>{}(
         (query_ptr + query_id * dataset_desc.dim)[i]);
     } else {
       query_buffer[j] = 0.0;

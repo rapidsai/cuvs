@@ -63,7 +63,7 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
 

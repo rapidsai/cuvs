@@ -17,7 +17,7 @@
 #include "cagra.cuh"
 #include <cuvs/neighbors/cagra.hpp>
 
-namespace cuvs::neighbors::cagra {
+namespace cuvs::neighbors::cagra::runtime {
 
 #define RAFT_INST_CAGRA_BUILD(T, IdxT)                                                   \
   auto build(raft::resources const& handle,                                              \
@@ -56,4 +56,4 @@ RAFT_INST_CAGRA_BUILD(float, uint32_t);
 
 #undef RAFT_INST_CAGRA_BUILD
 
-}  // namespace cuvs::neighbors::cagra
+}  // namespace cuvs::neighbors::cagra::runtime

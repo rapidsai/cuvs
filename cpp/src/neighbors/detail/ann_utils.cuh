@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * raft::copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * You may obtain a raft::copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -32,7 +32,7 @@
 #include <memory>
 #include <optional>
 
-namespace raft::spatial::knn::detail::utils {
+namespace cuvs::spatial::knn::detail::utils {
 
 /** Whether pointers are accessible on the device or on the host. */
 enum class pointer_residency {
@@ -255,12 +255,12 @@ RAFT_KERNEL block_copy_kernel(const IdxT* in_offsets,
       r = c;
     }
   }
-  // copy the data
+  // raft::copy the data
   out_data[out_offsets[l] * n_mult - in_offset + i] = in_data[i];
 }
 
 /**
- * Copy chunks of data from one array to another at given offsets.
+ * raft::copy chunks of data from one array to another at given offsets.
  *
  * @tparam T element type
  * @tparam IdxT index type
@@ -327,7 +327,7 @@ RAFT_KERNEL copy_selected_kernel(
 }
 
 /**
- * @brief Copy selected rows of a matrix while mapping the data from the source to the target
+ * @brief raft::copy selected rows of a matrix while mapping the data from the source to the target
  * type.
  *
  * @tparam T      target type
@@ -358,7 +358,7 @@ void copy_selected(IdxT n_rows,
     case pointer_residency::host_and_device:
     case pointer_residency::device_only: {
       IdxT block_dim = 128;
-      IdxT grid_dim  = ceildiv(n_rows * n_cols, block_dim);
+      IdxT grid_dim  = raft::ceildiv(n_rows * n_cols, block_dim);
       copy_selected_kernel<T, S>
         <<<grid_dim, block_dim, 0, stream>>>(n_rows, n_cols, src, row_ids, ld_src, dst, ld_dst);
     } break;
@@ -387,12 +387,12 @@ void copy_selected(IdxT n_rows,
  *  3. if `source` is not accessible from the device, `batch.data()` points to an intermediate
  *     buffer; the corresponding data is copied in the given `stream` on every iterator dereference
  *     (i.e. batches can be skipped). Dereferencing the same batch two times in a row does not force
- *     the copy.
+ *     the raft::copy.
  *
  * In all three scenarios, the number of iterations, batch offsets and sizes are the same.
  *
- * The iterator can be reused. If the number of iterations is one, at most one copy will ever be
- * invoked (i.e. small datasets are not reloaded multiple times).
+ * The iterator can be reused. If the number of iterations is one, at most one raft::copy will ever
+ * be invoked (i.e. small datasets are not reloaded multiple times).
  */
 template <typename T>
 struct batch_load_iterator {
@@ -471,7 +471,7 @@ struct batch_load_iterator {
                          size_t(offset()),
                          size_t(size()),
                          size_t(row_width()));
-          copy(dev_ptr_, source_ + offset() * row_width(), size() * row_width(), stream_);
+          raft::copy(dev_ptr_, source_ + offset() * row_width(), size() * row_width(), stream_);
         }
       } else {
         dev_ptr_ = const_cast<T*>(source_) + offset() * row_width();
@@ -574,4 +574,4 @@ struct batch_load_iterator {
   size_type cur_pos_;
 };
 
-}  // namespace raft::spatial::knn::detail::utils
+}  // namespace cuvs::spatial::knn::detail::utils

@@ -1225,7 +1225,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));
   size_t batch_size = (data_ptr_attr.devicePointer == nullptr) ? 100000 : nrow_;
 
-  raft::spatial::knn::detail::utils::batch_load_iterator vec_batches{
+  cuvs::spatial::knn::detail::utils::batch_load_iterator vec_batches{
     data, static_cast<size_t>(nrow_), build_config_.dataset_dim, batch_size, stream};
   for (auto const& batch : vec_batches) {
     preprocess_data_kernel<<<batch.size(),

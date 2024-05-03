@@ -112,7 +112,7 @@ void refine_device(
 
   raft::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<
     data_t,
-    typename raft::spatial::knn::detail::utils::config<data_t>::value_t,
+    typename cuvs::spatial::knn::detail::utils::config<data_t>::value_t,
     idx_t>(refinement_index,
            queries.data_handle(),
            fake_coarse_idx.data(),

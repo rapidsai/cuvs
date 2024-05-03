@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * raft::copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * You may obtain a raft::copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -55,7 +55,7 @@
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 /**
  * Select the clusters to probe and, as a side-effect, translate the queries type `T -> float`

@@ -132,7 +132,7 @@ void build_knn_graph(
 
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(res);
 
-  raft::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
+  cuvs::spatial::knn::detail::utils::batch_load_iterator<DataT> vec_batches(
     dataset.data_handle(),
     dataset.extent(0),
     dataset.extent(1),

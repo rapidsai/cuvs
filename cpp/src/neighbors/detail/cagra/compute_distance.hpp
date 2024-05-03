@@ -252,7 +252,7 @@ struct standard_dataset_descriptor_t
       unsigned j = device::swizzling(i);
       if (i < dim) {
         smem_query_ptr[j] =
-          raft::spatial::knn::detail::utils::mapping<QUERY_T>{}(dmem_query_ptr[i]);
+          cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(dmem_query_ptr[i]);
       } else {
         smem_query_ptr[j] = 0.0;
       }
@@ -308,7 +308,7 @@ struct standard_dataset_descriptor_t
             // - The data buffer has to be also padded with zeros.
             DISTANCE_T d = query_ptr[device::swizzling(kv)];
             norm2 += dist_op<DISTANCE_T, METRIC>(
-              d, raft::spatial::knn::detail::utils::mapping<float>{}(dl_buff[e].val.data[v]));
+              d, cuvs::spatial::knn::detail::utils::mapping<float>{}(dl_buff[e].val.data[v]));
           }
         }
       }

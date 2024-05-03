@@ -322,8 +322,8 @@ void search_main(raft::resources const& res,
   const DistanceT* dist_in = distances.data_handle();
   // We're converting the data from T to DistanceT during distance computation
   // and divide the values by kDivisor. Here we restore the original scale.
-  constexpr float kScale = raft::spatial::knn::detail::utils::config<T>::kDivisor /
-                           raft::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
+  constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
+                           cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
   cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
                                                       dist_in,
                                                       index.metric(),

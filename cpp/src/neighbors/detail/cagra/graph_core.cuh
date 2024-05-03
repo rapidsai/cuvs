@@ -94,9 +94,9 @@ RAFT_KERNEL kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, data
     const IdxT dstNode = knn_graph[k + static_cast<uint64_t>(graph_degree) * srcNode];
     float dist         = 0.0;
     for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
-      float diff = raft::spatial::knn::detail::utils::mapping<float>{}(
+      float diff = cuvs::spatial::knn::detail::utils::mapping<float>{}(
                      dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) -
-                   raft::spatial::knn::detail::utils::mapping<float>{}(
+                   cuvs::spatial::knn::detail::utils::mapping<float>{}(
                      dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
       dist += diff * diff;
     }
