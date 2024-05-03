@@ -54,7 +54,7 @@ void cagra_build_search_simple(raft::device_resources const& dev_resources,
   // search K nearest neighbors
   cagra::search(dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
-  // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
+  // The call to cagra::search is asynchronous. Before accessing the data, sync by calling
   // raft::resource::sync_stream(dev_resources);
 
   print_results(dev_resources, neighbors.view(), distances.view());
