@@ -15,7 +15,6 @@
  */
 
 #pragma once
-#include <raft/core/nvtx.hpp>
 
 namespace cuvs::common::nvtx::domain {
 /** @brief This NVTX domain is supposed to be used within cuvs.  */

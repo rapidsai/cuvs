@@ -16,14 +16,14 @@
 
 #pragma once
 
+#include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_list.cuh"
-#include <cuvs/core/nvtx.hpp>
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/detail/ivf_pq_helpers.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 #include <raft/cluster/kmeans_balanced.cuh>

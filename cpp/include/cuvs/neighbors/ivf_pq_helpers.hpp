@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <cuvs/core/nvtx.hpp>
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>

@@ -16,11 +16,11 @@
 
 #pragma once
 
+#include "../../core/nvtx.hpp"
+#include "../ivf_common.cuh"
 #include "ivf_pq_compute_similarity.cuh"
 #include "ivf_pq_fp_8bit.cuh"
-#include <cuvs/core/nvtx.hpp>
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/detail/ivf_common.cuh>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/sample_filter.hpp>
 #include <raft/core/cudart_utils.hpp>
