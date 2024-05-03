@@ -24,7 +24,7 @@
 #include <raft/core/resources.hpp>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include "../ann_utils.cuh"
 
 #include <raft/util/bitonic_sort.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>

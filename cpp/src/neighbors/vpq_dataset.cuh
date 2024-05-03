@@ -39,6 +39,7 @@ template <typename DatasetT,
           typename IdxT  = typename DatasetT::index_type>
 auto vpq_build(const raft::resources& res, const vpq_params& params, const DatasetT& dataset)
   -> vpq_dataset<MathT, IdxT>
+
 {
   if constexpr (std::is_same_v<MathT, half>) {
     return detail::vpq_convert_math_type<half, float, IdxT>(

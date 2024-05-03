@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"
 #include "ivf_pq_compute_similarity.cuh"
 #include "ivf_pq_fp_8bit.cuh"
@@ -37,7 +38,6 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_k.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>

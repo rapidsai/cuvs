@@ -18,6 +18,7 @@
 #include "../dataset.hpp"
 
 #include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
+#include "ann_utils.cuh"               // utils::mapping etc
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -25,7 +26,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping etc
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 

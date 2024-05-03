@@ -35,7 +35,7 @@
 #include <cuvs/neighbors/sample_filter.hpp>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include "../ann_utils.cuh"
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp

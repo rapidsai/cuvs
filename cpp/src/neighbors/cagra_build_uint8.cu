@@ -15,12 +15,7 @@
  */
 
 #include "cagra.cuh"
-#include <raft/neighbors/ivf_pq.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-
 #include <cuvs/neighbors/cagra.hpp>
-
-#include <cuda_fp16.h>
 
 namespace cuvs::neighbors::cagra {
 

@@ -23,9 +23,10 @@
 #include "ivf_pq_list.cuh"
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
+#include "../detail/ann_utils.cuh"  // utils::mapping
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -43,7 +44,6 @@
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
 #include <raft/random/rng.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping
 #include <raft/stats/histogram.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>

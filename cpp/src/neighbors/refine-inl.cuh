@@ -16,11 +16,11 @@
 
 #pragma once
 
+#include "detail/ann_utils.cuh"
 #include "detail/refine.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 
 namespace cuvs::neighbors {
 

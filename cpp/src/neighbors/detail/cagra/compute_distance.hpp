@@ -23,7 +23,7 @@
 #include <raft/core/operators.hpp>
 
 // TODO: This shouldn't be invoking spatial/knn
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include "../ann_utils.cuh"
 
 #include <raft/util/vectorized.cuh>
 

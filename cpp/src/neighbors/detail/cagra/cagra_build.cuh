@@ -29,16 +29,15 @@
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <cuvs/distance/distance_types.hpp>
-
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 // TODO: Fixme- this needs to be migrated
 #include "../../ivf_pq/ivf_pq_build.cuh"
+#include "../../nn_descent.cuh"
 #include "../../refine.cuh"
-#include <raft/neighbors/nn_descent.cuh>
 
 // TODO: This shouldn't be calling spatial/knn APIs
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include "../ann_utils.cuh"
 
 #include <rmm/resource_ref.hpp>
 
@@ -46,9 +45,9 @@
 #include <cstdio>
 #include <vector>
 
-static const std::string RAFT_NAME = "raft";
-
 namespace cuvs::neighbors::cagra::detail {
+
+static const std::string RAFT_NAME = "raft";
 
 template <typename DataT, typename IdxT, typename accessor>
 void build_knn_graph(
@@ -251,10 +250,10 @@ void build_knn_graph(
   raft::resources const& res,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
-  raft::neighbors::experimental::nn_descent::index_params build_params)
+  cuvs::neighbors::experimental::nn_descent::index_params build_params)
 {
-  auto nn_descent_idx = raft::neighbors::experimental::nn_descent::index<IdxT>(res, knn_graph);
-  raft::neighbors::experimental::nn_descent::build<DataT, IdxT>(
+  auto nn_descent_idx = cuvs::neighbors::experimental::nn_descent::index<IdxT>(res, knn_graph);
+  cuvs::neighbors::experimental::nn_descent::build<DataT, IdxT>(
     res, build_params, dataset, nn_descent_idx);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
@@ -308,7 +307,7 @@ index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  std::optional<raft::neighbors::experimental::nn_descent::index_params> nn_descent_params =
+  std::optional<cuvs::neighbors::experimental::nn_descent::index_params> nn_descent_params =
     std::nullopt,
   std::optional<float> refine_rate                                     = std::nullopt,
   std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params = std::nullopt,
@@ -343,7 +342,7 @@ index<T, IdxT> build(
       "L2Expanded is the only distance metrics supported for CAGRA build with nn_descent");
     // Use nn-descent to build CAGRA knn graph
     if (!nn_descent_params) {
-      nn_descent_params               = raft::neighbors::experimental::nn_descent::index_params();
+      nn_descent_params               = cuvs::neighbors::experimental::nn_descent::index_params();
       nn_descent_params->graph_degree = intermediate_degree;
       nn_descent_params->intermediate_graph_degree = 1.5 * intermediate_degree;
       nn_descent_params->max_iterations            = params.nn_descent_niter;

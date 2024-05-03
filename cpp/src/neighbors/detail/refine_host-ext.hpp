@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "refine_host-inl.hpp"
 #include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
 #include <raft/core/detail/macros.hpp>       // _RAFT_HAS_CUDA
 #include <raft/core/host_mdspan.hpp>         // raft::host_matrix_view
@@ -51,7 +52,7 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
     raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,         \
     raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,                           \
     raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,                    \
-    distance::DistanceType metric);
+    cuvs::distance::DistanceType metric);
 
 instantiate_raft_neighbors_refine(int64_t, float, float, int64_t);
 instantiate_raft_neighbors_refine(uint32_t, float, float, int64_t);

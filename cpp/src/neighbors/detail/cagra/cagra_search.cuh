@@ -37,7 +37,7 @@
 #include <cuvs/neighbors/sample_filter.hpp>
 
 // TODO: This shouldn't be calling spatial/knn apis
-#include <raft/spatial/knn/detail/ann_utils.cuh>
+#include "../ann_utils.cuh"
 
 #include <rmm/cuda_stream_view.hpp>
 
