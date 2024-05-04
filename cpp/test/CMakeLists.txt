@@ -128,35 +128,47 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+
+  ConfigureTest(
+    NAME
+    DISTANCE_TEST
+    PATH
+    test/distance/dist_canberra.cu
+    test/distance/dist_correlation.cu
+    test/distance/dist_cos.cu
+    test/distance/dist_hamming.cu
+    test/distance/dist_hellinger.cu
+    test/distance/dist_inner_product.cu
+    test/distance/dist_jensen_shannon.cu
+    test/distance/dist_kl_divergence.cu
+    test/distance/dist_l1.cu
+    test/distance/dist_l2_exp.cu
+    test/distance/dist_l2_sqrt_exp.cu
+    test/distance/dist_l_inf.cu
+    test/distance/dist_lp_unexp.cu
+    test/distance/dist_russell_rao.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
 endif()
 
 if(BUILD_C_TESTS)
   ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
 
   ConfigureTest(
-    NAME
-    BRUTEFORCE_C_TEST
-    PATH
-    test/neighbors/run_brute_force_c.c
-    test/neighbors/brute_force_c.cu
+    NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME
-    IVF_FLAT_C_TEST
-    PATH
-    test/neighbors/run_ivf_flat_c.c
-    test/neighbors/ann_ivf_flat_c.cu
+    NAME IVF_FLAT_C_TEST PATH test/neighbors/run_ivf_flat_c.c test/neighbors/ann_ivf_flat_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME
-    IVF_PQ_C_TEST
-    PATH
-    test/neighbors/run_ivf_pq_c.c
-    test/neighbors/ann_ivf_pq_c.cu C_LIB
+    NAME IVF_PQ_C_TEST PATH test/neighbors/run_ivf_pq_c.c test/neighbors/ann_ivf_pq_c.cu C_LIB
   )
 
   ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)

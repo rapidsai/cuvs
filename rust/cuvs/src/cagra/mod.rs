@@ -82,5 +82,5 @@ mod index_params;
 mod search_params;
 
 pub use index::Index;
-pub use index_params::{BuildAlgo, IndexParams};
+pub use index_params::{BuildAlgo, CompressionParams, IndexParams};
 pub use search_params::{HashMode, SearchAlgo, SearchParams};
