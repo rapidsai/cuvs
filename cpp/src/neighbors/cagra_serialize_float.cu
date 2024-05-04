@@ -23,35 +23,34 @@
 
 namespace cuvs::neighbors::cagra {
 
-#define CUVS_INST_CAGRA_SERIALIZE(DTYPE)                                                      \
-  void serialize_file(raft::resources const& handle,                                          \
-                      const std::string& filename,                                            \
-                      const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,            \
-                      bool include_dataset)                                                   \
-  {                                                                                           \
-    cuvs::neighbors::cagra::serialize_file(                                                   \
-      handle, filename, *index.get_raft_index(), include_dataset);                            \
-  };                                                                                          \
-                                                                                              \
-  void deserialize_file(raft::resources const& handle,                                        \
-                        const std::string& filename,                                          \
-                        cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)                \
-  {                                                                                           \
-    cuvs::neighbors::cagra::deserialize_file(handle, filename, index->get_raft_index());      \
-  };                                                                                          \
-  void serialize(raft::resources const& handle,                                               \
-                 std::string& str,                                                            \
-                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,                 \
-                 bool include_dataset)                                                        \
-  {                                                                                           \
-    cuvs::neighbors::cagra::serialize(handle, str, *index.get_raft_index(), include_dataset); \
-  }                                                                                           \
-                                                                                              \
-  void deserialize(raft::resources const& handle,                                             \
-                   const std::string& str,                                                    \
-                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)                     \
-  {                                                                                           \
-    cuvs::neighbors::cagra::deserialize(handle, str, index->get_raft_index());                \
+#define CUVS_INST_CAGRA_SERIALIZE(DTYPE)                                              \
+  void serialize_file(raft::resources const& handle,                                  \
+                      const std::string& filename,                                    \
+                      const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,    \
+                      bool include_dataset)                                           \
+  {                                                                                   \
+    cuvs::neighbors::cagra::serialize_file(handle, filename, index, include_dataset); \
+  };                                                                                  \
+                                                                                      \
+  void deserialize_file(raft::resources const& handle,                                \
+                        const std::string& filename,                                  \
+                        cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)        \
+  {                                                                                   \
+    cuvs::neighbors::cagra::deserialize_file(handle, filename, index);                \
+  };                                                                                  \
+  void serialize(raft::resources const& handle,                                       \
+                 std::string& str,                                                    \
+                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,         \
+                 bool include_dataset)                                                \
+  {                                                                                   \
+    cuvs::neighbors::cagra::serialize(handle, str, index, include_dataset);           \
+  }                                                                                   \
+                                                                                      \
+  void deserialize(raft::resources const& handle,                                     \
+                   const std::string& str,                                            \
+                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)             \
+  {                                                                                   \
+    cuvs::neighbors::cagra::deserialize(handle, str, index);                          \
   }
 
 CUVS_INST_CAGRA_SERIALIZE(float);

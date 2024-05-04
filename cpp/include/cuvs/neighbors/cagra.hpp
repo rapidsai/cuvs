@@ -235,8 +235,7 @@ struct index : cuvs::neighbors::ann::index {
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : ann::index(),
-      raft_index_(std::make_unique<cuvs::neighbors::cagra::index<T, IdxT>>(
-        res, static_cast<cuvs::distance::DistanceType>((int)metric)))
+      raft_index_(std::make_unique<cuvs::neighbors::cagra::index<T, IdxT>>(res, metric))
   {
   }
   /** Construct an index from dataset and knn_graph arrays
@@ -300,8 +299,8 @@ struct index : cuvs::neighbors::ann::index {
         raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
           knn_graph)
     : ann::index(),
-      raft_index_(std::make_unique<cuvs::neighbors::cagra::index<T, IdxT>>(
-        res, static_cast<cuvs::distance::DistanceType>((int)metric), dataset, knn_graph))
+      raft_index_(
+        std::make_unique<cuvs::neighbors::cagra::index<T, IdxT>>(res, metric, dataset, knn_graph))
   {
     RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                  "Dataset and knn_graph must have equal number of rows");
@@ -355,12 +354,6 @@ struct index : cuvs::neighbors::ann::index {
   {
     raft_index_->update_graph(res, knn_graph);
   }
-
-  auto get_raft_index() const -> const cuvs::neighbors::cagra::index<T, IdxT>*
-  {
-    return raft_index_.get();
-  }
-  auto get_raft_index() -> cuvs::neighbors::cagra::index<T, IdxT>* { return raft_index_.get(); }
 
  private:
   std::unique_ptr<cuvs::neighbors::cagra::index<T, IdxT>> raft_index_;

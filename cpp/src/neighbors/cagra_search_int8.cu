@@ -18,16 +18,15 @@
 #include <cuvs/neighbors/cagra.hpp>
 namespace cuvs::neighbors::cagra {
 
-#define CUVS_INST_CAGRA_SEARCH(T, IdxT)                                            \
-  void search(raft::resources const& handle,                                       \
-              cuvs::neighbors::cagra::search_params const& params,                 \
-              const cuvs::neighbors::cagra::index<T, IdxT>& index,                 \
-              raft::device_matrix_view<const T, int64_t, raft::row_major> queries, \
-              raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,  \
-              raft::device_matrix_view<float, int64_t, raft::row_major> distances) \
-  {                                                                                \
-    cuvs::neighbors::cagra::search(                                                \
-      handle, params, *index.get_raft_index(), queries, neighbors, distances);     \
+#define CUVS_INST_CAGRA_SEARCH(T, IdxT)                                                   \
+  void search(raft::resources const& handle,                                              \
+              cuvs::neighbors::cagra::search_params const& params,                        \
+              const cuvs::neighbors::cagra::index<T, IdxT>& index,                        \
+              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,        \
+              raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,         \
+              raft::device_matrix_view<float, int64_t, raft::row_major> distances)        \
+  {                                                                                       \
+    cuvs::neighbors::cagra::search(handle, params, index, queries, neighbors, distances); \
   }
 
 CUVS_INST_CAGRA_SEARCH(int8_t, uint32_t);
