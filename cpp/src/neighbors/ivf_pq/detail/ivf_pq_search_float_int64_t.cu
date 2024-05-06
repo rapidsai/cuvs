@@ -25,7 +25,7 @@
 
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include "ivf_pq_search.cuh"
+#include "../ivf_pq_search.cuh"
 
 namespace cuvs::neighbors::ivf_pq {
 

@@ -55,20 +55,16 @@ struct bitset_view {
    * @param sample_index Single index to test
    * @return bool True if index has not been unset in the bitset
    */
-  _RAFT_DEVICE inline bool test(const index_t sample_index) const
-  {
-    const bitset_t bit_element = bitset_ptr_[sample_index / bitset_element_size];
-    const index_t bit_index    = sample_index % bitset_element_size;
-    const bool is_bit_set      = (bit_element & (bitset_t{1} << bit_index)) != 0;
-    return is_bit_set;
-  }
+  _RAFT_HOST_DEVICE inline bool test(const index_t sample_index) const;
+
   /**
    * @brief Device function to test if a given index is set in the bitset.
    *
    * @param sample_index Single index to test
    * @return bool True if index has not been unset in the bitset
    */
-  _RAFT_DEVICE bool operator[](const index_t sample_index) const { return test(sample_index); }
+  _RAFT_HOST_DEVICE bool operator[](const index_t sample_index) const;
+
   /**
    * @brief Device function to set a given index to set_value in the bitset.
    *
@@ -184,23 +180,10 @@ struct bitset {
    * @param queries List of indices to test
    * @param output List of outputs
    */
-  /*
-  TODO: Disabled test() for cuVS migration
   template <typename output_t = bool>
   void test(const raft::resources& res,
             raft::device_vector_view<const index_t, index_t> queries,
-            raft::device_vector_view<output_t, index_t> output) const
-  {
-    RAFT_EXPECTS(output.extent(0) == queries.extent(0), "Output and queries must be same size");
-    auto bitset_view = view();
-    thrust::transform(
-        raft::resource::get_thrust_policy(res),
-        queries.data_handle(),
-        queries.data_handle() + queries.size(),
-        output.data_handle(),
-        [bitset_view] __device__(index_t query) { return output_t{bitset_view.test(query)}; });
-  }
-  */
+            raft::device_vector_view<output_t, index_t> output) const;
   /**
    * @brief Set a list of indices in a bitset to set_value.
    *
