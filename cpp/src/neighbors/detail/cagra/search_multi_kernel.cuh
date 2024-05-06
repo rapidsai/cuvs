@@ -147,17 +147,18 @@ RAFT_KERNEL random_pickup_kernel(
 
     DISTANCE_T norm2;
     switch (metric) {
-      case distance::DistanceType::L2Expanded:
+      case cuvs::distance::DistanceType::L2Expanded:
         norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
                                                          TEAM_SIZE,
-                                                         distance::DistanceType::L2Expanded>(
+                                                         cuvs::distance::DistanceType::L2Expanded>(
           query_buffer, seed_index, true);
         break;
-      case distance::DistanceType::InnerProduct:
-        norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                         TEAM_SIZE,
-                                                         distance::DistanceType::InnerProduct>(
-          query_buffer, seed_index, true);
+      case cuvs::distance::DistanceType::InnerProduct:
+        norm2 =
+          dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
+                                                   TEAM_SIZE,
+                                                   cuvs::distance::DistanceType::InnerProduct>(
+            query_buffer, seed_index, true);
         break;
       default: break;
     }

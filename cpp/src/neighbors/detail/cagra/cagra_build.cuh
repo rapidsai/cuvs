@@ -58,8 +58,8 @@ void build_knn_graph(
   std::optional<cuvs::neighbors::ivf_pq::index_params> build_params   = std::nullopt,
   std::optional<cuvs::neighbors::ivf_pq::search_params> search_params = std::nullopt)
 {
-  RAFT_EXPECTS(!build_params || build_params->metric == distance::DistanceType::L2Expanded ||
-                 build_params->metric == distance::DistanceType::InnerProduct,
+  RAFT_EXPECTS(!build_params || build_params->metric == cuvs::distance::DistanceType::L2Expanded ||
+                 build_params->metric == cuvs::distance::DistanceType::InnerProduct,
                "Currently only L2Expanded or InnerProduct metric are supported");
 
   uint32_t node_degree = knn_graph.extent(1);
@@ -366,15 +366,22 @@ index<T, IdxT> build(
                    "VPQ compression is only supported with L2Expanded distance mertric");
       index<T, IdxT> idx(res, params.metric);
       idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+
+      printf("Calling update dataset...\n");
       idx.update_dataset(
         res,
         // TODO: hardcoding codebook math to `half`, we can do runtime dispatching later
         cuvs::neighbors::vpq_build<decltype(dataset), half, int64_t>(
           res, *params.compression, dataset));
+
+      printf("Returning idx\n");
       return idx;
     }
+
+    printf("Returning index...\n");
     return index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
   } else {
+    printf("Simply calling update_graph...\n");
     // We just add the graph. User is expected to update dataset separately. This branch is used
     // if user needs special control of memory allocations for the dataset.
     index<T, IdxT> idx(res, params.metric);

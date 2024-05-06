@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <raft/neighbors/detail/cagra/search_single_cta_kernel-inl.cuh>
-#include <raft/neighbors/sample_filter_types.hpp>
+#include "search_single_cta_kernel-inl.cuh"
+#include <cuvs/neighbors/sample_filter.hpp>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 

@@ -23,9 +23,8 @@
  *
  */
 
-#include "search_multi_cta_inst.cuh"
-
 #include "compute_distance_vpq.cuh"
+#include "search_multi_cta_inst.cuh"
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 instantiate_kernel_selection(32,

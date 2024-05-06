@@ -28,7 +28,7 @@ void refine_check_input(ExtentsT dataset,
                         ExtentsT candidates,
                         ExtentsT indices,
                         ExtentsT distances,
-                        distance::DistanceType metric)
+                        cuvs::distance::DistanceType metric)
 {
   auto n_queries = queries.extent(0);
   auto k         = distances.extent(1);

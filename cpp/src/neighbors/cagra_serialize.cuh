@@ -228,10 +228,3 @@ index<T, IdxT> deserialize(raft::resources const& handle, const std::string& fil
 /**@}*/
 
 }  // namespace cuvs::neighbors::cagra
-
-// TODO: Remove deprecated experimental namespace in 23.12 release
-namespace cuvs::neighbors::experimental::cagra {
-using cuvs::neighbors::cagra::deserialize;
-using cuvs::neighbors::cagra::serialize;
-
-}  // namespace cuvs::neighbors::experimental::cagra
