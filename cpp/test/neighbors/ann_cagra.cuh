@@ -25,9 +25,10 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/linalg/add.cuh>
-#include <raft/neighbors/cagra.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -46,6 +47,18 @@
 namespace cuvs::neighbors::cagra {
 namespace {
 
+/** Xorshift rondem number generator.
+ *
+ * See https://en.wikipedia.org/wiki/Xorshift#xorshift for reference.
+ */
+_RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
+{
+  u ^= u >> 12;
+  u ^= u << 25;
+  u ^= u >> 27;
+  return u * 0x2545F4914F6CDD1DULL;
+}
+
 // For sort_knn_graph test
 template <typename IdxT>
 void RandomSuffle(raft::host_matrix_view<IdxT, int64_t> index)
@@ -55,9 +68,9 @@ void RandomSuffle(raft::host_matrix_view<IdxT, int64_t> index)
     IdxT* const row_ptr = index.data_handle() + i * index.extent(1);
     for (unsigned j = 0; j < index.extent(1); j++) {
       // Swap two indices at random
-      rand          = raft::neighbors::cagra::detail::device::xorshift64(rand);
+      rand          = xorshift64(rand);
       const auto i0 = rand % index.extent(1);
-      rand          = raft::neighbors::cagra::detail::device::xorshift64(rand);
+      rand          = xorshift64(rand);
       const auto i1 = rand % index.extent(1);
 
       const auto tmp = row_ptr[i0];
