@@ -507,7 +507,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           search_queries_view,
           indices_ivfflat_dev.view(),
           distances_ivfflat_dev.view(),
-          raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+           cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);

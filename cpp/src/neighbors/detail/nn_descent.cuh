@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../nn_descent_types.hpp"
+#include <cuvs/neighbors/nn_descent.hpp>
 
 #include "ann_utils.cuh"
 #include "cagra/device_common.hpp"
@@ -49,7 +49,7 @@
 #include <queue>
 #include <random>
 
-namespace cuvs::neighbors::experimental::nn_descent::detail {
+namespace cuvs::neighbors::nn_descent::detail {
 static const std::string RAFT_NAME = "raft";
 using pinned_memory_resource       = thrust::universal_host_pinned_memory_resource;
 template <typename T>
@@ -1454,4 +1454,4 @@ index<IdxT> build(
   return idx;
 }
 
-}  // namespace cuvs::neighbors::experimental::nn_descent::detail
+}  // namespace  cuvs::neighbors::nn_descent::detail

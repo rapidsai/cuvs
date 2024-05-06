@@ -250,11 +250,10 @@ void build_knn_graph(
   raft::resources const& res,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
-  cuvs::neighbors::experimental::nn_descent::index_params build_params)
+  cuvs::neighbors::nn_descent::index_params build_params)
 {
-  auto nn_descent_idx = cuvs::neighbors::experimental::nn_descent::index<IdxT>(res, knn_graph);
-  cuvs::neighbors::experimental::nn_descent::build<DataT, IdxT>(
-    res, build_params, dataset, nn_descent_idx);
+  auto nn_descent_idx = cuvs::neighbors::nn_descent::index<IdxT>(res, knn_graph);
+  cuvs::neighbors::nn_descent::build<DataT, IdxT>(res, build_params, dataset, nn_descent_idx);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
@@ -307,12 +306,11 @@ index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  std::optional<cuvs::neighbors::experimental::nn_descent::index_params> nn_descent_params =
-    std::nullopt,
-  std::optional<float> refine_rate                                     = std::nullopt,
-  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params = std::nullopt,
-  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params  = std::nullopt,
-  bool construct_index_with_dataset                                    = true)
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset                                          = true)
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
@@ -342,8 +340,8 @@ index<T, IdxT> build(
       "L2Expanded is the only distance metrics supported for CAGRA build with nn_descent");
     // Use nn-descent to build CAGRA knn graph
     if (!nn_descent_params) {
-      nn_descent_params               = cuvs::neighbors::experimental::nn_descent::index_params();
-      nn_descent_params->graph_degree = intermediate_degree;
+      nn_descent_params                            = cuvs::neighbors::nn_descent::index_params();
+      nn_descent_params->graph_degree              = intermediate_degree;
       nn_descent_params->intermediate_graph_degree = 1.5 * intermediate_degree;
       nn_descent_params->max_iterations            = params.nn_descent_niter;
     }

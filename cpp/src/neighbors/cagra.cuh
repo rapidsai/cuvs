@@ -150,7 +150,7 @@ void build_knn_graph(
   raft::resources const& res,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
-  cuvs::neighbors::experimental::nn_descent::index_params build_params)
+  cuvs::neighbors::nn_descent::index_params build_params)
 {
   detail::build_knn_graph<DataT, IdxT>(res, dataset, knn_graph, build_params);
 }
