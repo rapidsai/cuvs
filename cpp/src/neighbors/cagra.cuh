@@ -28,7 +28,7 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
-#include "dataset.hpp"
+#include <cuvs/neighbors/dataset.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
 

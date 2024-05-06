@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "../dataset.hpp"
+#include <cuvs/neighbors/dataset.hpp>
 
 #include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
 #include "ann_utils.cuh"               // utils::mapping etc
@@ -273,8 +273,8 @@ __device__ auto compute_code(
   // reduce among threads
 #pragma unroll
   for (uint32_t stride = SubWarpSize >> 1; stride > 0; stride >>= 1) {
-    const auto other_dist = shfl_xor(min_dist, stride, SubWarpSize);
-    const auto other_code = shfl_xor(code, stride, SubWarpSize);
+    const auto other_dist = raft::shfl_xor(min_dist, stride, SubWarpSize);
+    const auto other_code = raft::shfl_xor(code, stride, SubWarpSize);
     if (other_dist < min_dist) {
       min_dist = other_dist;
       code     = other_code;

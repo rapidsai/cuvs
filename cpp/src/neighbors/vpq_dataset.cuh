@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "dataset.hpp"
 #include "detail/vpq_dataset.cuh"
+#include <cuvs/neighbors/dataset.hpp>
 
 #include <raft/core/resources.hpp>
 
