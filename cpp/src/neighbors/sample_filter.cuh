@@ -16,34 +16,95 @@
 
 #pragma once
 
-#include <raft/core/bitset.cuh>
+#include "../core/bitset.cuh"
+#include <cuvs/neighbors/sample_filter.hpp>
+#include <raft/core/detail/macros.hpp>
 
 #include <cstddef>
 #include <cstdint>
 
 namespace cuvs::neighbors::filtering {
+
+/* A filter that filters nothing. This is the default behavior. */
+inline _RAFT_HOST_DEVICE bool none_ivf_sample_filter::operator()(
+  // query index
+  const uint32_t query_ix,
+  // the current inverted list index
+  const uint32_t cluster_ix,
+  // the index of the current sample inside the current inverted list
+  const uint32_t sample_ix) const
+{
+  return true;
+}
+
+/* A filter that filters nothing. This is the default behavior. */
+inline _RAFT_HOST_DEVICE bool none_cagra_sample_filter::operator()(
+  // query index
+  const uint32_t query_ix,
+  // the index of the current sample
+  const uint32_t sample_ix) const
+{
+  return true;
+}
+
+template <typename filter_t, typename = void>
+struct takes_three_args : std::false_type {};
+template <typename filter_t>
+struct takes_three_args<
+  filter_t,
+  std::void_t<decltype(std::declval<filter_t>()(uint32_t{}, uint32_t{}, uint32_t{}))>>
+  : std::true_type {};
+
 /**
- * @brief Filter an index with a bitset
+ * @brief Filter used to convert the cluster index and sample index
+ * of an IVF search into a sample index. This can be used as an
+ * intermediate filter.
  *
  * @tparam index_t Indexing type
+ * @tparam filter_t
  */
-template <typename bitset_t, typename index_t>
-struct bitset_filter {
-  // View of the bitset to use as a filter
-  const raft::core::bitset_view<bitset_t, index_t> bitset_view_;
+template <typename index_t, typename filter_t>
+ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* const* inds_ptrs,
+                                                              const filter_t next_filter)
+  : inds_ptrs_{inds_ptrs}, next_filter_{next_filter}
+{
+}
 
-  bitset_filter(const raft::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
-    : bitset_view_{bitset_for_filtering}
-  {
+/** If the original filter takes three arguments, then don't modify the arguments.
+ * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
+ * index.
+ */
+template <typename index_t, typename filter_t>
+inline _RAFT_HOST_DEVICE bool ivf_to_sample_filter<index_t, filter_t>::operator()(
+  // query index
+  const uint32_t query_ix,
+  // the current inverted list index
+  const uint32_t cluster_ix,
+  // the index of the current sample inside the current inverted list
+  const uint32_t sample_ix) const
+{
+  if constexpr (takes_three_args<filter_t>::value) {
+    return next_filter_(query_ix, cluster_ix, sample_ix);
+  } else {
+    return next_filter_(query_ix, inds_ptrs_[cluster_ix][sample_ix]);
   }
-  inline _RAFT_HOST_DEVICE bool operator()(
-    // query index
-    const uint32_t query_ix,
-    // the index of the current sample
-    const uint32_t sample_ix) const
-  {
-    return bitset_view_.test(sample_ix);
-  }
-};
+}
+
+template <typename bitset_t, typename index_t>
+bitset_filter<bitset_t, index_t>::bitset_filter(
+  const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
+  : bitset_view_{bitset_for_filtering}
+{
+}
+
+template <typename bitset_t, typename index_t>
+inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
+  // query index
+  const uint32_t query_ix,
+  // the index of the current sample
+  const uint32_t sample_ix) const
+{
+  return bitset_view_.test(sample_ix);
+}
 
 }  // namespace cuvs::neighbors::filtering

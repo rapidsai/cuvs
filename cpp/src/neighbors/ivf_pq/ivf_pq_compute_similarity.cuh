@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include "ivf_pq_fp_8bit.cuh"  // cuvs::neighbors::ivf_pq::detail::fp_8bit
+#include "../sample_filter.cuh"  // none_ivf_sample_filter
+#include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
 #include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
 #include <cuvs/neighbors/ivf_pq.hpp>         // cuvs::neighbors::ivf_pq::codebook_gen
-#include <cuvs/neighbors/sample_filter.hpp>  // none_ivf_sample_filter
 #include <raft/core/detail/macros.hpp>       // RAFT_WEAK_FUNCTION
 #include <rmm/cuda_stream_view.hpp>          // rmm::cuda_stream_view
 

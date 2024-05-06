@@ -20,9 +20,9 @@
  * > python generate_ivf_pq_compute_similarity.py
  */
 
-#include "ivf_pq_compute_similarity_impl.cuh"
-#include "ivf_pq_fp_8bit.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>
+#include "../../sample_filter.cuh"
+#include "../ivf_pq_compute_similarity_impl.cuh"
+#include "../ivf_pq_fp_8bit.cuh"
 
 #define instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(                 \
   OutT, LutT, IvfSampleFilterT)                                                             \

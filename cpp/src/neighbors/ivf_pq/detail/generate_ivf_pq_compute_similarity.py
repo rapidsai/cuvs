@@ -34,9 +34,9 @@ header = """/*
  * > python generate_ivf_pq_compute_similarity.py
  */
 
-#include "ivf_pq_compute_similarity_impl.cuh"
-#include "ivf_pq_fp_8bit.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>
+#include "../ivf_pq_compute_similarity_impl.cuh"
+#include "../ivf_pq_fp_8bit.cuh"
+#include "../../sample_filter.cuh"
 """
 
 declaration_macro = """

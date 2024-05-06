@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-#include "bitset.cuh"
+#include "sample_filter.cuh"
 
-namespace cuvs::core {
+namespace cuvs::neighbors::filtering {
 
-template struct bitset_view<uint8_t, uint32_t>;
-template struct bitset_view<uint16_t, uint32_t>;
-template struct bitset_view<uint32_t, uint32_t>;
-template struct bitset_view<uint32_t, int64_t>;
-template struct bitset_view<uint64_t, int64_t>;
-template struct bitset<uint8_t, uint32_t>;
-template struct bitset<uint16_t, uint32_t>;
-template struct bitset<uint32_t, uint32_t>;
-template struct bitset<uint32_t, int64_t>;
-template struct bitset<uint64_t, int64_t>;
-}  // namespace cuvs::core
+template struct bitset_filter<uint8_t, uint32_t>;
+template struct bitset_filter<uint16_t, uint32_t>;
+template struct bitset_filter<uint32_t, uint32_t>;
+template struct bitset_filter<uint32_t, int64_t>;
+template struct bitset_filter<uint64_t, int64_t>;
+}  // namespace cuvs::neighbors::filtering

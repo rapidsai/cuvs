@@ -41,10 +41,10 @@ header = """/*
 """
 
 build_include_macro = """
-#include "ivf_pq_build.cuh"
+#include "../ivf_pq_build.cuh"
 """
 search_include_macro = """
-#include "ivf_pq_search.cuh"
+#include "../ivf_pq_search.cuh"
 """
 
 namespace_macro = """
@@ -61,8 +61,8 @@ types = dict(
     uint8_t_int64_t=("uint8_t", "int64_t"),
 )
 
-build_macro = """
-#define CUVS_INST_IVF_PQ_BUILD(T, IdxT)                                                      \\
+build_extend_macro = """
+#define CUVS_INST_IVF_PQ_BUILD_EXTEND(T, IdxT)                                                      \\
   auto build(raft::resources const& handle,                                                  \\
              const cuvs::neighbors::ivf_pq::index_params& params,                            \\
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)               \\
@@ -77,28 +77,24 @@ build_macro = """
              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                      \\
   {                                                                                          \\
     cuvs::neighbors::ivf_pq::detail::build(handle, params, dataset, idx);                    \\
-  }
-"""
-
-extend_macro = """
-#define CUVS_INST_IVF_PQ_EXTEND(T, IdxT)                                             \\
-  auto extend(raft::resources const& handle,                                         \\
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
-              const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                \\
-    ->cuvs::neighbors::ivf_pq::index<IdxT>                                           \\
-  {                                                                                  \\
-    return cuvs::neighbors::ivf_pq::detail::extend(                                  \\
-      handle, new_vectors, new_indices, orig_index);                                 \\
-  }                                                                                  \\
-                                                                                     \\
-  void extend(raft::resources const& handle,                                         \\
-              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
-              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
-              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                             \\
-  {                                                                                  \\
-    cuvs::neighbors::ivf_pq::detail::extend(                                         \\
-      handle, new_vectors, new_indices, idx);                                        \\
+  }                                                                                          \\
+  auto extend(raft::resources const& handle,                                                 \\
+              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,          \\
+              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,         \\
+              const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                        \\
+    ->cuvs::neighbors::ivf_pq::index<IdxT>                                                   \\
+  {                                                                                          \\
+    return cuvs::neighbors::ivf_pq::detail::extend(                                          \\
+      handle, new_vectors, new_indices, orig_index);                                         \\
+  }                                                                                          \\
+                                                                                             \\
+  void extend(raft::resources const& handle,                                                 \\
+              raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,          \\
+              std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,         \\
+              cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                     \\
+  {                                                                                          \\
+    cuvs::neighbors::ivf_pq::detail::extend(                                                 \\
+      handle, new_vectors, new_indices, idx);                                                \\
   }             
 """
 
@@ -132,15 +128,10 @@ search_with_filter_macro = """
 """
 
 macros = dict(
-    build=dict(
+    build_extend=dict(
         include=build_include_macro,
-        definition=build_macro,
-        name="CUVS_INST_IVF_PQ_BUILD",
-    ),
-    extend=dict(
-        include=build_include_macro,
-        definition=extend_macro,
-        name="CUVS_INST_IVF_PQ_EXTEND",
+        definition=build_extend_macro,
+        name="CUVS_INST_IVF_PQ_BUILD_EXTEND",
     ),
     search=dict(
         include=search_include_macro,

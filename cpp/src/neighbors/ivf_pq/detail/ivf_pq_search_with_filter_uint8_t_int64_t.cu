@@ -25,7 +25,7 @@
 
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include "ivf_pq_search.cuh"
+#include "../ivf_pq_search.cuh"
 
 namespace cuvs::neighbors::ivf_pq {
 
@@ -42,7 +42,7 @@ namespace cuvs::neighbors::ivf_pq {
     cuvs::neighbors::ivf_pq::detail::search_with_filtering(                  \
       handle, params, index, queries, neighbors, distances, sample_filter);  \
   }
-CUVS_INST_IVF_PQ_SEARCH_FILTER(float, int64_t);
+CUVS_INST_IVF_PQ_SEARCH_FILTER(uint8_t, int64_t);
 
 #undef CUVS_INST_IVF_PQ_SEARCH_FILTER
 
