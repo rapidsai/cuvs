@@ -203,7 +203,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
       rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
 
-      printf("Performing bfknn\n");
       cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
                                                          distances_naive_dev.data(),
                                                          indices_naive_dev.data(),
@@ -217,8 +216,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);
-
-      printf("Done...\n");
     }
 
     {
@@ -239,8 +236,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
-        printf("Calling build index\n");
-
         {
           cagra::index<DataT, IdxT> index(handle_);
           if (ps.host_dataset) {
@@ -249,26 +244,17 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
 
-            printf("Assigning index...\n");
             index = cagra::build(handle_, index_params, database_host_view);
-            printf("Done assigning index...\n");
           } else {
-            printf("Assigning index2\n");
             index = cagra::build(handle_, index_params, database_view);
-            printf("Done assigning index 2\n ");
           };
 
-          printf("Serializing file...\n");
           cagra::serialize_file(handle_, "cagra_index", index, ps.include_serialized_dataset);
-          printf("Done serializing file..\n");
         }
-
-        printf("Done...\n");
 
         cagra::index<DataT, IdxT> index(handle_);
         cagra::deserialize_file(handle_, "cagra_index", &index);
 
-        printf("Deserializing index\n");
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -278,14 +264,11 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
           distances_dev.data(), ps.n_queries, ps.k);
 
-        printf("Searching index...\n");
-
         cagra::search(
           handle_, search_params, index, search_queries_view, indices_out_view, dists_out_view);
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
 
-        printf("Done...\n");
         raft::resource::sync_stream(handle_);
       }
 
@@ -338,8 +321,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         handle_, r, search_queries.data(), ps.n_queries * ps.dim, DataT(1), DataT(20));
     }
     raft::resource::sync_stream(handle_);
-
-    printf("Setup complete...\n");
   }
 
   void TearDown() override
