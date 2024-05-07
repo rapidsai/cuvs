@@ -1,6 +1,5 @@
 #!/bin/bash
-
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 # This script is a wrapper for cmakelang that may be used with pre-commit. The
 # wrapping is necessary because RAPIDS libraries split configuration for
@@ -17,7 +16,7 @@
 # and exits gracefully if the file is not found. If a user wishes to specify a
 # config file at a nonstandard location, they may do so by setting the
 # environment variable RAPIDS_CMAKE_FORMAT_FILE.
-# 
+#
 # This script can be invoked directly anywhere within the project repository.
 # Alternatively, it may be invoked as a pre-commit hook via
 # `pre-commit run (cmake-format)|(cmake-lint)`.
@@ -26,25 +25,26 @@
 # bash run-cmake-format.sh {cmake-format,cmake-lint} infile [infile ...]
 
 status=0
-if [ -z ${RAFT_ROOT:+PLACEHOLDER} ]; then
-    RAFT_BUILD_DIR=$(git rev-parse --show-toplevel 2>&1)/cpp/build
+if [ -z ${CUVS_ROOT:+PLACEHOLDER} ]; then
+    CUVS_BUILD_DIR=$(git rev-parse --show-toplevel 2>&1)/cpp/build
     status=$?
 else
-    RAFT_BUILD_DIR=${RAFT_ROOT}
+    CUVS_BUILD_DIR=${CUVS_ROOT}
 fi
 
 if ! [ ${status} -eq 0 ]; then
-    if [[ ${RAFT_BUILD_DIR} == *"not a git repository"* ]]; then
-        echo "This script must be run inside the raft repository, or the RAFT_ROOT environment variable must be set."
+    if [[ ${CUVS_BUILD_DIR} == *"not a git repository"* ]]; then
+        echo "This script must be run inside the raft repository, or the CUVS_ROOT environment variable must be set."
     else
         echo "Script failed with unknown error attempting to determine project root:"
-        echo ${RAFT_BUILD_DIR}
+        echo ${CUVS_BUILD_DIR}
     fi
     exit 1
 fi
 
 DEFAULT_FORMAT_FILE_LOCATIONS=(
-  "${RAFT_BUILD_DIR:-${HOME}}/_deps/rapids-cmake-src/cmake-format-rapids-cmake.json"
+  "${CUVS_BUILD_DIR:-${HOME}}/_deps/rapids-cmake-src/cmake-format-rapids-cmake.json"
+  "${CUVS_BUILD_DIR:-cpp/build}/latest/_deps/rapids-cmake-src/cmake-format-rapids-cmake.json"
 )
 
 if [ -z ${RAPIDS_CMAKE_FORMAT_FILE:+PLACEHOLDER} ]; then
