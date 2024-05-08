@@ -17,7 +17,6 @@
 #pragma once
 
 #include "../ivf_common.cuh"
-#include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_list.cuh"
 #include <cuvs/core/nvtx.hpp>

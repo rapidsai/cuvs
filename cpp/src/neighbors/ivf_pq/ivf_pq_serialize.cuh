@@ -17,7 +17,6 @@
 #pragma once
 
 #include "../ivf_common.cuh"
-#include "../ivf_list.cuh"
 #include "ivf_pq_list.cuh"
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
