@@ -455,7 +455,6 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       raft::resource::sync_stream(handle_);
     }
 
-    /*
     {
       // unless something is really wrong with clustering, this could serve as a lower bound on
       // recall
@@ -491,7 +490,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                                      test_ivf_sample_filter::offset));
         raft::resource::sync_stream(handle_);
 
-        raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
+        cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
           handle_, removed_indices.view(), ps.num_db_vecs);
 
         // Search with the filter
@@ -504,7 +503,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           search_queries_view,
           indices_ivfflat_dev.view(),
           distances_ivfflat_dev.view(),
-          raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+          cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);
@@ -521,7 +520,6 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                   0.001,
                                   min_recall));
     }
-    */
   }
 
   void SetUp() override

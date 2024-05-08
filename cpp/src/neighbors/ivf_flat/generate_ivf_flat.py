@@ -73,7 +73,7 @@ build_macro = """
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                \\
   {                                                                                            \\
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                          \\
-      std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));          \\
+      std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));           \\
   }                                                                                            \\
                                                                                                \\
   void build(raft::resources const& handle,                                                    \\
@@ -81,23 +81,23 @@ build_macro = """
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,                 \\
              cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                                   \\
   {                                                                                            \\
-    cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx); \\
-  } \\
+    cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx);                    \\
+  }                                                                                            \\
   auto build(raft::resources const& handle,                                                    \\
              const cuvs::neighbors::ivf_flat::index_params& params,                            \\
-             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset)                 \\
+             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset)                   \\
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                \\
   {                                                                                            \\
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                          \\
-      std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));          \\
+      std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));           \\
   }                                                                                            \\
                                                                                                \\
   void build(raft::resources const& handle,                                                    \\
              const cuvs::neighbors::ivf_flat::index_params& params,                            \\
-             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset,                 \\
+             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset,                   \\
              cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                                   \\
   {                                                                                            \\
-    cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx); \\
+    cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx);                    \\
   }
 """
 
@@ -110,8 +110,8 @@ extend_macro = """
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                      \\
   {                                                                                  \\
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                \\
-      std::move(cuvs::neighbors::ivf_flat::detail::extend(                          \\
-        handle, new_vectors, new_indices, orig_index)));           \\
+      std::move(cuvs::neighbors::ivf_flat::detail::extend(                           \\
+        handle, new_vectors, new_indices, orig_index)));                             \\
   }                                                                                  \\
                                                                                      \\
   void extend(raft::resources const& handle,                                         \\
@@ -119,27 +119,27 @@ extend_macro = """
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
               cuvs::neighbors::ivf_flat::index<T, IdxT>* idx)                        \\
   {                                                                                  \\
-    cuvs::neighbors::ivf_flat::detail::extend(                                      \\
-      handle, new_vectors, new_indices, idx);                      \\
-  }    \\
+    cuvs::neighbors::ivf_flat::detail::extend(                                       \\
+      handle, new_vectors, new_indices, idx);                                        \\
+  }                                                                                  \\
   auto extend(raft::resources const& handle,                                         \\
-              raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
-              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices, \\
+              raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,    \\
+              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,   \\
               const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)           \\
     ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                      \\
   {                                                                                  \\
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                \\
-      std::move(cuvs::neighbors::ivf_flat::detail::extend(                          \\
-        handle, new_vectors, new_indices, orig_index)));           \\
+      std::move(cuvs::neighbors::ivf_flat::detail::extend(                           \\
+        handle, new_vectors, new_indices, orig_index)));                             \\
   }                                                                                  \\
                                                                                      \\
   void extend(raft::resources const& handle,                                         \\
-              raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
-              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices, \\
+              raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,    \\
+              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,   \\
               cuvs::neighbors::ivf_flat::index<T, IdxT>* idx)                        \\
   {                                                                                  \\
-    cuvs::neighbors::ivf_flat::detail::extend(                                      \\
-      handle, new_vectors, new_indices, idx);                      \\
+    cuvs::neighbors::ivf_flat::detail::extend(                                       \\
+      handle, new_vectors, new_indices, idx);                                        \\
   }                    
 """
 
@@ -152,8 +152,20 @@ search_macro = """
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \\
               raft::device_matrix_view<float, IdxT, raft::row_major> distances) \\
   {                                                                             \\
-    cuvs::neighbors::ivf_flat::detail::search(                                 \\
-      handle, params, index, queries, neighbors, distances);  \\
+    cuvs::neighbors::ivf_flat::detail::search(                                  \\
+      handle, params, index, queries, neighbors, distances);                    \\
+  }                                                                             \\
+  void search_with_filtering(                                                   \\
+    raft::resources const& handle,                                              \\
+    const search_params& params,                                                \\
+    index<T, IdxT>& idx,                                                        \\
+    raft::device_matrix_view<const T, IdxT, raft::row_major> queries,           \\
+    raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,            \\
+    raft::device_matrix_view<float, IdxT, raft::row_major> distances,           \\
+    cuvs::neighbors::filtering::bitset_filter<uint32_t, IdxT> sample_filter)    \\ 
+  {                                                                             \\
+    cuvs::neighbors::ivf_flat::detail::search_with_filtering(                   \\
+      handle, params, idx, queries, neighbors, distances, sample_filter);       \\
   }
 """
 
@@ -163,16 +175,33 @@ serialize_macro = """
                       const std::string& filename,                                                 \\
                       const cuvs::neighbors::ivf_flat::index<T, IdxT>& index)                      \\
   {                                                                                                \\
-    cuvs::neighbors::ivf_flat::detail::serialize(handle, filename, index); \\
+    cuvs::neighbors::ivf_flat::detail::serialize(handle, filename, index);                         \\
+  }                                                                                                \\
+                                                                                                   \\
+  void serialize(raft::resources const& handle,                                                    \\
+                 std::string& str,                                                                 \\
+                 const cuvs::neighbors::ivf_flat::index<T, IdxT>& index)                           \\
+  {                                                                                                \\
+    std::ostringstream os;                                                                         \\
+    cuvs::neighbors::ivf_flat::detail::serialize(handle, os, index);                               \\
+    str = os.str();                                                                                \\
   }                                                                                                \\
                                                                                                    \\
   void deserialize_file(raft::resources const& handle,                                             \\
                         const std::string& filename,                                               \\
                         cuvs::neighbors::ivf_flat::index<T, IdxT>* index)                          \\
   {                                                                                                \\
-    * index = cuvs::neighbors::ivf_flat::detail::deserialize<T, IdxT>(                                          \\
-      handle, filename);                                                  \\
-  }                                                                                                
+    * index = cuvs::neighbors::ivf_flat::detail::deserialize<T, IdxT>(                             \\
+      handle, filename);                                                                           \\
+  }                                                                                                \\
+    void deserialize(raft::resources const& handle,                                                \\
+                     const std::string& str,                                                       \\
+                     cuvs::neighbors::ivf_flat::index<T, IdxT>* index)                             \\
+  {                                                                                                \\
+    std::istringstream is(str);                                                                    \\
+    * index = cuvs::neighbors::ivf_flat::detail::deserialize<T, IdxT>(                             \\
+      handle, is);                                                                                 \\
+  }                                                                                                 
 """
 
 macros = dict(
