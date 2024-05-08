@@ -88,11 +88,11 @@ endfunction()
 # ##################################################################################################
 
 if(BUILD_TESTS)
-  ConfigureTest(NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu GPUS 1 PERCENT 100)
+  ConfigureTest(NAME CUVS_NEIGHBORS_TEST PATH test/neighbors/brute_force.cu GPUS 1 PERCENT 100)
 
   ConfigureTest(
     NAME
-    NEIGHBORS_ANN_IVF_FLAT_TEST
+    CUVS_NEIGHBORS_ANN_IVF_FLAT_TEST
     PATH
     test/neighbors/ann_ivf_flat/test_float_int64_t.cu
     test/neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
@@ -105,7 +105,7 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME
-    NEIGHBORS_ANN_IVF_PQ_TEST
+    CUVS_NEIGHBORS_ANN_IVF_PQ_TEST
     PATH
     test/neighbors/ann_ivf_pq/test_float_int64_t.cu
     test/neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
@@ -118,7 +118,7 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME
-    NEIGHBORS_ANN_CAGRA_TEST
+    CUVS_NEIGHBORS_ANN_CAGRA_TEST
     PATH
     test/neighbors/ann_cagra/test_float_uint32_t.cu
     test/neighbors/ann_cagra/test_int8_t_uint32_t.cu
@@ -169,23 +169,23 @@ endif()
 
 if(BUILD_C_TESTS)
   ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
-  ConfigureTest(NAME CORE_TEST PATH test/core/bitset.cu C_LIB)
+  ConfigureTest(NAME CUVS_CORE_TEST PATH test/core/bitset.cu C_LIB)
 
   ConfigureTest(
-    NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu
+    NAME CUVS_BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_FLAT_C_TEST PATH test/neighbors/run_ivf_flat_c.c test/neighbors/ann_ivf_flat_c.cu
+    NAME CUVS_IVF_FLAT_C_TEST PATH test/neighbors/run_ivf_flat_c.c test/neighbors/ann_ivf_flat_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_PQ_C_TEST PATH test/neighbors/run_ivf_pq_c.c test/neighbors/ann_ivf_pq_c.cu C_LIB
+    NAME CUVS_IVF_PQ_C_TEST PATH test/neighbors/run_ivf_pq_c.c test/neighbors/ann_ivf_pq_c.cu C_LIB
   )
 
-  ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
+  ConfigureTest(NAME CUVS_CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
 endif()
 
 # ##################################################################################################
