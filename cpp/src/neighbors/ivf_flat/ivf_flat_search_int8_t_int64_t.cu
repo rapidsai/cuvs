@@ -48,7 +48,7 @@ namespace cuvs::neighbors::ivf_flat {
     raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,                 \
     raft::device_matrix_view<float, IdxT, raft::row_major> distances,                \
     cuvs::neighbors::filtering::bitset_filter<uint32_t, IdxT> sample_filter)      \ 
-     \
+        \
   {                                                                                  \
     cuvs::neighbors::ivf_flat::detail::search_with_filtering(                        \
       handle, params, idx, queries, neighbors, distances, sample_filter);            \
