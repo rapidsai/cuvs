@@ -16,16 +16,16 @@
 
 #pragma once
 
-#include "../ivf_common.cuh"              // cuvs::neighbors::detail::ivf
-#include "ivf_flat_interleaved_scan.cuh"  // interleaved_scan
-#include <cuvs/core/nvtx.hpp>
+#include "../../core/nvtx.hpp"
+#include "../ivf_common.cuh"                 // cuvs::neighbors::detail::ivf
+#include "ivf_flat_interleaved_scan.cuh"     // interleaved_scan
 #include <cuvs/neighbors/ivf_flat.hpp>       // raft::neighbors::ivf_flat::index
 #include <cuvs/neighbors/sample_filter.hpp>  // none_ivf_sample_filter
 
-#include <raft/core/logger.hpp>  // RAFT_LOG_TRACE
+#include <cuvs/distance/distance_types.hpp>  // is_min_close, DistanceType
+#include <raft/core/logger.hpp>              // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>                // raft::resources
-#include <raft/distance/distance_types.hpp>       // is_min_close, DistanceType
 #include <raft/linalg/gemm.cuh>                   // raft::linalg::gemm
 #include <raft/linalg/norm.cuh>                   // raft::linalg::norm
 #include <raft/linalg/unary_op.cuh>               // raft::linalg::unary_op
@@ -271,16 +271,17 @@ void search_impl(raft::resources const& handle,
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
-inline void search(raft::resources const& handle,
-                   const search_params& params,
-                   const index<T, IdxT>& index,
-                   const T* queries,
-                   uint32_t n_queries,
-                   uint32_t k,
-                   IdxT* neighbors,
-                   float* distances,
-                   rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
-                   IvfSampleFilterT sample_filter    = IvfSampleFilterT())
+inline void search_with_filtering(
+  raft::resources const& handle,
+  const search_params& params,
+  const index<T, IdxT>& index,
+  const T* queries,
+  uint32_t n_queries,
+  uint32_t k,
+  IdxT* neighbors,
+  float* distances,
+  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
+  IvfSampleFilterT sample_filter    = IvfSampleFilterT())
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::search(k = %u, n_queries = %u, dim = %zu)", k, n_queries, index.dim());
@@ -322,12 +323,43 @@ inline void search(raft::resources const& handle,
                                                   k,
                                                   n_probes,
                                                   max_samples,
-                                                  raft::distance::is_min_close(index.metric()),
+                                                  cuvs::distance::is_min_close(index.metric()),
                                                   neighbors + offset_q * k,
                                                   distances + offset_q * k,
                                                   mr,
                                                   sample_filter);
   }
+}
+
+template <typename T, typename IdxT, typename IvfSampleFilterT>
+void search_with_filtering(raft::resources const& handle,
+                           const search_params& params,
+                           const index<T, IdxT>& index,
+                           raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+                           raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+                           raft::device_matrix_view<float, IdxT, raft::row_major> distances,
+                           IvfSampleFilterT sample_filter = IvfSampleFilterT())
+{
+  RAFT_EXPECTS(
+    queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
+    "Number of rows in output neighbors and distances matrices must equal the number of queries.");
+
+  RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1),
+               "Number of columns in output neighbors and distances matrices must be equal");
+
+  RAFT_EXPECTS(queries.extent(1) == index.dim(),
+               "Number of query dimensions should equal number of dimensions in the index.");
+
+  search_with_filtering(handle,
+                        params,
+                        index,
+                        queries.data_handle(),
+                        static_cast<std::uint32_t>(queries.extent(0)),
+                        static_cast<std::uint32_t>(neighbors.extent(1)),
+                        neighbors.data_handle(),
+                        distances.data_handle(),
+                        raft::resource::get_workspace_resource(handle),
+                        sample_filter);
 }
 
 template <typename T, typename IdxT>
@@ -338,7 +370,13 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
             raft::device_matrix_view<float, IdxT, raft::row_major> distances)
 {
-  search(handle, params, idx, queries, neighbors, distances);
+  search_with_filtering(handle,
+                        params,
+                        idx,
+                        queries,
+                        neighbors,
+                        distances,
+                        cuvs::neighbors::filtering::none_ivf_sample_filter());
 }
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

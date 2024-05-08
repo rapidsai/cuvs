@@ -125,31 +125,5 @@ void unpack(
 template <typename T, typename IdxT>
 void reset_index(const raft::resources& res, index<T, IdxT>* index);
 
-/**
- * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
- * modified.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace raft::neighbors;
- *   raft::resources res;
- *   // use default index parameters
- *   ivf_flat::index_params index_params;
- *   // initialize an empty index
- *   ivf_flat::index<int64_t> index(res, index_params, D);
- *   ivf_flat::helpers::reset_index(res, &index);
- *   // recompute the internal state of the index
- *   ivf_flat::helpers::recompute_internal_state(res, &index);
- * @endcode
- *
- * @tparam T
- * @tparam IdxT
- *
- * @param[in] res raft resource
- * @param[inout] index pointer to IVF-FLAT index
- */
-template <typename T, typename IdxT>
-void recompute_internal_state(const raft::resources& res, index<T, IdxT>* index);
-
 /** @} */
 }  // namespace cuvs::neighbors::ivf_flat::helpers

@@ -16,11 +16,12 @@
 
 #pragma once
 
+#include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
+#include "../ivf_list.cuh"
 #include "ivf_flat_codepacker.cuh"
-#include <cuvs/core/nvtx.hpp>
-#include <cuvs/neighbors/detail/ivf_flat_helpers.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/neighbors/ivf_flat_helpers.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 
 #include <raft/cluster/kmeans_balanced.cuh>
@@ -551,9 +552,30 @@ auto build(raft::resources const& handle,
 }
 
 template <typename T, typename IdxT>
+auto build(raft::resources const& handle,
+           const index_params& params,
+           raft::host_matrix_view<const T, IdxT, raft::row_major> dataset) -> index<T, IdxT>
+{
+  IdxT n_rows = dataset.extent(0);
+  IdxT dim    = dataset.extent(1);
+  return build(handle, params, dataset.data_handle(), n_rows, dim);
+}
+
+template <typename T, typename IdxT>
 void build(raft::resources const& handle,
            const index_params& params,
            raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,
+           index<T, IdxT>& index)
+{
+  IdxT n_rows = dataset.extent(0);
+  IdxT dim    = dataset.extent(1);
+  index       = build(handle, params, dataset.data_handle(), n_rows, dim);
+}
+
+template <typename T, typename IdxT>
+void build(raft::resources const& handle,
+           const index_params& params,
+           raft::host_matrix_view<const T, IdxT, raft::row_major> dataset,
            index<T, IdxT>& index)
 {
   IdxT n_rows = dataset.extent(0);
@@ -584,9 +606,53 @@ auto extend(raft::resources const& handle,
 }
 
 template <typename T, typename IdxT>
+auto extend(raft::resources const& handle,
+            raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,
+            std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,
+            const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index) -> index<T, IdxT>
+{
+  ASSERT(new_vectors.extent(1) == orig_index.dim(),
+         "new_vectors should have the same dimension as the index");
+
+  IdxT n_rows = new_vectors.extent(0);
+  if (new_indices.has_value()) {
+    ASSERT(n_rows == new_indices.value().extent(0),
+           "new_vectors and new_indices have different number of rows");
+  }
+
+  return extend(handle,
+                orig_index,
+                new_vectors.data_handle(),
+                new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                n_rows);
+}
+
+template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
+            index<T, IdxT>* index)
+{
+  ASSERT(new_vectors.extent(1) == index->dim(),
+         "new_vectors should have the same dimension as the index");
+
+  IdxT n_rows = new_vectors.extent(0);
+  if (new_indices.has_value()) {
+    ASSERT(n_rows == new_indices.value().extent(0),
+           "new_vectors and new_indices have different number of rows");
+  }
+
+  *index = extend(handle,
+                  *index,
+                  new_vectors.data_handle(),
+                  new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                  n_rows);
+}
+
+template <typename T, typename IdxT>
+void extend(raft::resources const& handle,
+            raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,
+            std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,
             index<T, IdxT>* index)
 {
   ASSERT(new_vectors.extent(1) == index->dim(),
@@ -642,13 +708,6 @@ void reset_index(const raft::resources& res, index<T, IdxT>* index)
   utils::memzero(index->list_sizes().data_handle(), index->list_sizes().size(), stream);
   utils::memzero(index->data_ptrs().data_handle(), index->data_ptrs().size(), stream);
   utils::memzero(index->inds_ptrs().data_handle(), index->inds_ptrs().size(), stream);
-}
-
-template <typename T, typename IdxT>
-void recompute_internal_state(const raft::resources& res, index<T, IdxT>* index)
-{
-  auto& list = index->lists()[0];
-  ivf::detail::recompute_internal_state(res, *index);
 }
 
 }  // namespace helpers

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <raft/common/nvtx.hpp>
+
 namespace cuvs::common::nvtx {
 namespace domain {
 /** @brief The default NVTX domain. */

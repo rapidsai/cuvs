@@ -45,6 +45,22 @@ namespace cuvs::neighbors::ivf_flat {
              cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                         \
   {                                                                                  \
     cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx);          \
+  }                                                                                  \
+  auto build(raft::resources const& handle,                                          \
+             const cuvs::neighbors::ivf_flat::index_params& params,                  \
+             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset)         \
+    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                      \
+  {                                                                                  \
+    return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                \
+      std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset))); \
+  }                                                                                  \
+                                                                                     \
+  void build(raft::resources const& handle,                                          \
+             const cuvs::neighbors::ivf_flat::index_params& params,                  \
+             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset,         \
+             cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                         \
+  {                                                                                  \
+    cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx);          \
   }
 CUVS_INST_IVF_FLAT_BUILD(int8_t, int64_t);
 

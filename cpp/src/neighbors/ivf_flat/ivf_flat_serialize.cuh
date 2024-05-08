@@ -16,8 +16,10 @@
 
 #pragma once
 
-#include "ivf_flat_build.cuh"
+#include "../ivf_common.cuh"
+#include "../ivf_list.cuh"
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/neighbors/ivf_flat_helpers.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>

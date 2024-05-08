@@ -82,6 +82,22 @@ build_macro = """
              cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                                   \\
   {                                                                                            \\
     cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx); \\
+  } \\
+  auto build(raft::resources const& handle,                                                    \\
+             const cuvs::neighbors::ivf_flat::index_params& params,                            \\
+             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset)                 \\
+    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                \\
+  {                                                                                            \\
+    return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                          \\
+      std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));          \\
+  }                                                                                            \\
+                                                                                               \\
+  void build(raft::resources const& handle,                                                    \\
+             const cuvs::neighbors::ivf_flat::index_params& params,                            \\
+             raft::host_matrix_view<const T, IdxT, raft::row_major> dataset,                 \\
+             cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                                   \\
+  {                                                                                            \\
+    cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx); \\
   }
 """
 
@@ -105,7 +121,26 @@ extend_macro = """
   {                                                                                  \\
     cuvs::neighbors::ivf_flat::detail::extend(                                      \\
       handle, new_vectors, new_indices, idx);                      \\
-  }                 
+  }    \\
+  auto extend(raft::resources const& handle,                                         \\
+              raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
+              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices, \\
+              const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)           \\
+    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                      \\
+  {                                                                                  \\
+    return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                \\
+      std::move(cuvs::neighbors::ivf_flat::detail::extend(                          \\
+        handle, new_vectors, new_indices, orig_index)));           \\
+  }                                                                                  \\
+                                                                                     \\
+  void extend(raft::resources const& handle,                                         \\
+              raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
+              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices, \\
+              cuvs::neighbors::ivf_flat::index<T, IdxT>* idx)                        \\
+  {                                                                                  \\
+    cuvs::neighbors::ivf_flat::detail::extend(                                      \\
+      handle, new_vectors, new_indices, idx);                      \\
+  }                    
 """
 
 search_macro = """

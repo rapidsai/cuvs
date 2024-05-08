@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../ivf_common.cuh"
+#include "../sample_filter.cuh"
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/sample_filter.hpp>
 
@@ -127,9 +128,9 @@ struct loadAndComputeDist {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
       T encV[Veclen];
-      ldg(encV, data + (loadIndex + j * kIndexGroupSize) * Veclen);
+      raft::ldg(encV, data + (loadIndex + j * kIndexGroupSize) * Veclen);
       T queryRegs[Veclen];
-      lds(queryRegs, &query_shared[shmemIndex + j * Veclen]);
+      raft::lds(queryRegs, &query_shared[shmemIndex + j * Veclen]);
 #pragma unroll
       for (int k = 0; k < Veclen; ++k) {
         compute_dist(dist, queryRegs[k], encV[k]);
@@ -158,7 +159,7 @@ struct loadAndComputeDist {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         T encV[Veclen];
-        ldg(encV, data + (lane_id + j * kIndexGroupSize) * Veclen);
+        raft::ldg(encV, data + (lane_id + j * kIndexGroupSize) * Veclen);
         const int d = (i * kUnroll + j) * Veclen;
 #pragma unroll
         for (int k = 0; k < Veclen; ++k) {
@@ -180,7 +181,7 @@ struct loadAndComputeDist {
     const int loadDataIdx = lane_id * Veclen;
     for (int d = 0; d < dim - dimBlocks; d += Veclen, data += kIndexGroupSize * Veclen) {
       T enc[Veclen];
-      ldg(enc, data + loadDataIdx);
+      raft::ldg(enc, data + loadDataIdx);
 #pragma unroll
       for (int k = 0; k < Veclen; k++) {
         compute_dist(dist, raft::shfl(queryReg, d + k, raft::WarpSize), enc[k]);
@@ -210,10 +211,12 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t> {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
       uint32_t encV[veclen_int];
-      ldg(encV,
-          reinterpret_cast<unsigned const*>(data) + loadIndex + j * kIndexGroupSize * veclen_int);
+      raft::ldg(
+        encV,
+        reinterpret_cast<unsigned const*>(data) + loadIndex + j * kIndexGroupSize * veclen_int);
       uint32_t queryRegs[veclen_int];
-      lds(queryRegs, reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * veclen_int);
+      raft::lds(queryRegs,
+                reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
         compute_dist(dist, queryRegs[k], encV[k]);
@@ -235,8 +238,9 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t> {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         uint32_t encV[veclen_int];
-        ldg(encV,
-            reinterpret_cast<unsigned const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
+        raft::ldg(
+          encV,
+          reinterpret_cast<unsigned const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
         const int d = (i * kUnroll + j) * veclen_int;
 #pragma unroll
         for (int k = 0; k < veclen_int; ++k) {
@@ -258,7 +262,7 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t> {
     for (int d = 0; d < dim - dimBlocks;
          d += uint8_veclen, data += kIndexGroupSize * uint8_veclen) {
       uint32_t enc[veclen_int];
-      ldg(enc, reinterpret_cast<uint32_t const*>(data) + lane_id * veclen_int);
+      raft::ldg(enc, reinterpret_cast<uint32_t const*>(data) + lane_id * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
         uint32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);
@@ -472,10 +476,12 @@ struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t> {
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
       int32_t encV[veclen_int];
-      ldg(encV,
-          reinterpret_cast<int32_t const*>(data) + (loadIndex + j * kIndexGroupSize) * veclen_int);
+      raft::ldg(
+        encV,
+        reinterpret_cast<int32_t const*>(data) + (loadIndex + j * kIndexGroupSize) * veclen_int);
       int32_t queryRegs[veclen_int];
-      lds(queryRegs, reinterpret_cast<int32_t const*>(query_shared + shmemIndex) + j * veclen_int);
+      raft::lds(queryRegs,
+                reinterpret_cast<int32_t const*>(query_shared + shmemIndex) + j * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
         compute_dist(dist, queryRegs[k], encV[k]);
@@ -499,8 +505,9 @@ struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t> {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         int32_t encV[veclen_int];
-        ldg(encV,
-            reinterpret_cast<int32_t const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
+        raft::ldg(
+          encV,
+          reinterpret_cast<int32_t const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
         const int d = (i * kUnroll + j) * veclen_int;
 #pragma unroll
         for (int k = 0; k < veclen_int; ++k) {
@@ -519,7 +526,7 @@ struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t> {
     int32_t queryReg = loadDim < dim ? reinterpret_cast<int32_t const*>(query + loadDim)[0] : 0;
     for (int d = 0; d < dim - dimBlocks; d += int8_veclen, data += kIndexGroupSize * int8_veclen) {
       int32_t enc[veclen_int];
-      ldg(enc, reinterpret_cast<int32_t const*>(data) + lane_id * veclen_int);
+      raft::ldg(enc, reinterpret_cast<int32_t const*>(data) + lane_id * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
         int32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);  // Here 4 is for 1 - int;
@@ -1014,11 +1021,11 @@ template <int Capacity,
           typename IdxT,
           typename IvfSampleFilterT,
           typename... Args>
-void launch_with_fixed_consts(raft::distance::DistanceType metric, Args&&... args)
+void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... args)
 {
   switch (metric) {
-    case raft::distance::DistanceType::L2Expanded:
-    case raft::distance::DistanceType::L2Unexpanded:
+    case cuvs::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2Unexpanded:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,
@@ -1028,8 +1035,8 @@ void launch_with_fixed_consts(raft::distance::DistanceType metric, Args&&... arg
                            IvfSampleFilterT,
                            euclidean_dist<Veclen, T, AccT>,
                            raft::identity_op>({}, {}, std::forward<Args>(args)...);
-    case raft::distance::DistanceType::L2SqrtExpanded:
-    case raft::distance::DistanceType::L2SqrtUnexpanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded:
+    case cuvs::distance::DistanceType::L2SqrtUnexpanded:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,
@@ -1039,7 +1046,7 @@ void launch_with_fixed_consts(raft::distance::DistanceType metric, Args&&... arg
                            IvfSampleFilterT,
                            euclidean_dist<Veclen, T, AccT>,
                            raft::sqrt_op>({}, {}, std::forward<Args>(args)...);
-    case raft::distance::DistanceType::InnerProduct:
+    case cuvs::distance::DistanceType::InnerProduct:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,
@@ -1155,7 +1162,7 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               const uint32_t* coarse_query_results,
                               const uint32_t n_queries,
                               const uint32_t queries_offset,
-                              const raft::distance::DistanceType metric,
+                              const cuvs::distance::DistanceType metric,
                               const uint32_t n_probes,
                               const uint32_t k,
                               const uint32_t max_samples,
