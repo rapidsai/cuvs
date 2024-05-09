@@ -75,4 +75,5 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         COMPILE_LIBRARY          ON
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
+        USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
 )
