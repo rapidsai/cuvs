@@ -8,7 +8,7 @@ RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen ${RAPIDS_CUDA_VERSION})"
 RAPIDS_PY_WHEEL_NAME="cuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from-s3 ./dist
 
 # Force installing a pylibraft before the libraft wheel
-python -m pip install pylibraft==24.06.00a51
+python -m pip install pylibraft-${RAPIDS_PY_CUDA_SUFFIX}==24.06.00a51
 
 # echo to expand wildcard before adding `[extra]` requires for pip
 python -m pip install $(echo ./dist/cuvs*.whl)[test]
