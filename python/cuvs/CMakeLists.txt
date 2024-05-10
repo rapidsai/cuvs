@@ -64,6 +64,9 @@ endif()
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY ON)
+
+  find_package(raft "${RAPIDS_VERSION}" REQUIRED COMPONENTS compiled)
+
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 
   set(cython_lib_dir cuvs)
