@@ -439,10 +439,10 @@ if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
-    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUVS_USE_RAFT_STATIC}>>:raft::raft>
-           $<$<NOT:$<BOOL:${CUVS_USE_RAFT_STATIC}>>:raft::compiled>
-    PRIVATE $<$<BOOL:${CUVS_USE_RAFT_STATIC}>:raft::raft>
-            $<$<BOOL:${CUVS_USE_RAFT_STATIC}>:raft::compiled_static> nvidia::cutlass::cutlass
+    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
+           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
+    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
   )
 endif()
 
