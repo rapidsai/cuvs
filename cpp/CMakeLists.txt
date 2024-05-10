@@ -189,7 +189,6 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
-  src/core/bitset.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
