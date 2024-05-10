@@ -17,17 +17,19 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
-#include "ivf_pq_helpers.cuh"
 #include "naive_knn.cuh"
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/ivf_pq_helpers.hpp>
+#include <cuvs/neighbors/sample_filter.hpp>
 
-#include <raft/neighbors/ivf_pq-inl.cuh>
-#include <raft/neighbors/sample_filter.cuh>
+#include <raft/core/bitset.cuh>
+#include <raft/linalg/add.cuh>
+#include <raft/matrix/gather.cuh>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_pq {
 
-using namespace raft;
+using raft::RAFT_NAME;  // For logging
 
 struct test_ivf_sample_filter {
   static constexpr unsigned offset = 300;
@@ -108,9 +110,10 @@ void compare_vectors_l2(
   auto n_rows = a.extent(0);
   auto dim    = a.extent(1);
   rmm::mr::managed_memory_resource managed_memory;
-  auto dist = make_device_mdarray<double>(res, &managed_memory, make_extents<uint32_t>(n_rows));
-  linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
-    spatial::knn::detail::utils::mapping<float> f{};
+  auto dist =
+    raft::make_device_mdarray<double>(res, &managed_memory, raft::make_extents<uint32_t>(n_rows));
+  raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
+    raft::spatial::knn::detail::utils::mapping<float> f{};
     double d = 0.0f;
     for (uint32_t j = 0; j < dim; j++) {
       double t = f(a(i, j)) - f(b(i, j));
@@ -118,7 +121,7 @@ void compare_vectors_l2(
     }
     return sqrt(d / double(dim));
   });
-  resource::sync_stream(res);
+  raft::resource::sync_stream(res);
   for (uint32_t i = 0; i < n_rows; i++) {
     double d = dist(i);
     // The theoretical estimate of the error is hard to come up with,
@@ -145,7 +148,7 @@ template <typename EvalT, typename DataT, typename IdxT>
 class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
  public:
   ivf_pq_test()
-    : stream_(resource::get_cuda_stream(handle_)),
+    : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<ivf_pq_inputs>::GetParam()),
       database(0, stream_),
       search_queries(0, stream_)
@@ -169,7 +172,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       raft::random::uniformInt(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(1), DataT(20));
     }
-    resource::sync_stream(handle_);
+    raft::resource::sync_stream(handle_);
   }
 
   void calc_ref()
@@ -189,10 +192,10 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       ps.k,
       static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
     distances_ref.resize(queries_size);
-    update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
+    raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
-    update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
-    resource::sync_stream(handle_);
+    raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
   }
 
   auto build_only()
@@ -207,9 +210,9 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   auto build_2_extends()
   {
-    auto db_indices = make_device_vector<IdxT>(handle_, ps.num_db_vecs);
-    linalg::map_offset(handle_, db_indices.view(), identity_op{});
-    resource::sync_stream(handle_);
+    auto db_indices = raft::make_device_vector<IdxT>(handle_, ps.num_db_vecs);
+    raft::linalg::map_offset(handle_, db_indices.view(), raft::identity_op{});
+    raft::resource::sync_stream(handle_);
     auto size_1 = IdxT(ps.num_db_vecs) / 2;
     auto size_2 = IdxT(ps.num_db_vecs) - size_1;
     auto vecs_1 = database.data();
@@ -229,7 +232,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     cuvs::neighbors::ivf_pq::extend(handle_, vecs_2_view, inds_2_view, &idx);
 
     auto vecs_1_view =
-      raft::make_device_matrix_view<DataT, IdxT, row_major>(vecs_1, size_1, ps.dim);
+      raft::make_device_matrix_view<DataT, IdxT, raft::row_major>(vecs_1, size_1, ps.dim);
     auto inds_1_view = raft::make_device_vector_view<const IdxT, IdxT>(inds_1, size_1);
     cuvs::neighbors::ivf_pq::extend(handle_, vecs_1_view, inds_1_view, &idx);
     return idx;
@@ -257,19 +260,18 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     if (n_take == 0) { return; }
 
-    auto rec_data  = make_device_matrix<DataT>(handle_, n_take, dim);
-    auto orig_data = make_device_matrix<DataT>(handle_, n_take, dim);
+    auto rec_data  = raft::make_device_matrix<DataT>(handle_, n_take, dim);
+    auto orig_data = raft::make_device_matrix<DataT>(handle_, n_take, dim);
 
-    cuvs::neighbors::ivf_pq::helpers::reconstruct_list_data(
-      handle_, index, rec_data.view(), label, n_skip);
+    ivf_pq::helpers::reconstruct_list_data(handle_, index, rec_data.view(), label, n_skip);
 
-    matrix::gather(database.data(),
-                   IdxT{dim},
-                   IdxT{n_take},
-                   rec_list->indices.data_handle() + n_skip,
-                   IdxT{n_take},
-                   orig_data.data_handle(),
-                   stream_);
+    raft::matrix::gather(database.data(),
+                         IdxT{dim},
+                         IdxT{n_take},
+                         rec_list->indices.data_handle() + n_skip,
+                         IdxT{n_take},
+                         orig_data.data_handle(),
+                         stream_);
 
     compare_vectors_l2(handle_, rec_data.view(), orig_data.view(), label, compression_ratio, 0.06);
   }
@@ -282,26 +284,23 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto n_rows   = old_list->size.load();
     if (n_rows == 0) { return; }
 
-    auto vectors_1 = make_device_matrix<EvalT>(handle_, n_rows, index->dim());
-    auto indices   = make_device_vector<IdxT>(handle_, n_rows);
-    copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
+    auto vectors_1 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
+    auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
+    raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    cuvs::neighbors::ivf_pq::helpers::reconstruct_list_data(
-      handle_, *index, vectors_1.view(), label, 0);
-    cuvs::neighbors::ivf_pq::helpers::erase_list(handle_, index, label);
+    ivf_pq::helpers::reconstruct_list_data(handle_, *index, vectors_1.view(), label, uint32_t(0));
+    ivf_pq::helpers::erase_list(handle_, index, label);
     // NB: passing the type parameter because const->non-const implicit conversion of the mdspans
     // breaks type inference
-    cuvs::neighbors::ivf_pq::helpers::extend_list<EvalT, IdxT>(
-      handle_, index, vectors_1.view(), indices.view(), label);
+    ivf_pq::helpers::extend_list(handle_, index, vectors_1.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
       << "The old list should have been shared and retained after ivf_pq index has erased the "
          "corresponding cluster.";
 
-    auto vectors_2 = make_device_matrix<EvalT>(handle_, n_rows, index->dim());
-    cuvs::neighbors::ivf_pq::helpers::reconstruct_list_data(
-      handle_, *index, vectors_2.view(), label, 0);
+    auto vectors_2 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
+    ivf_pq::helpers::reconstruct_list_data(handle_, *index, vectors_2.view(), label, uint32_t(0));
     // The code search is unstable, and there's high chance of repeating values of the lvl-2 codes.
     // Hence, encoding-decoding chain often leads to altering both the PQ codes and the
     // reconstructed data.
@@ -316,20 +315,20 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     if (n_rows == 0) { return; }
 
-    auto codes   = make_device_matrix<uint8_t>(handle_, n_rows, index->pq_dim());
-    auto indices = make_device_vector<IdxT>(handle_, n_rows);
-    copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
+    auto codes   = raft::make_device_matrix<uint8_t>(handle_, n_rows, index->pq_dim());
+    auto indices = raft::make_device_vector<IdxT>(handle_, n_rows);
+    raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    cuvs::neighbors::ivf_pq::helpers::unpack_list_data(handle_, *index, codes.view(), label, 0);
-    cuvs::neighbors::ivf_pq::helpers::erase_list(handle_, index, label);
-    cuvs::neighbors::ivf_pq::helpers::extend_list_with_codes<IdxT>(
-      handle_, index, codes.view(), indices.view(), label);
+    ivf_pq::helpers::codepacker::unpack_list_data(
+      handle_, *index, codes.view(), label, uint32_t(0));
+    ivf_pq::helpers::erase_list(handle_, index, label);
+    ivf_pq::helpers::extend_list_with_codes(handle_, index, codes.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
       << "The old list should have been shared and retained after ivf_pq index has erased the "
          "corresponding cluster.";
-    auto list_data_size = (n_rows / raft::neighbors::ivf_pq::kIndexGroupSize) *
+    auto list_data_size = (n_rows / cuvs::neighbors::ivf_pq::kIndexGroupSize) *
                           new_list->data.extent(1) * new_list->data.extent(2) *
                           new_list->data.extent(3);
 
@@ -345,9 +344,10 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     int n_vec      = 3;
     ASSERT_TRUE(row_offset + n_vec < n_rows);
     size_t offset      = row_offset * index->pq_dim();
-    auto codes_to_pack = make_device_matrix_view<const uint8_t, uint32_t>(
+    auto codes_to_pack = raft::make_device_matrix_view<const uint8_t, uint32_t>(
       codes.data_handle() + offset, n_vec, index->pq_dim());
-    ivf_pq::helpers::pack_list_data(handle_, index, codes_to_pack, label, row_offset);
+    ivf_pq::helpers::codepacker::pack_list_data(
+      handle_, index, codes_to_pack, label, uint32_t(row_offset));
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_size,
@@ -358,12 +358,22 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     uint32_t n_take = 4;
     ASSERT_TRUE(row_offset + n_take < n_rows);
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
-    ivf_pq::helpers::codepacker::unpack(
-      handle_, list_data, index->pq_bits(), row_offset, codes2.view());
+    ivf_pq::helpers::codepacker::unpack_list_data(
+      // handle_, list_data, index->pq_bits(), row_offset, codes2.view());
+      handle_,
+      *index,
+      codes2.view(),
+      label,
+      uint32_t(row_offset));
 
     // Write it back
-    ivf_pq::helpers::codepacker::pack(
-      handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
+    ivf_pq::helpers::codepacker::pack_list_data(
+      // handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
+      handle_,
+      index,
+      make_const_mdspan(codes2.view()),
+      label,
+      uint32_t(row_offset));
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_size,
@@ -413,9 +423,9 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     cuvs::neighbors::ivf_pq::search(
       handle_, ps.search_params, index, query_view, inds_view, dists_view);
 
-    update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
-    update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
-    resource::sync_stream(handle_);
+    raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
+    raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
 
     // A very conservative lower bound on recall
     double min_recall =
@@ -444,11 +454,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       for (uint32_t k = 0; k < ps.k; k++) {
         auto flat_i   = query_ix * ps.k + k;
         auto found_ix = indices_ivf_pq[flat_i];
-        if (found_ix == raft::neighbors::ivf_pq::kOutOfBoundsRecord<IdxT>) {
+        if (found_ix == cuvs::neighbors::ivf_pq::kOutOfBoundsRecord<IdxT>) {
           found_oob++;
           continue;
         }
-        ASSERT_NE(found_ix, raft::neighbors::ivf::kInvalidRecord<IdxT>)
+        ASSERT_NE(found_ix, cuvs::neighbors::ivf::kInvalidRecord<IdxT>)
           << "got an invalid record at query_ix = " << query_ix << ", k = " << k
           << " (distance = " << distances_ivf_pq[flat_i] << ")";
         ASSERT_LT(found_ix, ps.num_db_vecs)
@@ -479,7 +489,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   void TearDown() override  // NOLINT
   {
     cudaGetLastError();
-    resource::sync_stream(handle_);
+    raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
     search_queries.resize(0, stream_);
   }
@@ -498,7 +508,7 @@ template <typename EvalT, typename DataT, typename IdxT>
 class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
  public:
   ivf_pq_filter_test()
-    : stream_(resource::get_cuda_stream(handle_)),
+    : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<ivf_pq_inputs>::GetParam()),
       database(0, stream_),
       search_queries(0, stream_)
@@ -522,7 +532,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       raft::random::uniformInt(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(1), DataT(20));
     }
-    resource::sync_stream(handle_);
+    raft::resource::sync_stream(handle_);
   }
 
   void calc_ref()
@@ -547,10 +557,10 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                             queries_size,
                             stream_);
     distances_ref.resize(queries_size);
-    update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
+    raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
-    update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
-    resource::sync_stream(handle_);
+    raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
   }
 
   auto build_only()
@@ -588,25 +598,25 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto removed_indices =
       raft::make_device_vector<IdxT, int64_t>(handle_, test_ivf_sample_filter::offset);
     thrust::sequence(
-      resource::get_thrust_policy(handle_),
+      raft::resource::get_thrust_policy(handle_),
       thrust::device_pointer_cast(removed_indices.data_handle()),
       thrust::device_pointer_cast(removed_indices.data_handle() + test_ivf_sample_filter::offset));
-    resource::sync_stream(handle_);
+    raft::resource::sync_stream(handle_);
 
-    raft::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
+    cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
       handle_, removed_indices.view(), ps.num_db_vecs);
-    raft::neighbors::ivf_pq::search_with_filtering<DataT, IdxT>(
+    cuvs::neighbors::ivf_pq::search_with_filtering(
       handle_,
       ps.search_params,
       index,
       query_view,
       inds_view,
       dists_view,
-      raft::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
 
-    update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
-    update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
-    resource::sync_stream(handle_);
+    raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
+    raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
+    raft::resource::sync_stream(handle_);
 
     // A very conservative lower bound on recall
     double min_recall =
@@ -637,7 +647,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   void TearDown() override  // NOLINT
   {
     cudaGetLastError();
-    resource::sync_stream(handle_);
+    raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
     search_queries.resize(0, stream_);
   }
@@ -702,7 +712,7 @@ inline auto big_dims() -> test_cases_t
   return map<ivf_pq_inputs>(xs, [](const ivf_pq_inputs& x) {
     ivf_pq_inputs y(x);
     uint32_t pq_len       = 2;
-    y.index_params.pq_dim = div_rounding_up_safe(x.dim, pq_len);
+    y.index_params.pq_dim = raft::div_rounding_up_safe(x.dim, pq_len);
     // This comes from pure experimentation, also the recall depens a lot on pq_len.
     y.min_recall = 0.48 + 0.028 * std::log2(x.dim);
     return y;
@@ -715,7 +725,7 @@ inline auto big_dims_moderate_lut() -> test_cases_t
   return map<ivf_pq_inputs>(big_dims(), [](const ivf_pq_inputs& x) {
     ivf_pq_inputs y(x);
     uint32_t pq_len           = 2;
-    y.index_params.pq_dim     = round_up_safe(div_rounding_up_safe(x.dim, pq_len), 4u);
+    y.index_params.pq_dim     = raft::round_up_safe(raft::div_rounding_up_safe(x.dim, pq_len), 4u);
     y.index_params.pq_bits    = 6;
     y.search_params.lut_dtype = CUDA_R_16F;
     y.min_recall              = 0.69;
@@ -729,7 +739,7 @@ inline auto big_dims_small_lut() -> test_cases_t
   return map<ivf_pq_inputs>(big_dims(), [](const ivf_pq_inputs& x) {
     ivf_pq_inputs y(x);
     uint32_t pq_len           = 8;
-    y.index_params.pq_dim     = round_up_safe(div_rounding_up_safe(x.dim, pq_len), 4u);
+    y.index_params.pq_dim     = raft::round_up_safe(raft::div_rounding_up_safe(x.dim, pq_len), 4u);
     y.index_params.pq_bits    = 6;
     y.search_params.lut_dtype = CUDA_R_8U;
     y.min_recall              = 0.21;
