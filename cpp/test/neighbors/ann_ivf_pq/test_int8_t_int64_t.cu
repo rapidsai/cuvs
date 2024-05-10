@@ -18,10 +18,13 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-using f32_i08_i64 = ivf_pq_test<float, int8_t, int64_t>;
+using f32_i08_i64        = ivf_pq_test<float, int8_t, int64_t>;
+using f32_i08_i64_filter = ivf_pq_filter_test<float, int8_t, int64_t>;
 
 TEST_BUILD_SEARCH(f32_i08_i64)
 TEST_BUILD_SERIALIZE_SEARCH(f32_i08_i64)
 INSTANTIATE(f32_i08_i64, defaults() + big_dims() + var_k());
 
+TEST_BUILD_SEARCH(f32_i08_i64_filter)
+INSTANTIATE(f32_i08_i64_filter, defaults() + big_dims() + var_k());
 }  // namespace cuvs::neighbors::ivf_pq

@@ -25,9 +25,10 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/linalg/add.cuh>
-#include <raft/neighbors/cagra.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -46,6 +47,18 @@
 namespace cuvs::neighbors::cagra {
 namespace {
 
+/** Xorshift rondem number generator.
+ *
+ * See https://en.wikipedia.org/wiki/Xorshift#xorshift for reference.
+ */
+_RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
+{
+  u ^= u >> 12;
+  u ^= u << 25;
+  u ^= u >> 27;
+  return u * 0x2545F4914F6CDD1DULL;
+}
+
 // For sort_knn_graph test
 template <typename IdxT>
 void RandomSuffle(raft::host_matrix_view<IdxT, int64_t> index)
@@ -55,9 +68,9 @@ void RandomSuffle(raft::host_matrix_view<IdxT, int64_t> index)
     IdxT* const row_ptr = index.data_handle() + i * index.extent(1);
     for (unsigned j = 0; j < index.extent(1); j++) {
       // Swap two indices at random
-      rand          = raft::neighbors::cagra::detail::device::xorshift64(rand);
+      rand          = xorshift64(rand);
       const auto i0 = rand % index.extent(1);
-      rand          = raft::neighbors::cagra::detail::device::xorshift64(rand);
+      rand          = xorshift64(rand);
       const auto i1 = rand % index.extent(1);
 
       const auto tmp = row_ptr[i0];
@@ -189,6 +202,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
       rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+
       cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
                                                          distances_naive_dev.data(),
                                                          indices_naive_dev.data(),
@@ -229,15 +243,18 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+
             index = cagra::build(handle_, index_params, database_host_view);
           } else {
             index = cagra::build(handle_, index_params, database_view);
           };
+
           cagra::serialize_file(handle_, "cagra_index", index, ps.include_serialized_dataset);
         }
 
         cagra::index<DataT, IdxT> index(handle_);
         cagra::deserialize_file(handle_, "cagra_index", &index);
+
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -251,6 +268,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           handle_, search_params, index, search_queries_view, indices_out_view, dists_out_view);
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
+
         raft::resource::sync_stream(handle_);
       }
 

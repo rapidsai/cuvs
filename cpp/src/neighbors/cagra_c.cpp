@@ -46,7 +46,7 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   build_params.nn_descent_niter = params.nn_descent_niter;
 
   if (auto* cparams = params.compression; cparams != nullptr) {
-    auto compression_params                        = cuvs::neighbors::cagra::vpq_params();
+    auto compression_params                        = cuvs::neighbors::ann::vpq_params();
     compression_params.pq_bits                     = cparams->pq_bits;
     compression_params.pq_dim                      = cparams->pq_dim;
     compression_params.vq_n_centers                = cparams->vq_n_centers;
@@ -216,7 +216,7 @@ extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params
 extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto ps = cuvs::neighbors::cagra::vpq_params();
+    auto ps = cuvs::neighbors::ann::vpq_params();
     *params =
       new cuvsCagraCompressionParams{.pq_bits                     = ps.pq_bits,
                                      .pq_dim                      = ps.pq_dim,
