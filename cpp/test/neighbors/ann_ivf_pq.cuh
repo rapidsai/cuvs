@@ -22,6 +22,7 @@
 #include <cuvs/neighbors/ivf_pq_helpers.hpp>
 #include <cuvs/neighbors/sample_filter.hpp>
 
+#include <raft/core/bitset.cuh>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <thrust/sequence.h>

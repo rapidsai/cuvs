@@ -169,7 +169,6 @@ endif()
 
 if(BUILD_C_TESTS)
   ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
-  ConfigureTest(NAME CORE_TEST PATH test/core/bitset.cu C_LIB)
 
   ConfigureTest(
     NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu
