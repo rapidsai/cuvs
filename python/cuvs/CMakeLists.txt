@@ -65,7 +65,9 @@ if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY ON)
 
-  find_package(raft "${RAPIDS_VERSION}" REQUIRED COMPONENTS compiled)
+  # Statically link dependencies if building wheels
+  set(CUDA_STATIC_RUNTIME ON)
+  set(CUVS_USE_RAFT_STATIC ON)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 

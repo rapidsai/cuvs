@@ -34,6 +34,7 @@ project(
   VERSION "${RAPIDS_VERSION}"
   LANGUAGES ${lang_list}
 )
+set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # Write the version header
 rapids_cmake_write_version_file(include/cuvs/version_config.hpp)
@@ -188,6 +189,7 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/core/bitset.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
