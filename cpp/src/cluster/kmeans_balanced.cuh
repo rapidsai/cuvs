@@ -281,7 +281,7 @@ void build_clusters(const raft::resources& handle,
                          labels.data_handle(),
                          cluster_sizes.data_handle(),
                          mapping_op,
-                         resource::get_workspace_resource(handle),
+                         raft::resource::get_workspace_resource(handle),
                          X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
 }
 
@@ -359,7 +359,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
                                  labels.data_handle(),
                                  reset_counters,
                                  mapping_op,
-                                 resource::get_workspace_resource(handle));
+                                 raft::resource::get_workspace_resource(handle));
 }
 
 }  // namespace helpers

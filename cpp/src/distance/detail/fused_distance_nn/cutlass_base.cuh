@@ -23,7 +23,7 @@
 // We define CUTLASS_NAMESPACE in case
 // RAFT cmake is not used
 #ifndef CUTLASS_NAMESPACE
-#define cutlass raft_cutlass
+#define cutlass cuvs_cutlass
 #endif
 
 #include "epilogue_elementwise.cuh"     // FusedDistanceNNEpilogueElementwise

@@ -37,7 +37,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/detail/qr.cuh>
 #include <raft/linalg/gemm.cuh>

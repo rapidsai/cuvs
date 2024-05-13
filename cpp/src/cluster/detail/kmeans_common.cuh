@@ -20,6 +20,7 @@
 #include "kmeans.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -30,7 +31,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
 #include <raft/linalg/unary_op.cuh>

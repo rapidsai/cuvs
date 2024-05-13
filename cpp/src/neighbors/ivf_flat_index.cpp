@@ -23,7 +23,7 @@ index<T, IdxT>::index(raft::resources const& res, const index_params& params, ui
   : ann::index(),
     raft_index_(std::make_unique<raft::neighbors::ivf_flat::index<T, IdxT>>(
       res,
-      static_cast<cuvs::distance::DistanceType>((int)params.metric),
+      static_cast<raft::distance::DistanceType>((int)params.metric),
       params.n_lists,
       params.adaptive_centers,
       params.conservative_memory_allocation,
@@ -47,7 +47,7 @@ uint32_t index<T, IdxT>::veclen() const noexcept
 template <typename T, typename IdxT>
 cuvs::distance::DistanceType index<T, IdxT>::metric() const noexcept
 {
-  return static_cast<cuvs::distance::DistanceType>((int)raft_index_->metric());
+  return static_cast<raft::distance::DistanceType>((int)raft_index_->metric());
 }
 
 template <typename T, typename IdxT>

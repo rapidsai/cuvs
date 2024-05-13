@@ -169,6 +169,8 @@ include(cmake/modules/ConfigureCUDA.cmake)
 # add third party dependencies using CPM
 rapids_cpm_init()
 
+include(cmake/thirdparty/get_cutlass.cmake)
+
 if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
 endif()
@@ -182,41 +184,39 @@ if(BUILD_TESTS OR BUILD_C_TESTS)
   rapids_cpm_gtest(BUILD_STATIC)
 endif()
 
-include(cmake/thirdparty/get_cutlass.cmake)
-
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 
 add_library(
   cuvs SHARED
   src/cluster/kmeans_fit_float.cu
-  src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_rbf.cu
-  src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_rbf.cu
   src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
