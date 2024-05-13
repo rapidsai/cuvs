@@ -17,7 +17,6 @@
 
 #include "../../distance/distance.cuh"
 #include "../../distance/fused_distance_nn.cuh"
-#include "kmeans.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance_types.hpp>
 
@@ -54,7 +53,7 @@
 #include <optional>
 #include <random>
 
-namespace cuvs::cluster::detail {
+namespace cuvs::cluster::kmeans::detail {
 
 template <typename DataT, typename IndexT>
 struct SamplingOp {
@@ -637,7 +636,7 @@ void countSamplesInCluster(raft::resources const& handle,
   //   'key' is index to an sample in 'centroids' (index of the nearest
   //   centroid) and 'value' is the distance between the sample 'X[i]' and the
   //   'centroid[key]'
-  cuvs::cluster::detail::minClusterAndDistanceCompute(
+  cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute(
     handle,
     X,
     (raft::device_matrix_view<const DataT, IndexT>)centroids,
@@ -652,9 +651,9 @@ void countSamplesInCluster(raft::resources const& handle,
   // Using TransformInputIteratorT to dereference an array of raft::KeyValuePair
   // and converting them to just return the Key to be used in reduce_rows_by_key
   // prims
-  cuvs::cluster::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
+  cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
   cub::TransformInputIterator<IndexT,
-                              cuvs::cluster::detail::KeyValueIndexOp<IndexT, DataT>,
+                              cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
                               raft::KeyValuePair<IndexT, DataT>*>
     itr(minClusterAndDistance.data_handle(), conversion_op);
 
@@ -666,4 +665,4 @@ void countSamplesInCluster(raft::resources const& handle,
               (IndexT)n_clusters,
               workspace);
 }
-}  // namespace cuvs::cluster::detail
+}  // namespace cuvs::cluster::kmeans::detail

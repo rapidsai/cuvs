@@ -47,7 +47,7 @@ uint32_t index<T, IdxT>::veclen() const noexcept
 template <typename T, typename IdxT>
 cuvs::distance::DistanceType index<T, IdxT>::metric() const noexcept
 {
-  return static_cast<raft::distance::DistanceType>((int)raft_index_->metric());
+  return static_cast<cuvs::distance::DistanceType>((int)raft_index_->metric());
 }
 
 template <typename T, typename IdxT>

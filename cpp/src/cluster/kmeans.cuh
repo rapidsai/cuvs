@@ -31,14 +31,14 @@ namespace cuvs::cluster::kmeans {
  * Functor used for sampling centroids
  */
 template <typename DataT, typename IndexT>
-using SamplingOp = cuvs::cluster::detail::SamplingOp<DataT, IndexT>;
+using SamplingOp = cuvs::cluster::kmeans::detail::SamplingOp<DataT, IndexT>;
 
 /**
  * Functor used to extract the index from a KeyValue pair
  * storing both index and a distance.
  */
 template <typename IndexT, typename DataT>
-using KeyValueIndexOp = cuvs::cluster::detail::KeyValueIndexOp<IndexT, DataT>;
+using KeyValueIndexOp = cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>;
 
 /**
  * @brief Find clusters with k-means algorithm.
@@ -94,7 +94,7 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  cuvs::cluster::detail::kmeans_fit<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
 
@@ -160,7 +160,7 @@ void predict(raft::resources const& handle,
              bool normalize_weight,
              raft::host_scalar_view<DataT> inertia)
 {
-  cuvs::cluster::detail::kmeans_predict<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
 
@@ -223,7 +223,7 @@ void fit_predict(raft::resources const& handle,
                  raft::host_scalar_view<DataT> inertia,
                  raft::host_scalar_view<IndexT> n_iter)
 {
-  cuvs::cluster::detail::kmeans_fit_predict<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_fit_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, inertia, n_iter);
 }
 
@@ -249,7 +249,8 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<const DataT, IndexT> centroids,
                raft::device_matrix_view<DataT, IndexT> X_new)
 {
-  cuvs::cluster::detail::kmeans_transform<DataT, IndexT>(handle, params, X, centroids, X_new);
+  cuvs::cluster::kmeans::detail::kmeans_transform<DataT, IndexT>(
+    handle, params, X, centroids, X_new);
 }
 
 template <typename DataT, typename IndexT>
@@ -261,7 +262,7 @@ void transform(raft::resources const& handle,
                IndexT n_features,
                DataT* X_new)
 {
-  cuvs::cluster::detail::kmeans_transform<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_transform<DataT, IndexT>(
     handle, params, X, centroids, n_samples, n_features, X_new);
 }
 
@@ -316,7 +317,8 @@ void find_k(raft::resources const& handle,
             idx_t maxiter = 100,
             value_t tol   = 1e-3)
 {
-  cuvs::cluster::detail::find_k(handle, X, best_k, inertia, n_iter, kmax, kmin, maxiter, tol);
+  cuvs::cluster::kmeans::detail::find_k(
+    handle, X, best_k, inertia, n_iter, kmax, kmin, maxiter, tol);
 }
 
 /**
@@ -347,7 +349,7 @@ void sample_centroids(raft::resources const& handle,
                       rmm::device_uvector<DataT>& inRankCp,
                       rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::detail::sampleCentroids<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::sampleCentroids<DataT, IndexT>(
     handle, X, minClusterDistance, isSampleCentroid, select_op, inRankCp, workspace);
 }
 
@@ -372,7 +374,7 @@ void cluster_cost(raft::resources const& handle,
                   raft::device_scalar_view<DataT> clusterCost,
                   ReductionOpT reduction_op)
 {
-  cuvs::cluster::detail::computeClusterCost(
+  cuvs::cluster::kmeans::detail::computeClusterCost(
     handle, minClusterDistance, workspace, clusterCost, raft::identity_op{}, reduction_op);
 }
 
@@ -405,7 +407,7 @@ void update_centroids(raft::resources const& handle,
   // ref https://github.com/rapidsai/raft/issues/930
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
-  cuvs::cluster::detail::update_centroids<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::update_centroids<DataT, IndexT>(
     handle, X, sample_weights, centroids, labels, weight_per_cluster, new_centroids, workspace);
 }
 
@@ -444,16 +446,16 @@ void min_cluster_distance(raft::resources const& handle,
                           int batch_centroids,
                           rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::detail::minClusterDistanceCompute<DataT, IndexT>(handle,
-                                                                  X,
-                                                                  centroids,
-                                                                  minClusterDistance,
-                                                                  L2NormX,
-                                                                  L2NormBuf_OR_DistBuf,
-                                                                  metric,
-                                                                  batch_samples,
-                                                                  batch_centroids,
-                                                                  workspace);
+  cuvs::cluster::kmeans::detail::minClusterDistanceCompute<DataT, IndexT>(handle,
+                                                                          X,
+                                                                          centroids,
+                                                                          minClusterDistance,
+                                                                          L2NormX,
+                                                                          L2NormBuf_OR_DistBuf,
+                                                                          metric,
+                                                                          batch_samples,
+                                                                          batch_centroids,
+                                                                          workspace);
 }
 
 /**
@@ -495,16 +497,16 @@ void min_cluster_and_distance(
   int batch_centroids,
   rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::detail::minClusterAndDistanceCompute<DataT, IndexT>(handle,
-                                                                     X,
-                                                                     centroids,
-                                                                     minClusterAndDistance,
-                                                                     L2NormX,
-                                                                     L2NormBuf_OR_DistBuf,
-                                                                     metric,
-                                                                     batch_samples,
-                                                                     batch_centroids,
-                                                                     workspace);
+  cuvs::cluster::kmeans::detail::minClusterAndDistanceCompute<DataT, IndexT>(handle,
+                                                                             X,
+                                                                             centroids,
+                                                                             minClusterAndDistance,
+                                                                             L2NormX,
+                                                                             L2NormBuf_OR_DistBuf,
+                                                                             metric,
+                                                                             batch_samples,
+                                                                             batch_centroids,
+                                                                             workspace);
 }
 
 /**
@@ -530,7 +532,7 @@ void shuffle_and_gather(raft::resources const& handle,
                         uint32_t n_samples_to_gather,
                         uint64_t seed)
 {
-  cuvs::cluster::detail::shuffleAndGather<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::shuffleAndGather<DataT, IndexT>(
     handle, in, out, n_samples_to_gather, seed);
 }
 
@@ -562,7 +564,7 @@ void count_samples_in_cluster(raft::resources const& handle,
                               rmm::device_uvector<char>& workspace,
                               raft::device_vector_view<DataT, IndexT> sampleCountInCluster)
 {
-  cuvs::cluster::detail::countSamplesInCluster<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::countSamplesInCluster<DataT, IndexT>(
     handle, params, X, L2NormX, centroids, workspace, sampleCountInCluster);
 }
 
@@ -590,7 +592,8 @@ void init_plus_plus(raft::resources const& handle,
                     raft::device_matrix_view<DataT, IndexT> centroids,
                     rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::detail::kmeansPlusPlus<DataT, IndexT>(handle, params, X, centroids, workspace);
+  cuvs::cluster::kmeans::detail::kmeansPlusPlus<DataT, IndexT>(
+    handle, params, X, centroids, workspace);
 }
 
 /*
@@ -626,7 +629,7 @@ void fit_main(raft::resources const& handle,
               raft::host_scalar_view<IndexT> n_iter,
               rmm::device_uvector<char>& workspace)
 {
-  cuvs::cluster::detail::kmeans_fit_main<DataT, IndexT>(
+  cuvs::cluster::kmeans::detail::kmeans_fit_main<DataT, IndexT>(
     handle, params, X, sample_weights, centroids, inertia, n_iter, workspace);
 }
 

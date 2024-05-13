@@ -25,7 +25,7 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/common/nvtx.hpp>
 #include <raft/core/cudart_utils.hpp>
-#include <raft/core/logger.hpp>
+#include <raft/core/logger-inl.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -56,8 +56,9 @@
 #include <tuple>
 #include <type_traits>
 
-namespace cuvs::cluster::detail {
+namespace cuvs::cluster::kmeans::detail {
 
+static const std::string RAFT_NAME                 = "raft";
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
 /**
@@ -126,6 +127,9 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         (void*)workspace.data_handle(),
         (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
         false,
+        true,
+        params.metric,
+        0.0f,
         stream);
 
       // todo(lsugy): use KVP + iterator in caller.
@@ -160,7 +164,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                          n_clusters,
                          stream);
 
-      auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, row_major>(
+      auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
         distances.data(), n_rows, n_clusters);
       auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
       raft::matrix::argmin(handle, distances_const_view, labels_view);
@@ -296,7 +300,8 @@ void calc_centers_and_sizes(const raft::resources& handle,
   }
 
   // Compute weight of each cluster
-  cuvs::cluster::detail::countLabels(handle, labels, temp_sizes, n_rows, n_clusters, workspace);
+  cuvs::cluster::kmeans::detail::countLabels(
+    handle, labels, temp_sizes, n_rows, n_clusters, workspace);
 
   // Add previous sizes if necessary
   if (!reset_counters) {
@@ -455,7 +460,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
 
   // choose a "random" i that belongs to a rather large cluster
   IdxT i;
-  IdxT j = laneId();
+  IdxT j = raft::laneId();
   if (j == 0) {
     do {
       auto old = atomicAdd(count, IdxT{1});
@@ -1088,4 +1093,4 @@ void build_hierarchical(const raft::resources& handle,
                      device_memory);
 }
 
-}  // namespace  cuvs::cluster::detail
+}  // namespace  cuvs::cluster::kmeans::detail

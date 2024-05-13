@@ -88,14 +88,14 @@ void fit(const raft::resources& handle,
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
-  cuvs::cluster::detail::build_hierarchical(handle,
-                                            params,
-                                            X.extent(1),
-                                            X.data_handle(),
-                                            X.extent(0),
-                                            centroids.data_handle(),
-                                            centroids.extent(0),
-                                            mapping_op);
+  cuvs::cluster::kmeans::detail::build_hierarchical(handle,
+                                                    params,
+                                                    X.extent(1),
+                                                    X.data_handle(),
+                                                    X.extent(0),
+                                                    centroids.data_handle(),
+                                                    centroids.extent(0),
+                                                    mapping_op);
 }
 
 /**
@@ -149,15 +149,15 @@ void predict(const raft::resources& handle,
                  static_cast<uint64_t>(std::numeric_limits<LabelT>::max()),
                "The chosen label type cannot represent all cluster labels");
 
-  cuvs::cluster::detail::predict(handle,
-                                 params,
-                                 centroids.data_handle(),
-                                 centroids.extent(0),
-                                 X.extent(1),
-                                 X.data_handle(),
-                                 X.extent(0),
-                                 labels.data_handle(),
-                                 mapping_op);
+  cuvs::cluster::kmeans::detail::predict(handle,
+                                         params,
+                                         centroids.data_handle(),
+                                         centroids.extent(0),
+                                         X.extent(1),
+                                         X.data_handle(),
+                                         X.extent(0),
+                                         labels.data_handle(),
+                                         mapping_op);
 }
 
 /**
@@ -271,7 +271,7 @@ void build_clusters(const raft::resources& handle,
   RAFT_EXPECTS(centroids.extent(0) == cluster_sizes.extent(0),
                "Number of rows in centroids and clusyer_sizes are different");
 
-  cuvs::cluster::detail::build_clusters(
+  cuvs::cluster::kmeans::detail::build_clusters(
     handle,
     params,
     X.extent(1),
@@ -350,17 +350,18 @@ void calc_centers_and_sizes(const raft::resources& handle,
   RAFT_EXPECTS(centroids.extent(0) == cluster_sizes.extent(0),
                "Number of rows in centroids and clusyer_sizes are different");
 
-  cuvs::cluster::detail::calc_centers_and_sizes(handle,
-                                                centroids.data_handle(),
-                                                cluster_sizes.data_handle(),
-                                                centroids.extent(0),
-                                                X.extent(1),
-                                                X.data_handle(),
-                                                X.extent(0),
-                                                labels.data_handle(),
-                                                reset_counters,
-                                                mapping_op,
-                                                raft::resource::get_workspace_resource(handle));
+  cuvs::cluster::kmeans::detail::calc_centers_and_sizes(
+    handle,
+    centroids.data_handle(),
+    cluster_sizes.data_handle(),
+    centroids.extent(0),
+    X.extent(1),
+    X.data_handle(),
+    X.extent(0),
+    labels.data_handle(),
+    reset_counters,
+    mapping_op,
+    raft::resource::get_workspace_resource(handle));
 }
 
 }  // namespace helpers
