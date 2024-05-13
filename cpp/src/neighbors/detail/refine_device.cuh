@@ -80,7 +80,7 @@ void refine_device(
                    fake_coarse_idx.data() + n_queries);
 
   raft::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
-    handle, raft::distance::DistanceType(metric), n_queries, false, true, dim);
+    handle, cuvs::distance::DistanceType(metric), n_queries, false, true, dim);
 
   raft::neighbors::ivf_flat::detail::fill_refinement_index(handle,
                                                            &refinement_index,
@@ -118,12 +118,12 @@ void refine_device(
            fake_coarse_idx.data(),
            static_cast<uint32_t>(n_queries),
            0,
-           raft::distance::DistanceType(refinement_index.metric()),
+           cuvs::distance::DistanceType(refinement_index.metric()),
            1,
            k,
            0,
            chunk_index.data(),
-           raft::distance::is_min_close(raft::distance::DistanceType(metric)),
+           cuvs::distance::is_min_close(cuvs::distance::DistanceType(metric)),
            raft::neighbors::filtering::none_ivf_sample_filter(),
            neighbors_uint32,
            distances.data_handle(),

@@ -23,7 +23,7 @@ index<T, IdxT>::index(raft::resources const& res, const index_params& params, ui
   : ann::index(),
     raft_index_(std::make_unique<raft::neighbors::ivf_flat::index<T, IdxT>>(
       res,
-      static_cast<raft::distance::DistanceType>((int)params.metric),
+      static_cast<cuvs::distance::DistanceType>((int)params.metric),
       params.n_lists,
       params.adaptive_centers,
       params.conservative_memory_allocation,

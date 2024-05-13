@@ -52,7 +52,7 @@ void single_linkage(raft::resources const& handle,
                     const value_t* X,
                     size_t m,
                     size_t n,
-                    raft::distance::DistanceType metric,
+                    cuvs::distance::DistanceType metric,
                     single_linkage_output<value_idx>* out,
                     int c,
                     size_t n_clusters)
@@ -87,7 +87,7 @@ void single_linkage(raft::resources const& handle,
                     raft::device_matrix_view<const value_t, idx_t, row_major> X,
                     raft::device_matrix_view<idx_t, idx_t, row_major> dendrogram,
                     raft::device_vector_view<idx_t, idx_t> labels,
-                    raft::distance::DistanceType metric,
+                    cuvs::distance::DistanceType metric,
                     size_t n_clusters,
                     std::optional<int> c = std::make_optional<int>(DEFAULT_CONST_C))
 {

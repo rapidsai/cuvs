@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include "kmeans.cuh"
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -31,7 +33,7 @@ namespace cuvs::cluster::detail {
 template <typename value_t, typename idx_t>
 void compute_dispersion(raft::resources const& handle,
                         raft::device_matrix_view<const value_t, idx_t> X,
-                        KMeansParams& params,
+                        cuvs::cluster::kmeans::params& params,
                         raft::device_matrix_view<value_t, idx_t> centroids_view,
                         raft::device_vector_view<idx_t> labels,
                         raft::device_vector_view<idx_t> clusterSizes,
@@ -111,7 +113,7 @@ void find_k(raft::resources const& handle,
   double objective[3];      // 0= left of mid, 1= right of mid
   if (left == 1) left = 2;  // at least do 2 clusters
 
-  KMeansParams params;
+  params params;
   params.max_iter = maxiter;
   params.tol      = tol;
 

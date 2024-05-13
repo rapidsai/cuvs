@@ -51,8 +51,8 @@ namespace cuvs::cluster::kmeans_balanced {
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
  *    cuvs::cluster::balanced_params params;
@@ -74,7 +74,7 @@ namespace cuvs::cluster::kmeans_balanced {
  */
 template <typename DataT, typename MathT, typename IndexT, typename MappingOpT = raft::identity_op>
 void fit(const raft::resources& handle,
-         balanced_params const& params,
+         cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
          MappingOpT mapping_op = raft::identity_op())
@@ -103,8 +103,8 @@ void fit(const raft::resources& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
  *    cuvs::cluster::balanced_params params;
@@ -132,7 +132,7 @@ template <typename DataT,
           typename LabelT,
           typename MappingOpT = raft::identity_op>
 void predict(const raft::resources& handle,
-             balanced_params const& params,
+             cuvs::cluster::kmeans::balanced_params const& params,
              raft::device_matrix_view<const DataT, IndexT> X,
              raft::device_matrix_view<const MathT, IndexT> centroids,
              raft::device_vector_view<LabelT, IndexT> labels,
@@ -166,8 +166,8 @@ void predict(const raft::resources& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
  *    cuvs::cluster::balanced_params params;
@@ -197,7 +197,7 @@ template <typename DataT,
           typename LabelT,
           typename MappingOpT = raft::identity_op>
 void fit_predict(const raft::resources& handle,
-                 balanced_params const& params,
+                 cuvs::cluster::kmeans::balanced_params const& params,
                  raft::device_matrix_view<const DataT, IndexT> X,
                  raft::device_matrix_view<MathT, IndexT> centroids,
                  raft::device_vector_view<LabelT, IndexT> labels,
@@ -220,8 +220,8 @@ namespace helpers {
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
- *   #include <raft/cluster/kmeans_balanced_types.hpp>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
  *   ...
  *   raft::handle_t handle;
  *    cuvs::cluster::balanced_params params;
@@ -256,7 +256,7 @@ template <typename DataT,
           typename CounterT,
           typename MappingOpT>
 void build_clusters(const raft::resources& handle,
-                    const balanced_params& params,
+                    const cuvs::cluster::kmeans::balanced_params& params,
                     raft::device_matrix_view<const DataT, IndexT> X,
                     raft::device_matrix_view<MathT, IndexT> centroids,
                     raft::device_vector_view<LabelT, IndexT> labels,
@@ -301,7 +301,7 @@ void build_clusters(const raft::resources& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans_balanced.cuh>
+ *   #include <cuvs/cluster/kmeans_balanced.cuh>
  *   ...
  *   raft::handle_t handle;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);

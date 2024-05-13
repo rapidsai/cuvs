@@ -189,6 +189,7 @@ include(cmake/thirdparty/get_cutlass.cmake)
 
 add_library(
   cuvs SHARED
+  src/cluster/kmeans_fit_float.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
@@ -216,6 +217,7 @@ add_library(
   src/distance/detail/pairwise_matrix/dispatch_rbf.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
   src/neighbors/brute_force_index.cu

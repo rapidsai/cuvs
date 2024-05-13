@@ -75,7 +75,7 @@ void connect_knn_graph(
   size_t n,
   value_idx* color,
   red_op reduction_op,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2SqrtExpanded)
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   auto stream = resource::get_cuda_stream(handle);
 
@@ -156,7 +156,7 @@ void build_sorted_mst(
   value_idx* color,
   size_t nnz,
   red_op reduction_op,
-  raft::distance::DistanceType metric = raft::distance::DistanceType::L2SqrtExpanded,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
   int max_iter                        = 10)
 {
   auto stream = resource::get_cuda_stream(handle);

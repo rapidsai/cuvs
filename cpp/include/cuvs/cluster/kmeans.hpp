@@ -128,7 +128,7 @@ struct balanced_params : base_params {
 };
 
 void fit(raft::resources const& handle,
-         const raft::cluster::kmeans::params& params,
+         const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const float, int> X,
          std::optional<raft::device_vector_view<const float, int>> sample_weight,
          raft::device_matrix_view<float, int> centroids,
@@ -136,7 +136,7 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<int, int> n_iter);
 
 void fit(raft::resources const& handle,
-         const raft::cluster::kmeans::params& params,
+         const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const double, int> X,
          std::optional<raft::device_vector_view<const double, int>> sample_weight,
          raft::device_matrix_view<double, int> centroids,

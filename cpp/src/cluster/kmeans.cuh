@@ -48,8 +48,8 @@ using KeyValueIndexOp = detail::KeyValueIndexOp<IndexT, DataT>;
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
@@ -102,8 +102,8 @@ void fit(raft::resources const& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
@@ -169,8 +169,8 @@ void predict(raft::resources const& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
@@ -270,8 +270,8 @@ void transform(raft::resources const& handle,
  *
  *  @code{.cpp}
  *   #include <raft/core/handle.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.cuh>
+ *   #include <cuvs/cluster/kmeans_types.hpp>
  *
  *   #include <raft/random/make_blobs.cuh>
  *
@@ -392,12 +392,12 @@ void cluster_cost(raft::resources const& handle,
  */
 template <typename DataT, typename IndexT, typename LabelsIterator>
 void update_centroids(raft::resources const& handle,
-                      raft::device_matrix_view<const DataT, IndexT, row_major> X,
+                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> X,
                       raft::device_vector_view<const DataT, IndexT> sample_weights,
-                      raft::device_matrix_view<const DataT, IndexT, row_major> centroids,
+                      raft::device_matrix_view<const DataT, IndexT, raft::row_major> centroids,
                       LabelsIterator labels,
                       raft::device_vector_view<DataT, IndexT> weight_per_cluster,
-                      raft::device_matrix_view<DataT, IndexT, row_major> new_centroids)
+                      raft::device_matrix_view<DataT, IndexT, raft::row_major> new_centroids)
 {
   // TODO: Passing these into the algorithm doesn't really present much of a benefit
   // because they are being resized anyways.
@@ -438,7 +438,7 @@ void min_cluster_distance(raft::resources const& handle,
                           raft::device_vector_view<DataT, IndexT> minClusterDistance,
                           raft::device_vector_view<DataT, IndexT> L2NormX,
                           rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-                          raft::distance::DistanceType metric,
+                          cuvs::distance::DistanceType metric,
                           int batch_samples,
                           int batch_centroids,
                           rmm::device_uvector<char>& workspace)
@@ -489,7 +489,7 @@ void min_cluster_and_distance(
   raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance,
   raft::device_vector_view<DataT, IndexT> L2NormX,
   rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,
-  raft::distance::DistanceType metric,
+  cuvs::distance::DistanceType metric,
   int batch_samples,
   int batch_centroids,
   rmm::device_uvector<char>& workspace)
