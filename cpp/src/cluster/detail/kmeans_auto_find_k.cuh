@@ -92,7 +92,7 @@ void find_k(raft::resources const& handle,
   auto clusterSizes = raft::make_device_vector<idx_t>(handle, kmax);
   auto labels       = raft::make_device_vector<idx_t>(handle, n);
 
-  rmm::device_uvector<char> workspace(0, resource::get_cuda_stream(handle));
+  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
   idx_t* clusterSizes_ptr = clusterSizes.data_handle();
 
@@ -113,7 +113,7 @@ void find_k(raft::resources const& handle,
   double objective[3];      // 0= left of mid, 1= right of mid
   if (left == 1) left = 2;  // at least do 2 clusters
 
-  params params;
+  cuvs::cluster::kmeans::params params;
   params.max_iter = maxiter;
   params.tol      = tol;
 

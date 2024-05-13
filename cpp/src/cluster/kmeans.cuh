@@ -402,7 +402,7 @@ void update_centroids(raft::resources const& handle,
   // TODO: Passing these into the algorithm doesn't really present much of a benefit
   // because they are being resized anyways.
   // ref https://github.com/rapidsai/raft/issues/930
-  rmm::device_uvector<char> workspace(0, resource::get_cuda_stream(handle));
+  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
   detail::update_centroids<DataT, IndexT>(
     handle, X, sample_weights, centroids, labels, weight_per_cluster, new_centroids, workspace);
