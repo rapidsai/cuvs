@@ -354,7 +354,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                   cuvs::Compare<uint8_t>{}));
 
     // Another test with the API that take list_data directly
-    auto list_data  = index->lists()[label]->data.view();
     uint32_t n_take = 4;
     ASSERT_TRUE(row_offset + n_take < n_rows);
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
