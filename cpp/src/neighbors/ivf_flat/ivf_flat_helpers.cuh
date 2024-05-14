@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <cuvs/neighbors/ivf_flat_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"
