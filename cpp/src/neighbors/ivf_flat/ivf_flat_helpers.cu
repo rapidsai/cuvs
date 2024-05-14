@@ -16,11 +16,11 @@
 
 #include <cuvs/neighbors/ivf_flat_helpers.cuh>
 
+#include "../detail/ann_utils.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/neighbors/detail/div_utils.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <variant>
 
 namespace cuvs::neighbors::ivf_flat {
@@ -185,13 +185,13 @@ void reset_index(const raft::resources& res, index<T, IdxT>* idx)
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  raft::spatial::knn::detail::utils::memzero(
+  cuvs::spatial::knn::detail::utils::memzero(
     idx->accum_sorted_sizes().data_handle(), idx->accum_sorted_sizes().size(), stream);
-  raft::spatial::knn::detail::utils::memzero(
+  cuvs::spatial::knn::detail::utils::memzero(
     idx->list_sizes().data_handle(), idx->list_sizes().size(), stream);
-  raft::spatial::knn::detail::utils::memzero(
+  cuvs::spatial::knn::detail::utils::memzero(
     idx->data_ptrs().data_handle(), idx->data_ptrs().size(), stream);
-  raft::spatial::knn::detail::utils::memzero(
+  cuvs::spatial::knn::detail::utils::memzero(
     idx->inds_ptrs().data_handle(), idx->inds_ptrs().size(), stream);
 }
 }  // namespace helpers

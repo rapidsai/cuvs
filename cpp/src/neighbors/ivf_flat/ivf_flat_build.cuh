@@ -23,6 +23,7 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 
+#include "../detail/ann_utils.cuh"
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
@@ -33,7 +34,6 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/pow2_utils.cuh>
 
@@ -42,7 +42,7 @@
 #include <cstdint>
 
 namespace cuvs::neighbors::ivf_flat {
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 namespace detail {
 

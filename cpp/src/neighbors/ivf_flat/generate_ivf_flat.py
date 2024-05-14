@@ -139,10 +139,6 @@ build_macro = """
   }                    
 """
 
-extend_macro = """
-
-"""
-
 search_macro = """
 #define CUVS_INST_IVF_FLAT_SEARCH(T, IdxT)                                      \\
   void search(raft::resources const& handle,                                    \\
@@ -162,7 +158,7 @@ search_macro = """
     raft::device_matrix_view<const T, IdxT, raft::row_major> queries,           \\
     raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,            \\
     raft::device_matrix_view<float, IdxT, raft::row_major> distances,           \\
-    cuvs::neighbors::filtering::bitset_filter<uint32_t, IdxT> sample_filter)    \\ 
+    cuvs::neighbors::filtering::bitset_filter<uint32_t, IdxT> sample_filter)    \\
   {                                                                             \\
     cuvs::neighbors::ivf_flat::detail::search_with_filtering(                   \\
       handle, params, idx, queries, neighbors, distances, sample_filter);       \\

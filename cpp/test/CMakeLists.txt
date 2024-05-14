@@ -131,6 +131,19 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME
+    NEIGHBORS_ANN_NN_DESCENT_TEST
+    PATH
+    test/neighbors/ann_nn_descent/test_float_uint32_t.cu
+    test/neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
+    test/neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
+  ConfigureTest(
+    NAME
     DISTANCE_TEST
     PATH
     test/distance/dist_canberra.cu
@@ -156,7 +169,6 @@ endif()
 
 if(BUILD_C_TESTS)
   ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
-  ConfigureTest(NAME CORE_TEST PATH test/core/bitset.cu C_LIB)
 
   ConfigureTest(
     NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu

@@ -41,11 +41,11 @@ namespace codepacker {
 /**
  * Unpack flat PQ codes from an existing list by the given offset.
  *
- * @param[out] codes flat PQ codes, one code per byte [n_rows, pq_dim]
- * @param[in] list_data the packed ivf::list data.
+ * @param[in] res
+ * @param[in] index
+ * @param[out] out_codes flat PQ codes, one code per byte [n_rows, pq_dim]
+ * @param[in] label
  * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
- * @param[in] pq_bits codebook size (1 << pq_bits)
- * @param[in] stream
  */
 void unpack_list_data(raft::resources const& res,
                       const index<int64_t>& index,
@@ -57,11 +57,11 @@ void unpack_list_data(raft::resources const& res,
  *
  * NB: no memory allocation happens here; the list must fit the data (offset + n_rows).
  *
- * @param[out] list_data the packed ivf::list data.
- * @param[in] codes flat PQ codes, one code per byte [n_rows, pq_dim]
+ * @param[in] res
+ * @param[in] index
+ * @param[out] new_codes
+ * @param[in] label
  * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
- * @param[in] pq_bits codebook size (1 << pq_bits)
- * @param[in] stream
  */
 void pack_list_data(raft::resources const& res,
                     index<int64_t>* index,
@@ -88,6 +88,13 @@ void make_rotation_matrix(raft::resources const& handle,
                           float* rotation_matrix,
                           raft::random::RngState rng = raft::random::RngState(7ULL));
 
+/**
+ * @brief Set cluster centers on an index
+ *
+ * @param handle
+ * @param index
+ * @param cluster_centers
+ */
 void set_centers(raft::resources const& handle,
                  index<int64_t>* index,
                  const float* cluster_centers);
@@ -118,7 +125,7 @@ void set_centers(raft::resources const& handle,
  *   it must be smaller than the list size.
  * @param[in] label
  *   The id of the list (cluster) to decode.
- * @param[in] offset
+ * @param[in] offset_or_indices
  *   How many records in the list to skip.
  */
 void reconstruct_list_data(raft::resources const& res,
@@ -126,7 +133,6 @@ void reconstruct_list_data(raft::resources const& res,
                            raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
                            uint32_t label,
                            std::variant<uint32_t, const uint32_t*> offset_or_indices);
-
 void reconstruct_list_data(raft::resources const& res,
                            const index<int64_t>& index,
                            raft::device_matrix_view<int8_t, uint32_t, raft::row_major> out_vectors,
@@ -162,6 +168,7 @@ void reconstruct_list_data(raft::resources const& res,
  * @param[inout] index
  * @param[in] new_codes flat PQ codes, [n_vec, ceildiv(pq_dim * pq_bits, 8)]
  * @param[in] n_rows number of records
+ * @param[in] label The id of the list (cluster) to decode.
  * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
  */
 void pack_contiguous_list_data(raft::resources const& res,

@@ -19,6 +19,7 @@
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
 
+#include <cuvs/core/bitset.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_flat_helpers.cuh>
 #include <raft/stats/mean.cuh>

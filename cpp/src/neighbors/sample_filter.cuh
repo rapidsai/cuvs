@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "../core/bitset.cuh"
 #include <cuvs/neighbors/sample_filter.hpp>
+#include <raft/core/bitset.cuh>
 #include <raft/core/detail/macros.hpp>
 
 #include <cstddef>

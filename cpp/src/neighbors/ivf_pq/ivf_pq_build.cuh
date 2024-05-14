@@ -26,6 +26,7 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
+#include "../detail/ann_utils.cuh"  // utils::mapping
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -43,7 +44,6 @@
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
 #include <raft/random/rng.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping
 #include <raft/stats/histogram.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>
@@ -63,7 +63,7 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
 
