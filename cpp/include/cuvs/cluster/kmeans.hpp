@@ -147,8 +147,7 @@ void fit(raft::resources const& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;
@@ -216,8 +215,7 @@ void predict(raft::resources const& handle,
  *
  * @code{.cpp}
  *   #include <raft/core/resources.hpp>
- *   #include <raft/cluster/kmeans.cuh>
- *   #include <raft/cluster/kmeans_types.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::raft::resources handle;

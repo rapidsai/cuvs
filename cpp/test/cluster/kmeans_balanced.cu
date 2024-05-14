@@ -16,7 +16,7 @@
 
 #include "../test_utils.h"
 
-#include <raft/cluster/kmeans_balanced.cuh>
+#include "../../src/cluster/kmeans_balanced.cuh"
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/operators.hpp>
@@ -40,7 +40,7 @@
  * dataset.
  */
 
-namespace raft {
+namespace cuvs {
 
 template <typename MathT, typename IdxT>
 struct KmeansBalancedInputs {
@@ -237,4 +237,4 @@ KB_TEST((KmeansBalancedTest<int8_t, double, uint32_t, int, i2f_scaler<int8_t, do
         KmeansBalancedTestDI8U32I32,
         inputsd_i32);
 
-}  // namespace raft
+}  // namespace cuvs

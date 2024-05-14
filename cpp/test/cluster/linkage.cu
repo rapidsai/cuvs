@@ -25,12 +25,12 @@
 
 #include "../test_utils.cuh"
 
+#include <cuvs/cluster/agglomerative.hpp>
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/sparse/coo.hpp>
-#include <raft/sparse/hierarchy/single_linkage.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
@@ -39,7 +39,7 @@
 
 #include <vector>
 
-namespace raft {
+namespace cuvs {
 
 using namespace std;
 
@@ -671,4 +671,4 @@ typedef LinkageTest<float, int> LinkageTestF_Int;
 TEST_P(LinkageTestF_Int, Result) { EXPECT_TRUE(score == 1.0); }
 
 INSTANTIATE_TEST_CASE_P(LinkageTest, LinkageTestF_Int, ::testing::ValuesIn(linkage_inputsf2));
-}  // end namespace raft
+}  // namespace cuvs

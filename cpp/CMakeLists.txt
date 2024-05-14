@@ -169,8 +169,6 @@ include(cmake/modules/ConfigureCUDA.cmake)
 # add third party dependencies using CPM
 rapids_cpm_init()
 
-include(cmake/thirdparty/get_cutlass.cmake)
-
 if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
 endif()
@@ -183,6 +181,8 @@ if(BUILD_TESTS OR BUILD_C_TESTS)
   include(${rapids-cmake-dir}/cpm/gtest.cmake)
   rapids_cpm_gtest(BUILD_STATIC)
 endif()
+
+include(cmake/thirdparty/get_cutlass.cmake)
 
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
