@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <cstdint>
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
