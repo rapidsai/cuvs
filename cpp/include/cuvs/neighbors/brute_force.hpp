@@ -18,8 +18,11 @@
 
 #include "ann_types.hpp"
 #include <cuvs/neighbors/ann_types.hpp>
+#include <raft/core/copy.hpp>
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
+#include <raft/core/host_mdspan.hpp>
 
 namespace cuvs::neighbors::brute_force {
 
@@ -42,34 +45,108 @@ struct index : cuvs::neighbors::ann::index {
   index& operator=(const index&) = delete;
   index& operator=(index&&)      = default;
   ~index()                       = default;
-  index(void* raft_index);
+
+  /** Construct a brute force index from dataset
+   *
+   * Constructs a brute force index from a dataset. This lets us precompute norms for
+   * the dataset, providing a speed benefit over doing this at query time.
+
+   * If the dataset is already in GPU memory, then this class stores a non-owning reference to
+   * the dataset. If the dataset is in host memory, it will be copied to the device and the
+   * index will own the device memory.
+   */
+  template <typename data_accessor>
+  index(raft::resources const& res,
+        raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
+        std::optional<raft::device_vector<T, int64_t>>&& norms,
+        cuvs::distance::DistanceType metric,
+        T metric_arg = 0.0)
+    : ann::index(),
+      metric_(metric),
+      dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
+      norms_(std::move(norms)),
+      metric_arg_(metric_arg)
+  {
+    if (norms_) { norms_view_ = raft::make_const_mdspan(norms_.value().view()); }
+    update_dataset(res, dataset);
+    raft::resource::sync_stream(res);
+  }
+
+  /** Construct a brute force index from dataset
+   *
+   * This class stores a non-owning reference to the dataset and norms here.
+   * Having precomputed norms gives us a performance advantage at query time.
+   */
+  index(raft::resources const& res,
+        raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
+        std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
+        cuvs::distance::DistanceType metric,
+        T metric_arg = 0.0)
+    : ann::index(),
+      metric_(metric),
+      dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
+      dataset_view_(dataset_view),
+      norms_view_(norms_view),
+      metric_arg_(metric_arg)
+  {
+  }
+
+  /**
+   * Replace the dataset with a new dataset.
+   */
+  void update_dataset(raft::resources const& res,
+                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
+  {
+    dataset_view_ = dataset;
+  }
+
+  /**
+   * Replace the dataset with a new dataset.
+   *
+   * We create a copy of the dataset on the device. The index manages the lifetime of this copy.
+   */
+  void update_dataset(raft::resources const& res,
+                      raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+  {
+    dataset_ = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
+    raft::copy(res, dataset_.view(), dataset);
+    dataset_view_ = raft::make_const_mdspan(dataset_.view());
+  }
 
   /** Distance metric used for retrieval */
-  cuvs::distance::DistanceType metric() const noexcept;
+  cuvs::distance::DistanceType metric() const noexcept { return metric_; }
 
   /** Metric argument */
-  T metric_arg() const noexcept;
+  T metric_arg() const noexcept { return metric_arg_; }
 
   /** Total length of the index (number of vectors). */
-  size_t size() const noexcept;
+  size_t size() const noexcept { return dataset_view_.extent(0); }
 
   /** Dimensionality of the data. */
-  size_t dim() const noexcept;
+  size_t dim() const noexcept { return dataset_view_.extent(1); }
 
   /** Dataset [size, dim] */
-  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset() const noexcept;
+  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset() const noexcept
+  {
+    return dataset_view_;
+  }
 
   /** Dataset norms */
-  raft::device_vector_view<const T, int64_t, raft::row_major> norms() const;
+  raft::device_vector_view<const T, int64_t, raft::row_major> norms() const
+  {
+    return norms_view_.value();
+  }
 
   /** Whether ot not this index has dataset norms */
-  bool has_norms() const noexcept;
-
-  // Get pointer to underlying RAFT index, not meant to be used outside of cuVS
-  inline const void* get_raft_index() const noexcept { return raft_index_.get(); }
+  inline bool has_norms() const noexcept { return norms_view_.has_value(); }
 
  private:
-  std::unique_ptr<void*> raft_index_;
+  cuvs::distance::DistanceType metric_;
+  raft::device_matrix<T, int64_t, raft::row_major> dataset_;
+  std::optional<raft::device_vector<T, int64_t>> norms_;
+  std::optional<raft::device_vector_view<const T, int64_t>> norms_view_;
+  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view_;
+  T metric_arg_;
 };
 /**
  * @}
