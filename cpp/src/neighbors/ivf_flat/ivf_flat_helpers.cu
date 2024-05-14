@@ -14,143 +14,14 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ivf_flat_helpers.cuh>
+#include <cstdint>
+#include <cuvs/neighbors/ivf_flat_helpers.hpp>
 
-#include "../detail/ann_utils.cuh"
-#include <raft/core/device_mdspan.hpp>
-#include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/div_utils.hpp>
-#include <variant>
+#include "ivf_flat_helpers.cuh"
 
 namespace cuvs::neighbors::ivf_flat {
 namespace codepacker {
-namespace {
-
-template <typename T>
-__device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
-{
-  // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
-
-  // Interleave dimensions of the source vector while recording it.
-  // NB: such `veclen` is selected, that `dim % veclen == 0`
-  auto group_offset = interleaved_group::roundDown(offset);
-  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
-
-  for (uint32_t l = 0; l < dim; l += veclen) {
-    for (uint32_t j = 0; j < veclen; j++) {
-      block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j] = flat_code[l + j];
-    }
-  }
-}
-
-/**
- * Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
- * indicates the id of the record. This function fetches one flat code from an interleaved code.
- *
- * @tparam T
- *
- * @param[in] block interleaved block. The block can be thought of as the whole inverted list in
- * interleaved format.
- * @param[out] flat_code output flat code
- * @param[in] dim dimension of the flat code
- * @param[in] veclen size of interleaved data chunks
- * @param[in] offset fetch the flat code by the given offset
- */
-template <typename T>
-__device__ void unpack_1(
-  const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
-{
-  // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
-
-  // NB: such `veclen` is selected, that `dim % veclen == 0`
-  auto group_offset = interleaved_group::roundDown(offset);
-  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
-
-  for (uint32_t l = 0; l < dim; l += veclen) {
-    for (uint32_t j = 0; j < veclen; j++) {
-      flat_code[l + j] = block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j];
-    }
-  }
-}
-
-template <typename T>
-RAFT_KERNEL pack_interleaved_list_kernel(const T* codes,
-                                         T* list_data,
-                                         uint32_t n_rows,
-                                         uint32_t dim,
-                                         uint32_t veclen,
-                                         std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  uint32_t tid          = blockIdx.x * blockDim.x + threadIdx.x;
-  const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
-                            ? std::get<uint32_t>(offset_or_indices) + tid
-                            : std::get<const uint32_t*>(offset_or_indices)[tid];
-  if (tid < n_rows) { pack_1(codes + tid * dim, list_data, dim, veclen, dst_ix); }
-}
-
-template <typename T>
-RAFT_KERNEL unpack_interleaved_list_kernel(
-  const T* list_data,
-  T* codes,
-  uint32_t n_rows,
-  uint32_t dim,
-  uint32_t veclen,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  uint32_t tid          = blockIdx.x * blockDim.x + threadIdx.x;
-  const uint32_t src_ix = std::holds_alternative<uint32_t>(offset_or_indices)
-                            ? std::get<uint32_t>(offset_or_indices) + tid
-                            : std::get<const uint32_t*>(offset_or_indices)[tid];
-  if (tid < n_rows) { unpack_1(list_data, codes + tid * dim, dim, veclen, src_ix); }
-}
-
-template <typename T, typename IdxT>
-void pack_list_data(
-  raft::resources const& res,
-  raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
-  uint32_t veclen,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
-    list_data)
-{
-  uint32_t n_rows = codes.extent(0);
-  uint32_t dim    = codes.extent(1);
-  if (n_rows == 0 || dim == 0) return;
-  static constexpr uint32_t kBlockSize = 256;
-  dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
-  dim3 threads(kBlockSize, 1, 1);
-  auto stream = raft::resource::get_cuda_stream(res);
-  pack_interleaved_list_kernel<<<blocks, threads, 0, stream>>>(
-    codes.data_handle(), list_data.data_handle(), n_rows, dim, veclen, offset_or_indices);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-}
-
-template <typename T, typename IdxT>
-void unpack_list_data(
-  raft::resources const& res,
-  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
-    list_data,
-  uint32_t veclen,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  raft::device_matrix_view<T, uint32_t, raft::row_major> codes)
-{
-  uint32_t n_rows = codes.extent(0);
-  uint32_t dim    = codes.extent(1);
-  if (n_rows == 0 || dim == 0) return;
-  static constexpr uint32_t kBlockSize = 256;
-  dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
-  dim3 threads(kBlockSize, 1, 1);
-  auto stream = raft::resource::get_cuda_stream(res);
-  unpack_interleaved_list_kernel<<<blocks, threads, 0, stream>>>(
-    list_data.data_handle(), codes.data_handle(), n_rows, dim, veclen, offset_or_indices);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-}
-
-}  // namespace
-
+namespace detail {
 template <typename T, typename IdxT>
 void pack(
   raft::resources const& res,
@@ -179,7 +50,7 @@ template <typename T>
 void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
+  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
 
   // Interleave dimensions of the source vector while recording it.
   // NB: such `veclen` is selected, that `dim % veclen == 0`
@@ -197,7 +68,7 @@ template <typename T>
 void unpack_1(const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
+  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
 
   // NB: such `veclen` is selected, that `dim % veclen == 0`
   auto group_offset = interleaved_group::roundDown(offset);
@@ -209,10 +80,111 @@ void unpack_1(const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint3
     }
   }
 }
+}  // namespace detail
+
+void pack(raft::resources const& res,
+          raft::device_matrix_view<const float, uint32_t, raft::row_major> codes,
+          uint32_t veclen,
+          uint32_t offset,
+          raft::device_mdspan<float,
+                              typename list_spec<uint32_t, float, int64_t>::list_extents,
+                              raft::row_major> list_data)
+{
+  detail::pack<float, int64_t>(res, codes, veclen, offset, list_data);
+}
+
+void pack(raft::resources const& res,
+          raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> codes,
+          uint32_t veclen,
+          uint32_t offset,
+          raft::device_mdspan<int8_t,
+                              typename list_spec<uint32_t, int8_t, int64_t>::list_extents,
+                              raft::row_major> list_data)
+{
+  detail::pack<int8_t, int64_t>(res, codes, veclen, offset, list_data);
+}
+
+void pack(raft::resources const& res,
+          raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
+          uint32_t veclen,
+          uint32_t offset,
+          raft::device_mdspan<uint8_t,
+                              typename list_spec<uint32_t, uint8_t, int64_t>::list_extents,
+                              raft::row_major> list_data)
+{
+  detail::pack<uint8_t, int64_t>(res, codes, veclen, offset, list_data);
+}
+
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const float,
+                                typename list_spec<uint32_t, float, int64_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t veclen,
+            uint32_t offset,
+            raft::device_matrix_view<float, uint32_t, raft::row_major> codes)
+{
+  detail::unpack<float, int64_t>(res, list_data, veclen, offset, codes);
+}
+
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const int8_t,
+                                typename list_spec<uint32_t, int8_t, int64_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t veclen,
+            uint32_t offset,
+            raft::device_matrix_view<int8_t, uint32_t, raft::row_major> codes)
+{
+  detail::unpack<int8_t, int64_t>(res, list_data, veclen, offset, codes);
+}
+
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const uint8_t,
+                                typename list_spec<uint32_t, uint8_t, int64_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t veclen,
+            uint32_t offset,
+            raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes)
+{
+  detail::unpack<uint8_t, int64_t>(res, list_data, veclen, offset, codes);
+}
+
+void pack_1(const float* flat_code, float* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::pack_1<float>(flat_code, block, dim, veclen, offset);
+}
+
+void pack_1(const int8_t* flat_code, int8_t* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::pack_1<int8_t>(flat_code, block, dim, veclen, offset);
+}
+
+void pack_1(
+  const uint8_t* flat_code, uint8_t* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::pack_1<uint8_t>(flat_code, block, dim, veclen, offset);
+}
+
+void unpack_1(const float* block, float* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::unpack_1<float>(block, flat_code, dim, veclen, offset);
+}
+
+void unpack_1(
+  const int8_t* block, int8_t* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::unpack_1<int8_t>(block, flat_code, dim, veclen, offset);
+}
+
+void unpack_1(
+  const uint8_t* block, uint8_t* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::unpack_1<uint8_t>(block, flat_code, dim, veclen, offset);
+}
 
 }  // namespace codepacker
 
 namespace helpers {
+namespace detail {
 
 template <typename T, typename IdxT>
 void reset_index(const raft::resources& res, index<T, IdxT>* idx)
@@ -228,5 +200,63 @@ void reset_index(const raft::resources& res, index<T, IdxT>* idx)
   cuvs::spatial::knn::detail::utils::memzero(
     idx->inds_ptrs().data_handle(), idx->inds_ptrs().size(), stream);
 }
+
+}  // namespace detail
+
+void reset_index(const raft::resources& res, index<float, int64_t>* index)
+{
+  detail::reset_index<float, int64_t>(res, index);
+}
+
+/**
+ * @brief Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+ * externally modifying the index without going through the build stage. The data and indices of the
+ * IVF lists will be lost.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   raft::resources res;
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // initialize an empty index
+ *   ivf_flat::index<int8_t, int64_t> index(res, index_params, D);
+ *   // reset the index's state and list sizes
+ *   ivf_flat::helpers::reset_index(res, &index);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] index pointer to IVF-Flat index
+ */
+void reset_index(const raft::resources& res, index<int8_t, int64_t>* index)
+{
+  detail::reset_index<int8_t, int64_t>(res, index);
+}
+
+/**
+ * @brief Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
+ * externally modifying the index without going through the build stage. The data and indices of the
+ * IVF lists will be lost.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   raft::resources res;
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_flat::index_params index_params;
+ *   // initialize an empty index
+ *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+ *   // reset the index's state and list sizes
+ *   ivf_flat::helpers::reset_index(res, &index);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] index pointer to IVF-Flat index
+ */
+void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index)
+{
+  detail::reset_index<uint8_t, int64_t>(res, index);
+}
+
 }  // namespace helpers
 }  // namespace cuvs::neighbors::ivf_flat
