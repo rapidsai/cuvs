@@ -114,8 +114,7 @@ void unpack(
  * @param[in] offset how many records to skip before writing the data into the list
  */
 template <typename T>
-__host__ __device__ void pack_1(
-  const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset);
+void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset);
 
 /**
  * Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
@@ -131,8 +130,7 @@ __host__ __device__ void pack_1(
  * @param[in] offset fetch the flat code by the given offset
  */
 template <typename T>
-__host__ __device__ void unpack_1(
-  const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset);
+void unpack_1(const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset);
 
 /** @} */
 
