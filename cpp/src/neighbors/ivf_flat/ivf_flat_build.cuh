@@ -24,13 +24,13 @@
 #include <cuvs/neighbors/ivf_list.hpp>
 
 #include "../detail/ann_utils.cuh"
+#include <cuvs/distance/distance_types.hpp>
 #include <raft/cluster/kmeans_balanced.cuh>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
