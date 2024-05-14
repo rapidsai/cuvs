@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"                 // cuvs::neighbors::detail::ivf
 #include "ivf_flat_interleaved_scan.cuh"     // interleaved_scan
 #include <cuvs/neighbors/ivf_flat.hpp>       // raft::neighbors::ivf_flat::index
@@ -36,7 +37,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
@@ -100,8 +101,8 @@ void search_impl(raft::resources const& handle,
 
   // todo(lsugy): raft distance? (if performance is similar/better than gemm)
   switch (index.metric()) {
-    case raft::distance::DistanceType::L2Expanded:
-    case raft::distance::DistanceType::L2SqrtExpanded: {
+    case cuvs::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded: {
       alpha = -2.0f;
       beta  = 1.0f;
       raft::linalg::rowNorm(query_norm_dev.data(),
