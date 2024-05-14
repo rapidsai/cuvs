@@ -66,3 +66,11 @@ Index serialize
     :project: cuvs
     :members:
     :content-only:
+
+Helper Methods
+---------------
+
+.. doxygengroup:: ivf_pq_cpp_helpers
+    :project: cuvs
+    :members:
+    :content-only:

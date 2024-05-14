@@ -19,12 +19,12 @@
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 #include <cuvs/neighbors/sample_filter.hpp>
 
 #include <raft/core/bitset.cuh>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
+#include <rmm/mr/device/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_pq {

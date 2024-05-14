@@ -24,7 +24,6 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"  // utils::mapping
 #include <raft/cluster/kmeans_balanced.cuh>
