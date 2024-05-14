@@ -47,13 +47,13 @@ index<IdxT>::index(raft::resources const& handle,
     pq_bits_(pq_bits),
     pq_dim_(pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim),
     conservative_memory_allocation_(conservative_memory_allocation),
-    pq_centers_{raft::make_device_mdarray<float>(handle, make_pq_centers_extents())},
     lists_{n_lists},
-    rotation_matrix_{
-      raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
+    pq_centers_{raft::make_device_mdarray<float>(handle, make_pq_centers_extents())},
     centers_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->dim_ext())},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
+    rotation_matrix_{
+      raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
