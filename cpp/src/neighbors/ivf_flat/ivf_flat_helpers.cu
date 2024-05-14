@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ivf_flat_helpers.cuh>
+#include <cuvs/neighbors/ivf_flat_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"
 #include <raft/core/device_mdspan.hpp>

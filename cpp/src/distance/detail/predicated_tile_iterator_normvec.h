@@ -44,7 +44,7 @@ Changes:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -70,12 +70,12 @@ class PredicatedTileIteratorNormVec {
   using Element = Element_;
 
   using Layout         = Layout_;
-  using TensorRef      = TensorRef<Element, Layout>;
+  using TensorRef      = cutlass::TensorRef<Element, Layout>;
   using ConstTensorRef = typename TensorRef::ConstTensorRef;
 
   using Index       = typename Layout::Index;
   using LongIndex   = typename Layout::LongIndex;
-  using TensorCoord = MatrixCoord;
+  using TensorCoord = cutlass::MatrixCoord;
 
   static int const kElementsPerAccess = ThreadMap::kElementsPerAccess;
   static int const kThreads           = ThreadMap::kThreads;
@@ -87,21 +87,22 @@ class PredicatedTileIteratorNormVec {
   static_assert(ThreadMap::Iterations::kColumn > 0, "ThreadMap::Iterations::kColumn must be > 0");
 
   /// Fragment object
-  using Fragment = Array<Element,
-                         ThreadMap::Iterations::kColumn * ThreadMap::Iterations::kRow *
-                           ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster *
-                           ThreadMap::kElementsPerAccess>;
+  using Fragment =
+    cutlass::Array<Element,
+                   ThreadMap::Iterations::kColumn * ThreadMap::Iterations::kRow *
+                     ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster *
+                     ThreadMap::kElementsPerAccess>;
 
   /// Memory access size
-  using AccessType = AlignedArray<Element, ThreadMap::kElementsPerAccess>;
+  using AccessType = cutlass::AlignedArray<Element, ThreadMap::kElementsPerAccess>;
 
   //
   // Parameters struct
   //
 
   /// Uses a non-template class
-  struct Params : PredicatedTileIteratorParams {
-    using Base = PredicatedTileIteratorParams;
+  struct Params : cutlass::epilogue::threadblock::PredicatedTileIteratorParams {
+    using Base = cutlass::epilogue::threadblock::PredicatedTileIteratorParams;
 
     CUTLASS_HOST_DEVICE
     Params() {}
@@ -110,7 +111,7 @@ class PredicatedTileIteratorNormVec {
     Params(Layout const& layout)
       : PredicatedTileIteratorParams(
           layout.stride(0) * int(sizeof(AccessType)) / kElementsPerAccess,
-          make_OutputTileThreadMapDesc<ThreadMap>())
+          cutlass::epilogue::threadblock::make_OutputTileThreadMapDesc<ThreadMap>())
     {
     }
 
@@ -156,12 +157,12 @@ class PredicatedTileIteratorNormVec {
   //
 
   /// Parameters structure containing reference and precomputed state.
-  PredicatedTileIteratorParams params_;
+  cutlass::epilogue::threadblock::PredicatedTileIteratorParams params_;
 
   /// Byte-level pointer
   uint8_t* byte_pointer_;
 
-  /// Array of boolean values to contain steady-state predicates
+  /// cutlass::Array of boolean values to contain steady-state predicates
   Mask mask_;
 
   /// Extent of the matrix tile in rows
@@ -188,7 +189,8 @@ class PredicatedTileIteratorNormVec {
 
   static_assert(sizeof(extent_row_) == 4, "Expected 32b extents");
   static_assert(sizeof(thread_start_row_) == 4, "Expected 32b extents");
-  static_assert(sizeof(PredicatedTileIteratorParams::stride) == 8, "Expected 64b strides");
+  static_assert(sizeof(cutlass::epilogue::threadblock::PredicatedTileIteratorParams::stride) == 8,
+                "Expected 64b strides");
 
  private:
   //
@@ -202,12 +204,13 @@ class PredicatedTileIteratorNormVec {
 
   /// Constructor
   CUTLASS_DEVICE
-  PredicatedTileIteratorNormVec(PredicatedTileIteratorParams const& params,
-                                Element* pointer,
-                                TensorCoord extent,
-                                int thread_idx,
-                                TensorCoord threadblock_offset = TensorCoord(),
-                                int const* indices             = nullptr)
+  PredicatedTileIteratorNormVec(
+    cutlass::epilogue::threadblock::PredicatedTileIteratorParams const& params,
+    Element* pointer,
+    TensorCoord extent,
+    int thread_idx,
+    TensorCoord threadblock_offset = TensorCoord(),
+    int const* indices             = nullptr)
     : params_(params), indices_(indices)
   {
     TensorCoord thread_offset = ThreadMap::initial_offset(thread_idx) + threadblock_offset;
@@ -247,7 +250,7 @@ class PredicatedTileIteratorNormVec {
   CUTLASS_HOST_DEVICE
   void add_pointer_offset(LongIndex pointer_offset)
   {
-    byte_pointer_ += pointer_offset * sizeof_bits<Element>::value / 8;
+    byte_pointer_ += pointer_offset * cutlass::sizeof_bits<Element>::value / 8;
   }
 
   /// Loads a fragment from memory
@@ -509,7 +512,10 @@ class PredicatedTileIteratorNormVec {
   }
 
   CUTLASS_DEVICE
-  MatrixCoord thread_start() const { return MatrixCoord(thread_start_row_, thread_start_column_); }
+  cutlass::MatrixCoord thread_start() const
+  {
+    return MatrixCoord(thread_start_row_, thread_start_column_);
+  }
 
   /// Need to get the thread start row from the tile iterator
   CUTLASS_DEVICE
@@ -580,6 +586,6 @@ class PredicatedTileIteratorNormVec {
 
 }  // namespace threadblock
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 ////////////////////////////////////////////////////////////////////////////////

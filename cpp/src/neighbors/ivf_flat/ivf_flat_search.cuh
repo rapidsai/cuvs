@@ -36,7 +36,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
@@ -100,8 +100,8 @@ void search_impl(raft::resources const& handle,
 
   // todo(lsugy): raft distance? (if performance is similar/better than gemm)
   switch (index.metric()) {
-    case raft::distance::DistanceType::L2Expanded:
-    case raft::distance::DistanceType::L2SqrtExpanded: {
+    case cuvs::distance::DistanceType::L2Expanded:
+    case cuvs::distance::DistanceType::L2SqrtExpanded: {
       alpha = -2.0f;
       beta  = 1.0f;
       raft::linalg::rowNorm(query_norm_dev.data(),

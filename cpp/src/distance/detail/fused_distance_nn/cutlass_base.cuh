@@ -83,7 +83,7 @@ void cutlassFusedDistanceNN(const DataT* x,
                             KVPReduceOpT pairRedOp,
                             cudaStream_t stream)
 {
-  using EpilogueOutputOp = cutlass::epilogue::thread::FusedDistanceNNEpilogueElementwise<
+  using EpilogueOutputOp = cuvs::epilogue::thread::FusedDistanceNNEpilogueElementwise<
     DataT,  // ElementC_
     AccT,   // ElementAccumulator_
     DataT,  // ElementCompute_
@@ -117,15 +117,15 @@ void cutlassFusedDistanceNN(const DataT* x,
   constexpr bool isRowMajor = true;
 
   using fusedDistanceNNKernel =
-    typename cutlass::gemm::kernel::FusedDistanceNNGemm<DataT,
-                                                        Alignment,
-                                                        DataT,
-                                                        Alignment,
-                                                        AccT,
-                                                        AccT,
-                                                        EpilogueOutputOp,
-                                                        NumStages,  // Number of pipeline stages
-                                                        isRowMajor>::GemmKernel;
+    typename cuvs::gemm::kernel::FusedDistanceNNGemm<DataT,
+                                                     Alignment,
+                                                     DataT,
+                                                     Alignment,
+                                                     AccT,
+                                                     AccT,
+                                                     EpilogueOutputOp,
+                                                     NumStages,  // Number of pipeline stages
+                                                     isRowMajor>::GemmKernel;
 
   using fusedDistanceNN = cutlass::gemm::device::GemmGrouped<fusedDistanceNNKernel>;
 
