@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-#include <cstdint>
-#include <cuvs/neighbors/ivf_flat_helpers.hpp>
-
 #include "ivf_flat_helpers.cuh"
+#include <cstdint>
 
 namespace cuvs::neighbors::ivf_flat {
 namespace codepacker {

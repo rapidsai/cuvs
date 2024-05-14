@@ -25,7 +25,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/kvp.hpp>
-#include <raft/core/logger-inl.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -371,7 +371,7 @@ void kmeans_fit_main(raft::resources const& handle,
                      rmm::device_uvector<char>& workspace)
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("kmeans_fit_main");
-  raft::logger::get(RAFT_NAME).set_level(params.verbosity);
+  //  raft::logger::get(RAFT_NAME).set_level(params.verbosity);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);
@@ -877,7 +877,7 @@ void kmeans_fit(raft::resources const& handle,
       pams.n_clusters);
   }
 
-  raft::logger::get(RAFT_NAME).set_level(pams.verbosity);
+  //  raft::logger::get(RAFT_NAME).set_level(pams.verbosity);
 
   // Allocate memory
   rmm::device_uvector<char> workspace(0, stream);
@@ -1023,7 +1023,7 @@ void kmeans_predict(raft::resources const& handle,
   RAFT_EXPECTS(centroids.extent(1) == n_features,
                "invalid parameter (centroids.extent(1) != n_features)");
 
-  raft::logger::get(RAFT_NAME).set_level(pams.verbosity);
+  //  raft::logger::get(RAFT_NAME).set_level(pams.verbosity);
   auto metric = pams.metric;
 
   // Allocate memory
@@ -1216,7 +1216,7 @@ void kmeans_transform(raft::resources const& handle,
                       raft::device_matrix_view<DataT> X_new)
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("kmeans_transform");
-  raft::logger::get(RAFT_NAME).set_level(pams.verbosity);
+  //  raft::logger::get(RAFT_NAME).set_level(pams.verbosity);
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   auto n_samples      = X.extent(0);
   auto n_features     = X.extent(1);

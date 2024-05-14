@@ -190,6 +190,13 @@ endif()
 add_library(
   cuvs SHARED
   src/cluster/kmeans_fit_float.cu
+  src/cluster/kmeans_fit_double.cu
+  src/cluster/kmeans_fit_predict_double.cu
+  src/cluster/kmeans_fit_predict_float.cu
+  src/cluster/kmeans_predict_double.cu
+  src/cluster/kmeans_predict_float.cu
+  src/cluster/kmeans_transform_double.cu
+  src/cluster/kmeans_transform_float.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu

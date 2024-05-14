@@ -17,7 +17,6 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger-inl.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/rng_state.hpp>
 
@@ -300,5 +299,9 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<const double, int> X,
                raft::device_matrix_view<const double, int> centroids,
                raft::device_matrix_view<double, int> X_new);
+
+namespace helpers {
+
+}
 
 }  // namespace  cuvs::cluster::kmeans
