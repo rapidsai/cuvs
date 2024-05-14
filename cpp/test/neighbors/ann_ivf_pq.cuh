@@ -319,8 +319,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto indices = raft::make_device_vector<IdxT>(handle_, n_rows);
     raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    ivf_pq::helpers::codepacker::unpack_list_data(
-      handle_, *index, codes.view(), label, uint32_t(0));
+    ivf_pq::helpers::unpack_list_data(handle_, *index, codes.view(), label, uint32_t(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
     ivf_pq::helpers::extend_list_with_codes(handle_, index, codes.view(), indices.view(), label);
 
@@ -346,8 +345,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     size_t offset      = row_offset * index->pq_dim();
     auto codes_to_pack = raft::make_device_matrix_view<const uint8_t, uint32_t>(
       codes.data_handle() + offset, n_vec, index->pq_dim());
-    ivf_pq::helpers::codepacker::pack_list_data(
-      handle_, index, codes_to_pack, label, uint32_t(row_offset));
+    ivf_pq::helpers::pack_list_data(handle_, index, codes_to_pack, label, uint32_t(row_offset));
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_size,
@@ -358,22 +356,12 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     uint32_t n_take = 4;
     ASSERT_TRUE(row_offset + n_take < n_rows);
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
-    ivf_pq::helpers::codepacker::unpack_list_data(
-      // handle_, list_data, index->pq_bits(), row_offset, codes2.view());
-      handle_,
-      *index,
-      codes2.view(),
-      label,
-      uint32_t(row_offset));
+    ivf_pq::helpers::codepacker::unpack(
+      handle_, list_data, index->pq_bits(), row_offset, codes2.view());
 
     // Write it back
-    ivf_pq::helpers::codepacker::pack_list_data(
-      // handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
-      handle_,
-      index,
-      make_const_mdspan(codes2.view()),
-      label,
-      uint32_t(row_offset));
+    ivf_pq::helpers::codepacker::pack(
+      handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_size,
