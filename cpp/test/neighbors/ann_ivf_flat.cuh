@@ -20,7 +20,7 @@
 #include "naive_knn.cuh"
 
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_flat_helpers.hpp>
+#include <cuvs/neighbors/ivf_flat_helpers.cuh>
 #include <raft/stats/mean.cuh>
 #include <thrust/sequence.h>
 
@@ -354,7 +354,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                                               list_size),
           flat_codes.view());
 
-        helpers::codepacker::pack<DataT, IdxT>(
+        codepacker::pack<DataT, IdxT>(
           handle_, make_const_mdspan(flat_codes.view()), idx.veclen(), 0, list_data.view());
 
         {
@@ -411,7 +411,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto unpacked_flat_codes =
           raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.dim());
 
-        helpers::codepacker::unpack<DataT, IdxT>(
+        codepacker::unpack<DataT, IdxT>(
           handle_, list_data.view(), idx.veclen(), 0, unpacked_flat_codes.view());
 
         ASSERT_TRUE(cuvs::devArrMatch(flat_codes.data_handle(),

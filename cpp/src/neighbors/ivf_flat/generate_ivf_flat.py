@@ -66,7 +66,7 @@ types = dict(
 )
 
 build_macro = """
-#define CUVS_INST_IVF_FLAT_BUILD(T, IdxT)                                                      \\
+#define CUVS_INST_IVF_FLAT_BUILD_EXTEND(T, IdxT)                                               \\
   auto build(raft::resources const& handle,                                                    \\
              const cuvs::neighbors::ivf_flat::index_params& params,                            \\
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)                 \\
@@ -98,11 +98,7 @@ build_macro = """
              cuvs::neighbors::ivf_flat::index<T, IdxT>& idx)                                   \\
   {                                                                                            \\
     cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset, idx);                    \\
-  }
-"""
-
-extend_macro = """
-#define CUVS_INST_IVF_FLAT_EXTEND(T, IdxT)                                           \\
+  }                                                                                            \\
   auto extend(raft::resources const& handle,                                         \\
               raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,  \\
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices, \\
@@ -141,6 +137,10 @@ extend_macro = """
     cuvs::neighbors::ivf_flat::detail::extend(                                       \\
       handle, new_vectors, new_indices, idx);                                        \\
   }                    
+"""
+
+extend_macro = """
+
 """
 
 search_macro = """
@@ -205,15 +205,10 @@ serialize_macro = """
 """
 
 macros = dict(
-    build=dict(
+    build_extend=dict(
         include=build_include_macro,
         definition=build_macro,
-        name="CUVS_INST_IVF_FLAT_BUILD",
-    ),
-    extend=dict(
-        include=build_include_macro,
-        definition=extend_macro,
-        name="CUVS_INST_IVF_FLAT_EXTEND",
+        name="CUVS_INST_IVF_FLAT_BUILD_EXTEND",
     ),
     search=dict(
         include=search_include_macro,

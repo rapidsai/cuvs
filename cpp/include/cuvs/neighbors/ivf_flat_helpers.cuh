@@ -20,13 +20,13 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::neighbors::ivf_flat::helpers {
+namespace cuvs::neighbors::ivf_flat {
+namespace codepacker {
+
 /**
- * @defgroup ivf_flat_helpers Helper functions for manipulationg IVF Flat Index
+ * @defgroup ivf_flat_codepacker Helper functions for IVF Flat codebook
  * @{
  */
-
-namespace codepacker {
 
 /**
  * Write flat codes into an existing list by the given offset.
@@ -98,7 +98,52 @@ void unpack(
   uint32_t veclen,
   uint32_t offset,
   raft::device_matrix_view<T, uint32_t, raft::row_major> codes);
+
+/**
+ * Write one flat code into a block by the given offset. The offset indicates the id of the record
+ * in the list. This function interleaves the code and is intended to later copy the interleaved
+ * codes over to the IVF list on device. NB: no memory allocation happens here; the block must fit
+ * the record (offset + 1).
+ *
+ * @tparam T
+ *
+ * @param[in] flat_code input flat code
+ * @param[out] block block of memory to write interleaved codes to
+ * @param[in] dim dimension of the flat code
+ * @param[in] veclen size of interleaved data chunks
+ * @param[in] offset how many records to skip before writing the data into the list
+ */
+template <typename T>
+__host__ __device__ void pack_1(
+  const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset);
+
+/**
+ * Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
+ * indicates the id of the record. This function fetches one flat code from an interleaved code.
+ *
+ * @tparam T
+ *
+ * @param[in] block interleaved block. The block can be thought of as the whole inverted list in
+ * interleaved format.
+ * @param[out] flat_code output flat code
+ * @param[in] dim dimension of the flat code
+ * @param[in] veclen size of interleaved data chunks
+ * @param[in] offset fetch the flat code by the given offset
+ */
+template <typename T>
+__host__ __device__ void unpack_1(
+  const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset);
+
+/** @} */
+
 }  // namespace codepacker
+
+namespace helpers {
+
+/**
+ * @defgroup ivf_flat_helpers Helper functions for manipulationg IVF Flat Index
+ * @{
+ */
 
 /**
  * @brief Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
@@ -124,6 +169,7 @@ void unpack(
  */
 template <typename T, typename IdxT>
 void reset_index(const raft::resources& res, index<T, IdxT>* index);
-
 /** @} */
-}  // namespace cuvs::neighbors::ivf_flat::helpers
+
+}  // namespace helpers
+}  // namespace cuvs::neighbors::ivf_flat

@@ -232,12 +232,10 @@ add_library(
   src/neighbors/cagra_serialize_int8.cpp
   src/neighbors/cagra_serialize_uint8.cpp
   src/neighbors/ivf_flat_index.cpp
-  src/neighbors/ivf_flat/ivf_flat_build_float_int64_t.cu
-  src/neighbors/ivf_flat/ivf_flat_build_int8_t_int64_t.cu
-  src/neighbors/ivf_flat/ivf_flat_build_uint8_t_int64_t.cu
-  src/neighbors/ivf_flat/ivf_flat_extend_float_int64_t.cu
-  src/neighbors/ivf_flat/ivf_flat_extend_int8_t_int64_t.cu
-  src/neighbors/ivf_flat/ivf_flat_extend_uint8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_helpers.cu
   src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
