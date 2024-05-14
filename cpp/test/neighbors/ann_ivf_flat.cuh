@@ -25,7 +25,9 @@
 #include <raft/stats/mean.cuh>
 #include <thrust/sequence.h>
 
-#include <raft/spatial/knn/ann.cuh>
+#include <raft/linalg/add.cuh>
+#include <raft/matrix/gather.cuh>
+#include <raft/util/fast_int_div.cuh>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -100,47 +102,6 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       rmm::device_uvector<T> distances_ivfflat_dev(queries_size, stream_);
       rmm::device_uvector<IdxT> indices_ivfflat_dev(queries_size, stream_);
 
-      {
-        // legacy interface
-        raft::spatial::knn::IVFFlatParam ivfParams;
-        ivfParams.nprobe = ps.nprobe;
-        ivfParams.nlist  = ps.nlist;
-        raft::spatial::knn::knnIndex index;
-
-        raft::spatial::knn::approx_knn_build_index(
-          handle_,
-          &index,
-          dynamic_cast<raft::spatial::knn::knnIndexParam*>(&ivfParams),
-          static_cast<raft::distance::DistanceType>((int)ps.metric),
-          (IdxT)0,
-          database.data(),
-          ps.num_db_vecs,
-          ps.dim);
-
-        raft::resource::sync_stream(handle_);
-        raft::spatial::knn::approx_knn_search(handle_,
-                                              distances_ivfflat_dev.data(),
-                                              indices_ivfflat_dev.data(),
-                                              &index,
-                                              ps.k,
-                                              search_queries.data(),
-                                              ps.num_queries);
-
-        raft::update_host(
-          distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
-        raft::update_host(
-          indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-      }
-
-      ASSERT_TRUE(eval_neighbours(indices_naive,
-                                  indices_ivfflat,
-                                  distances_naive,
-                                  distances_ivfflat,
-                                  ps.num_queries,
-                                  ps.k,
-                                  0.001,
-                                  min_recall));
       {
         cuvs::neighbors::ivf_flat::index_params index_params;
         cuvs::neighbors::ivf_flat::search_params search_params;

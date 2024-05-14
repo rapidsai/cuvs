@@ -28,6 +28,55 @@ namespace codepacker {
 namespace {
 
 template <typename T>
+__device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  // The data is written in interleaved groups of `index::kGroupSize` vectors
+  using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
+
+  // Interleave dimensions of the source vector while recording it.
+  // NB: such `veclen` is selected, that `dim % veclen == 0`
+  auto group_offset = interleaved_group::roundDown(offset);
+  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
+
+  for (uint32_t l = 0; l < dim; l += veclen) {
+    for (uint32_t j = 0; j < veclen; j++) {
+      block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j] = flat_code[l + j];
+    }
+  }
+}
+
+/**
+ * Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
+ * indicates the id of the record. This function fetches one flat code from an interleaved code.
+ *
+ * @tparam T
+ *
+ * @param[in] block interleaved block. The block can be thought of as the whole inverted list in
+ * interleaved format.
+ * @param[out] flat_code output flat code
+ * @param[in] dim dimension of the flat code
+ * @param[in] veclen size of interleaved data chunks
+ * @param[in] offset fetch the flat code by the given offset
+ */
+template <typename T>
+__device__ void unpack_1(
+  const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  // The data is written in interleaved groups of `index::kGroupSize` vectors
+  using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
+
+  // NB: such `veclen` is selected, that `dim % veclen == 0`
+  auto group_offset = interleaved_group::roundDown(offset);
+  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
+
+  for (uint32_t l = 0; l < dim; l += veclen) {
+    for (uint32_t j = 0; j < veclen; j++) {
+      flat_code[l + j] = block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j];
+    }
+  }
+}
+
+template <typename T>
 RAFT_KERNEL pack_interleaved_list_kernel(const T* codes,
                                          T* list_data,
                                          uint32_t n_rows,
@@ -127,8 +176,7 @@ void unpack(
 }
 
 template <typename T>
-__host__ __device__ void pack_1(
-  const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
   using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
@@ -145,22 +193,8 @@ __host__ __device__ void pack_1(
   }
 }
 
-/**
- * Unpack 1 record of a single list (cluster) in the index to fetch the flat code. The offset
- * indicates the id of the record. This function fetches one flat code from an interleaved code.
- *
- * @tparam T
- *
- * @param[in] block interleaved block. The block can be thought of as the whole inverted list in
- * interleaved format.
- * @param[out] flat_code output flat code
- * @param[in] dim dimension of the flat code
- * @param[in] veclen size of interleaved data chunks
- * @param[in] offset fetch the flat code by the given offset
- */
 template <typename T>
-__host__ __device__ void unpack_1(
-  const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+void unpack_1(const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
   using interleaved_group = raft::neighbors::detail::div_utils<kIndexGroupSize>;
