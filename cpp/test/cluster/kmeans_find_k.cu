@@ -16,7 +16,7 @@
 
 #include "../test_utils.h"
 
-#include "../../src/cluster/kmeans.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>

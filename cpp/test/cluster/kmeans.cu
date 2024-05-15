@@ -59,10 +59,10 @@ template <typename T>
 class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
  protected:
   KmeansTest()
-    : d_labels(0, resource::get_cuda_stream(handle)),
-      d_labels_ref(0, resource::get_cuda_stream(handle)),
-      d_centroids(0, resource::get_cuda_stream(handle)),
-      d_sample_weight(0, resource::get_cuda_stream(handle))
+    : d_labels(0, raft::resource::get_cuda_stream(handle)),
+      d_labels_ref(0, raft::resource::get_cuda_stream(handle)),
+      d_centroids(0, raft::resource::get_cuda_stream(handle)),
+      d_sample_weight(0, raft::resource::get_cuda_stream(handle))
   {
   }
 
@@ -70,7 +70,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   {
     testparams = ::testing::TestWithParam<KmeansInputs<T>>::GetParam();
 
-    auto stream                = resource::get_cuda_stream(handle);
+    auto stream                = raft::resource::get_cuda_stream(handle);
     int n_samples              = testparams.n_row;
     int n_features             = testparams.n_col;
     params.n_clusters          = testparams.n_clusters;
@@ -245,7 +245,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
 
     auto X      = raft::make_device_matrix<T, int>(handle, n_samples, n_features);
     auto labels = raft::make_device_vector<int, int>(handle, n_samples);
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
 
     raft::random::make_blobs<T, int>(X.data_handle(),
                                      labels.data_handle(),
@@ -295,10 +295,10 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       raft::make_host_scalar_view<T>(&inertia),
       raft::make_host_scalar_view<int>(&n_iter));
 
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
 
     score = raft::stats::adjusted_rand_index(
-      d_labels_ref.data(), d_labels.data(), n_samples, resource::get_cuda_stream(handle));
+      d_labels_ref.data(), d_labels.data(), n_samples, raft::resource::get_cuda_stream(handle));
 
     if (score < 1.0) {
       std::stringstream ss;

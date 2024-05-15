@@ -16,7 +16,8 @@
 
 #include "../test_utils.h"
 
-#include "../../src/cluster/kmeans_balanced.cuh"
+#include <cuvs/cluster/kmeans.hpp>
+
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/operators.hpp>
