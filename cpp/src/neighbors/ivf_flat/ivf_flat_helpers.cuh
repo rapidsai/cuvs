@@ -24,8 +24,7 @@
 #include <raft/core/resources.hpp>
 #include <variant>
 
-namespace cuvs::neighbors::ivf_flat {
-namespace codepacker {
+namespace cuvs::neighbors::ivf_flat::helpers::codepacker {
 
 namespace {
 
@@ -139,5 +138,4 @@ void unpack_list_data(
 }
 
 }  // namespace
-}  // namespace codepacker
-}  // namespace cuvs::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat::helpers::codepacker
