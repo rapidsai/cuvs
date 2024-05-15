@@ -1622,13 +1622,14 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename accessor>
 auto build(raft::resources const& handle,
            const index_params& params,
-           const T* dataset,
-           IdxT n_rows,
-           uint32_t dim) -> index<IdxT>
+           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset)
+  -> index<IdxT>
 {
+  IdxT n_rows = dataset.extent(0);
+  IdxT dim    = dataset.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::build(%zu, %u)", size_t(n_rows), dim);
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
@@ -1662,16 +1663,14 @@ auto build(raft::resources const& handle,
     auto trainset = raft::make_device_matrix<float, internal_extents_t>(handle, n_rows_train, dim);
 
     if constexpr (std::is_same_v<T, float>) {
-      raft::matrix::detail::sample_rows<T, int64_t>(
-        handle, random_state, dataset, n_rows, trainset.view());
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
       // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
       // TODO(tfeher): After https://github.com/rapidsai/raft/pull/2194 is merged, change this
       // to use large workspace allocator.
       auto trainset_tmp =
         raft::make_device_matrix<T, internal_extents_t>(handle, n_rows_train, dim);
-      raft::matrix::detail::sample_rows<T, int64_t>(
-        handle, random_state, dataset, n_rows, trainset_tmp.view());
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
 
       raft::linalg::unaryOp(trainset.data_handle(),
                             trainset_tmp.data_handle(),
@@ -1746,30 +1745,18 @@ auto build(raft::resources const& handle,
 
   // add the data if necessary
   if (params.add_data_on_build) {
-    detail::extend<T, IdxT>(handle, &index, dataset, nullptr, n_rows);
+    detail::extend<T, IdxT>(handle, &index, dataset.data_handle(), nullptr, n_rows);
   }
   return index;
 }
 
-template <typename T, typename IdxT>
-auto build(raft::resources const& handle,
-           const index_params& params,
-           raft::device_matrix_view<const T, IdxT, raft::row_major> dataset) -> index<IdxT>
-{
-  IdxT n_rows = dataset.extent(0);
-  IdxT dim    = dataset.extent(1);
-  return build(handle, params, dataset.data_handle(), n_rows, dim);
-}
-
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename accessor>
 void build(raft::resources const& handle,
            const index_params& params,
-           raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
            index<IdxT>* index)
 {
-  IdxT n_rows = dataset.extent(0);
-  IdxT dim    = dataset.extent(1);
-  *index      = build(handle, params, dataset.data_handle(), n_rows, dim);
+  *index = build(handle, params, dataset);
 }
 
 template <typename T, typename IdxT>
