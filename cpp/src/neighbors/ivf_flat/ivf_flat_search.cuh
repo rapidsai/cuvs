@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"                 // cuvs::neighbors::detail::ivf
 #include "ivf_flat_interleaved_scan.cuh"     // interleaved_scan
 #include <cuvs/neighbors/ivf_flat.hpp>       // raft::neighbors::ivf_flat::index
