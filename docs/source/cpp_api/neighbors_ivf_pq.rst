@@ -70,6 +70,10 @@ Index serialize
 Helper Methods
 ---------------
 
+Those methods are used to manipulate the underlying data of an IVF-PQ index, and perform operations like unpacking records, or writing PQ codes into an existing IVF list.
+
+namespace *cuvs::neighbors::ivf_pq::helpers*
+
 .. doxygengroup:: ivf_pq_cpp_helpers
     :project: cuvs
     :members:
