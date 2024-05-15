@@ -23,7 +23,7 @@
 
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance_types.hpp>
-#include <raft/core/logger.hpp>  // RAFT_LOG_TRACE
+#include <raft/core/logger-ext.hpp>  // RAFT_LOG_TRACE
 #include <raft/core/operators.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY

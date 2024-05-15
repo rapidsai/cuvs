@@ -24,7 +24,7 @@
 
 #include "../detail/ann_utils.cuh"           // utils::mapping
 #include <cuvs/distance/distance_types.hpp>  // is_min_close, DistanceType
-#include <raft/core/logger.hpp>              // RAFT_LOG_TRACE
+#include <raft/core/logger-ext.hpp>          // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>          // raft::resources
 #include <raft/linalg/gemm.cuh>             // raft::linalg::gemm
