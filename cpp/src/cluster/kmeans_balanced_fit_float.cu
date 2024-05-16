@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-#include "../neighbors/detail/ann_utils.cuh"
+// clang-format off
 #include "kmeans_balanced.cuh"
+#include "../neighbors/detail/ann_utils.cuh"
 #include <raft/core/resources.hpp>
+// clang-format on
 
 namespace cuvs::cluster::kmeans {
 
