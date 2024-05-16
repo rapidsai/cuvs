@@ -886,10 +886,10 @@ auto build_fine_clusters(const raft::resources& handle,
       if (labels_mptr[j] == LabelT(i)) { mc_trainset_ids[k++] = j; }
     }
     if (k != static_cast<IdxT>(mesocluster_sizes[i]))
-      RAFT_LOG_WARN("Incorrect mesocluster size at %d. %zu vs %zu",
-                    static_cast<int>(i),
-                    static_cast<size_t>(k),
-                    static_cast<size_t>(mesocluster_sizes[i]));
+      RAFT_LOG_DEBUG("Incorrect mesocluster size at %d. %zu vs %zu",
+                     static_cast<int>(i),
+                     static_cast<size_t>(k),
+                     static_cast<size_t>(mesocluster_sizes[i]));
     if (k == 0) {
       RAFT_LOG_DEBUG("Empty cluster %d", i);
       RAFT_EXPECTS(fine_clusters_nums[i] == 0,
