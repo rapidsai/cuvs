@@ -86,7 +86,12 @@ class single_linkage_output {
  * @param[out] labels output labels vector (size n_rows)
  * @param[in] metric distance metrix to use when constructing connectivities graph
  * @param[in] n_clusters number of clusters to assign data samples
- * @param[in] c a constant used when constructing connectivities from knn graph. Allows the indirect
+ * @param[in] linkage strategy for constructing the linkage. PAIRWISE uses more memory but can be
+ faster for
+ *                    smaller datasets. KNN_GRAPH allows the memory usage to be controlled (using
+ parameter c)
+ *                    at the expense of potentially additional minimum spanning tree iterations.
+ * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
 void single_linkage(
