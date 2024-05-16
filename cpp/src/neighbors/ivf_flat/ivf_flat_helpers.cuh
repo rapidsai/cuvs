@@ -138,4 +138,66 @@ void unpack_list_data(
 }
 
 }  // namespace
+
+namespace detail {
+template <typename T, typename IdxT>
+void pack(
+  raft::resources const& res,
+  raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
+  uint32_t veclen,
+  uint32_t offset,
+  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data)
+{
+  pack_list_data<T, IdxT>(res, codes, veclen, offset, list_data);
+}
+
+template <typename T, typename IdxT>
+void unpack(
+  raft::resources const& res,
+  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data,
+  uint32_t veclen,
+  uint32_t offset,
+  raft::device_matrix_view<T, uint32_t, raft::row_major> codes)
+{
+  unpack_list_data<T, IdxT>(res, list_data, veclen, offset, codes);
+}
+
+template <typename T>
+void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  // The data is written in interleaved groups of `index::kGroupSize` vectors
+  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+
+  // Interleave dimensions of the source vector while recording it.
+  // NB: such `veclen` is selected, that `dim % veclen == 0`
+  auto group_offset = interleaved_group::roundDown(offset);
+  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
+
+  for (uint32_t l = 0; l < dim; l += veclen) {
+    for (uint32_t j = 0; j < veclen; j++) {
+      block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j] = flat_code[l + j];
+    }
+  }
+}
+
+template <typename T>
+void unpack_1(const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  // The data is written in interleaved groups of `index::kGroupSize` vectors
+  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+
+  // NB: such `veclen` is selected, that `dim % veclen == 0`
+  auto group_offset = interleaved_group::roundDown(offset);
+  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
+
+  for (uint32_t l = 0; l < dim; l += veclen) {
+    for (uint32_t j = 0; j < veclen; j++) {
+      flat_code[l + j] = block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j];
+    }
+  }
+}
+
+}  // namespace detail
 }  // namespace cuvs::neighbors::ivf_flat::helpers::codepacker
