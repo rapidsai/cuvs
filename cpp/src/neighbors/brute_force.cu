@@ -20,6 +20,60 @@
 #include <raft/core/copy.hpp>
 
 namespace cuvs::neighbors::brute_force {
+template <typename T>
+index<T>::index(raft::resources const& res,
+                raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
+                std::optional<raft::device_vector<T, int64_t>>&& norms,
+                cuvs::distance::DistanceType metric,
+                T metric_arg)
+  : ann::index(),
+    metric_(metric),
+    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
+    norms_(std::move(norms)),
+    metric_arg_(metric_arg)
+{
+  if (norms_) { norms_view_ = raft::make_const_mdspan(norms_.value().view()); }
+  update_dataset(res, dataset);
+  raft::resource::sync_stream(res);
+}
+
+template <typename T>
+index<T>::index(raft::resources const& res,
+                raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
+                std::optional<raft::device_vector<T, int64_t>>&& norms,
+                cuvs::distance::DistanceType metric,
+                T metric_arg)
+  : ann::index(),
+    metric_(metric),
+    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
+    norms_(std::move(norms)),
+    metric_arg_(metric_arg)
+{
+  if (norms_) { norms_view_ = raft::make_const_mdspan(norms_.value().view()); }
+  update_dataset(res, dataset);
+}
+
+template <typename T>
+index<T>::index(raft::resources const& res,
+                raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
+                std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
+                cuvs::distance::DistanceType metric,
+                T metric_arg)
+  : ann::index(),
+    metric_(metric),
+    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
+    dataset_view_(dataset_view),
+    norms_view_(norms_view),
+    metric_arg_(metric_arg)
+{
+}
+
+template <typename T>
+void index<T>::update_dataset(raft::resources const& res,
+                              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
+{
+  dataset_view_ = dataset;
+}
 
 template <typename T>
 void index<T>::update_dataset(raft::resources const& res,
