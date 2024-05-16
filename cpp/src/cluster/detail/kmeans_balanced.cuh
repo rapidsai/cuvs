@@ -835,7 +835,7 @@ inline auto arrange_fine_clusters(IdxT n_clusters,
  *
  *  Note: this function uses at most `fine_clusters_nums_max` points per mesocluster for training;
  *  if one of the clusters is larger than that (as given by `mesocluster_sizes`), the extra data
- *  is ignored and a warning is reported.
+ *  is ignored.
  */
 template <typename T,
           typename MathT,
@@ -1035,7 +1035,7 @@ void build_hierarchical(const raft::resources& handle,
   const IdxT mesocluster_size_max_balanced = raft::div_rounding_up_safe<size_t>(
     2lu * size_t(n_rows), std::max<size_t>(size_t(n_mesoclusters), 1lu));
   if (mesocluster_size_max > mesocluster_size_max_balanced) {
-    RAFT_LOG_WARN(
+    RAFT_LOG_DEBUG(
       "build_hierarchical: built unbalanced mesoclusters (max_mesocluster_size == %u > %u). "
       "At most %u points will be used for training within each mesocluster. "
       "Consider increasing the number of training iterations `n_iters`.",
