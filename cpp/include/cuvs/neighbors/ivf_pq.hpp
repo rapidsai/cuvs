@@ -1072,7 +1072,7 @@ namespace helpers {
 namespace codepacker {
 /**
  * @addtogroup ivf_pq_cpp_helpers
-  * @{
+ * @{
  */
 /**
  * @brief Unpack `n_take` consecutive records of a single list (cluster) in the compressed index
@@ -1223,7 +1223,6 @@ void pack_contiguous(
  * @}
  */
 };  // namespace codepacker
-
 
 /**
  * Write flat PQ codes into an existing list by the given offset.
