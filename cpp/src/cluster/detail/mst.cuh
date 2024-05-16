@@ -29,11 +29,11 @@
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
-namespace cuvs::cluster::detail {
+namespace cuvs::cluster::agglomerative::detail {
 
 template <typename value_idx, typename value_t>
-void merge_msts(sparse::solver::Graph_COO<value_idx, value_idx, value_t>& coo1,
-                sparse::solver::Graph_COO<value_idx, value_idx, value_t>& coo2,
+void merge_msts(raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& coo1,
+                raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& coo2,
                 cudaStream_t stream)
 {
   /** Add edges to existing mst **/
@@ -70,14 +70,14 @@ template <typename value_idx, typename value_t, typename red_op>
 void connect_knn_graph(
   raft::resources const& handle,
   const value_t* X,
-  sparse::solver::Graph_COO<value_idx, value_idx, value_t>& msf,
+  raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& msf,
   size_t m,
   size_t n,
   value_idx* color,
   red_op reduction_op,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   raft::sparse::COO<value_t, value_idx> connected_edges(stream);
 
@@ -159,7 +159,7 @@ void build_sorted_mst(
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
   int max_iter                        = 10)
 {
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   // We want to have MST initialize colors on first call.
   auto mst_coo = raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(
@@ -204,4 +204,4 @@ void build_sorted_mst(
   raft::copy_async(mst_weight, mst_coo.weights.data(), mst_coo.n_edges, stream);
 }
 
-};  // namespace  cuvs::cluster::detail
+};  // namespace  cuvs::cluster::agglomerative::detail

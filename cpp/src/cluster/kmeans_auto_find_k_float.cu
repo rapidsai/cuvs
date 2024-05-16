@@ -15,17 +15,23 @@
  */
 
 #include "kmeans.cuh"
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::cluster::kmeans {
+namespace cuvs::cluster::kmeans::helpers {
 
-void transform(raft::resources const& handle,
-               const kmeans::params& params,
-               raft::device_matrix_view<const double, int> X,
-               raft::device_matrix_view<const double, int> centroids,
-               raft::device_matrix_view<double, int> X_new)
-
+void find_k(raft::resources const& handle,
+            raft::device_matrix_view<const float, int> X,
+            raft::host_scalar_view<int> best_k,
+            raft::host_scalar_view<float> inertia,
+            raft::host_scalar_view<int> n_iter,
+            int kmax,
+            int kmin,
+            int maxiter,
+            float tol)
 {
-  cuvs::cluster::kmeans::transform<double, int>(handle, params, X, centroids, X_new);
+  cuvs::cluster::kmeans::find_k<int, float>(
+    handle, X, best_k, inertia, n_iter, kmax, kmin, maxiter, tol);
 }
-}  // namespace cuvs::cluster::kmeans
+}  // namespace cuvs::cluster::kmeans::helpers

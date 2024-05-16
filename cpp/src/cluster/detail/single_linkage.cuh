@@ -25,7 +25,7 @@
 
 #include <rmm/device_uvector.hpp>
 
-namespace cuvs::cluster::detail {
+namespace cuvs::cluster::agglomerative::detail {
 
 static const size_t EMPTY = 0;
 
@@ -61,7 +61,7 @@ void single_linkage(raft::resources const& handle,
 {
   ASSERT(n_clusters <= m, "n_clusters must be less than or equal to the number of data points");
 
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   rmm::device_uvector<value_idx> indptr(EMPTY, stream);
   rmm::device_uvector<value_idx> indices(EMPTY, stream);
@@ -122,4 +122,4 @@ void single_linkage(raft::resources const& handle,
   out->n_leaves               = m;
   out->n_connected_components = 1;
 }
-};  // namespace  cuvs::cluster::detail
+};  // namespace  cuvs::cluster::agglomerative::detail

@@ -48,7 +48,7 @@ struct KmeansBalancedInputs {
   IdxT n_rows;
   IdxT n_cols;
   IdxT n_clusters;
-  raft::cluster::kmeans_balanced_params kb_params;
+  cuvs::cluster::kmeans::balanced_params kb_params;
   MathT tol;
 };
 
@@ -64,7 +64,7 @@ template <typename DataT, typename MathT, typename LabelT, typename IdxT, typena
 class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<MathT, IdxT>> {
  protected:
   KmeansBalancedTest()
-    : stream(resource::get_cuda_stream(handle)),
+    : stream(raft::resource::get_cuda_stream(handle)),
       d_labels(0, stream),
       d_labels_ref(0, stream),
       d_centroids(0, stream)
@@ -123,13 +123,13 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
       raft::make_device_matrix_view<MathT, IdxT>(d_centroids.data(), p.n_clusters, p.n_cols);
     auto d_labels_view = raft::make_device_vector_view<LabelT, IdxT>(d_labels.data(), p.n_rows);
 
-    raft::cluster::kmeans_balanced::fit_predict(
-      handle, p.kb_params, X_view, d_centroids_view, d_labels_view, op);
+    cuvs::cluster::kmeans::fit_predict(
+      handle, p.kb_params, X_view, d_centroids_view, d_labels_view);
 
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
 
     score = raft::stats::adjusted_rand_index(
-      d_labels_ref.data(), d_labels.data(), p.n_rows, resource::get_cuda_stream(handle));
+      d_labels_ref.data(), d_labels.data(), p.n_rows, raft::resource::get_cuda_stream(handle));
 
     if (score < 1.0) {
       std::stringstream ss;
@@ -159,7 +159,7 @@ std::vector<KmeansBalancedInputs<MathT, IdxT>> get_kmeans_balanced_inputs()
   std::vector<KmeansBalancedInputs<MathT, IdxT>> out;
   KmeansBalancedInputs<MathT, IdxT> p;
   p.kb_params.n_iters = 20;
-  p.kb_params.metric  = raft::distance::DistanceType::L2Expanded;
+  p.kb_params.metric  = cuvs::distance::DistanceType::L2Expanded;
   p.tol               = MathT{0.0001};
   std::vector<std::tuple<size_t, size_t, size_t>> row_cols_k = {{1000, 32, 5},
                                                                 {1000, 100, 20},
@@ -177,9 +177,9 @@ std::vector<KmeansBalancedInputs<MathT, IdxT>> get_kmeans_balanced_inputs()
 }
 
 const auto inputsf_i32 = get_kmeans_balanced_inputs<float, int>();
-const auto inputsd_i32 = get_kmeans_balanced_inputs<double, int>();
+// const auto inputsd_i32 = get_kmeans_balanced_inputs<double, int>();
 const auto inputsf_i64 = get_kmeans_balanced_inputs<float, int64_t>();
-const auto inputsd_i64 = get_kmeans_balanced_inputs<double, int64_t>();
+// const auto inputsd_i64 = get_kmeans_balanced_inputs<double, int64_t>();
 
 #define KB_TEST(test_type, test_name, test_inputs)         \
   typedef RAFT_DEPAREN(test_type) test_name;               \
@@ -193,27 +193,27 @@ const auto inputsd_i64 = get_kmeans_balanced_inputs<double, int64_t>();
 KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op>),
         KmeansBalancedTestFFU32I32,
         inputsf_i32);
-KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
-        KmeansBalancedTestDDU32I32,
-        inputsd_i32);
-KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
-        KmeansBalancedTestFFU32I64,
-        inputsf_i64);
-KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
-        KmeansBalancedTestDDU32I64,
-        inputsd_i64);
-KB_TEST((KmeansBalancedTest<float, float, int, int, raft::identity_op>),
-        KmeansBalancedTestFFI32I32,
-        inputsf_i32);
-KB_TEST((KmeansBalancedTest<float, float, int, int64_t, raft::identity_op>),
-        KmeansBalancedTestFFI32I64,
-        inputsf_i64);
-KB_TEST((KmeansBalancedTest<float, float, int64_t, int, raft::identity_op>),
-        KmeansBalancedTestFFI64I32,
-        inputsf_i32);
-KB_TEST((KmeansBalancedTest<float, float, int64_t, int64_t, raft::identity_op>),
-        KmeansBalancedTestFFI64I64,
-        inputsf_i64);
+// KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
+//         KmeansBalancedTestDDU32I32,
+//         inputsd_i32);
+// KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
+//         KmeansBalancedTestFFU32I64,
+//         inputsf_i64);
+// KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
+//         KmeansBalancedTestDDU32I64,
+//         inputsd_i64);
+// KB_TEST((KmeansBalancedTest<float, float, int, int, raft::identity_op>),
+//         KmeansBalancedTestFFI32I32,
+//         inputsf_i32);
+// KB_TEST((KmeansBalancedTest<float, float, int, int64_t, raft::identity_op>),
+//         KmeansBalancedTestFFI32I64,
+//         inputsf_i64);
+// KB_TEST((KmeansBalancedTest<float, float, int64_t, int, raft::identity_op>),
+//         KmeansBalancedTestFFI64I32,
+//         inputsf_i32);
+// KB_TEST((KmeansBalancedTest<float, float, int64_t, int64_t, raft::identity_op>),
+//         KmeansBalancedTestFFI64I64,
+//         inputsf_i64);
 
 /*
  * Second set of tests: integer dataset with conversion
@@ -234,8 +234,5 @@ struct i2f_scaler {
 KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, float>>),
         KmeansBalancedTestFI8U32I32,
         inputsf_i32);
-KB_TEST((KmeansBalancedTest<int8_t, double, uint32_t, int, i2f_scaler<int8_t, double>>),
-        KmeansBalancedTestDI8U32I32,
-        inputsd_i32);
 
 }  // namespace cuvs

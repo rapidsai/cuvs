@@ -14,20 +14,18 @@
  * limitations under the License.
  */
 
-#include "kmeans.cuh"
+#include "../neighbors/detail/ann_utils.cuh"
+#include "kmeans_balanced.cuh"
 #include <raft/core/resources.hpp>
 
 namespace cuvs::cluster::kmeans {
 
-void fit(raft::resources const& handle,
-         const cuvs::cluster::kmeans::params& params,
-         raft::device_matrix_view<const double, int> X,
-         std::optional<raft::device_vector_view<const double, int>> sample_weight,
-         raft::device_matrix_view<double, int> centroids,
-         raft::host_scalar_view<double, int> inertia,
-         raft::host_scalar_view<int, int> n_iter)
+void fit(const raft::resources& handle,
+         cuvs::cluster::kmeans::balanced_params const& params,
+         raft::device_matrix_view<const int8_t, int> X,
+         raft::device_matrix_view<float, int> centroids)
 {
-  cuvs::cluster::kmeans::fit<double, int>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  cuvs::cluster::kmeans_balanced::fit(
+    handle, params, X, centroids, cuvs::spatial::knn::detail::utils::mapping<float>{});
 }
 }  // namespace cuvs::cluster::kmeans

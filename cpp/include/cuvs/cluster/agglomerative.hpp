@@ -89,20 +89,14 @@ class single_linkage_output {
  * @param[in] c a constant used when constructing connectivities from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
  */
-void single_linkage(raft::resources const& handle,
-                    raft::device_matrix_view<const float, uint32_t, row_major> X,
-                    raft::device_matrix_view<uint32_t, uint32_t, row_major> dendrogram,
-                    raft::device_vector_view<uint32_t, uint32_t> labels,
-                    cuvs::distance::DistanceType metric,
-                    size_t n_clusters,
-                    std::optional<int> c = std::make_optional<int>(DEFAULT_CONST_C));
-
-void single_linkage(raft::resources const& handle,
-                    raft::device_matrix_view<const double, uint32_t, row_major> X,
-                    raft::device_matrix_view<uint32_t, uint32_t, row_major> dendrogram,
-                    raft::device_vector_view<uint32_t, uint32_t> labels,
-                    cuvs::distance::DistanceType metric,
-                    size_t n_clusters,
-                    std::optional<int> c = std::make_optional<int>(DEFAULT_CONST_C));
+void single_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int, raft::row_major> X,
+  raft::device_matrix_view<int, int, raft::row_major> dendrogram,
+  raft::device_vector_view<int, int> labels,
+  cuvs::distance::DistanceType metric,
+  size_t n_clusters,
+  cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
+  std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
 };  // end namespace  cuvs::cluster::agglomerative

@@ -18,6 +18,9 @@
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/cudart_utils.hpp>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_span.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/make_blobs.cuh>
@@ -28,7 +31,7 @@
 #include <optional>
 #include <vector>
 
-namespace raft {
+namespace cuvs::cluster::kmeans {
 
 template <typename T>
 struct KmeansFindKInputs {
@@ -43,7 +46,7 @@ template <typename T>
 class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
  protected:
   KmeansFindKTest()
-    : stream(resource::get_cuda_stream(handle)), best_k(raft::make_host_scalar<int>(0))
+    : stream(raft::resource::get_cuda_stream(handle)), best_k(raft::make_host_scalar<int>(0))
   {
   }
 
@@ -79,10 +82,10 @@ class KmeansFindKTest : public ::testing::TestWithParam<KmeansFindKInputs<T>> {
     auto X_view =
       raft::make_device_matrix_view<const T, int>(X.data_handle(), X.extent(0), X.extent(1));
 
-    raft::cluster::kmeans::find_k<int, T>(
+    cuvs::cluster::kmeans::helpers::find_k(
       handle, X_view, best_k.view(), inertia.view(), n_iter.view(), n_clusters);
 
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
   }
 
   void SetUp() override { basicTest(); }
@@ -105,17 +108,6 @@ const std::vector<KmeansFindKInputs<float>> inputsf2 = {{1000, 32, 8, 0.001f, tr
                                                         {10000, 500, 100, 0.001f, true},
                                                         {10000, 500, 100, 0.001f, false}};
 
-const std::vector<KmeansFindKInputs<double>> inputsd2 = {{1000, 32, 5, 0.0001, true},
-                                                         {1000, 32, 5, 0.0001, false},
-                                                         {1000, 100, 20, 0.0001, true},
-                                                         {1000, 100, 20, 0.0001, false},
-                                                         {10000, 32, 10, 0.0001, true},
-                                                         {10000, 32, 10, 0.0001, false},
-                                                         {10000, 100, 50, 0.0001, true},
-                                                         {10000, 100, 50, 0.0001, false},
-                                                         {10000, 500, 100, 0.0001, true},
-                                                         {10000, 500, 100, 0.0001, false}};
-
 typedef KmeansFindKTest<float> KmeansFindKTestF;
 TEST_P(KmeansFindKTestF, Result)
 {
@@ -125,18 +117,6 @@ TEST_P(KmeansFindKTestF, Result)
   ASSERT_TRUE(best_k.view()[0] == testparams.n_clusters);
 }
 
-typedef KmeansFindKTest<double> KmeansFindKTestD;
-TEST_P(KmeansFindKTestD, Result)
-{
-  if (best_k.view()[0] != testparams.n_clusters) {
-    std::cout << best_k.view()[0] << " " << testparams.n_clusters << std::endl;
-  }
-
-  ASSERT_TRUE(best_k.view()[0] == testparams.n_clusters);
-}
-
 INSTANTIATE_TEST_CASE_P(KmeansFindKTests, KmeansFindKTestF, ::testing::ValuesIn(inputsf2));
 
-INSTANTIATE_TEST_CASE_P(KmeansFindKTests, KmeansFindKTestD, ::testing::ValuesIn(inputsd2));
-
-}  // namespace raft
+}  // namespace cuvs::cluster::kmeans

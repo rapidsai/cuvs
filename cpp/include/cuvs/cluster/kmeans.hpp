@@ -126,6 +126,10 @@ struct balanced_params : base_params {
   uint32_t n_iters = 20;
 };
 
+/**
+ * Regular k-means
+ */
+
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const float, int> X,
@@ -136,11 +140,25 @@ void fit(raft::resources const& handle,
 
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
-         raft::device_matrix_view<const double, int> X,
-         std::optional<raft::device_vector_view<const double, int>> sample_weight,
-         raft::device_matrix_view<double, int> centroids,
-         raft::host_scalar_view<double, int> inertia,
+         raft::device_matrix_view<const int8_t, int> X,
+         std::optional<raft::device_vector_view<const int8_t, int>> sample_weight,
+         raft::device_matrix_view<int8_t, int> centroids,
+         raft::host_scalar_view<int8_t, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
+
+/**
+ * Balanced k-means
+ */
+
+void fit(const raft::resources& handle,
+         cuvs::cluster::kmeans::balanced_params const& params,
+         raft::device_matrix_view<const float, int> X,
+         raft::device_matrix_view<float, int> centroids);
+
+void fit(const raft::resources& handle,
+         cuvs::cluster::kmeans::balanced_params const& params,
+         raft::device_matrix_view<const int8_t, int> X,
+         raft::device_matrix_view<int8_t, int> centroids);
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -196,18 +214,21 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const float, int> X,
              std::optional<raft::device_vector_view<const float, int>> sample_weight,
              raft::device_matrix_view<const float, int> centroids,
-             raft::device_vector_view<int, int> labels,
+             raft::device_vector_view<uint32_t, int> labels,
              bool normalize_weight,
              raft::host_scalar_view<float> inertia);
 
-void predict(raft::resources const& handle,
-             const kmeans::params& params,
-             raft::device_matrix_view<const double, int> X,
-             std::optional<raft::device_vector_view<const double, int>> sample_weight,
-             raft::device_matrix_view<const double, int> centroids,
-             raft::device_vector_view<int, int> labels,
-             bool normalize_weight,
-             raft::host_scalar_view<double> inertia);
+void predict(const raft::resources& handle,
+             cuvs::cluster::kmeans::balanced_params const& params,
+             raft::device_matrix_view<const int8_t, int> X,
+             raft::device_matrix_view<const float, int> centroids,
+             raft::device_vector_view<uint32_t, int> labels);
+
+void predict(const raft::resources& handle,
+             cuvs::cluster::kmeans::balanced_params const& params,
+             raft::device_matrix_view<const float, int> X,
+             raft::device_matrix_view<const float, int> centroids,
+             raft::device_vector_view<uint32_t, int> labels);
 
 /**
  * @brief Compute k-means clustering and predicts cluster index for each sample
@@ -264,14 +285,17 @@ void fit_predict(raft::resources const& handle,
                  raft::host_scalar_view<float> inertia,
                  raft::host_scalar_view<int> n_iter);
 
-void fit_predict(raft::resources const& handle,
-                 const kmeans::params& params,
-                 raft::device_matrix_view<const double, int> X,
-                 std::optional<raft::device_vector_view<const double, int>> sample_weight,
-                 std::optional<raft::device_matrix_view<double, int>> centroids,
-                 raft::device_vector_view<int, int> labels,
-                 raft::host_scalar_view<double> inertia,
-                 raft::host_scalar_view<int> n_iter);
+void fit_predict(const raft::resources& handle,
+                 cuvs::cluster::kmeans::balanced_params const& params,
+                 raft::device_matrix_view<const float, int> X,
+                 raft::device_matrix_view<float, int> centroids,
+                 raft::device_vector_view<uint32_t, int> labels);
+
+void fit_predict(const raft::resources& handle,
+                 cuvs::cluster::kmeans::balanced_params const& params,
+                 raft::device_matrix_view<const int8_t, int> X,
+                 raft::device_matrix_view<float, int> centroids,
+                 raft::device_vector_view<uint32_t, int> labels);
 
 /**
  * @brief Transform X to a cluster-distance space.
@@ -292,14 +316,17 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<const float, int> centroids,
                raft::device_matrix_view<float, int> X_new);
 
-void transform(raft::resources const& handle,
-               const kmeans::params& params,
-               raft::device_matrix_view<const double, int> X,
-               raft::device_matrix_view<const double, int> centroids,
-               raft::device_matrix_view<double, int> X_new);
-
 namespace helpers {
 
+void find_k(raft::resources const& handle,
+            raft::device_matrix_view<const float, int> X,
+            raft::host_scalar_view<int> best_k,
+            raft::host_scalar_view<float> inertia,
+            raft::host_scalar_view<int> n_iter,
+            int kmax,
+            int kmin    = 1,
+            int maxiter = 100,
+            float tol   = 1e-3);
 }
 
 }  // namespace  cuvs::cluster::kmeans

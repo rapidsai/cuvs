@@ -37,7 +37,7 @@
 
 #include <cstddef>
 
-namespace cuvs::cluster::detail {
+namespace cuvs::cluster::agglomerative::detail {
 template <typename value_idx, typename value_t>
 class UnionFind {
  public:
@@ -111,7 +111,7 @@ void build_dendrogram_host(raft::resources const& handle,
                            value_t* out_delta,
                            value_idx* out_size)
 {
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   value_idx n_edges = nnz;
 
@@ -119,11 +119,11 @@ void build_dendrogram_host(raft::resources const& handle,
   std::vector<value_idx> mst_dst_h(n_edges);
   std::vector<value_t> mst_weights_h(n_edges);
 
-  update_host(mst_src_h.data(), rows, n_edges, stream);
-  update_host(mst_dst_h.data(), cols, n_edges, stream);
-  update_host(mst_weights_h.data(), data, n_edges, stream);
+  raft::update_host(mst_src_h.data(), rows, n_edges, stream);
+  raft::update_host(mst_dst_h.data(), cols, n_edges, stream);
+  raft::update_host(mst_weights_h.data(), data, n_edges, stream);
 
-  resource::sync_stream(handle, stream);
+  raft::resource::sync_stream(handle, stream);
 
   std::vector<value_idx> children_h(n_edges * 2);
   std::vector<value_idx> out_size_h(n_edges);
@@ -242,8 +242,8 @@ void extract_flattened_clusters(raft::resources const& handle,
                                 size_t n_clusters,
                                 size_t n_leaves)
 {
-  auto stream        = resource::get_cuda_stream(handle);
-  auto thrust_policy = resource::get_thrust_policy(handle);
+  auto stream        = raft::resource::get_cuda_stream(handle);
+  auto thrust_policy = raft::resource::get_thrust_policy(handle);
 
   // Handle special case where n_clusters == 1
   if (n_clusters == 1) {
@@ -273,7 +273,7 @@ void extract_flattened_clusters(raft::resources const& handle,
 
     rmm::device_uvector<value_idx> levels(n_vertices, stream);
 
-    value_idx n_blocks = ceildiv(n_vertices, (value_idx)tpb);
+    value_idx n_blocks = raft::ceildiv(n_vertices, (value_idx)tpb);
     write_levels_kernel<<<n_blocks, tpb, 0, stream>>>(children, levels.data(), n_vertices);
     /**
      * Step 1: Find label roots:
@@ -325,4 +325,4 @@ void extract_flattened_clusters(raft::resources const& handle,
   }
 }
 
-};  // namespace  cuvs::cluster::detail
+};  // namespace  cuvs::cluster::agglomerative::detail

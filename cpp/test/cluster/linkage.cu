@@ -39,7 +39,7 @@
 
 #include <vector>
 
-namespace cuvs {
+namespace cuvs::cluster::agglomerative {
 
 using namespace std;
 
@@ -169,15 +169,15 @@ class LinkageTest : public ::testing::TestWithParam<LinkageInputs<T, IdxT>> {
  public:
   LinkageTest()
     : params(::testing::TestWithParam<LinkageInputs<T, IdxT>>::GetParam()),
-      labels(0, resource::get_cuda_stream(handle)),
-      labels_ref(0, resource::get_cuda_stream(handle))
+      labels(0, raft::resource::get_cuda_stream(handle)),
+      labels_ref(0, raft::resource::get_cuda_stream(handle))
   {
   }
 
  protected:
   void basicTest()
   {
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
 
     labels.resize(params.n_row, stream);
     labels_ref.resize(params.n_row, stream);
@@ -188,36 +188,34 @@ class LinkageTest : public ::testing::TestWithParam<LinkageInputs<T, IdxT>> {
 
     rmm::device_uvector<IdxT> out_children(params.n_row * 2, stream);
 
-    auto data_view = raft::make_device_matrix_view<const T, IdxT, row_major>(
+    auto data_view = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
       data.data(), params.n_row, params.n_col);
-    auto dendrogram_view =
-      raft::make_device_matrix_view<IdxT, IdxT, row_major>(out_children.data(), params.n_row, 2);
+    auto dendrogram_view = raft::make_device_matrix_view<IdxT, IdxT, raft::row_major>(
+      out_children.data(), params.n_row, 2);
     auto labels_view = raft::make_device_vector_view<IdxT, IdxT>(labels.data(), params.n_row);
 
     if (params.use_knn) {
-      raft::cluster::hierarchy::
-        single_linkage<T, IdxT, raft::cluster::hierarchy::LinkageDistance::KNN_GRAPH>(
-          handle,
-          data_view,
-          dendrogram_view,
-          labels_view,
-          raft::distance::DistanceType::L2SqrtExpanded,
-          params.n_clusters,
-          std::make_optional<int>(params.c));
+      cuvs::cluster::agglomerative::single_linkage(handle,
+                                                   data_view,
+                                                   dendrogram_view,
+                                                   labels_view,
+                                                   cuvs::distance::DistanceType::L2SqrtExpanded,
+                                                   params.n_clusters,
+                                                   Linkage::KNN_GRAPH,
+                                                   std::make_optional<int>(params.c));
 
     } else {
-      raft::cluster::hierarchy::
-        single_linkage<T, IdxT, raft::cluster::hierarchy::LinkageDistance::PAIRWISE>(
-          handle,
-          data_view,
-          dendrogram_view,
-          labels_view,
-          raft::distance::DistanceType::L2SqrtExpanded,
-          params.n_clusters,
-          std::make_optional<int>(params.c));
+      cuvs::cluster::agglomerative::single_linkage(handle,
+                                                   data_view,
+                                                   dendrogram_view,
+                                                   labels_view,
+                                                   cuvs::distance::DistanceType::L2SqrtExpanded,
+                                                   params.n_clusters,
+                                                   Linkage::PAIRWISE,
+                                                   std::make_optional<int>(params.c));
     }
 
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
 
     score = compute_rand_index(labels.data(), labels_ref.data(), params.n_row, stream);
   }
@@ -671,4 +669,4 @@ typedef LinkageTest<float, int> LinkageTestF_Int;
 TEST_P(LinkageTestF_Int, Result) { EXPECT_TRUE(score == 1.0); }
 
 INSTANTIATE_TEST_CASE_P(LinkageTest, LinkageTestF_Int, ::testing::ValuesIn(linkage_inputsf2));
-}  // namespace cuvs
+}  // namespace cuvs::cluster::agglomerative

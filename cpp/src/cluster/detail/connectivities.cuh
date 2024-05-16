@@ -22,6 +22,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
@@ -37,9 +38,9 @@
 
 #include <limits>
 
-namespace cuvs::cluster::detail {
+namespace cuvs::cluster::agglomerative::detail {
 
-template <cuvs::cluster::Linkage dist_type, typename value_idx, typename value_t>
+template <Linkage dist_type, typename value_idx, typename value_t>
 struct distance_graph_impl {
   void run(raft::resources const& handle,
            const value_t* X,
@@ -58,7 +59,7 @@ struct distance_graph_impl {
  * @tparam value_t
  */
 template <typename value_idx, typename value_t>
-struct distance_graph_impl<cuvs::cluster::Linkage::KNN_GRAPH, value_idx, value_t> {
+struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
   void run(raft::resources const& handle,
            const value_t* X,
            size_t m,
@@ -69,13 +70,14 @@ struct distance_graph_impl<cuvs::cluster::Linkage::KNN_GRAPH, value_idx, value_t
            rmm::device_uvector<value_t>& data,
            int c)
   {
-    auto stream        = resource::get_cuda_stream(handle);
-    auto thrust_policy = resource::get_thrust_policy(handle);
+    auto stream        = raft::resource::get_cuda_stream(handle);
+    auto thrust_policy = raft::resource::get_thrust_policy(handle);
 
     // Need to symmetrize knn into undirected graph
     raft::sparse::COO<value_t, value_idx> knn_graph_coo(stream);
 
-    raft::sparse::neighbors::knn_graph(handle, X, m, n, metric, knn_graph_coo, c);
+    raft::sparse::neighbors::knn_graph(
+      handle, X, m, n, static_cast<raft::distance::DistanceType>(metric), knn_graph_coo, c);
 
     indices.resize(knn_graph_coo.nnz, stream);
     data.resize(knn_graph_coo.nnz, stream);
@@ -137,8 +139,8 @@ void pairwise_distances(const raft::resources& handle,
                         value_idx* indices,
                         value_t* data)
 {
-  auto stream      = resource::get_cuda_stream(handle);
-  auto exec_policy = resource::get_thrust_policy(handle);
+  auto stream      = raft::resource::get_cuda_stream(handle);
+  auto exec_policy = raft::resource::get_thrust_policy(handle);
 
   value_idx nnz = m * m;
 
@@ -175,7 +177,7 @@ void pairwise_distances(const raft::resources& handle,
  * @tparam value_t
  */
 template <typename value_idx, typename value_t>
-struct distance_graph_impl<cuvs::cluster::Linkage::PAIRWISE, value_idx, value_t> {
+struct distance_graph_impl<Linkage::PAIRWISE, value_idx, value_t> {
   void run(const raft::resources& handle,
            const value_t* X,
            size_t m,
@@ -186,7 +188,7 @@ struct distance_graph_impl<cuvs::cluster::Linkage::PAIRWISE, value_idx, value_t>
            rmm::device_uvector<value_t>& data,
            int c)
   {
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
 
     size_t nnz = m * m;
 
@@ -213,7 +215,7 @@ struct distance_graph_impl<cuvs::cluster::Linkage::PAIRWISE, value_idx, value_t>
  * @param[out] c constant 'c' used for nearest neighbors-based distances
  *             which will guarantee k <= log(n) + c
  */
-template <typename value_idx, typename value_t, cuvs::cluster::Linkage dist_type>
+template <typename value_idx, typename value_t, Linkage dist_type>
 void get_distance_graph(raft::resources const& handle,
                         const value_t* X,
                         size_t m,
@@ -224,7 +226,7 @@ void get_distance_graph(raft::resources const& handle,
                         rmm::device_uvector<value_t>& data,
                         int c)
 {
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   indptr.resize(m + 1, stream);
 
@@ -232,4 +234,4 @@ void get_distance_graph(raft::resources const& handle,
   dist_graph.run(handle, X, m, n, metric, indptr, indices, data, c);
 }
 
-};  // namespace  cuvs::cluster::detail
+};  // namespace  cuvs::cluster::agglomerative::detail
