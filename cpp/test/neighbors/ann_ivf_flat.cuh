@@ -315,7 +315,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                                               list_size),
           flat_codes.view());
 
-        codepacker::pack(
+        helpers::codepacker::pack(
           handle_, make_const_mdspan(flat_codes.view()), idx.veclen(), 0, list_data.view());
 
         {
@@ -372,7 +372,8 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto unpacked_flat_codes =
           raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.dim());
 
-        codepacker::unpack(handle_, list_data.view(), idx.veclen(), 0, unpacked_flat_codes.view());
+        helpers::codepacker::unpack(
+          handle_, list_data.view(), idx.veclen(), 0, unpacked_flat_codes.view());
 
         ASSERT_TRUE(cuvs::devArrMatch(flat_codes.data_handle(),
                                       unpacked_flat_codes.data_handle(),

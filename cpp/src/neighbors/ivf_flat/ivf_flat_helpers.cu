@@ -19,7 +19,7 @@
 #include "ivf_flat_helpers.cuh"
 #include <cuvs/neighbors/ivf_flat.hpp>
 
-namespace cuvs::neighbors::ivf_flat {
+namespace cuvs::neighbors::ivf_flat::helpers {
 namespace codepacker {
 namespace detail {
 template <typename T, typename IdxT>
@@ -183,7 +183,6 @@ void unpack_1(
 
 }  // namespace codepacker
 
-namespace helpers {
 namespace detail {
 
 template <typename T, typename IdxT>
@@ -258,5 +257,4 @@ void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index)
   detail::reset_index<uint8_t, int64_t>(res, index);
 }
 
-}  // namespace helpers
-}  // namespace cuvs::neighbors::ivf_flat
+}  // namespace cuvs::neighbors::ivf_flat::helpers

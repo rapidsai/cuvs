@@ -568,10 +568,6 @@ void build(raft::resources const& handle,
  */
 
 /**
- * @}
- */
-
-/**
  * @defgroup ivf_flat_cpp_index_extend IVF-Flat index extend
  * @{
  */
@@ -1514,12 +1510,14 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
-namespace codepacker {
+namespace helpers {
 
 /**
- * @defgroup ivf_flat_codepacker Helper functions for IVF Flat codebook
+ * @defgroup ivf_flat_helpers Helper functions for IVF Flat
  * @{
  */
+
+namespace codepacker {
 
 /**
  * Write flat codes into an existing list by the given offset.
@@ -1533,7 +1531,7 @@ namespace codepacker {
  *   auto codes = raft::make_device_matrix<float>(res, n_vec, index.dim());
  *   ... prepare n_vecs to pack into the list in codes ...
  *   // write codes into the list starting from the 42nd position
- *   ivf_flat::codepacker::pack(
+ *   ivf_flat::helpers::codepacker::pack(
  *       res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
  * @endcode
  *
@@ -1563,7 +1561,7 @@ void pack(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<int8_t>(res, n_vec, index.dim());
  *   ... prepare n_vecs to pack into the list in codes ...
  *   // write codes into the list starting from the 42nd position
- *   ivf_flat::codepacker::pack(
+ *   ivf_flat::helpers::codepacker::pack(
  *       res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
  * @endcode
  *
@@ -1593,7 +1591,7 @@ void pack(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<uint8_t>(res, n_vec, index.dim());
  *   ... prepare n_vecs to pack into the list in codes ...
  *   // write codes into the list starting from the 42nd position
- *   ivf_flat::codepacker::pack(
+ *   ivf_flat::helpers::codepacker::pack(
  *       res, make_const_mdspan(codes.view()), index.veclen(), 42, list_data);
  * @endcode
  *
@@ -1623,7 +1621,7 @@ void pack(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<float>(res, n_take, index.dim());
  *   uint32_t offset = 0;
  *   // unpack n_take elements from the list
- *   ivf_fat::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+ *   ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -1656,7 +1654,7 @@ void unpack(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<int8_t>(res, n_take, index.dim());
  *   uint32_t offset = 0;
  *   // unpack n_take elements from the list
- *   ivf_fat::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+ *   ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -1689,7 +1687,7 @@ void unpack(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<uint8_t>(res, n_take, index.dim());
  *   uint32_t offset = 0;
  *   // unpack n_take elements from the list
- *   ivf_fat::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
+ *   ivf_fat::helpers::codepacker::unpack(res, list_data, index.veclen(), offset, codes.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -1794,16 +1792,7 @@ void unpack_1(
 void unpack_1(
   const uint8_t* block, uint8_t* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset);
 
-/** @} */
-
 }  // namespace codepacker
-
-namespace helpers {
-
-/**
- * @defgroup ivf_flat_helpers Helper functions for manipulationg IVF Flat Index
- * @{
- */
 
 /**
  * @brief Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
@@ -1870,7 +1859,10 @@ void reset_index(const raft::resources& res, index<int8_t, int64_t>* index);
  * @param[inout] index pointer to IVF-Flat index
  */
 void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index);
-/** @} */
+
+/**
+ * @}
+ */
 
 }  // namespace helpers
 }  // namespace cuvs::neighbors::ivf_flat
