@@ -1,0 +1,141 @@
+/*
+ * Copyright (c) 2024, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <cuvs/neighbors/ivf_flat.hpp>
+
+#include "../detail/ann_utils.cuh"
+
+#include "../detail/div_utils.cuh"
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resources.hpp>
+#include <variant>
+
+namespace cuvs::neighbors::ivf_flat::helpers::codepacker {
+
+namespace {
+
+template <typename T>
+__device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  // The data is written in interleaved groups of `index::kGroupSize` vectors
+  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+
+  // Interleave dimensions of the source vector while recording it.
+  // NB: such `veclen` is selected, that `dim % veclen == 0`
+  auto group_offset = interleaved_group::roundDown(offset);
+  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
+
+  for (uint32_t l = 0; l < dim; l += veclen) {
+    for (uint32_t j = 0; j < veclen; j++) {
+      block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j] = flat_code[l + j];
+    }
+  }
+}
+
+template <typename T>
+__device__ void unpack_1(
+  const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  // The data is written in interleaved groups of `index::kGroupSize` vectors
+  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+
+  // NB: such `veclen` is selected, that `dim % veclen == 0`
+  auto group_offset = interleaved_group::roundDown(offset);
+  auto ingroup_id   = interleaved_group::mod(offset) * veclen;
+
+  for (uint32_t l = 0; l < dim; l += veclen) {
+    for (uint32_t j = 0; j < veclen; j++) {
+      flat_code[l + j] = block[group_offset * dim + l * kIndexGroupSize + ingroup_id + j];
+    }
+  }
+}
+
+template <typename T>
+RAFT_KERNEL pack_interleaved_list_kernel(const T* codes,
+                                         T* list_data,
+                                         uint32_t n_rows,
+                                         uint32_t dim,
+                                         uint32_t veclen,
+                                         std::variant<uint32_t, const uint32_t*> offset_or_indices)
+{
+  uint32_t tid          = blockIdx.x * blockDim.x + threadIdx.x;
+  const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
+                            ? std::get<uint32_t>(offset_or_indices) + tid
+                            : std::get<const uint32_t*>(offset_or_indices)[tid];
+  if (tid < n_rows) { pack_1(codes + tid * dim, list_data, dim, veclen, dst_ix); }
+}
+
+template <typename T>
+RAFT_KERNEL unpack_interleaved_list_kernel(
+  const T* list_data,
+  T* codes,
+  uint32_t n_rows,
+  uint32_t dim,
+  uint32_t veclen,
+  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+{
+  uint32_t tid          = blockIdx.x * blockDim.x + threadIdx.x;
+  const uint32_t src_ix = std::holds_alternative<uint32_t>(offset_or_indices)
+                            ? std::get<uint32_t>(offset_or_indices) + tid
+                            : std::get<const uint32_t*>(offset_or_indices)[tid];
+  if (tid < n_rows) { unpack_1(list_data, codes + tid * dim, dim, veclen, src_ix); }
+}
+
+template <typename T, typename IdxT>
+void pack_list_data(
+  raft::resources const& res,
+  raft::device_matrix_view<const T, uint32_t, raft::row_major> codes,
+  uint32_t veclen,
+  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  raft::device_mdspan<T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data)
+{
+  uint32_t n_rows = codes.extent(0);
+  uint32_t dim    = codes.extent(1);
+  if (n_rows == 0 || dim == 0) return;
+  static constexpr uint32_t kBlockSize = 256;
+  dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
+  dim3 threads(kBlockSize, 1, 1);
+  auto stream = raft::resource::get_cuda_stream(res);
+  pack_interleaved_list_kernel<<<blocks, threads, 0, stream>>>(
+    codes.data_handle(), list_data.data_handle(), n_rows, dim, veclen, offset_or_indices);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+}
+
+template <typename T, typename IdxT>
+void unpack_list_data(
+  raft::resources const& res,
+  raft::device_mdspan<const T, typename list_spec<uint32_t, T, IdxT>::list_extents, raft::row_major>
+    list_data,
+  uint32_t veclen,
+  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  raft::device_matrix_view<T, uint32_t, raft::row_major> codes)
+{
+  uint32_t n_rows = codes.extent(0);
+  uint32_t dim    = codes.extent(1);
+  if (n_rows == 0 || dim == 0) return;
+  static constexpr uint32_t kBlockSize = 256;
+  dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize), 1, 1);
+  dim3 threads(kBlockSize, 1, 1);
+  auto stream = raft::resource::get_cuda_stream(res);
+  unpack_interleaved_list_kernel<<<blocks, threads, 0, stream>>>(
+    list_data.data_handle(), codes.data_handle(), n_rows, dim, veclen, offset_or_indices);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+}
+
+}  // namespace
+}  // namespace cuvs::neighbors::ivf_flat::helpers::codepacker
