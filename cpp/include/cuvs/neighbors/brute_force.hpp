@@ -18,7 +18,6 @@
 
 #include "ann_types.hpp"
 #include <cuvs/neighbors/ann_types.hpp>
-#include <raft/core/copy.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
@@ -106,12 +105,7 @@ struct index : cuvs::neighbors::ann::index {
    * We create a copy of the dataset on the device. The index manages the lifetime of this copy.
    */
   void update_dataset(raft::resources const& res,
-                      raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
-  {
-    dataset_ = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
-    raft::copy(res, dataset_.view(), dataset);
-    dataset_view_ = raft::make_const_mdspan(dataset_.view());
-  }
+                      raft::host_matrix_view<const T, int64_t, raft::row_major> dataset);
 
   /** Distance metric used for retrieval */
   cuvs::distance::DistanceType metric() const noexcept { return metric_; }

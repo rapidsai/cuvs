@@ -17,7 +17,19 @@
 #include "./detail/knn_brute_force.cuh"
 #include <cuvs/neighbors/brute_force.hpp>
 
+#include <raft/core/copy.hpp>
+
 namespace cuvs::neighbors::brute_force {
+
+template <typename T>
+void index<T>::update_dataset(raft::resources const& res,
+                              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+{
+  dataset_ = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
+  raft::copy(res, dataset_.view(), dataset);
+  dataset_view_ = raft::make_const_mdspan(dataset_.view());
+}
+
 #define CUVS_INST_BFKNN(T)                                                           \
   auto build(raft::resources const& res,                                             \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,    \
