@@ -168,7 +168,7 @@ void fit(const raft::resources& handle,
  *   #include <cuvs/cluster/kmeans.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
- *   raft::raft::resources handle;
+ *   raft::resources handle;
  *    cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
@@ -239,7 +239,7 @@ void predict(const raft::resources& handle,
  *   #include <cuvs/cluster/kmeans.hpp>
  *   using namespace  cuvs::cluster;
  *   ...
- *   raft::raft::resources handle;
+ *   raft::resources handle;
  *    cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);

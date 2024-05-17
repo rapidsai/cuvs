@@ -15,6 +15,4 @@
  */
 #pragma once
 
-#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
 #include "fused_distance_nn-inl.cuh"
-#endif

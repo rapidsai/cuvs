@@ -23,6 +23,7 @@
 
 namespace cuvs::cluster::agglomerative {
 
+// constant to indirectly control the number of neighbors. k = sqrt(n) + c. default to 15
 constexpr int DEFAULT_CONST_C = 15;
 
 /**
