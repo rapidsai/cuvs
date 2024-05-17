@@ -1220,11 +1220,6 @@ void pack_contiguous(
     list_data);
 
 /**
- * @}
- */
-};  // namespace codepacker
-
-/**
  * Write flat PQ codes into an existing list by the given offset.
  *
  * The list is identified by its label.
@@ -1239,7 +1234,7 @@ void pack_contiguous(
  *   auto codes = raft::make_device_matrix<const uint8_t>(res, n_vec, index.pq_dim());
  *   ... prepare n_vecs to pack into the list in codes ...
  *   // write codes into the list starting from the 42nd position
- *   ivf_pq::helpers::pack_list_data(res, &index, codes_to_pack, label, 42);
+ *   ivf_pq::helpers::codepacker::pack_list_data(res, &index, codes_to_pack, label, 42);
  * @endcode
  *
  * @param[in] res raft resource
@@ -1280,7 +1275,7 @@ void pack_list_data(raft::resources const& res,
  *   // the first n_rows codes in the fourth IVF list are to be overwritten.
  *   uint32_t label = 3;
  *   // write codes into the list starting from the 0th position
- *   ivf_pq::helpers::pack_contiguous_list_data(
+ *   ivf_pq::helpers::codepacker::pack_contiguous_list_data(
  *     res, &index, codes.data_handle(), n_rows, label, 0);
  * @endcode
  *
@@ -1313,7 +1308,7 @@ void pack_contiguous_list_data(raft::resources const& res,
  *   // allocate the buffer for the output
  *   auto codes = raft::make_device_matrix<float>(res, list_size, index.pq_dim());
  *   // unpack the whole list
- *   ivf_pq::helpers::unpack_list_data(res, index, codes.view(), label, 0);
+ *   ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.view(), label, 0);
  * @endcode
  *
  * @param[in] res
@@ -1348,7 +1343,7 @@ void unpack_list_data(raft::resources const& res,
  *   // allocate the buffer for the output
  *   auto codes = raft::make_device_matrix<float>(res, selected_indices.size(), index.pq_dim());
  *   // decode the whole list
- *   ivf_pq::helpers::unpack_list_data(
+ *   ivf_pq::helpers::codepacker::unpack_list_data(
  *       res, index, selected_indices.view(), codes.view(), label);
  * @endcode
  *
@@ -1388,7 +1383,7 @@ void unpack_list_data(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<float>(res, list_size, raft::ceildiv(index.pq_dim() *
  *     index.pq_bits(), 8));
  *   // unpack the whole list
- *   ivf_pq::helpers::unpack_list_data(res, index, codes.data_handle(), list_size, label, 0);
+ *   ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.data_handle(), list_size, label, 0);
  * @endcode
  *
  * @param[in] res raft resource
@@ -1425,7 +1420,7 @@ void unpack_contiguous_list_data(raft::resources const& res,
  *   // allocate the buffer for the output
  *   auto decoded_vectors = raft::make_device_matrix<float>(res, list_size, index.dim());
  *   // decode the whole list
- *   ivf_pq::helpers::reconstruct_list_data(res, index, decoded_vectors.view(), label, 0);
+ *   ivf_pq::helpers::codepacker::reconstruct_list_data(res, index, decoded_vectors.view(), label, 0);
  * @endcode
  *
  * @param[in] res
@@ -1473,7 +1468,7 @@ void reconstruct_list_data(raft::resources const& res,
  *   auto decoded_vectors = raft::make_device_matrix<float>(
  *                             res, selected_indices.size(), index.dim());
  *   // decode the whole list
- *   ivf_pq::helpers::reconstruct_list_data(
+ *   ivf_pq::helpers::codepacker::reconstruct_list_data(
  *       res, index, selected_indices.view(), decoded_vectors.view(), label);
  * @endcode
  *
@@ -1521,7 +1516,7 @@ void reconstruct_list_data(raft::resources const& res,
  *       res, n_vec, index.pq_dim());
  *   ... fill codes ...
  *   // extend list with new codes
- *   ivf_pq::helpers::extend_list_with_codes(
+ *   ivf_pq::helpers::codepacker::extend_list_with_codes(
  *       res, &index, codes.view(), indices.view(), label);
  * @endcode
  *
@@ -1555,7 +1550,7 @@ void extend_list_with_codes(
  *       res, n_vec, index.dim());
  *   ... fill vectors ...
  *   // extend list with new vectors
- *   ivf_pq::helpers::extend_list(
+ *   ivf_pq::helpers::codepacker::extend_list(
  *       res, &index, new_vectors.view(), indices.view(), label);
  * @endcode
  *
@@ -1581,6 +1576,12 @@ void extend_list(raft::resources const& res,
                  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_vectors,
                  raft::device_vector_view<const int64_t, uint32_t, raft::row_major> new_indices,
                  uint32_t label);
+
+/**
+ * @}
+ */
+};  // namespace codepacker
+
 /**
  * @brief Remove all data from a single list (cluster) in the index.
  *

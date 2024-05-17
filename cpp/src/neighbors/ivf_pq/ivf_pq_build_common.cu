@@ -72,8 +72,6 @@ void pack_contiguous(
     list_data, codes, n_rows, pq_dim, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
 
-};  // namespace codepacker
-
 void pack_list_data(raft::resources const& res,
                     index<int64_t>* index,
                     raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
@@ -209,6 +207,8 @@ void extend_list(raft::resources const& res,
 {
   detail::extend_list<uint8_t, int64_t>(res, index, new_vectors, new_indices, label);
 }
+
+};  // namespace codepacker
 
 void erase_list(raft::resources const& res, index<int64_t>* index, uint32_t label)
 {
