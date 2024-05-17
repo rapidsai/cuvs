@@ -263,7 +263,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto rec_data  = raft::make_device_matrix<DataT>(handle_, n_take, dim);
     auto orig_data = raft::make_device_matrix<DataT>(handle_, n_take, dim);
 
-    ivf_pq::helpers::codepacker::reconstruct_list_data(handle_, index, rec_data.view(), label, n_skip);
+    ivf_pq::helpers::codepacker::reconstruct_list_data(
+      handle_, index, rec_data.view(), label, n_skip);
 
     raft::matrix::gather(database.data(),
                          IdxT{dim},
@@ -288,11 +289,13 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
     raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    ivf_pq::helpers::codepacker::reconstruct_list_data(handle_, *index, vectors_1.view(), label, uint32_t(0));
+    ivf_pq::helpers::codepacker::reconstruct_list_data(
+      handle_, *index, vectors_1.view(), label, uint32_t(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
     // NB: passing the type parameter because const->non-const implicit conversion of the mdspans
     // breaks type inference
-    ivf_pq::helpers::codepacker::extend_list(handle_, index, vectors_1.view(), indices.view(), label);
+    ivf_pq::helpers::codepacker::extend_list(
+      handle_, index, vectors_1.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
@@ -300,7 +303,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
          "corresponding cluster.";
 
     auto vectors_2 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
-    ivf_pq::helpers::codepacker::reconstruct_list_data(handle_, *index, vectors_2.view(), label, uint32_t(0));
+    ivf_pq::helpers::codepacker::reconstruct_list_data(
+      handle_, *index, vectors_2.view(), label, uint32_t(0));
     // The code search is unstable, and there's high chance of repeating values of the lvl-2 codes.
     // Hence, encoding-decoding chain often leads to altering both the PQ codes and the
     // reconstructed data.
@@ -319,9 +323,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto indices = raft::make_device_vector<IdxT>(handle_, n_rows);
     raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    ivf_pq::helpers::codepacker::unpack_list_data(handle_, *index, codes.view(), label, uint32_t(0));
+    ivf_pq::helpers::codepacker::unpack_list_data(
+      handle_, *index, codes.view(), label, uint32_t(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
-    ivf_pq::helpers::codepacker::extend_list_with_codes(handle_, index, codes.view(), indices.view(), label);
+    ivf_pq::helpers::codepacker::extend_list_with_codes(
+      handle_, index, codes.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
@@ -345,7 +351,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     size_t offset      = row_offset * index->pq_dim();
     auto codes_to_pack = raft::make_device_matrix_view<const uint8_t, uint32_t>(
       codes.data_handle() + offset, n_vec, index->pq_dim());
-    ivf_pq::helpers::codepacker::pack_list_data(handle_, index, codes_to_pack, label, uint32_t(row_offset));
+    ivf_pq::helpers::codepacker::pack_list_data(
+      handle_, index, codes_to_pack, label, uint32_t(row_offset));
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_size,

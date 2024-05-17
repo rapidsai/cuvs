@@ -1383,7 +1383,8 @@ void unpack_list_data(raft::resources const& res,
  *   auto codes = raft::make_device_matrix<float>(res, list_size, raft::ceildiv(index.pq_dim() *
  *     index.pq_bits(), 8));
  *   // unpack the whole list
- *   ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.data_handle(), list_size, label, 0);
+ *   ivf_pq::helpers::codepacker::unpack_list_data(res, index, codes.data_handle(), list_size,
+ * label, 0);
  * @endcode
  *
  * @param[in] res raft resource
@@ -1420,7 +1421,8 @@ void unpack_contiguous_list_data(raft::resources const& res,
  *   // allocate the buffer for the output
  *   auto decoded_vectors = raft::make_device_matrix<float>(res, list_size, index.dim());
  *   // decode the whole list
- *   ivf_pq::helpers::codepacker::reconstruct_list_data(res, index, decoded_vectors.view(), label, 0);
+ *   ivf_pq::helpers::codepacker::reconstruct_list_data(res, index, decoded_vectors.view(), label,
+ * 0);
  * @endcode
  *
  * @param[in] res
