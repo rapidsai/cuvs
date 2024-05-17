@@ -66,3 +66,15 @@ Index serialize
     :project: cuvs
     :members:
     :content-only:
+
+Helper Methods
+---------------
+
+Additional helper functions for manipulating the underlying data of an IVF-PQ index, unpacking records, and writing PQ codes into an existing IVF list.
+
+namespace *cuvs::neighbors::ivf_pq::helpers*
+
+.. doxygengroup:: ivf_pq_cpp_helpers
+    :project: cuvs
+    :members:
+    :content-only:
