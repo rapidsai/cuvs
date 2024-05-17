@@ -33,8 +33,11 @@
 #include "../test_utils.cuh"
 #include <gtest/gtest.h>
 #include <iostream>
+#include <limits>
 
 namespace cuvs::neighbors {
+
+using raft::RAFT_NAME;  // For logging
 
 struct print_dtype {
   cudaDataType_t value;
@@ -83,27 +86,35 @@ struct print_metric {
 inline auto operator<<(std::ostream& os, const print_metric& p) -> std::ostream&
 {
   switch (p.value) {
-    case cuvs::distance::L2Expanded: os << "distance::L2Expanded"; break;
-    case cuvs::distance::L2SqrtExpanded: os << "distance::L2SqrtExpanded"; break;
-    case cuvs::distance::CosineExpanded: os << "distance::CosineExpanded"; break;
-    case cuvs::distance::L1: os << "distance::L1"; break;
-    case cuvs::distance::L2Unexpanded: os << "distance::L2Unexpanded"; break;
-    case cuvs::distance::L2SqrtUnexpanded: os << "distance::L2SqrtUnexpanded"; break;
-    case cuvs::distance::InnerProduct: os << "distance::InnerProduct"; break;
-    case cuvs::distance::Linf: os << "distance::Linf"; break;
-    case cuvs::distance::Canberra: os << "distance::Canberra"; break;
-    case cuvs::distance::LpUnexpanded: os << "distance::LpUnexpanded"; break;
-    case cuvs::distance::CorrelationExpanded: os << "distance::CorrelationExpanded"; break;
-    case cuvs::distance::JaccardExpanded: os << "distance::JaccardExpanded"; break;
-    case cuvs::distance::HellingerExpanded: os << "distance::HellingerExpanded"; break;
-    case cuvs::distance::Haversine: os << "distance::Haversine"; break;
-    case cuvs::distance::BrayCurtis: os << "distance::BrayCurtis"; break;
-    case cuvs::distance::JensenShannon: os << "distance::JensenShannon"; break;
-    case cuvs::distance::HammingUnexpanded: os << "distance::HammingUnexpanded"; break;
-    case cuvs::distance::KLDivergence: os << "distance::KLDivergence"; break;
-    case cuvs::distance::RusselRaoExpanded: os << "distance::RusselRaoExpanded"; break;
-    case cuvs::distance::DiceExpanded: os << "distance::DiceExpanded"; break;
-    case cuvs::distance::Precomputed: os << "distance::Precomputed"; break;
+    case cuvs::distance::DistanceType::L2Expanded: os << "distance::L2Expanded"; break;
+    case cuvs::distance::DistanceType::L2SqrtExpanded: os << "distance::L2SqrtExpanded"; break;
+    case cuvs::distance::DistanceType::CosineExpanded: os << "distance::CosineExpanded"; break;
+    case cuvs::distance::DistanceType::L1: os << "distance::L1"; break;
+    case cuvs::distance::DistanceType::L2Unexpanded: os << "distance::L2Unexpanded"; break;
+    case cuvs::distance::DistanceType::L2SqrtUnexpanded: os << "distance::L2SqrtUnexpanded"; break;
+    case cuvs::distance::DistanceType::InnerProduct: os << "distance::InnerProduct"; break;
+    case cuvs::distance::DistanceType::Linf: os << "distance::Linf"; break;
+    case cuvs::distance::DistanceType::Canberra: os << "distance::Canberra"; break;
+    case cuvs::distance::DistanceType::LpUnexpanded: os << "distance::LpUnexpanded"; break;
+    case cuvs::distance::DistanceType::CorrelationExpanded:
+      os << "distance::CorrelationExpanded";
+      break;
+    case cuvs::distance::DistanceType::JaccardExpanded: os << "distance::JaccardExpanded"; break;
+    case cuvs::distance::DistanceType::HellingerExpanded:
+      os << "distance::HellingerExpanded";
+      break;
+    case cuvs::distance::DistanceType::Haversine: os << "distance::Haversine"; break;
+    case cuvs::distance::DistanceType::BrayCurtis: os << "distance::BrayCurtis"; break;
+    case cuvs::distance::DistanceType::JensenShannon: os << "distance::JensenShannon"; break;
+    case cuvs::distance::DistanceType::HammingUnexpanded:
+      os << "distance::HammingUnexpanded";
+      break;
+    case cuvs::distance::DistanceType::KLDivergence: os << "distance::KLDivergence"; break;
+    case cuvs::distance::DistanceType::RusselRaoExpanded:
+      os << "distance::RusselRaoExpanded";
+      break;
+    case cuvs::distance::DistanceType::DiceExpanded: os << "distance::DiceExpanded"; break;
+    case cuvs::distance::DistanceType::Precomputed: os << "distance::Precomputed"; break;
     default: RAFT_FAIL("unreachable code");
   }
   return os;
@@ -151,30 +162,60 @@ auto calc_recall(const std::vector<T>& expected_idx,
     static_cast<double>(match_count) / static_cast<double>(total_count), match_count, total_count);
 }
 
+/** check uniqueness of indices
+ */
+template <typename T>
+auto check_unique_indices(const std::vector<T>& actual_idx, size_t rows, size_t cols)
+{
+  size_t max_count;
+  std::set<T> unique_indices;
+  for (size_t i = 0; i < rows; ++i) {
+    unique_indices.clear();
+    max_count = 0;
+    for (size_t k = 0; k < cols; ++k) {
+      size_t idx_k = i * cols + k;  // row major assumption!
+      auto act_idx = actual_idx[idx_k];
+      if (act_idx == std::numeric_limits<T>::max()) {
+        max_count++;
+      } else if (unique_indices.find(act_idx) == unique_indices.end()) {
+        unique_indices.insert(act_idx);
+      } else {
+        return testing::AssertionFailure()
+               << "Duplicated index " << act_idx << " at k " << k << " for query " << i << "! ";
+      }
+    }
+  }
+  return testing::AssertionSuccess();
+}
+
 template <typename T>
 auto eval_recall(const std::vector<T>& expected_idx,
                  const std::vector<T>& actual_idx,
                  size_t rows,
                  size_t cols,
                  double eps,
-                 double min_recall) -> testing::AssertionResult
+                 double min_recall,
+                 bool test_unique = true) -> testing::AssertionResult
 {
   auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, rows, cols);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
-  /*RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
+  RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,
                 total_count,
                 std::abs(error_margin * 100.0),
                 error_margin < 0 ? "above" : "below",
-                eps);*/
+                eps);
   if (actual_recall < min_recall - eps) {
     return testing::AssertionFailure()
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
            << min_recall << "); eps = " << eps << ". ";
   }
-  return testing::AssertionSuccess();
+  if (test_unique)
+    return check_unique_indices(actual_idx, rows, cols);
+  else
+    return testing::AssertionSuccess();
 }
 
 /** Overload of calc_recall to account for distances
@@ -222,12 +263,13 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
                      size_t rows,
                      size_t cols,
                      double eps,
-                     double min_recall) -> testing::AssertionResult
+                     double min_recall,
+                     bool test_unique = true) -> testing::AssertionResult
 {
   auto [actual_recall, match_count, total_count] =
     calc_recall(expected_idx, actual_idx, expected_dist, actual_dist, rows, cols, eps);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
-  /*
+
   RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,
@@ -235,13 +277,16 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
                 std::abs(error_margin * 100.0),
                 error_margin < 0 ? "above" : "below",
                 eps);
-  */
+
   if (actual_recall < min_recall - eps) {
     return testing::AssertionFailure()
            << "actual recall (" << actual_recall << ") is lower than the minimum expected recall ("
            << min_recall << "); eps = " << eps << ". ";
   }
-  return testing::AssertionSuccess();
+  if (test_unique)
+    return check_unique_indices(actual_idx, rows, cols);
+  else
+    return testing::AssertionSuccess();
 }
 
 template <typename T, typename DistT, typename IdxT>
@@ -265,7 +310,7 @@ auto eval_distances(raft::resources const& handle,
 
     raft::matrix::copy_rows<T, IdxT>(
       handle,
-      raft::make_device_matrix_view<const T, IdxT>(x, k, n_cols),
+      raft::make_device_matrix_view<const T, IdxT>(x, n_rows, n_cols),
       y.view(),
       raft::make_device_vector_view<const IdxT, IdxT>(neighbors + i * k, k));
 

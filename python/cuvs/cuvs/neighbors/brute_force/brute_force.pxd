@@ -19,7 +19,7 @@ from libc.stdint cimport uintptr_t
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
-from cuvs.distance_type cimport DistanceType
+from cuvs.distance_type cimport cuvsDistanceType
 
 
 cdef extern from "cuvs/neighbors/brute_force.h" nogil:
@@ -36,7 +36,7 @@ cdef extern from "cuvs/neighbors/brute_force.h" nogil:
 
     cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
                                     DLManagedTensor* dataset,
-                                    DistanceType metric,
+                                    cuvsDistanceType metric,
                                     float metric_arg,
                                     cuvsBruteForceIndex_t index) except +
 

@@ -512,7 +512,7 @@ def search(SearchParams search_params,
     ... )
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
-    >>> # are performad with same query size.
+    >>> # are performed with same query size.
     >>> distances, neighbors = cagra.search(search_params, index, queries,
     ...                                     k)
     >>> neighbors = cp.asarray(neighbors)
