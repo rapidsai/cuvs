@@ -61,7 +61,7 @@ outputs:
         - cuda-version ={{ cuda_version }}
         - cmake {{ cmake_version }}
         - ninja
-        - sysroot_{{ target_platform }} {{ sysroot_version }}
+        - {{ stdlib("c") }}
       host:
         - libraft ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
@@ -127,7 +127,7 @@ outputs:
         - cuda-version ={{ cuda_version }}
         - cmake {{ cmake_version }}
         - ninja
-        - sysroot_{{ target_platform }} {{ sysroot_version }}
+        - {{ stdlib("c") }}
       host:
         - libraft ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
@@ -193,7 +193,7 @@ outputs:
         - cuda-version ={{ cuda_version }}
         - cmake {{ cmake_version }}
         - ninja
-        - sysroot_{{ target_platform }} {{ sysroot_version }}
+        - {{ stdlib("c") }}
       host:
         - libraft ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
@@ -260,7 +260,7 @@ outputs:
         - cuda-version ={{ cuda_version }}
         - cmake {{ cmake_version }}
         - ninja
-        - sysroot_{{ target_platform }} {{ sysroot_version }}
+        - {{ stdlib("c") }}
       host:
         - libraft ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}

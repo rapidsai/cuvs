@@ -17,7 +17,15 @@
 #pragma once
 
 #include "ann_types.hpp"
-#include <raft/neighbors/ivf_pq_types.hpp>
+#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/sample_filter.hpp>
+
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/error.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/mdspan_types.hpp>
+#include <raft/core/resources.hpp>
+#include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
 
@@ -92,23 +100,34 @@ struct index_params : ann::index_params {
    */
   bool conservative_memory_allocation = false;
 
-  /** Build a raft IVF_PQ index params from an existing cuvs IVF_PQ index params. */
-  operator raft::neighbors::ivf_pq::index_params() const
+  /**
+   * Creates index_params based on shape of the input dataset.
+   * Usage example:
+   * @code{.cpp}
+   *   using namespace raft::neighbors;
+   *   raft::resources res;
+   *   // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+   *   ivf_pq::index_params index_params =
+   *     ivf_pq::index_params::from_dataset(dataset.view(), raft::distance::InnerProduct);
+   *   // modify/update index_params as needed
+   *   index_params.add_data_on_build = true;
+   * @endcode
+   */
+  template <typename DataT, typename Accessor>
+  static index_params from_dataset(
+    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
   {
-    return raft::neighbors::ivf_pq::index_params{
-      {
-        .metric            = static_cast<raft::distance::DistanceType>((int)this->metric),
-        .metric_arg        = this->metric_arg,
-        .add_data_on_build = this->add_data_on_build,
-      },
-      .n_lists                  = n_lists,
-      .kmeans_n_iters           = kmeans_n_iters,
-      .kmeans_trainset_fraction = kmeans_trainset_fraction,
-      .pq_bits                  = pq_bits,
-      .pq_dim                   = pq_dim,
-      .codebook_kind = static_cast<raft::neighbors::ivf_pq::codebook_gen>((int)this->codebook_kind),
-      .force_random_rotation          = force_random_rotation,
-      .conservative_memory_allocation = conservative_memory_allocation};
+    index_params params;
+    params.n_lists =
+      dataset.extent(0) < 4 * 2500 ? 4 : static_cast<uint32_t>(std::sqrt(dataset.extent(0)));
+    params.pq_dim =
+      raft::round_up_safe(static_cast<uint32_t>(dataset.extent(1) / 4), static_cast<uint32_t>(8));
+    params.pq_bits                  = 8;
+    params.kmeans_trainset_fraction = dataset.extent(0) < 10000 ? 1 : 0.1;
+    params.metric                   = metric;
+    return params;
   }
 };
 /**
@@ -156,21 +175,59 @@ struct search_params : ann::search_params {
    * performance if tweaked incorrectly.
    */
   double preferred_shmem_carveout = 1.0;
-
-  /** Build a raft IVF_PQ search params from an existing cuvs IVF_PQ search params. */
-  operator raft::neighbors::ivf_pq::search_params() const
-  {
-    raft::neighbors::ivf_pq::search_params result = {
-      {}, n_probes, lut_dtype, internal_distance_dtype, preferred_shmem_carveout};
-    return result;
-  }
 };
 /**
  * @}
  */
 
+static_assert(std::is_aggregate_v<index_params>);
+static_assert(std::is_aggregate_v<search_params>);
+
+/** Size of the interleaved group. */
+constexpr static uint32_t kIndexGroupSize = 32;
+/** Stride of the interleaved group for vectorized loads. */
+constexpr static uint32_t kIndexGroupVecLen = 16;
+
+/**
+ * Default value returned by `search` when the `n_probes` is too small and top-k is too large.
+ * One may encounter it if the combined size of probed clusters is smaller than the requested
+ * number of results per query.
+ */
+template <typename IdxT>
+constexpr static IdxT kOutOfBoundsRecord = std::numeric_limits<IdxT>::max();
+
+template <typename SizeT, typename IdxT>
+struct list_spec {
+  using value_type = uint8_t;
+  using index_type = IdxT;
+  /** PQ-encoded data stored in the interleaved format:
+   *
+   *    [ ceildiv(list_size, kIndexGroupSize)
+   *    , ceildiv(pq_dim, (kIndexGroupVecLen * 8u) / pq_bits)
+   *    , kIndexGroupSize
+   *    , kIndexGroupVecLen
+   *    ].
+   */
+  using list_extents = raft::
+    extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
+
+  SizeT align_max;
+  SizeT align_min;
+  uint32_t pq_bits;
+  uint32_t pq_dim;
+
+  constexpr list_spec(uint32_t pq_bits, uint32_t pq_dim, bool conservative_memory_allocation);
+
+  // Allow casting between different size-types (for safer size and offset calculations)
+  template <typename OtherSizeT>
+  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT>& other_spec);
+
+  /** Determine the extents of an array enough to hold a given amount of data. */
+  constexpr list_extents make_list_extents(SizeT n_rows) const;
+};
+
 template <typename IdxT, typename SizeT = uint32_t>
-using list_data = raft::neighbors::ivf_pq::list_data<IdxT, SizeT>;
+using list_data = ivf::list<list_spec, SizeT, IdxT>;
 
 /**
  * @defgroup ivf_pq_cpp_index IVF-PQ index
@@ -226,7 +283,8 @@ struct index : ann::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = typename raft::neighbors::ivf_pq::index<IdxT>::pq_centers_extents;
+  using pq_centers_extents = std::experimental::
+    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
  public:
   index(const index&)                    = delete;
@@ -236,8 +294,17 @@ struct index : ann::index {
   ~index()                               = default;
 
   /** Construct an empty index. It needs to be trained and then populated. */
+  index(raft::resources const& handle,
+        cuvs::distance::DistanceType metric,
+        codebook_gen codebook_kind,
+        uint32_t n_lists,
+        uint32_t dim,
+        uint32_t pq_bits                    = 8,
+        uint32_t pq_dim                     = 0,
+        bool conservative_memory_allocation = false);
+
+  /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& handle, const index_params& params, uint32_t dim);
-  index(raft::neighbors::ivf_pq::index<IdxT>&& raft_idx);
 
   /** Total length of the index. */
   IdxT size() const noexcept;
@@ -290,8 +357,8 @@ struct index : ann::index {
    *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
-  raft::mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
-  raft::mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept;
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept;
+  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept;
 
   /** Lists' data and indices. */
   std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept;
@@ -334,18 +401,51 @@ struct index : ann::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept;
 
-  // Get pointer to underlying RAFT index, not meant to be used outside of cuVS
-  inline raft::neighbors::ivf_pq::index<IdxT>* get_raft_index() noexcept
-  {
-    return raft_index_.get();
-  }
-  inline const raft::neighbors::ivf_pq::index<IdxT>* get_raft_index() const noexcept
-  {
-    return raft_index_.get();
-  }
+  /** fetch size of a particular IVF list in bytes using the list extents.
+   * Usage example:
+   * @code{.cpp}
+   *   raft::resources res;
+   *   // use default index params
+   *   ivf_pq::index_params index_params;
+   *   // extend the IVF lists while building the index
+   *   index_params.add_data_on_build = true;
+   *   // create and fill the index from a [N, D] dataset
+   *   auto index = cuvs::neighbors::ivf_pq::build<int64_t>(res, index_params, dataset, N, D);
+   *   // Fetch the size of the fourth list
+   *   uint32_t size = index.get_list_size_in_bytes(3);
+   * @endcode
+   *
+   * @param[in] label list ID
+   */
+  uint32_t get_list_size_in_bytes(uint32_t label);
 
  private:
-  std::unique_ptr<raft::neighbors::ivf_pq::index<IdxT>> raft_index_;
+  cuvs::distance::DistanceType metric_;
+  codebook_gen codebook_kind_;
+  uint32_t dim_;
+  uint32_t pq_bits_;
+  uint32_t pq_dim_;
+  bool conservative_memory_allocation_;
+
+  // Primary data members
+  std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
+  raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
+  raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
+  raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
+
+  // Computed members for accelerating search.
+  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
+  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
+  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
+
+  /** Throw an error if the index content is inconsistent. */
+  void check_consistency();
+
+  pq_centers_extents make_pq_centers_extents();
+
+  static uint32_t calculate_pq_dim(uint32_t dim);
 };
 /**
  * @}
@@ -803,6 +903,105 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+/**
+ * @brief Search ANN using the constructed index with the given filter.
+ *
+ * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ * The exact size of the temporary buffer depends on multiple factors and is an implementation
+ * detail. However, you can safely specify a small initial size for the memory pool, so that only a
+ * few allocations happen to grow it during the first invocations of the `search`.
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] idx ivf-pq constructed index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
+ * query.
+ */
+void search_with_filtering(
+  raft::resources const& handle,
+  const search_params& params,
+  index<int64_t>& idx,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> sample_filter);
+
+/**
+ * @brief Search ANN using the constructed index with the given filter.
+ *
+ * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ * The exact size of the temporary buffer depends on multiple factors and is an implementation
+ * detail. However, you can safely specify a small initial size for the memory pool, so that only a
+ * few allocations happen to grow it during the first invocations of the `search`.
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] idx ivf-pq constructed index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
+ * query.
+ */
+void search_with_filtering(
+  raft::resources const& handle,
+  const search_params& params,
+  index<int64_t>& idx,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> sample_filter);
+
+/**
+ * @brief Search ANN using the constructed index with the given filter.
+ *
+ * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ * The exact size of the temporary buffer depends on multiple factors and is an implementation
+ * detail. However, you can safely specify a small initial size for the memory pool, so that only a
+ * few allocations happen to grow it during the first invocations of the `search`.
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] idx ivf-pq constructed index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
+ * query.
+ */
+void search_with_filtering(
+  raft::resources const& handle,
+  const search_params& params,
+  index<int64_t>& idx,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> sample_filter);
 /**
  * @}
  */

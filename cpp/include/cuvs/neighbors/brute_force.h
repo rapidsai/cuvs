@@ -102,7 +102,7 @@ cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  */
 cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
                                 DLManagedTensor* dataset,
-                                enum DistanceType metric,
+                                cuvsDistanceType metric,
                                 float metric_arg,
                                 cuvsBruteForceIndex_t index);
 /**

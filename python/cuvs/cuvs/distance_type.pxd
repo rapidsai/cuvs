@@ -17,7 +17,7 @@
 
 
 cdef extern from "cuvs/distance/distance_types.h" nogil:
-    ctypedef enum DistanceType:
+    ctypedef enum cuvsDistanceType:
         L2Expanded
         L2SqrtExpanded
         CosineExpanded

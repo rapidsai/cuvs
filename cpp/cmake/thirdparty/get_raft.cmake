@@ -17,7 +17,7 @@ set(RAFT_FORK "rapidsai")
 set(RAFT_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
 
 function(find_and_configure_raft)
-    set(oneValueArgs VERSION FORK PINNED_TAG COMPILE_LIBRARY ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)
+    set(oneValueArgs VERSION FORK PINNED_TAG COMPILE_LIBRARY USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
@@ -75,4 +75,5 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         COMPILE_LIBRARY          ON
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
+        USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
 )

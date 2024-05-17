@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 /** enum to tell how to compute distance */
-enum DistanceType {
+typedef enum {
 
   /** evaluate as dist_ij = sum(x_ik^2) + sum(y_ij)^2 - 2*sum(x_ik * y_jk) */
   L2Expanded = 0,
@@ -64,7 +64,7 @@ enum DistanceType {
   DiceExpanded = 19,
   /** Precomputed (special value) **/
   Precomputed = 100
-};
+} cuvsDistanceType;
 
 #ifdef __cplusplus
 }

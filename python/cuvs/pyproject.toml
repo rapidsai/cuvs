@@ -120,3 +120,8 @@ wheel.packages = ["cuvs"]
 provider = "scikit_build_core.metadata.regex"
 input = "cuvs/VERSION"
 regex = "(?P<value>.*)"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+]
