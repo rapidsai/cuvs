@@ -19,7 +19,9 @@ option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorit
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" ON)
-option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
+       ON
+)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include raft's ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ "Include raft's ivf pq algorithm in benchmark" ON)
@@ -28,7 +30,9 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include raft's brute force knn in be
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include raft's CAGRA in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" ON)
-option(CUVS_ANN_BENCH_SINGLE_EXE "Make a single executable with benchmark as shared library modules" OFF)
+option(CUVS_ANN_BENCH_SINGLE_EXE
+       "Make a single executable with benchmark as shared library modules" OFF
+)
 
 # ##################################################################################################
 # * Process options ----------------------------------------------------------
@@ -305,7 +309,9 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_glog.cmake)
-  ConfigureAnnBench(NAME GGNN PATH bench/ann/src/ggnn/ggnn_benchmark.cu LINKS glog::glog ggnn::ggnn)
+  ConfigureAnnBench(
+    NAME GGNN PATH bench/ann/src/ggnn/ggnn_benchmark.cu LINKS glog::glog ggnn::ggnn CUDA::curand
+  )
 endif()
 
 # ##################################################################################################

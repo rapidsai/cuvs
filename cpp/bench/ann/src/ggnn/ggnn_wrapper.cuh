@@ -19,7 +19,7 @@
 #include "../common/ann_types.hpp"
 #include "../common/util.hpp"
 
-#include <raft/util/cudart_utils.hpp>
+// #include <raft/util/cudart_utils.hpp>
 
 #include <ggnn/cuda_knn_ggnn_gpu_instance.cuh>
 
@@ -181,7 +181,7 @@ class GgnnImpl : public ANN<T>, public AnnGPU {
     if (base_dataset == nullptr) { return; }
     if (base_n_rows == 0) { return; }
     int device;
-    RAFT_CUDA_TRY(cudaGetDevice(&device));
+    cudaGetDevice(&device);
     ggnn_ = std::make_shared<GGNNGPUInstance>(
       device, base_n_rows, build_param_.num_layers, true, build_param_.tau);
     ggnn_->set_base_data(base_dataset);
@@ -193,7 +193,7 @@ class GgnnImpl : public ANN<T>, public AnnGPU {
 
       ggnn_host.load(graph_file.value());
       ggnn_host.uploadAsync(ggnn_device);
-      RAFT_CUDA_TRY(cudaStreamSynchronize(ggnn_device.stream));
+      cudaStreamSynchronize(ggnn_device.stream);
     }
   }
 };
@@ -259,7 +259,7 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::search(
   }
 
   ggnn_->set_stream(get_sync_stream());
-  RAFT_CUDA_TRY(cudaMemcpyToSymbol(c_tau_query, &search_param_.tau, sizeof(float)));
+  cudaMemcpyToSymbol(c_tau_query, &search_param_.tau, sizeof(float));
 
   const int block_dim      = search_param_.block_dim;
   const int max_iterations = search_param_.max_iterations;
@@ -306,7 +306,7 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::save(const std::string& file) c
   ggnn_->set_stream(get_sync_stream());
 
   ggnn_host.downloadAsync(ggnn_device);
-  RAFT_CUDA_TRY(cudaStreamSynchronize(ggnn_device.stream));
+  cudaStreamSynchronize(ggnn_device.stream);
   ggnn_host.store(file);
 }
 

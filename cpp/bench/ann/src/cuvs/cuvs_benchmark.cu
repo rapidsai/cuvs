@@ -17,8 +17,6 @@
 #include "../common/ann_types.hpp"
 #include "raft_ann_bench_param_parser.h"
 
-#include <raft/core/logger.hpp>
-
 #include <rmm/mr/device/per_device_resource.hpp>
 
 #define JSON_DIAGNOSTICS 1
