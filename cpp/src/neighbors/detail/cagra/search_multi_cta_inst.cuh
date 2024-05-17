@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include "search_multi_cta_kernel-inl.cuh"
 #include <cuvs/neighbors/sample_filter.hpp>
 

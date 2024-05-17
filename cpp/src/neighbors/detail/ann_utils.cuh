@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <raft/core/logger.hpp>
-#include <raft/distance/distance_types.hpp>
+#include <cuvs/distance/distance_types.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>

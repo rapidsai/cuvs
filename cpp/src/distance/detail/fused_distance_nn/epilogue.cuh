@@ -74,9 +74,12 @@ operation.
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace epilogue {
 namespace threadblock {
+
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::epilogue::threadblock;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -99,20 +102,20 @@ struct FusedDistanceNNEpilogue {
   //
   // Stores the result z = (y = GEMM(A, B, C), broadcast)
   //
-  using RowNormTileIterator = cutlass::epilogue::threadblock::
+  using RowNormTileIterator = cuvs::epilogue::threadblock::
     PredicatedTileIteratorNormVecSmem<typename Base::OutputTileThreadMap, ElementOutput, LayoutT>;
 
   //
   // Additional tensor tile iterator - stores t = Elementwise(z)
   //
-  using OutputTileIterator = cutlass::epilogue::threadblock::PredicatedTileIteratorReducedVec<
+  using OutputTileIterator = cuvs::epilogue::threadblock::PredicatedTileIteratorReducedVec<
     typename Base::OutputTileThreadMap,
     ElementTensor,
     LayoutT,
     typename OutputOp::Params>;
 
   /// Define the epilogue
-  using Epilogue = cutlass::epilogue::threadblock::EpilogueWithBroadcastCustom<
+  using Epilogue = cuvs::epilogue::threadblock::EpilogueWithBroadcastCustom<
     Shape,
     WarpMmaTensorOp,
     PartitionsK,
@@ -129,6 +132,6 @@ struct FusedDistanceNNEpilogue {
 
 }  // namespace threadblock
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 ////////////////////////////////////////////////////////////////////////////////

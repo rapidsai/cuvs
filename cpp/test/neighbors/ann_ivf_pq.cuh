@@ -113,7 +113,7 @@ void compare_vectors_l2(
   auto dist =
     raft::make_device_mdarray<double>(res, &managed_memory, raft::make_extents<uint32_t>(n_rows));
   raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
-    raft::spatial::knn::detail::utils::mapping<float> f{};
+    cuvs::spatial::knn::detail::utils::mapping<float> f{};
     double d = 0.0f;
     for (uint32_t j = 0; j < dim; j++) {
       double t = f(a(i, j)) - f(b(i, j));
@@ -352,8 +352,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                   cuvs::Compare<uint8_t>{}));
 
     // Another test with the API that take list_data directly
-    auto list_data  = index->lists()[label]->data.view();
-    uint32_t n_take = 4;
+    [[maybe_unused]] auto list_data = index->lists()[label]->data.view();
+    uint32_t n_take                 = 4;
     ASSERT_TRUE(row_offset + n_take < n_rows);
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
     ivf_pq::helpers::codepacker::unpack(

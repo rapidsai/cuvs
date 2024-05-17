@@ -35,7 +35,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace epilogue {
 namespace thread {
 
@@ -65,11 +65,11 @@ class PairwiseDistanceEpilogueElementwise {
   using DistanceOp = DistanceOp_;
   using FinalOp    = FinalOp_;
 
-  using FragmentAccumulator = Array<ElementAccumulator, kElementsPerAccess>;
-  using FragmentCompute     = Array<ElementCompute, kElementsPerAccess>;
-  using FragmentC           = Array<ElementOutput, kElementsPerAccess>;
-  using FragmentZ           = Array<ElementZ, kElementsPerAccess>;
-  using FragmentT           = Array<ElementT, kElementsPerAccess>;
+  using FragmentAccumulator = cutlass::Array<ElementAccumulator, kElementsPerAccess>;
+  using FragmentCompute     = cutlass::Array<ElementCompute, kElementsPerAccess>;
+  using FragmentC           = cutlass::Array<ElementOutput, kElementsPerAccess>;
+  using FragmentZ           = cutlass::Array<ElementZ, kElementsPerAccess>;
+  using FragmentT           = cutlass::Array<ElementT, kElementsPerAccess>;
 
   using FragmentOutput = FragmentZ;
 
@@ -136,9 +136,9 @@ class PairwiseDistanceEpilogueElementwise {
                   FragmentCompute const& V) const
   {
     FragmentCompute tmp_Accum =
-      NumericArrayConverter<ElementCompute, ElementAccumulator, kElementsPerAccess>()(AB);
+      cutlass::NumericArrayConverter<ElementCompute, ElementAccumulator, kElementsPerAccess>()(AB);
     FragmentCompute tmp_C =
-      NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(frag_C);
+      cutlass::NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(frag_C);
     FragmentCompute result_Z;
     FragmentCompute result_T;
 
@@ -148,7 +148,7 @@ class PairwiseDistanceEpilogueElementwise {
       result_T[i] = final_op(result_Z[i], 0);
     }
 
-    NumericArrayConverter<ElementT, ElementCompute, kElementsPerAccess> convert_t;
+    cutlass::NumericArrayConverter<ElementT, ElementCompute, kElementsPerAccess> convert_t;
     frag_T = convert_t(result_T);
   }
 
@@ -166,6 +166,6 @@ class PairwiseDistanceEpilogueElementwise {
 
 }  // namespace thread
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

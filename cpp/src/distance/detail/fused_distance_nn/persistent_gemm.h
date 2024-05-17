@@ -69,10 +69,12 @@ Changes:
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace gemm {
 namespace kernel {
 
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::gemm::kernel;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename Mma_,                         ///! Threadblock-scoped matrix multiply-accumulate
@@ -90,16 +92,18 @@ struct FusedDistanceNNPersistent {
   static bool const kTransposed                     = Transposed;
 
   // Optional transpose
-  using MapArguments = kernel::detail::MapArguments<typename Mma::IteratorA::Element,
-                                                    typename Mma::IteratorA::Layout,
-                                                    Mma::kTransformA,
-                                                    Mma::IteratorA::AccessType::kElements,
-                                                    typename Mma::IteratorB::Element,
-                                                    typename Mma::IteratorB::Layout,
-                                                    Mma::kTransformB,
-                                                    Mma::IteratorB::AccessType::kElements,
-                                                    typename Mma::LayoutC,
-                                                    kTransposed>;
+  // TODO: This is dangerous- we shouldn't be using `detail` APIs from cutlass
+  using MapArguments =
+    cutlass::gemm::kernel::detail::MapArguments<typename Mma::IteratorA::Element,
+                                                typename Mma::IteratorA::Layout,
+                                                Mma::kTransformA,
+                                                Mma::IteratorA::AccessType::kElements,
+                                                typename Mma::IteratorB::Element,
+                                                typename Mma::IteratorB::Layout,
+                                                Mma::kTransformB,
+                                                Mma::IteratorB::AccessType::kElements,
+                                                typename Mma::LayoutC,
+                                                kTransposed>;
 
   // Public-facing type definitions related to operand element type, layout, and complex conjugate
   // operation. Must interact with the 'kTransposed' notion.
@@ -110,8 +114,8 @@ struct FusedDistanceNNPersistent {
   using ElementC = typename Epilogue::OutputTileIterator::Element;
   using LayoutC  = typename MapArguments::LayoutC;
 
-  static ComplexTransform const kTransformA = MapArguments::kTransformA;
-  static ComplexTransform const kTransformB = MapArguments::kTransformB;
+  static cutlass::ComplexTransform const kTransformA = MapArguments::kTransformA;
+  static cutlass::ComplexTransform const kTransformB = MapArguments::kTransformB;
 
   // Type definitions about the mainloop.
   using Operator         = typename Mma::Operator;
@@ -152,7 +156,7 @@ struct FusedDistanceNNPersistent {
     //
     // Data members
     //
-    GemmCoord problem_sizes;
+    cutlass::gemm::GemmCoord problem_sizes;
     temp_problem_visitor problem_visitor;
     int problem_count;
     int threadblock_count;
@@ -171,7 +175,7 @@ struct FusedDistanceNNPersistent {
     typename LayoutC::Stride::Index ldt;
 
     // Only used by device-level operator
-    GemmCoord* host_problem_sizes;
+    cutlass::gemm::GemmCoord* host_problem_sizes;
 
     //
     // Methods
@@ -196,7 +200,7 @@ struct FusedDistanceNNPersistent {
 
     /// Ctor
     CUTLASS_HOST_DEVICE
-    Arguments(GemmCoord problem_sizes,
+    Arguments(cutlass::gemm::GemmCoord problem_sizes,
               int problem_count,
               int threadblock_count,
               typename EpilogueOutputOp::Params output_op,
@@ -209,7 +213,7 @@ struct FusedDistanceNNPersistent {
               typename LayoutB::Stride::Index ldb,
               typename LayoutC::Stride::Index ldc,
               typename LayoutC::Stride::Index ldt,
-              GemmCoord* host_problem_sizes = nullptr)
+              cutlass::gemm::GemmCoord* host_problem_sizes = nullptr)
       : problem_sizes(problem_sizes),
         threadblock_count(threadblock_count),
         output_op(output_op),
@@ -250,7 +254,7 @@ struct FusedDistanceNNPersistent {
     void* ptr_Vector;
     void* ptr_Tensor;
 
-    GemmCoord problem_size;
+    cutlass::gemm::GemmCoord problem_size;
     typename LayoutA::Stride::Index lda;
     typename LayoutB::Stride::Index ldb;
     typename LayoutC::Stride::Index ldc;
@@ -340,12 +344,12 @@ struct FusedDistanceNNPersistent {
   FusedDistanceNNPersistent() {}
 
   /// Determines whether kernel satisfies alignment
-  static Status can_implement(cutlass::gemm::GemmCoord const& problem_size)
+  static cutlass::Status can_implement(cutlass::gemm::GemmCoord const& problem_size)
   {
-    return Status::kSuccess;
+    return cutlass::Status::kSuccess;
   }
 
-  static Status can_implement(Arguments const& args) { return Status::kSuccess; }
+  static cutlass::Status can_implement(Arguments const& args) { return cutlass::Status::kSuccess; }
 
   static size_t get_extra_workspace_size(Arguments const& args,
                                          cutlass::gemm::GemmCoord const& grid_tiled_shape)
@@ -383,8 +387,8 @@ struct FusedDistanceNNPersistent {
     using ElementC = typename Epilogue::OutputTileIterator::Element;
     using LayoutC  = typename Epilogue::OutputTileIterator::Layout;
 
-    const GemmCoord& problem_size    = params.problem_size;
-    const auto grid_shape_           = grid_shape(problem_size);
+    const cutlass::gemm::GemmCoord& problem_size = params.problem_size;
+    const auto grid_shape_                       = grid_shape(problem_size);
     const uint32_t problem_chunk     = (tile_count(grid_shape_) - 1 + gridDim.x) / gridDim.x;
     const uint32_t problem_chunk_end = blockIdx.x * problem_chunk + problem_chunk;
     typename LayoutB::Index column =
@@ -507,6 +511,6 @@ struct FusedDistanceNNPersistent {
 
 }  // namespace kernel
 }  // namespace gemm
-}  // namespace cutlass
+}  // namespace cuvs
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

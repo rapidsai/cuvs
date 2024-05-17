@@ -17,7 +17,7 @@
 #pragma once
 
 // Defines a named requirement "has_cutlass_op"
-#include "../distance_ops/cutlass.cuh"
+#include "cutlass.cuh"
 
 // The distance operations:
 #include "../distance_ops/canberra.cuh"

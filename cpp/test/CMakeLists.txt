@@ -91,6 +91,11 @@ if(BUILD_TESTS)
   ConfigureTest(NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu GPUS 1 PERCENT 100)
 
   ConfigureTest(
+    NAME CLUSTER_TEST PATH test/cluster/kmeans.cu test/cluster/kmeans_balanced.cu
+    test/cluster/kmeans_find_k.cu test/cluster/linkage.cu GPUS 1 PERCENT 100
+  )
+
+  ConfigureTest(
     NAME
     NEIGHBORS_ANN_IVF_FLAT_TEST
     PATH
