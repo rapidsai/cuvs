@@ -15,6 +15,11 @@
 cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
 include(../../rapids_config.cmake)
+include(rapids-cmake)
+include(rapids-cpm)
+include(rapids-export)
+include(rapids-find)
+rapids_cpm_init()
 
 # we want to use the already built libcuvs if its available, but the rust cmake-rs project doesn't
 # support anything like find_package https://github.com/rust-lang/cmake-rs/issues/111 instead we're
@@ -51,6 +56,8 @@ if(NOT cuvs_FOUND)
   set(BUILD_C_LIBRARY ON)
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 endif()
+
+include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
 
 # add a dummy target here,
 add_library(cuvs-rust INTERFACE)
