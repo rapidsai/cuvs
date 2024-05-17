@@ -278,10 +278,6 @@ auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t 
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
   return make_strided_dataset(res, src, required_stride);
 }
-
-/** Parameters for VPQ compression. */
-using vpq_params = cuvs::neighbors::vpq_params;
-
 /**
  * @brief VPQ compressed dataset.
  *
