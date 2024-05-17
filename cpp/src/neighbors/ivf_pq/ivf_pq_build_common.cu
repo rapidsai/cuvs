@@ -17,7 +17,7 @@
 #include "../../core/nvtx.hpp"
 #include "ivf_pq_build.cuh"
 #include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq::helpers {

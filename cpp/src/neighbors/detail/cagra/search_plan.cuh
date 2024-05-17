@@ -18,7 +18,7 @@
 
 #include "hashmap.hpp"
 
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 // #include "search_single_cta_inst.cuh"
 // #include "topk_for_cagra/topk_core.cuh"

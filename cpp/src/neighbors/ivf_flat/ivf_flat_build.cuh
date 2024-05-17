@@ -21,8 +21,8 @@
 #include "../ivf_list.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_list.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"

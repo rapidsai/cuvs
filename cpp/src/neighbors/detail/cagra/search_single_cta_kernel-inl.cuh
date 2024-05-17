@@ -31,7 +31,7 @@
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"

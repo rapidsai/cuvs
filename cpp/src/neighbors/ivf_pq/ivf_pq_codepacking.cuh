@@ -17,7 +17,7 @@
 #pragma once
 
 #include "ivf_pq_list.cuh"
-#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/util/cuda_utils.cuh>

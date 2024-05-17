@@ -18,8 +18,8 @@
 
 #include "../ivf_common.cuh"
 #include "../sample_filter.cuh"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/sample_filter.hpp>
 
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance_types.hpp>

@@ -40,7 +40,7 @@ index<IdxT>::index(raft::resources const& handle,
                    uint32_t pq_bits,
                    uint32_t pq_dim,
                    bool conservative_memory_allocation)
-  : ann::index(),
+  : cuvs::neighbors::index(),
     metric_(metric),
     codebook_kind_(codebook_kind),
     dim_(dim),

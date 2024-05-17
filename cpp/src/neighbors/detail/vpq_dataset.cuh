@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <cuvs/neighbors/dataset.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 #include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
 #include "ann_utils.cuh"               // utils::mapping etc
