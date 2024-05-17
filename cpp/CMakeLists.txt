@@ -232,7 +232,6 @@ add_library(
   src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
-  src/neighbors/brute_force_index.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cu
   src/neighbors/cagra_build_int8.cu
