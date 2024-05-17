@@ -67,9 +67,12 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace epilogue {
 namespace thread {
+
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::epilogue::thread;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,12 +102,12 @@ class FusedDistanceNNEpilogueElementwise {
   using DistanceOp = DistanceOp_;
   using CGReduceOp = CGReduceOp_;
 
-  using FragmentAccumulator = Array<ElementAccumulator, kElementsPerAccess>;
-  using FragmentCompute     = Array<ElementCompute, kElementsPerAccess>;
-  using FragmentC           = Array<ElementOutput, kElementsPerAccess>;
-  using FragmentZ           = Array<ElementZ, kElementsPerAccess>;
+  using FragmentAccumulator = cutlass::Array<ElementAccumulator, kElementsPerAccess>;
+  using FragmentCompute     = cutlass::Array<ElementCompute, kElementsPerAccess>;
+  using FragmentC           = cutlass::Array<ElementOutput, kElementsPerAccess>;
+  using FragmentZ           = cutlass::Array<ElementZ, kElementsPerAccess>;
   using OutValT             = typename CGReduceOp::AccTypeT;
-  using FragmentT           = Array<OutValT, kElementsPerAccess>;
+  using FragmentT           = cutlass::Array<OutValT, kElementsPerAccess>;
 
   using FragmentOutput = FragmentZ;
 
@@ -189,9 +192,9 @@ class FusedDistanceNNEpilogueElementwise {
                   FragmentCompute const& V) const
   {
     FragmentCompute tmp_Accum =
-      NumericArrayConverter<ElementCompute, ElementAccumulator, kElementsPerAccess>()(AB);
+      cutlass::NumericArrayConverter<ElementCompute, ElementAccumulator, kElementsPerAccess>()(AB);
     FragmentCompute tmp_C =
-      NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(frag_C);
+      cutlass::NumericArrayConverter<ElementCompute, ElementC, kElementsPerAccess>()(frag_C);
     FragmentCompute result_Z;
 
     CUTLASS_PRAGMA_UNROLL
@@ -215,6 +218,6 @@ class FusedDistanceNNEpilogueElementwise {
 
 }  // namespace thread
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

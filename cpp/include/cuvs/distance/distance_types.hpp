@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-#include "distance_types.h"
 #pragma once
+
+#include "distance_types.h"
 
 namespace cuvs::distance {
 

@@ -43,7 +43,7 @@ operation.
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace epilogue {
 namespace threadblock {
 
@@ -62,13 +62,13 @@ template <typename Shape,
           bool ScatterD = false>
 struct PairwiseDistanceEpilogue {
   /// Use defaults related to the existing epilogue
-  using Base =
+  using Base = cutlass::epilogue::threadblock::
     DefaultEpilogueTensorOp<Shape, WarpMmaTensorOp, PartitionsK, OutputOp, ElementsPerAccess>;
 
   //
   // Stores the result z = (y = GEMM(A, B, C), broadcast)
   //
-  using OutputTileIterator = cutlass::epilogue::threadblock::
+  using OutputTileIterator = cuvs::epilogue::threadblock::
     PredicatedTileIteratorNormVec<typename Base::OutputTileThreadMap, ElementOutput, LayoutT>;
 
   //
@@ -79,22 +79,23 @@ struct PairwiseDistanceEpilogue {
                                                            ElementTensor>;
 
   /// Define the epilogue
-  using Epilogue = EpilogueWithBroadcast<Shape,
-                                         WarpMmaTensorOp,
-                                         PartitionsK,
-                                         OutputTileIterator,
-                                         TensorTileIterator,
-                                         ElementVector,
-                                         typename Base::AccumulatorFragmentIterator,
-                                         typename Base::WarpTileIterator,
-                                         typename Base::SharedLoadIterator,
-                                         OutputOp,
-                                         typename Base::Padding,
-                                         Base::kFragmentsPerIteration>;
+  using Epilogue = cutlass::epilogue::threadblock::EpilogueWithBroadcast<
+    Shape,
+    WarpMmaTensorOp,
+    PartitionsK,
+    OutputTileIterator,
+    TensorTileIterator,
+    ElementVector,
+    typename Base::AccumulatorFragmentIterator,
+    typename Base::WarpTileIterator,
+    typename Base::SharedLoadIterator,
+    OutputOp,
+    typename Base::Padding,
+    Base::kFragmentsPerIteration>;
 };
 
 }  // namespace threadblock
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 ////////////////////////////////////////////////////////////////////////////////

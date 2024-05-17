@@ -84,12 +84,15 @@ namespace cg = cooperative_groups;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace epilogue {
 namespace threadblock {
+
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::epilogue::threadblock;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -111,12 +114,12 @@ class PredicatedTileIteratorReducedVec {
   using Element = Element_;
 
   using Layout         = Layout_;
-  using TensorRef      = TensorRef<Element, Layout>;
+  using TensorRef      = cutlass::TensorRef<Element, Layout>;
   using ConstTensorRef = typename TensorRef::ConstTensorRef;
 
   using Index            = typename Layout::Index;
   using LongIndex        = typename Layout::LongIndex;
-  using TensorCoord      = MatrixCoord;
+  using TensorCoord      = cutlass::MatrixCoord;
   using EpilogueOpParams = EpilogueOpParams_;
   using OutIdxT          = typename EpilogueOpParams::CGReduceT::IndexT;
   using OutValT          = typename EpilogueOpParams::CGReduceT::AccTypeT;
@@ -135,14 +138,14 @@ class PredicatedTileIteratorReducedVec {
                                 ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster *
                                 ThreadMap::Count::kTile * ThreadMap::Delta::kRow;
   /// Fragment object
-  using Fragment =
-    Array<OutValT,
-          ThreadMap::Iterations::kColumn * ThreadMap::Iterations::kRow *
-            ThreadMap::Iterations::kGroup * ThreadMap::Iterations::kCluster * kElementsPerAccess>;
+  using Fragment = cutlass::Array<OutValT,
+                                  ThreadMap::Iterations::kColumn * ThreadMap::Iterations::kRow *
+                                    ThreadMap::Iterations::kGroup *
+                                    ThreadMap::Iterations::kCluster * kElementsPerAccess>;
 
   // Memory access size
-  using AccessType     = AlignedArray<Element, kElementsPerAccess>;
-  using AccessTypeValT = AlignedArray<OutValT, kElementsPerAccess>;
+  using AccessType     = cutlass::AlignedArray<Element, kElementsPerAccess>;
+  using AccessTypeValT = cutlass::AlignedArray<OutValT, kElementsPerAccess>;
 
   //
   // Parameters struct
@@ -215,10 +218,10 @@ class PredicatedTileIteratorReducedVec {
     //
     // Type definitions
     //
-    using Shape = MatrixShape<total_rows, 1>;
+    using Shape = cutlass::MatrixShape<total_rows, 1>;
 
     /// Shape of the shared memory allocation for the reduced values store
-    using StorageShape = MatrixShape<Shape::kRow, Shape::kColumn>;
+    using StorageShape = cutlass::MatrixShape<Shape::kRow, Shape::kColumn>;
 
     //
     // Data members
@@ -226,7 +229,7 @@ class PredicatedTileIteratorReducedVec {
     //
     // Methods
     //
-    AlignedBuffer<Element, StorageShape::kCount> storage;
+    cutlass::AlignedBuffer<Element, StorageShape::kCount> storage;
 
     CUTLASS_DEVICE
     Element* data() { return storage.data(); }
@@ -327,7 +330,7 @@ class PredicatedTileIteratorReducedVec {
   /// Byte-level pointer first tile offset of this threadblock.
   volatile uint8_t* first_tile_byte_pointer_;
 
-  /// Array of boolean values to contain steady-state predicates
+  /// cutlass::Array of boolean values to contain steady-state predicates
   Mask mask_;
 
   /// Extent of the matrix tile in rows
@@ -542,7 +545,10 @@ class PredicatedTileIteratorReducedVec {
   void store(Fragment& frag) const { store_with_byte_offset(frag, 0); }
 
   CUTLASS_DEVICE
-  MatrixCoord thread_start() const { return MatrixCoord(thread_start_row_, thread_start_column_); }
+  cutlass::MatrixCoord thread_start() const
+  {
+    return cutlass::MatrixCoord(thread_start_row_, thread_start_column_);
+  }
 
   /// Need to get the thread start row from the tile iterator
   CUTLASS_DEVICE
@@ -605,6 +611,6 @@ class PredicatedTileIteratorReducedVec {
 
 }  // namespace threadblock
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 ////////////////////////////////////////////////////////////////////////////////
