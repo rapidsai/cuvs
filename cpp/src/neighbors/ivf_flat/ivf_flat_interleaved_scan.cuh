@@ -21,11 +21,11 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/sample_filter.hpp>
 
-#include <raft/core/logger.hpp>  // RAFT_LOG_TRACE
+#include "../detail/ann_utils.cuh"
+#include <cuvs/distance/distance_types.hpp>
+#include <raft/core/logger-ext.hpp>  // RAFT_LOG_TRACE
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/matrix/detail/select_warpsort.cuh>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/integer_utils.hpp>
@@ -36,7 +36,7 @@
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-using namespace raft::spatial::knn::detail;  // NOLINT
+using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 constexpr int kThreadsPerBlock = 128;
 

@@ -23,15 +23,15 @@
 #include <cuvs/neighbors/ivf_flat.hpp>       // raft::neighbors::ivf_flat::index
 #include <cuvs/neighbors/sample_filter.hpp>  // none_ivf_sample_filter
 
+#include "../detail/ann_utils.cuh"           // utils::mapping
 #include <cuvs/distance/distance_types.hpp>  // is_min_close, DistanceType
-#include <raft/core/logger.hpp>              // RAFT_LOG_TRACE
+#include <raft/core/logger-ext.hpp>          // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>                // raft::resources
-#include <raft/linalg/gemm.cuh>                   // raft::linalg::gemm
-#include <raft/linalg/norm.cuh>                   // raft::linalg::norm
-#include <raft/linalg/unary_op.cuh>               // raft::linalg::unary_op
-#include <raft/matrix/detail/select_k.cuh>        // matrix::detail::select_k
-#include <raft/spatial/knn/detail/ann_utils.cuh>  // utils::mapping
+#include <raft/core/resources.hpp>          // raft::resources
+#include <raft/linalg/gemm.cuh>             // raft::linalg::gemm
+#include <raft/linalg/norm.cuh>             // raft::linalg::norm
+#include <raft/linalg/unary_op.cuh>         // raft::linalg::unary_op
+#include <raft/matrix/detail/select_k.cuh>  // matrix::detail::select_k
 
 #include <rmm/resource_ref.hpp>
 

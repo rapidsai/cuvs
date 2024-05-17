@@ -40,8 +40,8 @@ header = """/*
  */
 
 #include <raft/core/operators.hpp> // raft::identity_op
-#include <raft/distance/detail/distance_ops/all_ops.cuh>  // ops::*
-#include <raft/distance/detail/pairwise_matrix/dispatch-inl.cuh> // dispatch
+#include "../distance_ops/all_ops.cuh"  // ops::*
+#include "dispatch-inl.cuh" // dispatch
 """
 
 
@@ -150,7 +150,7 @@ op_instances = [
 
 def arch_headers(archs):
     include_headers ="\n".join([
-        f"#include <raft/distance/detail/pairwise_matrix/dispatch_sm{arch}.cuh>"
+        f"#include \"dispatch_sm{arch}.cuh\""
         for arch in archs
     ])
     return include_headers
@@ -178,7 +178,7 @@ with open("dispatch_rbf.cu", "w") as f:
         archs = [60]
 
         f.write(header)
-        f.write("#include <raft/distance/detail/kernels/rbf_fin_op.cuh> // rbf_fin_op\n")
+        f.write("#include \"../kernels/rbf_fin_op.cuh\" // rbf_fin_op\n")
         f.write(arch_headers(archs))
         f.write(macro)
 

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include "../test_utils.cuh"
 
 #include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType

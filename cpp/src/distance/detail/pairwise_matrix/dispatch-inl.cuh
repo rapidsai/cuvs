@@ -39,7 +39,7 @@
 // NOTE: to minimize compile times, we do not include dispatch_sm80.cuh.
 // Including dispatch_sm80.cuh can slow down compile times (due to CUTLASS).
 // Therefore, it is the including file's responsibility to include the correct
-// dispatch_smXX.cuh headers, as is done in raft/distance/detail/distance.cuh
+// dispatch_smXX.cuh headers, as is done in cuvs/distance/detail/distance.cuh
 // and src/distance/detail/pairwise_matrix/dispatch_*.cu.
 
 namespace cuvs::distance::detail {

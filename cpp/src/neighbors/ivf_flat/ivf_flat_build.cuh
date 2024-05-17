@@ -20,17 +20,18 @@
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 
+#include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
-#include <raft/cluster/kmeans_balanced.cuh>
-#include <raft/core/logger.hpp>
+#include <cuvs/distance/distance_types.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
@@ -184,8 +185,8 @@ void extend(raft::resources const& handle,
                "You must pass data indices when the index is non-empty.");
 
   auto new_labels = raft::make_device_vector<LabelT, IdxT>(handle, n_rows);
-  raft::cluster::kmeans_balanced_params kmeans_params;
-  kmeans_params.metric = static_cast<raft::distance::DistanceType>(index->metric());
+  cuvs::cluster::kmeans::balanced_params kmeans_params;
+  kmeans_params.metric = index->metric();
   auto orig_centroids_view =
     raft::make_device_matrix_view<const float, IdxT>(index->centers().data_handle(), n_lists, dim);
   // Calculate the batch size for the input data if it's not accessible directly from the device
@@ -205,7 +206,7 @@ void extend(raft::resources const& handle,
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
     auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
-    raft::cluster::kmeans_balanced::predict(handle,
+    cuvs::cluster::kmeans_balanced::predict(handle,
                                             kmeans_params,
                                             batch_data_view,
                                             orig_centroids_view,
@@ -229,7 +230,7 @@ void extend(raft::resources const& handle,
         raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
         new_labels.data_handle() + batch.offset(), batch.size());
-      raft::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
+      cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
                                                                       batch_data_view,
                                                                       batch_labels_view,
                                                                       centroids_view,
@@ -384,10 +385,10 @@ inline auto build(raft::resources const& handle,
       raft::make_device_matrix_view<const T, IdxT>(trainset.data(), n_rows_train, index.dim());
     auto centers_view = raft::make_device_matrix_view<float, IdxT>(
       index.centers().data_handle(), index.n_lists(), index.dim());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<raft::distance::DistanceType>(index.metric());
-    raft::cluster::kmeans_balanced::fit(
+    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(index.metric());
+    cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
 

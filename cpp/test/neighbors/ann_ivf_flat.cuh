@@ -216,7 +216,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           for (uint32_t l = 0; l < index_2.n_lists(); l++) {
             if (list_sizes[l] == 0) continue;
             rmm::device_uvector<float> cluster_data(list_sizes[l] * ps.dim, stream_);
-            raft::spatial::knn::detail::utils::copy_selected<float>((IdxT)list_sizes[l],
+            cuvs::spatial::knn::detail::utils::copy_selected<float>((IdxT)list_sizes[l],
                                                                     (IdxT)ps.dim,
                                                                     database.data(),
                                                                     list_indices[l],
