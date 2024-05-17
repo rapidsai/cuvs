@@ -72,7 +72,7 @@ endfunction()
 find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         FORK                     ${RAFT_FORK}
         PINNED_TAG               ${RAFT_PINNED_TAG}
-        COMPILE_LIBRARY          ON
+        COMPILE_LIBRARY          OFF
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}

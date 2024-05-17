@@ -447,14 +447,20 @@ target_include_directories(
               "$<INSTALL_INTERFACE:include>"
 )
 
+rapids_find_package(
+  OpenMP REQUIRED
+  BUILD_EXPORT_SET cuvs-exports
+  INSTALL_EXPORT_SET cuvs-exports
+)
+
 if(NOT BUILD_CPU_ONLY)
+
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
     PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
-           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
+    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft> nvidia::cutlass::cutlass
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
