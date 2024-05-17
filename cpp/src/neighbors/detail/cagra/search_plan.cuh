@@ -26,7 +26,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/util/pow2_utils.cuh>

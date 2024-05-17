@@ -26,7 +26,7 @@
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>

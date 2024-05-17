@@ -29,7 +29,7 @@
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 #include <cuvs/neighbors/common.hpp>
 

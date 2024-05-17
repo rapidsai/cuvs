@@ -17,7 +17,7 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance_types.h>
+#include <cuvs/distance/distance.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 

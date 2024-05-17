@@ -25,7 +25,7 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
 #include <cuvs/neighbors/common.hpp>

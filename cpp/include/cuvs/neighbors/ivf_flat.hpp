@@ -19,6 +19,8 @@
 #include "common.hpp"
 #include <cstdint>
 #include <cuvs/neighbors/common.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 /**
