@@ -175,13 +175,7 @@ struct index : ann::index {
     return graph_view_.extent(1);
   }
 
-  /**
-   * DEPRECATED: please use data() instead.
-   *   If you need to query dataset dimensions, use the dim() and size() of the cagra index.
-   *   The data_handle() is not always available: you need to do a dynamic_cast to the expected
-   *   dataset type at runtime.
-   */
-  [[nodiscard]] [[deprecated("Use data()")]] inline auto dataset() const noexcept
+  [[nodiscard]] inline auto dataset() const noexcept
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
   {
     auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());

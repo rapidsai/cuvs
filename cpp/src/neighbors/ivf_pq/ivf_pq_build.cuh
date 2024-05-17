@@ -27,14 +27,16 @@
 #include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"  // utils::mapping
-#include <raft/cluster/kmeans_balanced.cuh>
+
+// TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
+#include "../../cluster/kmeans_balanced.cuh"
+
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/detail/qr.cuh>
 #include <raft/linalg/gemm.cuh>
@@ -414,10 +416,10 @@ void train_per_subset(raft::resources const& handle,
       raft::make_device_vector_view<uint32_t, internal_extents_t>(sub_labels.data(), n_rows);
     auto cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
       pq_cluster_sizes.data(), index.pq_book_size());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
-    raft::cluster::kmeans_balanced::helpers::build_clusters(handle,
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
                                                             kmeans_params,
                                                             sub_trainset_view,
                                                             centers_tmp_view,
@@ -499,10 +501,10 @@ void train_per_cluster(raft::resources const& handle,
       raft::make_device_vector_view<uint32_t, internal_extents_t>(pq_labels.data(), pq_n_rows);
     auto pq_cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
       pq_cluster_sizes.data(), index.pq_book_size());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
-    raft::cluster::kmeans_balanced::helpers::build_clusters(handle,
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
                                                             kmeans_params,
                                                             rot_vectors_view,
                                                             centers_tmp_view,
@@ -1579,9 +1581,9 @@ void extend(raft::resources const& handle,
         new_data_labels.data() + batch.offset(), batch.size());
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
-      raft::cluster::kmeans_balanced_params kmeans_params;
-      kmeans_params.metric = static_cast<raft::distance::DistanceType>((int)index->metric());
-      raft::cluster::kmeans_balanced::predict(handle,
+      cuvs::cluster::kmeans::balanced_params kmeans_params;
+      kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
+      cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
                                               batch_data_view,
                                               centers_view,
@@ -1758,10 +1760,10 @@ auto build(raft::resources const& handle,
       trainset.data(), n_rows_train, index.dim());
     auto centers_view = raft::make_device_matrix_view<float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<raft::distance::DistanceType>((int)index.metric());
-    raft::cluster::kmeans_balanced::fit(
+    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
 
     // Trainset labels are needed for training PQ codebooks
@@ -1770,7 +1772,7 @@ auto build(raft::resources const& handle,
       cluster_centers, index.n_lists(), index.dim());
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
-    raft::cluster::kmeans_balanced::predict(handle,
+    cuvs::cluster::kmeans_balanced::predict(handle,
                                             kmeans_params,
                                             trainset_const_view,
                                             centers_const_view,

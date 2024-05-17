@@ -19,10 +19,13 @@
 
 #include "../ivf_pq/ivf_pq_build.cuh"  // pq_bits-bitfield
 #include "ann_utils.cuh"               // utils::mapping etc
-#include <raft/cluster/kmeans_balanced.cuh>
+
+// TODO(cjnolet): This should be using exposed APIs.
+#include "../../cluster/kmeans_balanced.cuh"
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/core/logger.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
@@ -135,14 +138,14 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
     raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, vq_n_centers, dim);
 
   using kmeans_in_type = typename DatasetT::value_type;
-  raft::cluster::kmeans_balanced_params kmeans_params;
+  cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.n_iters = params.kmeans_n_iters;
-  kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
+  kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
   auto vq_centers_view =
     raft::make_device_matrix_view<MathT, ix_t>(vq_centers.data_handle(), vq_n_centers, dim);
   auto vq_trainset_view = raft::make_device_matrix_view<const kmeans_in_type, ix_t>(
     vq_trainset.data_handle(), n_rows_train, dim);
-  raft::cluster::kmeans_balanced::fit<kmeans_in_type, MathT, ix_t>(
+  cuvs::cluster::kmeans_balanced::fit<kmeans_in_type, MathT, ix_t>(
     res,
     kmeans_params,
     vq_trainset_view,
@@ -163,8 +166,8 @@ auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCen
 
   auto vq_labels = raft::make_device_vector<label_type, index_type>(res, dataset.extent(0));
 
-  raft::cluster::kmeans_balanced_params kmeans_params;
-  kmeans_params.metric = raft::distance::DistanceType::L2Expanded;
+  cuvs::cluster::kmeans::balanced_params kmeans_params;
+  kmeans_params.metric = cuvs::distance::DistanceType::L2Expanded;
 
   auto vq_centers_view = raft::make_device_matrix_view<const kmeans_math_type, index_type>(
     vq_centers.data_handle(), vq_centers.extent(0), vq_centers.extent(1));
@@ -172,7 +175,7 @@ auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCen
   auto vq_dataset_view = raft::make_device_matrix_view<const kmeans_data_type, index_type>(
     dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  raft::cluster::kmeans_balanced::
+  cuvs::cluster::kmeans_balanced::
     predict<kmeans_data_type, kmeans_math_type, index_type, label_type>(
       res,
       kmeans_params,
@@ -222,9 +225,9 @@ auto train_pq(const raft::resources& res,
 
   // Train PQ centers
   {
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
 
     auto pq_centers_view =
       raft::make_device_matrix_view<MathT, ix_t>(pq_centers.data_handle(), pq_n_centers, pq_len);
@@ -232,7 +235,7 @@ auto train_pq(const raft::resources& res,
     auto pq_trainset_view = raft::make_device_matrix_view<const MathT, ix_t>(
       pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
 
-    raft::cluster::kmeans_balanced::fit<MathT, MathT, ix_t>(
+    cuvs::cluster::kmeans_balanced::fit<MathT, MathT, ix_t>(
       res, kmeans_params, pq_trainset_view, pq_centers_view);
   }
 

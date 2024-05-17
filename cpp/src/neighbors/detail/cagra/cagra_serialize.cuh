@@ -27,8 +27,6 @@
 
 #include "../dataset_serialize.hpp"
 
-#include <raft/neighbors/detail/dataset_serialize.hpp>
-
 #include <cstddef>
 #include <cstdint>
 #include <fstream>

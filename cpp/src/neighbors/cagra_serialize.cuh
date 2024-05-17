@@ -32,7 +32,7 @@ namespace cuvs::neighbors::cagra {
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/cagra_serialize.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
  *
  * raft::resources handle;
  *
@@ -67,7 +67,7 @@ void serialize(raft::resources const& handle,
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/cagra_serialize.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
  *
  * raft::resources handle;
  *
@@ -102,7 +102,7 @@ void serialize(raft::resources const& handle,
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/cagra_serialize.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
  *
  * raft::resources handle;
  *
@@ -135,7 +135,7 @@ void serialize_to_hnswlib(raft::resources const& handle,
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/cagra_serialize.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
  *
  * raft::resources handle;
  *
@@ -168,7 +168,7 @@ void serialize_to_hnswlib(raft::resources const& handle,
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/cagra_serialize.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
  *
  * raft::resources handle;
  *
@@ -200,7 +200,7 @@ index<T, IdxT> deserialize(raft::resources const& handle, std::istream& is)
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/cagra_serialize.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
  *
  * raft::resources handle;
  *

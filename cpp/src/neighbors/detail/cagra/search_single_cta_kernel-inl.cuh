@@ -26,7 +26,7 @@
 
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/core/logger.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>

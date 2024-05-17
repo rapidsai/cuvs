@@ -27,7 +27,6 @@
 #include "dispatch-inl.cuh"             // dispatch
 #include "dispatch_sm60.cuh"
 #include <raft/core/operators.hpp>  // raft::identity_op
-
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
   template void cuvs::distance::detail::                                               \

@@ -21,7 +21,6 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>

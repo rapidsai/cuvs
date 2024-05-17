@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <cstdint>
 #include <cuvs/distance/distance_types.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -37,7 +39,7 @@ namespace cuvs::distance {
  * #include <raft/core/device_mdarray.hpp>
  * #include <cuvs/distance/pairwise_distance.hpp>
  *
- * raft::raft::resources handle;
+ * raft::resources handle;
  * int n_samples = 5000;
  * int n_features = 50;
  *
@@ -81,7 +83,7 @@ void pairwise_distance(
  * #include <raft/core/device_mdarray.hpp>
  * #include <cuvs/distance/pairwise_distance.hpp>
  *
- * raft::raft::resources handle;
+ * raft::resources handle;
  * int n_samples = 5000;
  * int n_features = 50;
  *
@@ -125,7 +127,7 @@ void pairwise_distance(
  * #include <raft/core/device_mdarray.hpp>
  * #include <cuvs/distance/pairwise_distance.hpp>
  *
- * raft::raft::resources handle;
+ * raft::resources handle;
  * int n_samples = 5000;
  * int n_features = 50;
  *
@@ -168,7 +170,7 @@ void pairwise_distance(
  * #include <raft/core/device_mdarray.hpp>
  * #include <cuvs/distance/pairwise_distance.hpp>
  *
- * raft::raft::resources handle;
+ * raft::resources handle;
  * int n_samples = 5000;
  * int n_features = 50;
  *
