@@ -141,8 +141,8 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - &rmm_conda rmm==24.6.*
-          - &pylibraft_conda pylibraft==24.6.*
+          - &rmm_conda rmm==24.8.*
+          - &pylibraft_conda pylibraft==24.8.*
           - dlpack>=0.8,<1.0
       - output_types: requirements
         packages:
@@ -164,12 +164,12 @@ dependencies:
         matrices:
           - matrix: {cuda: "12.*"}
             packages:
-              - &rmm_cu12 rmm-cu12==24.6.*
-              - &pylibraft_cu12 pylibraft-cu12==24.6.*
+              - &rmm_cu12 rmm-cu12==24.8.*
+              - &pylibraft_cu12 pylibraft-cu12==24.8.*
           - matrix: {cuda: "11.*"}
             packages:
-              - &rmm_cu11 rmm-cu11==24.6.*
-              - &pylibraft_cu11 pylibraft-cu11==24.6.*
+              - &rmm_cu11 rmm-cu11==24.8.*
+              - &pylibraft_cu11 pylibraft-cu11==24.8.*
           - {matrix: null, packages: [*rmm_conda, *pylibraft_conda] }
   checks:
     common:
