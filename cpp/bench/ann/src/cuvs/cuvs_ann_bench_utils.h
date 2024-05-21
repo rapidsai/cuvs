@@ -36,13 +36,13 @@
 #include <memory>
 #include <type_traits>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
-inline raft::distance::DistanceType parse_metric_type(raft::bench::ann::Metric metric)
+inline raft::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
 {
-  if (metric == raft::bench::ann::Metric::kInnerProduct) {
+  if (metric == cuvs::bench::ann::Metric::kInnerProduct) {
     return raft::distance::DistanceType::InnerProduct;
-  } else if (metric == raft::bench::ann::Metric::kEuclidean) {
+  } else if (metric == cuvs::bench::ann::Metric::kEuclidean) {
     // Even for L2 expanded RAFT IVF Flat uses unexpanded formula
     return raft::distance::DistanceType::L2Expanded;
   } else {
@@ -153,7 +153,10 @@ class configured_raft_resources {
   operator const raft::resources&() const noexcept { return *res_; }
 
   /** Get the main stream */
-  [[nodiscard]] auto get_sync_stream() const noexcept { return resource::get_cuda_stream(*res_); }
+  [[nodiscard]] auto get_sync_stream() const noexcept
+  {
+    return raft::resource::get_cuda_stream(*res_);
+  }
 
  private:
   /** The resources shared among multiple raft handles / threads. */
@@ -219,7 +222,7 @@ void refine_helper(const raft::resources& res,
     auto neighbors_host  = raft::make_host_matrix<index_type, extents_type>(batch_size, k);
     auto distances_host  = raft::make_host_matrix<float, extents_type>(batch_size, k);
 
-    auto stream = resource::get_cuda_stream(res);
+    auto stream = raft::resource::get_cuda_stream(res);
     raft::copy(queries_host.data_handle(), queries.data_handle(), queries_host.size(), stream);
     raft::copy(
       candidates_host.data_handle(), candidates.data_handle(), candidates_host.size(), stream);
@@ -238,4 +241,4 @@ void refine_helper(const raft::resources& res,
   }
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

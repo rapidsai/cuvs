@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 enum Objective {
   THROUGHPUT,  // See how many vectors we can push through
@@ -44,9 +44,9 @@ enum class Metric {
 inline auto parse_metric(const std::string& metric_str) -> Metric
 {
   if (metric_str == "inner_product") {
-    return raft::bench::ann::Metric::kInnerProduct;
+    return cuvs::bench::ann::Metric::kInnerProduct;
   } else if (metric_str == "euclidean") {
-    return raft::bench::ann::Metric::kEuclidean;
+    return cuvs::bench::ann::Metric::kEuclidean;
   } else {
     throw std::runtime_error("invalid metric: '" + metric_str + "'");
   }
@@ -157,12 +157,12 @@ class ANN : public AnnBase {
   virtual auto copy() -> std::unique_ptr<ANN<T>> = 0;
 };
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann
 
 #define REGISTER_ALGO_INSTANCE(DataT)                                                            \
-  template auto raft::bench::ann::create_algo<DataT>(                                            \
+  template auto cuvs::bench::ann::create_algo<DataT>(                                            \
     const std::string&, const std::string&, int, const nlohmann::json&, const std::vector<int>&) \
-    ->std::unique_ptr<raft::bench::ann::ANN<DataT>>;                                             \
-  template auto raft::bench::ann::create_search_param<DataT>(const std::string&,                 \
+    ->std::unique_ptr<cuvs::bench::ann::ANN<DataT>>;                                             \
+  template auto cuvs::bench::ann::create_search_param<DataT>(const std::string&,                 \
                                                              const nlohmann::json&)              \
-    ->std::unique_ptr<typename raft::bench::ann::ANN<DataT>::AnnSearchParam>;
+    ->std::unique_ptr<typename cuvs::bench::ann::ANN<DataT>::AnnSearchParam>;

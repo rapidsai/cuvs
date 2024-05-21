@@ -15,7 +15,7 @@
  */
 
 #include "../common/ann_types.hpp"
-#include "raft_ann_bench_param_parser.h"
+#include "cuvs_ann_bench_param_parser.h"
 #include "raft_cagra_hnswlib_wrapper.h"
 
 #include <rmm/cuda_device.hpp>
@@ -25,18 +25,18 @@
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::RaftCagraHnswlib<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::ann::RaftCagraHnswlib<T, IdxT>::SearchParam& param)
 {
   param.ef = conf.at("ef");
   if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
 }
 
 template <typename T>
-std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
                                                       const std::string& distance,
                                                       int dim,
                                                       const nlohmann::json& conf,
@@ -45,14 +45,14 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  [[maybe_unused]] raft::bench::ann::Metric metric = parse_metric(distance);
-  std::unique_ptr<raft::bench::ann::ANN<T>> ann;
+  [[maybe_unused]] cuvs::bench::ann::Metric metric = parse_metric(distance);
+  std::unique_ptr<cuvs::bench::ann::ANN<T>> ann;
 
   if constexpr (std::is_same_v<T, float> or std::is_same_v<T, std::uint8_t>) {
     if (algo == "raft_cagra_hnswlib") {
-      typename raft::bench::ann::RaftCagraHnswlib<T, uint32_t>::BuildParam param;
+      typename cuvs::bench::ann::RaftCagraHnswlib<T, uint32_t>::BuildParam param;
       parse_build_param<T, uint32_t>(conf, param);
-      ann = std::make_unique<raft::bench::ann::RaftCagraHnswlib<T, uint32_t>>(metric, dim, param);
+      ann = std::make_unique<cuvs::bench::ann::RaftCagraHnswlib<T, uint32_t>>(metric, dim, param);
     }
   }
 
@@ -62,12 +62,12 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   if (algo == "raft_cagra_hnswlib") {
     auto param =
-      std::make_unique<typename raft::bench::ann::RaftCagraHnswlib<T, uint32_t>::SearchParam>();
+      std::make_unique<typename cuvs::bench::ann::RaftCagraHnswlib<T, uint32_t>::SearchParam>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }
@@ -75,7 +75,7 @@ std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -92,7 +92,7 @@ int main(int argc, char** argv)
     &cuda_mr, rmm::percent_of_free_device_memory(50)};
   // Updates the current device resource pointer to `pool_mr`
   auto old_mr = rmm::mr::set_current_device_resource(&pool_mr);
-  auto ret    = raft::bench::ann::run_main(argc, argv);
+  auto ret    = cuvs::bench::ann::run_main(argc, argv);
   // Restores the current device resource pointer to its previous value
   rmm::mr::set_current_device_resource(old_mr);
   return ret;

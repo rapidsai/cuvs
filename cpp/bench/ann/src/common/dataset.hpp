@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include "ann_types.hpp"
 #include "util.hpp"
 
 #include <errno.h>
@@ -30,7 +31,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 // http://big-ann-benchmarks.com/index.html:
 // binary format that starts with 8 bytes of data consisting of num_points(uint32_t)
@@ -492,4 +493,4 @@ void BinDataset<T>::map_base_set_() const
   this->mapped_base_set_ = base_file_.map();
 }
 
-}  // namespace  raft::bench::ann
+}  // namespace  cuvs::bench::ann

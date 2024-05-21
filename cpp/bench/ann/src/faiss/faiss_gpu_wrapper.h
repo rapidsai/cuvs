@@ -41,11 +41,11 @@
 
 namespace {
 
-faiss::MetricType parse_metric_type(raft::bench::ann::Metric metric)
+faiss::MetricType parse_metric_type(cuvs::bench::ann::Metric metric)
 {
-  if (metric == raft::bench::ann::Metric::kInnerProduct) {
+  if (metric == cuvs::bench::ann::Metric::kInnerProduct) {
     return faiss::METRIC_INNER_PRODUCT;
-  } else if (metric == raft::bench::ann::Metric::kEuclidean) {
+  } else if (metric == cuvs::bench::ann::Metric::kEuclidean) {
     return faiss::METRIC_L2;
   } else {
     throw std::runtime_error("faiss supports only metric type of inner product and L2");
@@ -73,7 +73,7 @@ class OmpSingleThreadScope {
 
 }  // namespace
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T>
 class FaissGpu : public ANN<T>, public AnnGPU {
@@ -430,4 +430,4 @@ class FaissGpuFlat : public FaissGpu<T> {
   std::unique_ptr<ANN<T>> copy() override { return std::make_unique<FaissGpuFlat<T>>(*this); };
 };
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

@@ -25,33 +25,33 @@
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
 #include "cuvs_ivf_flat_wrapper.h"
-extern template class raft::bench::ann::RaftIvfFlatGpu<float, int64_t>;
-extern template class raft::bench::ann::RaftIvfFlatGpu<uint8_t, int64_t>;
-extern template class raft::bench::ann::RaftIvfFlatGpu<int8_t, int64_t>;
+extern template class cuvs::bench::ann::RaftIvfFlatGpu<float, int64_t>;
+extern template class cuvs::bench::ann::RaftIvfFlatGpu<uint8_t, int64_t>;
+extern template class cuvs::bench::ann::RaftIvfFlatGpu<int8_t, int64_t>;
 #endif
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
   defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 #include "cuvs_ivf_pq_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
-extern template class raft::bench::ann::RaftIvfPQ<float, int64_t>;
-extern template class raft::bench::ann::RaftIvfPQ<uint8_t, int64_t>;
-extern template class raft::bench::ann::RaftIvfPQ<int8_t, int64_t>;
+extern template class cuvs::bench::ann::RaftIvfPQ<float, int64_t>;
+extern template class cuvs::bench::ann::RaftIvfPQ<uint8_t, int64_t>;
+extern template class cuvs::bench::ann::RaftIvfPQ<int8_t, int64_t>;
 #endif
 #if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 #include "cuvs_cagra_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
-extern template class raft::bench::ann::RaftCagra<float, uint32_t>;
-extern template class raft::bench::ann::RaftCagra<half, uint32_t>;
-extern template class raft::bench::ann::RaftCagra<uint8_t, uint32_t>;
-extern template class raft::bench::ann::RaftCagra<int8_t, uint32_t>;
+extern template class cuvs::bench::ann::RaftCagra<float, uint32_t>;
+extern template class cuvs::bench::ann::RaftCagra<half, uint32_t>;
+extern template class cuvs::bench::ann::RaftCagra<uint8_t, uint32_t>;
+extern template class cuvs::bench::ann::RaftCagra<int8_t, uint32_t>;
 #endif
 
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::RaftIvfFlatGpu<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::ann::RaftIvfFlatGpu<T, IdxT>::BuildParam& param)
 {
   param.n_lists = conf.at("nlist");
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
@@ -60,7 +60,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::RaftIvfFlatGpu<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::ann::RaftIvfFlatGpu<T, IdxT>::SearchParam& param)
 {
   param.ivf_flat_params.n_probes = conf.at("nprobe");
 }
@@ -70,7 +70,7 @@ void parse_search_param(const nlohmann::json& conf,
   defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::RaftIvfPQ<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::ann::RaftIvfPQ<T, IdxT>::BuildParam& param)
 {
   if (conf.contains("nlist")) { param.n_lists = conf.at("nlist"); }
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
@@ -92,7 +92,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::RaftIvfPQ<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::ann::RaftIvfPQ<T, IdxT>::SearchParam& param)
 {
   if (conf.contains("nprobe")) { param.pq_param.n_probes = conf.at("nprobe"); }
   if (conf.contains("internalDistanceDtype")) {
@@ -180,7 +180,7 @@ nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::RaftCagra<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::ann::RaftCagra<T, IdxT>::BuildParam& param)
 {
   if (conf.contains("graph_degree")) {
     param.cagra_params.graph_degree              = conf.at("graph_degree");
@@ -204,7 +204,7 @@ void parse_build_param(const nlohmann::json& conf,
   }
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
   if (!ivf_pq_search_conf.empty()) {
-    typename raft::bench::ann::RaftIvfPQ<T, IdxT>::SearchParam sparam;
+    typename cuvs::bench::ann::RaftIvfPQ<T, IdxT>::SearchParam sparam;
     parse_search_param<T, IdxT>(ivf_pq_search_conf, sparam);
     param.ivf_pq_search_params = sparam.pq_param;
     param.ivf_pq_refine_rate   = sparam.refine_ratio;
@@ -227,14 +227,14 @@ void parse_build_param(const nlohmann::json& conf,
   }
 }
 
-raft::bench::ann::AllocatorType parse_allocator(std::string mem_type)
+cuvs::bench::ann::AllocatorType parse_allocator(std::string mem_type)
 {
   if (mem_type == "device") {
-    return raft::bench::ann::AllocatorType::Device;
+    return cuvs::bench::ann::AllocatorType::Device;
   } else if (mem_type == "host_pinned") {
-    return raft::bench::ann::AllocatorType::HostPinned;
+    return cuvs::bench::ann::AllocatorType::HostPinned;
   } else if (mem_type == "host_huge_page") {
-    return raft::bench::ann::AllocatorType::HostHugePage;
+    return cuvs::bench::ann::AllocatorType::HostHugePage;
   }
   THROW(
     "Invalid value for memory type %s, must be one of [\"device\", \"host_pinned\", "
@@ -244,7 +244,7 @@ raft::bench::ann::AllocatorType parse_allocator(std::string mem_type)
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::RaftCagra<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::ann::RaftCagra<T, IdxT>::SearchParam& param)
 {
   if (conf.contains("itopk")) { param.p.itopk_size = conf.at("itopk"); }
   if (conf.contains("search_width")) { param.p.search_width = conf.at("search_width"); }

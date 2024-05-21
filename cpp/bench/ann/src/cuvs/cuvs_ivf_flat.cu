@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "raft_ivf_flat_wrapper.h"
+#include "cuvs_ivf_flat_wrapper.h"
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 template class RaftIvfFlatGpu<float, int64_t>;
 template class RaftIvfFlatGpu<uint8_t, int64_t>;
 template class RaftIvfFlatGpu<int8_t, int64_t>;
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

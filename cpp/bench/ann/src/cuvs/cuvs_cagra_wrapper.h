@@ -18,7 +18,7 @@
 #include "../common/ann_types.hpp"
 #include "../common/cuda_huge_page_resource.hpp"
 #include "../common/cuda_pinned_resource.hpp"
-#include "raft_ann_bench_utils.h"
+#include "cuvs_ann_bench_utils.h"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -47,7 +47,7 @@
 #include <string>
 #include <type_traits>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 enum class AllocatorType { HostPinned, HostHugePage, Device };
 template <typename T, typename IdxT>
@@ -204,7 +204,7 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
     raft::copy(new_graph.data_handle(),
                index_->graph().data_handle(),
                index_->graph().size(),
-               resource::get_cuda_stream(handle_));
+               raft::resource::get_cuda_stream(handle_));
 
     index_->update_graph(handle_, make_const_mdspan(new_graph.view()));
     // update_graph() only stores a view in the index. We need to keep the graph object alive.
@@ -286,7 +286,7 @@ void RaftCagra<T, IdxT>::search_base(
   if constexpr (sizeof(IdxT) == sizeof(AnnBase::index_type)) {
     neighbors_IdxT = reinterpret_cast<IdxT*>(neighbors);
   } else {
-    neighbors_storage.emplace(batch_size * k, resource::get_cuda_stream(handle_));
+    neighbors_storage.emplace(batch_size * k, raft::resource::get_cuda_stream(handle_));
     neighbors_IdxT = neighbors_storage->data();
   }
 
@@ -330,4 +330,4 @@ void RaftCagra<T, IdxT>::search(
       res, *input_dataset_v_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
   }
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

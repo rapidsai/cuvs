@@ -28,11 +28,11 @@
 #include <type_traits>
 #include <utility>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::Ggnn<T>::BuildParam& param)
+                       typename cuvs::bench::ann::Ggnn<T>::BuildParam& param)
 {
   param.k = conf.at("k");
 
@@ -47,7 +47,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::Ggnn<T>::SearchParam& param)
+                        typename cuvs::bench::ann::Ggnn<T>::SearchParam& param)
 {
   param.tau = conf.at("tau");
 
@@ -58,7 +58,7 @@ void parse_search_param(const nlohmann::json& conf,
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric metric,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric metric,
                                                     int dim,
                                                     const nlohmann::json& conf)
 {
@@ -68,7 +68,7 @@ std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric met
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric metric,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric metric,
                                                     int dim,
                                                     const nlohmann::json& conf,
                                                     const std::vector<int>& dev_list)
@@ -81,7 +81,7 @@ std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric met
 }
 
 template <typename T>
-std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
                                                       const std::string& distance,
                                                       int dim,
                                                       const nlohmann::json& conf,
@@ -90,12 +90,12 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  raft::bench::ann::Metric metric = parse_metric(distance);
-  std::unique_ptr<raft::bench::ann::ANN<T>> ann;
+  cuvs::bench::ann::Metric metric = parse_metric(distance);
+  std::unique_ptr<cuvs::bench::ann::ANN<T>> ann;
 
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
-    if (algo == "ggnn") { ann = make_algo<T, raft::bench::ann::Ggnn>(metric, dim, conf); }
+    if (algo == "ggnn") { ann = make_algo<T, cuvs::bench::ann::Ggnn>(metric, dim, conf); }
   }
   if (!ann) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
 
@@ -103,13 +103,13 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
     if (algo == "ggnn") {
-      auto param = std::make_unique<typename raft::bench::ann::Ggnn<T>::SearchParam>();
+      auto param = std::make_unique<typename cuvs::bench::ann::Ggnn<T>::SearchParam>();
       parse_search_param<T>(conf, *param);
       return param;
     }
@@ -118,7 +118,7 @@ std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -126,5 +126,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv) { return raft::bench::ann::run_main(argc, argv); }
+int main(int argc, char** argv) { return cuvs::bench::ann::run_main(argc, argv); }
 #endif

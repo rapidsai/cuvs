@@ -26,7 +26,7 @@
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 class Configuration {
  public:
@@ -158,4 +158,4 @@ class Configuration {
   std::vector<Index> indices_;
 };
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

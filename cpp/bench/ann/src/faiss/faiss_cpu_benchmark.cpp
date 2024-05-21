@@ -28,11 +28,11 @@
 #include <type_traits>
 #include <utility>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T>
 void parse_base_build_param(const nlohmann::json& conf,
-                            typename raft::bench::ann::FaissCpu<T>::BuildParam& param)
+                            typename cuvs::bench::ann::FaissCpu<T>::BuildParam& param)
 {
   param.nlist = conf.at("nlist");
   if (conf.contains("ratio")) { param.ratio = conf.at("ratio"); }
@@ -40,14 +40,14 @@ void parse_base_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::FaissCpuIVFFlat<T>::BuildParam& param)
+                       typename cuvs::bench::ann::FaissCpuIVFFlat<T>::BuildParam& param)
 {
   parse_base_build_param<T>(conf, param);
 }
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::FaissCpuIVFPQ<T>::BuildParam& param)
+                       typename cuvs::bench::ann::FaissCpuIVFPQ<T>::BuildParam& param)
 {
   parse_base_build_param<T>(conf, param);
   param.M = conf.at("M");
@@ -65,7 +65,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename raft::bench::ann::FaissCpuIVFSQ<T>::BuildParam& param)
+                       typename cuvs::bench::ann::FaissCpuIVFSQ<T>::BuildParam& param)
 {
   parse_base_build_param<T>(conf, param);
   param.quantizer_type = conf.at("quantizer_type");
@@ -73,7 +73,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_search_param(const nlohmann::json& conf,
-                        typename raft::bench::ann::FaissCpu<T>::SearchParam& param)
+                        typename cuvs::bench::ann::FaissCpu<T>::SearchParam& param)
 {
   param.nprobe = conf.at("nprobe");
   if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
@@ -81,7 +81,7 @@ void parse_search_param(const nlohmann::json& conf,
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric metric,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric metric,
                                                     int dim,
                                                     const nlohmann::json& conf)
 {
@@ -91,7 +91,7 @@ std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric met
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric metric,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric metric,
                                                     int dim,
                                                     const nlohmann::json& conf,
                                                     const std::vector<int>& dev_list)
@@ -104,7 +104,7 @@ std::unique_ptr<raft::bench::ann::ANN<T>> make_algo(raft::bench::ann::Metric met
 }
 
 template <typename T>
-std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
+std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
                                                       const std::string& distance,
                                                       int dim,
                                                       const nlohmann::json& conf,
@@ -113,18 +113,18 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  std::unique_ptr<raft::bench::ann::ANN<T>> ann;
+  std::unique_ptr<cuvs::bench::ann::ANN<T>> ann;
 
   if constexpr (std::is_same_v<T, float>) {
-    raft::bench::ann::Metric metric = parse_metric(distance);
+    cuvs::bench::ann::Metric metric = parse_metric(distance);
     if (algo == "faiss_cpu_ivf_flat") {
-      ann = make_algo<T, raft::bench::ann::FaissCpuIVFFlat>(metric, dim, conf, dev_list);
+      ann = make_algo<T, cuvs::bench::ann::FaissCpuIVFFlat>(metric, dim, conf, dev_list);
     } else if (algo == "faiss_cpu_ivf_pq") {
-      ann = make_algo<T, raft::bench::ann::FaissCpuIVFPQ>(metric, dim, conf);
+      ann = make_algo<T, cuvs::bench::ann::FaissCpuIVFPQ>(metric, dim, conf);
     } else if (algo == "faiss_cpu_ivf_sq") {
-      ann = make_algo<T, raft::bench::ann::FaissCpuIVFSQ>(metric, dim, conf);
+      ann = make_algo<T, cuvs::bench::ann::FaissCpuIVFSQ>(metric, dim, conf);
     } else if (algo == "faiss_cpu_flat") {
-      ann = std::make_unique<raft::bench::ann::FaissCpuFlat<T>>(metric, dim);
+      ann = std::make_unique<cuvs::bench::ann::FaissCpuFlat<T>>(metric, dim);
     }
   }
 
@@ -136,22 +136,22 @@ std::unique_ptr<raft::bench::ann::ANN<T>> create_algo(const std::string& algo,
 }
 
 template <typename T>
-std::unique_ptr<typename raft::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   if (algo == "faiss_cpu_ivf_flat" || algo == "faiss_cpu_ivf_pq" || algo == "faiss_cpu_ivf_sq") {
-    auto param = std::make_unique<typename raft::bench::ann::FaissCpu<T>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::ann::FaissCpu<T>::SearchParam>();
     parse_search_param<T>(conf, *param);
     return param;
   } else if (algo == "faiss_cpu_flat") {
-    auto param = std::make_unique<typename raft::bench::ann::FaissCpu<T>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::ann::FaissCpu<T>::SearchParam>();
     return param;
   }
   // else
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -159,5 +159,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv) { return raft::bench::ann::run_main(argc, argv); }
+int main(int argc, char** argv) { return cuvs::bench::ann::run_main(argc, argv); }
 #endif

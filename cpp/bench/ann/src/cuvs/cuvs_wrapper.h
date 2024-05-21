@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "raft_ann_bench_utils.h"
+#include "cuvs_ann_bench_utils.h"
 
 #include <raft/core/device_resources.hpp>
 #include <raft/distance/detail/distance.cuh>
@@ -32,17 +32,17 @@
 
 namespace raft_temp {
 
-inline raft::distance::DistanceType parse_metric_type(raft::bench::ann::Metric metric)
+inline raft::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
 {
   switch (metric) {
-    case raft::bench::ann::Metric::kInnerProduct: return raft::distance::DistanceType::InnerProduct;
-    case raft::bench::ann::Metric::kEuclidean: return raft::distance::DistanceType::L2Expanded;
+    case cuvs::bench::ann::Metric::kInnerProduct: return raft::distance::DistanceType::InnerProduct;
+    case cuvs::bench::ann::Metric::kEuclidean: return raft::distance::DistanceType::L2Expanded;
     default: throw std::runtime_error("raft supports only metric type of inner product and L2");
   }
 }
 }  // namespace raft_temp
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 // brute force KNN - RAFT
 template <typename T>
@@ -153,4 +153,4 @@ std::unique_ptr<ANN<T>> RaftGpu<T>::copy()
   return std::make_unique<RaftGpu<T>>(*this);  // use copy constructor
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

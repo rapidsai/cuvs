@@ -37,7 +37,7 @@
 #include <thread>
 #include <vector>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 static inline std::unique_ptr<AnnBase> current_algo{nullptr};
 static inline std::unique_ptr<AlgoProperty> current_algo_props{nullptr};
@@ -122,8 +122,8 @@ void bench_build(::benchmark::State& state,
                  bool force_overwrite)
 {
   // NB: these two thread-local vars can be used within algo wrappers
-  raft::bench::ann::benchmark_thread_id = state.thread_index();
-  raft::bench::ann::benchmark_n_threads = state.threads();
+  cuvs::bench::ann::benchmark_thread_id = state.thread_index();
+  cuvs::bench::ann::benchmark_n_threads = state.threads();
   dump_parameters(state, index.build_param);
   if (file_exists(index.file)) {
     if (force_overwrite) {
@@ -178,8 +178,8 @@ void bench_search(::benchmark::State& state,
                   Objective metric_objective)
 {
   // NB: these two thread-local vars can be used within algo wrappers
-  raft::bench::ann::benchmark_thread_id = state.thread_index();
-  raft::bench::ann::benchmark_n_threads = state.threads();
+  cuvs::bench::ann::benchmark_thread_id = state.thread_index();
+  cuvs::bench::ann::benchmark_n_threads = state.threads();
   std::size_t queries_processed         = 0;
 
   const auto& sp_json = index.search_params[search_param_ix];
@@ -726,4 +726,4 @@ inline auto run_main(int argc, char** argv) -> int
   reset_global_device_resources();
   return 0;
 }
-};  // namespace raft::bench::ann
+};  // namespace cuvs::bench::ann

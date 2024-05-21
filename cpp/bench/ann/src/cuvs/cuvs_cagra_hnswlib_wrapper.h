@@ -20,7 +20,7 @@
 
 #include <memory>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
 class RaftCagraHnswlib : public ANN<T>, public AnnGPU {
@@ -105,4 +105,4 @@ void RaftCagraHnswlib<T, IdxT>::search(
   hnswlib_search_.search(queries, batch_size, k, neighbors, distances);
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

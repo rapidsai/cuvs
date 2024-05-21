@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "raft_ann_bench_utils.h"
+#include "cuvs_ann_bench_utils.h"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -36,7 +36,7 @@
 #include <string>
 #include <type_traits>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
 class RaftIvfFlatGpu : public ANN<T>, public AnnGPU {
@@ -142,7 +142,7 @@ void RaftIvfFlatGpu<T, IdxT>::search(
   if constexpr (sizeof(IdxT) == sizeof(AnnBase::index_type)) {
     neighbors_IdxT = reinterpret_cast<IdxT*>(neighbors);
   } else {
-    neighbors_storage.emplace(batch_size * k, resource::get_cuda_stream(handle_));
+    neighbors_storage.emplace(batch_size * k, raft::resource::get_cuda_stream(handle_));
     neighbors_IdxT = neighbors_storage->data();
   }
   raft::neighbors::ivf_flat::search(handle_,
@@ -153,7 +153,7 @@ void RaftIvfFlatGpu<T, IdxT>::search(
                                     k,
                                     neighbors_IdxT,
                                     distances,
-                                    resource::get_workspace_resource(handle_));
+                                    raft::resource::get_workspace_resource(handle_));
   if constexpr (sizeof(IdxT) != sizeof(AnnBase::index_type)) {
     raft::linalg::unaryOp(neighbors,
                           neighbors_IdxT,
@@ -162,4 +162,4 @@ void RaftIvfFlatGpu<T, IdxT>::search(
                           raft::resource::get_cuda_stream(handle_));
   }
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

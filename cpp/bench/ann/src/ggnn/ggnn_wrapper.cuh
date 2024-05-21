@@ -26,7 +26,7 @@
 #include <memory>
 #include <stdexcept>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
 class GgnnImpl;
@@ -139,7 +139,7 @@ class GgnnImpl : public ANN<T>, public AnnGPU {
   {
     auto r = std::make_unique<GgnnImpl<T, measure, D, KBuild, KQuery, S>>(*this);
     // set the thread-local stream to the copied handle.
-    r->stream_ = raft::bench::ann::get_stream_from_global_pool();
+    r->stream_ = cuvs::bench::ann::get_stream_from_global_pool();
     return r;
   };
 
@@ -204,7 +204,7 @@ GgnnImpl<T, measure, D, KBuild, KQuery, S>::GgnnImpl(Metric metric,
                                                      const typename Ggnn<T>::BuildParam& param)
   : ANN<T>(metric, dim),
     build_param_(param),
-    stream_(raft::bench::ann::get_stream_from_global_pool())
+    stream_(cuvs::bench::ann::get_stream_from_global_pool())
 {
   if (metric_ == Metric::kInnerProduct) {
     if (measure != Cosine) { throw std::runtime_error("mis-matched metric"); }
@@ -319,4 +319,4 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::load(const std::string& file)
   }
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

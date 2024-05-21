@@ -39,7 +39,7 @@
 #include <string>
 #include <vector>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 /**
  * Current thread id as given by the benchmark State.
@@ -558,4 +558,4 @@ void log_error(Ts&&... vs)
   log_("E", std::forward<Ts>(vs)...);
 }
 
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann

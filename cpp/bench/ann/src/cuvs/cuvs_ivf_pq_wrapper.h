@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "raft_ann_bench_utils.h"
+#include "cuvs_ann_bench_utils.h"
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -34,7 +34,7 @@
 
 #include <type_traits>
 
-namespace raft::bench::ann {
+namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
 class RaftIvfPQ : public ANN<T>, public AnnGPU {
@@ -155,7 +155,7 @@ void RaftIvfPQ<T, IdxT>::search_base(
   if constexpr (sizeof(IdxT) == sizeof(AnnBase::index_type)) {
     neighbors_IdxT = reinterpret_cast<IdxT*>(neighbors);
   } else {
-    neighbors_storage.emplace(batch_size * k, resource::get_cuda_stream(handle_));
+    neighbors_storage.emplace(batch_size * k, raft::resource::get_cuda_stream(handle_));
     neighbors_IdxT = neighbors_storage->data();
   }
 
@@ -200,4 +200,4 @@ void RaftIvfPQ<T, IdxT>::search(
       res, dataset_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
   }
 }
-}  // namespace raft::bench::ann
+}  // namespace cuvs::bench::ann
