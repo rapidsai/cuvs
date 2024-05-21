@@ -1,9 +1,9 @@
 /*
- * raft::copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a raft::copy of the License at
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,7 +24,6 @@
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/ivf_list.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"  // utils::mapping
 
@@ -1393,7 +1392,7 @@ void extend_list_with_codes(
   // Allocate memory and write indices
   auto offset = extend_list_prepare(res, index, new_indices, label);
   // Pack the data
-  helpers::codepacker::pack_list_data(res, index, new_codes, label, offset);
+  pack_list_data(res, index, new_codes, label, offset);
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(res, *index);
 }
@@ -1780,13 +1779,9 @@ auto build(raft::resources const& handle,
                                             utils::mapping<float>());
 
     // Make rotation matrix
-    helpers::make_rotation_matrix(handle,
-                                  params.force_random_rotation,
-                                  index.rot_dim(),
-                                  index.dim(),
-                                  index.rotation_matrix().data_handle());
+    helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, cluster_centers);
+    helpers::set_centers(handle, &index, raft::make_const_mdspan(centers_view));
 
     // Train PQ codebooks
     switch (index.codebook_kind()) {

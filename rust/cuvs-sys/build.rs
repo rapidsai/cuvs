@@ -18,20 +18,9 @@ use std::env;
 use std::io::BufRead;
 use std::path::PathBuf;
 
-/*
-    TODO:
-    * would be nice to use already built versions of libcuvs_c / libcuvs
-        if they already existed, but this might not be possible here using cmake-rs
-        (https://github.com/rust-lang/cmake-rs/issues/111)
-    * figure out how this works with rust packaging: does the c++ code
-        need to be in a subdirectory? If so would a symlink work here
-        should we be using static linking ?
-*/
 fn main() {
     // build the cuvs c-api library with cmake, and link it into this crate
-    let cuvs_build = cmake::Config::new("../../cpp")
-        .configure_arg("-DBUILD_TESTS:BOOL=OFF")
-        .configure_arg("-DBUILD_C_LIBRARY:BOOL=ON")
+    let cuvs_build = cmake::Config::new(".")
         .build();
 
     println!(
