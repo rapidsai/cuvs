@@ -16,14 +16,14 @@
 #pragma once
 
 #include <cuvs/neighbors/sample_filter.hpp>
-#include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
+#include <raft/util/raft_explicit.hpp>  // CUVS_EXPLICIT
 
 #include <cuda_fp16.h>
 
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 template <unsigned TEAM_SIZE,
           unsigned MAX_DATASET_DIM,
@@ -56,9 +56,9 @@ void select_and_run(  // raft::resources const& res,
   size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
-  cudaStream_t stream) RAFT_EXPLICIT;
+  cudaStream_t stream) CUVS_EXPLICIT;
 
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_single_cta_select_and_run(                                                  \
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                     \

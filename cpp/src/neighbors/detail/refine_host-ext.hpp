@@ -20,7 +20,7 @@
 #include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
 #include <raft/core/detail/macros.hpp>       // _RAFT_HAS_CUDA
 #include <raft/core/host_mdspan.hpp>         // raft::host_matrix_view
-#include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
+#include <raft/util/raft_explicit.hpp>       // CUVS_EXPLICIT
 
 #include <cstdint>  // int64_t
 
@@ -28,7 +28,7 @@
 #include <cuda_fp16.h>
 #endif
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs::neighbors::detail {
 
@@ -39,11 +39,11 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
   raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
   raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
   raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) RAFT_EXPLICIT;
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) CUVS_EXPLICIT;
 
 }
 
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_refine(IdxT, DataT, DistanceT, ExtentsT)                    \
   extern template void cuvs::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \

@@ -20,9 +20,9 @@
 #include "../kernels/rbf_fin_op.cuh"      // rbf_fin_op
 #include "../pairwise_matrix/params.cuh"  // pairwise_matrix_params
 #include <raft/core/operators.hpp>        // raft::identity_op
-#include <raft/util/raft_explicit.hpp>    // RAFT_EXPLICIT
+#include <raft/util/raft_explicit.hpp>    // CUVS_EXPLICIT
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs::distance::detail {
 
@@ -43,11 +43,11 @@ void pairwise_matrix_dispatch(OpT distance_op,
                               OutT* out,
                               FinOpT fin_op,
                               cudaStream_t stream,
-                              bool is_row_major) RAFT_EXPLICIT;
+                              bool is_row_major) CUVS_EXPLICIT;
 
 };  // namespace cuvs::distance::detail
 
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
