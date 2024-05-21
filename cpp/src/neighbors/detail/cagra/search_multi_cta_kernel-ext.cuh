@@ -57,7 +57,7 @@ void select_and_run(
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream) RAFT_EXPLICIT;
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
+#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_kernel_selection(                                                           \
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                     \

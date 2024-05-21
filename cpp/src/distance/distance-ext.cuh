@@ -20,7 +20,7 @@
 #include <raft/core/device_mdspan.hpp>    // raft::device_matrix_view
 #include <raft/core/operators.hpp>        // raft::identity_op
 #include <raft/core/resources.hpp>        // raft::resources
-#include <raft/util/raft_explicit.hpp>    // CUVS_EXPLICIT
+#include <raft/util/raft_explicit.hpp>    // RAFT_EXPLICIT
 
 #include <rmm/device_uvector.hpp>  // rmm::device_uvector
 
@@ -144,7 +144,7 @@ void pairwise_distance(raft::resources const& handle,
 };  // namespace distance
 };  // namespace cuvs
 
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
+#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 /*
  * Hierarchy of instantiations:

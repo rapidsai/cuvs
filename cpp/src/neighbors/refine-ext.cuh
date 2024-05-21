@@ -50,7 +50,7 @@ void refine(raft::resources const& handle,
 
 }  // namespace cuvs::neighbors
 
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
+#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_refine_d(idx_t, data_t, distance_t, matrix_idx)          \
   extern template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(      \

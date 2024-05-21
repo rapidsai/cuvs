@@ -43,7 +43,7 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 
 }
 
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
+#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_neighbors_refine(IdxT, DataT, DistanceT, ExtentsT)                    \
   extern template void cuvs::neighbors::detail::refine_host<IdxT, DataT, DistanceT, ExtentsT>( \
