@@ -18,7 +18,7 @@
 #include "kmeans_common.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 #include <raft/common/nvtx.hpp>
 #include <raft/core/cudart_utils.hpp>

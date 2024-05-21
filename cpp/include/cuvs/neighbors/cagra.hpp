@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "ann_types.hpp"
-#include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/dataset.hpp>
+#include "common.hpp"
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -47,7 +47,7 @@ enum class graph_build_algo {
   NN_DESCENT
 };
 
-struct index_params : ann::index_params {
+struct index_params : cuvs::neighbors::index_params {
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree = 128;
   /** Degree of output graph. */
@@ -61,7 +61,7 @@ struct index_params : ann::index_params {
    *
    * NOTE: this is experimental new API, consider it unsafe.
    */
-  std::optional<cuvs::neighbors::ann::vpq_params> compression = std::nullopt;
+  std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 };
 
 /**
@@ -84,7 +84,7 @@ enum class search_algo {
 
 enum class hash_mode { HASH, SMALL, AUTO };
 
-struct search_params : ann::search_params {
+struct search_params : cuvs::neighbors::search_params {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
   size_t max_queries = 0;
 
@@ -149,7 +149,7 @@ static_assert(std::is_aggregate_v<search_params>);
  *
  */
 template <typename T, typename IdxT>
-struct index : ann::index {
+struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
@@ -207,7 +207,7 @@ struct index : ann::index {
   /** Construct an empty index. */
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
-    : ann::index(),
+    : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
       dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0))
@@ -274,7 +274,7 @@ struct index : ann::index {
         raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
         raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
           knn_graph)
-    : ann::index(),
+    : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
       dataset_(make_aligned_dataset(res, dataset, 16))

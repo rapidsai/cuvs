@@ -21,12 +21,12 @@
 #include "../ivf_list.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_list.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>

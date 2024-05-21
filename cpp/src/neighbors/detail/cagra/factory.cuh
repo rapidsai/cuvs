@@ -21,7 +21,7 @@
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
 
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
 

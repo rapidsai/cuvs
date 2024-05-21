@@ -36,7 +36,7 @@ index<T, IdxT>::index(raft::resources const& res,
                       bool adaptive_centers,
                       bool conservative_memory_allocation,
                       uint32_t dim)
-  : ann::index(),
+  : cuvs::neighbors::index(),
     veclen_(calculate_veclen(dim)),
     metric_(metric),
     adaptive_centers_(adaptive_centers),

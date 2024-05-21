@@ -114,7 +114,6 @@ repos:
                   setup[.]cfg$
             exclude: |
               (?x)
-                  cpp/include/cuvs/neighbors/detail/faiss_select/|
                   docs/source/sphinxext/github_link\.py|
                   cpp/cmake/modules/FindAVX\.cmake|
 
