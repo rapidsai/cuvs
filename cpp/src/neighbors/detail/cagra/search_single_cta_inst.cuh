@@ -17,7 +17,7 @@
 #pragma once
 
 #include "search_single_cta_kernel-inl.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 

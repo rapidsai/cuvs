@@ -16,9 +16,8 @@
 
 #pragma once
 
-#include "ann_types.hpp"
-#include <cuvs/neighbors/ivf_list.hpp>
-#include <cuvs/neighbors/sample_filter.hpp>
+#include "common.hpp"
+#include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
@@ -39,7 +38,7 @@ enum class codebook_gen {  // NOLINT
   PER_CLUSTER  = 1,        // NOLINT
 };
 
-struct index_params : ann::index_params {
+struct index_params : cuvs::neighbors::index_params {
   /**
    * The number of inverted lists (clusters)
    *
@@ -138,7 +137,7 @@ struct index_params : ann::index_params {
  * @defgroup ivf_pq_cpp_search_params IVF-PQ index search parameters
  * @{
  */
-struct search_params : ann::search_params {
+struct search_params : cuvs::neighbors::search_params {
   /** The number of clusters to search. */
   uint32_t n_probes = 20;
   /**
@@ -279,7 +278,7 @@ using list_data = ivf::list<list_spec, SizeT, IdxT>;
  *
  */
 template <typename IdxT>
-struct index : ann::index {
+struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 

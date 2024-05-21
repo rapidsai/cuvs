@@ -17,7 +17,7 @@
 #pragma once
 
 #include "../../src/neighbors/detail/ann_utils.cuh"
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/matrix/detail/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
 

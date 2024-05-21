@@ -18,8 +18,8 @@
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/sample_filter.hpp>
 
 #include <raft/core/bitset.cuh>
 #include <raft/linalg/add.cuh>
