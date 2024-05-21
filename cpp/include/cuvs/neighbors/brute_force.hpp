@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ann_types.hpp"
-#include <cuvs/neighbors/ann_types.hpp>
+#include "common.hpp"
+#include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
@@ -37,7 +37,7 @@ namespace cuvs::neighbors::brute_force {
  * @tparam T data element type
  */
 template <typename T>
-struct index : cuvs::neighbors::ann::index {
+struct index : cuvs::neighbors::index {
  public:
   index(const index&)            = delete;
   index(index&&)                 = default;

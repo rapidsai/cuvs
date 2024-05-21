@@ -19,7 +19,7 @@
 #include "gram_matrix.cuh"
 #include "kernel_matrices.cuh"
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::distance::kernels::detail {

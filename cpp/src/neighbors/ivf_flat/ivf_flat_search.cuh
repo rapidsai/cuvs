@@ -18,14 +18,14 @@
 
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
-#include "../ivf_common.cuh"                 // cuvs::neighbors::detail::ivf
-#include "ivf_flat_interleaved_scan.cuh"     // interleaved_scan
-#include <cuvs/neighbors/ivf_flat.hpp>       // raft::neighbors::ivf_flat::index
-#include <cuvs/neighbors/sample_filter.hpp>  // none_ivf_sample_filter
+#include "../ivf_common.cuh"              // cuvs::neighbors::detail::ivf
+#include "ivf_flat_interleaved_scan.cuh"  // interleaved_scan
+#include <cuvs/neighbors/common.hpp>      // none_ivf_sample_filter
+#include <cuvs/neighbors/ivf_flat.hpp>    // raft::neighbors::ivf_flat::index
 
-#include "../detail/ann_utils.cuh"           // utils::mapping
-#include <cuvs/distance/distance_types.hpp>  // is_min_close, DistanceType
-#include <raft/core/logger-ext.hpp>          // RAFT_LOG_TRACE
+#include "../detail/ann_utils.cuh"     // utils::mapping
+#include <cuvs/distance/distance.hpp>  // is_min_close, DistanceType
+#include <raft/core/logger-ext.hpp>    // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>          // raft::resources
 #include <raft/linalg/gemm.cuh>             // raft::linalg::gemm

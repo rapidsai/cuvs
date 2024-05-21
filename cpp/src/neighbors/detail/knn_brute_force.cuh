@@ -15,7 +15,7 @@
  */
 
 #pragma once
-#include <cuvs/distance/pairwise_distance.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
 #include "../../distance/detail/distance_ops/l2_exp.cuh"

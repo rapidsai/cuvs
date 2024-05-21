@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include "ann_types.hpp"
-#include "ivf_list.hpp"
+#include "common.hpp"
 #include <cstdint>
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 /**
@@ -30,7 +31,7 @@ namespace cuvs::neighbors::ivf_flat {
 /** Size of the interleaved group (see `index::data` description). */
 constexpr static uint32_t kIndexGroupSize = 32;
 
-struct index_params : ann::index_params {
+struct index_params : cuvs::neighbors::index_params {
   /** The number of inverted lists (clusters) */
   uint32_t n_lists = 1024;
   /** The number of iterations searching for kmeans centers (index building). */
@@ -69,7 +70,7 @@ struct index_params : ann::index_params {
  * @defgroup ivf_flat_cpp_search_params IVF-Flat index search parameters
  * @{
  */
-struct search_params : ann::search_params {
+struct search_params : cuvs::neighbors::search_params {
   /** The number of clusters to search. */
   uint32_t n_probes = 20;
 };
@@ -127,7 +128,7 @@ using list_data = ivf::list<list_spec, SizeT, ValueT, IdxT>;
  *
  */
 template <typename T, typename IdxT>
-struct index : ann::index {
+struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 

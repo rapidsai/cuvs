@@ -23,7 +23,7 @@
 #include "fused_distance_nn/helper_structs.cuh"
 #include "fused_distance_nn/simt_kernel.cuh"
 #include "pairwise_distance_base.cuh"  // PairwiseDistances
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/kvp.hpp>             // raft::KeyValuePair
 #include <raft/core/operators.hpp>       // raft::identity_op
 #include <raft/linalg/contractions.cuh>  // Policy

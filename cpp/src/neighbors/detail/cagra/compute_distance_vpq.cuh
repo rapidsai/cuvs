@@ -18,7 +18,7 @@
 
 #include "compute_distance.hpp"
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
