@@ -19,7 +19,7 @@
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 #include "ivf_pq_list.cuh"
-#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/logger-ext.hpp>

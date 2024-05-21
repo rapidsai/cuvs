@@ -26,6 +26,8 @@ dask-worker-space/
 *.bin
 bench/ann/data
 temporary_*.json
+rust/target/
+rust/Cargo.lock
 
 ## scikit-build
 _skbuild

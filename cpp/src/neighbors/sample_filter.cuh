@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <raft/core/bitset.cuh>
 #include <raft/core/detail/macros.hpp>
 

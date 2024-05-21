@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/ann_types.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -25,7 +25,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 namespace cuvs::neighbors::nn_descent {
 /**
@@ -48,7 +48,7 @@ namespace cuvs::neighbors::nn_descent {
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
  *
  */
-struct index_params : ann::index_params {
+struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree              = 64;      // Degree of output graph.
   size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
   size_t max_iterations            = 20;      // Number of nn-descent iterations.
@@ -69,7 +69,7 @@ struct index_params : ann::index_params {
  * @tparam IdxT dtype to be used for constructing knn-graph
  */
 template <typename IdxT>
-struct index : ann::index {
+struct index : cuvs::neighbors::index {
  public:
   /**
    * @brief Construct a new index object
@@ -83,7 +83,7 @@ struct index : ann::index {
    * @param n_cols number of cols in knn-graph
    */
   index(raft::resources const& res, int64_t n_rows, int64_t n_cols)
-    : ann::index(),
+    : cuvs::neighbors::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(n_rows, n_cols)},
@@ -103,7 +103,7 @@ struct index : ann::index {
    */
   index(raft::resources const& res,
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view)
-    : ann::index(),
+    : cuvs::neighbors::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},

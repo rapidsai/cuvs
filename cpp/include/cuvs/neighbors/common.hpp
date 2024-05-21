@@ -13,15 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
-#include <cuvs/neighbors/ann_types.hpp>
+#include <cstdint>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>   // get_device_for_address
 #include <raft/util/integer_utils.hpp>  // rounding up
+
+#include <cuvs/core/bitset.hpp>
+#include <raft/core/detail/macros.hpp>
 
 #include <memory>
 #include <numeric>
@@ -32,6 +37,72 @@
 #endif
 
 namespace cuvs::neighbors {
+
+/** Parameters for VPQ compression. */
+struct vpq_params {
+  /**
+   * The bit length of the vector element after compression by PQ.
+   *
+   * Possible values: [4, 5, 6, 7, 8].
+   *
+   * Hint: the smaller the 'pq_bits', the smaller the index size and the better the search
+   * performance, but the lower the recall.
+   */
+  uint32_t pq_bits = 8;
+  /**
+   * The dimensionality of the vector after compression by PQ.
+   * When zero, an optimal value is selected using a heuristic.
+   *
+   * TODO: at the moment `dim` must be a multiple `pq_dim`.
+   */
+  uint32_t pq_dim = 0;
+  /**
+   * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  uint32_t vq_n_centers = 0;
+  /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
+  uint32_t kmeans_n_iters = 25;
+  /**
+   * The fraction of data to use during iterative kmeans building (VQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double vq_kmeans_trainset_fraction = 0;
+  /**
+   * The fraction of data to use during iterative kmeans building (PQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double pq_kmeans_trainset_fraction = 0;
+};
+
+/**
+ * @defgroup neighbors_index Approximate Nearest Neighbors Types
+ * @{
+ */
+
+/** The base for approximate KNN index structures. */
+struct index {};
+
+/** The base for KNN index parameters. */
+struct index_params {
+  /** Distance type. */
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
+  /** The argument used by some distance metrics. */
+  float metric_arg = 2.0f;
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build`.
+   *  - `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but
+   * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
+   */
+  bool add_data_on_build = true;
+};
+
+struct search_params {};
+
+/** @} */  // end group neighbors_index
 
 /** Two-dimensional dataset; maybe owning, maybe compressed, maybe strided. */
 template <typename IdxT>
@@ -207,10 +278,6 @@ auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t 
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
   return make_strided_dataset(res, src, required_stride);
 }
-
-/** Parameters for VPQ compression. */
-using vpq_params = cuvs::neighbors::ann::vpq_params;
-
 /**
  * @brief VPQ compressed dataset.
  *
@@ -295,4 +362,240 @@ struct vpq_dataset : public dataset<IdxT> {
   }
 };
 
-}  // namespace cuvs::neighbors
+namespace filtering {
+
+/* A filter that filters nothing. This is the default behavior. */
+struct none_ivf_sample_filter {
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the current inverted list index
+    const uint32_t cluster_ix,
+    // the index of the current sample inside the current inverted list
+    const uint32_t sample_ix) const;
+};
+
+/* A filter that filters nothing. This is the default behavior. */
+struct none_cagra_sample_filter {
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample
+    const uint32_t sample_ix) const;
+};
+
+/**
+ * @brief Filter used to convert the cluster index and sample index
+ * of an IVF search into a sample index. This can be used as an
+ * intermediate filter.
+ *
+ * @tparam index_t Indexing type
+ * @tparam filter_t
+ */
+template <typename index_t, typename filter_t>
+struct ivf_to_sample_filter {
+  const index_t* const* inds_ptrs_;
+  const filter_t next_filter_;
+
+  ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
+
+  /** If the original filter takes three arguments, then don't modify the arguments.
+   * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
+   * index.
+   */
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the current inverted list index
+    const uint32_t cluster_ix,
+    // the index of the current sample inside the current inverted list
+    const uint32_t sample_ix) const;
+};
+
+/**
+ * @brief Filter an index with a bitset
+ *
+ * @tparam index_t Indexing type
+ */
+template <typename bitset_t, typename index_t>
+struct bitset_filter {
+  // View of the bitset to use as a filter
+  const cuvs::core::bitset_view<bitset_t, index_t> bitset_view_;
+
+  bitset_filter(const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering);
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample
+    const uint32_t sample_ix) const;
+};
+
+/**
+ * If the filtering depends on the index of a sample, then the following
+ * filter template can be used:
+ *
+ * template <typename IdxT>
+ * struct index_ivf_sample_filter {
+ *   using index_type = IdxT;
+ *
+ *   const index_type* const* inds_ptr = nullptr;
+ *
+ *   index_ivf_sample_filter() {}
+ *   index_ivf_sample_filter(const index_type* const* _inds_ptr)
+ *       : inds_ptr{_inds_ptr} {}
+ *   index_ivf_sample_filter(const index_ivf_sample_filter&) = default;
+ *   index_ivf_sample_filter(index_ivf_sample_filter&&) = default;
+ *   index_ivf_sample_filter& operator=(const index_ivf_sample_filter&) = default;
+ *   index_ivf_sample_filter& operator=(index_ivf_sample_filter&&) = default;
+ *
+ *   inline _RAFT_HOST_DEVICE bool operator()(
+ *       const uint32_t query_ix,
+ *       const uint32_t cluster_ix,
+ *       const uint32_t sample_ix) const {
+ *     index_type database_idx = inds_ptr[cluster_ix][sample_ix];
+ *
+ *     // return true or false, depending on the database_idx
+ *     return true;
+ *   }
+ * };
+ *
+ * Initialize it as:
+ *   using filter_type = index_ivf_sample_filter<idx_t>;
+ *   filter_type filter(cuvs_ivfpq_index.inds_ptrs().data_handle());
+ *
+ * Use it as:
+ *   cuvs::neighbors::ivf_pq::search_with_filtering<data_t, idx_t, filter_type>(
+ *     ...regular parameters here...,
+ *     filter
+ *   );
+ *
+ * Another example would be the following filter that greenlights samples according
+ * to a contiguous bit mask vector.
+ *
+ * template <typename IdxT>
+ * struct bitmask_ivf_sample_filter {
+ *   using index_type = IdxT;
+ *
+ *   const index_type* const* inds_ptr = nullptr;
+ *   const uint64_t* const bit_mask_ptr = nullptr;
+ *   const int64_t bit_mask_stride_64 = 0;
+ *
+ *   bitmask_ivf_sample_filter() {}
+ *   bitmask_ivf_sample_filter(
+ *       const index_type* const* _inds_ptr,
+ *       const uint64_t* const _bit_mask_ptr,
+ *       const int64_t _bit_mask_stride_64)
+ *       : inds_ptr{_inds_ptr},
+ *         bit_mask_ptr{_bit_mask_ptr},
+ *         bit_mask_stride_64{_bit_mask_stride_64} {}
+ *   bitmask_ivf_sample_filter(const bitmask_ivf_sample_filter&) = default;
+ *   bitmask_ivf_sample_filter(bitmask_ivf_sample_filter&&) = default;
+ *   bitmask_ivf_sample_filter& operator=(const bitmask_ivf_sample_filter&) = default;
+ *   bitmask_ivf_sample_filter& operator=(bitmask_ivf_sample_filter&&) = default;
+ *
+ *   inline _RAFT_HOST_DEVICE bool operator()(
+ *       const uint32_t query_ix,
+ *       const uint32_t cluster_ix,
+ *       const uint32_t sample_ix) const {
+ *     const index_type database_idx = inds_ptr[cluster_ix][sample_ix];
+ *     const uint64_t bit_mask_element =
+ *         bit_mask_ptr[query_ix * bit_mask_stride_64 + database_idx / 64];
+ *     const uint64_t masked_bool =
+ *         bit_mask_element & (1ULL << (uint64_t)(database_idx % 64));
+ *     const bool is_bit_set = (masked_bool != 0);
+ *
+ *     return is_bit_set;
+ *   }
+ * };
+ */
+}  // namespace filtering
+
+namespace ivf {
+
+/**
+ * Default value filled in the `indices` array.
+ * One may encounter it trying to access a record within a list that is outside of the
+ * `size` bound or whenever the list is allocated but not filled-in yet.
+ */
+template <typename IdxT>
+constexpr static IdxT kInvalidRecord =
+  (std::is_signed_v<IdxT> ? IdxT{0} : std::numeric_limits<IdxT>::max()) - 1;
+
+/** The data for a single IVF list. */
+template <template <typename, typename...> typename SpecT,
+          typename SizeT,
+          typename... SpecExtraArgs>
+struct list {
+  using size_type    = SizeT;
+  using spec_type    = SpecT<size_type, SpecExtraArgs...>;
+  using value_type   = typename spec_type::value_type;
+  using index_type   = typename spec_type::index_type;
+  using list_extents = typename spec_type::list_extents;
+
+  /** Possibly encoded data; it's layout is defined by `SpecT`. */
+  raft::device_mdarray<value_type, list_extents, raft::row_major> data;
+  /** Source indices. */
+  raft::device_mdarray<index_type, raft::extent_1d<size_type>, raft::row_major> indices;
+  /** The actual size of the content. */
+  std::atomic<size_type> size;
+
+  /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
+  list(raft::resources const& res, const spec_type& spec, size_type n_rows);
+};
+
+template <typename ListT, class T = void>
+struct enable_if_valid_list {};
+
+template <class T,
+          template <typename, typename...>
+          typename SpecT,
+          typename SizeT,
+          typename... SpecExtraArgs>
+struct enable_if_valid_list<list<SpecT, SizeT, SpecExtraArgs...>, T> {
+  using type = T;
+};
+
+/**
+ * Designed after `std::enable_if_t`, this trait is helpful in the instance resolution;
+ * plug this in the return type of a function that has an instance of `ivf::list` as
+ * a template parameter.
+ */
+template <typename ListT, class T = void>
+using enable_if_valid_list_t = typename enable_if_valid_list<ListT, T>::type;
+
+/**
+ * Resize a list by the given id, so that it can contain the given number of records;
+ * copy the data if necessary.
+ */
+template <typename ListT>
+void resize_list(raft::resources const& res,
+                 std::shared_ptr<ListT>& orig_list,  // NOLINT
+                 const typename ListT::spec_type& spec,
+                 typename ListT::size_type new_used_size,
+                 typename ListT::size_type old_used_size);
+
+template <typename ListT>
+enable_if_valid_list_t<ListT> serialize_list(
+  const raft::resources& handle,
+  std::ostream& os,
+  const ListT& ld,
+  const typename ListT::spec_type& store_spec,
+  std::optional<typename ListT::size_type> size_override = std::nullopt);
+template <typename ListT>
+enable_if_valid_list_t<ListT> serialize_list(
+  const raft::resources& handle,
+  std::ostream& os,
+  const std::shared_ptr<ListT>& ld,
+  const typename ListT::spec_type& store_spec,
+  std::optional<typename ListT::size_type> size_override = std::nullopt);
+
+template <typename ListT>
+enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
+                                               std::istream& is,
+                                               std::shared_ptr<ListT>& ld,
+                                               const typename ListT::spec_type& store_spec,
+                                               const typename ListT::spec_type& device_spec);
+
+}  // namespace ivf
+
+};  // namespace cuvs::neighbors
