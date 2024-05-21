@@ -39,7 +39,7 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
   raft::host_matrix_view<const IdxT, ExtentsT, raft::row_major> neighbor_candidates,
   raft::host_matrix_view<IdxT, ExtentsT, raft::row_major> indices,
   raft::host_matrix_view<DistanceT, ExtentsT, raft::row_major> distances,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) CUVS_EXPLICIT;
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded) RAFT_EXPLICIT;
 
 }
 

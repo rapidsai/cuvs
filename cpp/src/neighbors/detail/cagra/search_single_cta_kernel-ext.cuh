@@ -56,7 +56,7 @@ void select_and_run(  // raft::resources const& res,
   size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
-  cudaStream_t stream) CUVS_EXPLICIT;
+  cudaStream_t stream) RAFT_EXPLICIT;
 
 #endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 

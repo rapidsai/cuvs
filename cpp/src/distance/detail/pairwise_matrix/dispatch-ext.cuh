@@ -43,7 +43,7 @@ void pairwise_matrix_dispatch(OpT distance_op,
                               OutT* out,
                               FinOpT fin_op,
                               cudaStream_t stream,
-                              bool is_row_major) CUVS_EXPLICIT;
+                              bool is_row_major) RAFT_EXPLICIT;
 
 };  // namespace cuvs::distance::detail
 

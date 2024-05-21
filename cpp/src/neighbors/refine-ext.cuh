@@ -36,7 +36,7 @@ void refine(raft::resources const& handle,
             raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
             raft::device_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
             cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
-  CUVS_EXPLICIT;
+  RAFT_EXPLICIT;
 
 template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
 void refine(raft::resources const& handle,
@@ -46,7 +46,7 @@ void refine(raft::resources const& handle,
             raft::host_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
             raft::host_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
             cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
-  CUVS_EXPLICIT;
+  RAFT_EXPLICIT;
 
 }  // namespace cuvs::neighbors
 
