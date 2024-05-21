@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <cuvs/neighbors/dataset.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resources.hpp>

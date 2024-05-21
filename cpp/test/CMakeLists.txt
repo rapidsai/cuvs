@@ -48,6 +48,7 @@ function(ConfigureTest)
     ${TEST_NAME}
     PRIVATE cuvs
             cuvs::cuvs
+            raft::raft
             GTest::gtest
             GTest::gtest_main
             Threads::Threads

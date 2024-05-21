@@ -26,7 +26,7 @@
 #include "../test_utils.cuh"
 
 #include <cuvs/cluster/agglomerative.hpp>
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/transpose.cuh>

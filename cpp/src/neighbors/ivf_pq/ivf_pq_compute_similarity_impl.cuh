@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "../ivf_common.cuh"                 // dummy_block_sort_t
-#include "../sample_filter.cuh"              // none_ivf_sample_filter
-#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
-#include <cuvs/neighbors/ivf_pq.hpp>         // codebook_gen
+#include "../ivf_common.cuh"                       // dummy_block_sort_t
+#include "../sample_filter.cuh"                    // none_ivf_sample_filter
+#include <cuvs/distance/distance.hpp>              // cuvs::distance::DistanceType
+#include <cuvs/neighbors/ivf_pq.hpp>               // codebook_gen
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
 #include <raft/util/cuda_rt_essentials.hpp>  // RAFT_CUDA_TRY
 #include <raft/util/device_atomics.cuh>      // raft::atomicMin

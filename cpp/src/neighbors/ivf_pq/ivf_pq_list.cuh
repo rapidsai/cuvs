@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/util/integer_utils.hpp>
 

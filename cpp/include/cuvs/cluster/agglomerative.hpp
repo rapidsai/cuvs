@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <optional>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
