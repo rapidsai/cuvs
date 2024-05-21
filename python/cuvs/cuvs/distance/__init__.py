@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: import distance_types PWD etc
-
 from .distance import DISTANCE_TYPES, pairwise_distance
 
 __all__ = ["DISTANCE_TYPES", "pairwise_distance"]
