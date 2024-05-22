@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 #pragma once
-#include <dlpack/dlpack.h>
-
-#include <cuvs/core/c_api.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,40 +66,6 @@ typedef enum {
   Precomputed = 100
 } cuvsDistanceType;
 
-/**
- * @brief Compute pairwise distances for two matrices
- *
- *
- * Usage example:
- * @code{.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/distance/distance.h>
- *
- * // Create cuvsResources_t
- * cuvsResources_t res;
- * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
- *
- * // Assume a populated `DLManagedTensor` type here
- * DLManagedTensor x;
- * DLManagedTensor y;
- * DLManagedTensor dist;
- *
- * cuvsPairwiseDistance(handle, &x, &y, &dist, L2SqrtUnexpanded, 2.0);
- * @endcode
- *
- * @param[in] handle raft handle for managing expensive resources
- * @param[in] x first set of points (size n*k)
- * @param[in] y second set of points (size m*k)
- * @param[out] dist output distance matrix (size n*m)
- * @param[in] metric distance to evaluate
- * @param[in] metric_arg metric argument (used for Minkowski distance)
- */
-cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
-                                 DLManagedTensor* x,
-                                 DLManagedTensor* y,
-                                 DLManagedTensor* distances,
-                                 cuvsDistanceType metric,
-                                 float metric_arg);
 #ifdef __cplusplus
 }
 #endif
