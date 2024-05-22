@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#include <cuvs/distance/distance.h>
+#include <cuvs/distance/pairwise_distance.h>
+#include <stdint.h>
 
 void run_pairwise_distance(int64_t n_rows,
                            int64_t n_queries,
