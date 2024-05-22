@@ -47,13 +47,13 @@ files:
       - docs
       - py_version
       - rust
-      - build
+      - rapids_build
       - cuda
   rust:
     output: none
     includes:
       - cuda_version
-      - build
+      - rapids_build
       - cuda
       - rust
   py_build_py_cuvs:
