@@ -1031,7 +1031,7 @@ void search_with_filtering(
  *
  */
 void serialize(raft::resources const& handle,
-               std::string& filename,
+               const std::string& filename,
                const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 /**

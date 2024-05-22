@@ -16,7 +16,7 @@
 
 #include "../common/ann_types.hpp"
 #include "cuvs_ann_bench_param_parser.h"
-#include "raft_cagra_hnswlib_wrapper.h"
+#include "cuvs_cagra_hnswlib_wrapper.h"
 
 #include <rmm/cuda_device.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>

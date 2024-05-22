@@ -32,11 +32,11 @@
 
 namespace raft_temp {
 
-inline raft::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
+inline cuvs::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
 {
   switch (metric) {
-    case cuvs::bench::ann::Metric::kInnerProduct: return raft::distance::DistanceType::InnerProduct;
-    case cuvs::bench::ann::Metric::kEuclidean: return raft::distance::DistanceType::L2Expanded;
+    case cuvs::bench::ann::Metric::kInnerProduct: return cuvs::distance::DistanceType::InnerProduct;
+    case cuvs::bench::ann::Metric::kEuclidean: return cuvs::distance::DistanceType::L2Expanded;
     default: throw std::runtime_error("raft supports only metric type of inner product and L2");
   }
 }

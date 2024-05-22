@@ -59,17 +59,17 @@ std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
     if (algo == "raft_ivf_flat") {
-      typename cuvs::bench::ann::RaftIvfFlatGpu<T, int64_t>::BuildParam param;
+      typename cuvs::bench::ann::CuvsIvfFlatGpu<T, int64_t>::BuildParam param;
       parse_build_param<T, int64_t>(conf, param);
-      ann = std::make_unique<cuvs::bench::ann::RaftIvfFlatGpu<T, int64_t>>(metric, dim, param);
+      ann = std::make_unique<cuvs::bench::ann::CuvsIvfFlatGpu<T, int64_t>>(metric, dim, param);
     }
   }
 #endif
 #ifdef RAFT_ANN_BENCH_USE_RAFT_IVF_PQ
   if (algo == "raft_ivf_pq") {
-    typename cuvs::bench::ann::RaftIvfPQ<T, int64_t>::BuildParam param;
+    typename cuvs::bench::ann::CuvsIvfPQ<T, int64_t>::BuildParam param;
     parse_build_param<T, int64_t>(conf, param);
-    ann = std::make_unique<cuvs::bench::ann::RaftIvfPQ<T, int64_t>>(metric, dim, param);
+    ann = std::make_unique<cuvs::bench::ann::CuvsIvfPQ<T, int64_t>>(metric, dim, param);
   }
 #endif
 #ifdef RAFT_ANN_BENCH_USE_RAFT_CAGRA
@@ -100,7 +100,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
                 std::is_same_v<T, int8_t>) {
     if (algo == "raft_ivf_flat") {
       auto param =
-        std::make_unique<typename cuvs::bench::ann::RaftIvfFlatGpu<T, int64_t>::SearchParam>();
+        std::make_unique<typename cuvs::bench::ann::CuvsIvfFlatGpu<T, int64_t>::SearchParam>();
       parse_search_param<T, int64_t>(conf, *param);
       return param;
     }
@@ -108,7 +108,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
 #endif
 #ifdef RAFT_ANN_BENCH_USE_RAFT_IVF_PQ
   if (algo == "raft_ivf_pq") {
-    auto param = std::make_unique<typename cuvs::bench::ann::RaftIvfPQ<T, int64_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::ann::CuvsIvfPQ<T, int64_t>::SearchParam>();
     parse_search_param<T, int64_t>(conf, *param);
     return param;
   }

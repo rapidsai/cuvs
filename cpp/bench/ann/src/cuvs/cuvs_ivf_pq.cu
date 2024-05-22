@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "raft_ivf_pq_wrapper.h"
+#include "cuvs_ivf_pq_wrapper.h"
 
 namespace cuvs::bench::ann {
-template class RaftIvfPQ<float, int64_t>;
-template class RaftIvfPQ<half, int64_t>;
-template class RaftIvfPQ<uint8_t, int64_t>;
-template class RaftIvfPQ<int8_t, int64_t>;
+template class CuvsIvfPQ<float, int64_t>;
+// template class CuvsIvfPQ<half, int64_t>;
+template class CuvsIvfPQ<uint8_t, int64_t>;
+template class CuvsIvfPQ<int8_t, int64_t>;
 }  // namespace cuvs::bench::ann

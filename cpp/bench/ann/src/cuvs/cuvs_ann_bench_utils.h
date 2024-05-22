@@ -15,16 +15,17 @@
  */
 #pragma once
 
+#include "../../../../src/neighbors/refine.cuh"
+#include "../common/ann_types.hpp"
 #include "../common/util.hpp"
 
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/refine.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -38,13 +39,13 @@
 
 namespace cuvs::bench::ann {
 
-inline raft::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
+inline cuvs::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
 {
   if (metric == cuvs::bench::ann::Metric::kInnerProduct) {
-    return raft::distance::DistanceType::InnerProduct;
+    return cuvs::distance::DistanceType::InnerProduct;
   } else if (metric == cuvs::bench::ann::Metric::kEuclidean) {
     // Even for L2 expanded RAFT IVF Flat uses unexpanded formula
-    return raft::distance::DistanceType::L2Expanded;
+    return cuvs::distance::DistanceType::L2Expanded;
   } else {
     throw std::runtime_error("raft supports only metric type of inner product and L2");
   }
@@ -181,7 +182,7 @@ void refine_helper(const raft::resources& res,
                    int k,
                    AnnBase::index_type* neighbors,
                    float* distances,
-                   raft::distance::DistanceType metric)
+                   cuvs::distance::DistanceType metric)
 {
   using data_type    = typename DatasetT::value_type;
   using index_type   = AnnBase::index_type;
@@ -207,7 +208,7 @@ void refine_helper(const raft::resources& res,
     auto distances_device =
       raft::make_device_matrix_view<float, extents_type>(distances, batch_size, k);
 
-    raft::neighbors::refine<index_type, data_type, float, extents_type>(res,
+    cuvs::neighbors::refine<index_type, data_type, float, extents_type>(res,
                                                                         dataset_device,
                                                                         queries_device,
                                                                         candidates_device,
@@ -228,7 +229,7 @@ void refine_helper(const raft::resources& res,
       candidates_host.data_handle(), candidates.data_handle(), candidates_host.size(), stream);
 
     raft::resource::sync_stream(res);  // wait for the queries and candidates
-    raft::neighbors::refine<index_type, data_type, float, extents_type>(res,
+    cuvs::neighbors::refine<index_type, data_type, float, extents_type>(res,
                                                                         dataset_host,
                                                                         queries_host.view(),
                                                                         candidates_host.view(),

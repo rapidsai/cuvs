@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../hnswlib/hnswlib_wrapper.h"
-#include "raft_cagra_wrapper.h"
+#include "cuvs_cagra_wrapper.h"
 
 #include <memory>
 

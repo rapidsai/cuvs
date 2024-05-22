@@ -11,7 +11,7 @@ distances have been highly optimized and support a wide assortment of different 
 Distance Types
 --------------
 
-``#include <cuvs/distance/distance_types.hpp>``
+``#include <cuvs/distance/distance.hpp>``
 
 namespace *cuvs::distance*
 

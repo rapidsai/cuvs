@@ -18,6 +18,8 @@
 #include "../common/ann_types.hpp"
 #include "cuvs_ann_bench_utils.h"
 
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -25,10 +27,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/neighbors/ivf_pq.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
 #include <raft/neighbors/refine.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -37,20 +36,20 @@
 namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
-class RaftIvfPQ : public ANN<T>, public AnnGPU {
+class CuvsIvfPQ : public ANN<T>, public AnnGPU {
  public:
   using typename ANN<T>::AnnSearchParam;
   using ANN<T>::dim_;
 
   struct SearchParam : public AnnSearchParam {
-    raft::neighbors::ivf_pq::search_params pq_param;
+    cuvs::neighbors::ivf_pq::search_params pq_param;
     float refine_ratio = 1.0f;
     auto needs_dataset() const -> bool override { return refine_ratio > 1.0f; }
   };
 
-  using BuildParam = raft::neighbors::ivf_pq::index_params;
+  using BuildParam = cuvs::neighbors::ivf_pq::index_params;
 
-  RaftIvfPQ(Metric metric, int dim, const BuildParam& param)
+  CuvsIvfPQ(Metric metric, int dim, const BuildParam& param)
     : ANN<T>(metric, dim), index_params_(param), dimension_(dim)
   {
     index_params_.metric = parse_metric_type(metric);
@@ -93,43 +92,42 @@ class RaftIvfPQ : public ANN<T>, public AnnGPU {
   // handle_ must go first to make sure it dies last and all memory allocated in pool
   configured_raft_resources handle_{};
   BuildParam index_params_;
-  raft::neighbors::ivf_pq::search_params search_params_;
-  std::shared_ptr<raft::neighbors::ivf_pq::index<IdxT>> index_;
+  cuvs::neighbors::ivf_pq::search_params search_params_;
+  std::shared_ptr<cuvs::neighbors::ivf_pq::index<IdxT>> index_;
   int dimension_;
   float refine_ratio_ = 1.0;
   raft::device_matrix_view<const T, IdxT> dataset_;
 };
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::save(const std::string& file) const
+void CuvsIvfPQ<T, IdxT>::save(const std::string& file) const
 {
-  raft::neighbors::ivf_pq::serialize(handle_, file, *index_);
+  cuvs::neighbors::ivf_pq::serialize(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::load(const std::string& file)
+void CuvsIvfPQ<T, IdxT>::load(const std::string& file)
 {
-  index_ = std::make_shared<raft::neighbors::ivf_pq::index<IdxT>>(
-    std::move(raft::neighbors::ivf_pq::deserialize<IdxT>(handle_, file)));
+  cuvs::neighbors::ivf_pq::deserialize(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::build(const T* dataset, size_t nrow)
+void CuvsIvfPQ<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_v = raft::make_device_matrix_view<const T, IdxT>(dataset, IdxT(nrow), dim_);
-  std::make_shared<raft::neighbors::ivf_pq::index<IdxT>>(
-    std::move(raft::neighbors::ivf_pq::build(handle_, index_params_, dataset_v)))
+  std::make_shared<cuvs::neighbors::ivf_pq::index<IdxT>>(
+    std::move(cuvs::neighbors::ivf_pq::build(handle_, index_params_, dataset_v)))
     .swap(index_);
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<ANN<T>> RaftIvfPQ<T, IdxT>::copy()
+std::unique_ptr<ANN<T>> CuvsIvfPQ<T, IdxT>::copy()
 {
-  return std::make_unique<RaftIvfPQ<T, IdxT>>(*this);  // use copy constructor
+  return std::make_unique<CuvsIvfPQ<T, IdxT>>(*this);  // use copy constructor
 }
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::set_search_param(const AnnSearchParam& param)
+void CuvsIvfPQ<T, IdxT>::set_search_param(const AnnSearchParam& param)
 {
   auto search_param = dynamic_cast<const SearchParam&>(param);
   search_params_    = search_param.pq_param;
@@ -138,13 +136,13 @@ void RaftIvfPQ<T, IdxT>::set_search_param(const AnnSearchParam& param)
 }
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
+void CuvsIvfPQ<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 {
   dataset_ = raft::make_device_matrix_view<const T, IdxT>(dataset, nrow, index_->dim());
 }
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::search_base(
+void CuvsIvfPQ<T, IdxT>::search_base(
   const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
 {
   static_assert(std::is_integral_v<AnnBase::index_type>);
@@ -165,7 +163,7 @@ void RaftIvfPQ<T, IdxT>::search_base(
     raft::make_device_matrix_view<IdxT, uint32_t>(neighbors_IdxT, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, uint32_t>(distances, batch_size, k);
 
-  raft::neighbors::ivf_pq::search(
+  cuvs::neighbors::ivf_pq::search(
     handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
 
   if constexpr (sizeof(IdxT) != sizeof(AnnBase::index_type)) {
@@ -178,7 +176,7 @@ void RaftIvfPQ<T, IdxT>::search_base(
 }
 
 template <typename T, typename IdxT>
-void RaftIvfPQ<T, IdxT>::search(
+void CuvsIvfPQ<T, IdxT>::search(
   const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
 {
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);

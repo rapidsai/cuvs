@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "raft_cagra_wrapper.h"
+#include "cuvs_cagra_wrapper.h"
 
 namespace cuvs::bench::ann {
-template class RaftCagra<half, uint32_t>;
+// template class RaftCagra<half, uint32_t>;
 }  // namespace cuvs::bench::ann

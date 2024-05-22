@@ -16,7 +16,7 @@
 #include "cuvs_ivf_flat_wrapper.h"
 
 namespace cuvs::bench::ann {
-template class RaftIvfFlatGpu<float, int64_t>;
-template class RaftIvfFlatGpu<uint8_t, int64_t>;
-template class RaftIvfFlatGpu<int8_t, int64_t>;
+template class CuvsIvfFlatGpu<float, int64_t>;
+template class CuvsIvfFlatGpu<uint8_t, int64_t>;
+template class CuvsIvfFlatGpu<int8_t, int64_t>;
 }  // namespace cuvs::bench::ann
