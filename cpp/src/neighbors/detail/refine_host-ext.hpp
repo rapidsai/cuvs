@@ -17,10 +17,10 @@
 #pragma once
 
 #include "refine_host-inl.hpp"
-#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
-#include <raft/core/detail/macros.hpp>       // _RAFT_HAS_CUDA
-#include <raft/core/host_mdspan.hpp>         // raft::host_matrix_view
-#include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
+#include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
+#include <raft/core/detail/macros.hpp>  // _RAFT_HAS_CUDA
+#include <raft/core/host_mdspan.hpp>    // raft::host_matrix_view
+#include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #include <cstdint>  // int64_t
 

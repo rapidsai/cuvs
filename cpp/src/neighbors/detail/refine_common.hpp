@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/mdspan.hpp>
 
 namespace cuvs::neighbors::detail {

@@ -16,8 +16,8 @@
 #pragma once
 
 #include "compute_distance_vpq.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>  // none_cagra_sample_filter
-#include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
+#include <cuvs/neighbors/common.hpp>    // none_cagra_sample_filter
+#include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #include <cuda_fp16.h>
 

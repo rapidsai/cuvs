@@ -19,7 +19,7 @@
 #include "hashmap.hpp"
 #include "utils.hpp"
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/operators.hpp>
 
 // TODO: This shouldn't be invoking spatial/knn

@@ -17,7 +17,7 @@
 #pragma once
 
 #include "search_multi_cta_kernel-inl.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 

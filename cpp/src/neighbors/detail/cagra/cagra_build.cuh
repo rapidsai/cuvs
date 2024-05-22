@@ -28,7 +28,7 @@
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 // TODO: Fixme- this needs to be migrated

@@ -18,7 +18,7 @@
 #include "../../distance/distance.cuh"
 #include "../../distance/fused_distance_nn.cuh"
 #include <cuvs/cluster/kmeans.hpp>
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>

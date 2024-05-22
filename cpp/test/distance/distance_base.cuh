@@ -18,8 +18,8 @@
 
 #include "../test_utils.cuh"
 
-#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
-#include <cuvs/distance/pairwise_distance.hpp>
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
 #include <raft/common/nvtx.hpp>         // raft::common::nvtx::range
 #include <raft/core/device_mdspan.hpp>  //raft::make_device_matrix_view
 #include <raft/core/operators.hpp>      // raft::sqrt

@@ -16,7 +16,7 @@
 # cython: language_level=3
 
 
-cdef extern from "cuvs/distance/distance_types.h" nogil:
+cdef extern from "cuvs/distance/distance.h" nogil:
     ctypedef enum cuvsDistanceType:
         L2Expanded
         L2SqrtExpanded

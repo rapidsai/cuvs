@@ -20,8 +20,8 @@
 #include "../ivf_flat/ivf_flat_interleaved_scan.cuh"
 #include "ann_utils.cuh"
 #include "refine_common.hpp"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/sample_filter.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/nvtx.hpp>
