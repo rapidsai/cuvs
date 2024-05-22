@@ -17,7 +17,7 @@ set(RAFT_FORK "rapidsai")
 set(RAFT_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
 
 function(find_and_configure_raft)
-    set(oneValueArgs VERSION FORK PINNED_TAG COMPILE_LIBRARY USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)
+    set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
@@ -30,16 +30,6 @@ function(find_and_configure_raft)
     endif()
 
     set(RAFT_COMPONENTS "")
-
-    if(PKG_COMPILE_LIBRARY)
-      if(NOT PKG_USE_RAFT_STATIC)
-        string(APPEND RAFT_COMPONENTS " compiled")
-        set(RAFT_COMPILED_LIB raft::compiled PARENT_SCOPE)
-      else()
-        string(APPEND RAFT_COMPONENTS " compiled_static")
-        set(RAFT_COMPILED_LIB raft::compiled_static PARENT_SCOPE)
-      endif()
-    endif()
 
     if(PKG_ENABLE_MNMG_DEPENDENCIES)
         string(APPEND RAFT_COMPONENTS " distributed")
@@ -62,7 +52,7 @@ function(find_and_configure_raft)
               "BUILD_PRIMS_BENCH OFF"
               "BUILD_ANN_BENCH OFF"
               "RAFT_NVTX ${PKG_ENABLE_NVTX}"
-              "RAFT_COMPILE_LIBRARY ${PKG_COMPILE_LIBRARY}"
+              "RAFT_COMPILE_LIBRARY OFF"
             )
 endfunction()
 
@@ -72,7 +62,6 @@ endfunction()
 find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         FORK                     ${RAFT_FORK}
         PINNED_TAG               ${RAFT_PINNED_TAG}
-        COMPILE_LIBRARY          ON
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}

@@ -447,14 +447,29 @@ target_include_directories(
               "$<INSTALL_INTERFACE:include>"
 )
 
+rapids_find_package(
+  OpenMP REQUIRED
+  BUILD_EXPORT_SET cuvs-exports
+  INSTALL_EXPORT_SET cuvs-exports
+)
+
 if(NOT BUILD_CPU_ONLY)
+
+  set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
+  set(CUVS_CUBLAS_DEPENDENCY CUDA::cublas${_ctk_static_suffix})
+  set(CUVS_CURAND_DEPENDENCY CUDA::curand${_ctk_static_suffix})
+  set(CUVS_CUSPARSE_DEPENDENCY CUDA::cusparse${_ctk_static_suffix})
+
+  set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
+                                 ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
+  )
+
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
-    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
-           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
+    PUBLIC rmm::rmm raft::raft
+    PRIVATE nvidia::cutlass::cutlass ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
@@ -559,7 +574,7 @@ if(BUILD_C_LIBRARY)
   target_link_libraries(
     cuvs_c
     PUBLIC cuvs::cuvs
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+    PRIVATE raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
   )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
