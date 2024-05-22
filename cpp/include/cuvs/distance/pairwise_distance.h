@@ -41,10 +41,10 @@ extern "C" {
  * DLManagedTensor y;
  * DLManagedTensor dist;
  *
- * cuvsPairwiseDistance(handle, &x, &y, &dist, L2SqrtUnexpanded, 2.0);
+ * cuvsPairwiseDistance(res, &x, &y, &dist, L2SqrtUnexpanded, 2.0);
  * @endcode
  *
- * @param[in] handle raft handle for managing expensive resources
+ * @param[in] res cuvs resources object for managing expensive resources
  * @param[in] x first set of points (size n*k)
  * @param[in] y second set of points (size m*k)
  * @param[out] dist output distance matrix (size n*m)
@@ -54,7 +54,7 @@ extern "C" {
 cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
                                  DLManagedTensor* x,
                                  DLManagedTensor* y,
-                                 DLManagedTensor* distances,
+                                 DLManagedTensor* dist,
                                  cuvsDistanceType metric,
                                  float metric_arg);
 #ifdef __cplusplus
