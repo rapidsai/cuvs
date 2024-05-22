@@ -279,6 +279,11 @@ void optimize(
  * @param[in] res
  * @param[in] params parameters for building the index
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[in] nn_descent_params optional parameters for NN_DESCENT (default: nullopt)
+ * @param[in] refine_rate optional refinement rate for IVF_PQ (default: nullopt)
+ * @param[in] pq_build_params optional build parameters for IVF_PQ (default: nullopt)
+ * @param[in] search_params optional search parameters for IVF_PQ (default: nullopt)
+ * @param[in] construct_index_with_dataset optional boolean (default: true)
  *
  * @return the constructed cagra index
  */
@@ -289,9 +294,21 @@ template <typename T,
 index<T, IdxT> build(
   raft::resources const& res,
   const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params,
+  std::optional<float> refine_rate,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params,
+  bool construct_index_with_dataset)
 {
-  return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
+  return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res,
+                                                                  params,
+                                                                  dataset,
+                                                                  nn_descent_params,
+                                                                  refine_rate,
+                                                                  pq_build_params,
+                                                                  search_params,
+                                                                  construct_index_with_dataset);
 }
 
 /**

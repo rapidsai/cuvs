@@ -158,8 +158,8 @@ struct AnnCagraInputs {
   bool include_serialized_dataset;
   // std::optional<double>
   double min_recall;  // = std::nullopt;
-  std::optional<vpq_params> compression           = std::nullopt;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
+  std::optional<vpq_params> compression           = std::nullopt;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -248,13 +248,14 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
 
-            index = cagra::build(handle_, index_params, database_host_view);
-            // index = cagra::detail::build(handle_, index_params, database_host_view, std::nullopt,
-            // ps.ivf_pq_search_refine_ratio);
+            index = cagra::build(handle_,
+                                 index_params,
+                                 database_host_view,
+                                 std::nullopt,
+                                 ps.ivf_pq_search_refine_ratio);
           } else {
-            index = cagra::build(handle_, index_params, database_view);
-            // index = cagra::detail::build(handle_, index_params, database_view, std::nullopt,
-            // ps.ivf_pq_search_refine_ratio);
+            index = cagra::build(
+              handle_, index_params, database_view, std::nullopt, ps.ivf_pq_search_refine_ratio);
           };
 
           cagra::serialize_file(handle_, "cagra_index", index, ps.include_serialized_dataset);
@@ -463,9 +464,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   // refinement options
   inputs2 =
     raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {10000},
+                                                   {5000},
                                                    {32, 64},
-                                                   {10},
+                                                   {16},
                                                    {graph_build_algo::IVF_PQ},
                                                    {search_algo::AUTO},
                                                    {10},
@@ -476,7 +477,6 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {false, true},
                                                    {false},
                                                    {0.995},
-                                                   {std::optional<vpq_params>(std::nullopt)},
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 

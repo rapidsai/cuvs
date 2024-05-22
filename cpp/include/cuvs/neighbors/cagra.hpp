@@ -19,6 +19,8 @@
 #include "ann_types.hpp"
 #include <cuvs/distance/distance_types.hpp>
 #include <cuvs/neighbors/dataset.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -385,35 +387,65 @@ struct index : ann::index {
  * @defgroup cagra_cpp_index_build CAGRA index build functions
  * @{
  */
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset = true) -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset = true) -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset = true) -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset = true) -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset = true) -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::cagra::index_params& params,
-           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::cagra::index_params& params,
+  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt,
+  std::optional<float> refine_rate                                           = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params       = std::nullopt,
+  std::optional<cuvs::neighbors::ivf_pq::search_params> search_params        = std::nullopt,
+  bool construct_index_with_dataset = true) -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
  */

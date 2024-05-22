@@ -22,18 +22,42 @@ namespace cuvs::neighbors::cagra {
 #define RAFT_INST_CAGRA_BUILD(T, IdxT)                                                   \
   auto build(raft::resources const& handle,                                              \
              const cuvs::neighbors::cagra::index_params& params,                         \
-             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)        \
+             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,        \
+             std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params, \
+             std::optional<float> refine_rate,                                           \
+             std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params,       \
+             std::optional<cuvs::neighbors::ivf_pq::search_params> search_params,        \
+             bool construct_index_with_dataset)                                          \
     ->cuvs::neighbors::cagra::index<T, IdxT>                                             \
   {                                                                                      \
-    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);              \
+    return cuvs::neighbors::cagra::build<T, IdxT>(handle,                                \
+                                                  params,                                \
+                                                  dataset,                               \
+                                                  nn_descent_params,                     \
+                                                  refine_rate,                           \
+                                                  pq_build_params,                       \
+                                                  search_params,                         \
+                                                  construct_index_with_dataset);         \
   }                                                                                      \
                                                                                          \
   auto build(raft::resources const& handle,                                              \
              const cuvs::neighbors::cagra::index_params& params,                         \
-             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)          \
+             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,          \
+             std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params, \
+             std::optional<float> refine_rate,                                           \
+             std::optional<cuvs::neighbors::ivf_pq::index_params> pq_build_params,       \
+             std::optional<cuvs::neighbors::ivf_pq::search_params> search_params,        \
+             bool construct_index_with_dataset)                                          \
     ->cuvs::neighbors::cagra::index<T, IdxT>                                             \
   {                                                                                      \
-    return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);              \
+    return cuvs::neighbors::cagra::build<T, IdxT>(handle,                                \
+                                                  params,                                \
+                                                  dataset,                               \
+                                                  nn_descent_params,                     \
+                                                  refine_rate,                           \
+                                                  pq_build_params,                       \
+                                                  search_params,                         \
+                                                  construct_index_with_dataset);         \
   }                                                                                      \
                                                                                          \
   void build_device(raft::resources const& handle,                                       \
