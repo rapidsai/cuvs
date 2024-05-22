@@ -44,8 +44,8 @@ function(find_and_configure_raft)
             INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
-              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
-              GIT_TAG               ${PKG_PINNED_TAG}
+              GIT_REPOSITORY        https://github.com/rhdong/raft.git
+              GIT_TAG               pbf
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"
