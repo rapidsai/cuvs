@@ -25,7 +25,6 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
-#include <cuvs/distance/distance.h>
 #include <cuvs/distance/distance.hpp>
 
 namespace {
@@ -59,14 +58,24 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
                                             float metric_arg)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto x = x_tensor->dl_tensor;
+    auto x_dt    = x_tensor->dl_tensor.dtype;
+    auto y_dt    = x_tensor->dl_tensor.dtype;
+    auto dist_dt = x_tensor->dl_tensor.dtype;
 
-    if (x.dtype.code == kDLFloat && x.dtype.bits == 32) {
+    if ((x_dt.code != kDLFloat) || (y_dt.code != kDLFloat) || (dist_dt.code != kDLFloat)) {
+      RAFT_FAIL("Inputs to cuvsPairwiseDistance must all be floating point tensors");
+    }
+
+    if ((x_dt.bits != y_dt.bits) || (x_dt.bits != dist_dt.bits)) {
+      RAFT_FAIL("Inputs to cuvsPairwiseDistance must all have the same dtype");
+    }
+
+    if (x_dt.bits == 32) {
       _pairwise_distance<float>(res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
-    } else if (x.dtype.code == kDLFloat && x.dtype.bits == 64) {
+    } else if (x_dt.bits == 64) {
       _pairwise_distance<double>(res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
     } else {
-      RAFT_FAIL("Unsupported x DLtensor dtype: %d and bits: %d", x.dtype.code, x.dtype.bits);
+      RAFT_FAIL("Unsupported DLtensor dtype: %d and bits: %d", x_dt.code, x_dt.bits);
     }
   });
 }
