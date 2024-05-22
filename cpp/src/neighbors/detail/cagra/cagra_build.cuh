@@ -212,9 +212,7 @@ void build_knn_graph(
   size_t next_report_offset = 0;
   size_t d_report_offset    = dataset.extent(0) / 100;  // Report progress in 1% steps.
 
-  bool host_refinement   = raft::is_host_mdspan_v<decltype(dataset)> && top_k != gpu_top_k;
-  bool device_refinement = !raft::is_host_mdspan_v<decltype(dataset)> && top_k != gpu_top_k;
-
+  bool async_host_processing   = raft::is_host_mdspan_v<decltype(dataset)> || top_k == gpu_top_k;
   size_t previous_batch_size   = 0;
   size_t previous_batch_offset = 0;
 
@@ -231,7 +229,7 @@ void build_knn_graph(
     cuvs::neighbors::ivf_pq::search(
       res, *search_params, index, queries_view, neighbors_view, distances_view);
 
-    if (!device_refinement) {
+    if (async_host_processing) {
       // process previous batch async on host
       // NOTE: the async path also covers disabled refinement (top_k == gpu_top_k)
       if (previous_batch_size > 0) {
@@ -254,7 +252,7 @@ void build_knn_graph(
                  neighbors.data_handle(),
                  neighbors_view.size(),
                  raft::resource::get_cuda_stream(res));
-      if (host_refinement) {
+      if (top_k != gpu_top_k) {
         // can be skipped for disabled refinement
         raft::copy(queries_host.data_handle(),
                    batch.data(),
