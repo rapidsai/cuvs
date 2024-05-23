@@ -16,10 +16,8 @@
 
 #include "./detail/knn_brute_force.cuh"
 
-#include <cuvs/core/bitmap.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
-#include <raft/core/bitset.cuh>
 #include <raft/core/copy.hpp>
 
 namespace cuvs::neighbors::brute_force {

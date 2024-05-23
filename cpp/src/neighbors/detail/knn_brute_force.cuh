@@ -26,6 +26,7 @@
 #include "./knn_merge_parts.cuh"
 #include "./knn_utils.cuh"
 
+#include <raft/core/bitmap.cuh>
 #include <raft/core/detail/popc.cuh>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/resource/cuda_stream.hpp>

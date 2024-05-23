@@ -20,16 +20,9 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
-#include <raft/core/bitmap.cuh>
-#include <raft/core/device_csr_matrix.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_mdspan.hpp>
-#include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/random/rng_state.hpp>
-#include <raft/util/cuda_utils.cuh>
 
 #include <gtest/gtest.h>
 
