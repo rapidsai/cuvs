@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -100,7 +101,7 @@ void compress_to_bits(raft::resources const& handle,
                       raft::device_matrix_view<const bool, int, raft::layout_c_contiguous> in,
                       raft::device_matrix_view<T, int, raft::layout_c_contiguous> out)
 {
-  auto stream                    = resource::get_cuda_stream(handle);
+  auto stream                    = raft::resource::get_cuda_stream(handle);
   constexpr int bits_per_element = 8 * sizeof(T);
 
   RAFT_EXPECTS(raft::ceildiv(in.extent(0), bits_per_element) == out.extent(0),

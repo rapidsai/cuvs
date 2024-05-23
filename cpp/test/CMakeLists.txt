@@ -52,6 +52,7 @@ function(ConfigureTest)
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
+            ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
@@ -166,6 +167,8 @@ if(BUILD_TESTS)
     test/distance/dist_l_inf.cu
     test/distance/dist_lp_unexp.cu
     test/distance/dist_russell_rao.cu
+    test/distance/masked_nn.cu
+    test/sparse/neighbors/cross_component_nn.cu
     GPUS
     1
     PERCENT

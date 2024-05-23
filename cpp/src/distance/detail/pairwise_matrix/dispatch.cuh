@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
 #include "dispatch-inl.cuh"
 #endif
 
