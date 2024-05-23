@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
 #include "search_single_cta_kernel-inl.cuh"
 #endif
 

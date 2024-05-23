@@ -81,6 +81,7 @@ endif()
 rapids_cython_init()
 
 add_subdirectory(cuvs/common)
+add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
 
 if(DEFINED cython_lib_dir)

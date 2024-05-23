@@ -356,7 +356,8 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * cuvsError_t params_create_status = cuvsCagraSearchParamsCreate(&params);
  *
  * // Search the `index` built using `cuvsCagraBuild`
- * cuvsError_t search_status = cuvsCagraSearch(res, params, index, queries, neighbors, distances);
+ * cuvsError_t search_status = cuvsCagraSearch(res, params, index, &queries, &neighbors,
+ * &distances);
  *
  * // de-allocate `params` and `res`
  * cuvsError_t params_destroy_status = cuvsCagraSearchParamsDestroy(params);
