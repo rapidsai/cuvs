@@ -30,8 +30,9 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.distance.pairwise_distance import DISTANCE_TYPES
 from pylibraft.neighbors.common import _check_input_array
+
+from cuvs.distance import DISTANCE_TYPES
 
 from libc.stdint cimport (
     int8_t,
