@@ -595,6 +595,146 @@ void build(raft::resources const& handle,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 /**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_pq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a host_matrix_view to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-pq index
+ */
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+ *   ivf_pq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_pq::index
+ *
+ */
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_pq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a host_matrix_view to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-pq index
+ */
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+ *   ivf_pq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_pq::index
+ *
+ */
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = ivf_pq::build(handle, index_params, dataset);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset a host_matrix_view to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed ivf-pq index
+ */
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
+ *   ivf_pq::build(handle, index_params, dataset, index);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] index_params configure the index building
+ * @param[in] dataset raft::host_matrix_view to a row-major matrix [n_rows, dim]
+ * @param[out] idx reference to ivf_pq::index
+ *
+ */
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+           cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+/**
  * @}
  */
 
