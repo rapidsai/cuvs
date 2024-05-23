@@ -24,7 +24,7 @@
 
 #include <cstdint>  // int64_t
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs::neighbors {
 
