@@ -42,10 +42,10 @@ extern template class cuvs::bench::ann::CuvsIvfPQ<int8_t, int64_t>;
 #include "cuvs_cagra_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
-extern template class cuvs::bench::ann::RaftCagra<float, uint32_t>;
-extern template class cuvs::bench::ann::RaftCagra<half, uint32_t>;
-extern template class cuvs::bench::ann::RaftCagra<uint8_t, uint32_t>;
-extern template class cuvs::bench::ann::RaftCagra<int8_t, uint32_t>;
+extern template class cuvs::bench::ann::CuvsCagra<float, uint32_t>;
+extern template class cuvs::bench::ann::CuvsCagra<half, uint32_t>;
+extern template class cuvs::bench::ann::CuvsCagra<uint8_t, uint32_t>;
+extern template class cuvs::bench::ann::CuvsCagra<int8_t, uint32_t>;
 #endif
 
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
@@ -179,7 +179,7 @@ nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::RaftCagra<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::ann::CuvsCagra<T, IdxT>::BuildParam& param)
 {
   if (conf.contains("graph_degree")) {
     param.cagra_params.graph_degree              = conf.at("graph_degree");
@@ -243,7 +243,7 @@ cuvs::bench::ann::AllocatorType parse_allocator(std::string mem_type)
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::RaftCagra<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::ann::CuvsCagra<T, IdxT>::SearchParam& param)
 {
   if (conf.contains("itopk")) { param.p.itopk_size = conf.at("itopk"); }
   if (conf.contains("search_width")) { param.p.search_width = conf.at("search_width"); }

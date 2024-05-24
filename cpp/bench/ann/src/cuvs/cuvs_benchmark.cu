@@ -74,9 +74,9 @@ std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
 #endif
 #ifdef RAFT_ANN_BENCH_USE_RAFT_CAGRA
   if (algo == "raft_cagra") {
-    typename cuvs::bench::ann::RaftCagra<T, uint32_t>::BuildParam param;
+    typename cuvs::bench::ann::CuvsCagra<T, uint32_t>::BuildParam param;
     parse_build_param<T, uint32_t>(conf, param);
-    ann = std::make_unique<cuvs::bench::ann::RaftCagra<T, uint32_t>>(metric, dim, param);
+    ann = std::make_unique<cuvs::bench::ann::CuvsCagra<T, uint32_t>>(metric, dim, param);
   }
 #endif
 
@@ -115,7 +115,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
 #endif
 #ifdef RAFT_ANN_BENCH_USE_RAFT_CAGRA
   if (algo == "raft_cagra") {
-    auto param = std::make_unique<typename cuvs::bench::ann::RaftCagra<T, uint32_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::ann::CuvsCagra<T, uint32_t>::SearchParam>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }

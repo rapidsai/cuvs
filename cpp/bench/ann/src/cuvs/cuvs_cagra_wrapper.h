@@ -15,24 +15,24 @@
  */
 #pragma once
 
+#include "../../../../src/neighbors/detail/cagra/utils.hpp"
 #include "../common/ann_types.hpp"
 #include "../common/cuda_huge_page_resource.hpp"
 #include "../common/cuda_pinned_resource.hpp"
 #include "cuvs_ann_bench_utils.h"
 
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/neighbors/cagra.cuh>
-#include <raft/neighbors/cagra_serialize.cuh>
-#include <raft/neighbors/cagra_types.hpp>
-#include <raft/neighbors/dataset.hpp>
-#include <raft/neighbors/detail/cagra/cagra_build.cuh>
-#include <raft/neighbors/ivf_pq_types.hpp>
-#include <raft/neighbors/nn_descent_types.hpp>
+//#include <raft/neighbors/dataset.hpp>
+//#include <raft/neighbors/detail/cagra/cagra_build.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
@@ -51,12 +51,12 @@ namespace cuvs::bench::ann {
 
 enum class AllocatorType { HostPinned, HostHugePage, Device };
 template <typename T, typename IdxT>
-class RaftCagra : public ANN<T>, public AnnGPU {
+class CuvsCagra : public ANN<T>, public AnnGPU {
  public:
   using typename ANN<T>::AnnSearchParam;
 
   struct SearchParam : public AnnSearchParam {
-    raft::neighbors::experimental::cagra::search_params p;
+    cuvs::neighbors::cagra::search_params p;
     float refine_ratio;
     AllocatorType graph_mem   = AllocatorType::Device;
     AllocatorType dataset_mem = AllocatorType::Device;
@@ -64,25 +64,25 @@ class RaftCagra : public ANN<T>, public AnnGPU {
   };
 
   struct BuildParam {
-    raft::neighbors::cagra::index_params cagra_params;
-    std::optional<raft::neighbors::experimental::nn_descent::index_params> nn_descent_params =
-      std::nullopt;
+    cuvs::neighbors::cagra::index_params cagra_params;
+    std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
-    std::optional<raft::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
-    std::optional<raft::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
+    std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
+    std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
   };
 
-  RaftCagra(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
+  CuvsCagra(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
     : ANN<T>(metric, dim),
       index_params_(param),
       dimension_(dim),
       need_dataset_update_(true),
-      dataset_(std::make_shared<raft::device_matrix<T, int64_t, row_major>>(
-        std::move(make_device_matrix<T, int64_t>(handle_, 0, 0)))),
-      graph_(std::make_shared<raft::device_matrix<IdxT, int64_t, row_major>>(
-        std::move(make_device_matrix<IdxT, int64_t>(handle_, 0, 0)))),
+      dataset_(std::make_shared<raft::device_matrix<T, int64_t, raft::row_major>>(
+        std::move(raft::make_device_matrix<T, int64_t>(handle_, 0, 0)))),
+      graph_(std::make_shared<raft::device_matrix<IdxT, int64_t, raft::row_major>>(
+        std::move(raft::make_device_matrix<IdxT, int64_t>(handle_, 0, 0)))),
       input_dataset_v_(
-        std::make_shared<raft::device_matrix_view<const T, int64_t, row_major>>(nullptr, 0, 0)),
+        std::make_shared<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
+          nullptr, 0, 0)),
       graph_mem_(AllocatorType::Device),
       dataset_mem_(AllocatorType::Device)
   {
@@ -135,12 +135,12 @@ class RaftCagra : public ANN<T>, public AnnGPU {
   float refine_ratio_;
   BuildParam index_params_;
   bool need_dataset_update_;
-  raft::neighbors::cagra::search_params search_params_;
-  std::shared_ptr<raft::neighbors::cagra::index<T, IdxT>> index_;
+  cuvs::neighbors::cagra::search_params search_params_;
+  std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>> index_;
   int dimension_;
-  std::shared_ptr<raft::device_matrix<IdxT, int64_t, row_major>> graph_;
-  std::shared_ptr<raft::device_matrix<T, int64_t, row_major>> dataset_;
-  std::shared_ptr<raft::device_matrix_view<const T, int64_t, row_major>> input_dataset_v_;
+  std::shared_ptr<raft::device_matrix<IdxT, int64_t, raft::row_major>> graph_;
+  std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
+  std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
@@ -153,7 +153,7 @@ class RaftCagra : public ANN<T>, public AnnGPU {
 };
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::build(const T* dataset, size_t nrow)
+void CuvsCagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t>(dataset, IdxT(nrow), dimension_);
@@ -163,15 +163,13 @@ void RaftCagra<T, IdxT>::build(const T* dataset, size_t nrow)
   // Do include the compressed dataset for the CAGRA-Q
   bool shall_include_dataset = params.compression.has_value();
 
-  index_ = std::make_shared<raft::neighbors::cagra::index<T, IdxT>>(
-    std::move(raft::neighbors::cagra::detail::build(handle_,
-                                                    params,
-                                                    dataset_view,
-                                                    index_params_.nn_descent_params,
-                                                    index_params_.ivf_pq_refine_rate,
-                                                    index_params_.ivf_pq_build_params,
-                                                    index_params_.ivf_pq_search_params,
-                                                    shall_include_dataset)));
+  index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
+    std::move(cuvs::neighbors::cagra::build(handle_, params, dataset_view)));
+  //                                                   index_params_.nn_descent_params,
+  //                                                   index_params_.ivf_pq_refine_rate,
+  //                                                   index_params_.ivf_pq_build_params,
+  //                                                   index_params_.ivf_pq_search_params,
+  //                                                   shall_include_dataset)));
 }
 
 inline std::string allocator_to_string(AllocatorType mem_type)
@@ -187,7 +185,7 @@ inline std::string allocator_to_string(AllocatorType mem_type)
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
+void CuvsCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
 {
   auto search_param = dynamic_cast<const SearchParam&>(param);
   search_params_    = search_param.p;
@@ -198,8 +196,8 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
     RAFT_LOG_DEBUG("moving graph to new memory space: %s", allocator_to_string(graph_mem_).c_str());
     // We create a new graph and copy to it from existing graph
     auto mr        = get_mr(graph_mem_);
-    auto new_graph = make_device_mdarray<IdxT, int64_t>(
-      handle_, mr, make_extents<int64_t>(index_->graph().extent(0), index_->graph_degree()));
+    auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(
+      handle_, mr, raft::make_extents<int64_t>(index_->graph().extent(0), index_->graph_degree()));
 
     raft::copy(new_graph.data_handle(),
                index_->graph().data_handle(),
@@ -215,7 +213,7 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
     dataset_mem_ = search_param.dataset_mem;
 
     // First free up existing memory
-    *dataset_ = make_device_matrix<T, int64_t>(handle_, 0, 0);
+    *dataset_ = raft::make_device_matrix<T, int64_t>(handle_, 0, 0);
     index_->update_dataset(handle_, make_const_mdspan(dataset_->view()));
 
     // Allocate space using the correct memory resource.
@@ -223,7 +221,7 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
                    allocator_to_string(dataset_mem_).c_str());
 
     auto mr = get_mr(dataset_mem_);
-    raft::neighbors::cagra::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
+    cuvs::neighbors::cagra::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
 
     auto dataset_view = raft::make_device_strided_matrix_view<const T, int64_t>(
       dataset_->data_handle(), dataset_->extent(0), this->dim_, dataset_->extent(1));
@@ -234,48 +232,48 @@ void RaftCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
+void CuvsCagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 {
   using ds_idx_type = decltype(index_->data().n_rows());
   bool is_vpq =
-    dynamic_cast<const raft::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
-    dynamic_cast<const raft::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
+    dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
+    dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
   // It can happen that we are re-using a previous algo object which already has
   // the dataset set. Check if we need update.
   if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
       input_dataset_v_->data_handle() != dataset) {
-    *input_dataset_v_    = make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
+    *input_dataset_v_ = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
     need_dataset_update_ = !is_vpq;  // ignore update if this is a VPQ dataset.
   }
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::save(const std::string& file) const
+void CuvsCagra<T, IdxT>::save(const std::string& file) const
 {
-  raft::neighbors::cagra::serialize<T, IdxT>(handle_, file, *index_);
+  cuvs::neighbors::cagra::serialize_file(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
+void CuvsCagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
-  raft::neighbors::cagra::serialize_to_hnswlib<T, IdxT>(handle_, file, *index_);
+  cuvs::neighbors::cagra::serialize_to_hnswlib_file(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::load(const std::string& file)
+void CuvsCagra<T, IdxT>::load(const std::string& file)
 {
-  index_ = std::make_shared<raft::neighbors::cagra::index<T, IdxT>>(
-    std::move(raft::neighbors::cagra::deserialize<T, IdxT>(handle_, file)));
+  index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
+  cuvs::neighbors::cagra::deserialize_file(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<ANN<T>> RaftCagra<T, IdxT>::copy()
+std::unique_ptr<ANN<T>> CuvsCagra<T, IdxT>::copy()
 {
-  return std::make_unique<RaftCagra<T, IdxT>>(*this);  // use copy constructor
+  return std::make_unique<CuvsCagra<T, IdxT>>(*this);  // use copy constructor
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::search_base(
+void CuvsCagra<T, IdxT>::search_base(
   const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
 {
   static_assert(std::is_integral_v<AnnBase::index_type>);
@@ -295,7 +293,7 @@ void RaftCagra<T, IdxT>::search_base(
   auto neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(neighbors_IdxT, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
-  raft::neighbors::cagra::search(
+  cuvs::neighbors::cagra::search(
     handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
 
   if constexpr (sizeof(IdxT) != sizeof(AnnBase::index_type)) {
@@ -308,26 +306,27 @@ void RaftCagra<T, IdxT>::search_base(
 }
 
 template <typename T, typename IdxT>
-void RaftCagra<T, IdxT>::search(
+void CuvsCagra<T, IdxT>::search(
   const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
 {
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);
   const bool disable_refinement = k0 <= static_cast<size_t>(k);
   const raft::resources& res    = handle_;
 
-  if (disable_refinement) {
-    search_base(queries, batch_size, k, neighbors, distances);
-  } else {
-    auto queries_v =
-      raft::make_device_matrix_view<const T, AnnBase::index_type>(queries, batch_size, dimension_);
-    auto candidate_ixs =
-      raft::make_device_matrix<AnnBase::index_type, AnnBase::index_type>(res, batch_size, k0);
-    auto candidate_dists =
-      raft::make_device_matrix<float, AnnBase::index_type>(res, batch_size, k0);
-    search_base(
-      queries, batch_size, k0, candidate_ixs.data_handle(), candidate_dists.data_handle());
-    refine_helper(
-      res, *input_dataset_v_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
-  }
+  if (disable_refinement) { search_base(queries, batch_size, k, neighbors, distances); }
+  //  else {
+  //   auto queries_v =
+  //     raft::make_device_matrix_view<const T, AnnBase::index_type>(queries, batch_size,
+  //     dimension_);
+  //   auto candidate_ixs =
+  //     raft::make_device_matrix<AnnBase::index_type, AnnBase::index_type>(res, batch_size, k0);
+  //   auto candidate_dists =
+  //     raft::make_device_matrix<float, AnnBase::index_type>(res, batch_size, k0);
+  //   search_base(
+  //     queries, batch_size, k0, candidate_ixs.data_handle(), candidate_dists.data_handle());
+  //   refine_helper(
+  //     res, *input_dataset_v_, queries_v, candidate_ixs, k, neighbors, distances,
+  //     index_->metric());
+  // }
 }
 }  // namespace cuvs::bench::ann

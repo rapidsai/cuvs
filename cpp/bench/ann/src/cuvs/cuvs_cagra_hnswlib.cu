@@ -29,7 +29,7 @@ namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::RaftCagraHnswlib<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::ann::CuvsCagraHnswlib<T, IdxT>::SearchParam& param)
 {
   param.ef = conf.at("ef");
   if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
@@ -50,9 +50,9 @@ std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
 
   if constexpr (std::is_same_v<T, float> or std::is_same_v<T, std::uint8_t>) {
     if (algo == "raft_cagra_hnswlib") {
-      typename cuvs::bench::ann::RaftCagraHnswlib<T, uint32_t>::BuildParam param;
+      typename cuvs::bench::ann::CuvsCagraHnswlib<T, uint32_t>::BuildParam param;
       parse_build_param<T, uint32_t>(conf, param);
-      ann = std::make_unique<cuvs::bench::ann::RaftCagraHnswlib<T, uint32_t>>(metric, dim, param);
+      ann = std::make_unique<cuvs::bench::ann::CuvsCagraHnswlib<T, uint32_t>>(metric, dim, param);
     }
   }
 
@@ -67,7 +67,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
 {
   if (algo == "raft_cagra_hnswlib") {
     auto param =
-      std::make_unique<typename cuvs::bench::ann::RaftCagraHnswlib<T, uint32_t>::SearchParam>();
+      std::make_unique<typename cuvs::bench::ann::CuvsCagraHnswlib<T, uint32_t>::SearchParam>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }

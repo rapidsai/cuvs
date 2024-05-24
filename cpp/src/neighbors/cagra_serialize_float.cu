@@ -54,9 +54,9 @@ namespace cuvs::neighbors::cagra {
                                                                                                   \
   void serialize_to_hnswlib_file(raft::resources const& handle,                                   \
                                  const std::string& filename,                                     \
-                                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index)     \
+                                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)     \
   {                                                                                               \
-    cuvs::neighbors::cagra::serialize_to_hnswlib<DTYPE, uint32_t>(handle, filename, index);       \
+    cuvs::neighbors::cagra::serialize_to_hnswlib<DTYPE, uint32_t>(handle, filename, *index);      \
   };                                                                                              \
   void serialize_to_hnswlib(raft::resources const& handle,                                        \
                             std::string& str,                                                     \

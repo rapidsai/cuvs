@@ -531,6 +531,19 @@ void serialize(raft::resources const& handle,
 void deserialize(raft::resources const& handle,
                  const std::string& str,
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+
+void serialize_to_hnswlib_file(raft::resources const& handle,
+                               const std::string& filename,
+                               const cuvs::neighbors::cagra::index<float, uint32_t>* index);
+
+void serialize_to_hnswlib_file(raft::resources const& handle,
+                               const std::string& filename,
+                               const cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+
+void serialize_to_hnswlib_file(raft::resources const& handle,
+                               const std::string& filename,
+                               const cuvs::neighbors::cagra::index<int8_t, uint32_t>* index);
+
 /**
  * @}
  */

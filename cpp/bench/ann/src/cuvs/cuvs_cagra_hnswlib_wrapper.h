@@ -23,13 +23,13 @@
 namespace cuvs::bench::ann {
 
 template <typename T, typename IdxT>
-class RaftCagraHnswlib : public ANN<T>, public AnnGPU {
+class CuvsCagraHnswlib : public ANN<T>, public AnnGPU {
  public:
   using typename ANN<T>::AnnSearchParam;
-  using BuildParam  = typename RaftCagra<T, IdxT>::BuildParam;
+  using BuildParam  = typename CuvsCagra<T, IdxT>::BuildParam;
   using SearchParam = typename HnswLib<T>::SearchParam;
 
-  RaftCagraHnswlib(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
+  CuvsCagraHnswlib(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
     : ANN<T>(metric, dim),
       cagra_build_{metric, dim, param, concurrent_searches},
       // HnswLib param values don't matter since we don't build with HnswLib
@@ -65,41 +65,41 @@ class RaftCagraHnswlib : public ANN<T>, public AnnGPU {
   void load(const std::string&) override;
   std::unique_ptr<ANN<T>> copy() override
   {
-    return std::make_unique<RaftCagraHnswlib<T, IdxT>>(*this);
+    return std::make_unique<CuvsCagraHnswlib<T, IdxT>>(*this);
   }
 
  private:
-  RaftCagra<T, IdxT> cagra_build_;
+  CuvsCagra<T, IdxT> cagra_build_;
   HnswLib<T> hnswlib_search_;
 };
 
 template <typename T, typename IdxT>
-void RaftCagraHnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
+void CuvsCagraHnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   cagra_build_.build(dataset, nrow);
 }
 
 template <typename T, typename IdxT>
-void RaftCagraHnswlib<T, IdxT>::set_search_param(const AnnSearchParam& param_)
+void CuvsCagraHnswlib<T, IdxT>::set_search_param(const AnnSearchParam& param_)
 {
   hnswlib_search_.set_search_param(param_);
 }
 
 template <typename T, typename IdxT>
-void RaftCagraHnswlib<T, IdxT>::save(const std::string& file) const
+void CuvsCagraHnswlib<T, IdxT>::save(const std::string& file) const
 {
   cagra_build_.save_to_hnswlib(file);
 }
 
 template <typename T, typename IdxT>
-void RaftCagraHnswlib<T, IdxT>::load(const std::string& file)
+void CuvsCagraHnswlib<T, IdxT>::load(const std::string& file)
 {
   hnswlib_search_.load(file);
   hnswlib_search_.set_base_layer_only();
 }
 
 template <typename T, typename IdxT>
-void RaftCagraHnswlib<T, IdxT>::search(
+void CuvsCagraHnswlib<T, IdxT>::search(
   const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
 {
   hnswlib_search_.search(queries, batch_size, k, neighbors, distances);
