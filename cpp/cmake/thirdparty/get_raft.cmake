@@ -36,7 +36,7 @@ function(find_and_configure_raft)
     endif()
 
     #-----------------------------------------------------
-    # Invoke CPM find_package( )
+    # Invoke CPM find_package()
     #-----------------------------------------------------
     rapids_cpm_find(raft ${PKG_VERSION}
             GLOBAL_TARGETS      raft::raft
