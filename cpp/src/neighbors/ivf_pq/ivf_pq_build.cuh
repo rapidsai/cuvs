@@ -1824,11 +1824,13 @@ void build(raft::resources const& handle,
   *index = build(handle, params, dataset);
 }
 
-template <typename T, typename IdxT, typename accessor>
-auto extend(raft::resources const& handle,
-            raft::mdspan<const T, IdxT, raft::row_major, accessor> new_vectors,
-            raft::mdspan<const IdxT, IdxT, raft::row_major, accessor> new_indices,
-            const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+auto extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
 {
   ASSERT(new_vectors.extent(1) == orig_index.dim(),
          "new_vectors should have the same dimension as the index");
@@ -1846,11 +1848,13 @@ auto extend(raft::resources const& handle,
                 n_rows);
 }
 
-template <typename T, typename IdxT, typename accessor>
-void extend(raft::resources const& handle,
-            raft::mdspan<const T, IdxT, raft::row_major, accessor> new_vectors,
-            std::optional<raft::mdspan<const IdxT, IdxT, raft::row_major, accessor>> new_indices,
-            index<IdxT>* index)
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+void extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  index<IdxT>* index)
 {
   ASSERT(new_vectors.extent(1) == index->dim(),
          "new_vectors should have the same dimension as the index");

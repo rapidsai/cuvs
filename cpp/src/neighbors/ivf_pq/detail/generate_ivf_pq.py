@@ -41,7 +41,7 @@ header = """/*
 """
 
 build_include_macro = """
-#include "ivf_pq_build_extent_inst.cuh"
+#include "ivf_pq_build_extend_inst.cuh"
 """
 search_include_macro = """
 #include "../ivf_pq_search.cuh"

@@ -25,7 +25,7 @@
 
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include "ivf_pq_build_extent_inst.cuh"
+#include "ivf_pq_build_extend_inst.cuh"
 
 namespace cuvs::neighbors::ivf_pq {
 CUVS_INST_IVF_PQ_BUILD_EXTEND(int8_t, int64_t);
