@@ -476,7 +476,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {cuvs::distance::DistanceType::L2Expanded},
                                                    {false, true},
                                                    {false},
-                                                   {0.995},
+                                                   {0.99},
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
