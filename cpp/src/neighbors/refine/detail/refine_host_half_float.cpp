@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#if defined(_RAFT_HAS_CUDA)
-
 #include "../refine_host.hpp"
+#include <cuvs/neighbors/refine.hpp>
 
 #include <cuda_fp16.h>
 
@@ -36,4 +35,3 @@
 instantiate_cuvs_neighbors_refine(int64_t, half, float, int64_t);
 
 #undef instantiate_cuvs_neighbors_refine
-#endif

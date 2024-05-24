@@ -51,7 +51,7 @@ namespace cuvs::neighbors {
  *   // use default search parameters
  *   ivf_pq::search_params search_params;
  *   // search m = 4 * k nearest neighbours for each of the N queries
- *   ivf_pq::search(handle, search_params, index, queries, N, 4 * k, neighbor_candidates,
+ *   ivf_pq::search(handle, search_params, index, queries, neighbor_candidates,
  *                  out_dists_tmp);
  *   // refine it to the k nearest one
  *   refine(handle, dataset, queries, neighbor_candidates, out_indices, out_dists,
@@ -71,6 +71,14 @@ namespace cuvs::neighbors {
 void refine(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+
+void refine(raft::resources const& handle,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
             raft::device_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> indices,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
@@ -117,6 +125,13 @@ void refine(raft::resources const& handle,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances,
             cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
 void refine(raft::resources const& handle,
+            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+            raft::host_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+void refine(raft::resources const& handle,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
@@ -130,15 +145,5 @@ void refine(raft::resources const& handle,
             raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances,
             cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
-
-#if defined(_RAFT_HAS_CUDA)
-void refine(raft::resources const& handle,
-            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
-            raft::host_matrix_view<const half, int64_t, raft::row_major> queries,
-            raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
-            raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
-            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
-#endif
 
 }  // namespace cuvs::neighbors

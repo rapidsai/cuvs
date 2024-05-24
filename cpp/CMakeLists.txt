@@ -429,6 +429,7 @@ add_library(
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
   src/neighbors/refine/detail/refine_device_float_float.cu
+  src/neighbors/refine/detail/refine_device_half_float.cu
   src/neighbors/refine/detail/refine_device_int8_t_float.cu
   src/neighbors/refine/detail/refine_device_uint8_t_float.cu
   src/neighbors/refine/detail/refine_host_float_float.cpp
