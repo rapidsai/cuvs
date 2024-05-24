@@ -24,7 +24,7 @@
 
 #include <rmm/device_uvector.hpp>  // rmm::device_uvector
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs {
 namespace distance {

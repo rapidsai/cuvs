@@ -16,8 +16,8 @@
 
 #pragma once
 
+#include "../../sparse/neighbors/cross_component_nn.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/sparse/neighbors/cross_component_nn.cuh>
 #include <raft/sparse/op/sort.cuh>
 #include <raft/sparse/solver/mst.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -86,7 +86,7 @@ void connect_knn_graph(
   static constexpr size_t default_row_batch_size = 4096;
   static constexpr size_t default_col_batch_size = 16;
 
-  raft::sparse::neighbors::cross_component_nn<value_idx, value_t>(handle,
+  cuvs::sparse::neighbors::cross_component_nn<value_idx, value_t>(handle,
                                                                   connected_edges,
                                                                   X,
                                                                   color,
@@ -166,14 +166,14 @@ void build_sorted_mst(
     handle, indptr, indices, pw_dists, (value_idx)m, nnz, color, stream, false, true);
 
   int iters        = 1;
-  int n_components = raft::sparse::neighbors::get_n_components(color, m, stream);
+  int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
   while (n_components > 1 && iters < max_iter) {
     connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, color, reduction_op);
 
     iters++;
 
-    n_components = raft::sparse::neighbors::get_n_components(color, m, stream);
+    n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
   }
 
   /**
