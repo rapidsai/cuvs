@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/neighbors/cagra_types.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/stats/histogram.cuh>
-#include <cuvs/neighbors/cagra.hpp>
 
 #include <rmm/device_buffer.hpp>
 
@@ -32,7 +32,8 @@ template <class T, class IdxT, class Accessor>
 void add_node_core(
   raft::resources const& handle,
   const raft::neighbors::cagra::index<T, IdxT>& idx,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_stride, Accessor> additional_dataset_view,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_stride, Accessor>
+    additional_dataset_view,
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph)
 {
   using DistanceT                 = float;
