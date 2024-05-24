@@ -47,7 +47,7 @@ namespace cuvs::neighbors {
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = ivf_pq::build(handle, index_params, dataset, N, D);
+ *   auto index = ivf_pq::build(handle, index_params, dataset);
  *   // use default search parameters
  *   ivf_pq::search_params search_params;
  *   // search m = 4 * k nearest neighbours for each of the N queries
