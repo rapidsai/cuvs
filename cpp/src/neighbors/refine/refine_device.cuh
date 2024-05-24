@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include "../detail/ann_utils.cuh"
 #include "../ivf_flat/ivf_flat_build.cuh"
 #include "../ivf_flat/ivf_flat_interleaved_scan.cuh"
-#include "ann_utils.cuh"
 #include "refine_common.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -32,8 +32,9 @@
 
 #include <thrust/sequence.h>
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors {
 
+namespace detail {
 /**
  * See cuvs::neighbors::refine for docs.
  */
@@ -143,4 +144,18 @@ void refine_device(
                                                       raft::resource::get_cuda_stream(handle));
 }
 
-}  // namespace cuvs::neighbors::detail
+}  // namespace detail
+
+template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
+void refine_impl(
+  raft::resources const& handle,
+  raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
+  raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
+  raft::device_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
+  raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
+  raft::device_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+{
+  detail::refine_device(handle, dataset, queries, neighbor_candidates, indices, distances, metric);
+}
+}  // namespace cuvs::neighbors

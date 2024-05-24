@@ -25,6 +25,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 
+namespace cuvs::neighbors {
 /**
  * @defgroup ann_refine Approximate Nearest Neighbors Refinement
  * @{
@@ -67,20 +68,77 @@
  * @param[out] distances device matrix that stores the refined distances [n_queries, k]
  * @param[in] metric distance metric to use. Euclidean (L2) is used by default
  */
-template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
-  raft::device_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
-  raft::device_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
-  raft::device_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
-  raft::device_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
-  cuvs::distance::DistanceType metric);
+void refine(raft::resources const& handle,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
 
-template void cuvs::neighbors::refine<idx_t, data_t, distance_t, matrix_idx>(
-  raft::resources const& handle,
-  raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
-  raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
-  raft::host_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
-  raft::host_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
-  raft::host_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
-  cuvs::distance::DistanceType metric);
+void refine(raft::resources const& handle,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+
+void refine(raft::resources const& handle,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+
+/** Same as above, but all input and output data is in host memory.
+ * @param[in] handle the raft handle
+ * @param[in] dataset host matrix that stores the dataset [n_rows, dims]
+ * @param[in] queries host matrix of the queries [n_queris, dims]
+ * @param[in] neighbor_candidates host matrix with indices of candidate vectors [n_queries,
+ *   n_candidates], where n_candidates >= k
+ * @param[out] indices host matrix that stores the refined indices [n_queries, k]
+ * @param[out] distances host matrix that stores the refined distances [n_queries, k]
+ * @param[in] metric distance metric to use. Euclidean (L2) is used by default
+ */
+void refine(raft::resources const& handle,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+void refine(raft::resources const& handle,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const uint32_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<uint32_t, int64_t, raft::row_major> indices,
+            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+void refine(raft::resources const& handle,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+void refine(raft::resources const& handle,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+
+#if defined(_RAFT_HAS_CUDA)
+void refine(raft::resources const& handle,
+            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+            raft::host_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int64_t, int64_t, raft::row_major> neighbor_candidates,
+            raft::host_matrix_view<int64_t, int64_t, raft::row_major> indices,
+            raft::host_matrix_view<float, int64_t, raft::row_major> distances,
+            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded);
+#endif
+
+}  // namespace cuvs::neighbors

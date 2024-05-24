@@ -25,7 +25,9 @@
 
 #include <algorithm>
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors {
+
+namespace detail {
 
 template <typename DC, typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host_impl(
@@ -190,4 +192,19 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
   }
 }
 
-}  // namespace cuvs::neighbors::detail
+}  // namespace detail
+
+template <typename idx_t, typename data_t, typename distance_t, typename matrix_idx>
+void refine_impl(
+  raft::resources const& handle,
+  raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> dataset,
+  raft::host_matrix_view<const data_t, matrix_idx, raft::row_major> queries,
+  raft::host_matrix_view<const idx_t, matrix_idx, raft::row_major> neighbor_candidates,
+  raft::host_matrix_view<idx_t, matrix_idx, raft::row_major> indices,
+  raft::host_matrix_view<distance_t, matrix_idx, raft::row_major> distances,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded)
+{
+  detail::refine_host(dataset, queries, neighbor_candidates, indices, distances, metric);
+}
+
+}  // namespace cuvs::neighbors
