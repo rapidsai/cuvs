@@ -644,6 +644,86 @@ auto build(raft::resources const& res,
  */
 
 /**
+ * @defgroup cagra_cpp_index_add_nodes CAGRA graph node addition functions
+ * @{
+ */
+void add_graph_nodes(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> update_dataset_view,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& idx,
+  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  uint32_t batch_size = 0);
+
+void add_graph_nodes(
+  raft::resources const& handle,
+  raft::host_matrix_view<const float, int64_t, raft::row_major> update_dataset_view,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& idx,
+  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  uint32_t batch_size = 0);
+
+void add_graph_nodes(
+  raft::resources const& handle,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> update_dataset_view,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
+  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  uint32_t batch_size = 0);
+
+void add_graph_nodes(
+  raft::resources const& handle,
+  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> update_dataset_view,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
+  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  uint32_t batch_size = 0);
+
+void add_graph_nodes(
+  raft::resources const& handle,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> update_dataset_view,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
+  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  uint32_t batch_size = 0);
+
+void add_graph_nodes(
+  raft::resources const& handle,
+  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> update_dataset_view,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
+  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  uint32_t batch_size = 0);
+
+/**
+ * @defgroup cagra_cpp_index_extend CAGRA extend functions
+ * @{
+ */
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
+            cuvs::neighbors::cagra::index<float, uint32_t>& idx,
+            uint32_t batch_size = 0);
+
+void extend(raft::resources const& handle,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
+            cuvs::neighbors::cagra::index<float, uint32_t>& idx,
+            uint32_t batch_size = 0);
+
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
+            cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
+            uint32_t batch_size = 0);
+
+void extend(raft::resources const& handle,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
+            cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
+            uint32_t batch_size = 0);
+
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
+            cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
+            uint32_t batch_size = 0);
+
+void extend(raft::resources const& handle,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
+            cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
+            uint32_t batch_size = 0);
+
+/**
  * @defgroup cagra_cpp_index_search CAGRA search functions
  * @{
  */
