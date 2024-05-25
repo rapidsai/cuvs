@@ -30,6 +30,7 @@
 #include <raft/core/resources.hpp>          // raft::resources
 #include <raft/linalg/gemm.cuh>             // raft::linalg::gemm
 #include <raft/linalg/norm.cuh>             // raft::linalg::norm
+#include <raft/linalg/normalize.cuh>        // raft::linalg::row_normalize
 #include <raft/linalg/unary_op.cuh>         // raft::linalg::unary_op
 #include <raft/matrix/detail/select_k.cuh>  // matrix::detail::select_k
 
@@ -81,6 +82,19 @@ void search_impl(raft::resources const& handle,
   rmm::device_uvector<uint32_t> neighbors_uint32_buf(0, stream, search_mr);
 
   size_t float_query_size;
+  auto compute_metric = index.metric();
+  rmm::device_uvector<T> normalized_queries_dev(0, stream, search_mr);
+  const T* queries_ptr = queries;
+
+  if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    normalized_queries_dev.resize(n_queries * index.dim(), stream);
+    raft::linalg::row_normalize(
+      handle,
+      raft::make_device_matrix_view<const T, IdxT>(queries, n_queries, index.dim()),
+      raft::make_device_matrix_view<T, IdxT>(normalized_queries_dev.data(), n_queries, index.dim()),
+      raft::linalg::NormType::L2Norm);
+    queries_ptr = normalized_queries_dev.data();
+  }
   if constexpr (std::is_integral_v<T>) {
     float_query_size = n_queries * index.dim();
   } else {
@@ -90,10 +104,10 @@ void search_impl(raft::resources const& handle,
   float* converted_queries_ptr = converted_queries_dev.data();
 
   if constexpr (std::is_same_v<T, float>) {
-    converted_queries_ptr = const_cast<float*>(queries);
+    converted_queries_ptr = const_cast<float*>(queries_ptr);
   } else {
     raft::linalg::unaryOp(
-      converted_queries_ptr, queries, n_queries * index.dim(), utils::mapping<float>{}, stream);
+      converted_queries_ptr, queries_ptr, n_queries * index.dim(), utils::mapping<float>{}, stream);
   }
 
   float alpha = 1.0f;
@@ -120,6 +134,13 @@ void search_impl(raft::resources const& handle,
                        stream);
       RAFT_LOG_TRACE_VEC(index.center_norms()->data_handle(), std::min<uint32_t>(20, index.dim()));
       RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
+      break;
+    }
+    case cuvs::distance::DistanceType::CosineExpanded: {
+      compute_metric = cuvs::distance::DistanceType::InnerProduct;
+      select_min     = false;
+      alpha          = 1.0f;
+      beta           = 0.0f;
       break;
     }
     default: {
@@ -166,7 +187,7 @@ void search_impl(raft::resources const& handle,
       nullptr,
       n_queries,
       queries_offset,
-      index.metric(),
+      compute_metric,
       n_probes,
       k,
       0,
@@ -217,11 +238,11 @@ void search_impl(raft::resources const& handle,
 
   ivfflat_interleaved_scan<T, typename utils::config<T>::value_t, IdxT, IvfSampleFilterT>(
     index,
-    queries,
+    queries_ptr,
     coarse_indices_dev.data(),
     n_queries,
     queries_offset,
-    index.metric(),
+    compute_metric,
     n_probes,
     k,
     max_samples,
