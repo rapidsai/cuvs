@@ -1321,9 +1321,30 @@ void search_with_filtering(
  * @{
  */
 /**
- * Save the index to file.
+ * Serialize the index to an output string.
  *
- * Experimental, both the API and the serialization format are subject to change.
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input string
+ * std::string str
+ * // create an index with `auto index = ivf_pq::build(...);`
+ * cuvs::serialize(handle, str, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[out] str output string
+ * @param[in] index IVF-PQ index
+ *
+ */
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index);
+
+/**
+ * Save the index to file.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -1341,14 +1362,38 @@ void search_with_filtering(
  * @param[in] index IVF-PQ index
  *
  */
-void serialize(raft::resources const& handle,
-               std::string& filename,
-               const cuvs::neighbors::ivf_pq::index<int64_t>& index);
+void serialize_file(raft::resources const& handle,
+                    const std::string& filename,
+                    const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 /**
- * Load index from file.
+ * Load index from input string.
  *
- * Experimental, both the API and the serialization format are subject to change.
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ *
+ * raft::resources handle;
+ *
+ * std::string str = ...
+ *
+ * using IdxT = int64_t; // type of the index
+ * // create an empty index
+ * cuvs::neighbors::ivf_pq::index<IdxT> index(handl, index_params, dim);
+ *
+ * cuvs::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] str the name of the file that stores the index
+ * @param[out] index IVF-PQ index
+ *
+ */
+
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::ivf_pq::index<int64_t>* index);
+/**
+ * Load index from file.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -1358,7 +1403,9 @@ void serialize(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * using IdxT = int64_t; // type of the index
- * // create an empty index with `ivf_pq::index<IdxT> index(handle, index_params, dim);`
+ * // create an empty index with
+ * ivf_pq::index<IdxT> index(handle, index_params, dim);
+ *
  * cuvs::deserialize(handle, filename, &index);
  * @endcode
  *
@@ -1367,9 +1414,9 @@ void serialize(raft::resources const& handle,
  * @param[out] index IVF-PQ index
  *
  */
-void deserialize(raft::resources const& handle,
-                 const std::string& filename,
-                 cuvs::neighbors::ivf_pq::index<int64_t>* index);
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::ivf_pq::index<int64_t>* index);
 /**
  * @}
  */
