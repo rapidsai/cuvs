@@ -363,15 +363,15 @@ class PrefilteredBruteForceTest
 
     brute_force::search(handle, dataset, queries, out_idx, out_val, std::make_optional(filter));
 
-    ASSERT_TRUE(cuvs::spatial::knn::devArrMatchKnnPair(out_idx_expected_d.data(),
-                                                       out_idx.data_handle(),
-                                                       out_val_expected_d.data(),
-                                                       out_val.data_handle(),
-                                                       params.n_queries,
-                                                       params.top_k,
-                                                       0.001f,
-                                                       stream,
-                                                       true));
+    ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(out_idx_expected_d.data(),
+                                                    out_idx.data_handle(),
+                                                    out_val_expected_d.data(),
+                                                    out_val.data_handle(),
+                                                    params.n_queries,
+                                                    params.top_k,
+                                                    0.001f,
+                                                    stream,
+                                                    true));
   }
 
  protected:

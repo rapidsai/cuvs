@@ -24,7 +24,7 @@
 
 #include <memory>
 
-namespace cuvs::spatial::knn {
+namespace cuvs::neighbors {
 template <typename IdxT, typename DistT, typename compareDist>
 struct idx_dist_pair {
   IdxT idx;
@@ -92,4 +92,4 @@ testing::AssertionResult devArrMatchKnnPair(const T* expected_idx,
   }
   return testing::AssertionSuccess();
 }
-}  // namespace cuvs::spatial::knn
+}  // namespace cuvs::neighbors

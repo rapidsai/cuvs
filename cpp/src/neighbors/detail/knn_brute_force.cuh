@@ -553,7 +553,7 @@ void brute_force_search(
 }
 
 template <typename T, typename IdxT, typename BitmapT>
-void brute_force_search(
+void brute_force_search_filtered(
   raft::resources const& res,
   const cuvs::neighbors::brute_force::index<T>& idx,
   raft::device_matrix_view<const T, IdxT, raft::row_major> queries,

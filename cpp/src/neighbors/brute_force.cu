@@ -106,7 +106,7 @@ void index<T>::update_dataset(raft::resources const& res,
     if (!sample_filter.has_value()) {                                                             \
       detail::brute_force_search<T, int64_t>(res, idx, queries, neighbors, distances);            \
     } else {                                                                                      \
-      detail::brute_force_search<T, int64_t>(                                                     \
+      detail::brute_force_search_filtered<T, int64_t>(                                            \
         res, idx, queries, *sample_filter, neighbors, distances);                                 \
     }                                                                                             \
   }                                                                                               \
