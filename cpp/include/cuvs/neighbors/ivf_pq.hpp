@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "common.hpp"
 #include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/device_mdarray.hpp>
