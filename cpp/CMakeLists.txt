@@ -433,6 +433,8 @@ add_library(
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
   src/neighbors/sample_filter.cu
+  src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_uint32_t.cu
 )
 
 target_compile_options(
