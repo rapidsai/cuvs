@@ -31,8 +31,9 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.distance.pairwise_distance import DISTANCE_TYPES
 from pylibraft.neighbors.common import _check_input_array
+
+from cuvs.distance import DISTANCE_TYPES
 
 from cuvs.common.c_api cimport cuvsResources_t
 
@@ -194,7 +195,6 @@ def search(Index index,
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
 
-    cdef cuvsError_t search_status
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
     cdef cydlpack.DLManagedTensor* neighbors_dlpack = \

@@ -22,7 +22,7 @@ namespace *cuvs::distance*
 Pairwise Distances
 ------------------
 
-``include <cuvs/distance/pairwise_distance.hpp>``
+``include <cuvs/distance/distance.hpp>``
 
 namespace *cuvs::distance*
 

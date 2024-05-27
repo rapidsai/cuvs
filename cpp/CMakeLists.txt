@@ -474,9 +474,8 @@ if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
-    PUBLIC rmm::rmm raft::raft 
-    PRIVATE ${CUVS_CTK_MATH_DEPENDENCIES} nvidia::cutlass::cutlass 
-            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+    PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
@@ -553,8 +552,9 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 # * cuvs_c -------------------------------------------------------------------------------
 if(BUILD_C_LIBRARY)
   add_library(
-    cuvs_c SHARED src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-                  src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp
+    cuvs_c SHARED
+    src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
@@ -580,8 +580,8 @@ if(BUILD_C_LIBRARY)
 
   target_link_libraries(
     cuvs_c
-    PUBLIC cuvs::cuvs
-    PRIVATE raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+    PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE raft::raft
   )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries

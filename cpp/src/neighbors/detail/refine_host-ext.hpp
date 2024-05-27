@@ -28,7 +28,7 @@
 #include <cuda_fp16.h>
 #endif
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs::neighbors::detail {
 
