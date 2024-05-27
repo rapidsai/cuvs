@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "../ann_utils.cuh"
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_resources.hpp>
+#include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/neighbors/cagra_types.hpp>
@@ -31,7 +33,7 @@ namespace cuvs::neighbors::cagra::detail {
 template <class T, class IdxT, class Accessor>
 void add_node_core(
   raft::resources const& handle,
-  const raft::neighbors::cagra::index<T, IdxT>& idx,
+  const cuvs::neighbors::cagra::index<T, IdxT>& idx,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_stride, Accessor>
     additional_dataset_view,
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph)
@@ -67,7 +69,7 @@ void add_node_core(
 
   const std::size_t max_chunk_size = 1024;
 
-  raft::neighbors::cagra::search_params params;
+  cuvs::neighbors::cagra::search_params params;
   params.itopk_size = std::max(base_degree * 2lu, 256lu);
 
   // Memory space for rank-based neighbor list
@@ -85,7 +87,7 @@ void add_node_core(
   auto host_neighbor_indices =
     raft::make_host_matrix<IdxT, std::int64_t>(max_chunk_size, base_degree);
 
-  raft::spatial::knn::detail::utils::batch_load_iterator<T> additional_dataset_batch(
+  cuvs::spatial::knn::detail::utils::batch_load_iterator<T> additional_dataset_batch(
     additional_dataset_view.data_handle(),
     num_add,
     additional_dataset_view.stride(0),

@@ -25,6 +25,7 @@
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
+#include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -649,44 +650,50 @@ auto build(raft::resources const& res,
  */
 void add_graph_nodes(
   raft::resources const& handle,
-  raft::device_matrix_view<const float, int64_t, raft::row_major> update_dataset_view,
+  raft::device_mdspan<const float, raft::matrix_extent<int64_t>, raft::layout_stride>
+    updated_dataset_view,
   const cuvs::neighbors::cagra::index<float, uint32_t>& idx,
-  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  raft::host_matrix_view<uint32_t, std::int64_t> updated_graph_view,
   uint32_t batch_size = 0);
 
 void add_graph_nodes(
   raft::resources const& handle,
-  raft::host_matrix_view<const float, int64_t, raft::row_major> update_dataset_view,
+  raft::host_mdspan<const float, raft::matrix_extent<int64_t>, raft::layout_stride>
+    updated_dataset_view,
   const cuvs::neighbors::cagra::index<float, uint32_t>& idx,
-  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  raft::host_matrix_view<uint32_t, std::int64_t> updated_graph_view,
   uint32_t batch_size = 0);
 
 void add_graph_nodes(
   raft::resources const& handle,
-  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> update_dataset_view,
+  raft::device_mdspan<const int8_t, raft::matrix_extent<int64_t>, raft::layout_stride>
+    updated_dataset_view,
   const cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
-  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  raft::host_matrix_view<uint32_t, std::int64_t> updated_graph_view,
   uint32_t batch_size = 0);
 
 void add_graph_nodes(
   raft::resources const& handle,
-  raft::host_matrix_view<const int8_t, int64_t, raft::row_major> update_dataset_view,
+  raft::host_mdspan<const int8_t, raft::matrix_extent<int64_t>, raft::layout_stride>
+    updated_dataset_view,
   const cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
-  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  raft::host_matrix_view<uint32_t, std::int64_t> updated_graph_view,
   uint32_t batch_size = 0);
 
 void add_graph_nodes(
   raft::resources const& handle,
-  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> update_dataset_view,
+  raft::device_mdspan<const uint8_t, raft::matrix_extent<int64_t>, raft::layout_stride>
+    updated_dataset_view,
   const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
-  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  raft::host_matrix_view<uint32_t, std::int64_t> updated_graph_view,
   uint32_t batch_size = 0);
 
 void add_graph_nodes(
   raft::resources const& handle,
-  raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> update_dataset_view,
+  raft::host_mdspan<const uint8_t, raft::matrix_extent<int64_t>, raft::layout_stride>
+    updated_dataset_view,
   const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
-  raft::host_matrix_view<int64_t, std::int64_t> updated_graph_view,
+  raft::host_matrix_view<uint32_t, std::int64_t> updated_graph_view,
   uint32_t batch_size = 0);
 
 /**

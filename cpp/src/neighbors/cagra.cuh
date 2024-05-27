@@ -395,6 +395,7 @@ void search(raft::resources const& res,
     res, params, idx, queries, neighbors, distances, none_filter_type{});
 }
 
+namespace detail {
 /**
  * @brief Add new vectors to the index.
  *
@@ -500,11 +501,11 @@ void add_graph_nodes(
  * @param[in] max_batch_size the batch size for graph update (default: 0 (AUTO))
  */
 template <class T, class IdxT, class Accessor>
-void extend(raft::resources const& handle,
-            raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_c_contiguous, Accessor>
-              additional_dataset,
-            raft::neighbors::cagra::index<T, IdxT>& index,
-            const std::size_t max_batch_size = 0)
+void extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
+  cuvs::neighbors::cagra::index<T, IdxT>& index,
+  uint32_t max_batch_size = 0)
 {
   const std::size_t num_new_nodes        = additional_dataset.extent(0);
   const std::size_t initial_dataset_size = index.size();
@@ -565,7 +566,7 @@ void extend(raft::resources const& handle,
     using out_container_policy_type = typename out_mdarray_type::container_policy_type;
     using out_owning_type = owning_dataset<T, int64_t, out_layout_type, out_container_policy_type>;
     auto out_layout =
-      make_strided_layout(updated_dataset_view.extents(), std::array<int64_t, 2>{stride, 1});
+      raft::make_strided_layout(updated_dataset_view.extents(), std::array<int64_t, 2>{stride, 1});
 
     index.update_dataset(handle, out_owning_type{std::move(updated_dataset), out_layout});
     index.update_graph(handle, raft::make_const_mdspan(updated_graph.view()));
@@ -573,6 +574,8 @@ void extend(raft::resources const& handle,
     RAFT_FAIL("Only uncompressed dataset is supported");
   }
 }
+
+}  // namespace detail
 
 /** @} */  // end group cagra
 
