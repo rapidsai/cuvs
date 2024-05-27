@@ -184,19 +184,19 @@ void CuvsIvfPQ<T, IdxT>::search(
   const bool disable_refinement = k0 <= static_cast<size_t>(k);
   const raft::resources& res    = handle_;
 
-  if (disable_refinement) { search_base(queries, batch_size, k, neighbors, distances); }
-  //  else {
-  //   auto queries_v =
-  //     raft::make_device_matrix_view<const T, AnnBase::index_type>(queries, batch_size,
-  //     dimension_);
-  //   auto candidate_ixs =
-  //     raft::make_device_matrix<AnnBase::index_type, AnnBase::index_type>(res, batch_size, k0);
-  //   auto candidate_dists =
-  //     raft::make_device_matrix<float, AnnBase::index_type>(res, batch_size, k0);
-  //   search_base(
-  //     queries, batch_size, k0, candidate_ixs.data_handle(), candidate_dists.data_handle());
-  //   refine_helper(
-  //     res, dataset_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
-  // }
+  if (disable_refinement) {
+    search_base(queries, batch_size, k, neighbors, distances);
+  } else {
+    auto queries_v =
+      raft::make_device_matrix_view<const T, AnnBase::index_type>(queries, batch_size, dimension_);
+    auto candidate_ixs =
+      raft::make_device_matrix<AnnBase::index_type, AnnBase::index_type>(res, batch_size, k0);
+    auto candidate_dists =
+      raft::make_device_matrix<float, AnnBase::index_type>(res, batch_size, k0);
+    search_base(
+      queries, batch_size, k0, candidate_ixs.data_handle(), candidate_dists.data_handle());
+    refine_helper(
+      res, dataset_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
+  }
 }
 }  // namespace cuvs::bench::ann

@@ -15,9 +15,9 @@
  */
 #pragma once
 
-#include "../../../../src/neighbors/refine.cuh"
 #include "../common/ann_types.hpp"
 #include "../common/util.hpp"
+#include <cuvs/neighbors/refine.hpp>
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
