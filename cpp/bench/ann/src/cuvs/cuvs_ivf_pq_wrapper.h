@@ -102,13 +102,14 @@ class CuvsIvfPQ : public ANN<T>, public AnnGPU {
 template <typename T, typename IdxT>
 void CuvsIvfPQ<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::ivf_pq::serialize(handle_, file, *index_);
+  cuvs::neighbors::ivf_pq::serialize_file(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
 void CuvsIvfPQ<T, IdxT>::load(const std::string& file)
 {
-  cuvs::neighbors::ivf_pq::deserialize(handle_, file, index_.get());
+  index_ = std::make_shared<cuvs::neighbors::ivf_pq::index<IdxT>>(handle_, index_params_, dim_);
+  cuvs::neighbors::ivf_pq::deserialize_file(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>
