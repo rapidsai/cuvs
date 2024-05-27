@@ -91,8 +91,7 @@ void build_knn_graph(
   }();
 
   RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
-  auto index = cuvs::neighbors::ivf_pq::detail::build<DataT, int64_t>(
-    res, *build_params, dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+  auto index = cuvs::neighbors::ivf_pq::detail::build<DataT, int64_t>(res, *build_params, dataset);
 
   //
   // search top (k + 1) neighbors

@@ -564,7 +564,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ipams.add_data_on_build = true;
 
     auto index_view =
-      raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
+      raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
     return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
   }
 
