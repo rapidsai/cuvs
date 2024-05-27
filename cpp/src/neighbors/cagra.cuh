@@ -423,7 +423,7 @@ void add_graph_nodes(
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,
   const std::size_t max_batch_size)
 {
-  assert(updated_dataset.extent(0) >= original_index.size());
+  assert(input_updated_dataset_view.extent(0) >= index.size());
 
   const std::size_t initial_dataset_size = index.size();
   const std::size_t new_dataset_size     = input_updated_dataset_view.extent(0);
