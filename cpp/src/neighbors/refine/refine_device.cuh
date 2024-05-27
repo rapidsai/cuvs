@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_flat/ivf_flat_build.cuh"
 #include "../ivf_flat/ivf_flat_interleaved_scan.cuh"
@@ -24,7 +25,6 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
@@ -58,7 +58,7 @@ void refine_device(
                "k must be less than topk::kMaxCapacity (%d).",
                raft::matrix::detail::select::warpsort::kMaxCapacity);
 
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "neighbors::refine(%zu, %u)", size_t(n_queries), uint32_t(n_candidates));
 
   refine_check_input(dataset.extents(),

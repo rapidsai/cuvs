@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include "../../core/nvtx.hpp"
 #include "refine_common.hpp"
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/util/integer_utils.hpp>
 
 #include <omp.h>
@@ -43,7 +43,7 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
   size_t orig_k    = neighbor_candidates.extent(1);
   size_t refined_k = indices.extent(1);
 
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "neighbors::refine_host(%zu, %zu -> %zu)", n_queries, orig_k, refined_k);
 
   auto suggested_n_threads = std::max(1, std::min(omp_get_num_procs(), omp_get_max_threads()));
