@@ -73,7 +73,7 @@ struct AlgoProperty {
 
 class AnnBase {
  public:
-  using index_type = size_t;
+  using index_type = int64_t;
 
   inline AnnBase(Metric metric, int dim) : metric_(metric), dim_(dim) {}
   virtual ~AnnBase() noexcept = default;

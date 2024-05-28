@@ -186,7 +186,7 @@ void refine_helper(const raft::resources& res,
 {
   using data_type    = typename DatasetT::value_type;
   using index_type   = AnnBase::index_type;
-  using extents_type = index_type;  // device-side refine requires this
+  using extents_type = int64_t;  // device-side refine requires this
 
   static_assert(std::is_same_v<data_type, typename QueriesT::value_type>);
   static_assert(std::is_same_v<data_type, typename DatasetT::value_type>);
@@ -208,13 +208,13 @@ void refine_helper(const raft::resources& res,
     auto distances_device =
       raft::make_device_matrix_view<float, extents_type>(distances, batch_size, k);
 
-    cuvs::neighbors::refine<index_type, data_type, float, extents_type>(res,
-                                                                        dataset_device,
-                                                                        queries_device,
-                                                                        candidates_device,
-                                                                        neighbors_device,
-                                                                        distances_device,
-                                                                        metric);
+    cuvs::neighbors::refine(res,
+                            dataset_device,
+                            queries_device,
+                            candidates_device,
+                            neighbors_device,
+                            distances_device,
+                            metric);
   } else {
     auto dataset_host = raft::make_host_matrix_view<const data_type, extents_type>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
@@ -229,13 +229,13 @@ void refine_helper(const raft::resources& res,
       candidates_host.data_handle(), candidates.data_handle(), candidates_host.size(), stream);
 
     raft::resource::sync_stream(res);  // wait for the queries and candidates
-    cuvs::neighbors::refine<index_type, data_type, float, extents_type>(res,
-                                                                        dataset_host,
-                                                                        queries_host.view(),
-                                                                        candidates_host.view(),
-                                                                        neighbors_host.view(),
-                                                                        distances_host.view(),
-                                                                        metric);
+    cuvs::neighbors::refine(res,
+                            dataset_host,
+                            queries_host.view(),
+                            candidates_host.view(),
+                            neighbors_host.view(),
+                            distances_host.view(),
+                            metric);
 
     raft::copy(neighbors, neighbors_host.data_handle(), neighbors_host.size(), stream);
     raft::copy(distances, distances_host.data_handle(), distances_host.size(), stream);
