@@ -256,7 +256,7 @@ void CuvsCagra<T, IdxT>::save(const std::string& file) const
 template <typename T, typename IdxT>
 void CuvsCagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
-  cuvs::neighbors::cagra::serialize_to_hnswlib_file(handle_, file, index_.get());
+  cuvs::neighbors::cagra::serialize_to_hnswlib_file(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
