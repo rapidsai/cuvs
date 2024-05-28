@@ -43,6 +43,22 @@ Index build
     :members:
     :content-only:
 
+Index add_graph_nodes
+-----------
+
+.. doxygengroup:: cagra_cpp_index_add_nodes
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index extend
+-----------
+
+.. doxygengroup:: cagra_cpp_index_extend
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index search
 ------------
 
