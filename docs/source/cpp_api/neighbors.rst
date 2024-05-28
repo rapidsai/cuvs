@@ -10,7 +10,8 @@ Nearest Neighbors
    :caption: Contents:
 
    neighbors_bruteforce.rst
+   neighbors_cagra.rst
    neighbors_ivf_flat.rst
    neighbors_ivf_pq.rst
-   neighbors_cagra.rst
+   neighbors_nn_descent.rst
    neighbors_refine.rst
