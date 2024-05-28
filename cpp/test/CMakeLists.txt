@@ -90,7 +90,10 @@ endfunction()
 # ##################################################################################################
 
 if(BUILD_TESTS)
-  ConfigureTest(NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu GPUS 1 PERCENT 100)
+  ConfigureTest(
+    NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu test/neighbors/refine.cu GPUS 1 PERCENT
+    100
+  )
 
   ConfigureTest(
     NAME CLUSTER_TEST PATH test/cluster/kmeans.cu test/cluster/kmeans_balanced.cu
