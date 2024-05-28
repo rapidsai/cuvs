@@ -395,25 +395,6 @@ void search(raft::resources const& res,
     res, params, idx, queries, neighbors, distances, none_filter_type{});
 }
 
-/**
- * @brief Add new vectors to the index.
- *
- * This function expects an input array that contains both the old and new dataset vectors
- * (new vector appended to the end). This allows explicit control of dataset allocation.
- * If there are no specific requirements for dataset allocation, then it is recommended
- * to use cagra::extend to add new vectors.
- *
- * See [cagra::extend](#cagra::extend) for usage example
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle raft resources
- * @param[in] input_updated_dataset_view updated dataset (initial + additional dataset)
- * @param[in] index CAGRA index
- * @param[out] updated_graph_view updated graph
- * @param[in] max_batch_size the batch size for graph update
- */
 template <class T, class IdxT, class Accessor>
 void add_graph_nodes(
   raft::resources const& handle,
@@ -421,7 +402,7 @@ void add_graph_nodes(
     input_updated_dataset_view,
   const neighbors::cagra::index<T, IdxT>& index,
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,
-  const std::size_t max_batch_size)
+  const std::size_t max_chunk_size)
 {
   assert(input_updated_dataset_view.extent(0) >= index.size());
 
@@ -431,7 +412,7 @@ void add_graph_nodes(
   const std::size_t degree               = index.graph_degree();
   const std::size_t dim                  = index.dim();
   const std::size_t stride               = input_updated_dataset_view.stride(0);
-  const std::size_t max_batch_size_      = max_batch_size == 0 ? 1 : max_batch_size;
+  const std::size_t max_chunk_size_      = max_chunk_size == 0 ? 1 : max_chunk_size;
 
   raft::copy(updated_graph_view.data_handle(),
              index.graph().data_handle(),
@@ -445,9 +426,9 @@ void add_graph_nodes(
     raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, 0));
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
-       additional_dataset_offset += max_batch_size_) {
-    const auto actual_batch_size =
-      std::min(num_new_nodes - additional_dataset_offset, max_batch_size_);
+       additional_dataset_offset += max_chunk_size_) {
+    const auto actual_chunk_size =
+      std::min(num_new_nodes - additional_dataset_offset, max_chunk_size_);
 
     auto dataset_view = raft::make_device_strided_matrix_view<const T, std::int64_t>(
       input_updated_dataset_view.data_handle(),
@@ -464,12 +445,12 @@ void add_graph_nodes(
 
     auto updated_graph = raft::make_host_matrix_view<IdxT, std::int64_t>(
       updated_graph_view.data_handle(),
-      initial_dataset_size + additional_dataset_offset + actual_batch_size,
+      initial_dataset_size + additional_dataset_offset + actual_chunk_size,
       degree);
     auto additional_dataset_view = raft::make_device_strided_matrix_view<const T, std::int64_t>(
       input_updated_dataset_view.data_handle() +
         (initial_dataset_size + additional_dataset_offset) * stride,
-      actual_batch_size,
+      actual_chunk_size,
       dim,
       stride);
 
@@ -479,32 +460,12 @@ void add_graph_nodes(
   }
 }
 
-/**
- * @brief Add new vectors to a CAGRA index
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
- *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
- * @param[in] max_batch_size the batch size for graph update (default: 0 (AUTO))
- */
 template <class T, class IdxT, class Accessor>
 void extend(
   raft::resources const& handle,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
   cuvs::neighbors::cagra::index<T, IdxT>& index,
-  uint32_t max_batch_size = 0)
+  uint32_t max_chunk_size = 0)
 {
   const std::size_t num_new_nodes        = additional_dataset.extent(0);
   const std::size_t initial_dataset_size = index.size();
@@ -558,7 +519,7 @@ void extend(
       host_updated_dataset.data_handle(), new_dataset_size, dim, stride);
 
     index.update_dataset(handle, initial_dataset_view);
-    add_graph_nodes(handle, updated_dataset_view, index, updated_graph.view(), max_batch_size);
+    add_graph_nodes(handle, updated_dataset_view, index, updated_graph.view(), max_chunk_size);
 
     using out_mdarray_type          = decltype(updated_dataset);
     using out_layout_type           = typename out_mdarray_type::layout_type;

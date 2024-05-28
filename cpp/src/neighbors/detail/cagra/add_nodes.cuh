@@ -236,4 +236,4 @@ void add_node_core(
     }
   }
 }
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra
