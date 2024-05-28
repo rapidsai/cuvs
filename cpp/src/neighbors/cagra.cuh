@@ -345,7 +345,7 @@ void add_graph_nodes(
     input_updated_dataset_view,
   const neighbors::cagra::index<T, IdxT>& index,
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,
-  const std::size_t max_chunk_size)
+  const cagra::extend_params& params)
 {
   assert(input_updated_dataset_view.extent(0) >= index.size());
 
@@ -355,7 +355,7 @@ void add_graph_nodes(
   const std::size_t degree               = index.graph_degree();
   const std::size_t dim                  = index.dim();
   const std::size_t stride               = input_updated_dataset_view.stride(0);
-  const std::size_t max_chunk_size_      = max_chunk_size == 0 ? 1 : max_chunk_size;
+  const std::size_t max_chunk_size_      = params.max_chunk_size == 0 ? 1 : params.max_chunk_size;
 
   raft::copy(updated_graph_view.data_handle(),
              index.graph().data_handle(),
@@ -408,7 +408,7 @@ void extend(
   raft::resources const& handle,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
   cuvs::neighbors::cagra::index<T, IdxT>& index,
-  uint32_t max_chunk_size = 0)
+  const cagra::extend_params& params)
 {
   const std::size_t num_new_nodes        = additional_dataset.extent(0);
   const std::size_t initial_dataset_size = index.size();
@@ -462,7 +462,7 @@ void extend(
       host_updated_dataset.data_handle(), new_dataset_size, dim, stride);
 
     index.update_dataset(handle, initial_dataset_view);
-    add_graph_nodes(handle, updated_dataset_view, index, updated_graph.view(), max_chunk_size);
+    add_graph_nodes(handle, updated_dataset_view, index, updated_graph.view(), params);
 
     using out_mdarray_type          = decltype(updated_dataset);
     using out_layout_type           = typename out_mdarray_type::layout_type;

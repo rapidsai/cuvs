@@ -26,10 +26,10 @@ namespace cuvs::neighbors::cagra {
       updated_dataset_view,                                                                   \
     const cuvs::neighbors::cagra::index<T, IdxT>& idx,                                        \
     raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,                            \
-    uint32_t batch_size)                                                                      \
+    const cagra::extend_params& params)                                                       \
   {                                                                                           \
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(                                         \
-      handle, updated_dataset_view, idx, updated_graph_view, batch_size);                     \
+      handle, updated_dataset_view, idx, updated_graph_view, params);                         \
   }                                                                                           \
                                                                                               \
   void add_graph_nodes(                                                                       \
@@ -38,26 +38,26 @@ namespace cuvs::neighbors::cagra {
       updated_dataset_view,                                                                   \
     const cuvs::neighbors::cagra::index<T, IdxT>& idx,                                        \
     raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,                            \
-    uint32_t batch_size)                                                                      \
+    const cagra::extend_params& params)                                                       \
   {                                                                                           \
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(                                         \
-      handle, updated_dataset_view, idx, updated_graph_view, batch_size);                     \
+      handle, updated_dataset_view, idx, updated_graph_view, params);                         \
   }                                                                                           \
                                                                                               \
   void extend(raft::resources const& handle,                                                  \
               raft::device_matrix_view<const T, int64_t, raft::row_major> additional_dataset, \
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
-              uint32_t batch_size)                                                            \
+              const cagra::extend_params& params)                                             \
   {                                                                                           \
-    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, batch_size);     \
+    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params);         \
   }                                                                                           \
                                                                                               \
   void extend(raft::resources const& handle,                                                  \
               raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,   \
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
-              uint32_t batch_size)                                                            \
+              const cagra::extend_params& params)                                             \
   {                                                                                           \
-    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, batch_size);     \
+    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params);         \
   }
 
 RAFT_INST_CAGRA_EXTEND(int8_t, uint32_t);
