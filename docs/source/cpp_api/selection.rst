@@ -9,7 +9,7 @@ package.
    :class: highlight
 
 Select-K
---------------
+--------
 
 ``#include <cuvs/selection/select_k.hpp>``
 
