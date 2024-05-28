@@ -29,7 +29,7 @@
 
 #include <cstdint>
 
-namespace cuvs::neighbors::cagra::detail {
+namespace cuvs::neighbors::cagra {
 template <class T, class IdxT, class Accessor>
 void add_node_core(
   raft::resources const& handle,

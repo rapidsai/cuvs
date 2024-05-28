@@ -395,7 +395,6 @@ void search(raft::resources const& res,
     res, params, idx, queries, neighbors, distances, none_filter_type{});
 }
 
-namespace detail {
 /**
  * @brief Add new vectors to the index.
  *
@@ -474,7 +473,7 @@ void add_graph_nodes(
       dim,
       stride);
 
-    neighbors::cagra::detail::add_node_core<T, IdxT>(
+    neighbors::cagra::add_node_core<T, IdxT>(
       handle, internal_index, additional_dataset_view, updated_graph);
     raft::resource::sync_stream(handle);
   }
@@ -574,8 +573,6 @@ void extend(
     RAFT_FAIL("Only uncompressed dataset is supported");
   }
 }
-
-}  // namespace detail
 
 /** @} */  // end group cagra
 

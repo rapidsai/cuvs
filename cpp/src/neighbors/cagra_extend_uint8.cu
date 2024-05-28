@@ -28,7 +28,7 @@ namespace cuvs::neighbors::cagra {
     raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,                            \
     uint32_t batch_size)                                                                      \
   {                                                                                           \
-    cuvs::neighbors::cagra::detail::add_graph_nodes(                                          \
+    cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(                                         \
       handle, updated_dataset_view, idx, updated_graph_view, batch_size);                     \
   }                                                                                           \
                                                                                               \
@@ -40,7 +40,7 @@ namespace cuvs::neighbors::cagra {
     raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,                            \
     uint32_t batch_size)                                                                      \
   {                                                                                           \
-    cuvs::neighbors::cagra::detail::add_graph_nodes(                                          \
+    cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(                                         \
       handle, updated_dataset_view, idx, updated_graph_view, batch_size);                     \
   }                                                                                           \
                                                                                               \
@@ -49,7 +49,7 @@ namespace cuvs::neighbors::cagra {
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
               uint32_t batch_size)                                                            \
   {                                                                                           \
-    cuvs::neighbors::cagra::detail::extend(handle, additional_dataset, idx, batch_size);      \
+    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, batch_size);     \
   }                                                                                           \
                                                                                               \
   void extend(raft::resources const& handle,                                                  \
@@ -57,7 +57,7 @@ namespace cuvs::neighbors::cagra {
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
               uint32_t batch_size)                                                            \
   {                                                                                           \
-    cuvs::neighbors::cagra::detail::extend(handle, additional_dataset, idx, batch_size);      \
+    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, batch_size);     \
   }
 
 RAFT_INST_CAGRA_EXTEND(uint8_t, uint32_t);
