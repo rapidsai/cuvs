@@ -30,11 +30,11 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/refine.hpp>
 
 // TODO: Fixme- this needs to be migrated
 #include "../../ivf_pq/ivf_pq_build.cuh"
 #include "../../nn_descent.cuh"
-#include "../../refine.cuh"
 
 // TODO: This shouldn't be calling spatial/knn APIs
 #include "../ann_utils.cuh"
@@ -174,13 +174,13 @@ void build_knn_graph(
         refined_distances_host.data_handle(), batch.size(), top_k);
       raft::resource::sync_stream(res);
 
-      cuvs::neighbors::detail::refine_host<int64_t, DataT, float, int64_t>(
-        dataset,
-        queries_host_view,
-        neighbors_host_view,
-        refined_neighbors_host_view,
-        refined_distances_host_view,
-        build_params->metric);
+      cuvs::neighbors::refine(res,
+                              dataset,
+                              queries_host_view,
+                              neighbors_host_view,
+                              refined_neighbors_host_view,
+                              refined_distances_host_view,
+                              build_params->metric);
     } else {
       auto neighbor_candidates_view = raft::make_device_matrix_view<const int64_t, uint64_t>(
         neighbors.data_handle(), batch.size(), gpu_top_k);
@@ -191,14 +191,13 @@ void build_knn_graph(
 
       auto dataset_view = raft::make_device_matrix_view<const DataT, int64_t>(
         dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-      cuvs::neighbors::detail::refine_device<int64_t, DataT, float, int64_t>(
-        res,
-        dataset_view,
-        queries_view,
-        neighbor_candidates_view,
-        refined_neighbors_view,
-        refined_distances_view,
-        build_params->metric);
+      cuvs::neighbors::refine(res,
+                              dataset_view,
+                              queries_view,
+                              neighbor_candidates_view,
+                              refined_neighbors_view,
+                              refined_distances_view,
+                              build_params->metric);
       raft::copy(refined_neighbors_host.data_handle(),
                  refined_neighbors_view.data_handle(),
                  refined_neighbors_view.size(),
