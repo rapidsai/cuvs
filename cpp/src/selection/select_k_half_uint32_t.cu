@@ -28,6 +28,6 @@
     SelectAlgo algo,                                                                      \
     std::optional<raft::device_vector_view<const IdxT, int64_t>> len_i)
 
-instantiate_cuvs_selection_select_k(float, uint32_t);
+instantiate_cuvs_selection_select_k(__half, uint32_t);
 
 #undef instantiate_cuvs_selection_select_k

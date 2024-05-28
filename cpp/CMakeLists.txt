@@ -435,6 +435,7 @@ add_library(
   src/neighbors/sample_filter.cu
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_uint32_t.cu
+  src/selection/select_k_half_uint32_t.cu
 )
 
 target_compile_options(

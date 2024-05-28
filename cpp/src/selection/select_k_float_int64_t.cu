@@ -25,7 +25,9 @@
     raft::device_matrix_view<IdxT, int64_t, raft::row_major> out_idx,                     \
     bool select_min,                                                                      \
     bool sorted,                                                                          \
-    SelectAlgo algo)
+    SelectAlgo algo,                                                                      \
+    std::optional<raft::device_vector_view<const IdxT, int64_t>> len_i)
+
 instantiate_cuvs_selection_select_k(float, int64_t);
 
 #undef instantiate_cuvs_selection_select_k

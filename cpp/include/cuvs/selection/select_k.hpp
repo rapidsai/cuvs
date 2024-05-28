@@ -76,6 +76,8 @@ using SelectAlgo = raft::matrix::SelectAlgo;
  *   whether to make sure selected pairs are sorted by value
  * @param[in] algo
  *   the selection algorithm to use
+ * @param[in] len_i
+ *  optional array of size (batch_size) providing lengths for each individual row
  */
 template <typename T, typename IdxT>
 void select_k(raft::resources const& handle,
@@ -85,7 +87,8 @@ void select_k(raft::resources const& handle,
               raft::device_matrix_view<IdxT, int64_t, raft::row_major> out_idx,
               bool select_min,
               bool sorted     = false,
-              SelectAlgo algo = SelectAlgo::kAuto);
+              SelectAlgo algo = SelectAlgo::kAuto,
+              std::optional<raft::device_vector_view<const IdxT, int64_t>> len_i = std::nullopt);
 
 /** @} */  // end of group select_k
 
