@@ -45,15 +45,19 @@ namespace cuvs::bench::ann {
 
 // brute force KNN - RAFT
 template <typename T>
-class RaftGpu : public ANN<T>, public AnnGPU {
+class CuvsGpu : public ANN<T>, public AnnGPU {
  public:
   using typename ANN<T>::AnnSearchParam;
 
-  RaftGpu(Metric metric, int dim);
+  struct SearchParam : public AnnSearchParam {
+    auto needs_dataset() const -> bool override { return true; }
+  };
+
+  CuvsGpu(Metric metric, int dim);
 
   void build(const T*, size_t) final;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const SearchParam& param) override;
 
   void search(const T* queries,
               int batch_size,
@@ -89,7 +93,7 @@ class RaftGpu : public ANN<T>, public AnnGPU {
 };
 
 template <typename T>
-RaftGpu<T>::RaftGpu(Metric metric, int dim)
+CuvsGpu<T>::CuvsGpu(Metric metric, int dim)
   : ANN<T>(metric, dim), metric_type_(raft_temp::parse_metric_type(metric))
 {
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, double>,
@@ -98,7 +102,7 @@ RaftGpu<T>::RaftGpu(Metric metric, int dim)
 }
 
 template <typename T>
-void RaftGpu<T>::build(const T* dataset, size_t nrow)
+void CuvsGpu<T>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
   index_            = std::make_shared<cuvs::neighbors::brute_force::index<T>>(
@@ -106,13 +110,13 @@ void RaftGpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void RaftGpu<T>::set_search_param(const AnnSearchParam&)
+void CuvsGpu<T>::set_search_param(const SearchParam&)
 {
   // Nothing to set here as it is brute force implementation
 }
 
 template <typename T>
-void RaftGpu<T>::set_search_dataset(const T* dataset, size_t nrow)
+void CuvsGpu<T>::set_search_dataset(const T* dataset, size_t nrow)
 {
   dataset_ = dataset;
   nrow_    = nrow;
@@ -123,7 +127,7 @@ void RaftGpu<T>::set_search_dataset(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void RaftGpu<T>::save(const std::string& file) const
+void CuvsGpu<T>::save(const std::string& file) const
 {
   // The index is just the dataset with metadata (shape). The dataset already exist on disk,
   // therefore we do not need to save it here.
@@ -133,14 +137,14 @@ void RaftGpu<T>::save(const std::string& file) const
 }
 
 template <typename T>
-void RaftGpu<T>::load(const std::string& file)
+void CuvsGpu<T>::load(const std::string& file)
 {
   // We do not have serialization of brute force index. We can simply wrap the
   // dataset into a brute force index, like it is done in set_search_dataset.
 }
 
 template <typename T>
-void RaftGpu<T>::search(
+void CuvsGpu<T>::search(
   const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
 {
   auto queries_view =
@@ -155,9 +159,9 @@ void RaftGpu<T>::search(
 }
 
 template <typename T>
-std::unique_ptr<ANN<T>> RaftGpu<T>::copy()
+std::unique_ptr<ANN<T>> CuvsGpu<T>::copy()
 {
-  return std::make_unique<RaftGpu<T>>(*this);  // use copy constructor
+  return std::make_unique<CuvsGpu<T>>(*this);  // use copy constructor
 }
 
 }  // namespace cuvs::bench::ann

@@ -267,7 +267,7 @@ class FaissGpuIVFFlat : public FaissGpu<T> {
   {
     auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
     int nprobe        = search_param.nprobe;
-    assert(nprobe <= nlist_);
+    assert(nprobe <= this->nlist_);
 
     faiss::IVFSearchParameters faiss_search_params;
     faiss_search_params.nprobe = nprobe;
@@ -316,7 +316,7 @@ class FaissGpuIVFPQ : public FaissGpu<T> {
   {
     auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
     int nprobe        = search_param.nprobe;
-    assert(nprobe <= nlist_);
+    assert(nprobe <= this->nlist_);
     this->refine_ratio_ = search_param.refine_ratio;
     faiss::IVFPQSearchParameters faiss_search_params;
     faiss_search_params.nprobe = nprobe;
@@ -372,7 +372,7 @@ class FaissGpuIVFSQ : public FaissGpu<T> {
   {
     auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
     int nprobe        = search_param.nprobe;
-    assert(nprobe <= nlist_);
+    assert(nprobe <= this->nlist_);
 
     faiss::IVFSearchParameters faiss_search_params;
     faiss_search_params.nprobe = nprobe;
@@ -414,7 +414,7 @@ class FaissGpuFlat : public FaissGpu<T> {
   {
     auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
     int nprobe        = search_param.nprobe;
-    assert(nprobe <= nlist_);
+    assert(nprobe <= this->nlist_);
 
     this->search_params_ = std::make_shared<faiss::SearchParameters>();
   }

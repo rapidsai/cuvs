@@ -48,7 +48,7 @@ std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
   if constexpr (std::is_same_v<T, float>) {
 #ifdef CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
     if (algo == "raft_brute_force" || algo == "cuvs_brute_force") {
-      ann = std::make_unique<cuvs::bench::ann::RaftGpu<T>>(metric, dim);
+      ann = std::make_unique<cuvs::bench::ann::CuvsGpu<T>>(metric, dim);
     }
 #endif
   }
@@ -91,7 +91,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
 {
 #ifdef CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
   if (algo == "raft_brute_force" || algo == "cuvs_brute_force") {
-    auto param = std::make_unique<typename cuvs::bench::ann::ANN<T>::AnnSearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::ann::CuvsGpu<T>::SearchParam>();
     return param;
   }
 #endif
