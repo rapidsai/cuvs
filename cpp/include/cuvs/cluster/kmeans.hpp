@@ -31,6 +31,11 @@ struct base_params {
 };
 
 /**
+ * @defgroup kmeans_params k-means hyperparameters
+ * @{
+ */
+
+/**
  * Simple object to specify hyper-parameters to the kmeans algorithm.
  */
 struct params : base_params {
@@ -125,6 +130,15 @@ struct balanced_params : base_params {
    */
   uint32_t n_iters = 20;
 };
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup kmeans k-means clustering APIs
+ * @{
+ */
 
 /**
  * Regular k-means
@@ -316,6 +330,15 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<const float, int> centroids,
                raft::device_matrix_view<float, int> X_new);
 
+/**
+ * @}
+ */
+
+/**
+ * @defgroup kmeans_helpers k-means API helpers
+ * @{
+ */
+
 namespace helpers {
 
 void find_k(raft::resources const& handle,
@@ -328,5 +351,9 @@ void find_k(raft::resources const& handle,
             int maxiter = 100,
             float tol   = 1e-3);
 }
+
+/**
+ * @}
+ */
 
 }  // namespace  cuvs::cluster::kmeans
