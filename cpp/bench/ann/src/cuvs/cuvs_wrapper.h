@@ -18,13 +18,12 @@
 #include "../common/ann_types.hpp"
 #include "cuvs_ann_bench_utils.h"
 
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/distance/detail/distance.cuh>
-#include <raft/distance/distance_types.hpp>
-#include <raft/neighbors/brute_force.cuh>
-#include <raft/neighbors/brute_force_serialize.cuh>
 
 #include <cassert>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -82,8 +81,8 @@ class RaftGpu : public ANN<T>, public AnnGPU {
  protected:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
   configured_raft_resources handle_{};
-  std::shared_ptr<raft::neighbors::brute_force::index<T>> index_;
-  raft::distance::DistanceType metric_type_;
+  std::shared_ptr<cuvs::neighbors::brute_force::index<T>> index_;
+  cuvs::distance::DistanceType metric_type_;
   int device_;
   const T* dataset_;
   size_t nrow_;
@@ -101,9 +100,9 @@ RaftGpu<T>::RaftGpu(Metric metric, int dim)
 template <typename T>
 void RaftGpu<T>::build(const T* dataset, size_t nrow)
 {
-  auto dataset_view = raft::make_host_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
-  index_            = std::make_shared<raft::neighbors::brute_force::index<T>>(
-    std::move(raft::neighbors::brute_force::build(handle_, dataset_view)));
+  auto dataset_view = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
+  index_            = std::make_shared<cuvs::neighbors::brute_force::index<T>>(
+    std::move(cuvs::neighbors::brute_force::build(handle_, dataset_view, metric_type_)));
 }
 
 template <typename T>
@@ -117,19 +116,27 @@ void RaftGpu<T>::set_search_dataset(const T* dataset, size_t nrow)
 {
   dataset_ = dataset;
   nrow_    = nrow;
+  // Wrap the dataset with an index.
+  auto dataset_view = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
+  index_            = std::make_shared<cuvs::neighbors::brute_force::index<T>>(
+    std::move(cuvs::neighbors::brute_force::build(handle_, dataset_view, metric_type_)));
 }
 
 template <typename T>
 void RaftGpu<T>::save(const std::string& file) const
 {
-  raft::neighbors::brute_force::serialize<T>(handle_, file, *index_);
+  // The index is just the dataset with metadata (shape). The dataset already exist on disk,
+  // therefore we do not need to save it here.
+  // We create an empty file because the benchmark logic requires an index file to be created.
+  std::ofstream of(file);
+  of.close();
 }
 
 template <typename T>
 void RaftGpu<T>::load(const std::string& file)
 {
-  index_ = std::make_shared<raft::neighbors::brute_force::index<T>>(
-    std::move(raft::neighbors::brute_force::deserialize<T>(handle_, file)));
+  // We do not have serialization of brute force index. We can simply wrap the
+  // dataset into a brute force index, like it is done in set_search_dataset.
 }
 
 template <typename T>
@@ -143,7 +150,7 @@ void RaftGpu<T>::search(
     raft::make_device_matrix_view<AnnBase::index_type, int64_t>(neighbors, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
-  raft::neighbors::brute_force::search<T, AnnBase::index_type>(
+  cuvs::neighbors::brute_force::search(
     handle_, *index_, queries_view, neighbors_view, distances_view);
 }
 
