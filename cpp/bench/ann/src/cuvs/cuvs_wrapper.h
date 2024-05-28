@@ -57,7 +57,7 @@ class CuvsGpu : public ANN<T>, public AnnGPU {
 
   void build(const T*, size_t) final;
 
-  void set_search_param(const SearchParam& param) override;
+  void set_search_param(const AnnSearchParam& param) override;
 
   void search(const T* queries,
               int batch_size,
@@ -110,7 +110,7 @@ void CuvsGpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void CuvsGpu<T>::set_search_param(const SearchParam&)
+void CuvsGpu<T>::set_search_param(const AnnSearchParam&)
 {
   // Nothing to set here as it is brute force implementation
 }
