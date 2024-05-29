@@ -100,12 +100,13 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - rapids-build-backend>=0.3.0,<0.4.0.dev0
           - scikit-build-core>=0.7.0
       - output_types: [requirements, pyproject]
         packages:
-          - rapids-build-backend>=0.3.0,<0.4.0.dev0
           - scikit-build-core[pyproject]>=0.7.0
+      - output_types: [requirements, pyproject, conda]
+        packages:
+          - rapids-build-backend>=0.3.0,<0.4.0.dev0
   rapids_build:
     common:
       - output_types: [conda, requirements, pyproject]
