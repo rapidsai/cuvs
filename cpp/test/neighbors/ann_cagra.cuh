@@ -140,6 +140,14 @@ void GenerateRoundingErrorFreeDataset(const raft::resources& handle,
   GenerateRoundingErrorFreeDataset_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
     ptr, size, resolution);
 }
+
+enum class graph_build_algo {
+  /* Use IVF-PQ to build all-neighbors knn graph */
+  IVF_PQ,
+  /* Experimental, use NN-Descent to build all-neighbors knn graph */
+  NN_DESCENT
+};
+
 }  // namespace
 
 struct AnnCagraInputs {
@@ -230,7 +238,20 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
-        index_params.build_algo  = ps.build_algo;
+        switch (ps.build_algo) {
+          case graph_build_algo::IVF_PQ:
+            index_params.build_params = ivf_pq::graph_build_params{};
+            if (ps.ivf_pq_search_refine_ratio) {
+              std::get<cuvs::neighbors::cagra::ivf_pq::graph_build_params>(
+                index_params.build_params)
+                .refinement_rate = *ps.ivf_pq_search_refine_ratio;
+            }
+            break;
+          case graph_build_algo::NN_DESCENT:
+            index_params.build_params = nn_descent::graph_build_params{};
+            break;
+        };
+
         index_params.compression = ps.compression;
         cagra::search_params search_params;
         search_params.algo        = ps.algo;
@@ -248,14 +269,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
 
-            index = cagra::build(handle_,
-                                 index_params,
-                                 database_host_view,
-                                 std::nullopt,
-                                 ps.ivf_pq_search_refine_ratio);
+            index = cagra::build(handle_, index_params, database_host_view);
           } else {
-            index = cagra::build(
-              handle_, index_params, database_view, std::nullopt, ps.ivf_pq_search_refine_ratio);
+            index = cagra::build(handle_, index_params, database_view);
           };
 
           cagra::serialize_file(handle_, "cagra_index", index, ps.include_serialized_dataset);
