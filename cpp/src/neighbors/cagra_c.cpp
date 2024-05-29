@@ -44,7 +44,7 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
 
   switch (params.build_algo) {
     case cuvsCagraGraphBuildAlgo::IVF_PQ:
-      index_params.build_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params{};
+      index_params.graph_build_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params{};
       break;
     case cuvsCagraGraphBuildAlgo::NN_DESCENT:
       cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
@@ -52,7 +52,7 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
       nn_descent_params.max_iterations            = params.nn_descent_niter;
       nn_descent_params.graph_degree              = index_params.intermediate_graph_degree;
       nn_descent_params.intermediate_graph_degree = 1.5 * index_params.intermediate_graph_degree;
-      index_params.build_params                   = nn_descent_params;
+      index_params.graph_build_params             = nn_descent_params;
       break;
   };
 

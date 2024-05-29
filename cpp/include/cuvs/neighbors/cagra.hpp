@@ -69,7 +69,7 @@ struct index_params : cuvs::neighbors::index_params {
 
   // struct graph_build_params build_params = ivf_pq::graph_build_params{};
   std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>
-    build_params = graph_build_params::ivf_pq_params{};
+    graph_build_params = graph_build_params::ivf_pq_params{};
 };
 
 /**

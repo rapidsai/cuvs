@@ -421,9 +421,9 @@ index<T, IdxT> build(
 
   // dispatch graph_build_params
   if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
-        params.build_params)) {
-    auto ivf_pq_params =
-      std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(params.build_params);
+        params.graph_build_params)) {
+    auto ivf_pq_params = std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+      params.graph_build_params);
     build_knn_graph(res,
                     dataset,
                     knn_graph->view(),
@@ -435,7 +435,20 @@ index<T, IdxT> build(
       params.metric == cuvs::distance::DistanceType::L2Expanded,
       "L2Expanded is the only distance metrics supported for CAGRA build with nn_descent");
     auto nn_descent_params =
-      std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(params.build_params);
+      std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+        params.graph_build_params);
+
+    if (nn_descent_params.graph_degree != intermediate_degree) {
+      RAFT_LOG_WARN(
+        "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree (%lu), "
+        "aligning "
+        "nn-descent graph_degree.",
+        nn_descent_params.graph_degree,
+        intermediate_degree);
+      nn_descent_params.graph_degree              = intermediate_degree;
+      nn_descent_params.intermediate_graph_degree = 1.5 * intermediate_degree;
+    }
+
     // Use nn-descent to build CAGRA knn graph
     build_knn_graph<T, IdxT>(res, dataset, knn_graph->view(), nn_descent_params);
   }
