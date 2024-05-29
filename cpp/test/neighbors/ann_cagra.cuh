@@ -520,14 +520,15 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
-        index_params.build_algo = ps.build_algo;
+        index_params.build_algo       = ps.build_algo;
+        index_params.nn_descent_niter = 40;
         cagra::search_params search_params;
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        const double initial_dataset_ratio      = 0.95;
+        const double initial_dataset_ratio      = 0.90;
         const std::size_t initial_database_size = ps.n_rows * initial_dataset_ratio;
 
         auto initial_database_view = raft::make_device_matrix_view<const DataT, int64_t>(
