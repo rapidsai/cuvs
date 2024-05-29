@@ -15,6 +15,7 @@
  */
 
 #include "./detail/knn_brute_force.cuh"
+
 #include <cuvs/neighbors/brute_force.hpp>
 
 #include <raft/core/copy.hpp>
@@ -84,25 +85,32 @@ void index<T>::update_dataset(raft::resources const& res,
   dataset_view_ = raft::make_const_mdspan(dataset_.view());
 }
 
-#define CUVS_INST_BFKNN(T)                                                           \
-  auto build(raft::resources const& res,                                             \
-             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,    \
-             cuvs::distance::DistanceType metric,                                    \
-             T metric_arg)                                                           \
-    ->cuvs::neighbors::brute_force::index<T>                                         \
-  {                                                                                  \
-    return detail::build<T>(res, dataset, metric, metric_arg);                       \
-  }                                                                                  \
-                                                                                     \
-  void search(raft::resources const& res,                                            \
-              const cuvs::neighbors::brute_force::index<T>& idx,                     \
-              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,   \
-              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, \
-              raft::device_matrix_view<T, int64_t, raft::row_major> distances)       \
-  {                                                                                  \
-    detail::brute_force_search<T, int64_t>(res, idx, queries, neighbors, distances); \
-  }                                                                                  \
-                                                                                     \
+#define CUVS_INST_BFKNN(T)                                                                        \
+  auto build(raft::resources const& res,                                                          \
+             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,                 \
+             cuvs::distance::DistanceType metric,                                                 \
+             T metric_arg)                                                                        \
+    ->cuvs::neighbors::brute_force::index<T>                                                      \
+  {                                                                                               \
+    return detail::build<T>(res, dataset, metric, metric_arg);                                    \
+  }                                                                                               \
+                                                                                                  \
+  void search(                                                                                    \
+    raft::resources const& res,                                                                   \
+    const cuvs::neighbors::brute_force::index<T>& idx,                                            \
+    raft::device_matrix_view<const T, int64_t, raft::row_major> queries,                          \
+    raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,                        \
+    raft::device_matrix_view<T, int64_t, raft::row_major> distances,                              \
+    std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter = std::nullopt) \
+  {                                                                                               \
+    if (!sample_filter.has_value()) {                                                             \
+      detail::brute_force_search<T, int64_t>(res, idx, queries, neighbors, distances);            \
+    } else {                                                                                      \
+      detail::brute_force_search_filtered<T, int64_t>(                                            \
+        res, idx, queries, *sample_filter, neighbors, distances);                                 \
+    }                                                                                             \
+  }                                                                                               \
+                                                                                                  \
   template struct cuvs::neighbors::brute_force::index<T>;
 
 CUVS_INST_BFKNN(float);
