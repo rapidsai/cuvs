@@ -403,17 +403,12 @@ void predict(raft::resources const& handle,
  * @param[in]     params           Parameters for KMeans model.
  * @param[in]     X                New data to predict.
  *                                 [dim = n_samples x n_features]
- * @param[in]     sample_weight    Optional weights for each observation in X.
- *                                 [len = n_samples]
  * @param[in]     centroids        Cluster centroids. The data must be in
  *                                 row-major format.
  *                                 [dim = n_clusters x n_features]
- * @param[in]     normalize_weight True if the weights should be normalized
  * @param[out]    labels           Index of the cluster each sample in X
  *                                 belongs to.
  *                                 [len = n_samples]
- * @param[out]    inertia          Sum of squared distances of samples to
- *                                 their closest cluster center.
  */
 void predict(const raft::resources& handle,
              cuvs::cluster::kmeans::balanced_params const& params,
