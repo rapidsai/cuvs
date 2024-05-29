@@ -592,6 +592,8 @@ void brute_force_search_filtered(
   auto filter_view =
     raft::make_device_vector_view<const BitmapT, IdxT>(filter.data(), filter.n_elements());
 
+  // TODO(rhdong): Need to switch to the public API,
+  // with the issue: https://github.com/rapidsai/cuvs/issues/158
   raft::detail::popc(res, filter_view, n_queries * n_dataset, nnz_view);
   raft::copy(&nnz_h, nnz.data(), 1, stream);
 

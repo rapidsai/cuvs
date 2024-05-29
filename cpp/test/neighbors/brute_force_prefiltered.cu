@@ -195,6 +195,8 @@ class PrefilteredBruteForceTest
 
       set_bitmap(src, dst, bitmap, n_edges, n, stream);
 
+      // TODO(rhdong): Need to switch to the public API,
+      // with the issue: https://github.com/rapidsai/cuvs/issues/158
       raft::detail::popc(handle, filter_view, m * n, nnz_view);
       raft::copy(&nnz_h, nnz.data(), 1, stream);
 
