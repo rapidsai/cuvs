@@ -82,7 +82,7 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
 
     auto metric = cuvs::distance::DistanceType::L2Unexpanded;
     auto idx    = cuvs::neighbors::brute_force::build(handle, index, metric);
-    cuvs::neighbors::brute_force::search(handle, idx, search, indices, distances);
+    cuvs::neighbors::brute_force::search(handle, idx, search, indices, distances, std::nullopt);
 
     build_actual_output<<<raft::ceildiv(rows_ * k_, 32), 32, 0, stream>>>(
       actual_labels_.data(), rows_, k_, search_labels_.data(), indices_.data());
