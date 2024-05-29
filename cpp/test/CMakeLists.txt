@@ -96,6 +96,7 @@ if(BUILD_TESTS)
     PATH
     test/neighbors/brute_force.cu
     test/neighbors/brute_force_prefiltered.cu
+    test/neighbors/refine.cu
     GPUS
     1
     PERCENT
