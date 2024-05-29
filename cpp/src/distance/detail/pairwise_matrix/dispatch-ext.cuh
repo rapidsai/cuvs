@@ -22,7 +22,7 @@
 #include <raft/core/operators.hpp>        // raft::identity_op
 #include <raft/util/raft_explicit.hpp>    // RAFT_EXPLICIT
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs::distance::detail {
 

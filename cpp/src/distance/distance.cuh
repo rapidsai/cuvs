@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
 #include "distance-inl.cuh"
 #endif
 
