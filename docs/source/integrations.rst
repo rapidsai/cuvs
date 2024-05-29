@@ -5,7 +5,7 @@ Aside from using cuVS directly, it can be consumed through a number of sdk and v
 
 - `FAISS`_
 - `Milvus`_
-- `Lucene` _
+- `Lucene`_
 - `Kinetica`_
 
 

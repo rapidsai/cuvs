@@ -220,6 +220,7 @@ void index<T, IdxT>::check_consistency()
 }
 
 template struct index<float, int64_t>;
+template struct index<half, int64_t>;
 template struct index<int8_t, int64_t>;
 template struct index<uint8_t, int64_t>;
 
