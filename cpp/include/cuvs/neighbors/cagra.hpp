@@ -43,26 +43,15 @@ namespace cuvs::neighbors::cagra {
  * @brief ANN parameters used by CAGRA to build knn graph
  *
  */
-struct graph_build_params {
-  bool construct_index_with_dataset = true;
-  virtual ~graph_build_params() {}
-};
-
-namespace ivf_pq {
+namespace graph_build_params {
 /** Specialized parameters utilizing IVF-PQ to build knn graph */
-struct graph_build_params : cuvs::neighbors::cagra::graph_build_params {
+struct ivf_pq_params {
   std::optional<cuvs::neighbors::ivf_pq::index_params> build_params   = std::nullopt;
   std::optional<cuvs::neighbors::ivf_pq::search_params> search_params = std::nullopt;
   float refinement_rate                                               = 2.0f;
 };
-}  // namespace ivf_pq
-
-namespace nn_descent {
-/** Specialized parameters utilizing NN_DESCENT to build knn graph */
-struct graph_build_params : cuvs::neighbors::cagra::graph_build_params {
-  std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
-};
-}  // namespace nn_descent
+using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+}  // namespace graph_build_params
 
 struct index_params : cuvs::neighbors::index_params {
   /** Degree of input graph for pruning. */
@@ -76,9 +65,11 @@ struct index_params : cuvs::neighbors::index_params {
    */
   std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
+  bool construct_index_with_dataset = true;
+
   // struct graph_build_params build_params = ivf_pq::graph_build_params{};
-  std::variant<ivf_pq::graph_build_params, nn_descent::graph_build_params> build_params =
-    ivf_pq::graph_build_params{};
+  std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>
+    build_params = graph_build_params::ivf_pq_params{};
 };
 
 /**

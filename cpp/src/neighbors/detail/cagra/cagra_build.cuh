@@ -75,6 +75,7 @@ void write_to_graph(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_g
 
 template <typename DataT, typename IdxT, typename accessor>
 void refine_host_and_write_graph(
+  raft::resources const& res,
   raft::host_matrix<DataT, int64_t>& queries_host,
   raft::host_matrix<int64_t, int64_t>& neighbors_host,
   raft::host_matrix<int64_t, int64_t>& refined_neighbors_host,
@@ -104,7 +105,8 @@ void refine_host_and_write_graph(
         neighbors_host.data_handle(), batch_size, neighbors_host.extent(1));
       auto refined_distances_host_view = raft::make_host_matrix_view<float, int64_t>(
         refined_distances_host.data_handle(), batch_size, top_k);
-      cuvs::neighbors::refine(dataset,
+      cuvs::neighbors::refine(res,
+                              dataset,
                               queries_host_view,
                               neighbors_host_view,
                               refined_neighbors_host_view,
@@ -231,7 +233,8 @@ void build_knn_graph(
       // process previous batch async on host
       // NOTE: the async path also covers disabled refinement (top_k == gpu_top_k)
       if (previous_batch_size > 0) {
-        refine_host_and_write_graph(queries_host,
+        refine_host_and_write_graph(res,
+                                    queries_host,
                                     neighbors_host,
                                     refined_neighbors_host,
                                     refined_distances_host,
@@ -266,7 +269,8 @@ void build_knn_graph(
 
       // process last batch
       if (previous_batch_offset + previous_batch_size == (size_t)num_queries) {
-        refine_host_and_write_graph(queries_host,
+        refine_host_and_write_graph(res,
+                                    queries_host,
                                     neighbors_host,
                                     refined_neighbors_host,
                                     refined_distances_host,
@@ -416,33 +420,24 @@ index<T, IdxT> build(
     raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), intermediate_degree));
 
   // dispatch graph_build_params
-  bool construct_index_with_dataset;
-  if (std::holds_alternative<cuvs::neighbors::cagra::ivf_pq::graph_build_params>(
+  if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
         params.build_params)) {
-    auto graph_build_params =
-      std::get<cuvs::neighbors::cagra::ivf_pq::graph_build_params>(params.build_params);
-    construct_index_with_dataset = graph_build_params.construct_index_with_dataset;
+    auto ivf_pq_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(params.build_params);
     build_knn_graph(res,
                     dataset,
                     knn_graph->view(),
-                    graph_build_params.refinement_rate,
-                    graph_build_params.build_params,
-                    graph_build_params.search_params);
+                    ivf_pq_params.refinement_rate,
+                    ivf_pq_params.build_params,
+                    ivf_pq_params.search_params);
   } else {
     RAFT_EXPECTS(
       params.metric == cuvs::distance::DistanceType::L2Expanded,
       "L2Expanded is the only distance metrics supported for CAGRA build with nn_descent");
-    auto graph_build_params =
-      std::get<cuvs::neighbors::cagra::nn_descent::graph_build_params>(params.build_params);
-    auto nn_descent_params       = graph_build_params.nn_descent_params;
-    construct_index_with_dataset = graph_build_params.construct_index_with_dataset;
+    auto nn_descent_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(params.build_params);
     // Use nn-descent to build CAGRA knn graph
-    if (!nn_descent_params) {
-      nn_descent_params                            = cuvs::neighbors::nn_descent::index_params();
-      nn_descent_params->graph_degree              = intermediate_degree;
-      nn_descent_params->intermediate_graph_degree = 1.5 * intermediate_degree;
-    }
-    build_knn_graph<T, IdxT>(res, dataset, knn_graph->view(), *nn_descent_params);
+    build_knn_graph<T, IdxT>(res, dataset, knn_graph->view(), nn_descent_params);
   }
 
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
@@ -455,7 +450,7 @@ index<T, IdxT> build(
 
   RAFT_LOG_INFO("Graph optimized, creating index");
   // Construct an index from dataset and optimized knn graph.
-  if (construct_index_with_dataset) {
+  if (params.construct_index_with_dataset) {
     if (params.compression.has_value()) {
       RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
                    "VPQ compression is only supported with L2Expanded distance mertric");

@@ -240,15 +240,18 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                           // not used for knn_graph building.
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.build_params = ivf_pq::graph_build_params{};
+            index_params.build_params = graph_build_params::ivf_pq_params{};
             if (ps.ivf_pq_search_refine_ratio) {
-              std::get<cuvs::neighbors::cagra::ivf_pq::graph_build_params>(
+              std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.build_params)
                 .refinement_rate = *ps.ivf_pq_search_refine_ratio;
             }
             break;
           case graph_build_algo::NN_DESCENT:
-            index_params.build_params = nn_descent::graph_build_params{};
+            graph_build_params::nn_descent_params build_params{};
+            build_params.graph_degree              = index_params.intermediate_graph_degree;
+            build_params.intermediate_graph_degree = 1.5 * index_params.intermediate_graph_degree;
+            index_params.build_params              = build_params;
             break;
         };
 
