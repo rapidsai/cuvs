@@ -18,8 +18,8 @@
 
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_list.hpp>
 
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/mdarray.hpp>

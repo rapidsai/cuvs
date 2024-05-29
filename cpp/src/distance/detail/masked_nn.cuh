@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "../compress_to_bits.cuh"
-#include "../fused_distance_nn/fused_l2_nn.cuh"
-#include "../masked_distance_base.cuh"
+#include "compress_to_bits.cuh"
+#include "fused_distance_nn/fused_l2_nn.cuh"
+#include "masked_distance_base.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/linalg/contractions.cuh>
@@ -251,14 +251,14 @@ void masked_l2_nn_impl(raft::resources const& handle,
                        bool sqrt,
                        bool initOutBuffer)
 {
-  typedef typename linalg::Policy4x4<DataT, 1>::Policy P;
+  typedef typename raft::linalg::Policy4x4<DataT, 1>::Policy P;
 
   static_assert(P::Mblk == 64, "masked_l2_nn_impl only supports a policy with 64 rows per block.");
 
   // Get stream and workspace memory resource
   rmm::mr::device_memory_resource* ws_mr =
-    dynamic_cast<rmm::mr::device_memory_resource*>(resource::get_workspace_resource(handle));
-  auto stream = resource::get_cuda_stream(handle);
+    dynamic_cast<rmm::mr::device_memory_resource*>(raft::resource::get_workspace_resource(handle));
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   // Acquire temporary buffers and initialize to zero:
   // 1) Adjacency matrix bitfield

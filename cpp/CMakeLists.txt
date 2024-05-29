@@ -387,10 +387,6 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
-  src/neighbors/detail/refine_host_float_float.cpp
-  src/neighbors/detail/refine_host_half_float.cpp
-  src/neighbors/detail/refine_host_int8_t_float.cpp
-  src/neighbors/detail/refine_host_uint8_t_float.cpp
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
@@ -432,6 +428,14 @@ add_library(
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
+  src/neighbors/refine/detail/refine_device_float_float.cu
+  src/neighbors/refine/detail/refine_device_half_float.cu
+  src/neighbors/refine/detail/refine_device_int8_t_float.cu
+  src/neighbors/refine/detail/refine_device_uint8_t_float.cu
+  src/neighbors/refine/detail/refine_host_float_float.cpp
+  src/neighbors/refine/detail/refine_host_half_float.cpp
+  src/neighbors/refine/detail/refine_host_int8_t_float.cpp
+  src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
 )
 
@@ -447,14 +451,28 @@ target_include_directories(
               "$<INSTALL_INTERFACE:include>"
 )
 
+rapids_find_package(
+  OpenMP REQUIRED
+  BUILD_EXPORT_SET cuvs-exports
+  INSTALL_EXPORT_SET cuvs-exports
+)
+
 if(NOT BUILD_CPU_ONLY)
+
+  set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
+  set(CUVS_CUBLAS_DEPENDENCY CUDA::cublas${_ctk_static_suffix})
+  set(CUVS_CURAND_DEPENDENCY CUDA::curand${_ctk_static_suffix})
+  set(CUVS_CUSPARSE_DEPENDENCY CUDA::cusparse${_ctk_static_suffix})
+
+  set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
+                                 ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
+  )
+
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
-    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
-           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
+    PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
@@ -531,8 +549,9 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 # * cuvs_c -------------------------------------------------------------------------------
 if(BUILD_C_LIBRARY)
   add_library(
-    cuvs_c SHARED src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-                  src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp
+    cuvs_c SHARED
+    src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
@@ -558,8 +577,8 @@ if(BUILD_C_LIBRARY)
 
   target_link_libraries(
     cuvs_c
-    PUBLIC cuvs::cuvs
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+    PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE raft::raft
   )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries

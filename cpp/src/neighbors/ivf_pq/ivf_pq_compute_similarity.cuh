@@ -19,10 +19,10 @@
 #include "../sample_filter.cuh"  // none_ivf_sample_filter
 #include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
-#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
-#include <cuvs/neighbors/ivf_pq.hpp>         // cuvs::neighbors::ivf_pq::codebook_gen
-#include <raft/core/detail/macros.hpp>       // RAFT_WEAK_FUNCTION
-#include <rmm/cuda_stream_view.hpp>          // rmm::cuda_stream_view
+#include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
+#include <cuvs/neighbors/ivf_pq.hpp>    // cuvs::neighbors::ivf_pq::codebook_gen
+#include <raft/core/detail/macros.hpp>  // RAFT_WEAK_FUNCTION
+#include <rmm/cuda_stream_view.hpp>     // rmm::cuda_stream_view
 
 #include <cuda_fp16.h>  // __half
 

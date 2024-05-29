@@ -15,8 +15,8 @@
  */
 
 #include "../test_utils.cuh"
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
-#include <raft/distance/distance_types.hpp>
 
 namespace cuvs::neighbors::brute_force {
 struct KNNInputs {

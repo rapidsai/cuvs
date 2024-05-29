@@ -1,9 +1,9 @@
 /*
- * raft::copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a raft::copy of the License at
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,10 +21,9 @@
 #include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_list.cuh"
-#include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"  // utils::mapping
 
@@ -1393,7 +1392,7 @@ void extend_list_with_codes(
   // Allocate memory and write indices
   auto offset = extend_list_prepare(res, index, new_indices, label);
   // Pack the data
-  helpers::codepacker::pack_list_data(res, index, new_codes, label, offset);
+  pack_list_data(res, index, new_codes, label, offset);
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(res, *index);
 }
@@ -1660,13 +1659,14 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename accessor>
 auto build(raft::resources const& handle,
            const index_params& params,
-           const T* dataset,
-           IdxT n_rows,
-           uint32_t dim) -> index<IdxT>
+           raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset)
+  -> index<IdxT>
 {
+  IdxT n_rows = dataset.extent(0);
+  IdxT dim    = dataset.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::build(%zu, %u)", size_t(n_rows), dim);
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
@@ -1701,7 +1701,7 @@ auto build(raft::resources const& handle,
     if constexpr (std::is_same_v<T, float>) {
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
                                       sizeof(T) * index.dim(),
-                                      dataset,
+                                      dataset.data_handle(),
                                       sizeof(T) * index.dim() * trainset_ratio,
                                       sizeof(T) * index.dim(),
                                       n_rows_train,
@@ -1710,7 +1710,7 @@ auto build(raft::resources const& handle,
     } else {
       size_t dim = index.dim();
       cudaPointerAttributes dataset_attr;
-      RAFT_CUDA_TRY(cudaPointerGetAttributes(&dataset_attr, dataset));
+      RAFT_CUDA_TRY(cudaPointerGetAttributes(&dataset_attr, dataset.data_handle()));
       if (dataset_attr.devicePointer != nullptr) {
         // data is available on device: just run the kernel to raft::copy and map the data
         auto p = reinterpret_cast<T*>(dataset_attr.devicePointer);
@@ -1729,7 +1729,7 @@ auto build(raft::resources const& handle,
         // T at the end of float rows.
         RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset_tmp,
                                         sizeof(float) * index.dim(),
-                                        dataset,
+                                        dataset.data_handle(),
                                         sizeof(T) * index.dim() * trainset_ratio,
                                         sizeof(T) * index.dim(),
                                         n_rows_train,
@@ -1780,13 +1780,9 @@ auto build(raft::resources const& handle,
                                             utils::mapping<float>());
 
     // Make rotation matrix
-    helpers::make_rotation_matrix(handle,
-                                  params.force_random_rotation,
-                                  index.rot_dim(),
-                                  index.dim(),
-                                  index.rotation_matrix().data_handle());
+    helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, cluster_centers);
+    helpers::set_centers(handle, &index, raft::make_const_mdspan(centers_view));
 
     // Train PQ codebooks
     switch (index.codebook_kind()) {
@@ -1814,37 +1810,27 @@ auto build(raft::resources const& handle,
 
   // add the data if necessary
   if (params.add_data_on_build) {
-    detail::extend<T, IdxT>(handle, &index, dataset, nullptr, n_rows);
+    detail::extend<T, IdxT>(handle, &index, dataset.data_handle(), nullptr, n_rows);
   }
   return index;
 }
 
-template <typename T, typename IdxT>
-auto build(raft::resources const& handle,
-           const index_params& params,
-           raft::device_matrix_view<const T, IdxT, raft::row_major> dataset) -> index<IdxT>
-{
-  IdxT n_rows = dataset.extent(0);
-  IdxT dim    = dataset.extent(1);
-  return build(handle, params, dataset.data_handle(), n_rows, dim);
-}
-
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename accessor>
 void build(raft::resources const& handle,
            const index_params& params,
-           raft::device_matrix_view<const T, IdxT, raft::row_major> dataset,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> dataset,
            index<IdxT>* index)
 {
-  IdxT n_rows = dataset.extent(0);
-  IdxT dim    = dataset.extent(1);
-  *index      = build(handle, params, dataset.data_handle(), n_rows, dim);
+  *index = build(handle, params, dataset);
 }
 
-template <typename T, typename IdxT>
-auto extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
-            const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+auto extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
 {
   ASSERT(new_vectors.extent(1) == orig_index.dim(),
          "new_vectors should have the same dimension as the index");
@@ -1862,11 +1848,13 @@ auto extend(raft::resources const& handle,
                 n_rows);
 }
 
-template <typename T, typename IdxT>
-void extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
-            index<IdxT>* index)
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+void extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  index<IdxT>* index)
 {
   ASSERT(new_vectors.extent(1) == index->dim(),
          "new_vectors should have the same dimension as the index");

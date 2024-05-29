@@ -15,16 +15,16 @@
  */
 #pragma once
 
-#include "detail/kernels/rbf_fin_op.cuh"     // rbf_fin_op
-#include <cuvs/distance/distance_types.hpp>  // cuvs::distance::DistanceType
-#include <raft/core/device_mdspan.hpp>       // raft::device_matrix_view
-#include <raft/core/operators.hpp>           // raft::identity_op
-#include <raft/core/resources.hpp>           // raft::resources
-#include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
+#include "detail/kernels/rbf_fin_op.cuh"  // rbf_fin_op
+#include <cuvs/distance/distance.hpp>     // cuvs::distance::DistanceType
+#include <raft/core/device_mdspan.hpp>    // raft::device_matrix_view
+#include <raft/core/operators.hpp>        // raft::identity_op
+#include <raft/core/resources.hpp>        // raft::resources
+#include <raft/util/raft_explicit.hpp>    // RAFT_EXPLICIT
 
 #include <rmm/device_uvector.hpp>  // rmm::device_uvector
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs {
 namespace distance {
