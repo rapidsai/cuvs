@@ -146,7 +146,7 @@ void search_impl(raft::resources const& handle,
 
   RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
 
-  cuvs::selection::select_k<AccT, uint32_t>(
+  cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const AccT, int64_t>(
       distance_buffer_dev.data(), n_queries, index.n_lists()),
@@ -248,7 +248,7 @@ void search_impl(raft::resources const& handle,
 
     auto cols = manage_local_topk ? (k * grid_dim_x) : max_samples;
 
-    cuvs::selection::select_k<AccT, uint32_t>(
+    cuvs::selection::select_k(
       handle,
       raft::make_device_matrix_view<const AccT, int64_t>(distances_tmp_dev.data(), n_queries, cols),
       raft::make_device_matrix_view<const uint32_t, int64_t>(

@@ -214,7 +214,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
           });
       }
 
-      cuvs::selection::select_k<ElementType, IndexType>(
+      cuvs::selection::select_k(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_distances.data(), current_query_size, current_centroid_size),
@@ -256,7 +256,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
 
     if (tile_cols != n) {
       // select the actual top-k items here from the temporary output
-      cuvs::selection::select_k<ElementType, IndexType>(
+      cuvs::selection::select_k(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_out_distances.data(), current_query_size, temp_out_cols),

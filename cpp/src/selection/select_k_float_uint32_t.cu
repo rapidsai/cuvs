@@ -16,18 +16,4 @@
 
 #include "./select_k.cuh"
 
-#define instantiate_cuvs_selection_select_k(T, IdxT)                                      \
-  template void cuvs::selection::select_k(                                                \
-    raft::resources const& handle,                                                        \
-    raft::device_matrix_view<const T, int64_t, raft::row_major> in_val,                   \
-    std::optional<raft::device_matrix_view<const IdxT, int64_t, raft::row_major>> in_idx, \
-    raft::device_matrix_view<T, int64_t, raft::row_major> out_val,                        \
-    raft::device_matrix_view<IdxT, int64_t, raft::row_major> out_idx,                     \
-    bool select_min,                                                                      \
-    bool sorted,                                                                          \
-    SelectAlgo algo,                                                                      \
-    std::optional<raft::device_vector_view<const IdxT, int64_t>> len_i)
-
 instantiate_cuvs_selection_select_k(float, uint32_t);
-
-#undef instantiate_cuvs_selection_select_k

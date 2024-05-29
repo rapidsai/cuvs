@@ -19,7 +19,7 @@
 #include <cuvs/selection/select_k.hpp>
 #include <raft/matrix/detail/select_k.cuh>
 
-namespace cuvs::selection {
+namespace cuvs::selection::detail {
 
 template <typename T, typename IdxT>
 void select_k(raft::resources const& handle,
@@ -61,4 +61,20 @@ void select_k(raft::resources const& handle,
     algo,
     len_i.has_value() ? len_i->data_handle() : nullptr);
 }
-}  // namespace cuvs::selection
+}  // namespace cuvs::selection::detail
+
+#define instantiate_cuvs_selection_select_k(T, IdxT)                                      \
+  void cuvs::selection::select_k(                                                         \
+    raft::resources const& handle,                                                        \
+    raft::device_matrix_view<const T, int64_t, raft::row_major> in_val,                   \
+    std::optional<raft::device_matrix_view<const IdxT, int64_t, raft::row_major>> in_idx, \
+    raft::device_matrix_view<T, int64_t, raft::row_major> out_val,                        \
+    raft::device_matrix_view<IdxT, int64_t, raft::row_major> out_idx,                     \
+    bool select_min,                                                                      \
+    bool sorted,                                                                          \
+    SelectAlgo algo,                                                                      \
+    std::optional<raft::device_vector_view<const IdxT, int64_t>> len_i)                   \
+  {                                                                                       \
+    detail::select_k<T, IdxT>(                                                            \
+      handle, in_val, in_idx, out_val, out_idx, select_min, sorted, algo, len_i);         \
+  }

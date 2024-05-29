@@ -158,7 +158,7 @@ void select_clusters(raft::resources const& handle,
 
   // Select neighbor clusters for each query.
   rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
-  cuvs::selection::select_k<float, uint32_t>(
+  cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const float, int64_t>(qc_distances.data(), n_queries, n_lists),
     std::nullopt,
@@ -445,7 +445,7 @@ void ivfpq_search_worker(raft::resources const& handle,
       raft::make_device_vector_view<const uint32_t>(num_samples.data(), n_queries);
   }
 
-  cuvs::selection::select_k<ScoreT, uint32_t>(
+  cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const ScoreT, int64_t>(distances_buf.data(), n_queries, topk_len),
     raft::make_device_matrix_view<const uint32_t, int64_t>(neighbors_ptr, n_queries, topk_len),

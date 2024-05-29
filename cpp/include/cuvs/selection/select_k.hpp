@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <cuda_fp16.h>
+
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/matrix/select_k_types.hpp>
@@ -51,11 +53,6 @@ using SelectAlgo = raft::matrix::SelectAlgo;
  *     handle, in_values, std::nullopt, out_values.view(), out_indices.view(), true);
  * @endcode
  *
- * @tparam T
- *   the type of the keys (what is being compared).
- * @tparam IdxT
- *   the index type (what is being selected together with the keys).
- *
  * @param[in] handle container of reusable resources
  * @param[in] in_val
  *   inputs values [batch_size, len];
@@ -79,17 +76,38 @@ using SelectAlgo = raft::matrix::SelectAlgo;
  * @param[in] len_i
  *  optional array of size (batch_size) providing lengths for each individual row
  */
-template <typename T, typename IdxT>
-void select_k(raft::resources const& handle,
-              raft::device_matrix_view<const T, int64_t, raft::row_major> in_val,
-              std::optional<raft::device_matrix_view<const IdxT, int64_t, raft::row_major>> in_idx,
-              raft::device_matrix_view<T, int64_t, raft::row_major> out_val,
-              raft::device_matrix_view<IdxT, int64_t, raft::row_major> out_idx,
-              bool select_min,
-              bool sorted     = false,
-              SelectAlgo algo = SelectAlgo::kAuto,
-              std::optional<raft::device_vector_view<const IdxT, int64_t>> len_i = std::nullopt);
+void select_k(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> in_val,
+  std::optional<raft::device_matrix_view<const int64_t, int64_t, raft::row_major>> in_idx,
+  raft::device_matrix_view<float, int64_t, raft::row_major> out_val,
+  raft::device_matrix_view<int64_t, int64_t, raft::row_major> out_idx,
+  bool select_min,
+  bool sorted                                                           = false,
+  SelectAlgo algo                                                       = SelectAlgo::kAuto,
+  std::optional<raft::device_vector_view<const int64_t, int64_t>> len_i = std::nullopt);
 
+void select_k(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> in_val,
+  std::optional<raft::device_matrix_view<const uint32_t, int64_t, raft::row_major>> in_idx,
+  raft::device_matrix_view<float, int64_t, raft::row_major> out_val,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> out_idx,
+  bool select_min,
+  bool sorted                                                            = false,
+  SelectAlgo algo                                                        = SelectAlgo::kAuto,
+  std::optional<raft::device_vector_view<const uint32_t, int64_t>> len_i = std::nullopt);
+
+void select_k(
+  raft::resources const& handle,
+  raft::device_matrix_view<const half, int64_t, raft::row_major> in_val,
+  std::optional<raft::device_matrix_view<const uint32_t, int64_t, raft::row_major>> in_idx,
+  raft::device_matrix_view<half, int64_t, raft::row_major> out_val,
+  raft::device_matrix_view<uint32_t, int64_t, raft::row_major> out_idx,
+  bool select_min,
+  bool sorted                                                            = false,
+  SelectAlgo algo                                                        = SelectAlgo::kAuto,
+  std::optional<raft::device_vector_view<const uint32_t, int64_t>> len_i = std::nullopt);
 /** @} */  // end of group select_k
 
 }  // namespace cuvs::selection
