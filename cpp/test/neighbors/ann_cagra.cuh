@@ -270,12 +270,21 @@ struct AnnCagraInputs {
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 {
+  const auto metric_str = [](const cuvs::distance::DistanceType dist) -> std::string {
+    switch (dist) {
+      case InnerProduct: return "InnerProduct";
+      case L2Expanded: return "L2";
+      default: break;
+    }
+    return "Unknown";
+  };
+
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
-     << ", metric=" << static_cast<int>(p.metric) << (p.host_dataset ? ", host" : ", device")
+     << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
      << ", build_algo=" << build_algo.at((int)p.build_algo);
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
