@@ -20,11 +20,16 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
+#include <raft/core/detail/popc.cuh>
 #include <raft/matrix/copy.cuh>
 #include <raft/random/make_blobs.cuh>
+#include <raft/random/rmat_rectangular_generator.cuh>
+#include <raft/random/rng.cuh>
 #include <raft/random/rng_state.hpp>
 
 #include <gtest/gtest.h>
+
+#include <thrust/iterator/transform_iterator.h>
 
 #include <algorithm>
 #include <cmath>
@@ -66,6 +71,71 @@ struct CompareApproxWithInf {
   T eps;
 };
 
+template <typename OutT, typename InT>
+RAFT_KERNEL normalize_kernel(
+  OutT* theta, const InT* in_vals, size_t max_scale, size_t r_scale, size_t c_scale)
+{
+  size_t idx = threadIdx.x;
+  if (idx < max_scale) {
+    auto a   = OutT(in_vals[4 * idx]);
+    auto b   = OutT(in_vals[4 * idx + 1]);
+    auto c   = OutT(in_vals[4 * idx + 2]);
+    auto d   = OutT(in_vals[4 * idx + 3]);
+    auto sum = a + b + c + d;
+    a /= sum;
+    b /= sum;
+    c /= sum;
+    d /= sum;
+    theta[4 * idx]     = a;
+    theta[4 * idx + 1] = b;
+    theta[4 * idx + 2] = c;
+    theta[4 * idx + 3] = d;
+  }
+}
+
+template <typename OutT, typename InT>
+void normalize(OutT* theta,
+               const InT* in_vals,
+               size_t max_scale,
+               size_t r_scale,
+               size_t c_scale,
+               bool handle_rect,
+               bool theta_array,
+               cudaStream_t stream)
+{
+  normalize_kernel<OutT, InT><<<1, 256, 0, stream>>>(theta, in_vals, max_scale, r_scale, c_scale);
+  RAFT_CUDA_TRY(cudaGetLastError());
+}
+
+template <typename index_t, typename bitmap_t = uint32_t>
+RAFT_KERNEL set_bitmap_kernel(
+  const index_t* src, const index_t* dst, bitmap_t* bitmap, index_t n_edges, index_t n_cols)
+{
+  size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
+  if (idx < n_edges) {
+    index_t row      = src[idx];
+    index_t col      = dst[idx];
+    index_t g_idx    = row * n_cols + col;
+    index_t item_idx = (g_idx) >> 5;
+    uint32_t bit_idx = (g_idx)&31;
+    atomicOr(bitmap + item_idx, (uint32_t(1) << bit_idx));
+  }
+}
+
+template <typename index_t, typename bitmap_t = uint32_t>
+void set_bitmap(const index_t* src,
+                const index_t* dst,
+                bitmap_t* bitmap,
+                index_t n_edges,
+                index_t n_cols,
+                cudaStream_t stream)
+{
+  int block_size = 256;
+  int blocks     = raft::ceildiv<index_t>(n_edges, block_size);
+  set_bitmap_kernel<index_t, bitmap_t>
+    <<<blocks, block_size, 0, stream>>>(src, dst, bitmap, n_edges, n_cols);
+  RAFT_CUDA_TRY(cudaGetLastError());
+}
 template <typename value_t, typename index_t, typename bitmap_t = uint32_t>
 class PrefilteredBruteForceTest
   : public ::testing::TestWithParam<PrefilteredBruteForceInputs<index_t>> {
@@ -84,32 +154,54 @@ class PrefilteredBruteForceTest
   }
 
  protected:
-  index_t create_sparse_matrix(index_t m, index_t n, float sparsity, std::vector<bitmap_t>& bitmap)
+  index_t create_sparse_matrix_with_rmat(index_t m,
+                                         index_t n,
+                                         value_t sparsity,
+                                         rmm::device_uvector<bitmap_t>& filter_d)
   {
-    index_t total    = static_cast<index_t>(m * n);
-    index_t num_ones = static_cast<index_t>((total * 1.0f) * sparsity);
-    index_t res      = num_ones;
+    index_t r_scale   = (index_t)std::log2(m);
+    index_t c_scale   = (index_t)std::log2(n);
+    index_t n_edges   = (index_t)(m * n * 1.0 * sparsity);
+    index_t max_scale = std::max(r_scale, c_scale);
 
-    for (auto& item : bitmap) {
-      item = static_cast<bitmap_t>(0);
+    rmm::device_uvector<index_t> out_src{(unsigned long)n_edges, stream};
+    rmm::device_uvector<index_t> out_dst{(unsigned long)n_edges, stream};
+    rmm::device_uvector<value_t> theta{(unsigned long)(4 * max_scale), stream};
+
+    raft::random::RngState state{2024ULL, raft::random::GeneratorType::GenPC};
+
+    raft::random::uniform<value_t>(handle, state, theta.data(), theta.size(), 0.0f, 1.0f);
+    normalize<value_t, value_t>(
+      theta.data(), theta.data(), max_scale, r_scale, c_scale, r_scale != c_scale, true, stream);
+    raft::random::rmat_rectangular_gen((index_t*)nullptr,
+                                       out_src.data(),
+                                       out_dst.data(),
+                                       theta.data(),
+                                       r_scale,
+                                       c_scale,
+                                       n_edges,
+                                       stream,
+                                       state);
+
+    index_t nnz_h = 0;
+    {
+      auto src    = out_src.data();
+      auto dst    = out_dst.data();
+      auto bitmap = filter_d.data();
+      rmm::device_scalar<index_t> nnz(0, stream);
+      auto nnz_view = raft::make_device_scalar_view<index_t>(nnz.data());
+      auto filter_view =
+        raft::make_device_vector_view<const uint32_t, index_t>(filter_d.data(), filter_d.size());
+
+      set_bitmap(src, dst, bitmap, n_edges, n, stream);
+
+      raft::detail::popc(handle, filter_view, m * n, nnz_view);
+      raft::copy(&nnz_h, nnz.data(), 1, stream);
+
+      raft::resource::sync_stream(handle, stream);
     }
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<index_t> dis(0, total - 1);
-
-    while (num_ones > 0) {
-      index_t index = dis(gen);
-
-      bitmap_t& element    = bitmap[index / (8 * sizeof(bitmap_t))];
-      index_t bit_position = index % (8 * sizeof(bitmap_t));
-
-      if (((element >> bit_position) & 1) == 0) {
-        element |= (static_cast<index_t>(1) << bit_position);
-        num_ones--;
-      }
-    }
-    return res;
+    return nnz_h;
   }
 
   void cpu_convert_to_csr(std::vector<bitmap_t>& bitmap,
@@ -236,29 +328,18 @@ class PrefilteredBruteForceTest
     }
   }
 
-  void random_array(value_t* array, size_t size)
-  {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<value_t> dis(-10.0, 10.0);
-    std::unordered_set<value_t> uset;
-
-    while (uset.size() < size) {
-      uset.insert(dis(gen));
-    }
-    typename std::unordered_set<value_t>::iterator it = uset.begin();
-    for (size_t i = 0; i < size; ++i) {
-      array[i] = *(it++);
-    }
-  }
-
   void SetUp() override
   {
     index_t element =
       raft::ceildiv(params.n_queries * params.n_dataset, index_t(sizeof(bitmap_t) * 8));
     std::vector<bitmap_t> filter_h(element);
+    filter_d.resize(element, stream);
 
-    nnz = create_sparse_matrix(params.n_queries, params.n_dataset, params.sparsity, filter_h);
+    nnz =
+      create_sparse_matrix_with_rmat(params.n_queries, params.n_dataset, params.sparsity, filter_d);
+
+    raft::update_host(filter_h.data(), filter_d.data(), filter_d.size(), stream);
+    raft::resource::sync_stream(handle, stream);
 
     index_t dataset_size = params.n_dataset * params.dim;
     index_t queries_size = params.n_queries * params.dim;
@@ -300,7 +381,6 @@ class PrefilteredBruteForceTest
     std::vector<index_t> indices_h(nnz);
     std::vector<index_t> indptr_h(params.n_queries + 1);
 
-    filter_d.resize(filter_h.size(), stream);
     cpu_convert_to_csr(filter_h, params.n_queries, params.n_dataset, indices_h, indptr_h);
 
     cpu_sddmm(queries_h, dataset_h, values_h, indices_h, indptr_h, true, false);
@@ -317,7 +397,6 @@ class PrefilteredBruteForceTest
 
     raft::update_device(out_val_d.data(), out_val_h.data(), out_val_h.size(), stream);
     raft::update_device(out_idx_d.data(), out_idx_h.data(), out_idx_h.size(), stream);
-    raft::update_device(filter_d.data(), filter_h.data(), filter_h.size(), stream);
 
     raft::resource::sync_stream(handle);
 
@@ -398,43 +477,43 @@ TEST_P(PrefilteredBruteForceTest_float_int64, Result) { Run(); }
 
 template <typename index_t>
 const std::vector<PrefilteredBruteForceInputs<index_t>> selectk_inputs = {
-  {1, 100000, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
-  {10, 100000, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-  {20, 100000, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-  {1, 10000, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-  {20, 10000, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-  {100, 10000, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
+  {2, 131072, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
+  {8, 131072, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+  {16, 131072, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {2, 8192, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+  {16, 8192, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+  {128, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
 
-  {1000, 10000, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
 
-  {1000, 10000, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
-  {1000, 10000, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
-  {1000, 10000, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
 
-  {1000, 10000, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
-  {1000, 10000, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
-  {1000, 10000, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 8, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
-  {1000, 10000, 5, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
-  {1000, 10000, 8, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded}};
+  {1024, 8192, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+  {1024, 8192, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 8, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {1024, 8192, 5, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
+  {1024, 8192, 8, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded}};
 
 INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceTest,
                         PrefilteredBruteForceTest_float_int64,
