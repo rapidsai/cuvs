@@ -446,10 +446,6 @@ struct index : cuvs::neighbors::index {
  *
  * It is required that dataset and the optimized graph fit the GPU memory.
  *
- * To customize the parameters for knn-graph building and pruning, and to reuse the
- * intermediate results, you could build the index in two steps using
- * [cagra::build_knn_graph](#cagra::build_knn_graph) and [cagra::optimize](#cagra::optimize).
- *
  * The following distance metrics are supported:
  * - L2
  *
