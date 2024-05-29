@@ -50,9 +50,9 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
       cuvs::neighbors::cagra::nn_descent::graph_build_params build_params{};
       build_params.nn_descent_params                 = cuvs::neighbors::nn_descent::index_params{};
       build_params.nn_descent_params->max_iterations = params.nn_descent_niter;
-      build_params.nn_descent_params->graph_degree   = index_params.intermediate_degree;
+      build_params.nn_descent_params->graph_degree   = index_params.intermediate_graph_degree;
       build_params.nn_descent_params->intermediate_graph_degree =
-        1.5 * index_params.intermediate_degree;
+        1.5 * index_params.intermediate_graph_degree;
       index_params.build_params = build_params;
       break;
   };
