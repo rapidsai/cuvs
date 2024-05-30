@@ -145,7 +145,9 @@ enum class graph_build_algo {
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
-  NN_DESCENT
+  NN_DESCENT,
+  /* Choose default automatically */
+  AUTO
 };
 
 }  // namespace
@@ -173,7 +175,7 @@ struct AnnCagraInputs {
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 {
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
-  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT"};
+  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
@@ -240,18 +242,21 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                           // not used for knn_graph building.
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params = graph_build_params::ivf_pq_params{};
+            index_params.graph_build_params =
+              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
                 .refinement_rate = *ps.ivf_pq_search_refine_ratio;
             }
             break;
-          case graph_build_algo::NN_DESCENT:
-            graph_build_params::nn_descent_params build_params{};
-            build_params.graph_degree              = index_params.intermediate_graph_degree;
-            build_params.intermediate_graph_degree = 1.5 * index_params.intermediate_graph_degree;
-            index_params.graph_build_params        = build_params;
+          case graph_build_algo::NN_DESCENT: {
+            index_params.graph_build_params =
+              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::AUTO:
+            // do nothing
             break;
         };
 
@@ -435,21 +440,21 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000, 20000},
-    {32},
-    {10},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false, true},
-    {false},
-    {0.995});
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {10000, 20000},
+                                                   {32},
+                                                   {10},
+                                                   {graph_build_algo::AUTO},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded},
+                                                   {false, true},
+                                                   {false},
+                                                   {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations
