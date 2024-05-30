@@ -21,6 +21,7 @@
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
@@ -104,6 +105,27 @@ void _search(cuvsResources_t res,
     *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
 }
 
+template <typename T>
+void _serialize(cuvsResources_t res,
+                const char* filename,
+                cuvsCagraIndex_t index,
+                bool include_dataset)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
+  cuvs::neighbors::cagra::serialize_file(
+    *res_ptr, std::string(filename), *index_ptr, include_dataset);
+}
+
+template <typename T>
+void* _deserialize(cuvsResources_t res, const char* filename)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
+  cuvs::neighbors::cagra::deserialize_file(*res_ptr, std::string(filename), index);
+  return index;
+}
+
 }  // namespace
 
 extern "C" cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
@@ -140,15 +162,13 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
+    index->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr       = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
-      index->dtype.code = kDLFloat;
+      index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr       = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
-      index->dtype.code = kDLInt;
+      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
-      index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -246,4 +266,50 @@ extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* para
 extern "C" cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
+                                            const char* filename,
+                                            cuvsCagraIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // read the numpy dtype from the beginning of the file
+    std::ifstream is(filename, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", filename); }
+    char dtype_string[4];
+    is.read(dtype_string, 4);
+    auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
+
+    index->dtype.bits = dtype.itemsize * 8;
+    if (dtype.kind == 'f' && dtype.itemsize == 4) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
+      index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename));
+      index->dtype.code = kDLInt;
+    } else if (dtype.kind == 'u' && dtype.itemsize == 1) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<uint8_t>(res, filename));
+      index->dtype.code = kDLUInt;
+    } else {
+      RAFT_FAIL("Unsupported dtype in file %s", filename);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+                                          const char* filename,
+                                          cuvsCagraIndex_t index,
+                                          bool include_dataset)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize<float>(res, filename, index, include_dataset);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize<int8_t>(res, filename, index, include_dataset);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize<uint8_t>(res, filename, index, include_dataset);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
 }
