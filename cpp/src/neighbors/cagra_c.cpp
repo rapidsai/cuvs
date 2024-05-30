@@ -39,12 +39,26 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
-  auto build_params                      = cuvs::neighbors::cagra::index_params();
-  build_params.intermediate_graph_degree = params.intermediate_graph_degree;
-  build_params.graph_degree              = params.graph_degree;
-  build_params.build_algo =
-    static_cast<cuvs::neighbors::cagra::graph_build_algo>(params.build_algo);
-  build_params.nn_descent_niter = params.nn_descent_niter;
+  auto index_params                      = cuvs::neighbors::cagra::index_params();
+  index_params.intermediate_graph_degree = params.intermediate_graph_degree;
+  index_params.graph_degree              = params.graph_degree;
+
+  switch (params.build_algo) {
+    case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
+    case cuvsCagraGraphBuildAlgo::IVF_PQ: {
+      auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
+      index_params.graph_build_params =
+        cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
+      break;
+    }
+    case cuvsCagraGraphBuildAlgo::NN_DESCENT:
+      cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
+      nn_descent_params =
+        cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
+      nn_descent_params.max_iterations = params.nn_descent_niter;
+      index_params.graph_build_params  = nn_descent_params;
+      break;
+  };
 
   if (auto* cparams = params.compression; cparams != nullptr) {
     auto compression_params                        = cuvs::neighbors::vpq_params();
@@ -54,17 +68,17 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
     compression_params.kmeans_n_iters              = cparams->kmeans_n_iters;
     compression_params.vq_kmeans_trainset_fraction = cparams->vq_kmeans_trainset_fraction;
     compression_params.pq_kmeans_trainset_fraction = cparams->pq_kmeans_trainset_fraction;
-    build_params.compression.emplace(compression_params);
+    index_params.compression.emplace(compression_params);
   }
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::cagra::build_device(*res_ptr, build_params, mds, *index);
+    *index            = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::cagra::build_host(*res_ptr, build_params, mds, *index);
+    *index            = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
   }
   return index;
 }

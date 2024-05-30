@@ -35,6 +35,8 @@ extern "C" {
  *
  */
 enum cuvsCagraGraphBuildAlgo {
+  /* Select build algorithm automatically */
+  AUTO_SELECT,
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */

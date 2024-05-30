@@ -53,6 +53,15 @@ struct index_params : cuvs::neighbors::index_params {
   size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
   size_t max_iterations            = 20;      // Number of nn-descent iterations.
   float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
+
+  /** @brief Construct NN descent parameters for a specific kNN graph degree
+   *
+   * @param graph_degree output graph degree
+   */
+  index_params(size_t graph_degree = 64)
+    : graph_degree(graph_degree), intermediate_graph_degree(1.5 * graph_degree)
+  {
+  }
 };
 
 /**
@@ -320,6 +329,8 @@ auto build(raft::resources const& res,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
+/** @} */
+
 /**
  * @brief Build nn-descent Index with dataset in host memory
  *
@@ -353,7 +364,16 @@ auto build(raft::resources const& res,
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
- * @}
+ * @brief Test if we have enough GPU memory to run NN descent algorithm.
+ *
+ * @param res
+ * @param dataset shape of the dataset
+ * @param idx_size the size of index type in bytes
+ * @return true if enough GPU memory can be allocated
+ * @return false otherwise
  */
+bool has_enough_device_memory(raft::resources const& res,
+                              raft::matrix_extent<int64_t> dataset,
+                              size_t idx_size = 4);
 
 }  // namespace cuvs::neighbors::nn_descent
