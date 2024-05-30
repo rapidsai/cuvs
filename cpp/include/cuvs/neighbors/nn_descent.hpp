@@ -29,7 +29,7 @@
 
 namespace cuvs::neighbors::nn_descent {
 /**
- * @defgroup nn_descent_cpp_index_params The nn-descent algorithm.
+ * @defgroup nn_descent_cpp_index_params The nn-descent algorithm parameters.
  * @{
  */
 

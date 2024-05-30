@@ -1,5 +1,5 @@
-IVF-PQ
-======
+NN-Descent
+==========
 
 The NN-descent method is an ANN algorithm that directly approximates a k-nearest neighbors graph by randomly sampling points to compute distances and using neighbors of neighbors distances to reduce distance computations.
 
