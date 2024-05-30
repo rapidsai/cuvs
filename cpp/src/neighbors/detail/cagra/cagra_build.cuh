@@ -480,9 +480,12 @@ index<T, IdxT> build(
     RAFT_LOG_DEBUG("Insufficient GPU memory to construct CAGRA index with dataset on GPU");
     // We just add the graph. User is expected to update dataset separately (e.g allocating in
     // managed memory).
-    index<T, IdxT> idx(res, params.metric);
-    idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    return idx;
+  } catch (raft::logic_error& e) {
+    // The memory error can also manifest as logic_error.
+    RAFT_LOG_DEBUG("Insufficient GPU memory to construct CAGRA index with dataset on GPU");
   }
+  index<T, IdxT> idx(res, params.metric);
+  idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+  return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail
