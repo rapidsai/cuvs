@@ -29,7 +29,7 @@
 
 namespace cuvs::neighbors::nn_descent {
 /**
- * @defgroup nn-descent The nn-descent algorithm.
+ * @defgroup nn_descent_cpp_index_params The nn-descent algorithm parameters.
  * @{
  */
 
@@ -55,6 +55,14 @@ struct index_params : cuvs::neighbors::index_params {
   float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
 };
 
+/**
+ * @}
+ */
+
+/**
+ * @defgroup nn_descent_cpp_index nn-descent index
+ * @{
+ */
 /**
  * @brief nn-descent Build an nn-descent index
  * The index contains an all-neighbors graph of the input dataset
@@ -152,6 +160,11 @@ struct index : cuvs::neighbors::index {
 };
 
 /** @} */
+
+/**
+ * @defgroup nn_descent_cpp_index_build nn-descent index build
+ * @{
+ */
 
 /**
  * @brief Build nn-descent Index with dataset in device memory
@@ -338,5 +351,9 @@ auto build(raft::resources const& res,
            index_params const& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
+
+/**
+ * @}
+ */
 
 }  // namespace cuvs::neighbors::nn_descent
