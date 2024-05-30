@@ -329,6 +329,8 @@ auto build(raft::resources const& res,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
+/** @} */
+
 /**
  * @brief Build nn-descent Index with dataset in host memory
  *
@@ -373,6 +375,5 @@ auto build(raft::resources const& res,
 bool has_enough_device_memory(raft::resources const& res,
                               raft::matrix_extent<int64_t> dataset,
                               size_t idx_size = 4);
- * @}
- */
+
 }  // namespace cuvs::neighbors::nn_descent
