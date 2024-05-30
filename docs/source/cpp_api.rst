@@ -9,3 +9,4 @@ C++ API Documentation
 
    cpp_api/distance.rst
    cpp_api/neighbors.rst
+   cpp_api/selection.rst

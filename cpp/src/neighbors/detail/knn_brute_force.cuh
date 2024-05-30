@@ -18,6 +18,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/selection/select_k.hpp>
 
 #include "../../distance/detail/distance_ops/l2_exp.cuh"
 #include "./faiss_distance_utils.h"
@@ -38,7 +39,6 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
-#include <raft/matrix/select_k.cuh>
 #include <raft/sparse/convert/coo.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/distance/detail/utils.cuh>
@@ -247,7 +247,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
                          });
       }
 
-      raft::matrix::select_k<ElementType, IndexType>(
+      cuvs::selection::select_k(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_distances.data(), current_query_size, current_centroid_size),
@@ -289,7 +289,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
 
     if (tile_cols != n) {
       // select the actual top-k items here from the temporary output
-      raft::matrix::select_k<ElementType, IndexType>(
+      cuvs::selection::select_k(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
           temp_out_distances.data(), current_query_size, temp_out_cols),
