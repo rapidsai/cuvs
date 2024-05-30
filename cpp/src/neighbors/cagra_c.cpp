@@ -70,11 +70,11 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::cagra::build_device(*res_ptr, index_params, mds, *index);
+    *index            = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
   } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    cuvs::neighbors::cagra::build_host(*res_ptr, index_params, mds, *index);
+    *index            = cuvs::neighbors::cagra::build(*res_ptr, index_params, mds);
   }
   return index;
 }
