@@ -596,10 +596,10 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = cagra.build(cagra.IndexParams(), dataset)
+    >>> index = cagra.build_index(cagra.IndexParams(), dataset)
     >>> # Serialize and deserialize the cagra index built
     >>> cagra.save("my_index.bin", index)
-    >>> index_loaded = cagra.load("my_index.bin", handle=handle)
+    >>> index_loaded = cagra.load("my_index.bin")
     """
     cdef string c_filename = filename.encode('utf-8')
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
