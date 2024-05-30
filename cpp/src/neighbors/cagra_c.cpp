@@ -43,16 +43,19 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   index_params.graph_degree              = params.graph_degree;
 
   switch (params.build_algo) {
-    case cuvsCagraGraphBuildAlgo::IVF_PQ:
-      index_params.graph_build_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params{};
+    case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
+    case cuvsCagraGraphBuildAlgo::IVF_PQ: {
+      auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
+      index_params.graph_build_params =
+        cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
       break;
+    }
     case cuvsCagraGraphBuildAlgo::NN_DESCENT:
       cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
-      nn_descent_params                           = cuvs::neighbors::nn_descent::index_params{};
-      nn_descent_params.max_iterations            = params.nn_descent_niter;
-      nn_descent_params.graph_degree              = index_params.intermediate_graph_degree;
-      nn_descent_params.intermediate_graph_degree = 1.5 * index_params.intermediate_graph_degree;
-      index_params.graph_build_params             = nn_descent_params;
+      nn_descent_params =
+        cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
+      nn_descent_params.max_iterations = params.nn_descent_niter;
+      index_params.graph_build_params  = nn_descent_params;
       break;
   };
 
