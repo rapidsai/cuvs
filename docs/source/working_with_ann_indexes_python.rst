@@ -33,8 +33,3 @@ Searching an index
     index = // ... build index ...
 
     neighbors, distances = cagra.search(search_params, index, queries, k)
-
-
-
-Serializing an index
---------------------
