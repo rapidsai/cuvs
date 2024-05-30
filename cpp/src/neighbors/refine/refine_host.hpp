@@ -101,32 +101,36 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
 
   if (size_t(suggested_n_threads) > n_queries) { suggested_n_threads = n_queries; }
 
-#pragma omp parallel num_threads(suggested_n_threads)
   {
-    std::vector<std::tuple<DistanceT, IdxT>> refined_pairs(orig_k);
-    for (size_t i = omp_get_thread_num(); i < n_queries; i += omp_get_num_threads()) {
-      // Compute the refined distance using original dataset vectors
-      const DataT* query = queries.data_handle() + dim * i;
-      for (size_t j = 0; j < orig_k; j++) {
-        IdxT id            = neighbor_candidates(i, j);
-        DistanceT distance = 0.0;
-        if (static_cast<size_t>(id) >= n_rows) {
-          distance = std::numeric_limits<DistanceT>::max();
-        } else {
-          const DataT* row = dataset.data_handle() + dim * id;
-          for (size_t k = 0; k < dim; k++) {
-            distance += DC::template eval<DistanceT>(query[k], row[k]);
+    std::vector<std::vector<std::tuple<DistanceT, IdxT>>> refined_pairs(
+      suggested_n_threads, std::vector<std::tuple<DistanceT, IdxT>>(orig_k));
+#pragma omp parallel num_threads(suggested_n_threads)
+    {
+      auto tid = omp_get_thread_num();
+      for (size_t i = tid; i < n_queries; i += omp_get_num_threads()) {
+        // Compute the refined distance using original dataset vectors
+        const DataT* query = queries.data_handle() + dim * i;
+        for (size_t j = 0; j < orig_k; j++) {
+          IdxT id            = neighbor_candidates(i, j);
+          DistanceT distance = 0.0;
+          if (static_cast<size_t>(id) >= n_rows) {
+            distance = std::numeric_limits<DistanceT>::max();
+          } else {
+            const DataT* row = dataset.data_handle() + dim * id;
+            for (size_t k = 0; k < dim; k++) {
+              distance += DC::template eval<DistanceT>(query[k], row[k]);
+            }
           }
+          refined_pairs[tid][j] = std::make_tuple(distance, id);
         }
-        refined_pairs[j] = std::make_tuple(distance, id);
-      }
-      // Sort the query neighbors by their refined distances
-      std::sort(refined_pairs.begin(), refined_pairs.end());
-      // Store first refined_k neighbors
-      for (size_t j = 0; j < refined_k; j++) {
-        indices(i, j) = std::get<1>(refined_pairs[j]);
-        if (distances.data_handle() != nullptr) {
-          distances(i, j) = DC::template postprocess(std::get<0>(refined_pairs[j]));
+        // Sort the query neighbors by their refined distances
+        std::sort(refined_pairs[tid].begin(), refined_pairs[tid].end());
+        // Store first refined_k neighbors
+        for (size_t j = 0; j < refined_k; j++) {
+          indices(i, j) = std::get<1>(refined_pairs[tid][j]);
+          if (distances.data_handle() != nullptr) {
+            distances(i, j) = DC::template postprocess(std::get<0>(refined_pairs[tid][j]));
+          }
         }
       }
     }

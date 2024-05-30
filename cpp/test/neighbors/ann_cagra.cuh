@@ -140,6 +140,16 @@ void GenerateRoundingErrorFreeDataset(const raft::resources& handle,
   GenerateRoundingErrorFreeDataset_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
     ptr, size, resolution);
 }
+
+enum class graph_build_algo {
+  /* Use IVF-PQ to build all-neighbors knn graph */
+  IVF_PQ,
+  /* Experimental, use NN-Descent to build all-neighbors knn graph */
+  NN_DESCENT,
+  /* Choose default automatically */
+  AUTO
+};
+
 }  // namespace
 
 struct AnnCagraInputs {
@@ -158,18 +168,22 @@ struct AnnCagraInputs {
   bool include_serialized_dataset;
   // std::optional<double>
   double min_recall;  // = std::nullopt;
-  std::optional<vpq_params> compression = std::nullopt;
+  std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
+  std::optional<vpq_params> compression           = std::nullopt;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 {
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
-  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT"};
+  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
      << ", metric=" << static_cast<int>(p.metric) << (p.host_dataset ? ", host" : ", device")
      << ", build_algo=" << build_algo.at((int)p.build_algo);
+  if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
+    os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
+  }
   if (p.compression.has_value()) {
     auto vpq = p.compression.value();
     os << ", pq_bits=" << vpq.pq_bits << ", pq_dim=" << vpq.pq_dim
@@ -226,7 +240,26 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
-        index_params.build_algo  = ps.build_algo;
+        switch (ps.build_algo) {
+          case graph_build_algo::IVF_PQ:
+            index_params.graph_build_params =
+              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            if (ps.ivf_pq_search_refine_ratio) {
+              std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+                index_params.graph_build_params)
+                .refinement_rate = *ps.ivf_pq_search_refine_ratio;
+            }
+            break;
+          case graph_build_algo::NN_DESCENT: {
+            index_params.graph_build_params =
+              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
+        };
+
         index_params.compression = ps.compression;
         cagra::search_params search_params;
         search_params.algo        = ps.algo;
@@ -407,21 +440,21 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000, 20000},
-    {32},
-    {10},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false, true},
-    {false},
-    {0.995});
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {10000, 20000},
+                                                   {32},
+                                                   {10},
+                                                   {graph_build_algo::AUTO},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded},
+                                                   {false, true},
+                                                   {false},
+                                                   {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations
@@ -451,6 +484,25 @@ inline std::vector<AnnCagraInputs> generate_inputs()
       }
     }
   }
+
+  // refinement options
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {5000},
+                                                   {32, 64},
+                                                   {16},
+                                                   {graph_build_algo::IVF_PQ},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded},
+                                                   {false, true},
+                                                   {false},
+                                                   {0.99},
+                                                   {1.0f, 2.0f, 3.0f});
+  inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   return inputs;
 }
