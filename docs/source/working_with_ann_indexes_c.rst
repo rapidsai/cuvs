@@ -62,7 +62,3 @@ Searching an index
     cuvsCagraIndexDestroy(index);
     cuvsCagraIndexParamsDestroy(index_params);
     cuvsResourcesDestroy(res);
-
-
-Serializing an index
---------------------

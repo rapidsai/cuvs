@@ -43,9 +43,3 @@ Searching an index
     cagra::search_params search_params;
 
     cagra::search(res, search_params, index, queries, neighbors, distances);
-
-
-Serializing an index
---------------------
-
-
