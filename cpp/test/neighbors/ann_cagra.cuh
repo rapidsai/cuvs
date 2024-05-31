@@ -520,8 +520,27 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
-        index_params.build_algo       = ps.build_algo;
-        index_params.nn_descent_niter = 40;
+
+        switch (ps.build_algo) {
+          case graph_build_algo::IVF_PQ:
+            index_params.graph_build_params =
+              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            if (ps.ivf_pq_search_refine_ratio) {
+              std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+                index_params.graph_build_params)
+                .refinement_rate = *ps.ivf_pq_search_refine_ratio;
+            }
+            break;
+          case graph_build_algo::NN_DESCENT: {
+            index_params.graph_build_params =
+              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
+        };
+
         cagra::search_params search_params;
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
