@@ -32,8 +32,6 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-#include <rmm/device_uvector.hpp>
-
 #include <cub/cub.cuh>
 #include <cuda_runtime.h>
 #include <thrust/execution_policy.h>

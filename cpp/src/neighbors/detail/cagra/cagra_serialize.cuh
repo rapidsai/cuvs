@@ -62,19 +62,16 @@ void serialize(raft::resources const& res,
   dtype_string.resize(4);
   os << dtype_string;
 
-  printf("Inside serialize...\n");
   raft::serialize_scalar(res, os, serialization_version);
   raft::serialize_scalar(res, os, index_.size());
   raft::serialize_scalar(res, os, index_.dim());
   raft::serialize_scalar(res, os, index_.graph_degree());
   raft::serialize_scalar(res, os, index_.metric());
 
-  printf("Serializing mdspan\n");
   raft::serialize_mdspan(res, os, index_.graph());
 
   include_dataset &= (index_.data().n_rows() > 0);
 
-  printf("Serializing include dataset\n");
   raft::serialize_scalar(res, os, include_dataset);
   if (include_dataset) {
     RAFT_LOG_INFO("Saving CAGRA index with dataset");

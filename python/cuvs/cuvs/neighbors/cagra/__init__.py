@@ -19,6 +19,8 @@ from .cagra import (
     IndexParams,
     SearchParams,
     build_index,
+    load,
+    save,
     search,
 )
 
@@ -28,5 +30,7 @@ __all__ = [
     "IndexParams",
     "SearchParams",
     "build_index",
+    "load",
+    "save",
     "search",
 ]

@@ -17,6 +17,21 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
+index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
+                                        cuvs::distance::DistanceType metric)
+{
+  index_params params;
+  params.n_lists =
+    dataset.extent(0) < 4 * 2500 ? 4 : static_cast<uint32_t>(std::sqrt(dataset.extent(0)));
+  params.n_lists = std::min<uint32_t>(params.n_lists, dataset.extent(0));
+  params.pq_dim =
+    raft::round_up_safe(static_cast<uint32_t>(dataset.extent(1) / 4), static_cast<uint32_t>(8));
+  if (params.pq_dim == 0) params.pq_dim = 8;
+  params.pq_bits                  = 8;
+  params.kmeans_trainset_fraction = dataset.extent(0) < 10000 ? 1 : 0.1;
+  params.metric                   = metric;
+  return params;
+}
 
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
