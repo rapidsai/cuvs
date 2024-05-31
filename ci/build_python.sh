@@ -21,11 +21,8 @@ package_dir="python"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
 
 version=$(rapids-generate-version)
-git_commit=$(git rev-parse HEAD)
 export RAPIDS_PACKAGE_VERSION=${version}
 echo "${version}" > VERSION
-
-sed -i "/^__git_commit__/ s/= .*/= \"${git_commit}\"/g" "${package_dir}/${package_name}/${package_name}/_version.py"
 
 # TODO: Remove `--no-test` flags once importing on a CPU
 # node works correctly
