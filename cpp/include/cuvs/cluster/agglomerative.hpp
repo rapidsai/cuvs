@@ -27,6 +27,11 @@ namespace cuvs::cluster::agglomerative {
 constexpr int DEFAULT_CONST_C = 15;
 
 /**
+ * @defgroup agglomerative_params agglomerative clustering hyperparameters
+ * @{
+ */
+
+/**
  * Determines the method for computing the minimum spanning tree (MST)
  */
 enum Linkage {
@@ -44,6 +49,10 @@ enum Linkage {
    */
   KNN_GRAPH = 1
 };
+
+/**
+ * @}
+ */
 
 /**
  * Simple container object for consolidating linkage results. This closely
@@ -76,6 +85,10 @@ class single_linkage_output {
 };
 
 /**
+ * @defgroup single_linkage single-linkage clustering APIs
+ * @{
+ */
+/**
  * Single-linkage clustering, capable of constructing a KNN graph to
  * scale the algorithm beyond the n^2 memory consumption of implementations
  * that use the fully-connected graph of pairwise distances by connecting
@@ -105,4 +118,7 @@ void single_linkage(
   cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
+/**
+ * @}
+ */
 };  // end namespace  cuvs::cluster::agglomerative

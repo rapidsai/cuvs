@@ -33,11 +33,3 @@ Building an index
 
         Ok(())
     }
-
-
-Searching an index
-------------------
-
-
-Serializing an index
---------------------

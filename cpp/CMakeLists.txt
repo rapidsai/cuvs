@@ -243,6 +243,7 @@ add_library(
   src/neighbors/cagra_serialize_float.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
+  src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim256_t16_8pq_2subd_half.cu
@@ -387,10 +388,6 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
-  src/neighbors/detail/refine_host_float_float.cpp
-  src/neighbors/detail/refine_host_half_float.cpp
-  src/neighbors/detail/refine_host_int8_t_float.cpp
-  src/neighbors/detail/refine_host_uint8_t_float.cpp
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
@@ -429,10 +426,22 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
+  src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
+  src/neighbors/refine/detail/refine_device_float_float.cu
+  src/neighbors/refine/detail/refine_device_half_float.cu
+  src/neighbors/refine/detail/refine_device_int8_t_float.cu
+  src/neighbors/refine/detail/refine_device_uint8_t_float.cu
+  src/neighbors/refine/detail/refine_host_float_float.cpp
+  src/neighbors/refine/detail/refine_host_half_float.cpp
+  src/neighbors/refine/detail/refine_host_int8_t_float.cpp
+  src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_uint32_t.cu
+  src/selection/select_k_half_uint32_t.cu
 )
 
 target_compile_options(
