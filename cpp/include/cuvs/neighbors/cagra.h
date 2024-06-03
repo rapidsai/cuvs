@@ -18,6 +18,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <dlpack/dlpack.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -34,6 +35,8 @@ extern "C" {
  *
  */
 enum cuvsCagraGraphBuildAlgo {
+  /* Select build algorithm automatically */
+  AUTO_SELECT,
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
@@ -382,6 +385,50 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup cagra_c_serialize CAGRA C-API serialize functions
+ * @{
+ */
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsCagraBuild`
+ * cuvsCagraSerialize(res, "/path/to/index", index, true);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ *
+ */
+cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+                               const char* filename,
+                               cuvsCagraIndex_t index,
+                               bool include_dataset);
+
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index CAGRA index loaded disk
+ */
+cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

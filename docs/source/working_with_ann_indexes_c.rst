@@ -18,6 +18,8 @@ Building an index
     cuvsCagraIndex_t index;
 
     DLManagedTensor *dataset;
+
+    // populate tensor with data
     load_dataset(dataset);
 
     cuvsResourcesCreate(&res);
@@ -34,6 +36,29 @@ Building an index
 Searching an index
 ------------------
 
+.. code-block:: c
 
-Serializing an index
---------------------
+    #include <cuvs/neighbors/cagra.h>
+
+    cuvsResources_t res;
+    cuvsCagraSearchParams_t search_params;
+    cuvsCagraIndex_t index;
+
+    // ... build index ...
+
+    DLManagedTensor *queries;
+
+    DLManagedTensor *neighbors;
+    DLManagedTensor *distances;
+
+    // populate tensor with data
+    load_queries(queries);
+
+    cuvsResourcesCreate(&res);
+    cuvsCagraSearchParamsCreate(&index_params);
+
+    cuvsCagraSearch(res, search_params, index, queries, neighbors, distances);
+
+    cuvsCagraIndexDestroy(index);
+    cuvsCagraIndexParamsDestroy(index_params);
+    cuvsResourcesDestroy(res);

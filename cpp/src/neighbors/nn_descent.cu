@@ -18,6 +18,7 @@
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/logger.hpp>
 
+using namespace raft;
 namespace cuvs::neighbors::nn_descent {
 
 /**
@@ -52,6 +53,9 @@ bool has_enough_device_memory(raft::resources const& res,
     return true;
   } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("Insufficient memory for NN descent");
+    return false;
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_DEBUG("Insufficient memory for NN descent (logic error)");
     return false;
   }
 }

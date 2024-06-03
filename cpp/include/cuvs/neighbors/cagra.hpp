@@ -325,9 +325,7 @@ struct index : cuvs::neighbors::index {
                  "Dataset and knn_graph must have equal number of rows");
     update_graph(res, knn_graph);
 
-    printf("Called update_graph\n");
     raft::resource::sync_stream(res);
-    printf("Done syncing\n");
   }
 
   /**

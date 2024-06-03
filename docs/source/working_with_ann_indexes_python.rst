@@ -22,9 +22,14 @@ Building an index
 Searching an index
 ------------------
 
+.. code-block:: python
 
-CPU/GPU interoperability
-------------------------
+    from cuvs.neighbors import cagra
 
-Serializing an index
---------------------
+    queries = load_queries()
+
+    search_params = cagra.SearchParams()
+
+    index = // ... build index ...
+
+    neighbors, distances = cagra.search(search_params, index, queries, k)
