@@ -155,7 +155,7 @@ void CuvsGpu<T>::search(
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   cuvs::neighbors::brute_force::search(
-    handle_, *index_, queries_view, neighbors_view, distances_view);
+    handle_, *index_, queries_view, neighbors_view, distances_view, std::nullopt);
 }
 
 template <typename T>

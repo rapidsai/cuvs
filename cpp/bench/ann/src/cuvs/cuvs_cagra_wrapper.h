@@ -50,6 +50,8 @@
 namespace cuvs::bench::ann {
 
 enum class AllocatorType { HostPinned, HostHugePage, Device };
+enum class CagraBuildAlgo { AUTO, IVF_PQ, NN_DESCENT };
+
 template <typename T, typename IdxT>
 class CuvsCagra : public ANN<T>, public AnnGPU {
  public:
@@ -65,6 +67,7 @@ class CuvsCagra : public ANN<T>, public AnnGPU {
 
   struct BuildParam {
     cuvs::neighbors::cagra::index_params cagra_params;
+    CagraBuildAlgo algo;
     std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
@@ -160,16 +163,27 @@ void CuvsCagra<T, IdxT>::build(const T* dataset, size_t nrow)
 
   auto& params = index_params_.cagra_params;
 
-  // Do include the compressed dataset for the CAGRA-Q
-  bool shall_include_dataset = params.compression.has_value();
-
+  if (index_params_.algo == CagraBuildAlgo::IVF_PQ) {
+    auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+      dataset_view.extents(), params.metric);
+    if (index_params_.ivf_pq_build_params) {
+      pq_params.build_params = *index_params_.ivf_pq_build_params;
+    }
+    if (index_params_.ivf_pq_search_params) {
+      pq_params.search_params = *index_params_.ivf_pq_search_params;
+    }
+    if (index_params_.ivf_pq_refine_rate) {
+      pq_params.refinement_rate = *index_params_.ivf_pq_refine_rate;
+    }
+    params.graph_build_params = pq_params;
+  } else if (index_params_.algo == CagraBuildAlgo::NN_DESCENT) {
+    auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
+      params.intermediate_graph_degree);
+    if (index_params_.nn_descent_params) { nn_params = *index_params_.nn_descent_params; }
+    params.graph_build_params = nn_params;
+  }
   index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
     std::move(cuvs::neighbors::cagra::build(handle_, params, dataset_view)));
-  //                                                   index_params_.nn_descent_params,
-  //                                                   index_params_.ivf_pq_refine_rate,
-  //                                                   index_params_.ivf_pq_build_params,
-  //                                                   index_params_.ivf_pq_search_params,
-  //                                                   shall_include_dataset)));
 }
 
 inline std::string allocator_to_string(AllocatorType mem_type)

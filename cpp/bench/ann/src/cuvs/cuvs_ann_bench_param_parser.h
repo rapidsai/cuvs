@@ -190,9 +190,11 @@ void parse_build_param(const nlohmann::json& conf,
   }
   if (conf.contains("graph_build_algo")) {
     if (conf.at("graph_build_algo") == "IVF_PQ") {
-      param.cagra_params.build_algo = cuvs::neighbors::cagra::graph_build_algo::IVF_PQ;
+      param.algo = cuvs::bench::ann::CagraBuildAlgo::IVF_PQ;
     } else if (conf.at("graph_build_algo") == "NN_DESCENT") {
-      param.cagra_params.build_algo = cuvs::neighbors::cagra::graph_build_algo::NN_DESCENT;
+      param.algo = cuvs::bench::ann::CagraBuildAlgo::NN_DESCENT;
+    } else {
+      param.algo = cuvs::bench::ann::CagraBuildAlgo::AUTO;
     }
   }
   nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "ivf_pq_build_");
