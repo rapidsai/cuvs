@@ -15,21 +15,21 @@
 # ##################################################################################################
 # * benchmark options ------------------------------------------------------------------------------
 
-option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" OFF)
-option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" OFF)
-option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" OFF)
-option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
-       OFF
+       ON
 )
-option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" OFF  )
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ "Include cuVS ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA "Include cuVS CAGRA in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
-option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -211,32 +211,20 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigureAnnBench(
-    NAME
-    CUVS_IVF_PQ
-    PATH
-    bench/ann/src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_IVF_PQ}>:bench/ann/src/cuvs/cuvs_ivf_pq.cu>
-    LINKS
-    cuvs
+    NAME CUVS_IVF_PQ PATH bench/ann/src/cuvs/cuvs_benchmark.cu
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_IVF_PQ}>:bench/ann/src/cuvs/cuvs_ivf_pq.cu> LINKS cuvs
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   ConfigureAnnBench(
-    NAME
-    CUVS_IVF_FLAT
-    PATH
-    bench/ann/src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT}>:bench/ann/src/cuvs/cuvs_ivf_flat.cu>
-    LINKS
-    cuvs
+    NAME CUVS_IVF_FLAT PATH bench/ann/src/cuvs/cuvs_benchmark.cu
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT}>:bench/ann/src/cuvs/cuvs_ivf_flat.cu> LINKS cuvs
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE)
-  ConfigureAnnBench(
-    NAME CUVS_BRUTE_FORCE PATH bench/ann/src/cuvs/cuvs_benchmark.cu LINKS cuvs
-  )
+  ConfigureAnnBench(NAME CUVS_BRUTE_FORCE PATH bench/ann/src/cuvs/cuvs_benchmark.cu LINKS cuvs)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
