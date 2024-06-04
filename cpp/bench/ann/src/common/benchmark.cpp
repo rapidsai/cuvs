@@ -58,6 +58,22 @@ auto load_lib(const std::string& algo) -> void*
   return libs.emplace(algo, lib_name).first->second.handle;
 }
 
+/*
+  TODO(achirkin): remove this compatibility layer.
+  When reading old raft ANN configs, we may encounter raft_xxx algorithms;
+  they all are renamed to cuvs_xxx algorithm.
+  This compatibility layer helps using old configs with the new benchmark executable.
+ */
+auto load_lib_raft_compat(const std::string& algo) -> void*
+{
+  try {
+    return load_lib(algo);
+  } catch (std::runtime_error& e) {
+    if (algo.rfind("raft", 0) == 0) { return load_lib("cuvs" + algo.substr(4)); }
+    throw e;
+  }
+}
+
 auto get_fun_name(void* addr) -> std::string
 {
   Dl_info dl_info;
@@ -77,7 +93,7 @@ auto create_algo(const std::string& algo,
                  const std::vector<int>& dev_list) -> std::unique_ptr<cuvs::bench::ann::ANN<T>>
 {
   static auto fname = get_fun_name(reinterpret_cast<void*>(&create_algo<T>));
-  auto handle       = load_lib(algo);
+  auto handle       = load_lib_raft_compat(algo);
   auto fun_addr     = dlsym(handle, fname.c_str());
   if (fun_addr == nullptr) {
     throw std::runtime_error("Couldn't load the create_algo function (" + algo + ")");
@@ -91,7 +107,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
   const std::string& algo, const nlohmann::json& conf)
 {
   static auto fname = get_fun_name(reinterpret_cast<void*>(&create_search_param<T>));
-  auto handle       = load_lib(algo);
+  auto handle       = load_lib_raft_compat(algo);
   auto fun_addr     = dlsym(handle, fname.c_str());
   if (fun_addr == nullptr) {
     throw std::runtime_error("Couldn't load the create_search_param function (" + algo + ")");
