@@ -16,10 +16,12 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include "ann_utils.cuh"
 #include "cagra/device_common.hpp"
+#include "cuvs/distance/distance.hpp"
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -97,9 +99,9 @@ class ResultItem<int> {
 
  public:
   __host__ __device__ ResultItem()
-    : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()){};
+    : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()) {};
   __host__ __device__ ResultItem(const Index_t id_with_flag, const DistData_t dist)
-    : id_(id_with_flag), dist_(dist){};
+    : id_(id_with_flag), dist_(dist) {};
   __host__ __device__ bool is_new() const { return id_ >= 0; }
   __host__ __device__ Index_t& id_with_flag() { return id_; }
   __host__ __device__ Index_t id() const
@@ -216,6 +218,7 @@ struct BuildConfig {
   // If internal_node_degree == 0, the value of node_degree will be assigned to it
   size_t max_iterations{50};
   float termination_threshold{0.0001};
+  cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
 };
 
 template <typename Index_t>
@@ -448,11 +451,13 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
 // TODO: Replace with RAFT utilities https://github.com/rapidsai/raft/issues/1827
 /** Calculate L2 norm, and cast data to __half */
 template <typename Data_t>
-RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
-                                   __half* output_data,
-                                   int dim,
-                                   DistData_t* l2_norms,
-                                   size_t list_offset = 0)
+RAFT_KERNEL preprocess_data_kernel(
+  const Data_t* input_data,
+  __half* output_data,
+  int dim,
+  DistData_t* l2_norms,
+  size_t list_offset                  = 0,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 {
   extern __shared__ char buffer[];
   __shared__ float l2_norm;
@@ -481,9 +486,10 @@ RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
   for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
     int idx = step * raft::warp_size() + threadIdx.x;
     if (idx < dim) {
-      if (l2_norms == nullptr) {
-        output_data[list_id * dim + idx] =
-          (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
+      if (metric == cuvs::distance::DistanceType::InnerProduct) {
+        // output_data[list_id * dim + idx] =
+        //   (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
+        output_data[list_id * dim + idx] = (float)input_data[(size_t)blockIdx.x * dim + idx];
       } else {
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
@@ -709,7 +715,8 @@ __launch_bounds__(BLOCK_SIZE, 4)
                     DistData_t* dists,
                     int graph_width,
                     int* locks,
-                    DistData_t* l2_norms)
+                    DistData_t* l2_norms,
+                    cuvs::distance::DistanceType metric)
 {
 #if (__CUDA_ARCH__ >= 700)
   using namespace nvcuda;
@@ -821,7 +828,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
     if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_new_size &&
         i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
-      if (l2_norms == nullptr) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
       } else {
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
@@ -900,7 +907,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
     if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_old_size &&
         i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
-      if (l2_norms == nullptr) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
       } else {
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
@@ -1146,7 +1153,7 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
     ndim_(build_config.dataset_dim),
     d_data_{raft::make_device_matrix<__half, size_t, raft::row_major>(
       res, nrow_, build_config.dataset_dim)},
-    l2_norms_{raft::make_device_vector<DistData_t, size_t>(res, nrow_)},
+    l2_norms_{raft::make_device_vector<DistData_t, size_t>(res, 0)},
     graph_buffer_{
       raft::make_device_matrix<ID_t, size_t, raft::row_major>(res, nrow_, DEGREE_ON_DEVICE)},
     dists_buffer_{
@@ -1171,6 +1178,10 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
                reinterpret_cast<Index_t*>(graph_buffer_.data_handle()) + graph_buffer_.size(),
                std::numeric_limits<Index_t>::max());
   thrust::fill(thrust::device, d_locks_.data_handle(), d_locks_.data_handle() + d_locks_.size(), 0);
+
+  if (build_config.metric == cuvs::distance::DistanceType::L2Expanded) {
+    l2_norms_ = raft::make_device_vector<DistData_t, size_t>(res, nrow_);
+  }
 };
 
 template <typename Data_t, typename Index_t>
@@ -1207,7 +1218,8 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
     dists_buffer_.data_handle(),
     DEGREE_ON_DEVICE,
     d_locks_.data_handle(),
-    l2_norms_.data_handle());
+    l2_norms_.data_handle(),
+    build_config_.metric);
 }
 
 template <typename Data_t, typename Index_t>
@@ -1236,7 +1248,8 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
                                        d_data_.data_handle(),
                                        build_config_.dataset_dim,
                                        l2_norms_.data_handle(),
-                                       batch.offset());
+                                       batch.offset(),
+                                       build_config_.metric);
   }
 
   thrust::fill(thrust::device.on(stream),
@@ -1336,6 +1349,14 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
   raft::resource::sync_stream(res);
   graph_.sort_lists();
 
+  std::cout << "NN Descent distances: " << std::endl;
+  for (size_t i = 0; i < nrow_; i++) {
+    for (size_t j = 0; j < graph_.node_degree; j++) {
+      std::cout << graph_.h_dists.data_handle()[i * graph_.node_degree + j] << " ";
+    }
+    std::cout << std::endl;
+  }
+
   // Reuse graph_.h_dists as the buffer for shrink the lists in graph
   static_assert(sizeof(decltype(*(graph_.h_dists.data_handle()))) >= sizeof(Index_t));
   Index_t* graph_shrink_buffer = (Index_t*)graph_.h_dists.data_handle();
@@ -1410,7 +1431,8 @@ void build(raft::resources const& res,
                            .node_degree           = extended_graph_degree,
                            .internal_node_degree  = extended_intermediate_degree,
                            .max_iterations        = params.max_iterations,
-                           .termination_threshold = params.termination_threshold};
+                           .termination_threshold = params.termination_threshold,
+                           .metric                = params.metric};
 
   GNND<const T, int> nnd(res, build_config);
   nnd.build(dataset.data_handle(), dataset.extent(0), int_graph.data_handle());
@@ -1445,7 +1467,7 @@ index<IdxT> build(
     graph_degree = intermediate_degree;
   }
 
-  index<IdxT> idx{res, dataset.extent(0), static_cast<int64_t>(graph_degree)};
+  index<IdxT> idx{res, dataset.extent(0), static_cast<int64_t>(graph_degree), params.metric};
 
   build(res, params, dataset, idx);
 

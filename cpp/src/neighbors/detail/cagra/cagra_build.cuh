@@ -334,7 +334,8 @@ void build_knn_graph(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
-  auto nn_descent_idx = cuvs::neighbors::nn_descent::index<IdxT>(res, knn_graph);
+  auto nn_descent_idx =
+    cuvs::neighbors::nn_descent::index<IdxT>(res, knn_graph, build_params.metric);
   cuvs::neighbors::nn_descent::build<DataT, IdxT>(res, build_params, dataset, nn_descent_idx);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
@@ -417,7 +418,8 @@ index<T, IdxT> build(
         cuvs::neighbors::nn_descent::has_enough_device_memory(
           res, dataset.extents(), sizeof(IdxT))) {
       RAFT_LOG_DEBUG("NN descent solver");
-      knn_build_params = cagra::graph_build_params::nn_descent_params(intermediate_degree);
+      knn_build_params =
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
     } else {
       RAFT_LOG_DEBUG("Selecting IVF-PQ solver");
       knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), params.metric);
@@ -430,9 +432,6 @@ index<T, IdxT> build(
       std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(knn_build_params);
     build_knn_graph(res, dataset, knn_graph->view(), ivf_pq_params);
   } else {
-    RAFT_EXPECTS(
-      params.metric == cuvs::distance::DistanceType::L2Expanded,
-      "L2Expanded is the only distance metrics supported for CAGRA build with nn_descent");
     auto nn_descent_params =
       std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);
 
@@ -443,7 +442,8 @@ index<T, IdxT> build(
         "nn-descent graph_degree.",
         nn_descent_params.graph_degree,
         intermediate_degree);
-      nn_descent_params = cagra::graph_build_params::nn_descent_params(intermediate_degree);
+      nn_descent_params =
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
     }
 
     // Use nn-descent to build CAGRA knn graph

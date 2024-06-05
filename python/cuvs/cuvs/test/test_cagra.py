@@ -122,6 +122,7 @@ def run_cagra_build_search_test(
 @pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
 @pytest.mark.parametrize("array_type", ["device", "host"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
+@pytest.mark.parametrize("metric", ["euclidean", "inner_product"])
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo
 ):
