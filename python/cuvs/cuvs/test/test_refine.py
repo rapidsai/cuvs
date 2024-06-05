@@ -104,8 +104,13 @@ def run_refine(
 
     recall = calc_recall(out_idx, skl_idx)
 
-    min_recall = 0.99 if dtype is np.float16 else 0.999
-    if recall <= min_recall:
+    if memory_type == "device" and dtype == np.float16:
+        # fp16 differences between host and device make the
+        # reference results from sklearn likely to be substantially different
+        # from those calculated on device.
+        assert recall >= 0.9
+
+    elif recall <= 0.999:
         # We did not find the same neighbor indices.
         # We could have found other neighbor with same distance.
         if metric == "sqeuclidean":
@@ -115,9 +120,8 @@ def run_refine(
         else:
             raise ValueError("Invalid metric")
 
-        threshold = 1.0e-2 if dtype is np.float16 else 1.0e-6
         mask = out_idx != skl_idx
-        assert np.all(out_dist[mask] <= skl_dist[mask] + threshold)
+        assert np.all(out_dist[mask] <= skl_dist[mask] + 1.0e-6)
 
 
 @pytest.mark.parametrize("n_queries", [100, 1024, 37])
