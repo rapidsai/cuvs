@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from cuvs.neighbors import brute_force, cagra, ivf_flat, ivf_pq, prefilters
+from .prefilters import from_bitmap, no_filter
 
-__all__ = ["brute_force", "cagra", "ivf_flat", "ivf_pq", "prefilters"]
+__all__ = ["no_filter", "from_bitmap"]

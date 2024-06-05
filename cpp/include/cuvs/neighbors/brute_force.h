@@ -18,6 +18,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/prefilters.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
@@ -153,7 +154,8 @@ cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
                                  cuvsBruteForceIndex_t index,
                                  DLManagedTensor* queries,
                                  DLManagedTensor* neighbors,
-                                 DLManagedTensor* distances);
+                                 DLManagedTensor* distances,
+                                 cuvsPrefilter prefilter);
 /**
  * @}
  */

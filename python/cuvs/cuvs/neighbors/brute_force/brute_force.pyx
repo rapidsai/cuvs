@@ -38,6 +38,7 @@ from cuvs.distance import DISTANCE_TYPES
 from cuvs.common.c_api cimport cuvsResources_t
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors.prefilters import no_filter
 
 
 cdef class Index:
@@ -129,7 +130,8 @@ def search(Index index,
            k,
            neighbors=None,
            distances=None,
-           resources=None):
+           resources=None,
+           prefilter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -147,12 +149,15 @@ def search(Index index,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    prefilter : Optional cuvs.neighbors.cuvsPrefilter that can be used
+                to filter qureris and neighbors based on the given bitmap.
+                (default None)
     {resources_docstring}
 
     Examples
     --------
     >>> import cupy as cp
-    >>> from cuvs.neighbors import brute_force
+    >>> from cuvs.neighbors import brute_force, prefilters
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_queries = 1000
@@ -163,11 +168,15 @@ def search(Index index,
     >>> # Search using the built index
     >>> queries = cp.random.random_sample((n_queries, n_features),
     ...                                   dtype=cp.float32)
+    >>> # Build prefilters
+    >>> n_bitmap = np.ceil(n_samples * n_features / 32).astype(int)
+    >>> bitmap = cp.random.random_sample((n_bitmap), dtype=cp.uint32)
+    >>> prefilter = prefilters.from_bitmap(bitmap)
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
-    >>> distances, neighbors = brute_force.search(index, queries, k)
+    >>> distances, neighbors = brute_force.search(index, queries, k, prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
@@ -202,13 +211,17 @@ def search(Index index,
     cdef cydlpack.DLManagedTensor* distances_dlpack = \
         cydlpack.dlpack_c(distances_cai)
 
+    if prefilter is None:
+        prefilter = no_filter()
+
     with cuda_interruptible():
         check_cuvs(cuvsBruteForceSearch(
             res,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            prefilter
         ))
 
     return (distances, neighbors)

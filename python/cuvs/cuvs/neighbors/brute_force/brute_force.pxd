@@ -20,13 +20,17 @@ from libc.stdint cimport uintptr_t
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
+from cuvs.neighbors.prefilters.prefilters cimport (
+    cuvsPrefilter,
+    cuvsPrefilterType,
+)
 
 
 cdef extern from "cuvs/neighbors/brute_force.h" nogil:
 
     ctypedef struct cuvsBruteForceIndex:
         uintptr_t addr
-        DLDataType dtype
+        DLDataType type
 
     ctypedef cuvsBruteForceIndex* cuvsBruteForceIndex_t
 
@@ -44,4 +48,5 @@ cdef extern from "cuvs/neighbors/brute_force.h" nogil:
                                      cuvsBruteForceIndex_t index,
                                      DLManagedTensor* queries,
                                      DLManagedTensor* neighbors,
-                                     DLManagedTensor* distances) except +
+                                     DLManagedTensor* distances,
+                                     cuvsPrefilter filter) except +
