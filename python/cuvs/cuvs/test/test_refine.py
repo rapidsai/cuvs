@@ -103,7 +103,9 @@ def run_refine(
     skl_idx = candidates[:, :k]
 
     recall = calc_recall(out_idx, skl_idx)
-    if recall <= 0.999:
+
+    min_recall = 0.99 if dtype is np.float16 else 0.999
+    if recall <= min_recall:
         # We did not find the same neighbor indices.
         # We could have found other neighbor with same distance.
         if metric == "sqeuclidean":
@@ -112,14 +114,16 @@ def run_refine(
             skl_dist = 1 - skl_dist[:, :k]
         else:
             raise ValueError("Invalid metric")
+
+        threshold = 1.0e-2 if dtype is np.float16 else 1.0e-6
         mask = out_idx != skl_idx
-        assert np.all(out_dist[mask] <= skl_dist[mask] + 1.0e-6)
+        assert np.all(out_dist[mask] <= skl_dist[mask] + threshold)
 
 
 @pytest.mark.parametrize("n_queries", [100, 1024, 37])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8, np.float16])
 @pytest.mark.parametrize("memory_type", ["device", "host"])
 def test_refine_dtypes(n_queries, dtype, inplace, metric, memory_type):
     run_refine(

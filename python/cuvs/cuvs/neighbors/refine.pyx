@@ -66,9 +66,9 @@ def refine(dataset,
     Parameters
     ----------
     dataset : array interface compliant matrix, shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, int8, uint8, float16]
     queries : array interface compliant matrix, shape (n_queries, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, int8, uint8, float16]
     candidates : array interface compliant matrix, shape (n_queries, k0)
         Supported dtype int64
     k : int
