@@ -25,49 +25,49 @@
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::CuvsCagraHnswlib<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::search_param& param)
 {
   param.ef = conf.at("ef");
   if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
 }
 
 template <typename T>
-std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
-                                                      const std::string& distance,
-                                                      int dim,
-                                                      const nlohmann::json& conf,
-                                                      const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::algo<T>> create_algo(const std::string& algo,
+                                                  const std::string& distance,
+                                                  int dim,
+                                                  const nlohmann::json& conf,
+                                                  const std::vector<int>& dev_list)
 {
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  [[maybe_unused]] cuvs::bench::ann::Metric metric = parse_metric(distance);
-  std::unique_ptr<cuvs::bench::ann::ANN<T>> ann;
+  [[maybe_unused]] cuvs::bench::Metric metric = parse_metric(distance);
+  std::unique_ptr<cuvs::bench::algo<T>> a;
 
   if constexpr (std::is_same_v<T, float> or std::is_same_v<T, std::uint8_t>) {
     if (algo == "raft_cagra_hnswlib" || algo == "cuvs_cagra_hnswlib") {
-      typename cuvs::bench::ann::CuvsCagraHnswlib<T, uint32_t>::BuildParam param;
+      typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::build_param param;
       parse_build_param<T, uint32_t>(conf, param);
-      ann = std::make_unique<cuvs::bench::ann::CuvsCagraHnswlib<T, uint32_t>>(metric, dim, param);
+      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, param);
     }
   }
 
-  if (!ann) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
+  if (!a) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
 
-  return ann;
+  return a;
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   if (algo == "raft_cagra_hnswlib" || algo == "cuvs_cagra_hnswlib") {
     auto param =
-      std::make_unique<typename cuvs::bench::ann::CuvsCagraHnswlib<T, uint32_t>::SearchParam>();
+      std::make_unique<typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::search_param>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }
@@ -75,7 +75,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -92,7 +92,7 @@ int main(int argc, char** argv)
     &cuda_mr, rmm::percent_of_free_device_memory(50)};
   // Updates the current device resource pointer to `pool_mr`
   auto old_mr = rmm::mr::set_current_device_resource(&pool_mr);
-  auto ret    = cuvs::bench::ann::run_main(argc, argv);
+  auto ret    = cuvs::bench::run_main(argc, argv);
   // Restores the current device resource pointer to its previous value
   rmm::mr::set_current_device_resource(old_mr);
   return ret;

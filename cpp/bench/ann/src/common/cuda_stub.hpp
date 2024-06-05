@@ -49,7 +49,7 @@ typedef void* cudaEvent_t;
 typedef uint16_t half;
 #endif
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 struct cuda_lib_handle {
   void* handle{nullptr};
@@ -127,77 +127,81 @@ static inline cuda_lib_handle cudart{};
 #ifdef ANN_BENCH_LINK_CUDART
 namespace stub {
 
-[[gnu::weak, gnu::noinline]] cudaError_t cudaMemcpy(void* dst,
-                                                    const void* src,
-                                                    size_t count,
-                                                    enum cudaMemcpyKind kind)
+[[gnu::weak, gnu::noinline]] auto cuda_memcpy(void* dst,
+                                              const void* src,
+                                              size_t count,
+                                              enum cudaMemcpyKind kind) -> cudaError_t
 {
   return cudaSuccess;
 }
 
-[[gnu::weak, gnu::noinline]] cudaError_t cudaMalloc(void** ptr, size_t size)
+[[gnu::weak, gnu::noinline]] auto cuda_malloc(void** ptr, size_t size) -> cudaError_t
 {
   *ptr = nullptr;
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaMemset(void* devPtr, int value, size_t count)
+[[gnu::weak, gnu::noinline]] auto cuda_memset(void* devPtr, int value, size_t count) -> cudaError_t
 {
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaFree(void* devPtr) { return cudaSuccess; }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaStreamCreate(cudaStream_t* pStream)
+[[gnu::weak, gnu::noinline]] auto cuda_free(void* devPtr) -> cudaError_t { return cudaSuccess; }
+[[gnu::weak, gnu::noinline]] auto cuda_stream_create(cudaStream_t* pStream) -> cudaError_t
 {
-  *pStream = 0;
+  *pStream = nullptr;
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaStreamCreateWithFlags(cudaStream_t* pStream,
-                                                                   unsigned int flags)
+[[gnu::weak, gnu::noinline]] auto cuda_stream_create_with_flags(cudaStream_t* pStream,
+                                                                unsigned int flags) -> cudaError_t
 {
-  *pStream = 0;
+  *pStream = nullptr;
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaStreamDestroy(cudaStream_t pStream)
+[[gnu::weak, gnu::noinline]] auto cuda_stream_destroy(cudaStream_t pStream) -> cudaError_t
 {
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaDeviceSynchronize() { return cudaSuccess; }
+[[gnu::weak, gnu::noinline]] auto cuda_device_synchronize() -> cudaError_t { return cudaSuccess; }
 
-[[gnu::weak, gnu::noinline]] cudaError_t cudaStreamSynchronize(cudaStream_t pStream)
+[[gnu::weak, gnu::noinline]] auto cuda_stream_synchronize(cudaStream_t pStream) -> cudaError_t
 {
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaEventCreate(cudaEvent_t* event)
+[[gnu::weak, gnu::noinline]] auto cuda_event_create(cudaEvent_t* event) -> cudaError_t
 {
-  *event = 0;
+  *event = nullptr;
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaEventRecord(cudaEvent_t event, cudaStream_t stream)
-{
-  return cudaSuccess;
-}
-[[gnu::weak, gnu::noinline]] cudaError_t cudaEventSynchronize(cudaEvent_t event)
+[[gnu::weak, gnu::noinline]] auto cuda_event_record(cudaEvent_t event, cudaStream_t stream)
+  -> cudaError_t
 {
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaEventElapsedTime(float* ms,
-                                                              cudaEvent_t start,
-                                                              cudaEvent_t end)
+[[gnu::weak, gnu::noinline]] auto cuda_event_synchronize(cudaEvent_t event) -> cudaError_t
+{
+  return cudaSuccess;
+}
+[[gnu::weak, gnu::noinline]] auto cuda_event_elapsed_time(float* ms,
+                                                          cudaEvent_t start,
+                                                          cudaEvent_t end) -> cudaError_t
 {
   *ms = 0;
   return cudaSuccess;
 }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaEventDestroy(cudaEvent_t event) { return cudaSuccess; }
-[[gnu::weak, gnu::noinline]] cudaError_t cudaGetDevice(int* device)
+[[gnu::weak, gnu::noinline]] auto cuda_event_destroy(cudaEvent_t event) -> cudaError_t
+{
+  return cudaSuccess;
+}
+[[gnu::weak, gnu::noinline]] auto cuda_get_device(int* device) -> cudaError_t
 {
   *device = 0;
   return cudaSuccess;
 };
-[[gnu::weak, gnu::noinline]] cudaError_t cudaDriverGetVersion(int* driver)
+[[gnu::weak, gnu::noinline]] auto cuda_driver_get_version(int* driver) -> cudaError_t
 {
   *driver = 0;
   return cudaSuccess;
 };
-[[gnu::weak, gnu::noinline]] cudaError_t cudaRuntimeGetVersion(int* runtime)
+[[gnu::weak, gnu::noinline]] auto cuda_runtime_get_version(int* runtime) -> cudaError_t
 {
   *runtime = 0;
   return cudaSuccess;
@@ -215,26 +219,26 @@ namespace stub {
   static inline decltype(&stub::fun) fun = \
     cudart.found() ? cudart.sym<decltype(&stub::fun)>(#fun) : &stub::fun
 
-RAFT_DECLARE_CUDART(cudaMemcpy);
-RAFT_DECLARE_CUDART(cudaMalloc);
-RAFT_DECLARE_CUDART(cudaMemset);
-RAFT_DECLARE_CUDART(cudaFree);
-RAFT_DECLARE_CUDART(cudaStreamCreate);
-RAFT_DECLARE_CUDART(cudaStreamCreateWithFlags);
-RAFT_DECLARE_CUDART(cudaStreamDestroy);
-RAFT_DECLARE_CUDART(cudaDeviceSynchronize);
-RAFT_DECLARE_CUDART(cudaStreamSynchronize);
-RAFT_DECLARE_CUDART(cudaEventCreate);
-RAFT_DECLARE_CUDART(cudaEventRecord);
-RAFT_DECLARE_CUDART(cudaEventSynchronize);
-RAFT_DECLARE_CUDART(cudaEventElapsedTime);
-RAFT_DECLARE_CUDART(cudaEventDestroy);
-RAFT_DECLARE_CUDART(cudaGetDevice);
-RAFT_DECLARE_CUDART(cudaDriverGetVersion);
-RAFT_DECLARE_CUDART(cudaRuntimeGetVersion);
+RAFT_DECLARE_CUDART(cuda_memcpy);
+RAFT_DECLARE_CUDART(cuda_malloc);
+RAFT_DECLARE_CUDART(cuda_memset);
+RAFT_DECLARE_CUDART(cuda_free);
+RAFT_DECLARE_CUDART(cuda_stream_create);
+RAFT_DECLARE_CUDART(cuda_stream_create_with_flags);
+RAFT_DECLARE_CUDART(cuda_stream_destroy);
+RAFT_DECLARE_CUDART(cuda_device_synchronize);
+RAFT_DECLARE_CUDART(cuda_stream_synchronize);
+RAFT_DECLARE_CUDART(cuda_event_create);
+RAFT_DECLARE_CUDART(cuda_event_record);
+RAFT_DECLARE_CUDART(cuda_event_synchronize);
+RAFT_DECLARE_CUDART(cuda_event_elapsed_time);
+RAFT_DECLARE_CUDART(cuda_event_destroy);
+RAFT_DECLARE_CUDART(cuda_get_device);
+RAFT_DECLARE_CUDART(cuda_driver_get_version);
+RAFT_DECLARE_CUDART(cuda_runtime_get_version);
 RAFT_DECLARE_CUDART(cudaGetDeviceProperties);
 
 #undef RAFT_DECLARE_CUDART
 #endif
 
-};  // namespace cuvs::bench::ann
+};  // namespace cuvs::bench

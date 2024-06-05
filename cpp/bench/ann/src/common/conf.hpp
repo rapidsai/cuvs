@@ -26,11 +26,11 @@
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
-class Configuration {
+class configuration {
  public:
-  struct Index {
+  struct index {
     std::string name;
     std::string algo;
     nlohmann::json build_param;
@@ -42,7 +42,7 @@ class Configuration {
     std::vector<nlohmann::json> search_params;
   };
 
-  struct DatasetConf {
+  struct dataset_conf {
     std::string name;
     std::string base_file;
     // use only a subset of base_file,
@@ -59,20 +59,20 @@ class Configuration {
     std::string dtype;
   };
 
-  explicit inline Configuration(std::istream& conf_stream)
+  explicit inline configuration(std::istream& conf_stream)
   {
     // to enable comments in json
     auto conf = nlohmann::json::parse(conf_stream, nullptr, true, true);
 
-    parse_dataset_(conf.at("dataset"));
-    parse_index_(conf.at("index"), conf.at("search_basic_param"));
+    parse_dataset(conf.at("dataset"));
+    parse_index(conf.at("index"), conf.at("search_basic_param"));
   }
 
-  [[nodiscard]] inline auto get_dataset_conf() const -> DatasetConf { return dataset_conf_; }
-  [[nodiscard]] inline auto get_indices() const -> std::vector<Index> { return indices_; };
+  [[nodiscard]] inline auto get_dataset_conf() const -> dataset_conf { return dataset_conf_; }
+  [[nodiscard]] inline auto get_indices() const -> std::vector<index> { return indices_; };
 
  private:
-  inline void parse_dataset_(const nlohmann::json& conf)
+  inline void parse_dataset(const nlohmann::json& conf)
   {
     dataset_conf_.name       = conf.at("name");
     dataset_conf_.base_file  = conf.at("base_file");
@@ -107,14 +107,13 @@ class Configuration {
       }
     }
   }
-  inline void parse_index_(const nlohmann::json& index_conf,
-                           const nlohmann::json& search_basic_conf)
+  inline void parse_index(const nlohmann::json& index_conf, const nlohmann::json& search_basic_conf)
   {
     const int batch_size = search_basic_conf.at("batch_size");
     const int k          = search_basic_conf.at("k");
 
     for (const auto& conf : index_conf) {
-      Index index;
+      index index;
       index.name        = conf.at("name");
       index.algo        = conf.at("algo");
       index.build_param = conf.at("build_param");
@@ -154,8 +153,8 @@ class Configuration {
     }
   }
 
-  DatasetConf dataset_conf_;
-  std::vector<Index> indices_;
+  dataset_conf dataset_conf_;
+  std::vector<index> indices_;
 };
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

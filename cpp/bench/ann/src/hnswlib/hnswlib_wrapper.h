@@ -17,6 +17,7 @@
 
 #include "../common/ann_types.hpp"
 #include "../common/thread_pool.hpp"
+#include "../common/util.hpp"
 
 #include <hnswlib/hnswlib.h>
 
@@ -36,7 +37,7 @@
 #include <utility>
 #include <vector>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
 struct hnsw_dist_t {
@@ -59,66 +60,66 @@ struct hnsw_dist_t<int8_t> {
 };
 
 template <typename T>
-class HnswLib : public ANN<T> {
+class hnsw_lib : public algo<T> {
  public:
   // https://github.com/nmslib/hnswlib/blob/master/ALGO_PARAMS.md
-  struct BuildParam {
-    int M;
+  struct build_param {
+    int m;
     int ef_construction;
     int num_threads = omp_get_num_procs();
   };
 
-  using typename ANN<T>::AnnSearchParam;
-  struct SearchParam : public AnnSearchParam {
+  using search_param_base = typename algo<T>::search_param;
+  struct search_param : public search_param_base {
     int ef;
     int num_threads = 1;
   };
 
-  HnswLib(Metric metric, int dim, const BuildParam& param);
+  hnsw_lib(Metric metric, int dim, const build_param& param);
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
   void search(const T* query,
               int batch_size,
               int k,
-              AnnBase::index_type* indices,
+              algo_base::index_type* indices,
               float* distances) const override;
 
   void save(const std::string& path_to_index) const override;
   void load(const std::string& path_to_index) override;
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<HnswLib<T>>(*this); };
+  auto copy() -> std::unique_ptr<algo<T>> override { return std::make_unique<hnsw_lib<T>>(*this); };
 
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::Host;
-    property.query_memory_type   = MemoryType::Host;
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kHost;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
 
   void set_base_layer_only() { appr_alg_->base_layer_only = true; }
 
  private:
-  void get_search_knn_results_(const T* query,
-                               int k,
-                               AnnBase::index_type* indices,
-                               float* distances) const;
+  void get_search_knn_results(const T* query,
+                              int k,
+                              algo_base::index_type* indices,
+                              float* distances) const;
 
   std::shared_ptr<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>> appr_alg_;
   std::shared_ptr<hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>> space_;
 
-  using ANN<T>::metric_;
-  using ANN<T>::dim_;
+  using algo<T>::metric_;
+  using algo<T>::dim_;
   int ef_construction_;
   int m_;
   int num_threads_;
-  std::shared_ptr<FixedThreadPool> thread_pool_;
-  Objective metric_objective_;
+  std::shared_ptr<fixed_thread_pool> thread_pool_;
+  Mode bench_mode_;
 };
 
 template <typename T>
-HnswLib<T>::HnswLib(Metric metric, int dim, const BuildParam& param) : ANN<T>(metric, dim)
+hnsw_lib<T>::hnsw_lib(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
   assert(dim_ > 0);
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, uint8_t>);
@@ -129,12 +130,12 @@ HnswLib<T>::HnswLib(Metric metric, int dim, const BuildParam& param) : ANN<T>(me
   }
 
   ef_construction_ = param.ef_construction;
-  m_               = param.M;
+  m_               = param.m;
   num_threads_     = param.num_threads;
 }
 
 template <typename T>
-void HnswLib<T>::build(const T* dataset, size_t nrow)
+void hnsw_lib<T>::build(const T* dataset, size_t nrow)
 {
   if constexpr (std::is_same_v<T, float>) {
     if (metric_ == Metric::kInnerProduct) {
@@ -149,7 +150,7 @@ void HnswLib<T>::build(const T* dataset, size_t nrow)
   appr_alg_ = std::make_shared<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     space_.get(), nrow, m_, ef_construction_);
 
-  thread_pool_                  = std::make_shared<FixedThreadPool>(num_threads_);
+  thread_pool_                  = std::make_shared<fixed_thread_pool>(num_threads_);
   const size_t items_per_thread = nrow / (num_threads_ + 1);
 
   thread_pool_->submit(
@@ -168,27 +169,28 @@ void HnswLib<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void HnswLib<T>::set_search_param(const AnnSearchParam& param_)
+void hnsw_lib<T>::set_search_param(const search_param_base& param_)
 {
-  auto param        = dynamic_cast<const SearchParam&>(param_);
-  appr_alg_->ef_    = param.ef;
-  metric_objective_ = param.metric_objective;
-  num_threads_      = param.num_threads;
+  auto param     = dynamic_cast<const search_param&>(param_);
+  appr_alg_->ef_ = param.ef;
+  num_threads_   = param.num_threads;
+  // bench_mode_ = param.metric_objective;
+  bench_mode_ = Mode::kLatency;  // TODO(achirkin): pass the benchmark mode in the algo parameters
 
   // Create a pool if multiple query threads have been set and the pool hasn't been created already
-  bool create_pool = (metric_objective_ == Objective::LATENCY && num_threads_ > 1 && !thread_pool_);
-  if (create_pool) { thread_pool_ = std::make_shared<FixedThreadPool>(num_threads_); }
+  bool create_pool = (bench_mode_ == Mode::kLatency && num_threads_ > 1 && !thread_pool_);
+  if (create_pool) { thread_pool_ = std::make_shared<fixed_thread_pool>(num_threads_); }
 }
 
 template <typename T>
-void HnswLib<T>::search(
-  const T* query, int batch_size, int k, AnnBase::index_type* indices, float* distances) const
+void hnsw_lib<T>::search(
+  const T* query, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
   auto f = [&](int i) {
     // hnsw can only handle a single vector at a time.
-    get_search_knn_results_(query + i * dim_, k, indices + i * k, distances + i * k);
+    get_search_knn_results(query + i * dim_, k, indices + i * k, distances + i * k);
   };
-  if (metric_objective_ == Objective::LATENCY && num_threads_ > 1) {
+  if (bench_mode_ == Mode::kLatency && num_threads_ > 1) {
     thread_pool_->submit(f, batch_size);
   } else {
     for (int i = 0; i < batch_size; i++) {
@@ -198,13 +200,13 @@ void HnswLib<T>::search(
 }
 
 template <typename T>
-void HnswLib<T>::save(const std::string& path_to_index) const
+void hnsw_lib<T>::save(const std::string& path_to_index) const
 {
   appr_alg_->saveIndex(std::string(path_to_index));
 }
 
 template <typename T>
-void HnswLib<T>::load(const std::string& path_to_index)
+void hnsw_lib<T>::load(const std::string& path_to_index)
 {
   if constexpr (std::is_same_v<T, float>) {
     if (metric_ == Metric::kInnerProduct) {
@@ -221,9 +223,9 @@ void HnswLib<T>::load(const std::string& path_to_index)
 }
 
 template <typename T>
-void HnswLib<T>::get_search_knn_results_(const T* query,
+void hnsw_lib<T>::get_search_knn_results(const T* query,
                                          int k,
-                                         AnnBase::index_type* indices,
+                                         algo_base::index_type* indices,
                                          float* distances) const
 {
   auto result = appr_alg_->searchKnn(query, k);
@@ -236,4 +238,4 @@ void HnswLib<T>::get_search_knn_results_(const T* query,
   }
 }
 
-};  // namespace cuvs::bench::ann
+};  // namespace cuvs::bench

@@ -39,7 +39,7 @@
 #include <string>
 #include <vector>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 /**
  * Current thread id as given by the benchmark State.
@@ -66,7 +66,7 @@ struct cuda_timer {
   template <typename AnnT>
   static inline auto extract_stream(AnnT* algo) -> std::optional<cudaStream_t>
   {
-    auto gpu_ann = dynamic_cast<AnnGPU*>(algo);
+    auto gpu_ann = dynamic_cast<algo_gpu*>(algo);
     if (gpu_ann != nullptr && gpu_ann->uses_stream()) {
       return std::make_optional(gpu_ann->get_sync_stream());
     }
@@ -184,7 +184,7 @@ inline auto get_stream_from_global_pool() -> cudaStream_t
 {
 #ifndef BUILD_CPU_ONLY
   std::lock_guard guard(detail::gsp_mutex);
-  if (int(detail::global_stream_pool.size()) < benchmark_n_threads) {
+  if (static_cast<int>(detail::global_stream_pool.size()) < benchmark_n_threads) {
     detail::global_stream_pool.resize(benchmark_n_threads);
   }
   return detail::global_stream_pool[benchmark_thread_id].view();
@@ -203,11 +203,11 @@ struct result_buffer {
     cudaStreamSynchronize(stream_);
 #endif
   }
-  result_buffer()                                = delete;
-  result_buffer(result_buffer&&)                 = delete;
-  result_buffer& operator=(result_buffer&&)      = delete;
-  result_buffer(const result_buffer&)            = delete;
-  result_buffer& operator=(const result_buffer&) = delete;
+  result_buffer()                                        = delete;
+  result_buffer(result_buffer&&)                         = delete;
+  auto operator=(result_buffer&&) -> result_buffer&      = delete;
+  result_buffer(const result_buffer&)                    = delete;
+  auto operator=(const result_buffer&) -> result_buffer& = delete;
   ~result_buffer() noexcept
   {
     if (size_ == 0) { return; }
@@ -219,15 +219,15 @@ struct result_buffer {
   }
 
   [[nodiscard]] auto size() const noexcept { return size_; }
-  [[nodiscard]] auto data(ann::MemoryType loc) const noexcept
+  [[nodiscard]] auto data(MemoryType loc) const noexcept
   {
     switch (loc) {
-      case MemoryType::Device: return data_device_;
+      case MemoryType::kDevice: return data_device_;
       default: return data_host_;
     }
   }
 
-  void transfer_data(ann::MemoryType dst, ann::MemoryType src)
+  void transfer_data(MemoryType dst, MemoryType src)
   {
     auto dst_ptr = data(dst);
     auto src_ptr = data(src);
@@ -270,9 +270,9 @@ inline auto get_result_buffer_from_global_pool(size_t size) -> result_buffer&
     return *rb;
   }();
 
-  memset(rb.data(MemoryType::Host), 0, size);
+  memset(rb.data(MemoryType::kHost), 0, size);
 #ifndef BUILD_CPU_ONLY
-  cudaMemsetAsync(rb.data(MemoryType::Device), 0, size, stream);
+  cudaMemsetAsync(rb.data(MemoryType::kDevice), 0, size, stream);
   cudaStreamSynchronize(stream);
 #endif
   return rb;
@@ -348,7 +348,7 @@ struct nvtx_case {
 
 #ifdef ANN_BENCH_NVTX3_HEADERS_FOUND
   explicit nvtx_case(std::string case_name)
-    : case_name_(std::move(case_name)), domain_(nvtxDomainCreateA("ANN benchmark"))
+    : case_name_(std::move(case_name)), domain_(nvtxDomainCreateA("algo benchmark"))
   {
     case_attrib_.version       = NVTX_VERSION;
     iter_attrib_.version       = NVTX_VERSION;
@@ -462,7 +462,7 @@ struct progress_barrier {
   int thread_progress_{0};
 };
 
-inline std::vector<std::string> split(const std::string& s, char delimiter)
+inline auto split(const std::string& s, char delimiter) -> std::vector<std::string>
 {
   std::vector<std::string> tokens;
   std::string token;
@@ -473,21 +473,21 @@ inline std::vector<std::string> split(const std::string& s, char delimiter)
   return tokens;
 }
 
-inline bool file_exists(const std::string& filename)
+inline auto file_exists(const std::string& filename) -> bool
 {
   struct stat statbuf;
   if (stat(filename.c_str(), &statbuf) != 0) { return false; }
   return S_ISREG(statbuf.st_mode);
 }
 
-inline bool dir_exists(const std::string& dir)
+inline auto dir_exists(const std::string& dir) -> bool
 {
   struct stat statbuf;
   if (stat(dir.c_str(), &statbuf) != 0) { return false; }
   return S_ISDIR(statbuf.st_mode);
 }
 
-inline bool create_dir(const std::string& dir)
+inline auto create_dir(const std::string& dir) -> bool
 {
   const auto path = split(dir, '/');
 
@@ -521,7 +521,7 @@ inline auto combine_path(const std::string& dir, const std::string& path)
 }
 
 template <typename... Ts>
-void log_(const char* level, const Ts&... vs)
+void log_with_level(const char* level, const Ts&... vs)
 {
   char buf[20];
   auto now    = std::chrono::system_clock::now();
@@ -543,19 +543,19 @@ void log_(const char* level, const Ts&... vs)
 template <typename... Ts>
 void log_info(Ts&&... vs)
 {
-  log_("I", std::forward<Ts>(vs)...);
+  log_with_level("I", std::forward<Ts>(vs)...);
 }
 
 template <typename... Ts>
 void log_warn(Ts&&... vs)
 {
-  log_("W", std::forward<Ts>(vs)...);
+  log_with_level("W", std::forward<Ts>(vs)...);
 }
 
 template <typename... Ts>
 void log_error(Ts&&... vs)
 {
-  log_("E", std::forward<Ts>(vs)...);
+  log_with_level("E", std::forward<Ts>(vs)...);
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

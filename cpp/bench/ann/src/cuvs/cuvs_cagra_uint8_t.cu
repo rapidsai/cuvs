@@ -15,6 +15,6 @@
  */
 #include "cuvs_cagra_wrapper.h"
 
-namespace cuvs::bench::ann {
-template class CuvsCagra<uint8_t, uint32_t>;
-}  // namespace cuvs::bench::ann
+namespace cuvs::bench {
+template class cuvs_cagra<uint8_t, uint32_t>;
+}  // namespace cuvs::bench

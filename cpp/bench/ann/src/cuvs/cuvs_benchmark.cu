@@ -30,25 +30,25 @@
 #include <type_traits>
 #include <utility>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
-std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
-                                                      const std::string& distance,
-                                                      int dim,
-                                                      const nlohmann::json& conf,
-                                                      const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::algo<T>> create_algo(const std::string& algo,
+                                                  const std::string& distance,
+                                                  int dim,
+                                                  const nlohmann::json& conf,
+                                                  const std::vector<int>& dev_list)
 {
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  [[maybe_unused]] cuvs::bench::ann::Metric metric = parse_metric(distance);
-  std::unique_ptr<cuvs::bench::ann::ANN<T>> ann;
+  [[maybe_unused]] cuvs::bench::Metric metric = parse_metric(distance);
+  std::unique_ptr<cuvs::bench::algo<T>> a;
 
   if constexpr (std::is_same_v<T, float>) {
 #ifdef CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
     if (algo == "raft_brute_force" || algo == "cuvs_brute_force") {
-      ann = std::make_unique<cuvs::bench::ann::CuvsGpu<T>>(metric, dim);
+      a = std::make_unique<cuvs::bench::cuvs_gpu<T>>(metric, dim);
     }
 #endif
   }
@@ -59,39 +59,39 @@ std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
     if (algo == "raft_ivf_flat" || algo == "cuvs_ivf_flat") {
-      typename cuvs::bench::ann::CuvsIvfFlatGpu<T, int64_t>::BuildParam param;
+      typename cuvs::bench::cuvs_ivf_flat<T, int64_t>::build_param param;
       parse_build_param<T, int64_t>(conf, param);
-      ann = std::make_unique<cuvs::bench::ann::CuvsIvfFlatGpu<T, int64_t>>(metric, dim, param);
+      a = std::make_unique<cuvs::bench::cuvs_ivf_flat<T, int64_t>>(metric, dim, param);
     }
   }
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
   if (algo == "raft_ivf_pq" || algo == "cuvs_ivf_pq") {
-    typename cuvs::bench::ann::CuvsIvfPQ<T, int64_t>::BuildParam param;
+    typename cuvs::bench::cuvs_ivf_pq<T, int64_t>::build_param param;
     parse_build_param<T, int64_t>(conf, param);
-    ann = std::make_unique<cuvs::bench::ann::CuvsIvfPQ<T, int64_t>>(metric, dim, param);
+    a = std::make_unique<cuvs::bench::cuvs_ivf_pq<T, int64_t>>(metric, dim, param);
   }
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
   if (algo == "raft_cagra" || algo == "cuvs_cagra") {
-    typename cuvs::bench::ann::CuvsCagra<T, uint32_t>::BuildParam param;
+    typename cuvs::bench::cuvs_cagra<T, uint32_t>::build_param param;
     parse_build_param<T, uint32_t>(conf, param);
-    ann = std::make_unique<cuvs::bench::ann::CuvsCagra<T, uint32_t>>(metric, dim, param);
+    a = std::make_unique<cuvs::bench::cuvs_cagra<T, uint32_t>>(metric, dim, param);
   }
 #endif
 
-  if (!ann) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
+  if (!a) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
 
-  return ann;
+  return a;
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
 #ifdef CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
   if (algo == "raft_brute_force" || algo == "cuvs_brute_force") {
-    auto param = std::make_unique<typename cuvs::bench::ann::CuvsGpu<T>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::cuvs_gpu<T>::search_param>();
     return param;
   }
 #endif
@@ -100,7 +100,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
                 std::is_same_v<T, int8_t>) {
     if (algo == "raft_ivf_flat" || algo == "cuvs_ivf_flat") {
       auto param =
-        std::make_unique<typename cuvs::bench::ann::CuvsIvfFlatGpu<T, int64_t>::SearchParam>();
+        std::make_unique<typename cuvs::bench::cuvs_ivf_flat<T, int64_t>::search_param>();
       parse_search_param<T, int64_t>(conf, *param);
       return param;
     }
@@ -108,14 +108,14 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
   if (algo == "raft_ivf_pq" || algo == "cuvs_ivf_pq") {
-    auto param = std::make_unique<typename cuvs::bench::ann::CuvsIvfPQ<T, int64_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::cuvs_ivf_pq<T, int64_t>::search_param>();
     parse_search_param<T, int64_t>(conf, *param);
     return param;
   }
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
   if (algo == "raft_cagra" || algo == "cuvs_cagra") {
-    auto param = std::make_unique<typename cuvs::bench::ann::CuvsCagra<T, uint32_t>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::cuvs_cagra<T, uint32_t>::search_param>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }
@@ -125,7 +125,7 @@ std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-};  // namespace cuvs::bench::ann
+};  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
 // REGISTER_ALGO_INSTANCE(half);
@@ -134,5 +134,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv) { return cuvs::bench::ann::run_main(argc, argv); }
+int main(int argc, char** argv) { return cuvs::bench::run_main(argc, argv); }
 #endif

@@ -31,46 +31,46 @@
 
 namespace raft_temp {
 
-inline cuvs::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
+inline auto parse_metric_type(cuvs::bench::Metric metric) -> cuvs::distance::DistanceType
 {
   switch (metric) {
-    case cuvs::bench::ann::Metric::kInnerProduct: return cuvs::distance::DistanceType::InnerProduct;
-    case cuvs::bench::ann::Metric::kEuclidean: return cuvs::distance::DistanceType::L2Expanded;
+    case cuvs::bench::Metric::kInnerProduct: return cuvs::distance::DistanceType::InnerProduct;
+    case cuvs::bench::Metric::kEuclidean: return cuvs::distance::DistanceType::L2Expanded;
     default: throw std::runtime_error("raft supports only metric type of inner product and L2");
   }
 }
 }  // namespace raft_temp
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 // brute force KNN - RAFT
 template <typename T>
-class CuvsGpu : public ANN<T>, public AnnGPU {
+class cuvs_gpu : public algo<T>, public algo_gpu {
  public:
-  using typename ANN<T>::AnnSearchParam;
+  using search_param_base = typename algo<T>::search_param;
 
-  struct SearchParam : public AnnSearchParam {
-    auto needs_dataset() const -> bool override { return true; }
+  struct search_param : public search_param_base {
+    [[nodiscard]] auto needs_dataset() const -> bool override { return true; }
   };
 
-  CuvsGpu(Metric metric, int dim);
+  cuvs_gpu(Metric metric, int dim);
 
   void build(const T*, size_t) final;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
 
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const final;
 
   // to enable dataset access from GPU memory
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::Device;
-    property.query_memory_type   = MemoryType::Device;
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kDevice;
+    property.query_memory_type   = MemoryType::kDevice;
     return property;
   }
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
@@ -80,7 +80,7 @@ class CuvsGpu : public ANN<T>, public AnnGPU {
   void set_search_dataset(const T* dataset, size_t nrow) override;
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<ANN<T>> copy() override;
+  std::unique_ptr<algo<T>> copy() override;
 
  protected:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
@@ -93,8 +93,8 @@ class CuvsGpu : public ANN<T>, public AnnGPU {
 };
 
 template <typename T>
-CuvsGpu<T>::CuvsGpu(Metric metric, int dim)
-  : ANN<T>(metric, dim), metric_type_(raft_temp::parse_metric_type(metric))
+cuvs_gpu<T>::cuvs_gpu(Metric metric, int dim)
+  : algo<T>(metric, dim), metric_type_(raft_temp::parse_metric_type(metric))
 {
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, double>,
                 "raft bfknn only supports float/double");
@@ -102,7 +102,7 @@ CuvsGpu<T>::CuvsGpu(Metric metric, int dim)
 }
 
 template <typename T>
-void CuvsGpu<T>::build(const T* dataset, size_t nrow)
+void cuvs_gpu<T>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
   index_            = std::make_shared<cuvs::neighbors::brute_force::index<T>>(
@@ -110,13 +110,13 @@ void CuvsGpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void CuvsGpu<T>::set_search_param(const AnnSearchParam&)
+void cuvs_gpu<T>::set_search_param(const search_param_base&)
 {
   // Nothing to set here as it is brute force implementation
 }
 
 template <typename T>
-void CuvsGpu<T>::set_search_dataset(const T* dataset, size_t nrow)
+void cuvs_gpu<T>::set_search_dataset(const T* dataset, size_t nrow)
 {
   dataset_ = dataset;
   nrow_    = nrow;
@@ -127,7 +127,7 @@ void CuvsGpu<T>::set_search_dataset(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void CuvsGpu<T>::save(const std::string& file) const
+void cuvs_gpu<T>::save(const std::string& file) const
 {
   // The index is just the dataset with metadata (shape). The dataset already exist on disk,
   // therefore we do not need to save it here.
@@ -137,21 +137,21 @@ void CuvsGpu<T>::save(const std::string& file) const
 }
 
 template <typename T>
-void CuvsGpu<T>::load(const std::string& file)
+void cuvs_gpu<T>::load(const std::string& file)
 {
   // We do not have serialization of brute force index. We can simply wrap the
   // dataset into a brute force index, like it is done in set_search_dataset.
 }
 
 template <typename T>
-void CuvsGpu<T>::search(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void cuvs_gpu<T>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   auto queries_view =
     raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, this->dim_);
 
   auto neighbors_view =
-    raft::make_device_matrix_view<AnnBase::index_type, int64_t>(neighbors, batch_size, k);
+    raft::make_device_matrix_view<algo_base::index_type, int64_t>(neighbors, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   cuvs::neighbors::brute_force::search(
@@ -159,9 +159,9 @@ void CuvsGpu<T>::search(
 }
 
 template <typename T>
-std::unique_ptr<ANN<T>> CuvsGpu<T>::copy()
+std::unique_ptr<algo<T>> cuvs_gpu<T>::copy()
 {
-  return std::make_unique<CuvsGpu<T>>(*this);  // use copy constructor
+  return std::make_unique<cuvs_gpu<T>>(*this);  // use copy constructor
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

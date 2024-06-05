@@ -37,13 +37,13 @@
 #include <memory>
 #include <type_traits>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
-inline cuvs::distance::DistanceType parse_metric_type(cuvs::bench::ann::Metric metric)
+inline auto parse_metric_type(cuvs::bench::Metric metric) -> cuvs::distance::DistanceType
 {
-  if (metric == cuvs::bench::ann::Metric::kInnerProduct) {
+  if (metric == cuvs::bench::Metric::kInnerProduct) {
     return cuvs::distance::DistanceType::InnerProduct;
-  } else if (metric == cuvs::bench::ann::Metric::kEuclidean) {
+  } else if (metric == cuvs::bench::Metric::kEuclidean) {
     // Even for L2 expanded RAFT IVF Flat uses unexpanded formula
     return cuvs::distance::DistanceType::L2Expanded;
   } else {
@@ -97,10 +97,10 @@ class shared_raft_resources {
       e.what());
   }
 
-  shared_raft_resources(shared_raft_resources&&)                       = delete;
-  shared_raft_resources& operator=(shared_raft_resources&&)            = delete;
-  shared_raft_resources(const shared_raft_resources& res)              = delete;
-  shared_raft_resources& operator=(const shared_raft_resources& other) = delete;
+  shared_raft_resources(shared_raft_resources&&)                               = delete;
+  auto operator=(shared_raft_resources&&) -> shared_raft_resources&            = delete;
+  shared_raft_resources(const shared_raft_resources& res)                      = delete;
+  auto operator=(const shared_raft_resources& other) -> shared_raft_resources& = delete;
 
   ~shared_raft_resources() noexcept { rmm::mr::set_current_device_resource(orig_resource_); }
 
@@ -138,20 +138,20 @@ class configured_raft_resources {
   }
 
   configured_raft_resources(configured_raft_resources&&);
-  configured_raft_resources& operator=(configured_raft_resources&&);
+  auto operator=(configured_raft_resources&&) -> configured_raft_resources&;
   ~configured_raft_resources() = default;
   configured_raft_resources(const configured_raft_resources& res)
     : configured_raft_resources{res.shared_res_}
   {
   }
-  configured_raft_resources& operator=(const configured_raft_resources& other)
+  auto operator=(const configured_raft_resources& other) -> configured_raft_resources&
   {
     this->shared_res_ = other.shared_res_;
     return *this;
   }
 
-  operator raft::resources&() noexcept { return *res_; }
-  operator const raft::resources&() const noexcept { return *res_; }
+  operator raft::resources&() noexcept { return *res_; }              // NOLINT
+  operator const raft::resources&() const noexcept { return *res_; }  // NOLINT
 
   /** Get the main stream */
   [[nodiscard]] auto get_sync_stream() const noexcept
@@ -170,8 +170,8 @@ class configured_raft_resources {
 };
 
 inline configured_raft_resources::configured_raft_resources(configured_raft_resources&&) = default;
-inline configured_raft_resources& configured_raft_resources::operator=(
-  configured_raft_resources&&) = default;
+inline auto configured_raft_resources::operator=(configured_raft_resources&&)
+  -> configured_raft_resources& = default;
 
 /** A helper to refine the neighbors when the data is on device or on host. */
 template <typename DatasetT, typename QueriesT, typename CandidatesT>
@@ -180,12 +180,12 @@ void refine_helper(const raft::resources& res,
                    QueriesT queries,
                    CandidatesT candidates,
                    int k,
-                   AnnBase::index_type* neighbors,
+                   algo_base::index_type* neighbors,
                    float* distances,
                    cuvs::distance::DistanceType metric)
 {
   using data_type    = typename DatasetT::value_type;
-  using index_type   = AnnBase::index_type;
+  using index_type   = algo_base::index_type;
   using extents_type = int64_t;  // device-side refine requires this
 
   static_assert(std::is_same_v<data_type, typename QueriesT::value_type>);
@@ -242,4 +242,4 @@ void refine_helper(const raft::resources& res,
   }
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

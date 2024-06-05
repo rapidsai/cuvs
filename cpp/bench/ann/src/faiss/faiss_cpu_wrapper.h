@@ -35,11 +35,11 @@
 
 namespace {
 
-faiss::MetricType parse_metric_type(cuvs::bench::ann::Metric metric)
+auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
 {
-  if (metric == cuvs::bench::ann::Metric::kInnerProduct) {
+  if (metric == cuvs::bench::Metric::kInnerProduct) {
     return faiss::METRIC_INNER_PRODUCT;
-  } else if (metric == cuvs::bench::ann::Metric::kEuclidean) {
+  } else if (metric == cuvs::bench::Metric::kEuclidean) {
     return faiss::METRIC_L2;
   } else {
     throw std::runtime_error("faiss supports only metric type of inner product and L2");
@@ -47,25 +47,25 @@ faiss::MetricType parse_metric_type(cuvs::bench::ann::Metric metric)
 }
 }  // namespace
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
-class FaissCpu : public ANN<T> {
+class faiss_cpu : public algo<T> {
  public:
-  using typename ANN<T>::AnnSearchParam;
-  struct SearchParam : public AnnSearchParam {
+  using search_param_base = typename algo<T>::search_param;
+  struct search_param : public search_param_base {
     int nprobe;
     float refine_ratio = 1.0;
     int num_threads    = omp_get_num_procs();
   };
 
-  struct BuildParam {
+  struct build_param {
     int nlist = 1;
     int ratio = 2;
   };
 
-  FaissCpu(Metric metric, int dim, const BuildParam& param)
-    : ANN<T>(metric, dim),
+  faiss_cpu(Metric metric, int dim, const build_param& param)
+    : algo<T>(metric, dim),
       metric_type_(parse_metric_type(metric)),
       nlist_{param.nlist},
       training_sample_fraction_{1.0 / double(param.ratio)}
@@ -75,7 +75,7 @@ class FaissCpu : public ANN<T> {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
 
   void init_quantizer(int dim)
   {
@@ -86,29 +86,29 @@ class FaissCpu : public ANN<T> {
     }
   }
 
-  // TODO: if the number of results is less than k, the remaining elements of 'neighbors'
-  // will be filled with (size_t)-1
+  // TODO(snanditale): if the number of results is less than k, the remaining elements of
+  // 'neighbors' will be filled with (size_t)-1
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const final;
 
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
+    algo_property property;
     // to enable building big dataset which is larger than  memory
-    property.dataset_memory_type = MemoryType::Host;
-    property.query_memory_type   = MemoryType::Host;
+    property.dataset_memory_type = MemoryType::kHost;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
 
  protected:
   template <typename Index>
-  void save_(const std::string& file) const;
+  void save_(const std::string& file) const;  // NOLINT
 
   template <typename Index>
-  void load_(const std::string& file);
+  void load_(const std::string& file);  // NOLINT
 
   std::shared_ptr<faiss::Index> index_;
   std::shared_ptr<faiss::Index> quantizer_;
@@ -118,11 +118,11 @@ class FaissCpu : public ANN<T> {
   double training_sample_fraction_;
 
   int num_threads_;
-  std::shared_ptr<FixedThreadPool> thread_pool_;
+  std::shared_ptr<fixed_thread_pool> thread_pool_;
 };
 
 template <typename T>
-void FaissCpu<T>::build(const T* dataset, size_t nrow)
+void faiss_cpu<T>::build(const T* dataset, size_t nrow)
 {
   auto index_ivf = dynamic_cast<faiss::IndexIVF*>(index_.get());
   if (index_ivf != nullptr) {
@@ -153,26 +153,24 @@ void FaissCpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void FaissCpu<T>::set_search_param(const AnnSearchParam& param)
+void faiss_cpu<T>::set_search_param(const search_param_base& param)
 {
-  auto search_param = dynamic_cast<const SearchParam&>(param);
-  int nprobe        = search_param.nprobe;
+  auto sp    = dynamic_cast<const search_param&>(param);
+  int nprobe = sp.nprobe;
   assert(nprobe <= nlist_);
   dynamic_cast<faiss::IndexIVF*>(index_.get())->nprobe = nprobe;
 
-  if (search_param.refine_ratio > 1.0) {
-    this->index_refine_.get()->k_factor = search_param.refine_ratio;
-  }
+  if (sp.refine_ratio > 1.0) { this->index_refine_.get()->k_factor = sp.refine_ratio; }
 
-  if (!thread_pool_ || num_threads_ != search_param.num_threads) {
-    num_threads_ = search_param.num_threads;
-    thread_pool_ = std::make_shared<FixedThreadPool>(num_threads_);
+  if (!thread_pool_ || num_threads_ != sp.num_threads) {
+    num_threads_ = sp.num_threads;
+    thread_pool_ = std::make_shared<fixed_thread_pool>(num_threads_);
   }
 }
 
 template <typename T>
-void FaissCpu<T>::search(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void faiss_cpu<T>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
@@ -187,24 +185,25 @@ void FaissCpu<T>::search(
 
 template <typename T>
 template <typename Index>
-void FaissCpu<T>::save_(const std::string& file) const
+void faiss_cpu<T>::save_(const std::string& file) const
 {
   faiss::write_index(index_.get(), file.c_str());
 }
 
 template <typename T>
 template <typename Index>
-void FaissCpu<T>::load_(const std::string& file)
+void faiss_cpu<T>::load_(const std::string& file)
 {
   index_ = std::shared_ptr<Index>(dynamic_cast<Index*>(faiss::read_index(file.c_str())));
 }
 
 template <typename T>
-class FaissCpuIVFFlat : public FaissCpu<T> {
+class faiss_cpu_ivf_flat : public faiss_cpu<T> {
  public:
-  using typename FaissCpu<T>::BuildParam;
+  using typename faiss_cpu<T>::build_param;
 
-  FaissCpuIVFFlat(Metric metric, int dim, const BuildParam& param) : FaissCpu<T>(metric, dim, param)
+  faiss_cpu_ivf_flat(Metric metric, int dim, const build_param& param)
+    : faiss_cpu<T>(metric, dim, param)
   {
     this->init_quantizer(dim);
     this->index_ = std::make_shared<faiss::IndexIVFFlat>(
@@ -217,26 +216,27 @@ class FaissCpuIVFFlat : public FaissCpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexIVFFlat>(file); }
 
-  std::unique_ptr<ANN<T>> copy()
+  std::unique_ptr<algo<T>> copy()
   {
-    return std::make_unique<FaissCpuIVFFlat<T>>(*this);  // use copy constructor
+    return std::make_unique<faiss_cpu_ivf_flat<T>>(*this);  // use copy constructor
   }
 };
 
 template <typename T>
-class FaissCpuIVFPQ : public FaissCpu<T> {
+class faiss_cpu_ivfpq : public faiss_cpu<T> {
  public:
-  struct BuildParam : public FaissCpu<T>::BuildParam {
-    int M;
-    int bitsPerCode;
-    bool usePrecomputed;
+  struct build_param : public faiss_cpu<T>::build_param {
+    int m;
+    int bits_per_code;
+    bool use_precomputed;
   };
 
-  FaissCpuIVFPQ(Metric metric, int dim, const BuildParam& param) : FaissCpu<T>(metric, dim, param)
+  faiss_cpu_ivfpq(Metric metric, int dim, const build_param& param)
+    : faiss_cpu<T>(metric, dim, param)
   {
     this->init_quantizer(dim);
     this->index_ = std::make_shared<faiss::IndexIVFPQ>(
-      this->quantizer_.get(), dim, param.nlist, param.M, param.bitsPerCode, this->metric_type_);
+      this->quantizer_.get(), dim, param.nlist, param.m, param.bits_per_code, this->metric_type_);
   }
 
   void save(const std::string& file) const override
@@ -245,22 +245,23 @@ class FaissCpuIVFPQ : public FaissCpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexIVFPQ>(file); }
 
-  std::unique_ptr<ANN<T>> copy()
+  std::unique_ptr<algo<T>> copy()
   {
-    return std::make_unique<FaissCpuIVFPQ<T>>(*this);  // use copy constructor
+    return std::make_unique<faiss_cpu_ivfpq<T>>(*this);  // use copy constructor
   }
 };
 
-// TODO: Enable this in cmake
+// TODO(snanditale): Enable this in cmake
 //  ref: https://github.com/rapidsai/raft/issues/1876
 template <typename T>
-class FaissCpuIVFSQ : public FaissCpu<T> {
+class faiss_cpu_ivfsq : public faiss_cpu<T> {
  public:
-  struct BuildParam : public FaissCpu<T>::BuildParam {
+  struct build_param : public faiss_cpu<T>::build_param {
     std::string quantizer_type;
   };
 
-  FaissCpuIVFSQ(Metric metric, int dim, const BuildParam& param) : FaissCpu<T>(metric, dim, param)
+  faiss_cpu_ivfsq(Metric metric, int dim, const build_param& param)
+    : faiss_cpu<T>(metric, dim, param)
   {
     faiss::ScalarQuantizer::QuantizerType qtype;
     if (param.quantizer_type == "fp16") {
@@ -268,7 +269,7 @@ class FaissCpuIVFSQ : public FaissCpu<T> {
     } else if (param.quantizer_type == "int8") {
       qtype = faiss::ScalarQuantizer::QT_8bit;
     } else {
-      throw std::runtime_error("FaissCpuIVFSQ supports only fp16 and int8 but got " +
+      throw std::runtime_error("faiss_cpu_ivfsq supports only fp16 and int8 but got " +
                                param.quantizer_type);
     }
 
@@ -286,28 +287,28 @@ class FaissCpuIVFSQ : public FaissCpu<T> {
     this->template load_<faiss::IndexIVFScalarQuantizer>(file);
   }
 
-  std::unique_ptr<ANN<T>> copy()
+  std::unique_ptr<algo<T>> copy()
   {
-    return std::make_unique<FaissCpuIVFSQ<T>>(*this);  // use copy constructor
+    return std::make_unique<faiss_cpu_ivfsq<T>>(*this);  // use copy constructor
   }
 };
 
 template <typename T>
-class FaissCpuFlat : public FaissCpu<T> {
+class faiss_cpu_flat : public faiss_cpu<T> {
  public:
-  FaissCpuFlat(Metric metric, int dim)
-    : FaissCpu<T>(metric, dim, typename FaissCpu<T>::BuildParam{})
+  faiss_cpu_flat(Metric metric, int dim)
+    : faiss_cpu<T>(metric, dim, typename faiss_cpu<T>::build_param{})
   {
     this->index_ = std::make_shared<faiss::IndexFlat>(dim, this->metric_type_);
   }
 
-  // class FaissCpu is more like a IVF class, so need special treating here
-  void set_search_param(const typename ANN<T>::AnnSearchParam& param) override
+  // class faiss_cpu is more like a IVF class, so need special treating here
+  void set_search_param(const typename algo<T>::search_param& param) override
   {
-    auto search_param = dynamic_cast<const typename FaissCpu<T>::SearchParam&>(param);
+    auto search_param = dynamic_cast<const typename faiss_cpu<T>::search_param&>(param);
     if (!this->thread_pool_ || this->num_threads_ != search_param.num_threads) {
       this->num_threads_ = search_param.num_threads;
-      this->thread_pool_ = std::make_shared<FixedThreadPool>(this->num_threads_);
+      this->thread_pool_ = std::make_shared<fixed_thread_pool>(this->num_threads_);
     }
   };
 
@@ -317,10 +318,10 @@ class FaissCpuFlat : public FaissCpu<T> {
   }
   void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
 
-  std::unique_ptr<ANN<T>> copy()
+  std::unique_ptr<algo<T>> copy()
   {
-    return std::make_unique<FaissCpuFlat<T>>(*this);  // use copy constructor
+    return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
   }
 };
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

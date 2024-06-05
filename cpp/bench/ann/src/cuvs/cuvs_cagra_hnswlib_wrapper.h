@@ -20,31 +20,31 @@
 
 #include <memory>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, typename IdxT>
-class CuvsCagraHnswlib : public ANN<T>, public AnnGPU {
+class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
  public:
-  using typename ANN<T>::AnnSearchParam;
-  using BuildParam  = typename CuvsCagra<T, IdxT>::BuildParam;
-  using SearchParam = typename HnswLib<T>::SearchParam;
+  using search_param_base = typename algo<T>::search_param;
+  using build_param       = typename cuvs_cagra<T, IdxT>::build_param;
+  using search_param      = typename hnsw_lib<T>::search_param;
 
-  CuvsCagraHnswlib(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
-    : ANN<T>(metric, dim),
+  cuvs_cagra_hnswlib(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
+    : algo<T>(metric, dim),
       cagra_build_{metric, dim, param, concurrent_searches},
-      // HnswLib param values don't matter since we don't build with HnswLib
-      hnswlib_search_{metric, dim, typename HnswLib<T>::BuildParam{50, 100}}
+      // hnsw_lib param values don't matter since we don't build with hnsw_lib
+      hnswlib_search_{metric, dim, typename hnsw_lib<T>::build_param{50, 100}}
   {
   }
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
 
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const override;
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
@@ -53,56 +53,56 @@ class CuvsCagraHnswlib : public ANN<T>, public AnnGPU {
   }
 
   // to enable dataset access from GPU memory
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::HostMmap;
-    property.query_memory_type   = MemoryType::Host;
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kHostMmap;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
 
   void save(const std::string& file) const override;
   void load(const std::string&) override;
-  std::unique_ptr<ANN<T>> copy() override
+  std::unique_ptr<algo<T>> copy() override
   {
-    return std::make_unique<CuvsCagraHnswlib<T, IdxT>>(*this);
+    return std::make_unique<cuvs_cagra_hnswlib<T, IdxT>>(*this);
   }
 
  private:
-  CuvsCagra<T, IdxT> cagra_build_;
-  HnswLib<T> hnswlib_search_;
+  cuvs_cagra<T, IdxT> cagra_build_;
+  hnsw_lib<T> hnswlib_search_;
 };
 
 template <typename T, typename IdxT>
-void CuvsCagraHnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
+void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   cagra_build_.build(dataset, nrow);
 }
 
 template <typename T, typename IdxT>
-void CuvsCagraHnswlib<T, IdxT>::set_search_param(const AnnSearchParam& param_)
+void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_)
 {
   hnswlib_search_.set_search_param(param_);
 }
 
 template <typename T, typename IdxT>
-void CuvsCagraHnswlib<T, IdxT>::save(const std::string& file) const
+void cuvs_cagra_hnswlib<T, IdxT>::save(const std::string& file) const
 {
   cagra_build_.save_to_hnswlib(file);
 }
 
 template <typename T, typename IdxT>
-void CuvsCagraHnswlib<T, IdxT>::load(const std::string& file)
+void cuvs_cagra_hnswlib<T, IdxT>::load(const std::string& file)
 {
   hnswlib_search_.load(file);
   hnswlib_search_.set_base_layer_only();
 }
 
 template <typename T, typename IdxT>
-void CuvsCagraHnswlib<T, IdxT>::search(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void cuvs_cagra_hnswlib<T, IdxT>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   hnswlib_search_.search(queries, batch_size, k, neighbors, distances);
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

@@ -28,11 +28,11 @@
 #include <type_traits>
 #include <utility>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
 void parse_base_build_param(const nlohmann::json& conf,
-                            typename cuvs::bench::ann::FaissCpu<T>::BuildParam& param)
+                            typename cuvs::bench::faiss_cpu<T>::build_param& param)
 {
   param.nlist = conf.at("nlist");
   if (conf.contains("ratio")) { param.ratio = conf.at("ratio"); }
@@ -40,32 +40,32 @@ void parse_base_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::FaissCpuIVFFlat<T>::BuildParam& param)
+                       typename cuvs::bench::faiss_cpu_ivf_flat<T>::build_param& param)
 {
   parse_base_build_param<T>(conf, param);
 }
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::FaissCpuIVFPQ<T>::BuildParam& param)
+                       typename cuvs::bench::faiss_cpu_ivfpq<T>::build_param& param)
 {
   parse_base_build_param<T>(conf, param);
-  param.M = conf.at("M");
+  param.m = conf.at("M");
   if (conf.contains("usePrecomputed")) {
-    param.usePrecomputed = conf.at("usePrecomputed");
+    param.use_precomputed = conf.at("usePrecomputed");
   } else {
-    param.usePrecomputed = false;
+    param.use_precomputed = false;
   }
   if (conf.contains("bitsPerCode")) {
-    param.bitsPerCode = conf.at("bitsPerCode");
+    param.bits_per_code = conf.at("bitsPerCode");
   } else {
-    param.bitsPerCode = 8;
+    param.bits_per_code = 8;
   }
 }
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::FaissCpuIVFSQ<T>::BuildParam& param)
+                       typename cuvs::bench::faiss_cpu_ivfsq<T>::build_param& param)
 {
   parse_base_build_param<T>(conf, param);
   param.quantizer_type = conf.at("quantizer_type");
@@ -73,7 +73,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::FaissCpu<T>::SearchParam& param)
+                        typename cuvs::bench::faiss_cpu<T>::search_param& param)
 {
   param.nprobe = conf.at("nprobe");
   if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
@@ -81,22 +81,22 @@ void parse_search_param(const nlohmann::json& conf,
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric metric,
-                                                    int dim,
-                                                    const nlohmann::json& conf)
+std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
+                                                int dim,
+                                                const nlohmann::json& conf)
 {
-  typename Algo<T>::BuildParam param;
+  typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
   return std::make_unique<Algo<T>>(metric, dim, param);
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric metric,
-                                                    int dim,
-                                                    const nlohmann::json& conf,
-                                                    const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
+                                                int dim,
+                                                const nlohmann::json& conf,
+                                                const std::vector<int>& dev_list)
 {
-  typename Algo<T>::BuildParam param;
+  typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
 
   (void)dev_list;
@@ -104,54 +104,54 @@ std::unique_ptr<cuvs::bench::ann::ANN<T>> make_algo(cuvs::bench::ann::Metric met
 }
 
 template <typename T>
-std::unique_ptr<cuvs::bench::ann::ANN<T>> create_algo(const std::string& algo,
-                                                      const std::string& distance,
-                                                      int dim,
-                                                      const nlohmann::json& conf,
-                                                      const std::vector<int>& dev_list)
+std::unique_ptr<cuvs::bench::algo<T>> create_algo(const std::string& algo,
+                                                  const std::string& distance,
+                                                  int dim,
+                                                  const nlohmann::json& conf,
+                                                  const std::vector<int>& dev_list)
 {
   // stop compiler warning; not all algorithms support multi-GPU so it may not be used
   (void)dev_list;
 
-  std::unique_ptr<cuvs::bench::ann::ANN<T>> ann;
+  std::unique_ptr<cuvs::bench::algo<T>> a;
 
   if constexpr (std::is_same_v<T, float>) {
-    cuvs::bench::ann::Metric metric = parse_metric(distance);
+    cuvs::bench::Metric metric = parse_metric(distance);
     if (algo == "faiss_cpu_ivf_flat") {
-      ann = make_algo<T, cuvs::bench::ann::FaissCpuIVFFlat>(metric, dim, conf, dev_list);
+      a = make_algo<T, cuvs::bench::faiss_cpu_ivf_flat>(metric, dim, conf, dev_list);
     } else if (algo == "faiss_cpu_ivf_pq") {
-      ann = make_algo<T, cuvs::bench::ann::FaissCpuIVFPQ>(metric, dim, conf);
+      a = make_algo<T, cuvs::bench::faiss_cpu_ivfpq>(metric, dim, conf);
     } else if (algo == "faiss_cpu_ivf_sq") {
-      ann = make_algo<T, cuvs::bench::ann::FaissCpuIVFSQ>(metric, dim, conf);
+      a = make_algo<T, cuvs::bench::faiss_cpu_ivfsq>(metric, dim, conf);
     } else if (algo == "faiss_cpu_flat") {
-      ann = std::make_unique<cuvs::bench::ann::FaissCpuFlat<T>>(metric, dim);
+      a = std::make_unique<cuvs::bench::faiss_cpu_flat<T>>(metric, dim);
     }
   }
 
   if constexpr (std::is_same_v<T, uint8_t>) {}
 
-  if (!ann) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
+  if (!a) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
 
-  return ann;
+  return a;
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::ann::ANN<T>::AnnSearchParam> create_search_param(
+std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
   const std::string& algo, const nlohmann::json& conf)
 {
   if (algo == "faiss_cpu_ivf_flat" || algo == "faiss_cpu_ivf_pq" || algo == "faiss_cpu_ivf_sq") {
-    auto param = std::make_unique<typename cuvs::bench::ann::FaissCpu<T>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::faiss_cpu<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
   } else if (algo == "faiss_cpu_flat") {
-    auto param = std::make_unique<typename cuvs::bench::ann::FaissCpu<T>::SearchParam>();
+    auto param = std::make_unique<typename cuvs::bench::faiss_cpu<T>::search_param>();
     return param;
   }
   // else
   throw std::runtime_error("invalid algo: '" + algo + "'");
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
 REGISTER_ALGO_INSTANCE(std::int8_t);
@@ -159,5 +159,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv) { return cuvs::bench::ann::run_main(argc, argv); }
+int main(int argc, char** argv) { return cuvs::bench::run_main(argc, argv); }
 #endif

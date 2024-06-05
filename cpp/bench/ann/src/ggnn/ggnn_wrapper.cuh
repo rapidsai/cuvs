@@ -26,15 +26,15 @@
 #include <memory>
 #include <stdexcept>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-class GgnnImpl;
+class ggnn_impl;
 
 template <typename T>
-class Ggnn : public ANN<T>, public AnnGPU {
+class ggnn : public algo<T>, public algo_gpu {
  public:
-  struct BuildParam {
+  struct build_param {
     int k_build{24};       // KBuild
     int segment_size{32};  // S
     int num_layers{4};     // L
@@ -43,39 +43,42 @@ class Ggnn : public ANN<T>, public AnnGPU {
     int k;  // GGNN requires to know k during building
   };
 
-  using typename ANN<T>::AnnSearchParam;
-  struct SearchParam : public AnnSearchParam {
+  using search_param_base = typename algo<T>::search_param;
+  struct search_param : public search_param_base {
     float tau;
     int block_dim{32};
     int max_iterations{400};
     int cache_size{512};
     int sorted_size{256};
-    auto needs_dataset() const -> bool override { return true; }
+    [[nodiscard]] auto needs_dataset() const -> bool override { return true; }
   };
 
-  Ggnn(Metric metric, int dim, const BuildParam& param);
+  ggnn(Metric metric, int dim, const build_param& param);
 
   void build(const T* dataset, size_t nrow) override { impl_->build(dataset, nrow); }
 
-  void set_search_param(const AnnSearchParam& param) override { impl_->set_search_param(param); }
+  void set_search_param(const search_param_base& param) override { impl_->set_search_param(param); }
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const override
   {
     impl_->search(queries, batch_size, k, neighbors, distances);
   }
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
-    return dynamic_cast<AnnGPU*>(impl_.get())->get_sync_stream();
+    return dynamic_cast<algo_gpu*>(impl_.get())->get_sync_stream();
   }
 
   void save(const std::string& file) const override { impl_->save(file); }
   void load(const std::string& file) override { impl_->load(file); }
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<Ggnn<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<ggnn<T>>(*this); };
 
-  AlgoProperty get_preference() const override { return impl_->get_preference(); }
+  [[nodiscard]] auto get_preference() const -> algo_property override
+  {
+    return impl_->get_preference();
+  }
 
   void set_search_dataset(const T* dataset, size_t nrow) override
   {
@@ -83,32 +86,32 @@ class Ggnn : public ANN<T>, public AnnGPU {
   };
 
  private:
-  std::shared_ptr<ANN<T>> impl_;
+  std::shared_ptr<algo<T>> impl_;
 };
 
 template <typename T>
-Ggnn<T>::Ggnn(Metric metric, int dim, const BuildParam& param) : ANN<T>(metric, dim)
+ggnn<T>::ggnn(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
   // ggnn/src/sift1m.cu
   if (metric == Metric::kEuclidean && dim == 128 && param.k_build == 24 && param.k == 10 &&
       param.segment_size == 32) {
-    impl_ = std::make_shared<GgnnImpl<T, Euclidean, 128, 24, 10, 32>>(metric, dim, param);
+    impl_ = std::make_shared<ggnn_impl<T, Euclidean, 128, 24, 10, 32>>(metric, dim, param);
   }
   // ggnn/src/deep1b_multi_gpu.cu, and adapt it deep1B
   else if (metric == Metric::kEuclidean && dim == 96 && param.k_build == 24 && param.k == 10 &&
            param.segment_size == 32) {
-    impl_ = std::make_shared<GgnnImpl<T, Euclidean, 96, 24, 10, 32>>(metric, dim, param);
+    impl_ = std::make_shared<ggnn_impl<T, Euclidean, 96, 24, 10, 32>>(metric, dim, param);
   } else if (metric == Metric::kInnerProduct && dim == 96 && param.k_build == 24 && param.k == 10 &&
              param.segment_size == 32) {
-    impl_ = std::make_shared<GgnnImpl<T, Cosine, 96, 24, 10, 32>>(metric, dim, param);
+    impl_ = std::make_shared<ggnn_impl<T, Cosine, 96, 24, 10, 32>>(metric, dim, param);
   } else if (metric == Metric::kInnerProduct && dim == 96 && param.k_build == 96 && param.k == 10 &&
              param.segment_size == 64) {
-    impl_ = std::make_shared<GgnnImpl<T, Cosine, 96, 96, 10, 64>>(metric, dim, param);
+    impl_ = std::make_shared<ggnn_impl<T, Cosine, 96, 96, 10, 64>>(metric, dim, param);
   }
   // ggnn/src/glove200.cu, adapt it to glove100
   else if (metric == Metric::kInnerProduct && dim == 100 && param.k_build == 96 && param.k == 10 &&
            param.segment_size == 64) {
-    impl_ = std::make_shared<GgnnImpl<T, Cosine, 100, 96, 10, 64>>(metric, dim, param);
+    impl_ = std::make_shared<ggnn_impl<T, Cosine, 100, 96, 10, 64>>(metric, dim, param);
   } else {
     throw std::runtime_error(
       "ggnn: not supported combination of metric, dim and build param; "
@@ -117,81 +120,81 @@ Ggnn<T>::Ggnn(Metric metric, int dim, const BuildParam& param) : ANN<T>(metric, 
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-class GgnnImpl : public ANN<T>, public AnnGPU {
+class ggnn_impl : public algo<T>, public algo_gpu {
  public:
-  using typename ANN<T>::AnnSearchParam;
+  using search_param_base = typename algo<T>::search_param;
 
-  GgnnImpl(Metric metric, int dim, const typename Ggnn<T>::BuildParam& param);
+  ggnn_impl(Metric metric, int dim, const typename ggnn<T>::build_param& param);
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const override;
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override { return stream_; }
 
   void save(const std::string& file) const override;
   void load(const std::string& file) override;
-  std::unique_ptr<ANN<T>> copy() override
+  std::unique_ptr<algo<T>> copy() override
   {
-    auto r = std::make_unique<GgnnImpl<T, measure, D, KBuild, KQuery, S>>(*this);
+    auto r = std::make_unique<ggnn_impl<T, measure, D, KBuild, KQuery, S>>(*this);
     // set the thread-local stream to the copied handle.
-    r->stream_ = cuvs::bench::ann::get_stream_from_global_pool();
+    r->stream_ = cuvs::bench::get_stream_from_global_pool();
     return r;
   };
 
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::Device;
-    property.query_memory_type   = MemoryType::Device;
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kDevice;
+    property.query_memory_type   = MemoryType::kDevice;
     return property;
   }
 
   void set_search_dataset(const T* dataset, size_t nrow) override;
 
  private:
-  using ANN<T>::metric_;
-  using ANN<T>::dim_;
+  using algo<T>::metric_;
+  using algo<T>::dim_;
 
-  using GGNNGPUInstance = GGNNGPUInstance<measure,
-                                          int64_t /* KeyT */,
-                                          float /* ValueT */,
-                                          size_t /* GAddrT */,
-                                          T /* BaseT */,
-                                          size_t /* BAddrT */,
-                                          D,
-                                          KBuild,
-                                          KBuild / 2 /* KF */,
-                                          KQuery,
-                                          S>;
-  std::shared_ptr<GGNNGPUInstance> ggnn_;
-  typename Ggnn<T>::BuildParam build_param_;
-  typename Ggnn<T>::SearchParam search_param_;
+  using ggnngpu_instance = GGNNGPUInstance<measure,
+                                           int64_t /* KeyT */,
+                                           float /* ValueT */,
+                                           size_t /* GAddrT */,
+                                           T /* BaseT */,
+                                           size_t /* BAddrT */,
+                                           D,
+                                           KBuild,
+                                           KBuild / 2 /* KF */,
+                                           KQuery,
+                                           S>;
+  std::shared_ptr<ggnngpu_instance> ggnn_;
+  typename ggnn<T>::build_param build_param_;
+  typename ggnn<T>::search_param search_param_;
   cudaStream_t stream_;
-  const T* base_dataset                 = nullptr;
-  size_t base_n_rows                    = 0;
-  std::optional<std::string> graph_file = std::nullopt;
+  const T* base_dataset_                 = nullptr;
+  size_t base_n_rows_                    = 0;
+  std::optional<std::string> graph_file_ = std::nullopt;
 
   void load_impl()
   {
-    if (base_dataset == nullptr) { return; }
-    if (base_n_rows == 0) { return; }
+    if (base_dataset_ == nullptr) { return; }
+    if (base_n_rows_ == 0) { return; }
     int device;
     cudaGetDevice(&device);
-    ggnn_ = std::make_shared<GGNNGPUInstance>(
-      device, base_n_rows, build_param_.num_layers, true, build_param_.tau);
-    ggnn_->set_base_data(base_dataset);
+    ggnn_ = std::make_shared<ggnngpu_instance>(
+      device, base_n_rows_, build_param_.num_layers, true, build_param_.tau);
+    ggnn_->set_base_data(base_dataset_);
     ggnn_->set_stream(get_sync_stream());
-    if (graph_file.has_value()) {
+    if (graph_file_.has_value()) {
       auto& ggnn_host   = ggnn_->ggnn_cpu_buffers.at(0);
       auto& ggnn_device = ggnn_->ggnn_shards.at(0);
       ggnn_->set_stream(get_sync_stream());
 
-      ggnn_host.load(graph_file.value());
+      ggnn_host.load(graph_file_.value());
       ggnn_host.uploadAsync(ggnn_device);
       cudaStreamSynchronize(ggnn_device.stream);
     }
@@ -199,12 +202,10 @@ class GgnnImpl : public ANN<T>, public AnnGPU {
 };
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-GgnnImpl<T, measure, D, KBuild, KQuery, S>::GgnnImpl(Metric metric,
-                                                     int dim,
-                                                     const typename Ggnn<T>::BuildParam& param)
-  : ANN<T>(metric, dim),
-    build_param_(param),
-    stream_(cuvs::bench::ann::get_stream_from_global_pool())
+ggnn_impl<T, measure, D, KBuild, KQuery, S>::ggnn_impl(Metric metric,
+                                                       int dim,
+                                                       const typename ggnn<T>::build_param& param)
+  : algo<T>(metric, dim), build_param_(param), stream_(cuvs::bench::get_stream_from_global_pool())
 {
   if (metric_ == Metric::kInnerProduct) {
     if (measure != Cosine) { throw std::runtime_error("mis-matched metric"); }
@@ -219,11 +220,11 @@ GgnnImpl<T, measure, D, KBuild, KQuery, S>::GgnnImpl(Metric metric,
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void GgnnImpl<T, measure, D, KBuild, KQuery, S>::build(const T* dataset, size_t nrow)
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::build(const T* dataset, size_t nrow)
 {
-  base_dataset = dataset;
-  base_n_rows  = nrow;
-  graph_file   = std::nullopt;
+  base_dataset_ = dataset;
+  base_n_rows_  = nrow;
+  graph_file_   = std::nullopt;
   load_impl();
   ggnn_->build(0);
   for (int i = 0; i < build_param_.refine_iterations; ++i) {
@@ -232,24 +233,24 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::build(const T* dataset, size_t 
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void GgnnImpl<T, measure, D, KBuild, KQuery, S>::set_search_dataset(const T* dataset, size_t nrow)
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::set_search_dataset(const T* dataset, size_t nrow)
 {
-  if (base_dataset != dataset || base_n_rows != nrow) {
-    base_dataset = dataset;
-    base_n_rows  = nrow;
+  if (base_dataset_ != dataset || base_n_rows_ != nrow) {
+    base_dataset_ = dataset;
+    base_n_rows_  = nrow;
     load_impl();
   }
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void GgnnImpl<T, measure, D, KBuild, KQuery, S>::set_search_param(const AnnSearchParam& param)
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::set_search_param(const search_param_base& param)
 {
-  search_param_ = dynamic_cast<const typename Ggnn<T>::SearchParam&>(param);
+  search_param_ = dynamic_cast<const typename ggnn<T>::search_param&>(param);
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void GgnnImpl<T, measure, D, KBuild, KQuery, S>::search(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   static_assert(sizeof(size_t) == sizeof(int64_t), "sizes of size_t and GGNN's KeyT are different");
   if (k != KQuery) {
@@ -299,7 +300,7 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::search(
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void GgnnImpl<T, measure, D, KBuild, KQuery, S>::save(const std::string& file) const
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::save(const std::string& file) const
 {
   auto& ggnn_host   = ggnn_->ggnn_cpu_buffers.at(0);
   auto& ggnn_device = ggnn_->ggnn_shards.at(0);
@@ -311,12 +312,12 @@ void GgnnImpl<T, measure, D, KBuild, KQuery, S>::save(const std::string& file) c
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void GgnnImpl<T, measure, D, KBuild, KQuery, S>::load(const std::string& file)
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::load(const std::string& file)
 {
-  if (!graph_file.has_value() || graph_file.value() != file) {
-    graph_file = file;
+  if (!graph_file_.has_value() || graph_file_.value() != file) {
+    graph_file_ = file;
     load_impl();
   }
 }
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

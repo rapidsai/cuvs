@@ -41,11 +41,11 @@
 
 namespace {
 
-faiss::MetricType parse_metric_type(cuvs::bench::ann::Metric metric)
+auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
 {
-  if (metric == cuvs::bench::ann::Metric::kInnerProduct) {
+  if (metric == cuvs::bench::Metric::kInnerProduct) {
     return faiss::METRIC_INNER_PRODUCT;
-  } else if (metric == cuvs::bench::ann::Metric::kEuclidean) {
+  } else if (metric == cuvs::bench::Metric::kEuclidean) {
     return faiss::METRIC_L2;
   } else {
     throw std::runtime_error("faiss supports only metric type of inner product and L2");
@@ -54,14 +54,14 @@ faiss::MetricType parse_metric_type(cuvs::bench::ann::Metric metric)
 
 // note BLAS library can still use multi-threading, and
 // setting environment variable like OPENBLAS_NUM_THREADS can control it
-class OmpSingleThreadScope {
+class omp_single_thread_scope {
  public:
-  OmpSingleThreadScope()
+  omp_single_thread_scope()
   {
     max_threads_ = omp_get_max_threads();
     omp_set_num_threads(1);
   }
-  ~OmpSingleThreadScope()
+  ~omp_single_thread_scope()
   {
     // the best we can do
     omp_set_num_threads(max_threads_);
@@ -73,25 +73,25 @@ class OmpSingleThreadScope {
 
 }  // namespace
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
 template <typename T>
-class FaissGpu : public ANN<T>, public AnnGPU {
+class faiss_gpu : public algo<T>, public algo_gpu {
  public:
-  using typename ANN<T>::AnnSearchParam;
-  struct SearchParam : public AnnSearchParam {
+  using search_param_base = typename algo<T>::search_param;
+  struct search_param : public search_param_base {
     int nprobe;
     float refine_ratio = 1.0;
-    auto needs_dataset() const -> bool override { return refine_ratio > 1.0f; }
+    [[nodiscard]] auto needs_dataset() const -> bool override { return refine_ratio > 1.0f; }
   };
 
-  struct BuildParam {
+  struct build_param {
     int nlist = 1;
     int ratio = 2;
   };
 
-  FaissGpu(Metric metric, int dim, const BuildParam& param)
-    : ANN<T>(metric, dim),
+  faiss_gpu(Metric metric, int dim, const build_param& param)
+    : algo<T>(metric, dim),
       gpu_resource_{std::make_shared<faiss::gpu::StandardGpuResources>()},
       metric_type_(parse_metric_type(metric)),
       nlist_{param.nlist},
@@ -103,16 +103,16 @@ class FaissGpu : public ANN<T>, public AnnGPU {
 
   void build(const T* dataset, size_t nrow) final;
 
-  virtual void set_search_param(const FaissGpu<T>::AnnSearchParam& param) {}
+  virtual void set_search_param(const search_param_base& param) {}
 
   void set_search_dataset(const T* dataset, size_t nrow) override { dataset_ = dataset; }
 
-  // TODO: if the number of results is less than k, the remaining elements of 'neighbors'
-  // will be filled with (size_t)-1
+  // TODO(snanditale): if the number of results is less than k, the remaining elements of
+  // 'neighbors' will be filled with (size_t)-1
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const final;
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
@@ -120,21 +120,21 @@ class FaissGpu : public ANN<T>, public AnnGPU {
     return gpu_resource_->getDefaultStream(device_);
   }
 
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
+    algo_property property;
     // to enable building big dataset which is larger than GPU memory
-    property.dataset_memory_type = MemoryType::Host;
-    property.query_memory_type   = MemoryType::Host;
+    property.dataset_memory_type = MemoryType::kHost;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
 
  protected:
   template <typename GpuIndex, typename CpuIndex>
-  void save_(const std::string& file) const;
+  void save_(const std::string& file) const;  // NOLINT
 
   template <typename GpuIndex, typename CpuIndex>
-  void load_(const std::string& file);
+  void load_(const std::string& file);  // NOLINT
 
   /** [NOTE Multithreading]
    *
@@ -165,9 +165,9 @@ class FaissGpu : public ANN<T>, public AnnGPU {
 };
 
 template <typename T>
-void FaissGpu<T>::build(const T* dataset, size_t nrow)
+void faiss_gpu<T>::build(const T* dataset, size_t nrow)
 {
-  OmpSingleThreadScope omp_single_thread;
+  omp_single_thread_scope omp_single_thread;
   auto index_ivf = dynamic_cast<faiss::gpu::GpuIndexIVF*>(index_.get());
   if (index_ivf != nullptr) {
     // set the min/max training size for clustering to use the whole provided training set.
@@ -196,15 +196,15 @@ void FaissGpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void FaissGpu<T>::search(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void faiss_gpu<T>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
 
   if (this->refine_ratio_ > 1.0) {
-    // TODO: FAISS changed their search APIs to accept the search parameters as a struct object
-    // but their refine API doesn't allow the struct to be passed in. Once this is fixed, we
+    // TODO(snanditale): FAISS changed their search APIs to accept the search parameters as a struct
+    // object but their refine API doesn't allow the struct to be passed in. Once this is fixed, we
     // need to re-enable refinement below
     // index_refine_->search(batch_size, queries, k, distances,
     // reinterpret_cast<faiss::idx_t*>(neighbors), this->search_params_.get()); Related FAISS issue:
@@ -224,9 +224,9 @@ void FaissGpu<T>::search(
 
 template <typename T>
 template <typename GpuIndex, typename CpuIndex>
-void FaissGpu<T>::save_(const std::string& file) const
+void faiss_gpu<T>::save_(const std::string& file) const
 {
-  OmpSingleThreadScope omp_single_thread;
+  omp_single_thread_scope omp_single_thread;
 
   auto cpu_index = std::make_unique<CpuIndex>();
   dynamic_cast<GpuIndex*>(index_.get())->copyTo(cpu_index.get());
@@ -235,9 +235,9 @@ void FaissGpu<T>::save_(const std::string& file) const
 
 template <typename T>
 template <typename GpuIndex, typename CpuIndex>
-void FaissGpu<T>::load_(const std::string& file)
+void faiss_gpu<T>::load_(const std::string& file)
 {
-  OmpSingleThreadScope omp_single_thread;
+  omp_single_thread_scope omp_single_thread;
 
   std::unique_ptr<CpuIndex> cpu_index(dynamic_cast<CpuIndex*>(faiss::read_index(file.c_str())));
   assert(cpu_index);
@@ -251,11 +251,13 @@ void FaissGpu<T>::load_(const std::string& file)
 }
 
 template <typename T>
-class FaissGpuIVFFlat : public FaissGpu<T> {
+class faiss_gpu_ivf_flat : public faiss_gpu<T> {
  public:
-  using typename FaissGpu<T>::BuildParam;
+  using typename faiss_gpu<T>::build_param;
+  using typename faiss_gpu<T>::search_param_base;
 
-  FaissGpuIVFFlat(Metric metric, int dim, const BuildParam& param) : FaissGpu<T>(metric, dim, param)
+  faiss_gpu_ivf_flat(Metric metric, int dim, const build_param& param)
+    : faiss_gpu<T>(metric, dim, param)
   {
     faiss::gpu::GpuIndexIVFFlatConfig config;
     config.device = this->device_;
@@ -263,16 +265,16 @@ class FaissGpuIVFFlat : public FaissGpu<T> {
       this->gpu_resource_.get(), dim, param.nlist, this->metric_type_, config);
   }
 
-  void set_search_param(const typename FaissGpu<T>::AnnSearchParam& param) override
+  void set_search_param(const search_param_base& param) override
   {
-    auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
-    int nprobe        = search_param.nprobe;
+    auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
+    int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
 
     faiss::IVFSearchParameters faiss_search_params;
     faiss_search_params.nprobe = nprobe;
     this->search_params_       = std::make_shared<faiss::IVFSearchParameters>(faiss_search_params);
-    this->refine_ratio_        = search_param.refine_ratio;
+    this->refine_ratio_        = sp.refine_ratio;
   }
 
   void save(const std::string& file) const override
@@ -283,50 +285,55 @@ class FaissGpuIVFFlat : public FaissGpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexIVFFlat, faiss::IndexIVFFlat>(file);
   }
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<FaissGpuIVFFlat<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override
+  {
+    return std::make_unique<faiss_gpu_ivf_flat<T>>(*this);
+  };
 };
 
 template <typename T>
-class FaissGpuIVFPQ : public FaissGpu<T> {
+class faiss_gpu_ivfpq : public faiss_gpu<T> {
  public:
-  struct BuildParam : public FaissGpu<T>::BuildParam {
-    int M;
-    bool useFloat16;
-    bool usePrecomputed;
+  struct build_param : public faiss_gpu<T>::build_param {
+    int m;
+    bool use_float16;
+    bool use_precomputed;
   };
+  using typename faiss_gpu<T>::search_param_base;
 
-  FaissGpuIVFPQ(Metric metric, int dim, const BuildParam& param) : FaissGpu<T>(metric, dim, param)
+  faiss_gpu_ivfpq(Metric metric, int dim, const build_param& param)
+    : faiss_gpu<T>(metric, dim, param)
   {
     faiss::gpu::GpuIndexIVFPQConfig config;
-    config.useFloat16LookupTables = param.useFloat16;
-    config.usePrecomputedTables   = param.usePrecomputed;
+    config.useFloat16LookupTables = param.use_float16;
+    config.usePrecomputedTables   = param.use_precomputed;
     config.device                 = this->device_;
 
     this->index_ =
       std::make_shared<faiss::gpu::GpuIndexIVFPQ>(this->gpu_resource_.get(),
                                                   dim,
                                                   param.nlist,
-                                                  param.M,
+                                                  param.m,
                                                   8,  // FAISS only supports bitsPerCode=8
                                                   this->metric_type_,
                                                   config);
   }
 
-  void set_search_param(const typename FaissGpu<T>::AnnSearchParam& param) override
+  void set_search_param(const search_param_base& param) override
   {
-    auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
-    int nprobe        = search_param.nprobe;
+    auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
+    int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
-    this->refine_ratio_ = search_param.refine_ratio;
+    this->refine_ratio_ = sp.refine_ratio;
     faiss::IVFPQSearchParameters faiss_search_params;
     faiss_search_params.nprobe = nprobe;
 
     this->search_params_ = std::make_shared<faiss::IVFPQSearchParameters>(faiss_search_params);
 
-    if (search_param.refine_ratio > 1.0) {
+    if (sp.refine_ratio > 1.0) {
       this->index_refine_ =
         std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
-      this->index_refine_.get()->k_factor = search_param.refine_ratio;
+      this->index_refine_.get()->k_factor = sp.refine_ratio;
     }
   }
 
@@ -338,19 +345,21 @@ class FaissGpuIVFPQ : public FaissGpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexIVFPQ, faiss::IndexIVFPQ>(file);
   }
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<FaissGpuIVFPQ<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_ivfpq<T>>(*this); };
 };
 
-// TODO: Enable this in cmake
+// TODO(snanditale): Enable this in cmake
 //  ref: https://github.com/rapidsai/raft/issues/1876
 template <typename T>
-class FaissGpuIVFSQ : public FaissGpu<T> {
+class faiss_gpu_ivfsq : public faiss_gpu<T> {
  public:
-  struct BuildParam : public FaissGpu<T>::BuildParam {
+  struct build_param : public faiss_gpu<T>::build_param {
     std::string quantizer_type;
   };
+  using typename faiss_gpu<T>::search_param_base;
 
-  FaissGpuIVFSQ(Metric metric, int dim, const BuildParam& param) : FaissGpu<T>(metric, dim, param)
+  faiss_gpu_ivfsq(Metric metric, int dim, const build_param& param)
+    : faiss_gpu<T>(metric, dim, param)
   {
     faiss::ScalarQuantizer::QuantizerType qtype;
     if (param.quantizer_type == "fp16") {
@@ -358,7 +367,7 @@ class FaissGpuIVFSQ : public FaissGpu<T> {
     } else if (param.quantizer_type == "int8") {
       qtype = faiss::ScalarQuantizer::QT_8bit;
     } else {
-      throw std::runtime_error("FaissGpuIVFSQ supports only fp16 and int8 but got " +
+      throw std::runtime_error("faiss_gpu_ivfsq supports only fp16 and int8 but got " +
                                param.quantizer_type);
     }
 
@@ -368,21 +377,21 @@ class FaissGpuIVFSQ : public FaissGpu<T> {
       this->gpu_resource_.get(), dim, param.nlist, qtype, this->metric_type_, true, config);
   }
 
-  void set_search_param(const typename FaissGpu<T>::AnnSearchParam& param) override
+  void set_search_param(const search_param_base& param) override
   {
-    auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
-    int nprobe        = search_param.nprobe;
+    auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
+    int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
 
     faiss::IVFSearchParameters faiss_search_params;
     faiss_search_params.nprobe = nprobe;
 
     this->search_params_ = std::make_shared<faiss::IVFSearchParameters>(faiss_search_params);
-    this->refine_ratio_  = search_param.refine_ratio;
-    if (search_param.refine_ratio > 1.0) {
+    this->refine_ratio_  = sp.refine_ratio;
+    if (sp.refine_ratio > 1.0) {
       this->index_refine_ =
         std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
-      this->index_refine_.get()->k_factor = search_param.refine_ratio;
+      this->index_refine_.get()->k_factor = sp.refine_ratio;
     }
   }
 
@@ -396,24 +405,26 @@ class FaissGpuIVFSQ : public FaissGpu<T> {
     this->template load_<faiss::gpu::GpuIndexIVFScalarQuantizer, faiss::IndexIVFScalarQuantizer>(
       file);
   }
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<FaissGpuIVFSQ<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_ivfsq<T>>(*this); };
 };
 
 template <typename T>
-class FaissGpuFlat : public FaissGpu<T> {
+class faiss_gpu_flat : public faiss_gpu<T> {
  public:
-  FaissGpuFlat(Metric metric, int dim)
-    : FaissGpu<T>(metric, dim, typename FaissGpu<T>::BuildParam{})
+  using typename faiss_gpu<T>::search_param_base;
+
+  faiss_gpu_flat(Metric metric, int dim)
+    : faiss_gpu<T>(metric, dim, typename faiss_gpu<T>::build_param{})
   {
     faiss::gpu::GpuIndexFlatConfig config;
     config.device = this->device_;
     this->index_  = std::make_shared<faiss::gpu::GpuIndexFlat>(
       this->gpu_resource_.get(), dim, this->metric_type_, config);
   }
-  void set_search_param(const typename FaissGpu<T>::AnnSearchParam& param) override
+  void set_search_param(const search_param_base& param) override
   {
-    auto search_param = dynamic_cast<const typename FaissGpu<T>::SearchParam&>(param);
-    int nprobe        = search_param.nprobe;
+    auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
+    int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
 
     this->search_params_ = std::make_shared<faiss::SearchParameters>();
@@ -427,7 +438,7 @@ class FaissGpuFlat : public FaissGpu<T> {
   {
     this->template load_<faiss::gpu::GpuIndexFlat, faiss::IndexFlat>(file);
   }
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<FaissGpuFlat<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_flat<T>>(*this); };
 };
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

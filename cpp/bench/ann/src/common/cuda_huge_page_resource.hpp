@@ -37,12 +37,12 @@ namespace raft::mr {
  */
 class cuda_huge_page_resource final : public rmm::mr::device_memory_resource {
  public:
-  cuda_huge_page_resource()                                          = default;
-  ~cuda_huge_page_resource() override                                = default;
-  cuda_huge_page_resource(cuda_huge_page_resource const&)            = default;
-  cuda_huge_page_resource(cuda_huge_page_resource&&)                 = default;
-  cuda_huge_page_resource& operator=(cuda_huge_page_resource const&) = default;
-  cuda_huge_page_resource& operator=(cuda_huge_page_resource&&)      = default;
+  cuda_huge_page_resource()                                                  = default;
+  ~cuda_huge_page_resource() override                                        = default;
+  cuda_huge_page_resource(cuda_huge_page_resource const&)                    = default;
+  cuda_huge_page_resource(cuda_huge_page_resource&&)                         = default;
+  auto operator=(cuda_huge_page_resource const&) -> cuda_huge_page_resource& = default;
+  auto operator=(cuda_huge_page_resource&&) -> cuda_huge_page_resource&      = default;
 
  private:
   /**
@@ -57,17 +57,17 @@ class cuda_huge_page_resource final : public rmm::mr::device_memory_resource {
    * @param bytes The size, in bytes, of the allocation
    * @return void* Pointer to the newly allocated memory
    */
-  void* do_allocate(std::size_t bytes, rmm::cuda_stream_view) override
+  auto do_allocate(std::size_t bytes, rmm::cuda_stream_view) -> void* override
   {
-    void* _addr{nullptr};
-    _addr = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (_addr == MAP_FAILED) { RAFT_FAIL("huge_page_resource::MAP FAILED"); }
-    if (madvise(_addr, bytes, MADV_HUGEPAGE) == -1) {
-      munmap(_addr, bytes);
+    void* addr{nullptr};
+    addr = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED) { RAFT_FAIL("huge_page_resource::MAP FAILED"); }
+    if (madvise(addr, bytes, MADV_HUGEPAGE) == -1) {
+      munmap(addr, bytes);
       RAFT_FAIL("huge_page_resource::madvise MADV_HUGEPAGE");
     }
-    memset(_addr, 0, bytes);
-    return _addr;
+    memset(addr, 0, bytes);
+    return addr;
   }
 
   /**
@@ -96,7 +96,8 @@ class cuda_huge_page_resource final : public rmm::mr::device_memory_resource {
    * @return true If the two resources are equivalent
    * @return false If the two resources are not equal
    */
-  [[nodiscard]] bool do_is_equal(device_memory_resource const& other) const noexcept override
+  [[nodiscard]] auto do_is_equal(device_memory_resource const& other) const noexcept
+    -> bool override
   {
     return dynamic_cast<cuda_huge_page_resource const*>(&other) != nullptr;
   }

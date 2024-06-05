@@ -37,12 +37,12 @@ namespace raft::mr {
  */
 class cuda_pinned_resource final : public rmm::mr::device_memory_resource {
  public:
-  cuda_pinned_resource()                                       = default;
-  ~cuda_pinned_resource() override                             = default;
-  cuda_pinned_resource(cuda_pinned_resource const&)            = default;
-  cuda_pinned_resource(cuda_pinned_resource&&)                 = default;
-  cuda_pinned_resource& operator=(cuda_pinned_resource const&) = default;
-  cuda_pinned_resource& operator=(cuda_pinned_resource&&)      = default;
+  cuda_pinned_resource()                                               = default;
+  ~cuda_pinned_resource() override                                     = default;
+  cuda_pinned_resource(cuda_pinned_resource const&)                    = default;
+  cuda_pinned_resource(cuda_pinned_resource&&)                         = default;
+  auto operator=(cuda_pinned_resource const&) -> cuda_pinned_resource& = default;
+  auto operator=(cuda_pinned_resource&&) -> cuda_pinned_resource&      = default;
 
  private:
   /**
@@ -57,7 +57,7 @@ class cuda_pinned_resource final : public rmm::mr::device_memory_resource {
    * @param bytes The size, in bytes, of the allocation
    * @return void* Pointer to the newly allocated memory
    */
-  void* do_allocate(std::size_t bytes, rmm::cuda_stream_view) override
+  auto do_allocate(std::size_t bytes, rmm::cuda_stream_view) -> void* override
   {
     void* ptr{nullptr};
     RMM_CUDA_TRY_ALLOC(cudaMallocHost(&ptr, bytes));
@@ -90,7 +90,8 @@ class cuda_pinned_resource final : public rmm::mr::device_memory_resource {
    * @return true If the two resources are equivalent
    * @return false If the two resources are not equal
    */
-  [[nodiscard]] bool do_is_equal(device_memory_resource const& other) const noexcept override
+  [[nodiscard]] auto do_is_equal(device_memory_resource const& other) const noexcept
+    -> bool override
   {
     return dynamic_cast<cuda_pinned_resource const*>(&other) != nullptr;
   }

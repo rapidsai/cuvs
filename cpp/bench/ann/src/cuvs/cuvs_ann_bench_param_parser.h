@@ -25,33 +25,33 @@
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
 #include "cuvs_ivf_flat_wrapper.h"
-extern template class cuvs::bench::ann::CuvsIvfFlatGpu<float, int64_t>;
-extern template class cuvs::bench::ann::CuvsIvfFlatGpu<uint8_t, int64_t>;
-extern template class cuvs::bench::ann::CuvsIvfFlatGpu<int8_t, int64_t>;
+extern template class cuvs::bench::cuvs_ivf_flat<float, int64_t>;
+extern template class cuvs::bench::cuvs_ivf_flat<uint8_t, int64_t>;
+extern template class cuvs::bench::cuvs_ivf_flat<int8_t, int64_t>;
 #endif
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
   defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 #include "cuvs_ivf_pq_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
-extern template class cuvs::bench::ann::CuvsIvfPQ<float, int64_t>;
-extern template class cuvs::bench::ann::CuvsIvfPQ<uint8_t, int64_t>;
-extern template class cuvs::bench::ann::CuvsIvfPQ<int8_t, int64_t>;
+extern template class cuvs::bench::cuvs_ivf_pq<float, int64_t>;
+extern template class cuvs::bench::cuvs_ivf_pq<uint8_t, int64_t>;
+extern template class cuvs::bench::cuvs_ivf_pq<int8_t, int64_t>;
 #endif
 #if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 #include "cuvs_cagra_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
-extern template class cuvs::bench::ann::CuvsCagra<float, uint32_t>;
-extern template class cuvs::bench::ann::CuvsCagra<half, uint32_t>;
-extern template class cuvs::bench::ann::CuvsCagra<uint8_t, uint32_t>;
-extern template class cuvs::bench::ann::CuvsCagra<int8_t, uint32_t>;
+extern template class cuvs::bench::cuvs_cagra<float, uint32_t>;
+extern template class cuvs::bench::cuvs_cagra<half, uint32_t>;
+extern template class cuvs::bench::cuvs_cagra<uint8_t, uint32_t>;
+extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 #endif
 
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::CuvsIvfFlatGpu<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::cuvs_ivf_flat<T, IdxT>::build_param& param)
 {
   param.n_lists = conf.at("nlist");
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
@@ -60,7 +60,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::CuvsIvfFlatGpu<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::cuvs_ivf_flat<T, IdxT>::search_param& param)
 {
   param.ivf_flat_params.n_probes = conf.at("nprobe");
 }
@@ -70,7 +70,7 @@ void parse_search_param(const nlohmann::json& conf,
   defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::CuvsIvfPQ<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::build_param& param)
 {
   if (conf.contains("nlist")) { param.n_lists = conf.at("nlist"); }
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
@@ -92,7 +92,7 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::CuvsIvfPQ<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param& param)
 {
   if (conf.contains("nprobe")) { param.pq_param.n_probes = conf.at("nprobe"); }
   if (conf.contains("internalDistanceDtype")) {
@@ -179,7 +179,7 @@ nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-                       typename cuvs::bench::ann::CuvsCagra<T, IdxT>::BuildParam& param)
+                       typename cuvs::bench::cuvs_cagra<T, IdxT>::build_param& param)
 {
   if (conf.contains("graph_degree")) {
     param.cagra_params.graph_degree              = conf.at("graph_degree");
@@ -190,11 +190,11 @@ void parse_build_param(const nlohmann::json& conf,
   }
   if (conf.contains("graph_build_algo")) {
     if (conf.at("graph_build_algo") == "IVF_PQ") {
-      param.algo = cuvs::bench::ann::CagraBuildAlgo::IVF_PQ;
+      param.algo = cuvs::bench::CagraBuildAlgo::kIvfPq;
     } else if (conf.at("graph_build_algo") == "NN_DESCENT") {
-      param.algo = cuvs::bench::ann::CagraBuildAlgo::NN_DESCENT;
+      param.algo = cuvs::bench::CagraBuildAlgo::kNnDescent;
     } else {
-      param.algo = cuvs::bench::ann::CagraBuildAlgo::AUTO;
+      param.algo = cuvs::bench::CagraBuildAlgo::kAuto;
     }
   }
   nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "ivf_pq_build_");
@@ -205,7 +205,7 @@ void parse_build_param(const nlohmann::json& conf,
   }
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
   if (!ivf_pq_search_conf.empty()) {
-    typename cuvs::bench::ann::CuvsIvfPQ<T, IdxT>::SearchParam sparam;
+    typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param sparam;
     parse_search_param<T, IdxT>(ivf_pq_search_conf, sparam);
     param.ivf_pq_search_params = sparam.pq_param;
     param.ivf_pq_refine_rate   = sparam.refine_ratio;
@@ -228,14 +228,14 @@ void parse_build_param(const nlohmann::json& conf,
   }
 }
 
-cuvs::bench::ann::AllocatorType parse_allocator(std::string mem_type)
+cuvs::bench::AllocatorType parse_allocator(std::string mem_type)
 {
   if (mem_type == "device") {
-    return cuvs::bench::ann::AllocatorType::Device;
+    return cuvs::bench::AllocatorType::kDevice;
   } else if (mem_type == "host_pinned") {
-    return cuvs::bench::ann::AllocatorType::HostPinned;
+    return cuvs::bench::AllocatorType::kHostPinned;
   } else if (mem_type == "host_huge_page") {
-    return cuvs::bench::ann::AllocatorType::HostHugePage;
+    return cuvs::bench::AllocatorType::kHostHugePage;
   }
   THROW(
     "Invalid value for memory type %s, must be one of [\"device\", \"host_pinned\", "
@@ -245,7 +245,7 @@ cuvs::bench::ann::AllocatorType parse_allocator(std::string mem_type)
 
 template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
-                        typename cuvs::bench::ann::CuvsCagra<T, IdxT>::SearchParam& param)
+                        typename cuvs::bench::cuvs_cagra<T, IdxT>::search_param& param)
 {
   if (conf.contains("itopk")) { param.p.itopk_size = conf.at("itopk"); }
   if (conf.contains("search_width")) { param.p.search_width = conf.at("search_width"); }

@@ -23,17 +23,18 @@
 #include <string>
 #include <vector>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
-enum Objective {
-  THROUGHPUT,  // See how many vectors we can push through
-  LATENCY      // See how fast we can push a vector through
+/** Benchmark mode: measuring latency vs throughput. */
+enum class Mode {
+  kThroughput,  // See how many vectors we can push through
+  kLatency      // See how fast we can push a vector through
 };
 
 enum class MemoryType {
-  Host,
-  HostMmap,
-  Device,
+  kHost,
+  kHostMmap,
+  kDevice,
 };
 
 enum class Metric {
@@ -44,9 +45,9 @@ enum class Metric {
 inline auto parse_metric(const std::string& metric_str) -> Metric
 {
   if (metric_str == "inner_product") {
-    return cuvs::bench::ann::Metric::kInnerProduct;
+    return cuvs::bench::Metric::kInnerProduct;
   } else if (metric_str == "euclidean") {
-    return cuvs::bench::ann::Metric::kEuclidean;
+    return cuvs::bench::Metric::kEuclidean;
   } else {
     throw std::runtime_error("invalid metric: '" + metric_str + "'");
   }
@@ -55,28 +56,28 @@ inline auto parse_metric(const std::string& metric_str) -> Metric
 inline auto parse_memory_type(const std::string& memory_type) -> MemoryType
 {
   if (memory_type == "host") {
-    return MemoryType::Host;
+    return MemoryType::kHost;
   } else if (memory_type == "mmap") {
-    return MemoryType::HostMmap;
+    return MemoryType::kHostMmap;
   } else if (memory_type == "device") {
-    return MemoryType::Device;
+    return MemoryType::kDevice;
   } else {
     throw std::runtime_error("invalid memory type: '" + memory_type + "'");
   }
 }
 
-struct AlgoProperty {
+struct algo_property {
   MemoryType dataset_memory_type;
   // neighbors/distances should have same memory type as queries
   MemoryType query_memory_type;
 };
 
-class AnnBase {
+class algo_base {
  public:
   using index_type = int64_t;
 
-  inline AnnBase(Metric metric, int dim) : metric_(metric), dim_(dim) {}
-  virtual ~AnnBase() noexcept = default;
+  inline algo_base(Metric metric, int dim) : metric_(metric), dim_(dim) {}
+  virtual ~algo_base() noexcept = default;
 
  protected:
   Metric metric_;
@@ -92,7 +93,7 @@ class AnnBase {
  *
  * If the algo does not implement this interface, GPU timings are disabled.
  */
-class AnnGPU {
+class algo_gpu {
  public:
   /**
    * Return the main cuda stream for this algorithm.
@@ -109,60 +110,58 @@ class AnnGPU {
    *   - ONLY IF THE ALGORITHM HAS PRODUCED ITS OUTPUT BY THE TIME IT SYNCHRONIZES WITH CPU.
    */
   [[nodiscard]] virtual auto uses_stream() const noexcept -> bool { return true; }
-  virtual ~AnnGPU() noexcept = default;
+  virtual ~algo_gpu() noexcept = default;
 };
 
 template <typename T>
-class ANN : public AnnBase {
+class algo : public algo_base {
  public:
-  struct AnnSearchParam {
-    Objective metric_objective = Objective::LATENCY;
-    virtual ~AnnSearchParam()  = default;
+  struct search_param {
+    virtual ~search_param() = default;
     [[nodiscard]] virtual auto needs_dataset() const -> bool { return false; };
   };
 
-  inline ANN(Metric metric, int dim) : AnnBase(metric, dim) {}
-  virtual ~ANN() noexcept override = default;
+  inline algo(Metric metric, int dim) : algo_base(metric, dim) {}
+  ~algo() noexcept override = default;
 
   virtual void build(const T* dataset, size_t nrow) = 0;
 
-  virtual void set_search_param(const AnnSearchParam& param) = 0;
-  // TODO: this assumes that an algorithm can always return k results.
+  virtual void set_search_param(const search_param& param) = 0;
+  // TODO(snanditale): this assumes that an algorithm can always return k results.
   // This is not always possible.
   virtual void search(const T* queries,
                       int batch_size,
                       int k,
-                      AnnBase::index_type* neighbors,
+                      algo_base::index_type* neighbors,
                       float* distances) const = 0;
 
   virtual void save(const std::string& file) const = 0;
   virtual void load(const std::string& file)       = 0;
 
-  virtual AlgoProperty get_preference() const = 0;
+  [[nodiscard]] virtual auto get_preference() const -> algo_property = 0;
 
   // Some algorithms don't save the building dataset in their indices.
   // So they should be given the access to that dataset during searching.
   // The advantage of this way is that index has smaller size
   // and many indices can share one dataset.
   //
-  // SearchParam::needs_dataset() of such algorithm should be true,
+  // search_param::needs_dataset() of such algorithm should be true,
   // and set_search_dataset() should save the passed-in pointer somewhere.
   // The client code should call set_search_dataset() before searching,
   // and should not release dataset before searching is finished.
   virtual void set_search_dataset(const T* /*dataset*/, size_t /*nrow*/){};
 
   /**
-   * Make a shallow copy of the ANN wrapper that shares the resources and ensures thread-safe access
-   * to them. */
-  virtual auto copy() -> std::unique_ptr<ANN<T>> = 0;
+   * Make a shallow copy of the algo wrapper that shares the resources and ensures thread-safe
+   * access to them. */
+  virtual auto copy() -> std::unique_ptr<algo<T>> = 0;
 };
 
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench
 
-#define REGISTER_ALGO_INSTANCE(DataT)                                                            \
-  template auto cuvs::bench::ann::create_algo<DataT>(                                            \
-    const std::string&, const std::string&, int, const nlohmann::json&, const std::vector<int>&) \
-    ->std::unique_ptr<cuvs::bench::ann::ANN<DataT>>;                                             \
-  template auto cuvs::bench::ann::create_search_param<DataT>(const std::string&,                 \
-                                                             const nlohmann::json&)              \
-    ->std::unique_ptr<typename cuvs::bench::ann::ANN<DataT>::AnnSearchParam>;
+#define REGISTER_ALGO_INSTANCE(DataT)                                                              \
+  template auto cuvs::bench::create_algo<DataT>(                                                   \
+    const std::string&, const std::string&, int, const nlohmann::json&, const std::vector<int>&)   \
+    ->std::unique_ptr<cuvs::bench::algo<DataT>>;                                                   \
+  template auto cuvs::bench::create_search_param<DataT>(const std::string&, const nlohmann::json&) \
+    ->std::unique_ptr<typename cuvs::bench::algo<DataT>::search_param>;

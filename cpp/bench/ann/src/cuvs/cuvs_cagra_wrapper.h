@@ -47,25 +47,25 @@
 #include <string>
 #include <type_traits>
 
-namespace cuvs::bench::ann {
+namespace cuvs::bench {
 
-enum class AllocatorType { HostPinned, HostHugePage, Device };
-enum class CagraBuildAlgo { AUTO, IVF_PQ, NN_DESCENT };
+enum class AllocatorType { kHostPinned, kHostHugePage, kDevice };
+enum class CagraBuildAlgo { kAuto, kIvfPq, kNnDescent };
 
 template <typename T, typename IdxT>
-class CuvsCagra : public ANN<T>, public AnnGPU {
+class cuvs_cagra : public algo<T>, public algo_gpu {
  public:
-  using typename ANN<T>::AnnSearchParam;
+  using search_param_base = typename algo<T>::search_param;
 
-  struct SearchParam : public AnnSearchParam {
+  struct search_param : public search_param_base {
     cuvs::neighbors::cagra::search_params p;
     float refine_ratio;
-    AllocatorType graph_mem   = AllocatorType::Device;
-    AllocatorType dataset_mem = AllocatorType::Device;
-    auto needs_dataset() const -> bool override { return true; }
+    AllocatorType graph_mem   = AllocatorType::kDevice;
+    AllocatorType dataset_mem = AllocatorType::kDevice;
+    [[nodiscard]] auto needs_dataset() const -> bool override { return true; }
   };
 
-  struct BuildParam {
+  struct build_param {
     cuvs::neighbors::cagra::index_params cagra_params;
     CagraBuildAlgo algo;
     std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
@@ -74,20 +74,19 @@ class CuvsCagra : public ANN<T>, public AnnGPU {
     std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
   };
 
-  CuvsCagra(Metric metric, int dim, const BuildParam& param, int concurrent_searches = 1)
-    : ANN<T>(metric, dim),
+  cuvs_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
+    : algo<T>(metric, dim),
       index_params_(param),
       dimension_(dim),
-      need_dataset_update_(true),
+
       dataset_(std::make_shared<raft::device_matrix<T, int64_t, raft::row_major>>(
         std::move(raft::make_device_matrix<T, int64_t>(handle_, 0, 0)))),
       graph_(std::make_shared<raft::device_matrix<IdxT, int64_t, raft::row_major>>(
         std::move(raft::make_device_matrix<IdxT, int64_t>(handle_, 0, 0)))),
       input_dataset_v_(
         std::make_shared<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
-          nullptr, 0, 0)),
-      graph_mem_(AllocatorType::Device),
-      dataset_mem_(AllocatorType::Device)
+          nullptr, 0, 0))
+
   {
     index_params_.cagra_params.metric         = parse_metric_type(metric);
     index_params_.ivf_pq_build_params->metric = parse_metric_type(metric);
@@ -95,19 +94,19 @@ class CuvsCagra : public ANN<T>, public AnnGPU {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
 
   void set_search_dataset(const T* dataset, size_t nrow) override;
 
   void search(const T* queries,
               int batch_size,
               int k,
-              AnnBase::index_type* neighbors,
+              algo_base::index_type* neighbors,
               float* distances) const override;
   void search_base(const T* queries,
                    int batch_size,
                    int k,
-                   AnnBase::index_type* neighbors,
+                   algo_base::index_type* neighbors,
                    float* distances) const;
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
@@ -116,28 +115,28 @@ class CuvsCagra : public ANN<T>, public AnnGPU {
   }
 
   // to enable dataset access from GPU memory
-  AlgoProperty get_preference() const override
+  [[nodiscard]] auto get_preference() const -> algo_property override
   {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::HostMmap;
-    property.query_memory_type   = MemoryType::Device;
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kHostMmap;
+    property.query_memory_type   = MemoryType::kDevice;
     return property;
   }
   void save(const std::string& file) const override;
   void load(const std::string&) override;
   void save_to_hnswlib(const std::string& file) const;
-  std::unique_ptr<ANN<T>> copy() override;
+  std::unique_ptr<algo<T>> copy() override;
 
  private:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
   configured_raft_resources handle_{};
   raft::mr::cuda_pinned_resource mr_pinned_;
   raft::mr::cuda_huge_page_resource mr_huge_page_;
-  AllocatorType graph_mem_;
-  AllocatorType dataset_mem_;
+  AllocatorType graph_mem_{AllocatorType::kDevice};
+  AllocatorType dataset_mem_{AllocatorType::kDevice};
   float refine_ratio_;
-  BuildParam index_params_;
-  bool need_dataset_update_;
+  build_param index_params_;
+  bool need_dataset_update_{true};
   cuvs::neighbors::cagra::search_params search_params_;
   std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>> index_;
   int dimension_;
@@ -148,22 +147,22 @@ class CuvsCagra : public ANN<T>, public AnnGPU {
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
     switch (mem_type) {
-      case (AllocatorType::HostPinned): return &mr_pinned_;
-      case (AllocatorType::HostHugePage): return &mr_huge_page_;
+      case (AllocatorType::kHostPinned): return &mr_pinned_;
+      case (AllocatorType::kHostHugePage): return &mr_huge_page_;
       default: return rmm::mr::get_current_device_resource();
     }
   }
 };
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::build(const T* dataset, size_t nrow)
+void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t>(dataset, IdxT(nrow), dimension_);
 
   auto& params = index_params_.cagra_params;
 
-  if (index_params_.algo == CagraBuildAlgo::IVF_PQ) {
+  if (index_params_.algo == CagraBuildAlgo::kIvfPq) {
     auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
       dataset_view.extents(), params.metric);
     if (index_params_.ivf_pq_build_params) {
@@ -176,7 +175,7 @@ void CuvsCagra<T, IdxT>::build(const T* dataset, size_t nrow)
       pq_params.refinement_rate = *index_params_.ivf_pq_refine_rate;
     }
     params.graph_build_params = pq_params;
-  } else if (index_params_.algo == CagraBuildAlgo::NN_DESCENT) {
+  } else if (index_params_.algo == CagraBuildAlgo::kNnDescent) {
     auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
       params.intermediate_graph_degree);
     if (index_params_.nn_descent_params) { nn_params = *index_params_.nn_descent_params; }
@@ -186,27 +185,27 @@ void CuvsCagra<T, IdxT>::build(const T* dataset, size_t nrow)
     std::move(cuvs::neighbors::cagra::build(handle_, params, dataset_view)));
 }
 
-inline std::string allocator_to_string(AllocatorType mem_type)
+inline auto allocator_to_string(AllocatorType mem_type) -> std::string
 {
-  if (mem_type == AllocatorType::Device) {
+  if (mem_type == AllocatorType::kDevice) {
     return "device";
-  } else if (mem_type == AllocatorType::HostPinned) {
+  } else if (mem_type == AllocatorType::kHostPinned) {
     return "host_pinned";
-  } else if (mem_type == AllocatorType::HostHugePage) {
+  } else if (mem_type == AllocatorType::kHostHugePage) {
     return "host_huge_page";
   }
   return "<invalid allocator type>";
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
+void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
 {
-  auto search_param = dynamic_cast<const SearchParam&>(param);
-  search_params_    = search_param.p;
-  refine_ratio_     = search_param.refine_ratio;
-  if (search_param.graph_mem != graph_mem_) {
+  auto sp        = dynamic_cast<const search_param&>(param);
+  search_params_ = sp.p;
+  refine_ratio_  = sp.refine_ratio;
+  if (sp.graph_mem != graph_mem_) {
     // Move graph to correct memory space
-    graph_mem_ = search_param.graph_mem;
+    graph_mem_ = sp.graph_mem;
     RAFT_LOG_DEBUG("moving graph to new memory space: %s", allocator_to_string(graph_mem_).c_str());
     // We create a new graph and copy to it from existing graph
     auto mr        = get_mr(graph_mem_);
@@ -223,8 +222,8 @@ void CuvsCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
     *graph_ = std::move(new_graph);
   }
 
-  if (search_param.dataset_mem != dataset_mem_ || need_dataset_update_) {
-    dataset_mem_ = search_param.dataset_mem;
+  if (sp.dataset_mem != dataset_mem_ || need_dataset_update_) {
+    dataset_mem_ = sp.dataset_mem;
 
     // First free up existing memory
     *dataset_ = raft::make_device_matrix<T, int64_t>(handle_, 0, 0);
@@ -246,7 +245,7 @@ void CuvsCagra<T, IdxT>::set_search_param(const AnnSearchParam& param)
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
+void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 {
   using ds_idx_type = decltype(index_->data().n_rows());
   bool is_vpq =
@@ -262,66 +261,67 @@ void CuvsCagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::save(const std::string& file) const
+void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 {
   cuvs::neighbors::cagra::serialize_file(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
+void cuvs_cagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
   cuvs::neighbors::cagra::serialize_to_hnswlib_file(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::load(const std::string& file)
+void cuvs_cagra<T, IdxT>::load(const std::string& file)
 {
   index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
   cuvs::neighbors::cagra::deserialize_file(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<ANN<T>> CuvsCagra<T, IdxT>::copy()
+std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
 {
-  return std::make_unique<CuvsCagra<T, IdxT>>(*this);  // use copy constructor
+  return std::make_unique<cuvs_cagra<T, IdxT>>(*this);  // use copy constructor
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::search_base(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void cuvs_cagra<T, IdxT>::search_base(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  static_assert(std::is_integral_v<AnnBase::index_type>);
+  static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
 
-  IdxT* neighbors_IdxT;
+  IdxT* neighbors_idx_t;
   std::optional<rmm::device_uvector<IdxT>> neighbors_storage{std::nullopt};
-  if constexpr (sizeof(IdxT) == sizeof(AnnBase::index_type)) {
-    neighbors_IdxT = reinterpret_cast<IdxT*>(neighbors);
+  if constexpr (sizeof(IdxT) == sizeof(algo_base::index_type)) {
+    neighbors_idx_t = reinterpret_cast<IdxT*>(neighbors);
   } else {
     neighbors_storage.emplace(batch_size * k, raft::resource::get_cuda_stream(handle_));
-    neighbors_IdxT = neighbors_storage->data();
+    neighbors_idx_t = neighbors_storage->data();
   }
 
   auto queries_view =
     raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, dimension_);
-  auto neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(neighbors_IdxT, batch_size, k);
+  auto neighbors_view =
+    raft::make_device_matrix_view<IdxT, int64_t>(neighbors_idx_t, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   cuvs::neighbors::cagra::search(
     handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
 
-  if constexpr (sizeof(IdxT) != sizeof(AnnBase::index_type)) {
+  if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
     raft::linalg::unaryOp(neighbors,
-                          neighbors_IdxT,
+                          neighbors_idx_t,
                           batch_size * k,
-                          raft::cast_op<AnnBase::index_type>(),
+                          raft::cast_op<algo_base::index_type>(),
                           raft::resource::get_cuda_stream(handle_));
   }
 }
 
 template <typename T, typename IdxT>
-void CuvsCagra<T, IdxT>::search(
-  const T* queries, int batch_size, int k, AnnBase::index_type* neighbors, float* distances) const
+void cuvs_cagra<T, IdxT>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);
   const bool disable_refinement = k0 <= static_cast<size_t>(k);
@@ -330,16 +330,16 @@ void CuvsCagra<T, IdxT>::search(
   if (disable_refinement) {
     search_base(queries, batch_size, k, neighbors, distances);
   } else {
-    auto queries_v =
-      raft::make_device_matrix_view<const T, AnnBase::index_type>(queries, batch_size, dimension_);
+    auto queries_v = raft::make_device_matrix_view<const T, algo_base::index_type>(
+      queries, batch_size, dimension_);
     auto candidate_ixs =
-      raft::make_device_matrix<AnnBase::index_type, AnnBase::index_type>(res, batch_size, k0);
+      raft::make_device_matrix<algo_base::index_type, algo_base::index_type>(res, batch_size, k0);
     auto candidate_dists =
-      raft::make_device_matrix<float, AnnBase::index_type>(res, batch_size, k0);
+      raft::make_device_matrix<float, algo_base::index_type>(res, batch_size, k0);
     search_base(
       queries, batch_size, k0, candidate_ixs.data_handle(), candidate_dists.data_handle());
     refine_helper(
       res, *input_dataset_v_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
   }
 }
-}  // namespace cuvs::bench::ann
+}  // namespace cuvs::bench

@@ -25,9 +25,9 @@
 #include <thread>
 #include <utility>
 
-class FixedThreadPool {
+class fixed_thread_pool {
  public:
-  FixedThreadPool(int num_threads)
+  explicit fixed_thread_pool(int num_threads)
   {
     if (num_threads < 1) {
       throw std::runtime_error("num_threads must >= 1");
@@ -35,7 +35,7 @@ class FixedThreadPool {
       return;
     }
 
-    tasks_ = new Task_[num_threads];
+    tasks_ = new task[num_threads];
 
     threads_.reserve(num_threads);
     for (int i = 0; i < num_threads; ++i) {
@@ -54,7 +54,7 @@ class FixedThreadPool {
     }
   }
 
-  ~FixedThreadPool()
+  ~fixed_thread_pool()
   {
     if (threads_.empty()) { return; }
 
@@ -121,14 +121,14 @@ class FixedThreadPool {
   }
 
  private:
-  struct alignas(64) Task_ {
+  struct alignas(64) task {
     std::mutex mtx;
     std::condition_variable cv;
     bool has_task = false;
     std::packaged_task<void()> task;
   };
 
-  Task_* tasks_;
+  task* tasks_;
   std::vector<std::thread> threads_;
   std::atomic<bool> finished_{false};
 };
