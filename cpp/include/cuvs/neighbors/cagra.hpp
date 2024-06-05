@@ -727,55 +727,321 @@ void search(raft::resources const& res,
  * @defgroup cagra_cpp_serialize CAGRA serialize functions
  * @{
  */
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::cagra::index<float, uint32_t>& index,
-                    bool include_dataset = true);
 
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::cagra::index<float, uint32_t>* index);
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, filename, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ *
+ */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               const std::string& filename,
                const cuvs::neighbors::cagra::index<float, uint32_t>& index,
                bool include_dataset = true);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+
+ * cuvs::neighbors::cagra::index<float, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index the cagra index
+ */
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 const std::string& filename,
                  cuvs::neighbors::cagra::index<float, uint32_t>* index);
 
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
-                    bool include_dataset = true);
-
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::cagra::index<int8_t, uint32_t>* index);
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
+               const cuvs::neighbors::cagra::index<float, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * cuvs::neighbors::cagra::index<float, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, is, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<float, uint32_t>* index);
+
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, filename, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               const std::string& filename,
                const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
                bool include_dataset = true);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+
+ * cuvs::neighbors::cagra::index<int8_t, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index the cagra index
+ */
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 const std::string& filename,
                  cuvs::neighbors::cagra::index<int8_t, uint32_t>* index);
 
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
-                    bool include_dataset = true);
-
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
+               const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * cuvs::neighbors::cagra::index<int8_t, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, is, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<int8_t, uint32_t>* index);
+
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, filename, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               const std::string& filename,
                const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
                bool include_dataset = true);
 
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+
+ * cuvs::neighbors::cagra::index<uint8_t, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index the cagra index
+ */
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               std::ostream& os,
+               const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * cuvs::neighbors::cagra::index<uint8_t, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, is, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
 /**
  * @}
