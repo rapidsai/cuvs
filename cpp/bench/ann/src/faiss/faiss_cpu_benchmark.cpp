@@ -17,9 +17,6 @@
 #include "../common/ann_types.hpp"
 #include "faiss_cpu_wrapper.h"
 
-#define JSON_DIAGNOSTICS 1
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -81,74 +78,57 @@ void parse_search_param(const nlohmann::json& conf,
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
-                                                int dim,
-                                                const nlohmann::json& conf)
+auto make_algo(cuvs::bench::Metric metric, int dim, const nlohmann::json& conf)
+  -> std::unique_ptr<cuvs::bench::algo<T>>
 {
   typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
-  return std::make_unique<Algo<T>>(metric, dim, param);
-}
-
-template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
-                                                int dim,
-                                                const nlohmann::json& conf,
-                                                const std::vector<int>& dev_list)
-{
-  typename Algo<T>::build_param param;
-  parse_build_param<T>(conf, param);
-
-  (void)dev_list;
   return std::make_unique<Algo<T>>(metric, dim, param);
 }
 
 template <typename T>
-std::unique_ptr<cuvs::bench::algo<T>> create_algo(const std::string& algo,
-                                                  const std::string& distance,
-                                                  int dim,
-                                                  const nlohmann::json& conf,
-                                                  const std::vector<int>& dev_list)
+auto create_algo(const std::string& algo_name,
+                 const std::string& distance,
+                 int dim,
+                 const nlohmann::json& conf) -> std::unique_ptr<cuvs::bench::algo<T>>
 {
-  // stop compiler warning; not all algorithms support multi-GPU so it may not be used
-  (void)dev_list;
-
   std::unique_ptr<cuvs::bench::algo<T>> a;
 
   if constexpr (std::is_same_v<T, float>) {
     cuvs::bench::Metric metric = parse_metric(distance);
-    if (algo == "faiss_cpu_ivf_flat") {
-      a = make_algo<T, cuvs::bench::faiss_cpu_ivf_flat>(metric, dim, conf, dev_list);
-    } else if (algo == "faiss_cpu_ivf_pq") {
+    if (algo_name == "faiss_cpu_ivf_flat") {
+      a = make_algo<T, cuvs::bench::faiss_cpu_ivf_flat>(metric, dim, conf);
+    } else if (algo_name == "faiss_cpu_ivf_pq") {
       a = make_algo<T, cuvs::bench::faiss_cpu_ivfpq>(metric, dim, conf);
-    } else if (algo == "faiss_cpu_ivf_sq") {
+    } else if (algo_name == "faiss_cpu_ivf_sq") {
       a = make_algo<T, cuvs::bench::faiss_cpu_ivfsq>(metric, dim, conf);
-    } else if (algo == "faiss_cpu_flat") {
+    } else if (algo_name == "faiss_cpu_flat") {
       a = std::make_unique<cuvs::bench::faiss_cpu_flat<T>>(metric, dim);
     }
   }
 
   if constexpr (std::is_same_v<T, uint8_t>) {}
 
-  if (!a) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
+  if (!a) { throw std::runtime_error("invalid algo: '" + algo_name + "'"); }
 
   return a;
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
-  const std::string& algo, const nlohmann::json& conf)
+auto create_search_param(const std::string& algo_name, const nlohmann::json& conf)
+  -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
-  if (algo == "faiss_cpu_ivf_flat" || algo == "faiss_cpu_ivf_pq" || algo == "faiss_cpu_ivf_sq") {
+  if (algo_name == "faiss_cpu_ivf_flat" || algo_name == "faiss_cpu_ivf_pq" ||
+      algo_name == "faiss_cpu_ivf_sq") {
     auto param = std::make_unique<typename cuvs::bench::faiss_cpu<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
-  } else if (algo == "faiss_cpu_flat") {
+  } else if (algo_name == "faiss_cpu_flat") {
     auto param = std::make_unique<typename cuvs::bench::faiss_cpu<T>::search_param>();
     return param;
   }
   // else
-  throw std::runtime_error("invalid algo: '" + algo + "'");
+  throw std::runtime_error("invalid algo: '" + algo_name + "'");
 }
 
 }  // namespace cuvs::bench

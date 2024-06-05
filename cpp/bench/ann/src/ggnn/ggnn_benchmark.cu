@@ -17,9 +17,6 @@
 #include "../common/ann_types.hpp"
 #include "ggnn_wrapper.cuh"
 
-#define JSON_DIAGNOSTICS 1
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -58,64 +55,46 @@ void parse_search_param(const nlohmann::json& conf,
 }
 
 template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
-                                                int dim,
-                                                const nlohmann::json& conf)
+auto make_algo(cuvs::bench::Metric metric, int dim, const nlohmann::json& conf)
+  -> std::unique_ptr<cuvs::bench::algo<T>>
 {
   typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
-  return std::make_unique<Algo<T>>(metric, dim, param);
-}
-
-template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
-                                                int dim,
-                                                const nlohmann::json& conf,
-                                                const std::vector<int>& dev_list)
-{
-  typename Algo<T>::build_param param;
-  parse_build_param<T>(conf, param);
-
-  (void)dev_list;
   return std::make_unique<Algo<T>>(metric, dim, param);
 }
 
 template <typename T>
-std::unique_ptr<cuvs::bench::algo<T>> create_algo(const std::string& algo,
-                                                  const std::string& distance,
-                                                  int dim,
-                                                  const nlohmann::json& conf,
-                                                  const std::vector<int>& dev_list)
+auto create_algo(const std::string& algo_name,
+                 const std::string& distance,
+                 int dim,
+                 const nlohmann::json& conf) -> std::unique_ptr<cuvs::bench::algo<T>>
 {
-  // stop compiler warning; not all algorithms support multi-GPU so it may not be used
-  (void)dev_list;
-
   cuvs::bench::Metric metric = parse_metric(distance);
   std::unique_ptr<cuvs::bench::algo<T>> a;
 
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
-    if (algo == "ggnn") { a = make_algo<T, cuvs::bench::ggnn>(metric, dim, conf); }
+    if (algo_name == "ggnn") { a = make_algo<T, cuvs::bench::ggnn>(metric, dim, conf); }
   }
-  if (!a) { throw std::runtime_error("invalid algo: '" + algo + "'"); }
+  if (!a) { throw std::runtime_error("invalid algo: '" + algo_name + "'"); }
 
   return a;
 }
 
 template <typename T>
-std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(
-  const std::string& algo, const nlohmann::json& conf)
+auto create_search_param(const std::string& algo_name, const nlohmann::json& conf)
+  -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
-    if (algo == "ggnn") {
+    if (algo_name == "ggnn") {
       auto param = std::make_unique<typename cuvs::bench::ggnn<T>::search_param>();
       parse_search_param<T>(conf, *param);
       return param;
     }
   }
   // else
-  throw std::runtime_error("invalid algo: '" + algo + "'");
+  throw std::runtime_error("invalid algo: '" + algo_name + "'");
 }
 
 }  // namespace cuvs::bench

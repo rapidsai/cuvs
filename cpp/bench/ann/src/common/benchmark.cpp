@@ -21,8 +21,6 @@
 #include "ann_types.hpp"
 
 #include <dlfcn.h>
-#define JSON_DIAGNOSTICS 1
-#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <memory>
@@ -89,8 +87,7 @@ template <typename T>
 auto create_algo(const std::string& algo,
                  const std::string& distance,
                  int dim,
-                 const nlohmann::json& conf,
-                 const std::vector<int>& dev_list) -> std::unique_ptr<cuvs::bench::algo<T>>
+                 const nlohmann::json& conf) -> std::unique_ptr<cuvs::bench::algo<T>>
 {
   static auto fname = get_fun_name(reinterpret_cast<void*>(&create_algo<T>));
   auto handle       = load_lib_raft_compat(algo);
@@ -99,7 +96,7 @@ auto create_algo(const std::string& algo,
     throw std::runtime_error("Couldn't load the create_algo function (" + algo + ")");
   }
   auto fun = reinterpret_cast<decltype(&create_algo<T>)>(fun_addr);
-  return fun(algo, distance, dim, conf, dev_list);
+  return fun(algo, distance, dim, conf);
 }
 
 template <typename T>

@@ -19,6 +19,7 @@
 #include "cuda_stub.hpp"  // cudaStream_t
 
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -161,7 +162,7 @@ class algo : public algo_base {
 
 #define REGISTER_ALGO_INSTANCE(DataT)                                                              \
   template auto cuvs::bench::create_algo<DataT>(                                                   \
-    const std::string&, const std::string&, int, const nlohmann::json&, const std::vector<int>&)   \
+    const std::string&, const std::string&, int, const nlohmann::json&)                            \
     ->std::unique_ptr<cuvs::bench::algo<DataT>>;                                                   \
   template auto cuvs::bench::create_search_param<DataT>(const std::string&, const nlohmann::json&) \
     ->std::unique_ptr<typename cuvs::bench::algo<DataT>::search_param>;

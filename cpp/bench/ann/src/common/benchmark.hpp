@@ -136,8 +136,7 @@ void bench_build(::benchmark::State& state,
 
   std::unique_ptr<algo<T>> algo;
   try {
-    algo = create_algo<T>(
-      index.algo, dataset->distance(), dataset->dim(), index.build_param, index.dev_list);
+    algo = create_algo<T>(index.algo, dataset->distance(), dataset->dim(), index.build_param);
   } catch (const std::exception& e) {
     return state.SkipWithError("Failed to create an algo: " + std::string(e.what()));
   }
@@ -230,8 +229,8 @@ void bench_search(::benchmark::State& state,
     algo<T>* a;
     try {
       if (!current_algo || (a = dynamic_cast<algo<T>*>(current_algo.get())) == nullptr) {
-        auto ualgo = create_algo<T>(
-          index.algo, dataset->distance(), dataset->dim(), index.build_param, index.dev_list);
+        auto ualgo =
+          create_algo<T>(index.algo, dataset->distance(), dataset->dim(), index.build_param);
         a = ualgo.get();
         a->load(index_file);
         current_algo = std::move(ualgo);

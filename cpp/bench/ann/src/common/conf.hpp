@@ -23,9 +23,6 @@
 #include <unordered_set>
 #include <vector>
 
-#define JSON_DIAGNOSTICS 1
-#include <nlohmann/json.hpp>
-
 namespace cuvs::bench {
 
 class configuration {
@@ -35,7 +32,6 @@ class configuration {
     std::string algo;
     nlohmann::json build_param;
     std::string file;
-    std::vector<int> dev_list;
 
     int batch_size;
     int k;
@@ -120,15 +116,6 @@ class configuration {
       index.file        = conf.at("file");
       index.batch_size  = batch_size;
       index.k           = k;
-
-      if (conf.contains("multigpu")) {
-        for (auto it : conf.at("multigpu")) {
-          index.dev_list.push_back(it);
-        }
-        if (index.dev_list.empty()) { throw std::runtime_error("dev_list shouln't be empty!"); }
-        index.dev_list.shrink_to_fit();
-        index.build_param["multigpu"] = conf["multigpu"];
-      }
 
       for (auto param : conf.at("search_params")) {
         /*  ### Special parameters for backward compatibility ###

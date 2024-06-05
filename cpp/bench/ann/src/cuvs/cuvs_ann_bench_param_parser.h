@@ -16,9 +16,6 @@
 
 #pragma once
 
-#define JSON_DIAGNOSTICS 1
-#include <nlohmann/json.hpp>
-
 #undef WARP_SIZE
 #ifdef CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
 #include "cuvs_wrapper.h"
