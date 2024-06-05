@@ -33,7 +33,7 @@ namespace {
 template <typename T>
 void* _build(cuvsResources_t res,
              DLManagedTensor* dataset_tensor,
-             enum DistanceType metric,
+             cuvsDistanceType metric,
              T metric_arg)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -66,7 +66,7 @@ void _search(cuvsResources_t res,
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
 
   cuvs::neighbors::brute_force::search(
-    *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+    *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds, std::nullopt);
 }
 
 }  // namespace
@@ -97,7 +97,7 @@ extern "C" cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index_c_
 
 extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
                                            DLManagedTensor* dataset_tensor,
-                                           enum DistanceType metric,
+                                           cuvsDistanceType metric,
                                            float metric_arg,
                                            cuvsBruteForceIndex_t index)
 {

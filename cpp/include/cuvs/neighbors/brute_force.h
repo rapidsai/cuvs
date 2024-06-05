@@ -17,7 +17,7 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance_types.h>
+#include <cuvs/distance/distance.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
@@ -102,7 +102,7 @@ cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  */
 cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
                                 DLManagedTensor* dataset,
-                                enum DistanceType metric,
+                                cuvsDistanceType metric,
                                 float metric_arg,
                                 cuvsBruteForceIndex_t index);
 /**

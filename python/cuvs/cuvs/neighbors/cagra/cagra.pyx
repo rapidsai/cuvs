@@ -23,6 +23,7 @@ from cuvs.common.resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libcpp cimport bool, cast
+from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
 
@@ -42,6 +43,82 @@ from libc.stdint cimport (
 
 from cuvs.common.exceptions import check_cuvs
 
+
+cdef class CompressionParams:
+    """
+    Parameters for VPQ Compression
+
+    Parameters
+    ----------
+    pq_bits: int
+        The bit length of the vector element after compression by PQ.
+        Possible values: [4, 5, 6, 7, 8]. The smaller the 'pq_bits', the
+        smaller the index size and the better the search performance, but
+        the lower the recall.
+    pq_dim: int
+        The dimensionality of the vector after compression by PQ. When zero,
+        an optimal value is selected using a heuristic.
+    vq_n_centers: int
+        Vector Quantization (VQ) codebook size - number of "coarse cluster
+        centers". When zero, an optimal value is selected using a heuristic.
+    kmeans_n_iters: int
+        The number of iterations searching for kmeans centers (both VQ & PQ
+        phases).
+    vq_kmeans_trainset_fraction: float
+        The fraction of data to use during iterative kmeans building (VQ
+        phase). When zero, an optimal value is selected using a heuristic.
+    vq_kmeans_trainset_fraction: float
+        The fraction of data to use during iterative kmeans building (PQ
+        phase). When zero, an optimal value is selected using a heuristic.
+    """
+    cdef cuvsCagraCompressionParams * params
+
+    def __cinit__(self):
+        check_cuvs(cuvsCagraCompressionParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsCagraCompressionParamsDestroy(self.params))
+
+    def __init__(self, *,
+                 pq_bits=8,
+                 pq_dim=0,
+                 vq_n_centers=0,
+                 kmeans_n_iters=25,
+                 vq_kmeans_trainset_fraction=0.0,
+                 pq_kmeans_trainset_fraction=0.0):
+        self.params.pq_bits = pq_bits
+        self.params.pq_dim = pq_dim
+        self.params.vq_n_centers = vq_n_centers
+        self.params.kmeans_n_iters = kmeans_n_iters
+        self.params.vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction
+        self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
+
+    @property
+    def pq_bits(self):
+        return self.params.pq_bits
+
+    @property
+    def pq_dim(self):
+        return self.params.pq_dim
+
+    @property
+    def vq_n_centers(self):
+        return self.params.vq_n_centers
+
+    @property
+    def kmeans_n_iters(self):
+        return self.params.kmeans_n_iters
+
+    @property
+    def vq_kmeans_trainset_fraction(self):
+        return self.params.vq_kmeans_trainset_fraction
+
+    @property
+    def pq_kmeans_trainset_fraction(self):
+        return self.params.pq_kmeans_trainset_fraction
+
+    def get_handle(self):
+        return <size_t>self.params
 
 cdef class IndexParams:
     """
@@ -64,17 +141,30 @@ cdef class IndexParams:
             - nn_descent (experimental) will use the NN-Descent algorithm for
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
+    compression: CompressionParams, optional
+        If compression is desired should be a CompressionParams object. If None
+        compression will be disabled.
     """
 
     cdef cuvsCagraIndexParams* params
+
+    # hold on to a reference to the compression, to keep from being GC'ed
+    cdef public object compression
+
+    def __cinit__(self):
+        check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
+        self.compression = None
+
+    def __dealloc__(self):
+        check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  metric="sqeuclidean",
                  intermediate_graph_degree=128,
                  graph_degree=64,
                  build_algo="ivf_pq",
-                 nn_descent_niter=20):
-        cuvsCagraIndexParamsCreate(&self.params)
+                 nn_descent_niter=20,
+                 compression=None):
 
         # todo (dgd): enable once other metrics are present
         # and exposed in cuVS C API
@@ -87,6 +177,10 @@ cdef class IndexParams:
         elif build_algo == "nn_descent":
             self.params.build_algo = cuvsCagraGraphBuildAlgo.NN_DESCENT
         self.params.nn_descent_niter = nn_descent_niter
+        if compression is not None:
+            self.compression = compression
+            self.params.compression = \
+                <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
 
     # @property
     # def metric(self):
@@ -189,7 +283,6 @@ def build_index(IndexParams index_params, dataset, resources=None):
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
-    cdef cuvsError_t build_status
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
     cdef cuvsCagraIndexParams* params = index_params.params
@@ -419,7 +512,7 @@ def search(SearchParams search_params,
     ... )
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
-    >>> # are performad with same query size.
+    >>> # are performed with same query size.
     >>> distances, neighbors = cagra.search(search_params, index, queries,
     ...                                     k)
     >>> neighbors = cp.asarray(neighbors)
@@ -451,7 +544,6 @@ def search(SearchParams search_params,
                        exp_rows=n_queries, exp_cols=k)
 
     cdef cuvsCagraSearchParams* params = &search_params.params
-    cdef cuvsError_t search_status
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
     cdef cydlpack.DLManagedTensor* neighbors_dlpack = \
@@ -471,3 +563,80 @@ def search(SearchParams search_params,
         ))
 
     return (distances, neighbors)
+
+
+@auto_sync_resources
+def save(filename, Index index, bool include_dataset=True, resources=None):
+    """
+    Saves the index to a file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    index : Index
+        Trained CAGRA index.
+    include_dataset : bool
+        Whether or not to write out the dataset along with the index. Including
+        the dataset in the serialized index will use extra disk space, and
+        might not be desired if you already have a copy of the dataset on
+        disk. If this option is set to false, you will have to call
+        `index.update_dataset(dataset)` after loading the index.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import cagra
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = cagra.build_index(cagra.IndexParams(), dataset)
+    >>> # Serialize and deserialize the cagra index built
+    >>> cagra.save("my_index.bin", index)
+    >>> index_loaded = cagra.load("my_index.bin")
+    """
+    cdef string c_filename = filename.encode('utf-8')
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsCagraSerialize(res,
+                                  c_filename.c_str(),
+                                  index.index,
+                                  include_dataset))
+
+
+@auto_sync_resources
+def load(filename, resources=None):
+    """
+    Loads index from file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change, therefore loading an index saved with a previous
+    version of cuvs is not guaranteed to work.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+
+    """
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef string c_filename = filename.encode('utf-8')
+
+    check_cuvs(cuvsCagraDeserialize(
+        res,
+        c_filename.c_str(),
+        idx.index
+    ))
+    idx.trained = True
+    return idx

@@ -16,16 +16,22 @@
 
 #pragma once
 
-#include "ann_types.hpp"
-#include <cuvs/distance/distance_types.hpp>
+#include "common.hpp"
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
+#include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/cagra_types.hpp>
+#include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
 #include <optional>
+#include <variant>
 
 namespace cuvs::neighbors::cagra {
 /**
@@ -34,95 +40,70 @@ namespace cuvs::neighbors::cagra {
  */
 
 /**
- * @brief ANN algorithm used by CAGRA to build knn graph
+ * @brief ANN parameters used by CAGRA to build knn graph
  *
  */
-enum class graph_build_algo {
-  /* Use IVF-PQ to build all-neighbors knn graph */
-  IVF_PQ,
-  /* Experimental, use NN-Descent to build all-neighbors knn graph */
-  NN_DESCENT
+namespace graph_build_params {
+
+/** Specialized parameters utilizing IVF-PQ to build knn graph */
+struct ivf_pq_params {
+  cuvs::neighbors::ivf_pq::index_params build_params;
+  cuvs::neighbors::ivf_pq::search_params search_params;
+  float refinement_rate;
+
+  ivf_pq_params() = default;
+  /**
+   * Set default parameters based on shape of the input dataset.
+   * Usage example:
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *   raft::resources res;
+   *   // create index_params for a [N. D] dataset
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+   *   auto pq_params =
+   *     cagra::graph_build_params::ivf_pq_params(dataset.extents());
+   *   // modify/update index_params as needed
+   *   index_params.add_data_on_build = true;
+   * @endcode
+   */
+  ivf_pq_params(raft::matrix_extent<int64_t> dataset_extents,
+                cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
-/** Parameters for VPQ compression. */
-struct vpq_params {
-  /**
-   * The bit length of the vector element after compression by PQ.
-   *
-   * Possible values: [4, 5, 6, 7, 8].
-   *
-   * Hint: the smaller the 'pq_bits', the smaller the index size and the better the search
-   * performance, but the lower the recall.
-   */
-  uint32_t pq_bits = 8;
-  /**
-   * The dimensionality of the vector after compression by PQ.
-   * When zero, an optimal value is selected using a heuristic.
-   *
-   * TODO: at the moment `dim` must be a multiple `pq_dim`.
-   */
-  uint32_t pq_dim = 0;
-  /**
-   * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
-   * When zero, an optimal value is selected using a heuristic.
-   */
-  uint32_t vq_n_centers = 0;
-  /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
-  uint32_t kmeans_n_iters = 25;
-  /**
-   * The fraction of data to use during iterative kmeans building (VQ phase).
-   * When zero, an optimal value is selected using a heuristic.
-   */
-  double vq_kmeans_trainset_fraction = 0;
-  /**
-   * The fraction of data to use during iterative kmeans building (PQ phase).
-   * When zero, an optimal value is selected using a heuristic.
-   */
-  double pq_kmeans_trainset_fraction = 0;
+using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+}  // namespace graph_build_params
 
-  /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
-  operator raft::neighbors::vpq_params() const
-  {
-    return {.pq_bits                     = pq_bits,
-            .pq_dim                      = pq_dim,
-            .vq_n_centers                = vq_n_centers,
-            .kmeans_n_iters              = kmeans_n_iters,
-            .vq_kmeans_trainset_fraction = vq_kmeans_trainset_fraction,
-            .pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction};
-  }
-};
-
-struct index_params : ann::index_params {
+struct index_params : cuvs::neighbors::index_params {
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree = 128;
   /** Degree of output graph. */
   size_t graph_degree = 64;
-  /** ANN algorithm to build knn graph. */
-  graph_build_algo build_algo = graph_build_algo::IVF_PQ;
-  /** Number of Iterations to run if building with NN_DESCENT */
-  size_t nn_descent_niter = 20;
   /**
    * Specify compression parameters if compression is desired.
-   *
-   * NOTE: this is experimental new API, consider it unsafe.
    */
-  std::optional<vpq_params> compression = std::nullopt;
+  std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
-  /** Build a raft CAGRA index params from an existing cuvs CAGRA index params. */
-  operator raft::neighbors::cagra::index_params() const
-  {
-    return raft::neighbors::cagra::index_params{
-      {
-        .metric            = static_cast<raft::distance::DistanceType>((int)this->metric),
-        .metric_arg        = this->metric_arg,
-        .add_data_on_build = this->add_data_on_build,
-      },
-      .intermediate_graph_degree = intermediate_graph_degree,
-      .graph_degree              = graph_degree,
-      .build_algo       = static_cast<raft::neighbors::cagra::graph_build_algo>((int)build_algo),
-      .nn_descent_niter = nn_descent_niter,
-      .compression      = compression};
-  }
+  /** Parameters for graph building.
+   *
+   * Set ivf_pq_params or nn_descent_params to select the graph build algorithm and control their
+   * parameters. The default (std::monostate) is to use a heuristic to decide the algorithm and its
+   * parameters.
+   *
+   * @code{.cpp}
+   * cagra::index_params params;
+   * // 1. Choose IVF-PQ algorithm
+   * params.graph_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extent,
+   * params.metric);
+   *
+   * // 2. Choose NN Descent algorithm for kNN graph construction
+   * params.graph_build_params =
+   * cagra::graph_build_params::nn_descent_params(params.intermediate_graph_degree);
+   * @endcode
+   */
+  std::variant<std::monostate,
+               graph_build_params::ivf_pq_params,
+               graph_build_params::nn_descent_params>
+    graph_build_params;
 };
 
 /**
@@ -145,7 +126,7 @@ enum class search_algo {
 
 enum class hash_mode { HASH, SMALL, AUTO };
 
-struct search_params : ann::search_params {
+struct search_params : cuvs::neighbors::search_params {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
   size_t max_queries = 0;
 
@@ -187,27 +168,6 @@ struct search_params : ann::search_params {
   uint32_t num_random_samplings = 1;
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask = 0x128394;
-
-  /** Build a raft CAGRA search params from an existing cuvs CAGRA search params. */
-  operator raft::neighbors::cagra::search_params() const
-  {
-    raft::neighbors::cagra::search_params result = {
-      {},
-      max_queries,
-      itopk_size,
-      max_iterations,
-      static_cast<raft::neighbors::cagra::search_algo>((int)algo),
-      team_size,
-      search_width,
-      min_iterations,
-      thread_block_size,
-      static_cast<raft::neighbors::cagra::hash_mode>((int)hashmap_mode),
-      hashmap_min_bitlen,
-      hashmap_max_fill_rate,
-      num_random_samplings,
-      rand_xor_mask};
-    return result;
-  }
 };
 
 /**
@@ -231,13 +191,7 @@ static_assert(std::is_aggregate_v<search_params>);
  *
  */
 template <typename T, typename IdxT>
-struct index : ann::index {
-  /** Build a cuvs CAGRA index from an existing RAFT CAGRA index. */
-  index(raft::neighbors::cagra::index<T, IdxT>&& raft_idx)
-    : ann::index(),
-      raft_index_{std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(std::move(raft_idx))}
-  {
-  }
+struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
@@ -245,35 +199,44 @@ struct index : ann::index {
   /** Distance metric used for clustering. */
   [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
   {
-    return static_cast<cuvs::distance::DistanceType>((int)raft_index_->metric());
+    return metric_;
   }
 
   /** Total length of the index (number of vectors). */
-  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT { return raft_index_->size(); }
+  [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
+  {
+    auto data_rows = dataset_->n_rows();
+    return data_rows > 0 ? data_rows : graph_view_.extent(0);
+  }
 
   /** Dimensionality of the data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
-  {
-    return raft_index_->dim();
-  }
+  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dataset_->dim(); }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
   {
-    return raft_index_->graph_degree();
+    return graph_view_.extent(1);
   }
 
-  /** Dataset [size, dim] */
   [[nodiscard]] inline auto dataset() const noexcept
     -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
   {
-    return raft_index_->dataset();
+    auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+    if (p != nullptr) { return p->view(); }
+    auto d = dataset_->dim();
+    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
+  }
+
+  /** Dataset [size, dim] */
+  [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
+  {
+    return *dataset_;
   }
 
   /** neighborhood graph [size, graph-degree] */
   [[nodiscard]] inline auto graph() const noexcept
     -> raft::device_matrix_view<const IdxT, int64_t, raft::row_major>
   {
-    return raft_index_->graph();
+    return graph_view_;
   }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
@@ -286,11 +249,13 @@ struct index : ann::index {
   /** Construct an empty index. */
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
-    : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(
-        res, static_cast<raft::distance::DistanceType>((int)metric)))
+    : cuvs::neighbors::index(),
+      metric_(metric),
+      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
+      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0))
   {
   }
+
   /** Construct an index from dataset and knn_graph arrays
    *
    * If the dataset and graph is already in GPU memory, then the index is just a thin wrapper around
@@ -306,7 +271,7 @@ struct index : ann::index {
    *
    * - Cagra index is normally created by the cagra::build
    * @code{.cpp}
-   *   using namespace cuvs::neighbors::experimental;
+   *   using namespace raft::neighbors::experimental;
    *   auto dataset = raft::make_host_matrix<float, int64_t>(n_rows, n_cols);
    *   load_dataset(dataset.view());
    *   // use default index parameters
@@ -322,11 +287,11 @@ struct index : ann::index {
    * @endcode
    *   In the above example, we have passed a host dataset to build. The returned index will own a
    * device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a
-   * raft::device_mdspan to build, then it will only store a reference to it.
+   * device_mdspan to build, then it will only store a reference to it.
    *
    * - Constructing index using existing knn-graph
    * @code{.cpp}
-   *   using namespace cuvs::neighbors::experimental;
+   *   using namespace raft::neighbors::experimental;
    *
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
    *   auto knn_graph = raft::make_device_matrix<uint32_n, int64_t>(res, n_rows, graph_degree);
@@ -351,14 +316,15 @@ struct index : ann::index {
         raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
         raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
           knn_graph)
-    : ann::index(),
-      raft_index_(std::make_unique<raft::neighbors::cagra::index<T, IdxT>>(
-        res, static_cast<raft::distance::DistanceType>((int)metric), dataset, knn_graph))
+    : cuvs::neighbors::index(),
+      metric_(metric),
+      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
+      dataset_(make_aligned_dataset(res, dataset, 16))
   {
     RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                  "Dataset and knn_graph must have equal number of rows");
-    update_dataset(res, dataset);
     update_graph(res, knn_graph);
+
     raft::resource::sync_stream(res);
   }
 
@@ -372,8 +338,16 @@ struct index : ann::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    raft_index_->update_dataset(res, dataset);
+    dataset_ = make_aligned_dataset(res, dataset, 16);
   }
+
+  /** Set the dataset reference explicitly to a device matrix view with padding. */
+  void update_dataset(raft::resources const& res,
+                      raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
+  {
+    dataset_ = make_aligned_dataset(res, dataset, 16);
+  }
+
   /**
    * Replace the dataset with a new dataset.
    *
@@ -382,7 +356,22 @@ struct index : ann::index {
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    raft_index_->update_dataset(res, dataset);
+    dataset_ = make_aligned_dataset(res, dataset, 16);
+  }
+
+  /** Replace the dataset with a new dataset. */
+  template <typename DatasetT>
+  auto update_dataset(raft::resources const& res, DatasetT&& dataset)
+    -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<int64_t>, DatasetT>>
+  {
+    dataset_ = std::make_unique<DatasetT>(std::move(dataset));
+  }
+
+  template <typename DatasetT>
+  auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
+    -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<int64_t>, DatasetT>>
+  {
+    dataset_ = std::move(dataset);
   }
 
   /**
@@ -394,7 +383,7 @@ struct index : ann::index {
   void update_graph(raft::resources const& res,
                     raft::device_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
   {
-    raft_index_->update_graph(res, knn_graph);
+    graph_view_ = knn_graph;
   }
 
   /**
@@ -405,19 +394,27 @@ struct index : ann::index {
   void update_graph(raft::resources const& res,
                     raft::host_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
   {
-    raft_index_->update_graph(res, knn_graph);
-  }
+    RAFT_LOG_DEBUG("Copying CAGRA knn graph from host to device");
 
-  auto get_raft_index() const -> const raft::neighbors::cagra::index<T, IdxT>*
-  {
-    return raft_index_.get();
+    if ((graph_.extent(0) != knn_graph.extent(0)) || (graph_.extent(1) != knn_graph.extent(1))) {
+      // clear existing memory before allocating to prevent OOM errors on large graphs
+      if (graph_.size()) { graph_ = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0); }
+      graph_ =
+        raft::make_device_matrix<IdxT, int64_t>(res, knn_graph.extent(0), knn_graph.extent(1));
+    }
+    raft::copy(graph_.data_handle(),
+               knn_graph.data_handle(),
+               knn_graph.size(),
+               raft::resource::get_cuda_stream(res));
+    graph_view_ = graph_.view();
   }
-  auto get_raft_index() -> raft::neighbors::cagra::index<T, IdxT>* { return raft_index_.get(); }
 
  private:
-  std::unique_ptr<raft::neighbors::cagra::index<T, IdxT>> raft_index_;
+  cuvs::distance::DistanceType metric_;
+  raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
+  raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
+  std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
 };
-
 /**
  * @}
  */
@@ -426,32 +423,219 @@ struct index : ann::index {
  * @defgroup cagra_cpp_index_build CAGRA index build functions
  * @{
  */
-auto build(raft::resources const& handle,
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
-auto build(raft::resources const& handle,
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
-auto build(raft::resources const& handle,
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
@@ -459,56 +643,77 @@ auto build(raft::resources const& handle,
  * @}
  */
 
-void build_device(raft::resources const& handle,
-                  const cuvs::neighbors::cagra::index_params& params,
-                  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
-                  cuvs::neighbors::cagra::index<float, uint32_t>& idx);
-
-void build_host(raft::resources const& handle,
-                const cuvs::neighbors::cagra::index_params& params,
-                raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
-                cuvs::neighbors::cagra::index<float, uint32_t>& idx);
-
-void build_device(raft::resources const& handle,
-                  const cuvs::neighbors::cagra::index_params& params,
-                  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
-                  cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx);
-
-void build_host(raft::resources const& handle,
-                const cuvs::neighbors::cagra::index_params& params,
-                raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
-                cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx);
-
-void build_device(raft::resources const& handle,
-                  const cuvs::neighbors::cagra::index_params& params,
-                  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
-                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx);
-
-void build_host(raft::resources const& handle,
-                const cuvs::neighbors::cagra::index_params& params,
-                raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
-                cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx);
-
 /**
  * @defgroup cagra_cpp_index_search CAGRA search functions
  * @{
  */
 
-void search(raft::resources const& handle,
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @tparam T data element type
+ * @tparam IdxT type of the indices
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ */
+void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<float, uint32_t>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
-void search(raft::resources const& handle,
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @tparam T data element type
+ * @tparam IdxT type of the indices
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ */
+void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 
-void search(raft::resources const& handle,
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @tparam T data element type
+ * @tparam IdxT type of the indices
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ */
+void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,

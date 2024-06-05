@@ -25,9 +25,7 @@ dependencies:
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
 - gcc_linux-64=11.*
-- gmock>=1.13.0
 - graphviz
-- gtest>=1.13.0
 - ipython
 - libclang
 - libcublas-dev
@@ -41,11 +39,11 @@ dependencies:
 - numpydoc
 - pre-commit
 - pydata-sphinx-theme
-- pylibraft==24.4.*
+- pylibraft==24.6.*
 - pytest-cov
 - pytest==7.*
 - recommonmark
-- rmm==24.4.*
+- rmm==24.6.*
 - rust
 - scikit-build-core>=0.7.0
 - scikit-learn

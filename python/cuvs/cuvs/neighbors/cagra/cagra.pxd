@@ -23,6 +23,7 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
+from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
@@ -34,11 +35,22 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         IVF_PQ
         NN_DESCENT
 
+    ctypedef struct cuvsCagraCompressionParams:
+        uint32_t pq_bits
+        uint32_t pq_dim
+        uint32_t vq_n_centers
+        uint32_t kmeans_n_iters
+        double vq_kmeans_trainset_fraction
+        double pq_kmeans_trainset_fraction
+
+    ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
+
     ctypedef struct cuvsCagraIndexParams:
         size_t intermediate_graph_degree
         size_t graph_degree
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
+        cuvsCagraCompressionParams_t compression
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
 
@@ -74,6 +86,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     ctypedef cuvsCagraIndex* cuvsCagraIndex_t
 
+    cuvsError_t cuvsCagraCompressionParamsCreate(
+        cuvsCagraCompressionParams_t* params)
+
+    cuvsError_t cuvsCagraCompressionParamsDestroy(
+        cuvsCagraCompressionParams_t index)
+
     cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 
     cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index)
@@ -93,3 +111,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
                                 DLManagedTensor* distances) except +
+
+    cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+                                   const char * filename,
+                                   cuvsCagraIndex_t index,
+                                   bool include_dataset) except +
+
+    cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
+                                     const char * filename,
+                                     cuvsCagraIndex_t index) except +

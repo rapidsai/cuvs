@@ -30,7 +30,7 @@ extern "C" void run_brute_force(int64_t n_rows,
                                 float* query_data,
                                 float* distances_data,
                                 int64_t* neighbors_data,
-                                enum DistanceType metric);
+                                cuvsDistanceType metric);
 
 template <typename T>
 void generate_random_data(T* devPtr, size_t size)
@@ -49,7 +49,7 @@ void recall_eval(T* query_data,
                  size_t n_rows,
                  size_t n_dim,
                  size_t n_neighbors,
-                 DistanceType metric)
+                 cuvsDistanceType metric)
 {
   raft::handle_t handle;
   auto distances_ref = raft::make_device_matrix<T, IdxT>(handle, n_queries, n_neighbors);
@@ -97,7 +97,7 @@ TEST(BruteForceC, BuildSearch)
   int64_t n_dim        = 32;
   uint32_t n_neighbors = 8;
 
-  enum DistanceType metric = L2Expanded;
+  cuvsDistanceType metric = L2Expanded;
 
   float *index_data, *query_data, *distances_data;
   int64_t* neighbors_data;

@@ -38,6 +38,7 @@ def run_cagra_build_search_test(
     inplace=True,
     add_data_on_build=True,
     search_params={},
+    compression=None,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -49,6 +50,7 @@ def run_cagra_build_search_test(
         intermediate_graph_degree=intermediate_graph_degree,
         graph_degree=graph_degree,
         build_algo=build_algo,
+        compression=compression,
     )
 
     if array_type == "device":
@@ -173,3 +175,61 @@ def test_cagra_index_params(params):
         compare=False,
         build_algo=params["build_algo"],
     )
+
+
+def test_cagra_vpq_compression():
+    dim = 64
+    pq_len = 2
+    run_cagra_build_search_test(
+        n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
+    )
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.ubyte])
+# TODO: expose update_dataset
+# @pytest.mark.parametrize("include_dataset", [True, False])
+@pytest.mark.parametrize("include_dataset", [True])
+def test_save_load(dtype, include_dataset):
+    n_rows = 10000
+    n_cols = 50
+    n_queries = 1000
+
+    dataset = generate_data((n_rows, n_cols), dtype)
+    dataset_device = device_ndarray(dataset)
+
+    build_params = cagra.IndexParams()
+    index = cagra.build_index(build_params, dataset_device)
+
+    assert index.trained
+    filename = "my_index.bin"
+    cagra.save(filename, index, include_dataset=include_dataset)
+    loaded_index = cagra.load(filename)
+
+    # if we didn't save the dataset with the index, we need to update the
+    # index with an already loaded copy
+    if not include_dataset:
+        loaded_index.update_dataset(dataset)
+
+    queries = generate_data((n_queries, n_cols), dtype)
+
+    queries_device = device_ndarray(queries)
+    search_params = cagra.SearchParams()
+    k = 10
+
+    distance_dev, neighbors_dev = cagra.search(
+        search_params, index, queries_device, k
+    )
+
+    neighbors = neighbors_dev.copy_to_host()
+    dist = distance_dev.copy_to_host()
+    del index
+
+    distance_dev, neighbors_dev = cagra.search(
+        search_params, loaded_index, queries_device, k
+    )
+
+    neighbors2 = neighbors_dev.copy_to_host()
+    dist2 = distance_dev.copy_to_host()
+
+    assert np.all(neighbors == neighbors2)
+    assert np.allclose(dist, dist2, rtol=1e-6)

@@ -18,7 +18,7 @@
 #include <cuvs_internal/neighbors/naive_knn.cuh>
 #include <raft/core/resource/cuda_stream.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
