@@ -154,8 +154,31 @@ def search(Index index,
                 (default None)
     {resources_docstring}
 
-    Examples
+    Examples without pre-filter
     --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> n_queries = 1000
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset, metric="sqeuclidean")
+    >>> # Search using the built index
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
+    >>> k = 10
+    >>> # Using a pooling allocator reduces overhead of temporary array
+    >>> # creation during search. This is useful if multiple searches
+    >>> # are performed with same query size.
+    >>> distances, neighbors = brute_force.search(index, queries, k)
+    >>> neighbors = cp.asarray(neighbors)
+    >>> distances = cp.asarray(distances)
+
+    Examples with pre-filter
+    --------
+    >>> import numpy as np
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force, prefilters
     >>> n_samples = 50000
@@ -169,14 +192,15 @@ def search(Index index,
     >>> queries = cp.random.random_sample((n_queries, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build prefilters
-    >>> n_bitmap = np.ceil(n_samples * n_features / 32).astype(int)
-    >>> bitmap = cp.random.random_sample((n_bitmap), dtype=cp.uint32)
+    >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
+    >>> # Create your own bitmap as the filter by replacing the random one.
+    >>> bitmap = cp.random.randint(1, 1000, size=(n_bitmap,), dtype=cp.uint32)
     >>> prefilter = prefilters.from_bitmap(bitmap)
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
-    >>> distances, neighbors = brute_force.search(index, queries, k, prefilter)
+    >>> distances, neighbors = brute_force.search(index, queries, k, prefilter=prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """

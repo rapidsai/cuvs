@@ -75,8 +75,8 @@ def from_bitmap(bitmap):
     >>> n_queries = 1000
     >>>
     >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
-    >>> bitmap_arr = cp.random.random_sample((n_bitmap), dtype=cp.uint32)
-    >>> prefilter = prefilters.from_bitmap(bitmap_arr)
+    >>> bitmap = cp.random.randint(1, 100, size=(n_bitmap,), dtype=cp.uint32)
+    >>> prefilter = prefilters.from_bitmap(bitmap)
     """
     bitmap_cai = wrap_array(bitmap)
     _check_input_array(bitmap_cai, [np.dtype('uint32')])

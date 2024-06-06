@@ -30,7 +30,7 @@ cdef extern from "cuvs/neighbors/brute_force.h" nogil:
 
     ctypedef struct cuvsBruteForceIndex:
         uintptr_t addr
-        DLDataType type
+        DLDataType dtype
 
     ctypedef cuvsBruteForceIndex* cuvsBruteForceIndex_t
 
