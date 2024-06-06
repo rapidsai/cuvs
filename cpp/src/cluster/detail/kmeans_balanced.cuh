@@ -280,7 +280,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             bool reset_counters,
                             MappingOpT mapping_op,
                             rmm::device_async_resource_ref mr,
-                            const T* dataset_norm = nullptr)
+                            const MathT* dataset_norm = nullptr)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -566,7 +566,8 @@ auto adjust_centers(MathT* centers,
                     MathT threshold,
                     MappingOpT mapping_op,
                     rmm::cuda_stream_view stream,
-                    rmm::device_async_resource_ref device_memory) -> bool
+                    rmm::device_async_resource_ref device_memory,
+                    const MathT* dataset_norm) -> bool
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "adjust_centers(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
@@ -601,7 +602,8 @@ auto adjust_centers(MathT* centers,
                                                                         average,
                                                                         ofst,
                                                                         update_count.data(),
-                                                                        mapping_op);
+                                                                        mapping_op,
+                                                                        dataset_norm);
   adjusted = update_count.value(stream) > 0;  // NB: rmm scalar performs the sync
 
   return adjusted;
@@ -681,7 +683,8 @@ void balancing_em_iters(const raft::resources& handle,
                                    balancing_threshold,
                                    mapping_op,
                                    stream,
-                                   device_memory)) {
+                                   device_memory,
+                                   dataset_norm)) {
       if (balancing_counter++ >= balancing_pullback) {
         balancing_counter -= balancing_pullback;
         n_iters++;
@@ -726,7 +729,8 @@ void balancing_em_iters(const raft::resources& handle,
                            cluster_labels,
                            true,
                            mapping_op,
-                           device_memory);
+                           device_memory,
+                           dataset_norm);
   }
 }
 
@@ -770,7 +774,8 @@ void build_clusters(const raft::resources& handle,
                          cluster_labels,
                          true,
                          mapping_op,
-                         device_memory);
+                         device_memory,
+                         dataset_norm);
 
   // run EM
   balancing_em_iters(handle,

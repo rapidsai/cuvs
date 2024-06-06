@@ -21,7 +21,11 @@
 namespace cuvs::neighbors::ivf_flat {
 
 typedef AnnIVFFlatTest<float, float, int64_t> AnnIVFFlatTestF_float;
-TEST_P(AnnIVFFlatTestF_float, AnnIVFFlat) { this->testIVFFlat(); }
+TEST_P(AnnIVFFlatTestF_float, AnnIVFFlat) {
+    this->testIVFFlatCosine();
+    this->testIVFFlat();
+    this->testPacker();
+}
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_float, ::testing::ValuesIn(inputs));
 

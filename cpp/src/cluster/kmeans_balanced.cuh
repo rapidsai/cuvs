@@ -136,7 +136,8 @@ void predict(const raft::resources& handle,
              raft::device_matrix_view<const DataT, IndexT> X,
              raft::device_matrix_view<const MathT, IndexT> centroids,
              raft::device_vector_view<LabelT, IndexT> labels,
-             MappingOpT mapping_op = raft::identity_op())
+             MappingOpT mapping_op = raft::identity_op(),
+             std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");
@@ -157,7 +158,9 @@ void predict(const raft::resources& handle,
                                          X.data_handle(),
                                          X.extent(0),
                                          labels.data_handle(),
-                                         mapping_op);
+                                         mapping_op,
+                                         raft::resource::get_workspace_resource(handle),
+                                         X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
 }
 
 /**
@@ -343,7 +346,7 @@ void calc_centers_and_sizes(
   raft::device_vector_view<CounterT, IndexT> cluster_sizes,
   bool reset_counters                                                 = true,
   MappingOpT mapping_op                                               = raft::identity_op(),
-  std::optional<raft::device_vector_view<const DataT, IndexT>> X_norm = std::nullopt)
+  std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");

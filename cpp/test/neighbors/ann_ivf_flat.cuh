@@ -20,7 +20,9 @@
 #include "naive_knn.cuh"
 
 #include <cuvs/core/bitset.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/stats/mean.cuh>
 #include <thrust/sequence.h>
 
@@ -240,6 +242,91 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                         cuvs::Compare<float>(),
                                         stream_));
         }
+      }
+      ASSERT_TRUE(eval_neighbours(indices_naive,
+                                  indices_ivfflat,
+                                  distances_naive,
+                                  distances_ivfflat,
+                                  ps.num_queries,
+                                  ps.k,
+                                  0.001,
+                                  min_recall));
+    }
+  }
+
+  void testIVFFlatCosine()
+  {
+    size_t queries_size = ps.num_queries * ps.k;
+    std::vector<IdxT> indices_ivfflat(queries_size);
+    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<T> distances_ivfflat(queries_size);
+    std::vector<T> distances_naive(queries_size);
+
+    {
+      rmm::device_uvector<T> distances_naive_dev(queries_size, stream_);
+      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+      auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+        (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+      auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
+        search_queries.data(), ps.num_queries, ps.dim);
+
+      auto indices_out_view = raft::make_device_matrix_view<IdxT, IdxT>(
+        indices_naive_dev.data(), ps.num_queries, ps.k);
+      auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
+        distances_naive_dev.data(), ps.num_queries, ps.k);
+      auto bfi = cuvs::neighbors::brute_force::build(handle_, database_view, ps.metric);
+      cuvs::neighbors::brute_force::search(handle_,
+        bfi,
+        search_queries_view,
+        indices_out_view,
+        dists_out_view);
+
+      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
+      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
+      raft::resource::sync_stream(handle_);
+    }
+    {
+      // unless something is really wrong with clustering, this could serve as a lower bound on
+      // recall
+      double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
+
+      rmm::device_uvector<T> distances_ivfflat_dev(queries_size, stream_);
+      rmm::device_uvector<IdxT> indices_ivfflat_dev(queries_size, stream_);
+
+      {
+        ivf_flat::index_params index_params;
+        ivf_flat::search_params search_params;
+        index_params.n_lists          = ps.nlist;
+        index_params.metric           = ps.metric;
+        index_params.adaptive_centers = ps.adaptive_centers;
+        search_params.n_probes        = ps.nprobe;
+
+        index_params.add_data_on_build        = true;
+        index_params.kmeans_trainset_fraction = 0.5;
+        index_params.metric_arg               = 0;
+
+        ivf_flat::index<DataT, IdxT> idx(handle_, index_params, ps.dim);
+
+        auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
+          (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
+        idx = ivf_flat::build(handle_, index_params, database_view);
+
+        auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
+          search_queries.data(), ps.num_queries, ps.dim);
+        auto indices_out_view = raft::make_device_matrix_view<IdxT, IdxT>(
+          indices_ivfflat_dev.data(), ps.num_queries, ps.k);
+        auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
+          distances_ivfflat_dev.data(), ps.num_queries, ps.k);
+        ivf_flat::search(handle_,
+                         search_params,
+                         idx,
+                         search_queries_view,
+                         indices_out_view,
+                         dists_out_view);
+
+        raft::update_host(distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
+        raft::update_host(indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
+        raft::resource::sync_stream(handle_);
       }
       ASSERT_TRUE(eval_neighbours(indices_naive,
                                   indices_ivfflat,
@@ -516,6 +603,13 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   AnnIvfFlatInputs<IdxT> ps;
   rmm::device_uvector<DataT> database;
   rmm::device_uvector<DataT> search_queries;
+};
+
+const std::vector<AnnIvfFlatInputs<int64_t>> inputs_cosine = {
+  // test various dims (aligned and not aligned to vector sizes)
+  {2, 20, 1024, 3, 2, 4, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false}
 };
 
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {

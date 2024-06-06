@@ -127,7 +127,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                uint32_t dim,
                                uint32_t veclen,
                                IdxT batch_offset          = 0,
-                               const T* source_vecs_norms = nullptr)
+                               const float* source_vecs_norms = nullptr)
 {
   const IdxT i = IdxT(blockDim.x) * IdxT(blockIdx.x) + threadIdx.x;
   if (i >= n_rows) { return; }
@@ -159,9 +159,41 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   // NB: such `veclen` is selected, that `dim % veclen == 0`
   for (uint32_t l = 0; l < dim; l += veclen) {
     for (uint32_t j = 0; j < veclen; j++) {
-      list_data[l * kIndexGroupSize + ingroup_id + j] = source_vecs[l + j] * vec_norm;
+      list_data[l * kIndexGroupSize + ingroup_id + j] = source_vecs[l + j] / vec_norm;
     }
   }
+}
+
+template <typename InType,
+          typename OutType,
+          typename LayoutPolicy,
+          typename IndexType,
+          typename Lambda = raft::identity_op>
+void myl2rownorm(raft::resources const& handle,
+          raft::device_matrix_view<const InType, IndexType, LayoutPolicy> in,
+          raft::device_vector_view<OutType, IndexType> out,
+          raft::linalg::NormType type,
+          raft::linalg::Apply apply,
+          Lambda fin_op = raft::identity_op())
+{
+  // Created to support two different data types for input and output
+  // To be replaced with raft::linalg::rowNorm once it supports different data types
+  auto constexpr row_major = std::is_same_v<LayoutPolicy, raft::row_major>;
+  RAFT_EXPECTS(static_cast<IndexType>(out.size()) == in.extent(0),
+                "Output should be equal to number of rows in Input");
+
+  raft::linalg::reduce(out.data_handle(),
+                      in.data_handle(),
+                      in.extent(1),
+                      in.extent(0),
+                      (OutType)0,
+                      row_major,
+                      true,
+                      raft::resource::get_cuda_stream(handle),
+                      false,
+                      raft::sq_op(),
+                      raft::add_op(),
+                      fin_op);
 }
 
 /** See raft::neighbors::ivf_flat::extend docs */
@@ -187,6 +219,9 @@ void extend(raft::resources const& handle,
                "You must pass data indices when the index is non-empty.");
 
   auto new_labels = raft::make_device_vector<LabelT, IdxT>(handle, n_rows);
+  rmm::device_uvector<float> new_vectors_norms(0, stream);
+  if (index->metric() == cuvs::distance::DistanceType::CosineExpanded)
+    new_vectors_norms.resize(n_rows, stream);
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = index->metric();
   auto orig_centroids_view =
@@ -208,12 +243,28 @@ void extend(raft::resources const& handle,
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
     auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
+
+    // Compute norm if necessary (Cosine)
+    auto batch_vectors_norms = raft::make_device_vector_view<float, IdxT>(new_vectors_norms.data() + batch.offset(), batch.size());
+    std::optional<raft::device_vector_view<const float, IdxT>> batch_vectors_norms_opt = std::nullopt;
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      myl2rownorm(handle,
+                  batch_data_view,
+                  batch_vectors_norms,
+                  raft::linalg::NormType::L2Norm,
+                  raft::linalg::Apply::ALONG_ROWS,
+                  raft::sqrt_op());
+      batch_vectors_norms_opt =
+        std::make_optional(raft::make_const_mdspan(batch_vectors_norms));
+    }
+
     cuvs::cluster::kmeans_balanced::predict(handle,
                                             kmeans_params,
                                             batch_data_view,
                                             orig_centroids_view,
                                             batch_labels_view,
-                                            utils::mapping<float>{});
+                                            utils::mapping<float>{},
+                                            batch_vectors_norms_opt);
   }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
@@ -232,18 +283,11 @@ void extend(raft::resources const& handle,
         raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
         new_labels.data_handle() + batch.offset(), batch.size());
-      auto batch_vectors_norms = raft::make_device_vector<T, IdxT>(handle, batch.size());
-      std::optional<raft::device_vector_view<const T, IdxT>> batch_vectors_norms_opt = std::nullopt;
-      // Normalize if necessary (Cosine)
+      auto batch_vectors_norms = raft::make_device_vector_view<float, IdxT>(new_vectors_norms.data() + batch.offset(), batch.size());
+      std::optional<raft::device_vector_view<const float, IdxT>> batch_vectors_norms_opt = std::nullopt;
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::norm(handle,
-                           batch_data_view,
-                           batch_vectors_norms.view(),
-                           raft::linalg::NormType::L2Norm,
-                           raft::linalg::Apply::ALONG_ROWS,
-                           raft::sqrt_op());
         batch_vectors_norms_opt =
-          std::make_optional(raft::make_const_mdspan(batch_vectors_norms.view()));
+          std::make_optional(raft::make_const_mdspan(batch_vectors_norms));
       }
       cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
                                                                       batch_data_view,
@@ -296,18 +340,9 @@ void extend(raft::resources const& handle,
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
-    auto batch_vectors_norms   = raft::make_device_vector<T, IdxT>(handle, batch.size());
-    T* batch_vectors_norms_ptr = nullptr;
-    // Normalize if necessary (Cosine)
-    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm(handle,
-                         batch_data_view,
-                         batch_vectors_norms.view(),
-                         raft::linalg::NormType::L2Norm,
-                         raft::linalg::Apply::ALONG_ROWS,
-                         raft::sqrt_op());
-      batch_vectors_norms_ptr = batch_vectors_norms.data_handle();
-    }
+    float* batch_vectors_norms_ptr = nullptr;
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded)
+      batch_vectors_norms_ptr = new_vectors_norms.data() + batch.offset();
     // Kernel to insert the new vectors
     const dim3 block_dim(256);
     const dim3 grid_dim(raft::ceildiv<IdxT>(batch.size(), block_dim.x));
@@ -417,10 +452,9 @@ inline auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = index.metric();
-    if (kmeans_params.metric == cuvs::distance::DistanceType::CosineExpanded)
-      kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
     // Normalize if necessary (Cosine)
     if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
       raft::linalg::row_normalize(
         handle,
         trainset_const_view,
