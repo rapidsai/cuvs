@@ -30,6 +30,10 @@ extern "C" {
  * @{
  */
 
+/**
+ * @brief Enum to denote prefilter type
+ *
+ */
 enum cuvsPrefilterType {
   /* No filter */
   NO_FILTER,
