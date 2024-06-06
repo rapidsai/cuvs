@@ -200,7 +200,8 @@ def search(Index index,
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
-    >>> distances, neighbors = brute_force.search(index, queries, k, prefilter=prefilter)
+    >>> distances, neighbors = brute_force.search(index, queries, k,
+    ...                                           prefilter=prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
