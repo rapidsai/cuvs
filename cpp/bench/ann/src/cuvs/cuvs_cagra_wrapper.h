@@ -263,7 +263,7 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::cagra::serialize_file(handle_, file, *index_);
+  cuvs::neighbors::cagra::serialize(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
@@ -276,7 +276,7 @@ template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::load(const std::string& file)
 {
   index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
-  cuvs::neighbors::cagra::deserialize_file(handle_, file, index_.get());
+  cuvs::neighbors::cagra::deserialize(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>

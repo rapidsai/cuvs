@@ -102,14 +102,14 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
 template <typename T, typename IdxT>
 void cuvs_ivf_pq<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::ivf_pq::serialize_file(handle_, file, *index_);
+  cuvs::neighbors::ivf_pq::serialize(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
 void cuvs_ivf_pq<T, IdxT>::load(const std::string& file)
 {
   index_ = std::make_shared<cuvs::neighbors::ivf_pq::index<IdxT>>(handle_, index_params_, dim_);
-  cuvs::neighbors::ivf_pq::deserialize_file(handle_, file, index_.get());
+  cuvs::neighbors::ivf_pq::deserialize(handle_, file, index_.get());
 }
 
 template <typename T, typename IdxT>

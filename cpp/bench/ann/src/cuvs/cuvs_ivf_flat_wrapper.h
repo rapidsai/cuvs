@@ -117,7 +117,7 @@ void cuvs_ivf_flat<T, IdxT>::set_search_param(const search_param_base& param)
 template <typename T, typename IdxT>
 void cuvs_ivf_flat<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::ivf_flat::serialize_file(handle_, file, *index_);
+  cuvs::neighbors::ivf_flat::serialize(handle_, file, *index_);
   return;
 }
 
@@ -127,7 +127,7 @@ void cuvs_ivf_flat<T, IdxT>::load(const std::string& file)
   index_ =
     std::make_shared<cuvs::neighbors::ivf_flat::index<T, IdxT>>(handle_, index_params_, this->dim_);
 
-  cuvs::neighbors::ivf_flat::deserialize_file(handle_, file, index_.get());
+  cuvs::neighbors::ivf_flat::deserialize(handle_, file, index_.get());
   return;
 }
 
