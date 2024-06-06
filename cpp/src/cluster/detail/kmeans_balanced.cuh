@@ -148,7 +148,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
 
       MathT alpha = -1.0;
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) alpha = 1.0;
       MathT beta = 0.0;
 
       raft::linalg::gemm(handle,
@@ -481,7 +480,8 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
                         IdxT average,
                         IdxT seed,
                         IdxT* count,
-                        MappingOpT mapping_op)
+                        MappingOpT mapping_op,
+                        const MathT* dataset_norm = nullptr)
 {
   IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.y);
   if (l >= n_clusters) return;
@@ -508,10 +508,11 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   const MathT wc = min(static_cast<MathT>(csize), static_cast<MathT>(kAdjustCentersWeight));
   // Weight for the datapoint used to shift the center.
   const MathT wd = 1.0;
+  const MathT data_norm = dataset_norm == nullptr ? 1.0 : dataset_norm[i];
   for (; j < dim; j += raft::WarpSize) {
     MathT val = 0;
     val += wc * centers[j + dim * li];
-    val += wd * mapping_op(dataset[j + dim * i]);
+    val += wd * mapping_op(dataset[j + dim * i]) / data_norm;
     val /= wc + wd;
     centers[j + dim * l] = val;
   }
@@ -940,7 +941,8 @@ auto build_fine_clusters(const raft::resources& handle,
     cub::TransformInputIterator<MathT, MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
     raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+        params.metric == cuvs::distance::DistanceType::CosineExpanded) {
       thrust::gather(raft::resource::get_thrust_policy(handle),
                      mc_trainset_ids,
                      mc_trainset_ids + k,
