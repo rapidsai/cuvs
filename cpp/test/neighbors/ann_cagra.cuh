@@ -282,11 +282,11 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index = cagra::build(handle_, index_params, database_view);
           };
 
-          cagra::serialize_file(handle_, "cagra_index", index, ps.include_serialized_dataset);
+          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        cagra::deserialize_file(handle_, "cagra_index", &index);
+        cagra::deserialize(handle_, "cagra_index", &index);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
