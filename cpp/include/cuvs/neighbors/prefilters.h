@@ -26,13 +26,13 @@ extern "C" {
 #endif
 
 /**
- * @defgroup prefilter
+ * @defgroup prefilter Prefilter APIs
+ * @brief APIs related to prefilter functionality.
  * @{
  */
 
 /**
- * @brief Enum to denote prefilter type
- *
+ * @brief Enum to denote prefilter type.
  */
 enum cuvsPrefilterType {
   /* No filter */

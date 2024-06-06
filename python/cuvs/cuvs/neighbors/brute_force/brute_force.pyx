@@ -150,7 +150,7 @@ def search(Index index,
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
     prefilter : Optional cuvs.neighbors.cuvsPrefilter that can be used
-                to filter qureris and neighbors based on the given bitmap.
+                to filter queries and neighbors based on the given bitmap.
                 (default None)
     {resources_docstring}
 
