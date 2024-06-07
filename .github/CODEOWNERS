@@ -17,7 +17,6 @@ python/setup.py    @rapidsai/cuvs-build-codeowners
 build.sh           @rapidsai/cuvs-build-codeowners
 **/build.sh        @rapidsai/cuvs-build-codeowners
 
-#build/ops code owners
 #CI code owners
 /.github/                @rapidsai/ci-codeowners
 /ci/                     @rapidsai/ci-codeowners
