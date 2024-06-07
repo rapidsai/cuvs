@@ -15,4 +15,6 @@
 
 from cuvs.neighbors import brute_force, cagra, ivf_flat, ivf_pq, prefilters
 
-__all__ = ["brute_force", "cagra", "ivf_flat", "ivf_pq", "prefilters"]
+from .refine import refine
+
+__all__ = ["brute_force", "cagra", "ivf_flat", "ivf_pq", "prefilters", "refine"]
