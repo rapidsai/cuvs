@@ -64,6 +64,7 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
+using raft::RAFT_NAME;                       // TODO: this is required for RAFT_LOG_XXX messages.
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
@@ -357,8 +358,7 @@ void train_per_subset(raft::resources const& handle,
                       size_t n_rows,
                       const float* trainset,   // [n_rows, dim]
                       const uint32_t* labels,  // [n_rows]
-                      uint32_t kmeans_n_iters,
-                      rmm::mr::device_memory_resource* managed_memory)
+                      uint32_t kmeans_n_iters)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
@@ -435,11 +435,13 @@ void train_per_cluster(raft::resources const& handle,
                        size_t n_rows,
                        const float* trainset,   // [n_rows, dim]
                        const uint32_t* labels,  // [n_rows]
-                       uint32_t kmeans_n_iters,
-                       rmm::mr::device_memory_resource* managed_memory)
+                       uint32_t kmeans_n_iters)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
+  // NB: Managed memory is used for small arrays accessed from both device and host. There's no
+  // performance reasoning behind this, just avoiding the boilerplate of explicit copies.
+  rmm::mr::managed_memory_resource managed_memory;
 
   rmm::device_uvector<float> pq_centers_tmp(index.pq_centers().size(), stream, device_memory);
   rmm::device_uvector<uint32_t> cluster_sizes(index.n_lists(), stream, managed_memory);
@@ -1713,7 +1715,6 @@ auto build(raft::resources const& handle,
     size_t n_rows_train = n_rows / trainset_ratio;
 
     rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
-    rmm::mr::managed_memory_resource managed_memory;
 
     // If the trainset is small enough to comfortably fit into device memory, put it there.
     // Otherwise, use the managed memory.
@@ -1727,7 +1728,15 @@ auto build(raft::resources const& handle,
 
     // Besides just sampling, we transform the input dataset into floats to make it easier
     // to use gemm operations from cublas.
-    rmm::device_uvector<float> trainset(n_rows_train * index.dim(), stream, big_memory_resource);
+    rmm::device_uvector<float> trainset(0, stream, big_memory_resource);
+    try {
+      trainset.resize(n_rows_train * index.dim(), stream);
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_ERROR(
+        "Insufficient memory for kmeans training set allocation. Please decrease "
+        "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
+      throw;
+    }
     // TODO: a proper sampling
     if constexpr (std::is_same_v<T, float>) {
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
@@ -1818,22 +1827,12 @@ auto build(raft::resources const& handle,
     // Train PQ codebooks
     switch (index.codebook_kind()) {
       case codebook_gen::PER_SUBSPACE:
-        train_per_subset(handle,
-                         index,
-                         n_rows_train,
-                         trainset.data(),
-                         labels.data(),
-                         params.kmeans_n_iters,
-                         &managed_memory);
+        train_per_subset(
+          handle, index, n_rows_train, trainset.data(), labels.data(), params.kmeans_n_iters);
         break;
       case codebook_gen::PER_CLUSTER:
-        train_per_cluster(handle,
-                          index,
-                          n_rows_train,
-                          trainset.data(),
-                          labels.data(),
-                          params.kmeans_n_iters,
-                          &managed_memory);
+        train_per_cluster(
+          handle, index, n_rows_train, trainset.data(), labels.data(), params.kmeans_n_iters);
         break;
       default: RAFT_FAIL("Unreachable code");
     }
