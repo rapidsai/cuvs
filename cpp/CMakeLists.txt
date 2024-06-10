@@ -555,8 +555,13 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 if(BUILD_C_LIBRARY)
   add_library(
     cuvs_c SHARED
-    src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-    src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp src/distance/pairwise_distance_c.cpp
+    src/core/c_api.cpp
+    src/neighbors/brute_force_c.cpp
+    src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp
+    src/neighbors/cagra_c.cpp
+    src/neighbors/refine/refine_c.cpp
+    src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
