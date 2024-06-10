@@ -1534,7 +1534,7 @@ void extend(raft::resources const& handle,
   }
   // Allocate a buffer for the new labels (classifying the new data)
   rmm::device_uvector<uint32_t> new_data_labels(n_rows, stream, labels_mr);
-  if (labels_mr == device_memory) { free_mem -= sizeof(uint32_t) * n_rows; }
+  free_mem = raft::resource::get_workspace_free_bytes(handle);
 
   // Calculate the batch size for the input data if it's not accessible directly from the device
   constexpr size_t kReasonableMaxBatchSize = 65536;
