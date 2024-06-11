@@ -49,11 +49,9 @@ popd
 rapids-logger "Build Python docs"
 pushd docs
 sphinx-build -b dirhtml source _html
-sphinx-build -b text source _text
 mv ../rust/target/doc ./_html/_static/rust
-mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"{html,txt}
+mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"html
 mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
-mv _text/* "${RAPIDS_DOCS_DIR}/cuvs/txt"
 popd
 
 rapids-upload-docs
