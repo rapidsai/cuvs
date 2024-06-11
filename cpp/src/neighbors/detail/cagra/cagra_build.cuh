@@ -34,6 +34,7 @@
 
 // TODO: Fixme- this needs to be migrated
 #include "../../ivf_pq/ivf_pq_build.cuh"
+#include "../../ivf_pq/ivf_pq_search.cuh"
 #include "../../nn_descent.cuh"
 
 // TODO: This shouldn't be calling spatial/knn APIs
@@ -166,43 +167,47 @@ void build_knn_graph(
   uint32_t gpu_top_k     = node_degree * pq.refinement_rate;
   gpu_top_k              = std::min<IdxT>(std::max(gpu_top_k, top_k), dataset.extent(0));
   const auto num_queries = dataset.extent(0);
-  rmm::device_async_resource_ref workspace_mr = raft::resource::get_workspace_resource(res);
 
-  constexpr size_t kDefaultBatchSize = 1024;
-  constexpr size_t kMaxBatchSize     = 4096;  // No more perf beyond this
-  constexpr size_t kMinBatchSize     = 128;   // Too slow if smaller
-  // Heuristic: how much of the workspace we can spare for the queries.
-  // The rest is going to be used by ivf_pq::search
-  const auto workspace_queries_bytes = raft::resource::get_workspace_free_bytes(res) / 5;
-  auto max_batch_size =
-    std::min<size_t>(workspace_queries_bytes / sizeof(DataT) / dataset.extent(1), kMaxBatchSize);
-  // Heuristic: if the workspace is too small for a decent batch size, switch to use the large
-  // resource with a default batch size.
-  if (max_batch_size < kMinBatchSize) {
-    max_batch_size = kDefaultBatchSize;
-    workspace_mr   = raft::resource::get_large_workspace_resource(res);
-  }
+  // Use the same maximum batch size as the ivf_pq::search to avoid allocating more than needed.
+  using cuvs::neighbors::ivf_pq::detail::kMaxQueries;
+  // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
+  // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
+  // multiple of what is required for the I/O batching below.
+  constexpr size_t kMinWorkspaceRatio = 5;
+  auto desired_workspace_size         = kMaxQueries * kMinWorkspaceRatio *
+                                (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
+                                 + sizeof(float) * gpu_top_k        // distances
+                                 + sizeof(int64_t) * gpu_top_k      // neighbors
+                                 + sizeof(float) * top_k            // refined_distances
+                                 + sizeof(int64_t) * top_k          // refined_neighbors
+                                );
+
+  // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
+  rmm::device_async_resource_ref workspace_mr =
+    desired_workspace_size <= raft::resource::get_workspace_free_bytes(res)
+      ? raft::resource::get_workspace_resource(res)
+      : raft::resource::get_large_workspace_resource(res);
+
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
     node_degree,
     top_k,
     gpu_top_k,
-    max_batch_size,
+    kMaxQueries,
     pq.search_params.n_probes);
 
-  rmm::device_async_resource_ref large_mr = raft::resource::get_large_workspace_resource(res);
-  auto distances                          = raft::make_device_mdarray<float>(
-    res, large_mr, raft::make_extents<int64_t>(max_batch_size, gpu_top_k));
+  auto distances = raft::make_device_mdarray<float>(
+    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, gpu_top_k));
   auto neighbors = raft::make_device_mdarray<int64_t>(
-    res, large_mr, raft::make_extents<int64_t>(max_batch_size, gpu_top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, gpu_top_k));
   auto refined_distances = raft::make_device_mdarray<float>(
-    res, large_mr, raft::make_extents<int64_t>(max_batch_size, top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, top_k));
   auto refined_neighbors = raft::make_device_mdarray<int64_t>(
-    res, large_mr, raft::make_extents<int64_t>(max_batch_size, top_k));
-  auto neighbors_host = raft::make_host_matrix<int64_t, int64_t>(max_batch_size, gpu_top_k);
-  auto queries_host   = raft::make_host_matrix<DataT, int64_t>(max_batch_size, dataset.extent(1));
-  auto refined_neighbors_host = raft::make_host_matrix<int64_t, int64_t>(max_batch_size, top_k);
-  auto refined_distances_host = raft::make_host_matrix<float, int64_t>(max_batch_size, top_k);
+    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, top_k));
+  auto neighbors_host = raft::make_host_matrix<int64_t, int64_t>(kMaxQueries, gpu_top_k);
+  auto queries_host   = raft::make_host_matrix<DataT, int64_t>(kMaxQueries, dataset.extent(1));
+  auto refined_neighbors_host = raft::make_host_matrix<int64_t, int64_t>(kMaxQueries, top_k);
+  auto refined_distances_host = raft::make_host_matrix<float, int64_t>(kMaxQueries, top_k);
 
   // TODO(tfeher): batched search with multiple GPUs
   std::size_t num_self_included = 0;
@@ -213,7 +218,7 @@ void build_knn_graph(
     dataset.data_handle(),
     dataset.extent(0),
     dataset.extent(1),
-    (int64_t)max_batch_size,
+    static_cast<int64_t>(kMaxQueries),
     raft::resource::get_cuda_stream(res),
     workspace_mr);
 
