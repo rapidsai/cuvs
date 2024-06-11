@@ -113,7 +113,7 @@ if(TARGET CUDA::nvtx3)
 endif()
 
 # ##################################################################################################
-# * Configure tests function-------------------------------------------------------------
+# * Target function -------------------------------------------------------------
 
 function(ConfigureAnnBench)
 
@@ -197,10 +197,16 @@ function(ConfigureAnnBench)
     COMPONENT ann_bench
     DESTINATION bin/ann
   )
+
+  add_dependencies(CUVS_ANN_BENCH_ALL ${BENCH_NAME})
 endfunction()
 
 # ##################################################################################################
-# * Configure tests-------------------------------------------------------------
+# * Configure benchmark targets -------------------------------------------------------------
+
+if(NOT TARGET CUVS_ANN_BENCH_ALL)
+  add_custom_target(CUVS_ANN_BENCH_ALL)
+endif()
 
 if(CUVS_ANN_BENCH_USE_HNSWLIB)
   ConfigureAnnBench(
