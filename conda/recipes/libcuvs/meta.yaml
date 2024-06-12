@@ -193,6 +193,7 @@ outputs:
         - cuda-version ={{ cuda_version }}
         - cmake {{ cmake_version }}
         - ninja
+        - openblas
         - {{ stdlib("c") }}
       host:
         - libraft ={{ minor_version }}
