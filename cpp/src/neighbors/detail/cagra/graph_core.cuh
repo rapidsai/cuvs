@@ -41,8 +41,7 @@
 #include <memory>
 #include <random>
 
-namespace cuvs::neighbors::cagra::detail {
-namespace graph {
+namespace cuvs::neighbors::cagra::detail::graph {
 
 // unnamed namespace to avoid multiple definition error
 namespace {
@@ -251,7 +250,10 @@ void sort_knn_graph(
   const uint32_t input_graph_degree = knn_graph.extent(1);
   IdxT* const input_graph_ptr       = knn_graph.data_handle();
 
-  auto d_input_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph_size, input_graph_degree);
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
+
+  auto d_input_graph = raft::make_device_mdarray<IdxT>(
+    res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
 
   //
   // Sorting kNN graph
@@ -259,7 +261,8 @@ void sort_knn_graph(
   const double time_sort_start = cur_time();
   RAFT_LOG_DEBUG("# Sorting kNN Graph on GPUs ");
 
-  auto d_dataset = raft::make_device_matrix<DataT, int64_t>(res, dataset_size, dataset_dim);
+  auto d_dataset = raft::make_device_mdarray<DataT>(
+    res, large_tmp_mr, raft::make_extents<int64_t>(dataset_size, dataset_dim));
   raft::copy(d_dataset.data_handle(),
              dataset_ptr,
              dataset_size * dataset_dim,
@@ -332,6 +335,7 @@ void optimize(
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
+  auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
 
   RAFT_EXPECTS(knn_graph.extent(0) == new_graph.extent(0),
                "Each input array is expected to have the same number of rows");
@@ -347,15 +351,16 @@ void optimize(
     //
     // Prune kNN graph
     //
-    auto d_detour_count =
-      raft::make_device_matrix<uint8_t, int64_t>(res, graph_size, input_graph_degree);
+    auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
 
     RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
                                   0xff,
                                   graph_size * input_graph_degree * sizeof(uint8_t),
                                   raft::resource::get_cuda_stream(res)));
 
-    auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
+    auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
     RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
                                   0x00,
                                   graph_size * sizeof(uint32_t),
@@ -475,14 +480,16 @@ void optimize(
                                   graph_size * output_graph_degree * sizeof(IdxT),
                                   raft::resource::get_cuda_stream(res)));
 
-    auto d_rev_graph_count = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
+    auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
+      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
     RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph_count.data_handle(),
                                   0x00,
                                   graph_size * sizeof(uint32_t),
                                   raft::resource::get_cuda_stream(res)));
 
-    auto dest_nodes   = raft::make_host_vector<IdxT, int64_t>(graph_size);
-    auto d_dest_nodes = raft::make_device_vector<IdxT, int64_t>(res, graph_size);
+    auto dest_nodes = raft::make_host_vector<IdxT, int64_t>(graph_size);
+    auto d_dest_nodes =
+      raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
 
     for (uint64_t k = 0; k < output_graph_degree; k++) {
 #pragma omp parallel for
@@ -578,5 +585,4 @@ void optimize(
   }
 }
 
-}  // namespace graph
-}  // namespace cuvs::neighbors::cagra::detail
+}  // namespace cuvs::neighbors::cagra::detail::graph
