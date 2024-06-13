@@ -460,7 +460,7 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = ivf_pq.build_index(ivf_pq.IndexParams(), dataset)
+    >>> index = ivf_pq.build(ivf_pq.IndexParams(), dataset)
     >>> # Serialize and deserialize the ivf_pq index built
     >>> ivf_pq.save("my_index.bin", index)
     >>> index_loaded = ivf_pq.load("my_index.bin")

@@ -386,7 +386,7 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = ivf_flat.build_index(ivf_flat.IndexParams(), dataset)
+    >>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
     >>> # Serialize and deserialize the ivf_flat index built
     >>> ivf_flat.save("my_index.bin", index)
     >>> index_loaded = ivf_flat.load("my_index.bin")
