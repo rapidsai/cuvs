@@ -65,7 +65,7 @@ from cuvs.neighbors import cagra
 dataset = load_data()
 index_params = cagra.IndexParams()
 
-index = cagra.build_index(build_params, dataset)
+index = cagra.build(build_params, dataset)
 ```
 
 ### C++ API
