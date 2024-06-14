@@ -1,7 +1,5 @@
 package common
 
-// #cgo CFLAGS: -I/usr/local/cuda/include -I/home/ajit/miniforge3/include
-// #cgo LDFLAGS: -L/usr/local/cuda/lib64 -L/home/ajit/miniforge3/lib -lcudart -lcudart -lcuvs
 // #include <cuda_runtime_api.h>
 // #include <cuvs/core/c_api.h>
 // #include <cuvs/distance/pairwise_distance.h>
