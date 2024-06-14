@@ -127,8 +127,7 @@ void _serialize(cuvsResources_t res,
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
-  cuvs::neighbors::cagra::serialize_file(
-    *res_ptr, std::string(filename), *index_ptr, include_dataset);
+  cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
 }
 
 template <typename T>
@@ -136,7 +135,7 @@ void* _deserialize(cuvsResources_t res, const char* filename)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
-  cuvs::neighbors::cagra::deserialize_file(*res_ptr, std::string(filename), index);
+  cuvs::neighbors::cagra::deserialize(*res_ptr, std::string(filename), index);
   return index;
 }
 

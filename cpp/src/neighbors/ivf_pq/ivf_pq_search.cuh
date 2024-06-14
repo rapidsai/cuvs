@@ -586,6 +586,9 @@ inline auto get_max_batch_size(raft::resources const& res,
   return max_batch_size;
 }
 
+/** Maximum number of queries ivf_pq::search can process in one batch. */
+constexpr uint32_t kMaxQueries = 4096;
+
 /** See raft::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
@@ -648,7 +651,7 @@ inline void search(raft::resources const& handle,
   auto mr = raft::resource::get_workspace_resource(handle);
 
   // Maximum number of query vectors to search at the same time.
-  const auto max_queries = std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), 4096);
+  const auto max_queries = std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), kMaxQueries);
   auto max_batch_size    = get_max_batch_size(handle, k, n_probes, max_queries, max_samples);
 
   rmm::device_uvector<float> float_queries(max_queries * dim_ext, stream, mr);

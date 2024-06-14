@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <cuda_fp16.h>
+
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -44,7 +46,9 @@ DLDataType data_type_to_DLDataType()
 {
   uint8_t const bits{sizeof(T) * 8};
   uint16_t const lanes{1};
-  if constexpr (std::is_floating_point_v<T>) {
+  // std::is_floating_point returns false for the half type - handle
+  // that here
+  if constexpr (std::is_floating_point_v<T> || std::is_same_v<T, half>) {
     return DLDataType{kDLFloat, bits, lanes};
   } else if constexpr (std::is_signed_v<T>) {
     return DLDataType{kDLInt, bits, lanes};
@@ -72,9 +76,13 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
 
   auto to_data_type = data_type_to_DLDataType<typename MdspanType::value_type>();
   RAFT_EXPECTS(to_data_type.code == tensor.dtype.code,
-               "code mismatch between return mdspan and DLTensor");
+               "code mismatch between return mdspan (%i) and DLTensor (%i)",
+               to_data_type.code,
+               tensor.dtype.code);
   RAFT_EXPECTS(to_data_type.bits == tensor.dtype.bits,
-               "bits mismatch between return mdspan and DLTensor");
+               "bits mismatch between return mdspan (%i) and DLTensor (%i)",
+               to_data_type.bits,
+               tensor.dtype.bits);
   RAFT_EXPECTS(to_data_type.lanes == tensor.dtype.lanes,
                "lanes mismatch between return mdspan and DLTensor");
   RAFT_EXPECTS(tensor.dtype.lanes == 1, "More than 1 DLTensor lanes not supported");
