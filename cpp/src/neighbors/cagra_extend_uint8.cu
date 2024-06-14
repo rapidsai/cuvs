@@ -20,44 +20,22 @@
 namespace cuvs::neighbors::cagra {
 
 #define RAFT_INST_CAGRA_EXTEND(T, IdxT)                                                       \
-  void add_graph_nodes(                                                                       \
-    raft::resources const& handle,                                                            \
-    raft::device_mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_stride>           \
-      updated_dataset_view,                                                                   \
-    const cuvs::neighbors::cagra::index<T, IdxT>& idx,                                        \
-    raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,                            \
-    const cagra::extend_params& params)                                                       \
-  {                                                                                           \
-    cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(                                         \
-      handle, updated_dataset_view, idx, updated_graph_view, params);                         \
-  }                                                                                           \
-                                                                                              \
-  void add_graph_nodes(                                                                       \
-    raft::resources const& handle,                                                            \
-    raft::host_mdspan<const T, raft::matrix_extent<int64_t>, raft::layout_stride>             \
-      updated_dataset_view,                                                                   \
-    const cuvs::neighbors::cagra::index<T, IdxT>& idx,                                        \
-    raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,                            \
-    const cagra::extend_params& params)                                                       \
-  {                                                                                           \
-    cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(                                         \
-      handle, updated_dataset_view, idx, updated_graph_view, params);                         \
-  }                                                                                           \
-                                                                                              \
   void extend(raft::resources const& handle,                                                  \
               raft::device_matrix_view<const T, int64_t, raft::row_major> additional_dataset, \
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
-              const cagra::extend_params& params)                                             \
+              const cagra::extend_params& params,                                             \
+              const extend_memory_buffers<T, IdxT>& mb)                                       \
   {                                                                                           \
-    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params);         \
+    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params, mb);     \
   }                                                                                           \
                                                                                               \
   void extend(raft::resources const& handle,                                                  \
               raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,   \
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
-              const cagra::extend_params& params)                                             \
+              const cagra::extend_params& params,                                             \
+              const extend_memory_buffers<T, IdxT>& mb)                                       \
   {                                                                                           \
-    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params);         \
+    cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params, mb);     \
   }
 
 RAFT_INST_CAGRA_EXTEND(uint8_t, uint32_t);
