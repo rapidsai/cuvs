@@ -252,7 +252,8 @@ extern "C" cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
       index->addr = reinterpret_cast<uintptr_t>(_deserialize<uint8_t, int64_t>(res, filename));
       index->dtype.code = kDLUInt;
     } else {
-      RAFT_FAIL("Unsupported dtype in file %s", filename);
+      RAFT_FAIL(
+        "Unsupported dtype in file %s itemsize %i kind %i", filename, dtype.itemsize, dtype.kind);
     }
   });
 }
