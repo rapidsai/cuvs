@@ -34,6 +34,23 @@ index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
 }
 
 template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle)
+  // this constructor is just for a temporary index, for use in the deserialization
+  // api. all the parameters here will get replaced with loaded values - that aren't
+  // necessarily known ahead of time before deserialization.
+  // TODO: do we even need a handle here - could just construct one?
+  : index(handle,
+          cuvs::distance::DistanceType::L2Expanded,
+          codebook_gen::PER_SUBSPACE,
+          0,
+          0,
+          8,
+          0,
+          true)
+{
+}
+
+template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
   : index(handle,
           params.metric,
@@ -76,6 +93,7 @@ index<IdxT>::index(raft::resources const& handle,
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
+
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
 {
