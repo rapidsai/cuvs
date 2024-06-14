@@ -15,6 +15,8 @@
 #
 # cython: language_level=3
 
+import warnings
+
 import numpy as np
 
 cimport cuvs.common.cydlpack
@@ -231,7 +233,7 @@ cdef class Index:
 
 
 @auto_sync_resources
-def build_index(IndexParams index_params, dataset, resources=None):
+def build(IndexParams index_params, dataset, resources=None):
     """
     Build the CAGRA index from the dataset for efficient search.
 
@@ -268,7 +270,7 @@ def build_index(IndexParams index_params, dataset, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
-    >>> index = cagra.build_index(build_params, dataset)
+    >>> index = cagra.build(build_params, dataset)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
     ...                                      index, dataset,
     ...                                      k)
@@ -299,6 +301,12 @@ def build_index(IndexParams index_params, dataset, resources=None):
         idx.trained = True
 
     return idx
+
+
+def build_index(IndexParams index_params, dataset, resources=None):
+    warnings.warn("cagra.build_index is deprecated, use cagra.build instead",
+                  FutureWarning)
+    return build(index_params, dataset, resources=resources)
 
 
 cdef class SearchParams:
@@ -501,7 +509,7 @@ def search(SearchParams search_params,
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = cagra.build_index(cagra.IndexParams(), dataset)
+    >>> index = cagra.build(cagra.IndexParams(), dataset)
     >>> # Search using the built index
     >>> queries = cp.random.random_sample((n_queries, n_features),
     ...                                   dtype=cp.float32)
@@ -596,7 +604,7 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = cagra.build_index(cagra.IndexParams(), dataset)
+    >>> index = cagra.build(cagra.IndexParams(), dataset)
     >>> # Serialize and deserialize the cagra index built
     >>> cagra.save("my_index.bin", index)
     >>> index_loaded = cagra.load("my_index.bin")
