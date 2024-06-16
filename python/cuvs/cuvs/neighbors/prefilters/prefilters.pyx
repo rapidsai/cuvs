@@ -28,19 +28,17 @@ from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.neighbors.common import _check_input_array
 
 
-@auto_convert_output
 def no_filter():
     """
     Create a default pre-filter which filters nothing.
     """
     cdef cuvsPrefilter filter = cuvsPrefilter()
-    filter.type = NO_FILTER
+    filter.ftype = NO_FILTER
     filter.addr = <uintptr_t>NULL
 
     return filter
 
 
-@auto_convert_output
 def from_bitmap(bitmap):
     """
     Create a pre-filter from an array with type of uint32.
