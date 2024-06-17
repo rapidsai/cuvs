@@ -19,6 +19,12 @@
 namespace cuvs::neighbors::ivf_flat {
 
 template <typename T, typename IdxT>
+index<T, IdxT>::index(raft::resources const& res)
+  : index(res, cuvs::distance::DistanceType::L2Expanded, 0, false, false, 0)
+{
+}
+
+template <typename T, typename IdxT>
 index<T, IdxT>::index(raft::resources const& res, const index_params& params, uint32_t dim)
   : index(res,
           params.metric,

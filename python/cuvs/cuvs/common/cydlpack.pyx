@@ -53,6 +53,9 @@ cdef DLManagedTensor* dlpack_c(ary):
     elif ary.dtype == np.float64:
         dtype.code = DLDataTypeCode.kDLFloat
         dtype.bits = 64
+    elif ary.dtype == np.float16:
+        dtype.code = DLDataTypeCode.kDLFloat
+        dtype.bits = 16
     elif ary.dtype == np.int8:
         dtype.code = DLDataTypeCode.kDLInt
         dtype.bits = 8
@@ -74,6 +77,8 @@ cdef DLManagedTensor* dlpack_c(ary):
     elif ary.dtype == np.bool_:
         dtype.code = DLDataTypeCode.kDLFloat
         dtype.bits = 8
+    else:
+        raise ValueError(f"Unsupported dtype {ary.dtype}")
 
     dtype.lanes = 1
 

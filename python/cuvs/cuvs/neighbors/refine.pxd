@@ -15,23 +15,16 @@
 #
 # cython: language_level=3
 
-from cuvs.common.c_api cimport cuvsError_t, cuvsGetLastErrorText
+from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
+from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
+from cuvs.distance_type cimport cuvsDistanceType
 
 
-class CuvsException(Exception):
-    pass
-
-
-def get_last_error_text():
-    """ returns the last error description from the cuvs c-api """
-    cdef const char* c_err = cuvsGetLastErrorText()
-    if c_err is NULL:
-        return
-    cdef bytes err = c_err
-    return err.decode("utf8", "ignore")
-
-
-def check_cuvs(status: cuvsError_t):
-    """ Converts a status code into an exception """
-    if status == cuvsError_t.CUVS_ERROR:
-        raise CuvsException(get_last_error_text())
+cdef extern from "cuvs/neighbors/refine.h" nogil:
+    cuvsError_t cuvsRefine(cuvsResources_t res,
+                           DLManagedTensor* dataset,
+                           DLManagedTensor* queries,
+                           DLManagedTensor* candidates,
+                           cuvsDistanceType metric,
+                           DLManagedTensor* indices,
+                           DLManagedTensor* distances) except +

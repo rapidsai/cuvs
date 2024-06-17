@@ -174,3 +174,31 @@ auto deserialize(raft::resources const& handle, const std::string& filename) -> 
   return index;
 }
 }  // namespace cuvs::neighbors::ivf_flat::detail
+
+#define CUVS_INST_IVF_FLAT_SERIALIZE(T, IdxT)                                           \
+  void serialize(raft::resources const& handle,                                         \
+                 const std::string& filename,                                           \
+                 const cuvs::neighbors::ivf_flat::index<T, IdxT>& index)                \
+  {                                                                                     \
+    cuvs::neighbors::ivf_flat::detail::serialize(handle, filename, index);              \
+  }                                                                                     \
+                                                                                        \
+  void serialize(raft::resources const& handle,                                         \
+                 std::ostream& os,                                                      \
+                 const cuvs::neighbors::ivf_flat::index<T, IdxT>& index)                \
+  {                                                                                     \
+    cuvs::neighbors::ivf_flat::detail::serialize(handle, os, index);                    \
+  }                                                                                     \
+                                                                                        \
+  void deserialize(raft::resources const& handle,                                       \
+                   const std::string& filename,                                         \
+                   cuvs::neighbors::ivf_flat::index<T, IdxT>* index)                    \
+  {                                                                                     \
+    *index = cuvs::neighbors::ivf_flat::detail::deserialize<T, IdxT>(handle, filename); \
+  }                                                                                     \
+  void deserialize(raft::resources const& handle,                                       \
+                   std::istream& is,                                                    \
+                   cuvs::neighbors::ivf_flat::index<T, IdxT>* index)                    \
+  {                                                                                     \
+    *index = cuvs::neighbors::ivf_flat::detail::deserialize<T, IdxT>(handle, is);       \
+  }
