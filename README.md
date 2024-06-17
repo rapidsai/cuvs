@@ -34,9 +34,9 @@ cuVS contains state-of-the-art implementations of several algorithms for running
 
 cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python). Different packages are available for the different languages supported by cuVS:
 
-| Python | C++ | C |
-|--------|-----|---|
-| `cuvs`| `libcuvs` | `libcuvs_c` |
+| Python | C/C++                       |
+|--------|-----------------------------|
+| `cuvs` | `libcuvs`, `libcuvs-static` |
 
 ### Stable release
 
