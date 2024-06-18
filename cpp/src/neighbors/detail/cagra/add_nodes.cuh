@@ -259,14 +259,14 @@ void add_graph_nodes(
 
   raft::copy(updated_graph_view.data_handle(),
              index.graph().data_handle(),
-             initial_dataset_size * degree,
+             index.graph().size(),
              raft::resource::get_cuda_stream(handle));
 
   neighbors::cagra::index<T, IdxT> internal_index(
     handle,
     index.metric(),
-    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, 0),
-    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, 0));
+    raft::make_device_matrix_view<const T, int64_t>(nullptr, 0, dim),
+    raft::make_device_matrix_view<const IdxT, int64_t>(nullptr, 0, degree));
 
   for (std::size_t additional_dataset_offset = 0; additional_dataset_offset < num_new_nodes;
        additional_dataset_offset += max_chunk_size_) {
@@ -386,7 +386,7 @@ void extend_core(
     } else {
       // Deallocate the current dataset memory space if the dataset is `owning'.
       index.update_dataset(
-        handle, raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, 0, stride));
+        handle, raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, dim, stride));
 
       // Allocate the new dataset
       updated_dataset = raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, stride);
@@ -397,11 +397,8 @@ void extend_core(
     // Copy updated dataset on host memory to device memory
     raft::copy(updated_dataset_view.data_handle(),
                host_updated_dataset.data_handle(),
-               updated_dataset_view.size(),
+               new_dataset_size * stride,
                raft::resource::get_cuda_stream(handle));
-
-    updated_dataset_view = raft::make_device_strided_matrix_view<T, int64_t>(
-      host_updated_dataset.data_handle(), new_dataset_size, dim, stride);
 
     // Add graph nodes
     cuvs::neighbors::cagra::add_graph_nodes<T, IdxT>(
@@ -409,8 +406,7 @@ void extend_core(
 
     // Update index dataset
     if (new_memory_buffers.dataset.has_value()) {
-      auto new_dataset_view = new_memory_buffers.dataset.value();
-      index.update_dataset(handle, raft::make_const_mdspan(new_dataset_view));
+      index.update_dataset(handle, raft::make_const_mdspan(updated_dataset_view));
     } else {
       using out_mdarray_type          = decltype(updated_dataset);
       using out_layout_type           = typename out_mdarray_type::layout_type;
