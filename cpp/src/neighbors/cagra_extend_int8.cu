@@ -21,18 +21,18 @@ namespace cuvs::neighbors::cagra {
 
 #define RAFT_INST_CAGRA_EXTEND(T, IdxT)                                                       \
   void extend(raft::resources const& handle,                                                  \
+              const cagra::extend_params& params,                                             \
               raft::device_matrix_view<const T, int64_t, raft::row_major> additional_dataset, \
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
-              const cagra::extend_params& params,                                             \
               const extend_memory_buffers<T, IdxT>& mb)                                       \
   {                                                                                           \
     cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params, mb);     \
   }                                                                                           \
                                                                                               \
   void extend(raft::resources const& handle,                                                  \
+              const cagra::extend_params& params,                                             \
               raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,   \
               cuvs::neighbors::cagra::index<T, IdxT>& idx,                                    \
-              const cagra::extend_params& params,                                             \
               const extend_memory_buffers<T, IdxT>& mb)                                       \
   {                                                                                           \
     cuvs::neighbors::cagra::extend<T, IdxT>(handle, additional_dataset, idx, params, mb);     \

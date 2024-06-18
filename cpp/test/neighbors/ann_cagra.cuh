@@ -574,7 +574,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         cagra::extend_params extend_params;
         cagra::extend(
-          handle_, raft::make_const_mdspan(additional_dataset.view()), index, extend_params);
+          handle_, extend_params, raft::make_const_mdspan(additional_dataset.view()), index);
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);

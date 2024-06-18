@@ -197,9 +197,19 @@ struct extend_params {
 
 template <typename T, typename IdxT>
 struct extend_memory_buffers {
+  /** The memory space for the new dataset. The shape must be (new_dataset_size, dataset_dim) and
+   * the stride must be the same as the dataset of the original index.
+   */
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> dataset = std::nullopt;
-  std::optional<raft::device_matrix_view<IdxT, int64_t>> graph                     = std::nullopt;
+
+  /** The memory space for the new graph. The shape must be (new_dataset_size, degree).
+   */
+  std::optional<raft::device_matrix_view<IdxT, int64_t>> graph = std::nullopt;
 };
+
+/**
+ * @}
+ */
 
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
@@ -681,25 +691,24 @@ auto build(raft::resources const& res,
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
+ *   auto additional_dataset = raft::make_device_matrix<float, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
  *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on device memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_params extend params
- * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
+ * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * and graph
  */
 void extend(raft::resources const& handle,
+            const cagra::extend_params& params,
             raft::device_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
             cuvs::neighbors::cagra::index<float, uint32_t>& idx,
-            const cagra::extend_params& params,
             const extend_memory_buffers<float, uint32_t>& new_memory_buffers =
               extend_memory_buffers<float, uint32_t>{});
 
@@ -708,25 +717,24 @@ void extend(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
+ *   auto additional_dataset = raft::make_host_matrix<float, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
  *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
- * @param[in] extend_params extend params
- * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on host memory
+ * @param[in,out] idx CAGRA index
+ * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * and graph
  */
 void extend(raft::resources const& handle,
+            const cagra::extend_params& params,
             raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
             cuvs::neighbors::cagra::index<float, uint32_t>& idx,
-            const cagra::extend_params& params,
             const extend_memory_buffers<float, uint32_t>& new_memory_buffers =
               extend_memory_buffers<float, uint32_t>{});
 
@@ -735,25 +743,24 @@ void extend(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
+ *   auto additional_dataset = raft::make_device_matrix<int8_t, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
  *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
- * @param[in] extend_params extend params
- * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on device memory
+ * @param[in,out] idx CAGRA index
+ * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * and graph
  */
 void extend(raft::resources const& handle,
+            const cagra::extend_params& params,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
             cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
-            const cagra::extend_params& params,
             const extend_memory_buffers<int8_t, uint32_t>& new_memory_buffers =
               extend_memory_buffers<int8_t, uint32_t>{});
 
@@ -762,25 +769,24 @@ void extend(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
+ *   auto additional_dataset = raft::make_host_matrix<int8_t, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
  *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
- * @param[in] extend_params extend params
- * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on host memory
+ * @param[in,out] idx CAGRA index
+ * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * and graph
  */
 void extend(raft::resources const& handle,
+            const cagra::extend_params& params,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
             cuvs::neighbors::cagra::index<int8_t, uint32_t>& idx,
-            const cagra::extend_params& params,
             const extend_memory_buffers<int8_t, uint32_t>& new_memory_buffers =
               extend_memory_buffers<int8_t, uint32_t>{});
 
@@ -789,25 +795,24 @@ void extend(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
+ *   auto additional_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
  *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
- * @param[in] extend_params extend params
- * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on host memory
+ * @param[in,out] idx CAGRA index
+ * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * and graph
  */
 void extend(raft::resources const& handle,
+            const cagra::extend_params& params,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
             cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
-            const cagra::extend_params& params,
             const extend_memory_buffers<uint8_t, uint32_t>& new_memory_buffers =
               extend_memory_buffers<uint8_t, uint32_t>{});
 
@@ -816,25 +821,24 @@ void extend(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
- *   // memory space for a new dataset and graph
- *   auto additional_dataset = raft::make_host_matrix<uint32_t,int64_t>(res,add_size,dim);
+ *   auto additional_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle,add_size,dim);
+ *   // set_additional_dataset(additional_dataset.view());
  *
- *   cagra::extend(res, index, raft::make_const_mdspan(additional_dataset.view()));
+ *   cagra::extend_params params;
+ *   cagra::extend(res, params, raft::make_const_mdspan(additional_dataset.view()), index);
  * @endcode
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] handle raft resources
- * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
- * @param[in] extend_params extend params
- * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
+ * @param[in] params extend params
+ * @param[in] additional_dataset additional dataset on host memory
+ * @param[in,out] idx CAGRA index
+ * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * and graph
  */
 void extend(raft::resources const& handle,
+            const cagra::extend_params& params,
             raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
             cuvs::neighbors::cagra::index<uint8_t, uint32_t>& idx,
-            const cagra::extend_params& params,
             const extend_memory_buffers<uint8_t, uint32_t>& new_memory_buffers =
               extend_memory_buffers<uint8_t, uint32_t>{});
 /**
