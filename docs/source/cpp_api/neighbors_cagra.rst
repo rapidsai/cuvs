@@ -35,6 +35,14 @@ Index extend parameters
     :members:
     :content-only:
 
+Index extend memory buffers
+----------------------
+
+.. doxygengroup:: cagra_cpp_extend_memory_buffers
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index
 -----
 

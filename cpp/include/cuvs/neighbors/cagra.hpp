@@ -186,15 +186,21 @@ struct extend_params {
   uint32_t max_chunk_size = 0;
 };
 
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_cpp_extend_memory_buffers CAGRA index extend memory buffers
+ * @{
+ */
+
 template <typename T, typename IdxT>
 struct extend_memory_buffers {
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> dataset = std::nullopt;
   std::optional<raft::device_matrix_view<IdxT, int64_t>> graph                     = std::nullopt;
 };
 
-/**
- * @}
- */
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
 
@@ -686,7 +692,7 @@ auto build(raft::resources const& res,
  *
  * @param[in] handle raft resources
  * @param[in] additional_dataset additional dataset
- * @param[in,out] index CAGRA index
+ * @param[in,out] idx CAGRA index
  * @param[in] extend_params extend params
  * @param[in] extend_memory_buffers (Optional) memory space for extended dataset and graph
  */
