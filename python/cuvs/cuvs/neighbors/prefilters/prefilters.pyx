@@ -23,20 +23,27 @@ from cuvs.common cimport cydlpack
 
 from .prefilters cimport BITMAP, NO_FILTER, cuvsPrefilter
 
-from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.neighbors.common import _check_input_array
+
+
+cdef class Prefilter:
+    cdef public cuvsPrefilter prefilter
+    cdef public object parent
+    def __init__(self, cuvsPrefilter prefilter, parent=None):
+        if parent is not None:
+          self.parent = parent
+        self.prefilter = prefilter
 
 
 def no_filter():
     """
     Create a default pre-filter which filters nothing.
     """
-    cdef cuvsPrefilter filter = cuvsPrefilter()
-    filter.ftype = NO_FILTER
-    filter.addr = <uintptr_t>NULL
-
-    return filter
+    cdef cuvsPrefilter filter
+    filter.type = NO_FILTER
+    filter.addr = <uintptr_t> NULL
+    return Prefilter(filter)
 
 
 def from_bitmap(bitmap):
@@ -57,8 +64,8 @@ def from_bitmap(bitmap):
 
     Returns
     -------
-    index : cuvs.neighbors.cuvsPrefilter
-        An instance of `cuvsPrefilter` that can be used to filter neighbors
+    filter : cuvs.neighbors.prefilters.Prefilter
+        An instance of `Prefilter` that can be used to filter neighbors
         based on the given bitmap.
     {resources_docstring}
 
@@ -82,8 +89,9 @@ def from_bitmap(bitmap):
     cdef cydlpack.DLManagedTensor* bitmap_dlpack = \
         cydlpack.dlpack_c(bitmap_cai)
 
-    cdef cuvsPrefilter filter = cuvsPrefilter()
+    cdef cuvsPrefilter filter
     filter.type = BITMAP
-    filter.addr = <uintptr_t>bitmap_dlpack
+    filter.addr = <uintptr_t> bitmap_dlpack
 
-    return filter
+
+    return Prefilter(filter, parent=bitmap)

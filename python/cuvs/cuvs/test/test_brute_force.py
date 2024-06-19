@@ -145,7 +145,7 @@ def test_prefiltered_brute_force_knn(
     distances_device = device_ndarray(distances)
     bitmap_device = device_ndarray(bitmap)
     prefilter = prefilters.from_bitmap(bitmap_device)
-
+    bitmap_device = None
     brute_force_index = brute_force.build(index_device, metric)
     ret_distances, ret_indices = brute_force.search(
         brute_force_index,

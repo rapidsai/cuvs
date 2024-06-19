@@ -149,13 +149,14 @@ def search(Index index,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
-    prefilter : Optional cuvs.neighbors.cuvsPrefilter that can be used
+    prefilter : Optional cuvs.neighbors.prefilters.Prefilter that can be used
                 to filter queries and neighbors based on the given bitmap.
                 (default None)
     {resources_docstring}
 
-    Examples without pre-filter
+    Examples
     --------
+    >>> # Example without pre-filter
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force
     >>> n_samples = 50000
@@ -176,8 +177,9 @@ def search(Index index,
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
 
-    Examples with pre-filter
+    Examples
     --------
+    >>> # Example with pre-filter
     >>> import numpy as np
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force, prefilters
@@ -246,7 +248,7 @@ def search(Index index,
             queries_dlpack,
             neighbors_dlpack,
             distances_dlpack,
-            prefilter
+            prefilter.prefilter
         ))
 
     return (distances, neighbors)
