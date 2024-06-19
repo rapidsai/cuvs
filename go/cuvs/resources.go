@@ -30,3 +30,9 @@ func NewResource(stream C.cudaStream_t) Resource {
 func Sync(r C.cuvsResources_t) {
 	CheckCuvs(C.cuvsStreamSync(r))
 }
+
+func GetCudaStream(r C.cuvsResources_t) C.cudaStream_t {
+	var stream C.cudaStream_t
+	CheckCuvs(C.cuvsStreamGet(r, &stream))
+	return stream
+}

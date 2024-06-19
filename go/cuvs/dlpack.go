@@ -8,6 +8,12 @@ package common
 //     tensor->manager_ctx = NULL;
 //     free(tensor);
 // }
+// #include <cuvs/core/c_api.h>
+// #include <cuvs/distance/pairwise_distance.h>
+// #include <cuvs/neighbors/brute_force.h>
+// #include <cuvs/neighbors/ivf_flat.h>
+// #include <cuvs/neighbors/cagra.h>
+// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
 import (
 	"unsafe"
@@ -15,7 +21,7 @@ import (
 
 type ManagedTensor = C.DLManagedTensor
 
-func NewManagedTensor(from_cai bool, shape []int, data []float32) *C.DLManagedTensor {
+func NewManagedTensor[T any](from_cai bool, shape []int, data []T, use_int64 bool) *C.DLManagedTensor {
 
 	if len(shape) < 2 {
 		panic("shape must be atleast 2")
@@ -40,10 +46,19 @@ func NewManagedTensor(from_cai bool, shape []int, data []float32) *C.DLManagedTe
 		device_id:   0,
 	}
 
-	dtype := C.DLDataType{
-		bits:  C.uchar(32),
-		lanes: C.ushort(1),
-		code:  C.kDLFloat,
+	var dtype C.DLDataType
+	if use_int64 {
+		dtype = C.DLDataType{
+			bits:  C.uchar(64),
+			lanes: C.ushort(1),
+			code:  C.kDLInt,
+		}
+	} else {
+		dtype = C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLFloat,
+		}
 	}
 
 	dlm.dl_tensor.data = unsafe.Pointer(&data[0])
@@ -60,5 +75,81 @@ func NewManagedTensor(from_cai bool, shape []int, data []float32) *C.DLManagedTe
 	dlm.deleter = (*[0]byte)(C.delete_tensor)
 
 	return dlm
+
+}
+
+func GetBytes(t *C.DLManagedTensor) int {
+	bytes := 1
+
+	for dim := 0; dim < int(t.dl_tensor.ndim); dim++ {
+		offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.dl_tensor.shape))
+
+		// Convert the pointer to the correct type and dereference it to get the value
+		dimSize := *(*C.long)(offset)
+
+		bytes *= int(dimSize)
+	}
+	bytes *= int(t.dl_tensor.dtype.bits / 8)
+
+	return bytes
+}
+
+func ToDevice(t *C.DLManagedTensor, res *Resource) *C.DLManagedTensor {
+	bytes := GetBytes(t)
+
+	// device_data := &C.void{}
+
+	var DeviceDataPointer unsafe.Pointer
+	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
+	// var deviceData *C.void = nil
+	println("host data location:")
+	println(t.dl_tensor.data)
+	println("device data pointer:")
+	println(DeviceDataPointer)
+	println("host data location:")
+	println(t.dl_tensor.data)
+	// t.dl_tensor.data = unsafe.Pointer(uintptr(t.dl_tensor.data) + uintptr(1200))
+	// println("new host data location:")
+	// println(t.dl_tensor.data)
+
+	// CheckCuvs(C.cuvsRMMAlloc(res.resource, &DeviceDataPointer, C.size_t(bytes)))
+	CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(bytes)))
+
+	println("device data pointer:")
+	println(DeviceDataPointer)
+	println(&DeviceDataPointer)
+	println("bytes:")
+	println(bytes)
+	// bytes = 0
+
+	hostData := make([]float32, 2)
+
+	// Initialize host memory in Go
+	for i := range hostData {
+		hostData[i] = float32(i)
+	}
+
+	println("host data:")
+	println(unsafe.Pointer(&hostData[0]))
+
+	CheckCuda(
+		C.cudaMemcpy(
+			DeviceDataPointer,
+			// t.dl_tensor.data,
+			unsafe.Pointer(&hostData[0]),
+			// DeviceDataPointer,
+			// C.size_t(bytes),
+			C.size_t(bytes),
+			C.cudaMemcpyHostToDevice,
+
+			// res.get_cuda_stream(),
+			// GetCudaStream(res.resource),
+		))
+
+	println("done")
+
+	t.dl_tensor.data = DeviceDataPointer
+
+	return t
 
 }

@@ -13,3 +13,9 @@ func CheckCuvs(error C.cuvsError_t) {
 		panic(C.GoString(C.cuvsGetLastErrorText()))
 	}
 }
+
+func CheckCuda(error C.cudaError_t) {
+	if error != C.cudaSuccess {
+		panic(C.GoString(C.cudaGetErrorString(error)))
+	}
+}

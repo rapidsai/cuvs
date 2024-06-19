@@ -41,11 +41,11 @@ func DestroyIndex(index Index) {
 
 }
 
-func BuildIndex(Resources C.cuvsResources_t, Dataset *C.DLManagedTensor, metric string, metric_arg float32, index C.cuvsBruteForceIndex_t) {
+func BuildIndex(Resources C.cuvsResources_t, Dataset *C.DLManagedTensor, metric string, metric_arg float32, index *Index) {
 
 	// Data := unsafe.Pointer(Dataset)
 
-	// C.cuvsRMMAlloc(Resources, &Data, 24)
+	// CheckCuvs(C.cuvsRMMAlloc(Resources, &Data, 2400))
 
 	CMetric := C.cuvsDistanceType(0)
 
@@ -56,11 +56,14 @@ func BuildIndex(Resources C.cuvsResources_t, Dataset *C.DLManagedTensor, metric 
 		panic("Unsupported metric")
 	}
 
-	CheckCuvs(C.cuvsBruteForceBuild(Resources, Dataset, CMetric, C.float(metric_arg), index))
+	println(index.index.addr)
+
+	CheckCuvs(C.cuvsBruteForceBuild(Resources, Dataset, CMetric, C.float(metric_arg), index.index))
+	println(index.index.addr)
 
 }
 
-func SearchIndex(resources C.cuvsResources_t, index Index, queries *ManagedTensor, neighbors *ManagedTensor, distances *ManagedTensor) {
+func SearchIndex(resources C.cuvsResources_t, index Index, queries *C.DLManagedTensor, neighbors *C.DLManagedTensor, distances *C.DLManagedTensor) {
 
 	if !index.trained {
 		panic("Index needs to be built before calling search.")
