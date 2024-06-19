@@ -193,12 +193,12 @@ outputs:
         - cuda-version ={{ cuda_version }}
         - cmake {{ cmake_version }}
         - ninja
-        - openblas
         - {{ stdlib("c") }}
       host:
         - libraft ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
+        - openblas # required by some CPU algos in benchmarks
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
         - libcublas {{ cuda11_libcublas_host_version }}
