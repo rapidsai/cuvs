@@ -138,6 +138,15 @@ struct index : cuvs::neighbors::index {
   index& operator=(const index&) = delete;
   index& operator=(index&&)      = default;
   ~index()                       = default;
+
+  /**
+   * @brief Construct an empty index.
+   *
+   * Constructs an empty index. This index will either need to be trained with `build`
+   * or loaded from a saved copy with `deserialize`
+   */
+  index(raft::resources const& res);
+
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& res, const index_params& params, uint32_t dim);
   /** Construct an empty index. It needs to be trained and then populated. */
