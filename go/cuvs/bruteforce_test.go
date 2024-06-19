@@ -1,56 +1,63 @@
 package common
 
 import (
+	"math/rand"
 	"testing"
+	"time"
+	"unsafe"
 )
 
 func TestBruteForce(t *testing.T) {
 
 	resource := NewResource(nil)
 
-	dataset := NewManagedTensor(true, []int{1, 2}, []float32{1, 2}, false)
-	bytes := GetBytes(dataset)
-	println("size:")
-	println(bytes)
-	println(dataset.dl_tensor.dtype.code)
+	rand.Seed(time.Now().UnixNano())
+
+	NDataPoints := 16
+	NFeatures := 8
+
+	TestDataset := make([]float32, NDataPoints*NFeatures)
+	for index := range TestDataset {
+		TestDataset[index] = rand.Float32()
+		// TestDataset[index] = float32(index)
+	}
+
+	dataset := NewManagedTensor(true, []int{NDataPoints, NFeatures}, TestDataset, false)
 
 	index := CreateIndex()
+	// use the first 4 points from the dataset as queries : will test that we get them back
+	// as their own nearest neighbor
+
+	NQueries := 4
+	K := 4
+	queries := NewManagedTensor(true, []int{NQueries, NFeatures}, TestDataset[:(NQueries*NFeatures)], false)
+	neighbors := NewManagedTensor(true, []int{NQueries, K}, make([]int64, NQueries*K), true)
+	distances := NewManagedTensor(true, []int{NQueries, K}, make([]float32, NQueries*K), false)
+
+	ToDevice(neighbors, &resource)
+	ToDevice(distances, &resource)
+	ToDevice(dataset, &resource)
 
 	BuildIndex(resource.resource, dataset, "L2Expanded", 2.0, index)
-	println("got here")
+	Sync(resource.resource)
 
-	println("index created")
+	ToDevice(queries, &resource)
 
 	index.trained = true
 
-	queries := NewManagedTensor(true, []int{1, 2}, []float32{1, 2}, false)
+	SearchIndex(resource.resource, *index, queries, neighbors, distances)
 
-	neighbors := NewManagedTensor(true, []int{1, 1}, []int64{3, 3}, true)
+	ToHost(neighbors, &resource)
+	ToHost(distances, &resource)
 
-	// distances := NewManagedTensor(true, []int{1, 1}, []float32{1, 4}, false)
+	Sync(resource.resource)
 
-	println("tensors created")
+	p := (*int64)(unsafe.Pointer(uintptr(neighbors.dl_tensor.data) + uintptr(K*8*3)))
 
-	println(queries.dl_tensor.data)
-
-	queries_device := ToDevice(queries, &resource)
-
-	println("queries tensor transferred")
-
-	// neighbors_device := ToDevice(neighbors, &resource)
-
-	// distances_device := ToDevice(distances, &resource)
-
-	println(queries_device.dl_tensor.data)
-
-	println("tensors on device")
-
-	// SearchIndex(resource.resource, *index, queries_device, neighbors_device, distances_device)
-
-	println("search done")
-
-	p := (*float32)(neighbors.dl_tensor.data)
+	d := (*float32)(distances.dl_tensor.data)
 
 	println(*p)
+
+	println(*d)
 
 }

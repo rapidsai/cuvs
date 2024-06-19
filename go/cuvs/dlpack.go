@@ -35,11 +35,11 @@ func NewManagedTensor[T any](from_cai bool, shape []int, data []T, use_int64 boo
 
 	var devicetype C.DLDeviceType
 
-	if from_cai {
-		devicetype = C.kDLCUDA
-	} else {
-		devicetype = C.kDLCPU
-	}
+	// if from_cai {
+	devicetype = C.kDLCUDA
+	// } else {
+	// devicetype = C.kDLCPU
+	// }
 
 	device := C.DLDevice{
 		device_type: devicetype,
@@ -94,7 +94,7 @@ func GetBytes(t *C.DLManagedTensor) int {
 	return bytes
 }
 
-func ToDevice(t *C.DLManagedTensor, res *Resource) *C.DLManagedTensor {
+func ToDevice(t *C.DLManagedTensor, res *Resource) {
 	bytes := GetBytes(t)
 
 	// device_data := &C.void{}
@@ -112,8 +112,8 @@ func ToDevice(t *C.DLManagedTensor, res *Resource) *C.DLManagedTensor {
 	// println("new host data location:")
 	// println(t.dl_tensor.data)
 
-	// CheckCuvs(C.cuvsRMMAlloc(res.resource, &DeviceDataPointer, C.size_t(bytes)))
-	CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(bytes)))
+	CheckCuvs(C.cuvsRMMAlloc(res.resource, &DeviceDataPointer, C.size_t(bytes)))
+	// CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(bytes)))
 
 	println("device data pointer:")
 	println(DeviceDataPointer)
@@ -134,9 +134,11 @@ func ToDevice(t *C.DLManagedTensor, res *Resource) *C.DLManagedTensor {
 
 	CheckCuda(
 		C.cudaMemcpy(
+			// DeviceDataPointer,
 			DeviceDataPointer,
-			// t.dl_tensor.data,
-			unsafe.Pointer(&hostData[0]),
+			// unsafe.Pointer(&hostData[0]),
+			t.dl_tensor.data,
+			// unsafe.Pointer(&hostData[0]),
 			// DeviceDataPointer,
 			// C.size_t(bytes),
 			C.size_t(bytes),
@@ -149,7 +151,65 @@ func ToDevice(t *C.DLManagedTensor, res *Resource) *C.DLManagedTensor {
 	println("done")
 
 	t.dl_tensor.data = DeviceDataPointer
+	println("normal transfer done")
+	// return t
 
-	return t
+}
+
+func ToHost(t *C.DLManagedTensor, res *Resource) {
+	bytes := GetBytes(t)
+
+	// var DeviceDataPointer unsafe.Pointer
+
+	addr := (C.malloc(C.size_t(bytes)))
+
+	// hostData := make([]float32, 2)
+
+	CheckCuda(
+		C.cudaMemcpy(
+			// DeviceDataPointer,
+			addr,
+			// unsafe.Pointer(&hostData[0]),
+			t.dl_tensor.data,
+			// unsafe.Pointer(&hostData[0]),
+			// DeviceDataPointer,
+			// C.size_t(bytes),
+			C.size_t(bytes),
+			C.cudaMemcpyDeviceToHost,
+
+			// res.get_cuda_stream(),
+			// GetCudaStream(res.resource),
+		))
+
+	t.dl_tensor.data = addr
+}
+
+func TestCuda() {
+
+	var DeviceDataPointer unsafe.Pointer
+	CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(8)))
+
+	array := make([]float32, 2)
+
+	for i := range array {
+		array[i] = float32(i)
+	}
+
+	CheckCuda(
+		C.cudaMemcpy(
+			// DeviceDataPointer,
+			DeviceDataPointer,
+			unsafe.Pointer(&array[0]),
+			// unsafe.Pointer(&hostData[0]),
+			// DeviceDataPointer,
+			// C.size_t(bytes),
+			C.size_t(8),
+			C.cudaMemcpyHostToDevice,
+
+			// res.get_cuda_stream(),
+			// GetCudaStream(res.resource),
+		))
+
+	println("cuda test done")
 
 }

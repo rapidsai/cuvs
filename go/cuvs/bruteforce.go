@@ -43,6 +43,10 @@ func DestroyIndex(index Index) {
 
 func BuildIndex(Resources C.cuvsResources_t, Dataset *C.DLManagedTensor, metric string, metric_arg float32, index *Index) {
 
+	if Dataset.dl_tensor.device.device_type != C.kDLCUDA {
+		panic("Dataset must be on GPU")
+	}
+
 	// Data := unsafe.Pointer(Dataset)
 
 	// CheckCuvs(C.cuvsRMMAlloc(Resources, &Data, 2400))
