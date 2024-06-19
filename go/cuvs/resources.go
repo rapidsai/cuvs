@@ -14,25 +14,34 @@ type Resource struct {
 }
 
 // func NewResource() *Resource {
-func NewResource(stream C.cudaStream_t) Resource {
+func NewResource(stream C.cudaStream_t) (Resource, error) {
 
 	res := C.cuvsResources_t(0)
 
-	CheckCuvs(C.cuvsResourcesCreate(&res))
-
-	if stream != nil {
-		CheckCuvs(C.cuvsStreamSet(res, stream))
+	err := CheckCuvs(C.cuvsResourcesCreate(&res))
+	if err != nil {
+		return Resource{}, err
 	}
 
-	return Resource{resource: res}
+	if stream != nil {
+		err := CheckCuvs(C.cuvsStreamSet(res, stream))
+		if err != nil {
+			return Resource{}, err
+		}
+	}
+
+	return Resource{resource: res}, nil
 }
 
-func Sync(r C.cuvsResources_t) {
-	CheckCuvs(C.cuvsStreamSync(r))
+func Sync(r C.cuvsResources_t) error {
+	return CheckCuvs(C.cuvsStreamSync(r))
 }
 
-func GetCudaStream(r C.cuvsResources_t) C.cudaStream_t {
+func GetCudaStream(r C.cuvsResources_t) (C.cudaStream_t, error) {
 	var stream C.cudaStream_t
-	CheckCuvs(C.cuvsStreamGet(r, &stream))
-	return stream
+	err := CheckCuvs(C.cuvsStreamGet(r, &stream))
+	if err != nil {
+		return C.cudaStream_t(nil), err
+	}
+	return stream, nil
 }

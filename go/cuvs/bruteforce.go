@@ -9,6 +9,7 @@ package common
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
 import (
+	"errors"
 	"unsafe"
 )
 
@@ -21,35 +22,38 @@ type Index struct {
 // 	// C.free(index.index)
 // }
 
-func CreateIndex() *Index {
+func CreateIndex() (*Index, error) {
 
 	index := (C.cuvsBruteForceIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsBruteForceIndex{}))))
 
-	// defer C.free(unsafe.Pointer(index))
-
-	err := C.cuvsBruteForceIndexCreate(&index)
-
-	CheckCuvs(err)
-
-	return &Index{index: index, trained: false}
-
-}
-
-func DestroyIndex(index Index) {
-	err := C.cuvsBruteForceIndexDestroy(index.index)
-	CheckCuvs(err)
-
-}
-
-func BuildIndex(Resources C.cuvsResources_t, Dataset *C.DLManagedTensor, metric string, metric_arg float32, index *Index) {
-
-	if Dataset.dl_tensor.device.device_type != C.kDLCUDA {
-		panic("Dataset must be on GPU")
+	if index == nil {
+		return nil, errors.New("memory allocation failed")
 	}
 
-	// Data := unsafe.Pointer(Dataset)
+	err := CheckCuvs(C.cuvsBruteForceIndexCreate(&index))
 
-	// CheckCuvs(C.cuvsRMMAlloc(Resources, &Data, 2400))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Index{index: index, trained: false}, nil
+
+}
+
+func (index *Index) Close() error {
+	err := CheckCuvs(C.cuvsBruteForceIndexDestroy(index.index))
+	if err != nil {
+		return err
+	}
+	// TODO free memory
+	return nil
+}
+
+func BuildIndex[T any](Resources C.cuvsResources_t, Dataset *Tensor[T], metric string, metric_arg float32, index *Index) error {
+
+	if Dataset.c_tensor.dl_tensor.device.device_type != C.kDLCUDA {
+		return errors.New("dataset must be on GPU")
+	}
 
 	CMetric := C.cuvsDistanceType(0)
 
@@ -57,22 +61,27 @@ func BuildIndex(Resources C.cuvsResources_t, Dataset *C.DLManagedTensor, metric 
 	case "L2Expanded":
 		CMetric = C.L2Expanded
 	default:
-		panic("Unsupported metric")
+		return errors.New("unsupported metric")
 	}
 
 	println(index.index.addr)
 
-	CheckCuvs(C.cuvsBruteForceBuild(Resources, Dataset, CMetric, C.float(metric_arg), index.index))
-	println(index.index.addr)
+	err := CheckCuvs(C.cuvsBruteForceBuild(Resources, Dataset.c_tensor, CMetric, C.float(metric_arg), index.index))
+	if err != nil {
+		return err
+	}
+	index.trained = true
+
+	return nil
 
 }
 
-func SearchIndex(resources C.cuvsResources_t, index Index, queries *C.DLManagedTensor, neighbors *C.DLManagedTensor, distances *C.DLManagedTensor) {
+func SearchIndex[T any](resources C.cuvsResources_t, index Index, queries *Tensor[T], neighbors *Tensor[int64], distances *Tensor[T]) error {
 
 	if !index.trained {
-		panic("Index needs to be built before calling search.")
+		return errors.New("index needs to be built before calling search")
 	}
 
-	CheckCuvs(C.cuvsBruteForceSearch(resources, index.index, queries, neighbors, distances))
+	return CheckCuvs(C.cuvsBruteForceSearch(resources, index.index, queries.c_tensor, neighbors.c_tensor, distances.c_tensor))
 
 }

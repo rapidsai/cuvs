@@ -7,15 +7,18 @@ package common
 // #include <cuvs/neighbors/cagra.h>
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+import "errors"
 
-func CheckCuvs(error C.cuvsError_t) {
+func CheckCuvs(error C.cuvsError_t) error {
 	if error == C.CUVS_ERROR {
-		panic(C.GoString(C.cuvsGetLastErrorText()))
+		return errors.New(C.GoString(C.cuvsGetLastErrorText()))
 	}
+	return nil
 }
 
-func CheckCuda(error C.cudaError_t) {
+func CheckCuda(error C.cudaError_t) error {
 	if error != C.cudaSuccess {
-		panic(C.GoString(C.cudaGetErrorString(error)))
+		return errors.New(C.GoString(C.cudaGetErrorString(error)))
 	}
+	return nil
 }

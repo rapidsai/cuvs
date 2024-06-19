@@ -4,60 +4,76 @@ import (
 	"math/rand"
 	"testing"
 	"time"
-	"unsafe"
 )
 
 func TestBruteForce(t *testing.T) {
 
-	resource := NewResource(nil)
+	resource, _ := NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
 	NDataPoints := 16
 	NFeatures := 8
 
-	TestDataset := make([]float32, NDataPoints*NFeatures)
-	for index := range TestDataset {
-		TestDataset[index] = rand.Float32()
-		// TestDataset[index] = float32(index)
+	TestDataset := make([][]float32, NDataPoints)
+	for i := range TestDataset {
+		TestDataset[i] = make([]float32, NFeatures)
+		for j := range TestDataset[i] {
+			TestDataset[i][j] = rand.Float32()
+		}
 	}
 
-	dataset := NewManagedTensor(true, []int{NDataPoints, NFeatures}, TestDataset, false)
+	dataset, _ := NewTensor(true, TestDataset)
 
-	index := CreateIndex()
+	index, _ := CreateIndex()
+	defer index.Close()
 	// use the first 4 points from the dataset as queries : will test that we get them back
 	// as their own nearest neighbor
 
 	NQueries := 4
 	K := 4
-	queries := NewManagedTensor(true, []int{NQueries, NFeatures}, TestDataset[:(NQueries*NFeatures)], false)
-	neighbors := NewManagedTensor(true, []int{NQueries, K}, make([]int64, NQueries*K), true)
-	distances := NewManagedTensor(true, []int{NQueries, K}, make([]float32, NQueries*K), false)
+	queries, _ := NewTensor(true, TestDataset[:NQueries])
+	NeighborsDataset := make([][]int64, NQueries)
+	for i := range NeighborsDataset {
+		NeighborsDataset[i] = make([]int64, K)
+	}
+	DistancesDataset := make([][]float32, NQueries)
+	for i := range DistancesDataset {
+		DistancesDataset[i] = make([]float32, K)
+	}
+	neighbors, _ := NewTensor(true, NeighborsDataset)
+	distances, _ := NewTensor(true, DistancesDataset)
 
-	ToDevice(neighbors, &resource)
-	ToDevice(distances, &resource)
-	ToDevice(dataset, &resource)
+	neighbors.ToDevice(&resource)
+	distances.ToDevice(&resource)
+	dataset.ToDevice(&resource)
 
-	BuildIndex(resource.resource, dataset, "L2Expanded", 2.0, index)
+	BuildIndex(resource.resource, &dataset, "L2Expanded", 2.0, index)
 	Sync(resource.resource)
 
-	ToDevice(queries, &resource)
+	queries.ToDevice(&resource)
 
-	index.trained = true
+	SearchIndex(resource.resource, *index, &queries, &neighbors, &distances)
 
-	SearchIndex(resource.resource, *index, queries, neighbors, distances)
-
-	ToHost(neighbors, &resource)
-	ToHost(distances, &resource)
+	neighbors.ToHost(&resource)
+	distances.ToHost(&resource)
 
 	Sync(resource.resource)
 
-	p := (*int64)(unsafe.Pointer(uintptr(neighbors.dl_tensor.data) + uintptr(K*8*3)))
+	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
+	arr, _ := neighbors.GetArray()
+	for i := range arr {
+		println(arr[i][0])
+		if arr[i][0] != int64(i) {
+			t.Error("wrong neighbor, expected", i, "got", arr[i][0])
+		}
+	}
 
-	d := (*float32)(distances.dl_tensor.data)
-
-	println(*p)
-
-	println(*d)
+	arr_dist, _ := distances.GetArray()
+	for i := range arr_dist {
+		if arr_dist[i][0] >= float32(0.001) || arr_dist[i][0] <= float32(-0.001) {
+			t.Error("wrong distance, expected", float32(i), "got", arr_dist[i][0])
+		}
+	}
 
 }
