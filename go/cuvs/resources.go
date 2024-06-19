@@ -33,15 +33,24 @@ func NewResource(stream C.cudaStream_t) (Resource, error) {
 	return Resource{resource: res}, nil
 }
 
-func Sync(r C.cuvsResources_t) error {
-	return CheckCuvs(C.cuvsStreamSync(r))
+func (r Resource) Sync() error {
+	return CheckCuvs(C.cuvsStreamSync(r.resource))
 }
 
-func GetCudaStream(r C.cuvsResources_t) (C.cudaStream_t, error) {
+func (r Resource) GetCudaStream() (C.cudaStream_t, error) {
 	var stream C.cudaStream_t
-	err := CheckCuvs(C.cuvsStreamGet(r, &stream))
+	err := CheckCuvs(C.cuvsStreamGet(r.resource, &stream))
 	if err != nil {
 		return C.cudaStream_t(nil), err
 	}
 	return stream, nil
+}
+
+func (r Resource) Close() error {
+	err := CheckCuvs(C.cuvsResourcesDestroy(r.resource))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

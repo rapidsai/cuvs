@@ -49,7 +49,7 @@ func TestBruteForce(t *testing.T) {
 	dataset.ToDevice(&resource)
 
 	BuildIndex(resource.resource, &dataset, "L2Expanded", 2.0, index)
-	Sync(resource.resource)
+	resource.Sync()
 
 	queries.ToDevice(&resource)
 
@@ -58,7 +58,7 @@ func TestBruteForce(t *testing.T) {
 	neighbors.ToHost(&resource)
 	distances.ToHost(&resource)
 
-	Sync(resource.resource)
+	resource.Sync()
 
 	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
 	arr, _ := neighbors.GetArray()
