@@ -349,13 +349,14 @@ void calc_centers_and_sizes(const raft::resources& handle,
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */
-template <typename T, typename MathT, typename IdxT, typename MappingOpT>
+template <typename T, typename MathT, typename IdxT, typename MappingOpT, typename FinOpT>
 void compute_norm(const raft::resources& handle,
                   MathT* dataset_norm,
                   const T* dataset,
                   IdxT dim,
                   IdxT n_rows,
                   MappingOpT mapping_op,
+                  FinOpT norm_fin_op,
                   std::optional<rmm::device_async_resource_ref> mr = std::nullopt)
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("compute_norm");
@@ -376,7 +377,7 @@ void compute_norm(const raft::resources& handle,
   }
 
   raft::linalg::rowNorm<MathT, IdxT>(
-    dataset_norm, dataset_ptr, dim, n_rows, raft::linalg::L2Norm, true, stream);
+    dataset_norm, dataset_ptr, dim, n_rows, raft::linalg::L2Norm, true, stream, norm_fin_op);
 }
 
 /**
@@ -441,8 +442,12 @@ void predict(const raft::resources& handle,
 
     // Compute the norm now if it hasn't been pre-computed.
     if (need_compute_norm) {
-      compute_norm(
-        handle, cur_dataset_norm.data(), cur_dataset_ptr, dim, minibatch_size, mapping_op, mem_res);
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+        compute_norm(
+          handle, cur_dataset_norm.data(), cur_dataset_ptr, dim, minibatch_size, mapping_op, raft::sqrt_op{}, mr);
+      else
+        compute_norm(
+          handle, cur_dataset_norm.data(), cur_dataset_ptr, dim, minibatch_size, mapping_op, raft::identity_op{}, mr);
       dataset_norm_ptr = cur_dataset_norm.data();
     } else if (dataset_norm != nullptr) {
       dataset_norm_ptr = dataset_norm + offset;
@@ -1001,7 +1006,8 @@ void build_hierarchical(const raft::resources& handle,
                         IdxT n_rows,
                         MathT* cluster_centers,
                         IdxT n_clusters,
-                        MappingOpT mapping_op)
+                        MappingOpT mapping_op,
+                        const MathT* dataset_norm = nullptr)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   using LabelT = uint32_t;
@@ -1018,21 +1024,32 @@ void build_hierarchical(const raft::resources& handle,
   auto [max_minibatch_size, mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
 
-  // Precompute the L2 norm of the dataset if relevant.
-  const MathT* dataset_norm = nullptr;
+  // Precompute the L2 norm of the dataset if relevant and not yet computed.
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
-  if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-      params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+  if (dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+      params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);
-      compute_norm(handle,
-                   dataset_norm_buf.data() + offset,
-                   dataset + dim * offset,
-                   dim,
-                   minibatch_size,
-                   mapping_op,
-                   device_memory);
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+        compute_norm(handle,
+          dataset_norm_buf.data() + offset,
+          dataset + dim * offset,
+          dim,
+          minibatch_size,
+          mapping_op,
+          raft::sqrt_op{},
+          device_memory);
+      else
+        compute_norm(handle,
+          dataset_norm_buf.data() + offset,
+          dataset + dim * offset,
+          dim,
+          minibatch_size,
+          mapping_op,
+          raft::identity_op{},
+          device_memory);
     }
     dataset_norm = (const MathT*)dataset_norm_buf.data();
   }
