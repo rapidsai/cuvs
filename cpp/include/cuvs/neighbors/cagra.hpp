@@ -702,7 +702,7 @@ auto build(raft::resources const& res,
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on device memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * @param[in] new_memory_buffers (Optional) user-allocated memory buffers for the extended dataset
  * and graph
  */
 void extend(raft::resources const& handle,
@@ -728,7 +728,7 @@ void extend(raft::resources const& handle,
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on host memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * @param[in] new_memory_buffers (Optional) user-allocated memory buffers for the extended dataset
  * and graph
  */
 void extend(raft::resources const& handle,
@@ -754,7 +754,7 @@ void extend(raft::resources const& handle,
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on device memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * @param[in] new_memory_buffers (Optional) user-allocated memory buffers for the extended dataset
  * and graph
  */
 void extend(raft::resources const& handle,
@@ -780,7 +780,7 @@ void extend(raft::resources const& handle,
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on host memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * @param[in] new_memory_buffers (Optional) user-allocated memory buffers for the extended dataset
  * and graph
  */
 void extend(raft::resources const& handle,
@@ -806,7 +806,7 @@ void extend(raft::resources const& handle,
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on host memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * @param[in] new_memory_buffers (Optional) user-allocated memory buffers for the extended dataset
  * and graph
  */
 void extend(raft::resources const& handle,
@@ -832,7 +832,7 @@ void extend(raft::resources const& handle,
  * @param[in] params extend params
  * @param[in] additional_dataset additional dataset on host memory
  * @param[in,out] idx CAGRA index
- * @param[in] extend_memory_buffers (Optional) user-allocated memory spaces for the extended dataset
+ * @param[in] new_memory_buffers (Optional) user-allocated memory buffers for the extended dataset
  * and graph
  */
 void extend(raft::resources const& handle,
