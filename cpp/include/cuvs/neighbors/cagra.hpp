@@ -79,7 +79,8 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Specify compression parameters if compression is desired.
+   * Specify compression parameters if compression is desired. If set, overrides the
+   * add_data_on_build argument.
    */
   std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
@@ -104,6 +105,16 @@ struct index_params : cuvs::neighbors::index_params {
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params>
     graph_build_params;
+
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build`.
+   *  - `false` means `build` only builds the graph, but
+   * the user is expected to update dataset separately.
+   */
+  bool add_data_on_build = true;
 };
 
 /**
