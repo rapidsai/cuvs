@@ -20,10 +20,10 @@ import (
 	"unsafe"
 )
 
-// type ManagedTensor = C.DLManagedTensor
+type ManagedTensor = *C.DLManagedTensor
 
 type Tensor[T any] struct {
-	c_tensor *C.DLManagedTensor
+	C_tensor ManagedTensor
 }
 
 // func NewTensor[T any](from_cai bool, shape []int, data []T, use_int64 bool) (Tensor, error) {
@@ -114,7 +114,7 @@ func (t *Tensor[T]) Close() error {
 		if err != nil {
 			return err
 		}
-		return CheckCuvs(C.cuvsRMMFree(res.resource, t.c_tensor.dl_tensor.data, C.size_t(bytes)))
+		return CheckCuvs(C.cuvsRMMFree(res.Resource, t.c_tensor.dl_tensor.data, C.size_t(bytes)))
 
 		// C.run_callback(t.c_tensor.deleter, t.c_tensor)
 	}
@@ -137,10 +137,14 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	println("host data location:")
 	println(t.c_tensor.dl_tensor.data)
 
-	CheckCuvs(C.cuvsRMMAlloc(res.resource, &DeviceDataPointer, C.size_t(bytes)))
+	err := CheckCuvs(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes)))
+	if err != nil {
+		//	panic(err)
+		return nil, err
+	}
 	// CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(bytes)))
 
-	println("device data pointer:")
+	println("device data pointer (after allocation):")
 	println(DeviceDataPointer)
 	println(&DeviceDataPointer)
 	println("bytes:")
@@ -157,7 +161,7 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	println("host data:")
 	println(unsafe.Pointer(&hostData[0]))
 
-	err := CheckCuda(
+	err = CheckCuda(
 		C.cudaMemcpy(
 			DeviceDataPointer,
 			t.c_tensor.dl_tensor.data,

@@ -9,7 +9,9 @@ package common
 import "C"
 import "errors"
 
-func CheckCuvs(error C.cuvsError_t) error {
+type CuvsError C.cuvsError_t
+
+func CheckCuvs(error CuvsError) error {
 	if error == C.CUVS_ERROR {
 		return errors.New(C.GoString(C.cuvsGetLastErrorText()))
 	}

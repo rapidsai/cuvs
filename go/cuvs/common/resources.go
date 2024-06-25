@@ -9,8 +9,10 @@ package common
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
 
+type cuvsResource C.cuvsResources_t
+
 type Resource struct {
-	resource C.cuvsResources_t
+	Resource C.cuvsResources_t
 }
 
 // func NewResource() *Resource {
@@ -30,16 +32,16 @@ func NewResource(stream C.cudaStream_t) (Resource, error) {
 		}
 	}
 
-	return Resource{resource: res}, nil
+	return Resource{Resource: res}, nil
 }
 
 func (r Resource) Sync() error {
-	return CheckCuvs(C.cuvsStreamSync(r.resource))
+	return CheckCuvs(C.cuvsStreamSync(r.Resource))
 }
 
 func (r Resource) GetCudaStream() (C.cudaStream_t, error) {
 	var stream C.cudaStream_t
-	err := CheckCuvs(C.cuvsStreamGet(r.resource, &stream))
+	err := CheckCuvs(C.cuvsStreamGet(r.Resource, &stream))
 	if err != nil {
 		return C.cudaStream_t(nil), err
 	}
@@ -47,7 +49,7 @@ func (r Resource) GetCudaStream() (C.cudaStream_t, error) {
 }
 
 func (r Resource) Close() error {
-	err := CheckCuvs(C.cuvsResourcesDestroy(r.resource))
+	err := CheckCuvs(C.cuvsResourcesDestroy(r.Resource))
 	if err != nil {
 		return err
 	}

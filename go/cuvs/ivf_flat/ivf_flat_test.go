@@ -1,4 +1,4 @@
-package common
+package ivf_flat
 
 import (
 	"math/rand"
@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestBruteForce(t *testing.T) {
+func TestIvfFlat(t *testing.T) {
 
 	resource, _ := NewResource(nil)
 
@@ -25,7 +25,9 @@ func TestBruteForce(t *testing.T) {
 
 	dataset, _ := NewTensor(true, TestDataset)
 
-	index, _ := CreateIndex()
+	IndexParams, _ := CreateIndexParams(2, "L2Expanded", 2.0, 0, 0.5, true)
+
+	index, _ := CreateIvfFlatIndex(IndexParams, &dataset)
 	defer index.Close()
 	// use the first 4 points from the dataset as queries : will test that we get them back
 	// as their own nearest neighbor
@@ -51,12 +53,20 @@ func TestBruteForce(t *testing.T) {
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
 
-	BuildIndex(resource.resource, &dataset, "L2Expanded", 2.0, index)
+	err := BuildIvfFlatIndex(resource, IndexParams, &dataset, index)
+	if err != nil {
+		panic(err)
+	}
 	resource.Sync()
 
 	queries.ToDevice(&resource)
 
-	SearchIndex(resource.resource, *index, &queries, &neighbors, &distances)
+	SearchParams, _ := CreateSearchParams(10)
+
+	err = SearchIvfFlatIndex(resource, SearchParams, index, &queries, &neighbors, &distances)
+	if err != nil {
+		panic(err)
+	}
 
 	neighbors.ToHost(&resource)
 	distances.ToHost(&resource)
