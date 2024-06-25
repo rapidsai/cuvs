@@ -43,11 +43,12 @@ dependencies:
 - nvcc_linux-aarch64=11.8
 - pre-commit
 - pydata-sphinx-theme
-- pylibraft==24.8.*
+- pylibraft==24.8.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
+- rapids-build-backend>=0.3.0,<0.4.0.dev0
 - recommonmark
-- rmm==24.8.*
+- rmm==24.8.*,>=0.0.0a0
 - rust
 - scikit-build-core>=0.7.0
 - scikit-learn

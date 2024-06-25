@@ -391,7 +391,7 @@ fi
 if (( ${NUMARGS} == 0 )) || hasArg python; then
     SKBUILD_CMAKE_ARGS="${SKBUILD_EXTRA_CMAKE_ARGS}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
-        python -m pip install --no-build-isolation --no-deps -vvv ${REPODIR}/python/cuvs
+        python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs
 fi
 
 # Build the cuvs Rust bindings

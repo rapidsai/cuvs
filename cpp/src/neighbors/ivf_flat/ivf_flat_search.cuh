@@ -23,15 +23,15 @@
 #include <cuvs/neighbors/common.hpp>      // none_ivf_sample_filter
 #include <cuvs/neighbors/ivf_flat.hpp>    // raft::neighbors::ivf_flat::index
 
-#include "../detail/ann_utils.cuh"     // utils::mapping
-#include <cuvs/distance/distance.hpp>  // is_min_close, DistanceType
-#include <raft/core/logger-ext.hpp>    // RAFT_LOG_TRACE
+#include "../detail/ann_utils.cuh"      // utils::mapping
+#include <cuvs/distance/distance.hpp>   // is_min_close, DistanceType
+#include <cuvs/selection/select_k.hpp>  // cuvs::selection::select_k
+#include <raft/core/logger-ext.hpp>     // RAFT_LOG_TRACE
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>          // raft::resources
-#include <raft/linalg/gemm.cuh>             // raft::linalg::gemm
-#include <raft/linalg/norm.cuh>             // raft::linalg::norm
-#include <raft/linalg/unary_op.cuh>         // raft::linalg::unary_op
-#include <raft/matrix/detail/select_k.cuh>  // matrix::detail::select_k
+#include <raft/core/resources.hpp>   // raft::resources
+#include <raft/linalg/gemm.cuh>      // raft::linalg::gemm
+#include <raft/linalg/norm.cuh>      // raft::linalg::norm
+#include <raft/linalg/unary_op.cuh>  // raft::linalg::unary_op
 
 #include <rmm/resource_ref.hpp>
 
@@ -145,15 +145,17 @@ void search_impl(raft::resources const& handle,
                      stream);
 
   RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
-  raft::matrix::detail::select_k<AccT, uint32_t>(handle,
-                                                 distance_buffer_dev.data(),
-                                                 nullptr,
-                                                 n_queries,
-                                                 index.n_lists(),
-                                                 n_probes,
-                                                 coarse_distances_dev.data(),
-                                                 coarse_indices_dev.data(),
-                                                 select_min);
+
+  cuvs::selection::select_k(
+    handle,
+    raft::make_device_matrix_view<const AccT, int64_t>(
+      distance_buffer_dev.data(), n_queries, index.n_lists()),
+    std::nullopt,
+    raft::make_device_matrix_view<AccT, int64_t>(coarse_distances_dev.data(), n_queries, n_probes),
+    raft::make_device_matrix_view<uint32_t, int64_t>(
+      coarse_indices_dev.data(), n_queries, n_probes),
+    select_min);
+
   RAFT_LOG_TRACE_VEC(coarse_indices_dev.data(), n_probes);
   RAFT_LOG_TRACE_VEC(coarse_distances_dev.data(), n_probes);
 
@@ -238,19 +240,25 @@ void search_impl(raft::resources const& handle,
 
   // Merge topk values from different blocks
   if (!manage_local_topk || grid_dim_x > 1) {
-    raft::matrix::detail::select_k<AccT, uint32_t>(
+    std::optional<raft::device_vector_view<const uint32_t>> num_samples_vector;
+    if (!manage_local_topk) {
+      num_samples_vector =
+        raft::make_device_vector_view<const uint32_t>(num_samples.data(), n_queries);
+    }
+
+    auto cols = manage_local_topk ? (k * grid_dim_x) : max_samples;
+
+    cuvs::selection::select_k(
       handle,
-      distances_tmp_dev.data(),
-      indices_tmp_dev.data(),
-      n_queries,
-      manage_local_topk ? (k * grid_dim_x) : max_samples,
-      k,
-      distances,
-      neighbors_uint32,
+      raft::make_device_matrix_view<const AccT, int64_t>(distances_tmp_dev.data(), n_queries, cols),
+      raft::make_device_matrix_view<const uint32_t, int64_t>(
+        indices_tmp_dev.data(), n_queries, cols),
+      raft::make_device_matrix_view<AccT, int64_t>(distances, n_queries, k),
+      raft::make_device_matrix_view<uint32_t, int64_t>(neighbors_uint32, n_queries, k),
       select_min,
       false,
-      raft::matrix::SelectAlgo::kAuto,
-      manage_local_topk ? nullptr : num_samples.data());
+      cuvs::selection::SelectAlgo::kAuto,
+      num_samples_vector);
   }
   if (!manage_local_topk) {
     // post process distances && neighbor IDs
@@ -272,17 +280,15 @@ void search_impl(raft::resources const& handle,
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
-inline void search_with_filtering(
-  raft::resources const& handle,
-  const search_params& params,
-  const index<T, IdxT>& index,
-  const T* queries,
-  uint32_t n_queries,
-  uint32_t k,
-  IdxT* neighbors,
-  float* distances,
-  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
-  IvfSampleFilterT sample_filter    = IvfSampleFilterT())
+inline void search_with_filtering(raft::resources const& handle,
+                                  const search_params& params,
+                                  const index<T, IdxT>& index,
+                                  const T* queries,
+                                  uint32_t n_queries,
+                                  uint32_t k,
+                                  IdxT* neighbors,
+                                  float* distances,
+                                  IvfSampleFilterT sample_filter = IvfSampleFilterT())
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::search(k = %u, n_queries = %u, dim = %zu)", k, n_queries, index.dim());
@@ -327,7 +333,7 @@ inline void search_with_filtering(
                                                   cuvs::distance::is_min_close(index.metric()),
                                                   neighbors + offset_q * k,
                                                   distances + offset_q * k,
-                                                  mr,
+                                                  raft::resource::get_workspace_resource(handle),
                                                   sample_filter);
   }
 }
@@ -359,7 +365,6 @@ void search_with_filtering(raft::resources const& handle,
                         static_cast<std::uint32_t>(neighbors.extent(1)),
                         neighbors.data_handle(),
                         distances.data_handle(),
-                        raft::resource::get_workspace_resource(handle),
                         sample_filter);
 }
 

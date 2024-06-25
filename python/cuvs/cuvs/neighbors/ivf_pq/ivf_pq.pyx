@@ -23,6 +23,7 @@ from cuvs.common.resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libcpp cimport bool, cast
+from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
 from cuvs.distance_type cimport cuvsDistanceType
@@ -454,3 +455,73 @@ def search(SearchParams search_params,
         ))
 
     return (distances, neighbors)
+
+
+@auto_sync_resources
+def save(filename, Index index, bool include_dataset=True, resources=None):
+    """
+    Saves the index to a file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    index : Index
+        Trained IVF-PQ index.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_pq
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = ivf_pq.build(ivf_pq.IndexParams(), dataset)
+    >>> # Serialize and deserialize the ivf_pq index built
+    >>> ivf_pq.save("my_index.bin", index)
+    >>> index_loaded = ivf_pq.load("my_index.bin")
+    """
+    cdef string c_filename = filename.encode('utf-8')
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsIvfPqSerialize(res,
+                                  c_filename.c_str(),
+                                  index.index))
+
+
+@auto_sync_resources
+def load(filename, resources=None):
+    """
+    Loads index from file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change, therefore loading an index saved with a previous
+    version of cuvs is not guaranteed to work.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+
+    """
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef string c_filename = filename.encode('utf-8')
+
+    check_cuvs(cuvsIvfPqDeserialize(
+        res,
+        c_filename.c_str(),
+        idx.index
+    ))
+    idx.trained = True
+    return idx

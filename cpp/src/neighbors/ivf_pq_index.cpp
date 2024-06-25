@@ -17,6 +17,38 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
+index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
+                                        cuvs::distance::DistanceType metric)
+{
+  index_params params;
+  params.n_lists =
+    dataset.extent(0) < 4 * 2500 ? 4 : static_cast<uint32_t>(std::sqrt(dataset.extent(0)));
+  params.n_lists = std::min<uint32_t>(params.n_lists, dataset.extent(0));
+  params.pq_dim =
+    raft::round_up_safe(static_cast<uint32_t>(dataset.extent(1) / 4), static_cast<uint32_t>(8));
+  if (params.pq_dim == 0) params.pq_dim = 8;
+  params.pq_bits                  = 8;
+  params.kmeans_trainset_fraction = dataset.extent(0) < 10000 ? 1 : 0.1;
+  params.metric                   = metric;
+  return params;
+}
+
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle)
+  // this constructor is just for a temporary index, for use in the deserialization
+  // api. all the parameters here will get replaced with loaded values - that aren't
+  // necessarily known ahead of time before deserialization.
+  // TODO: do we even need a handle here - could just construct one?
+  : index(handle,
+          cuvs::distance::DistanceType::L2Expanded,
+          codebook_gen::PER_SUBSPACE,
+          0,
+          0,
+          8,
+          0,
+          true)
+{
+}
 
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
@@ -61,6 +93,7 @@ index<IdxT>::index(raft::resources const& handle,
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
+
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
 {

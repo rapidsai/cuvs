@@ -360,6 +360,46 @@ cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup ivf_pq_c_serialize IVF-PQ C-API serialize functions
+ * @{
+ */
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <cuvs/neighbors/ivf_pq.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsIvfPqBuild`
+ * cuvsIvfPqSerialize(res, "/path/to/index", index, true);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-PQ index
+ */
+cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res, const char* filename, cuvsIvfPqIndex_t index);
+
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index IVF-PQ index loaded disk
+ */
+cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res, const char* filename, cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
+
 #ifdef __cplusplus
 }
 #endif

@@ -191,12 +191,15 @@ auto build(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
+ * @param[in] sample_filter a optional device bitmap filter function that greenlights samples for a
+ * given
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::index<float>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
 /**
  * @}
  */

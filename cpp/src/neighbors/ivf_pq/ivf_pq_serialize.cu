@@ -20,19 +20,17 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::ivf_pq::index<int64_t>& index)
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index)
 {
   cuvs::neighbors::ivf_pq::detail::serialize(handle, filename, index);
 }
 
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
                const cuvs::neighbors::ivf_pq::index<int64_t>& index)
 {
-  std::ostringstream os;
   cuvs::neighbors::ivf_pq::detail::serialize(handle, os, index);
-  str = os.str();
 }
 }  // namespace cuvs::neighbors::ivf_pq

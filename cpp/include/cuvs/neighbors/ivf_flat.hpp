@@ -138,6 +138,15 @@ struct index : cuvs::neighbors::index {
   index& operator=(const index&) = delete;
   index& operator=(index&&)      = default;
   ~index()                       = default;
+
+  /**
+   * @brief Construct an empty index.
+   *
+   * Constructs an empty index. This index will either need to be trained with `build`
+   * or loaded from a saved copy with `deserialize`
+   */
+  index(raft::resources const& res);
+
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& res, const index_params& params, uint32_t dim);
   /** Construct an empty index. It needs to be trained and then populated. */
@@ -1197,7 +1206,7 @@ void search_with_filtering(
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * // create an index with `auto index = ivf_flat::build(...);`
- * cuvs::serialize_file(handle, filename, index);
+ * cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1205,9 +1214,9 @@ void search_with_filtering(
  * @param[in] index IVF-Flat index
  *
  */
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 
 /**
  * Load index from file.
@@ -1225,7 +1234,7 @@ void serialize_file(raft::resources const& handle,
  * using T    = float; // data element type
  * using IdxT = int64_t; // type of the index
  * // create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
- * cuvs::deserialize_file(handle, filename, &index);
+ * cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1233,12 +1242,12 @@ void serialize_file(raft::resources const& handle,
  * @param[in] index IVF-Flat index
  *
  */
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
 
 /**
- * Write the index to an output string
+ * Write the index to an output stream
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1248,23 +1257,23 @@ void deserialize_file(raft::resources const& handle,
  *
  * raft::resources handle;
  *
- * // create an output string
- * std::string str;
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
  * // create an index with `auto index = ivf_flat::build(...);`
- * cuvs::serialize(handle, str, index);
+ * cuvs::neighbors::ivf_flat::serialize(handle, os, index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[out] str output string
+ * @param[in] os output stream
  * @param[in] index IVF-Flat index
  *
  */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
                const cuvs::neighbors::ivf_flat::index<float, int64_t>& index);
 
 /**
- * Load index from input string
+ * Load index from input stream
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1274,21 +1283,21 @@ void serialize(raft::resources const& handle,
  *
  * raft::resources handle;
  *
- * // create an input string
- * std::string str;
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
  * using T    = float; // data element type
  * using IdxT = int64_t; // type of the index
  * // create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
- * auto index = cuvs::deserialize(handle, str, &index);
+ * cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[in] str output string
+ * @param[in] is input stream
  * @param[in] index IVF-Flat index
  *
  */
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 std::istream& is,
                  cuvs::neighbors::ivf_flat::index<float, int64_t>* index);
 
 /**
@@ -1305,7 +1314,7 @@ void deserialize(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * // create an index with `auto index = ivf_flat::build(...);`
- * cuvs::serialize_file(handle, filename, index);
+ * cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1313,9 +1322,9 @@ void deserialize(raft::resources const& handle,
  * @param[in] index IVF-Flat index
  *
  */
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
 /**
  * Load index from file.
@@ -1333,7 +1342,7 @@ void serialize_file(raft::resources const& handle,
  * using T    = float; // data element type
  * using IdxT = int64_t; // type of the index
  * // create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
- * cuvs::deserialize_file(handle, filename, &index);
+ * cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1341,12 +1350,12 @@ void serialize_file(raft::resources const& handle,
  * @param[in] index IVF-Flat index
  *
  */
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
 
 /**
- * Write the index to an output string
+ * Write the index to an output stream
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1356,23 +1365,23 @@ void deserialize_file(raft::resources const& handle,
  *
  * raft::resources handle;
  *
- * // create an output string
- * std::string str;
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
  * // create an index with `auto index = ivf_flat::build(...);`
- * cuvs::serialize(handle, str, index);
+ * cuvs::neighbors::ivf_flat::serialize(handle, os, index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[out] str output string
+ * @param[in] os output stream
  * @param[in] index IVF-Flat index
  *
  */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
                const cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index);
 
 /**
- * Load index from input string
+ * Load index from input stream
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1382,21 +1391,21 @@ void serialize(raft::resources const& handle,
  *
  * raft::resources handle;
  *
- * // create an input string
- * std::string str;
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
  * using T    = float; // data element type
  * using IdxT = int64_t; // type of the index
  * // create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
- * auto index = cuvs::deserialize(handle, str, &index);
+ * cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[in] str output string
+ * @param[in] is input stream
  * @param[in] index IVF-Flat index
  *
  */
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 std::istream& is,
                  cuvs::neighbors::ivf_flat::index<int8_t, int64_t>* index);
 
 /**
@@ -1413,7 +1422,7 @@ void deserialize(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * // create an index with `auto index = ivf_flat::build(...);`
- * cuvs::serialize_file(handle, filename, index);
+ * cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1421,9 +1430,9 @@ void deserialize(raft::resources const& handle,
  * @param[in] index IVF-Flat index
  *
  */
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
 /**
  * Load index from file.
@@ -1441,7 +1450,7 @@ void serialize_file(raft::resources const& handle,
  * using T    = float; // data element type
  * using IdxT = int64_t; // type of the index
  * // create an empty index with ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
- * cuvs::deserialize_file(handle, filename, &index);
+ * cuvs::neighbors::ivf_flat::deserialize(handle, filename, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1449,12 +1458,12 @@ void serialize_file(raft::resources const& handle,
  * @param[in] index IVF-Flat index
  *
  */
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 
 /**
- * Write the index to an output string
+ * Write the index to an output stream
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1464,23 +1473,23 @@ void deserialize_file(raft::resources const& handle,
  *
  * raft::resources handle;
  *
- * // create an output string
- * std::string str;
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
  * // create an index with `auto index = ivf_flat::build(...);`
- * cuvs::serialize(handle, str, index);
+ * cuvs::neighbors::ivf_flat::serialize(handle, os, index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[out] str output string
+ * @param[in] os output stream
  * @param[in] index IVF-Flat index
  *
  */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
                const cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index);
 
 /**
- * Load index from input string
+ * Load index from input stream
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1490,21 +1499,21 @@ void serialize(raft::resources const& handle,
  *
  * raft::resources handle;
  *
- * // create an input string
- * std::string str;
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
  * using T    = float; // data element type
  * using IdxT = int64_t; // type of the index
  * // create an empty index with `ivf_flat::index<T, IdxT> index(handle, index_params, dim);`
- * auto index = cuvs::deserialize(handle, str, &index);
+ * cuvs::neighbors::ivf_flat::deserialize(handle, is, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[in] str output string
+ * @param[in] is input stream
  * @param[in] index IVF-Flat index
  *
  */
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 std::istream& is,
                  cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>* index);
 
 /**

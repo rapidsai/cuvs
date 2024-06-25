@@ -243,6 +243,7 @@ add_library(
   src/neighbors/cagra_serialize_float.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
+  src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim256_t16_8pq_2subd_half.cu
@@ -425,6 +426,7 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
+  src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
@@ -437,6 +439,9 @@ add_library(
   src/neighbors/refine/detail/refine_host_int8_t_float.cpp
   src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_uint32_t.cu
+  src/selection/select_k_half_uint32_t.cu
 )
 
 target_compile_options(
@@ -550,8 +555,13 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 if(BUILD_C_LIBRARY)
   add_library(
     cuvs_c SHARED
-    src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-    src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp src/distance/pairwise_distance_c.cpp
+    src/core/c_api.cpp
+    src/neighbors/brute_force_c.cpp
+    src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp
+    src/neighbors/cagra_c.cpp
+    src/neighbors/refine/refine_c.cpp
+    src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
