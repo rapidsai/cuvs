@@ -30,9 +30,10 @@ from pylibraft.neighbors.common import _check_input_array
 cdef class Prefilter:
     cdef public cuvsPrefilter prefilter
     cdef public object parent
+
     def __init__(self, cuvsPrefilter prefilter, parent=None):
         if parent is not None:
-          self.parent = parent
+            self.parent = parent
         self.prefilter = prefilter
 
 
@@ -92,6 +93,5 @@ def from_bitmap(bitmap):
     cdef cuvsPrefilter filter
     filter.type = BITMAP
     filter.addr = <uintptr_t> bitmap_dlpack
-
 
     return Prefilter(filter, parent=bitmap)
