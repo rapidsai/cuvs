@@ -278,6 +278,50 @@ cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup ivf_flat_c_serialize IVF-Flat C-API serialize functions
+ * @{
+ */
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <cuvs/neighbors/ivf_flat.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsIvfFlatBuild`
+ * cuvsIvfFlatSerialize(res, "/path/to/index", index, true);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-Flat index
+ */
+cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
+                                 const char* filename,
+                                 cuvsIvfFlatIndex_t index);
+
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index IVF-Flat index loaded disk
+ */
+cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
+                                   const char* filename,
+                                   cuvsIvfFlatIndex_t index);
+/**
+ * @}
+ */
+
 #ifdef __cplusplus
 }
 #endif
