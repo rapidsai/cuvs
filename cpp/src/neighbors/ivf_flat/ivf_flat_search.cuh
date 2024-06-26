@@ -138,7 +138,7 @@ void search_impl(raft::resources const& handle,
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
       compute_metric = cuvs::distance::DistanceType::InnerProduct;
-      //select_min     = false;
+      select_min = cuvs::distance::is_min_close(compute_metric);
       alpha          = 1.0f;
       beta           = 0.0f;
       break;

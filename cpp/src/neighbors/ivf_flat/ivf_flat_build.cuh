@@ -452,15 +452,6 @@ inline auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = index.metric();
-    // Normalize if necessary (Cosine)
-    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
-      raft::linalg::row_normalize(
-        handle,
-        trainset_const_view,
-        raft::make_device_matrix_view<T, IdxT>(trainset.data(), n_rows_train, index.dim()),
-        raft::linalg::NormType::L2Norm);
-    }
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
