@@ -152,7 +152,7 @@ struct index : cuvs::neighbors::index {
  * @param[in] metric cuvs::distance::DistanceType
  * @param[in] metric_arg metric argument
  *
- * @return the constructed ivf-flat index
+ * @return the constructed brute-force index
  */
 auto build(raft::resources const& handle,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -169,7 +169,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Search ANN using the constructed index.
  *
- * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
+ * See the [brute_force::build](#brute_force::build) documentation for a usage example.
  *
  * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
  * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
@@ -186,13 +186,14 @@ auto build(raft::resources const& handle,
  * @endcode
  *
  * @param[in] handle
- * @param[in] index ivf-flat constructed index
+ * @param[in] index brute-force constructed index
  * @param[in] queries a device pointer to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter a optional device bitmap filter function that greenlights samples for a
- * given
+ * @param[in] sample_filter An optional device bitmap filter function with a `row-major` layout and
+ * the shape of [n_queries, n_datasets], which means the filter will use the first `n_datasets` bits
+ * to indicate whether queries[0] should compute the distance with datasets.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::index<float>& index,
