@@ -573,11 +573,11 @@ __launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
   raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     in_list_data,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+  const uint32_t offset)
 {
   const uint32_t pq_dim = out_codes.extent(1);
   auto unpack_action    = unpack_codes{out_codes};
-  run_on_list<PqBits>(in_list_data, offset_or_indices, out_codes.extent(0), pq_dim, unpack_action);
+  run_on_list<PqBits>(in_list_data, offset, out_codes.extent(0), pq_dim, unpack_action);
 }
 
 /**
@@ -585,7 +585,7 @@ __launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
  *
  * @param[out] codes flat PQ codes, one code per byte [n_rows, pq_dim]
  * @param[in] list_data the packed ivf::list data.
- * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
+ * @param[in] offset how many records in the list to skip.
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
@@ -593,7 +593,7 @@ inline void unpack_list_data(
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes,
   raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     list_data,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  const uint32_t offset,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
 {
@@ -613,7 +613,7 @@ inline void unpack_list_data(
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
-  kernel<<<blocks, threads, 0, stream>>>(codes, list_data, offset_or_indices);
+  kernel<<<blocks, threads, 0, stream>>>(codes, list_data, offset);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -623,11 +623,11 @@ void unpack_list_data(raft::resources const& res,
                       const index<IdxT>& index,
                       raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
                       uint32_t label,
-                      std::variant<uint32_t, const uint32_t*> offset_or_indices)
+                      const uint32_t offset)
 {
   unpack_list_data(out_codes,
                    index.lists()[label]->data.view(),
-                   offset_or_indices,
+                   offset,
                    index.pq_bits(),
                    raft::resource::get_cuda_stream(res));
 }
@@ -666,18 +666,18 @@ __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_
     in_list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+  const uint32_t offset)
 {
   run_on_list<PqBits>(
-    in_list_data, offset_or_indices, n_rows, pq_dim, unpack_contiguous<PqBits>(out_codes, pq_dim));
+    in_list_data, offset, n_rows, pq_dim, unpack_contiguous<PqBits>(out_codes, pq_dim));
 }
 
 /**
- * Unpack flat PQ codes from an existing list by the given offset.
+ * Unpack flat PQ vectors from an existing list starting at the given offset.
  *
- * @param[out] codes flat compressed PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
+ * @param[out] codes flat compressed PQ vectors [n_rows, ceildiv(pq_dim * pq_bits, 8)]
  * @param[in] list_data the packed ivf::list data.
- * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
+ * @param[in] offset how many records in the list to skip.
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
@@ -687,7 +687,7 @@ inline void unpack_contiguous_list_data(
     list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  const uint32_t offset,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
 {
@@ -706,7 +706,7 @@ inline void unpack_contiguous_list_data(
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
-  kernel<<<blocks, threads, 0, stream>>>(codes, list_data, n_rows, pq_dim, offset_or_indices);
+  kernel<<<blocks, threads, 0, stream>>>(codes, list_data, n_rows, pq_dim, offset);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -717,13 +717,13 @@ void unpack_contiguous_list_data(raft::resources const& res,
                                  uint8_t* out_codes,
                                  uint32_t n_rows,
                                  uint32_t label,
-                                 std::variant<uint32_t, const uint32_t*> offset_or_indices)
+                                 const uint32_t offset)
 {
   unpack_contiguous_list_data(out_codes,
                               index.lists()[label]->data.view(),
                               n_rows,
                               index.pq_dim(),
-                              offset_or_indices,
+                              offset,
                               index.pq_bits(),
                               raft::resource::get_cuda_stream(res));
 }
@@ -798,8 +798,7 @@ __launch_bounds__(BlockSize) static __global__ void reconstruct_list_data_kernel
   const uint32_t pq_dim = out_vectors.extent(1) / pq_centers.extent(1);
   auto reconstruct_action =
     reconstruct_vectors{out_vectors, pq_centers, centers_rot, codebook_kind, cluster_ix};
-  run_on_list<PqBits>(
-    in_list_data, offset_or_indices, out_vectors.extent(0), pq_dim, reconstruct_action);
+  run_on_list<PqBits>(in_list_data, offset_or_indices, out_vectors.extent(0), pq_dim, reconstruct_action);
 }
 
 /** Decode the list data; see the public interface for the api and usage. */
@@ -813,6 +812,8 @@ void reconstruct_list_data(raft::resources const& res,
   auto n_rows = out_vectors.extent(0);
   if (n_rows == 0) { return; }
   auto& list = index.lists()[label];
+  // sic! I'm using the upper bound `list.size` instead of exact `list_sizes(label)`
+  // to avoid an extra device-host data raft::copy and the stream sync.
   if (std::holds_alternative<uint32_t>(offset_or_indices)) {
     auto n_skip = std::get<uint32_t>(offset_or_indices);
     // sic! I'm using the upper bound `list.size` instead of exact `list_sizes(label)`
@@ -914,10 +915,9 @@ __launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     list_data,
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+  const uint32_t offset)
 {
-  write_list<PqBits, 1>(
-    list_data, offset_or_indices, codes.extent(0), codes.extent(1), pass_codes{codes});
+  write_list<PqBits, 1>(list_data, offset, codes.extent(0), codes.extent(1), pass_codes{codes});
 }
 
 /**
@@ -927,7 +927,7 @@ __launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
  *
  * @param[out] list_data the packed ivf::list data.
  * @param[in] codes flat PQ codes, one code per byte [n_rows, pq_dim]
- * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
+ * @param[in] offset how many records in the list to skip.
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
@@ -935,7 +935,7 @@ inline void pack_list_data(
   raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     list_data,
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  const uint32_t offset,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
 {
@@ -955,7 +955,7 @@ inline void pack_list_data(
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
-  kernel<<<blocks, threads, 0, stream>>>(list_data, codes, offset_or_indices);
+  kernel<<<blocks, threads, 0, stream>>>(list_data, codes, offset);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -964,11 +964,11 @@ void pack_list_data(raft::resources const& res,
                     index<IdxT>* index,
                     raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> new_codes,
                     uint32_t label,
-                    std::variant<uint32_t, const uint32_t*> offset_or_indices)
+                    const uint32_t offset)
 {
   pack_list_data(index->lists()[label]->data.view(),
                  new_codes,
-                 offset_or_indices,
+                 offset,
                  index->pq_bits(),
                  raft::resource::get_cuda_stream(res));
 }
@@ -1007,10 +1007,9 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+  const uint32_t offset)
 {
-  write_list<PqBits, 1>(
-    list_data, offset_or_indices, n_rows, pq_dim, pack_contiguous<PqBits>(codes, pq_dim));
+  write_list<PqBits, 1>(list_data, offset, n_rows, pq_dim, pack_contiguous<PqBits>(codes, pq_dim));
 }
 
 /**
@@ -1020,7 +1019,7 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
  *
  * @param[out] list_data the packed ivf::list data.
  * @param[in] codes flat compressed PQ codes [n_rows, ceildiv(pq_dim * pq_bits, 8)]
- * @param[in] offset_or_indices how many records in the list to skip or the exact indices.
+ * @param[in] offset how many records in the list to skip
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
@@ -1030,7 +1029,7 @@ inline void pack_contiguous_list_data(
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
+  const uint32_t offset,
   uint32_t pq_bits,
   rmm::cuda_stream_view stream)
 {
@@ -1049,7 +1048,7 @@ inline void pack_contiguous_list_data(
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
-  kernel<<<blocks, threads, 0, stream>>>(list_data, codes, n_rows, pq_dim, offset_or_indices);
+  kernel<<<blocks, threads, 0, stream>>>(list_data, codes, n_rows, pq_dim, offset);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -1059,13 +1058,13 @@ void pack_contiguous_list_data(raft::resources const& res,
                                const uint8_t* new_codes,
                                uint32_t n_rows,
                                uint32_t label,
-                               std::variant<uint32_t, const uint32_t*> offset_or_indices)
+                               const uint32_t offset)
 {
   pack_contiguous_list_data(index->lists()[label]->data.view(),
                             new_codes,
                             n_rows,
                             index->pq_dim(),
-                            offset_or_indices,
+                            offset,
                             index->pq_bits(),
                             raft::resource::get_cuda_stream(res));
 }
@@ -1213,14 +1212,13 @@ __launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind,
   uint32_t cluster_ix,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+  const uint32_t offset)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   const uint32_t pq_dim           = new_vectors.extent(1) / pq_centers.extent(1);
   auto encode_action =
     encode_vectors<kSubWarpSize, uint32_t>{pq_centers, new_vectors, codebook_kind, cluster_ix};
-  write_list<PqBits, kSubWarpSize>(
-    list_data, offset_or_indices, new_vectors.extent(0), pq_dim, encode_action);
+  write_list<PqBits, kSubWarpSize>(list_data, offset, new_vectors.extent(0), pq_dim, encode_action);
 }
 
 template <typename T, typename IdxT>
@@ -1228,7 +1226,7 @@ void encode_list_data(raft::resources const& res,
                       index<IdxT>* index,
                       raft::device_matrix_view<const T, uint32_t, raft::row_major> new_vectors,
                       uint32_t label,
-                      std::variant<uint32_t, const uint32_t*> offset_or_indices)
+                      const uint32_t offset)
 {
   auto n_rows = new_vectors.extent(0);
   if (n_rows == 0) { return; }
@@ -1267,7 +1265,7 @@ void encode_list_data(raft::resources const& res,
     index->pq_centers(),
     index->codebook_kind(),
     label,
-    offset_or_indices);
+    offset);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -1288,9 +1286,7 @@ void encode_list_data(raft::resources const& res,
  * @param[in] new_vectors
  *    a pointer to a row-major device array [index.dim(), n_rows];
  * @param[in] src_offset_or_indices
- *    references for the new data:
- *      either a starting index for the auto-indexing
- *      or a pointer to a device array of explicit indices [n_rows];
+ *    a starting index for the auto-indexing
  * @param[in] new_labels
  *    cluster ids (first-level quantization) - a device array [n_rows];
  * @param n_rows

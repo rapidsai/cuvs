@@ -1673,42 +1673,6 @@ void unpack_list_data(raft::resources const& res,
                       uint32_t offset);
 
 /**
- * @brief Unpack a series of records of a single list (cluster) in the compressed index
- * by their in-list offsets, one code per byte (independently of pq_bits).
- *
- * Usage example:
- * @code{.cpp}
- *   // We will unpack the fourth cluster
- *   uint32_t label = 3;
- *   // Create the selection vector
- *   auto selected_indices = raft::make_device_vector<uint32_t>(res, 4);
- *   ... fill the indices ...
- *   resource::sync_stream(res);
- *   // allocate the buffer for the output
- *   auto codes = raft::make_device_matrix<float>(res, selected_indices.size(), index.pq_dim());
- *   // decode the whole list
- *   ivf_pq::helpers::codepacker::unpack_list_data(
- *       res, index, selected_indices.view(), codes.view(), label);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[in] index IVF-PQ index (passed by reference)
- * @param[in] in_cluster_indices
- *   The offsets of the selected indices within the cluster.
- * @param[out] out_codes
- *   the destination buffer [n_take, index.pq_dim()].
- *   The length `n_take` defines how many records to unpack,
- *   it must be smaller than the list size.
- * @param[in] label
- *   The id of the list (cluster) to decode.
- */
-void unpack_list_data(raft::resources const& res,
-                      const index<int64_t>& index,
-                      raft::device_vector_view<const uint32_t> in_cluster_indices,
-                      raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
-                      uint32_t label);
-
-/**
  * @brief Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
  * compressed index starting at given `offset`, not expanded to one code per byte. Each code in the
  * output buffer occupies ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes.

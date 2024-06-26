@@ -100,15 +100,6 @@ void unpack_list_data(raft::resources const& res,
   detail::unpack_list_data(res, index, out_codes, label, offset);
 }
 
-void unpack_list_data(raft::resources const& res,
-                      const index<int64_t>& index,
-                      raft::device_vector_view<const uint32_t> in_cluster_indices,
-                      raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
-                      uint32_t label)
-{
-  detail::unpack_list_data<int64_t>(res, index, out_codes, label, in_cluster_indices.data_handle());
-}
-
 void unpack_contiguous_list_data(raft::resources const& res,
                                  const index<int64_t>& index,
                                  uint8_t* out_codes,
@@ -145,15 +136,6 @@ void reconstruct_list_data(raft::resources const& res,
   detail::reconstruct_list_data<uint8_t, int64_t>(res, index, out_vectors, label, offset);
 }
 
-void reconstruct_list_data(raft::resources const& res,
-                           const index<int64_t>& index,
-                           raft::device_vector_view<const uint32_t> in_cluster_indices,
-                           raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
-                           uint32_t label)
-{
-  detail::reconstruct_list_data<float, int64_t>(
-    res, index, out_vectors, label, in_cluster_indices.data_handle());
-}
 void reconstruct_list_data(raft::resources const& res,
                            const index<int64_t>& index,
                            raft::device_vector_view<const uint32_t> in_cluster_indices,
