@@ -192,8 +192,8 @@ auto build(raft::resources const& handle,
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
  * @param[in] sample_filter An optional device bitmap filter function with a `row-major` layout and
- * the shape of [n_queries, n_datasets], which means the filter will use the first `n_datasets` bits
- * to indicate whether queries[0] should compute the distance with datasets.
+ * the shape of [n_queries, index->size()], which means the filter will use the first
+ * `index->size()` bits to indicate whether queries[0] should compute the distance with dataset.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::index<float>& index,
