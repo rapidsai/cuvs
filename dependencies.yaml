@@ -324,6 +324,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - *cmake_ver
+          - openblas
   docs:
     common:
       - output_types: [conda]
