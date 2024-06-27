@@ -186,9 +186,9 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
           distances_ivfflat_dev.data(), ps.num_queries, ps.k);
         const std::string filename = "ivf_flat_index";
-        cuvs::neighbors::ivf_flat::serialize_file(handle_, filename, index_2);
-        cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_loaded(handle_, index_params, ps.dim);
-        cuvs::neighbors::ivf_flat::deserialize_file(handle_, filename, &index_loaded);
+        cuvs::neighbors::ivf_flat::serialize(handle_, filename, index_2);
+        cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_loaded(handle_);
+        cuvs::neighbors::ivf_flat::deserialize(handle_, filename, &index_loaded);
         ASSERT_EQ(index_2.size(), index_loaded.size());
 
         cuvs::neighbors::ivf_flat::search(handle_,
@@ -279,7 +279,8 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         bfi,
         search_queries_view,
         indices_out_view,
-        dists_out_view);
+        dists_out_view,
+        std::nullopt);
 
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);

@@ -55,6 +55,7 @@ option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_C_LIBRARY "Build raft C API library" OFF)
 option(BUILD_C_TESTS "Build raft C API tests" OFF)
+option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
@@ -92,6 +93,7 @@ include(CMakeDependentOption)
 
 message(VERBOSE "cuVS: Build cuVS unit-tests: ${BUILD_TESTS}")
 message(VERBOSE "cuVS: Build CPU only components: ${BUILD_CPU_ONLY}")
+message(VERBOSE "cuVS: Build ANN benchmarks: ${BUILD_ANN_BENCH}")
 message(VERBOSE "cuVS: Enable detection of conda environment for dependencies: ${DETECT_CONDA_ENV}")
 message(VERBOSE "cuVS: Disable depreaction warnings " ${DISABLE_DEPRECATION_WARNINGS})
 message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
@@ -184,6 +186,11 @@ endif()
 
 include(cmake/thirdparty/get_cutlass.cmake)
 
+if(BUILD_ANN_BENCH)
+  include(${rapids-cmake-dir}/cpm/gbench.cmake)
+  rapids_cpm_gbench(BUILD_STATIC)
+endif()
+
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 
@@ -243,6 +250,7 @@ add_library(
   src/neighbors/cagra_serialize_float.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
+  src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim256_t16_8pq_2subd_half.cu
@@ -387,10 +395,6 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
-  src/neighbors/detail/refine_host_float_float.cpp
-  src/neighbors/detail/refine_host_half_float.cpp
-  src/neighbors/detail/refine_host_int8_t_float.cpp
-  src/neighbors/detail/refine_host_uint8_t_float.cpp
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
@@ -429,10 +433,22 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
+  src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
+  src/neighbors/refine/detail/refine_device_float_float.cu
+  src/neighbors/refine/detail/refine_device_half_float.cu
+  src/neighbors/refine/detail/refine_device_int8_t_float.cu
+  src/neighbors/refine/detail/refine_device_uint8_t_float.cu
+  src/neighbors/refine/detail/refine_host_float_float.cpp
+  src/neighbors/refine/detail/refine_host_half_float.cpp
+  src/neighbors/refine/detail/refine_host_int8_t_float.cpp
+  src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_uint32_t.cu
+  src/selection/select_k_half_uint32_t.cu
 )
 
 target_compile_options(
@@ -546,8 +562,13 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 if(BUILD_C_LIBRARY)
   add_library(
     cuvs_c SHARED
-    src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-    src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp src/distance/pairwise_distance_c.cpp
+    src/core/c_api.cpp
+    src/neighbors/brute_force_c.cpp
+    src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp
+    src/neighbors/cagra_c.cpp
+    src/neighbors/refine/refine_c.cpp
+    src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
@@ -648,4 +669,11 @@ rapids_export(
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(internal/CMakeLists.txt)
   include(test/CMakeLists.txt)
+endif()
+
+# ##################################################################################################
+# * build ann benchmark executable -----------------------------------------------
+
+if(BUILD_ANN_BENCH)
+  include(bench/ann/CMakeLists.txt)
 endif()

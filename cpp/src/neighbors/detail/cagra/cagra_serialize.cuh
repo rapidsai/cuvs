@@ -62,19 +62,16 @@ void serialize(raft::resources const& res,
   dtype_string.resize(4);
   os << dtype_string;
 
-  printf("Inside serialize...\n");
   raft::serialize_scalar(res, os, serialization_version);
   raft::serialize_scalar(res, os, index_.size());
   raft::serialize_scalar(res, os, index_.dim());
   raft::serialize_scalar(res, os, index_.graph_degree());
   raft::serialize_scalar(res, os, index_.metric());
 
-  printf("Serializing mdspan\n");
   raft::serialize_mdspan(res, os, index_.graph());
 
   include_dataset &= (index_.data().n_rows() > 0);
 
-  printf("Serializing include dataset\n");
   raft::serialize_scalar(res, os, include_dataset);
   if (include_dataset) {
     RAFT_LOG_INFO("Saving CAGRA index with dataset");
@@ -233,7 +230,7 @@ void serialize_to_hnswlib(raft::resources const& res,
  *
  */
 template <typename T, typename IdxT>
-auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
+void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* index_)
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::deserialize");
 
@@ -252,26 +249,23 @@ auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
   auto graph = raft::make_host_matrix<IdxT, int64_t>(n_rows, graph_degree);
   deserialize_mdspan(res, is, graph.view());
 
-  index<T, IdxT> idx(res, metric);
-  idx.update_graph(res, raft::make_const_mdspan(graph.view()));
+  *index_ = index<T, IdxT>(res, metric);
+  index_->update_graph(res, raft::make_const_mdspan(graph.view()));
   bool has_dataset = raft::deserialize_scalar<bool>(res, is);
   if (has_dataset) {
-    idx.update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
+    index_->update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
   }
-  return idx;
 }
 
 template <typename T, typename IdxT>
-auto deserialize(raft::resources const& res, const std::string& filename) -> index<T, IdxT>
+void deserialize(raft::resources const& res, const std::string& filename, index<T, IdxT>* index_)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  auto index = detail::deserialize<T, IdxT>(res, is);
+  detail::deserialize<T, IdxT>(res, is, index_);
 
   is.close();
-
-  return index;
 }
 }  // namespace cuvs::neighbors::cagra::detail
