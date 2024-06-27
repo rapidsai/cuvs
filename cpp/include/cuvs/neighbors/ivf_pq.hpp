@@ -2025,7 +2025,7 @@ void make_rotation_matrix(raft::resources const& res,
  */
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t> cluster_centers);
+                 raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
  * modified.
