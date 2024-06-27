@@ -2072,10 +2072,8 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
  *   auto cluster_centers = raft::make_device_matrix<float, uint32_t>(
  *     res, index.n_lists(), index.dim());
  *   // Extract the IVF centroids into the buffer
- *   raft::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
+ *   cuvs::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
  * @endcode
- *
- * @tparam IdxT
  *
  * @param[in] res raft resource
  * @param[in] index IVF-PQ index (passed by reference)
