@@ -27,7 +27,7 @@ namespace cuvs::neighbors::ivf_flat::helpers::codepacker {
 namespace {
 
 template <typename T>
-__host__ __device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+__device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
   using interleaved_group = raft::Pow2<kIndexGroupSize>;
@@ -45,7 +45,7 @@ __host__ __device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint
 }
 
 template <typename T>
-__host__ __device__ void unpack_1(
+__device__ void unpack_1(
   const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
