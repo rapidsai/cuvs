@@ -105,6 +105,16 @@ struct index_params : cuvs::neighbors::index_params {
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params>
     graph_build_params;
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build` provided there is enough memory available.
+   *  - `false` means `build` only builds the graph and the user is expected to
+   * update the dataset using cuvs::neighbors::cagra::update_dataset. CAGRA does not have `extent`
+   * API.
+   */
+  bool populate_data = true;
 };
 
 /**
