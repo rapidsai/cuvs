@@ -25,6 +25,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/selection/select_k.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger-ext.hpp>
@@ -37,7 +38,6 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/matrix/detail/select_k.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -158,15 +158,13 @@ void select_clusters(raft::resources const& handle,
 
   // Select neighbor clusters for each query.
   rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
-  raft::matrix::detail::select_k<float, uint32_t>(handle,
-                                                  qc_distances.data(),
-                                                  nullptr,
-                                                  n_queries,
-                                                  n_lists,
-                                                  n_probes,
-                                                  cluster_dists.data(),
-                                                  clusters_to_probe,
-                                                  true);
+  cuvs::selection::select_k(
+    handle,
+    raft::make_device_matrix_view<const float, int64_t>(qc_distances.data(), n_queries, n_lists),
+    std::nullopt,
+    raft::make_device_matrix_view<float, int64_t>(cluster_dists.data(), n_queries, n_probes),
+    raft::make_device_matrix_view<uint32_t, int64_t>(clusters_to_probe, n_queries, n_probes),
+    true);
 }
 
 /**
@@ -440,19 +438,23 @@ void ivfpq_search_worker(raft::resources const& handle,
 
   // Select topk vectors for each query
   rmm::device_uvector<ScoreT> topk_dists(n_queries * topK, stream, mr);
-  raft::matrix::detail::select_k<ScoreT, uint32_t>(
+
+  std::optional<raft::device_vector_view<const uint32_t>> num_samples_vector;
+  if (!manage_local_topk) {
+    num_samples_vector =
+      raft::make_device_vector_view<const uint32_t>(num_samples.data(), n_queries);
+  }
+
+  cuvs::selection::select_k(
     handle,
-    distances_buf.data(),
-    neighbors_ptr,
-    n_queries,
-    topk_len,
-    topK,
-    topk_dists.data(),
-    neighbors_uint32,
+    raft::make_device_matrix_view<const ScoreT, int64_t>(distances_buf.data(), n_queries, topk_len),
+    raft::make_device_matrix_view<const uint32_t, int64_t>(neighbors_ptr, n_queries, topk_len),
+    raft::make_device_matrix_view<ScoreT, int64_t>(topk_dists.data(), n_queries, topK),
+    raft::make_device_matrix_view<uint32_t, int64_t>(neighbors_uint32, n_queries, topK),
     true,
     false,
-    raft::matrix::SelectAlgo::kAuto,
-    manage_local_topk ? nullptr : num_samples.data());
+    cuvs::selection::SelectAlgo::kAuto,
+    num_samples_vector);
 
   // Postprocessing
   ivf::detail::postprocess_distances(
@@ -584,6 +586,9 @@ inline auto get_max_batch_size(raft::resources const& res,
   return max_batch_size;
 }
 
+/** Maximum number of queries ivf_pq::search can process in one batch. */
+constexpr uint32_t kMaxQueries = 4096;
+
 /** See raft::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
@@ -646,7 +651,7 @@ inline void search(raft::resources const& handle,
   auto mr = raft::resource::get_workspace_resource(handle);
 
   // Maximum number of query vectors to search at the same time.
-  const auto max_queries = std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), 4096);
+  const auto max_queries = std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), kMaxQueries);
   auto max_batch_size    = get_max_batch_size(handle, k, n_probes, max_queries, max_samples);
 
   rmm::device_uvector<float> float_queries(max_queries * dim_ext, stream, mr);

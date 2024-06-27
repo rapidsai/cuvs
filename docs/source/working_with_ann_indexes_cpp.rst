@@ -23,13 +23,23 @@ Building an index
     auto index = cagra::build(res, index_params, dataset);
 
 
-
 Searching an index
 ------------------
 
+.. code-block:: c++
 
-CPU/GPU interoperability
-------------------------
+    #include <cuvs/neighbors/cagra.hpp>
 
-Serializing an index
---------------------
+    using namespace cuvs::neighbors;
+    cagra::index index;
+
+    // ... build index ...
+
+    raft::device_matrix_view<float> queries = load_queries();
+    raft::device_matrix_view<uint32_t> neighbors = make_device_matrix_view<uint32_t>(n_queries, k);
+    raft::device_matrix_view<float> distances = make_device_matrix_view<float>(n_queries, k);
+    raft::device_resources res;
+
+    cagra::search_params search_params;
+
+    cagra::search(res, search_params, index, queries, neighbors, distances);

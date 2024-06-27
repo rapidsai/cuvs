@@ -23,6 +23,7 @@ from libc.stdint cimport (
     uint64_t,
     uintptr_t,
 )
+from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
@@ -110,3 +111,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
                                 DLManagedTensor* distances) except +
+
+    cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+                                   const char * filename,
+                                   cuvsCagraIndex_t index,
+                                   bool include_dataset) except +
+
+    cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
+                                     const char * filename,
+                                     cuvsCagraIndex_t index) except +
