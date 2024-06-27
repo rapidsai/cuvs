@@ -50,7 +50,7 @@ C Package
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs_c cuda-version=12.0
+    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.0
 
 Python Package
 ~~~~~~~~~~~~~~
