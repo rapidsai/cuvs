@@ -290,27 +290,6 @@ void set_centers(raft::resources const& handle,
   detail::set_centers(handle, index, cluster_centers.data_handle());
 }
 
-/**
- * @brief Public helper API for fetching a trained index's IVF centroids into a buffer that may be
- * allocated on either host or device.
- *
- * Usage example:
- * @code{.cpp}
- *   raft::resources res;
- *   // allocate the buffer for the output centers
- *   auto cluster_centers = raft::make_device_matrix<float, uint32_t>(
- *     res, index.n_lists(), index.dim());
- *   // Extract the IVF centroids into the buffer
- *   raft::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
- * @endcode
- *
- * @tparam IdxT
- *
- * @param[in] res raft resource
- * @param[in] index IVF-PQ index (passed by reference)
- * @param[out] cluster_centers IVF cluster centers [index.n_lists(), index.dim]
- */
-template <typename IdxT>
 void extract_centers(raft::resources const& res,
                      const cuvs::neighbors::ivf_pq::index<int64_t>& index,
                      raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers)
@@ -331,5 +310,4 @@ void extract_centers(raft::resources const& res,
                                   cudaMemcpyDefault,
                                   stream));
 }
-
 }  // namespace cuvs::neighbors::ivf_pq::helpers

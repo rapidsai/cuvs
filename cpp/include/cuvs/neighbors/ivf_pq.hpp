@@ -2063,8 +2063,7 @@ void set_centers(raft::resources const& res,
 void recompute_internal_state(const raft::resources& res, index<int64_t>* index);
 
 /**
- * @brief Public helper API for fetching a trained index's IVF centroids into a buffer that may be
- * allocated on either host or device.
+ * @brief Public helper API for fetching a trained index's IVF centroids
  *
  * Usage example:
  * @code{.cpp}
@@ -2073,8 +2072,10 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
  *   auto cluster_centers = raft::make_device_matrix<float, uint32_t>(
  *     res, index.n_lists(), index.dim());
  *   // Extract the IVF centroids into the buffer
- *   cuvs::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
+ *   raft::neighbors::ivf_pq::helpers::extract_centers(res, index, cluster_centers.data_handle());
  * @endcode
+ *
+ * @tparam IdxT
  *
  * @param[in] res raft resource
  * @param[in] index IVF-PQ index (passed by reference)
@@ -2082,7 +2083,7 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
  */
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
-                     raft::device_matrix_view<float> cluster_centers);
+                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @}
  */
