@@ -128,7 +128,7 @@ void build_knn_graph(
   cuvs::neighbors::cagra::graph_build_params::ivf_pq_params pq)
 {
   RAFT_EXPECTS(pq.build_params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                 pq.build_params.metric == cuvs::distance::DistanceType::InnerProduct || 
+                 pq.build_params.metric == cuvs::distance::DistanceType::InnerProduct ||
                  pq.build_params.metric == cuvs::distance::DistanceType::CosineExpanded,
                "Currently only L2Expanded, InnerProduct and CosineExpanded metrics are supported");
 
