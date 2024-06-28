@@ -117,7 +117,7 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename LabelT, bool gather_src = false>
+template <typename T, typename IdxT, typename LabelT, bool gather_src = false, typename MappingOpT = raft::identity_op>
 RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                const T* source_vecs,
                                const IdxT* source_ixs,
@@ -128,6 +128,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                uint32_t dim,
                                uint32_t veclen,
                                IdxT batch_offset          = 0,
+                               MappingOpT mapping_op      = raft::identity_op{},
                                const float* source_vecs_norms = nullptr)
 {
   const IdxT i = IdxT(blockDim.x) * IdxT(blockIdx.x) + threadIdx.x;
@@ -140,7 +141,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
 
   // Record the source vector id in the index
   list_index[inlist_id] = source_ixs == nullptr ? i + batch_offset : source_ixs[i];
-  const auto vec_norm   = source_vecs_norms == nullptr ? T(1) : source_vecs_norms[i];
+  const auto vec_norm   = source_vecs_norms == nullptr ? float{1} : source_vecs_norms[i];
 
   // The data is written in interleaved groups of `index::kGroupSize` vectors
   using interleaved_group = raft::Pow2<kIndexGroupSize>;
@@ -160,7 +161,10 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   // NB: such `veclen` is selected, that `dim % veclen == 0`
   for (uint32_t l = 0; l < dim; l += veclen) {
     for (uint32_t j = 0; j < veclen; j++) {
-      list_data[l * kIndexGroupSize + ingroup_id + j] = source_vecs[l + j] / vec_norm;
+      if (source_vecs_norms != nullptr)
+        list_data[l * kIndexGroupSize + ingroup_id + j] = mapping_op(source_vecs[l + j]) / vec_norm;
+      else
+        list_data[l * kIndexGroupSize + ingroup_id + j] = source_vecs[l + j];
     }
   }
 }
@@ -360,6 +364,7 @@ void extend(raft::resources const& handle,
                                            dim,
                                            index->veclen(),
                                            batch.offset(),
+                                           utils::mapping<float>{},
                                            batch_vectors_norms_ptr);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
@@ -533,7 +538,9 @@ inline void fill_refinement_index(raft::resources const& handle,
                                          list_sizes_ptr,
                                          n_queries * n_candidates,
                                          refinement_index->dim(),
-                                         refinement_index->veclen());
+                                         refinement_index->veclen(),
+                                         IdxT(0),
+                                         utils::mapping<float>{});
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
