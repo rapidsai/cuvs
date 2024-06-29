@@ -17,13 +17,13 @@ package common
 import "C"
 import (
 	"errors"
+	// "rapidsai/cuvs/cuvs"
+	// "rapidsai/cuvs/cuvs/ivf_flat"
 	"unsafe"
 )
 
-type ManagedTensor = *C.DLManagedTensor
-
 type Tensor[T any] struct {
-	C_tensor ManagedTensor
+	C_tensor C.DLManagedTensor
 }
 
 // func NewTensor[T any](from_cai bool, shape []int, data []T, use_int64 bool) (Tensor, error) {

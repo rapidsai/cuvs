@@ -1,5 +1,8 @@
 package ivf_flat
 
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <dlpack/dlpack.h>
 // #include <cuda_runtime_api.h>
 // #include <cuvs/core/c_api.h>
 // #include <cuvs/distance/pairwise_distance.h>
@@ -30,10 +33,10 @@ func CreateIvfFlatIndex(params *IndexParams, dataset *common.Tensor[float32]) (*
 	return &IvfFlatIndex{index: index}, nil
 }
 
-type ManagedTensor2 = *C.DLManagedTensor
+type ManagedTensor = *C.DLManagedTensor
 
 func BuildIvfFlatIndex[T any](Resources common.Resource, params *IndexParams, dataset *common.Tensor[T], index *IvfFlatIndex) error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatBuild(C.ulong(Resources.Resource), params.params, ManagedTensor2(dataset.C_tensor), index.index)))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatBuild(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(&dataset.C_tensor)), index.index)))
 	if err != nil {
 		return err
 	}
@@ -42,7 +45,7 @@ func BuildIvfFlatIndex[T any](Resources common.Resource, params *IndexParams, da
 }
 
 func (index *IvfFlatIndex) Close() error {
-	err := CheckCuvs(C.cuvsIvfFlatIndexDestroy(index.index))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatIndexDestroy(index.index)))
 	if err != nil {
 		return err
 	}
