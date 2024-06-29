@@ -117,7 +117,11 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename LabelT, bool gather_src = false, typename MappingOpT = raft::identity_op>
+template <typename T,
+          typename IdxT,
+          typename LabelT,
+          bool gather_src     = false,
+          typename MappingOpT = raft::identity_op>
 RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                const T* source_vecs,
                                const IdxT* source_ixs,
@@ -127,8 +131,8 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                IdxT n_rows,
                                uint32_t dim,
                                uint32_t veclen,
-                               IdxT batch_offset          = 0,
-                               MappingOpT mapping_op      = raft::identity_op{},
+                               IdxT batch_offset              = 0,
+                               MappingOpT mapping_op          = raft::identity_op{},
                                const float* source_vecs_norms = nullptr)
 {
   const IdxT i = IdxT(blockDim.x) * IdxT(blockIdx.x) + threadIdx.x;
@@ -175,30 +179,30 @@ template <typename InType,
           typename IndexType,
           typename Lambda = raft::identity_op>
 void myl2rownorm(raft::resources const& handle,
-          raft::device_matrix_view<const InType, IndexType, LayoutPolicy> in,
-          raft::device_vector_view<OutType, IndexType> out,
-          raft::linalg::NormType type,
-          raft::linalg::Apply apply,
-          Lambda fin_op = raft::identity_op())
+                 raft::device_matrix_view<const InType, IndexType, LayoutPolicy> in,
+                 raft::device_vector_view<OutType, IndexType> out,
+                 raft::linalg::NormType type,
+                 raft::linalg::Apply apply,
+                 Lambda fin_op = raft::identity_op())
 {
   // Created to support two different data types for input and output
   // To be replaced with raft::linalg::rowNorm once it supports different data types
   auto constexpr row_major = std::is_same_v<LayoutPolicy, raft::row_major>;
   RAFT_EXPECTS(static_cast<IndexType>(out.size()) == in.extent(0),
-                "Output should be equal to number of rows in Input");
+               "Output should be equal to number of rows in Input");
 
   raft::linalg::reduce(out.data_handle(),
-                      in.data_handle(),
-                      in.extent(1),
-                      in.extent(0),
-                      (OutType)0,
-                      row_major,
-                      apply == raft::linalg::Apply::ALONG_ROWS,
-                      raft::resource::get_cuda_stream(handle),
-                      false,
-                      raft::sq_op(),
-                      raft::add_op(),
-                      fin_op);
+                       in.data_handle(),
+                       in.extent(1),
+                       in.extent(0),
+                       (OutType)0,
+                       row_major,
+                       apply == raft::linalg::Apply::ALONG_ROWS,
+                       raft::resource::get_cuda_stream(handle),
+                       false,
+                       raft::sq_op(),
+                       raft::add_op(),
+                       fin_op);
 }
 
 /** See raft::neighbors::ivf_flat::extend docs */
@@ -225,7 +229,8 @@ void extend(raft::resources const& handle,
 
   auto new_labels = raft::make_device_mdarray<LabelT>(
     handle, raft::resource::get_large_workspace_resource(handle), raft::make_extents<IdxT>(n_rows));
-  rmm::device_uvector<float> new_vectors_norms(0, stream, raft::resource::get_large_workspace_resource(handle));
+  rmm::device_uvector<float> new_vectors_norms(
+    0, stream, raft::resource::get_large_workspace_resource(handle));
   if (index->metric() == cuvs::distance::DistanceType::CosineExpanded)
     new_vectors_norms.resize(n_rows, stream);
   cuvs::cluster::kmeans::balanced_params kmeans_params;
@@ -251,8 +256,10 @@ void extend(raft::resources const& handle,
       new_labels.data_handle() + batch.offset(), batch.size());
 
     // Compute norm if necessary (Cosine)
-    auto batch_vectors_norms = raft::make_device_vector_view<float, IdxT>(new_vectors_norms.data() + batch.offset(), batch.size());
-    std::optional<raft::device_vector_view<const float, IdxT>> batch_vectors_norms_opt = std::nullopt;
+    auto batch_vectors_norms = raft::make_device_vector_view<float, IdxT>(
+      new_vectors_norms.data() + batch.offset(), batch.size());
+    std::optional<raft::device_vector_view<const float, IdxT>> batch_vectors_norms_opt =
+      std::nullopt;
     if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
       myl2rownorm(handle,
                   batch_data_view,
@@ -260,8 +267,7 @@ void extend(raft::resources const& handle,
                   raft::linalg::NormType::L2Norm,
                   raft::linalg::Apply::ALONG_ROWS,
                   raft::sqrt_op());
-      batch_vectors_norms_opt =
-        std::make_optional(raft::make_const_mdspan(batch_vectors_norms));
+      batch_vectors_norms_opt = std::make_optional(raft::make_const_mdspan(batch_vectors_norms));
     }
 
     cuvs::cluster::kmeans_balanced::predict(handle,
@@ -290,11 +296,12 @@ void extend(raft::resources const& handle,
         raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
         new_labels.data_handle() + batch.offset(), batch.size());
-      auto batch_vectors_norms = raft::make_device_vector_view<float, IdxT>(new_vectors_norms.data() + batch.offset(), batch.size());
-      std::optional<raft::device_vector_view<const float, IdxT>> batch_vectors_norms_opt = std::nullopt;
+      auto batch_vectors_norms = raft::make_device_vector_view<float, IdxT>(
+        new_vectors_norms.data() + batch.offset(), batch.size());
+      std::optional<raft::device_vector_view<const float, IdxT>> batch_vectors_norms_opt =
+        std::nullopt;
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        batch_vectors_norms_opt =
-          std::make_optional(raft::make_const_mdspan(batch_vectors_norms));
+        batch_vectors_norms_opt = std::make_optional(raft::make_const_mdspan(batch_vectors_norms));
       }
       cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
                                                                       batch_data_view,

@@ -148,7 +148,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
 
       MathT alpha = -1.0;
-      MathT beta = 0.0;
+      MathT beta  = 0.0;
 
       raft::linalg::gemm(handle,
                          true,
@@ -443,11 +443,23 @@ void predict(const raft::resources& handle,
     // Compute the norm now if it hasn't been pre-computed.
     if (need_compute_norm) {
       if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
-        compute_norm(
-          handle, cur_dataset_norm.data(), cur_dataset_ptr, dim, minibatch_size, mapping_op, raft::sqrt_op{}, mr);
+        compute_norm(handle,
+                     cur_dataset_norm.data(),
+                     cur_dataset_ptr,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::sqrt_op{},
+                     mr);
       else
-        compute_norm(
-          handle, cur_dataset_norm.data(), cur_dataset_ptr, dim, minibatch_size, mapping_op, raft::identity_op{}, mr);
+        compute_norm(handle,
+                     cur_dataset_norm.data(),
+                     cur_dataset_ptr,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::identity_op{},
+                     mr);
       dataset_norm_ptr = cur_dataset_norm.data();
     } else if (dataset_norm != nullptr) {
       dataset_norm_ptr = dataset_norm + offset;
@@ -512,7 +524,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   // We dump it for anomalously small clusters, but keep constant otherwise.
   const MathT wc = min(static_cast<MathT>(csize), static_cast<MathT>(kAdjustCentersWeight));
   // Weight for the datapoint used to shift the center.
-  const MathT wd = 1.0;
+  const MathT wd        = 1.0;
   const MathT data_norm = dataset_norm == nullptr ? 1.0 : dataset_norm[i];
   for (; j < dim; j += raft::WarpSize) {
     MathT val = 0;
@@ -1027,29 +1039,29 @@ void build_hierarchical(const raft::resources& handle,
   // Precompute the L2 norm of the dataset if relevant and not yet computed.
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
   if (dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-      params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-      params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
+                                  params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                                  params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);
       if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
         compute_norm(handle,
-          dataset_norm_buf.data() + offset,
-          dataset + dim * offset,
-          dim,
-          minibatch_size,
-          mapping_op,
-          raft::sqrt_op{},
-          device_memory);
+                     dataset_norm_buf.data() + offset,
+                     dataset + dim * offset,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::sqrt_op{},
+                     device_memory);
       else
         compute_norm(handle,
-          dataset_norm_buf.data() + offset,
-          dataset + dim * offset,
-          dim,
-          minibatch_size,
-          mapping_op,
-          raft::identity_op{},
-          device_memory);
+                     dataset_norm_buf.data() + offset,
+                     dataset + dim * offset,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::identity_op{},
+                     device_memory);
     }
     dataset_norm = (const MathT*)dataset_norm_buf.data();
   }

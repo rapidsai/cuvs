@@ -89,11 +89,15 @@ void search_impl(raft::resources const& handle,
 
   if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
     normalized_queries_dev.resize(n_queries * index.dim(), stream);
-    raft::linalg::row_normalize( // L2Norm
+    raft::linalg::row_normalize(  // L2Norm
       handle,
       raft::make_device_matrix_view<const T, IdxT>(queries, n_queries, index.dim()),
       raft::make_device_matrix_view<T, IdxT>(normalized_queries_dev.data(), n_queries, index.dim()),
-      T(0), raft::sq_op(), raft::add_op(), raft::sqrt_op(), T(1e-8));
+      T(0),
+      raft::sq_op(),
+      raft::add_op(),
+      raft::sqrt_op(),
+      T(1e-8));
     queries_ptr = normalized_queries_dev.data();
   }
   if constexpr (std::is_integral_v<T>) {
@@ -139,7 +143,7 @@ void search_impl(raft::resources const& handle,
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
       compute_metric = cuvs::distance::DistanceType::InnerProduct;
-      select_min = cuvs::distance::is_min_close(compute_metric);
+      select_min     = cuvs::distance::is_min_close(compute_metric);
       alpha          = 1.0f;
       beta           = 0.0f;
       break;

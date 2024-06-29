@@ -267,33 +267,34 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
       auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
         (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-auto database_float = raft::make_device_matrix<float, IdxT>(
-        handle_, ps.num_db_vecs, ps.dim);
+      auto database_float = raft::make_device_matrix<float, IdxT>(handle_, ps.num_db_vecs, ps.dim);
       auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
         search_queries.data(), ps.num_queries, ps.dim);
-auto search_queries_float = raft::make_device_matrix<float, IdxT>(
-        handle_, ps.num_queries, ps.dim);
-      raft::linalg::map(handle_,
-                        database_float.view(),
-                        [] __device__(DataT val) { return static_cast<float>(val); },
-                        database_view);
+      auto search_queries_float =
+        raft::make_device_matrix<float, IdxT>(handle_, ps.num_queries, ps.dim);
+      raft::linalg::map(
+        handle_,
+        database_float.view(),
+        [] __device__(DataT val) { return static_cast<float>(val); },
+        database_view);
 
-      raft::linalg::map(handle_,
-                        search_queries_float.view(),
-                        [] __device__(DataT val) { return static_cast<float>(val); },
-                        search_queries_view);
-      auto indices_out_view = raft::make_device_matrix_view<IdxT, IdxT>(
-        indices_naive_dev.data(), ps.num_queries, ps.k);
-      auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
-        distances_naive_dev.data(), ps.num_queries, ps.k);
-      auto bfi = cuvs::neighbors::brute_force::build(handle_,
-      raft::make_const_mdspan(database_float.view()), ps.metric);
+      raft::linalg::map(
+        handle_,
+        search_queries_float.view(),
+        [] __device__(DataT val) { return static_cast<float>(val); },
+        search_queries_view);
+      auto indices_out_view =
+        raft::make_device_matrix_view<IdxT, IdxT>(indices_naive_dev.data(), ps.num_queries, ps.k);
+      auto dists_out_view =
+        raft::make_device_matrix_view<T, IdxT>(distances_naive_dev.data(), ps.num_queries, ps.k);
+      auto bfi = cuvs::neighbors::brute_force::build(
+        handle_, raft::make_const_mdspan(database_float.view()), ps.metric);
       cuvs::neighbors::brute_force::search(handle_,
-        bfi,
-        raft::make_const_mdspan(search_queries_float.view()),
-        indices_out_view,
-        dists_out_view,
-        std::nullopt);
+                                           bfi,
+                                           raft::make_const_mdspan(search_queries_float.view()),
+                                           indices_out_view,
+                                           dists_out_view,
+                                           std::nullopt);
 
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
@@ -331,15 +332,13 @@ auto search_queries_float = raft::make_device_matrix<float, IdxT>(
           indices_ivfflat_dev.data(), ps.num_queries, ps.k);
         auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
           distances_ivfflat_dev.data(), ps.num_queries, ps.k);
-        ivf_flat::search(handle_,
-                         search_params,
-                         idx,
-                         search_queries_view,
-                         indices_out_view,
-                         dists_out_view);
+        ivf_flat::search(
+          handle_, search_params, idx, search_queries_view, indices_out_view, dists_out_view);
 
-        raft::update_host(distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
-        raft::update_host(indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
+        raft::update_host(
+          distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
+        raft::update_host(
+          indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
       }
       ASSERT_TRUE(eval_neighbours(indices_naive,
@@ -626,8 +625,7 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs_cosine = {
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {100, 1000, 5, 32, 40, 124, cuvs::distance::DistanceType::CosineExpanded, true},
   {100, 1000, 8, 64, 40, 124, cuvs::distance::DistanceType::CosineExpanded, true},
-  {100, 1000, 500, 16, 10, 50, cuvs::distance::DistanceType::CosineExpanded, false}
-};
+  {100, 1000, 500, 16, 10, 50, cuvs::distance::DistanceType::CosineExpanded, false}};
 
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // test various dims (aligned and not aligned to vector sizes)

@@ -21,16 +21,14 @@
 namespace cuvs::neighbors::ivf_flat {
 
 typedef AnnIVFFlatTest<float, float, int64_t> AnnIVFFlatTestF_float;
-TEST_P(AnnIVFFlatTestF_float, AnnIVFFlat) {
-    this->testIVFFlat();
-}
+TEST_P(AnnIVFFlatTestF_float, AnnIVFFlat) { this->testIVFFlat(); }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_float, ::testing::ValuesIn(inputs));
 
 typedef AnnIVFFlatTest<float, float, int64_t> AnnIVFFlatTestF_cosine_float;
-TEST_P(AnnIVFFlatTestF_cosine_float, AnnIVFFlat) {
-    this->testIVFFlatCosine();
-}
-INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_cosine_float, ::testing::ValuesIn(inputs_cosine));
+TEST_P(AnnIVFFlatTestF_cosine_float, AnnIVFFlat) { this->testIVFFlatCosine(); }
+INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest,
+                        AnnIVFFlatTestF_cosine_float,
+                        ::testing::ValuesIn(inputs_cosine));
 
 }  // namespace cuvs::neighbors::ivf_flat
