@@ -1709,7 +1709,7 @@ auto build(raft::resources const& handle,
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
       // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
-      auto trainset_tmp = raft::make_device_mdarray<float>(
+      auto trainset_tmp = raft::make_device_mdarray<T>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
 
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
