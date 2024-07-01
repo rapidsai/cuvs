@@ -2026,33 +2026,6 @@ void make_rotation_matrix(raft::resources const& res,
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t> cluster_centers);
-/**
- * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
- * modified.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   raft::resources res;
- *   // use default index parameters
- *   ivf_pq::index_params index_params;
- *   // initialize an empty index
- *   ivf_pq::index<int64_t> index(res, index_params, D);
- *   ivf_pq::helpers::reset_index(res, &index);
- *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, int64_t>{
- *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
- *   uint32_t new_size = 5;
- *   ivf::resize_list(res, list, spec, new_size, 0);
- *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
- *   // recompute the internal state of the index
- *   ivf_pq::helpers::recompute_internal_state(res, &index);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[inout] index pointer to IVF-PQ index
- */
-void recompute_internal_state(const raft::resources& res, index<int64_t>* index);
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids into a buffer that may be
