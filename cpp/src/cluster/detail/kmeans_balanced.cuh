@@ -33,6 +33,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/normalize.cuh>
@@ -141,6 +142,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: {
       // TODO: pass buffer
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
@@ -163,6 +165,14 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                          distances.data(),
                          n_clusters,
                          stream);
+      if (dataset_norm) {
+        raft::linalg::binary_div_skip_zero(
+          handle,
+          raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
+            distances.data(), n_rows, n_clusters),
+          raft::make_device_vector_view<const MathT, IdxT>(dataset_norm, n_rows),
+          raft::linalg::Apply::ALONG_COLUMNS);
+      }
 
       auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
         distances.data(), n_rows, n_clusters);
@@ -268,7 +278,8 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             const LabelT* labels,
                             bool reset_counters,
                             MappingOpT mapping_op,
-                            rmm::device_async_resource_ref mr)
+                            rmm::device_async_resource_ref mr,
+                            const MathT* dataset_norm = nullptr)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -290,13 +301,31 @@ void calc_centers_and_sizes(const raft::resources& handle,
 
   // Apply mapping only when the data and math types are different.
   if constexpr (std::is_same_v<T, MathT>) {
-    raft::linalg::reduce_rows_by_key(
-      dataset, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
+    raft::linalg::reduce_rows_by_key(dataset,
+                                     dim,
+                                     labels,
+                                     dataset_norm,
+                                     nullptr,
+                                     n_rows,
+                                     dim,
+                                     n_clusters,
+                                     centers,
+                                     stream,
+                                     reset_counters);
   } else {
     // todo(lsugy): use iterator from KV output of fusedL2NN
     cub::TransformInputIterator<MathT, MappingOpT, const T*> mapping_itr(dataset, mapping_op);
-    raft::linalg::reduce_rows_by_key(
-      mapping_itr, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
+    raft::linalg::reduce_rows_by_key(mapping_itr,
+                                     dim,
+                                     labels,
+                                     dataset_norm,
+                                     nullptr,
+                                     n_rows,
+                                     dim,
+                                     n_clusters,
+                                     centers,
+                                     stream,
+                                     reset_counters);
   }
 
   // Compute weight of each cluster
@@ -320,13 +349,14 @@ void calc_centers_and_sizes(const raft::resources& handle,
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */
-template <typename T, typename MathT, typename IdxT, typename MappingOpT>
+template <typename T, typename MathT, typename IdxT, typename MappingOpT, typename FinOpT>
 void compute_norm(const raft::resources& handle,
                   MathT* dataset_norm,
                   const T* dataset,
                   IdxT dim,
                   IdxT n_rows,
                   MappingOpT mapping_op,
+                  FinOpT norm_fin_op,
                   std::optional<rmm::device_async_resource_ref> mr = std::nullopt)
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("compute_norm");
@@ -347,7 +377,7 @@ void compute_norm(const raft::resources& handle,
   }
 
   raft::linalg::rowNorm<MathT, IdxT>(
-    dataset_norm, dataset_ptr, dim, n_rows, raft::linalg::L2Norm, true, stream);
+    dataset_norm, dataset_ptr, dim, n_rows, raft::linalg::L2Norm, true, stream, norm_fin_op);
 }
 
 /**
@@ -394,7 +424,8 @@ void predict(const raft::resources& handle,
     std::is_same_v<T, MathT> ? 0 : max_minibatch_size * dim, stream, mem_res);
   bool need_compute_norm =
     dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                                params.metric == cuvs::distance::DistanceType::L2SqrtExpanded);
+                                params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                                params.metric == cuvs::distance::DistanceType::CosineExpanded);
   rmm::device_uvector<MathT> cur_dataset_norm(
     need_compute_norm ? max_minibatch_size : 0, stream, mem_res);
   const MathT* dataset_norm_ptr = nullptr;
@@ -411,8 +442,24 @@ void predict(const raft::resources& handle,
 
     // Compute the norm now if it hasn't been pre-computed.
     if (need_compute_norm) {
-      compute_norm(
-        handle, cur_dataset_norm.data(), cur_dataset_ptr, dim, minibatch_size, mapping_op, mem_res);
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+        compute_norm(handle,
+                     cur_dataset_norm.data(),
+                     cur_dataset_ptr,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::sqrt_op{},
+                     mr);
+      else
+        compute_norm(handle,
+                     cur_dataset_norm.data(),
+                     cur_dataset_ptr,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::identity_op{},
+                     mr);
       dataset_norm_ptr = cur_dataset_norm.data();
     } else if (dataset_norm != nullptr) {
       dataset_norm_ptr = dataset_norm + offset;
@@ -450,7 +497,8 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
                         IdxT average,
                         IdxT seed,
                         IdxT* count,
-                        MappingOpT mapping_op)
+                        MappingOpT mapping_op,
+                        const MathT* dataset_norm = nullptr)
 {
   IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.y);
   if (l >= n_clusters) return;
@@ -476,11 +524,12 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   // We dump it for anomalously small clusters, but keep constant otherwise.
   const MathT wc = min(static_cast<MathT>(csize), static_cast<MathT>(kAdjustCentersWeight));
   // Weight for the datapoint used to shift the center.
-  const MathT wd = 1.0;
+  const MathT wd        = 1.0;
+  const MathT data_norm = dataset_norm == nullptr ? 1.0 : dataset_norm[i];
   for (; j < dim; j += raft::WarpSize) {
     MathT val = 0;
     val += wc * centers[j + dim * li];
-    val += wd * mapping_op(dataset[j + dim * i]);
+    val += wd * mapping_op(dataset[j + dim * i]) / data_norm;
     val /= wc + wd;
     centers[j + dim * l] = val;
   }
@@ -535,7 +584,8 @@ auto adjust_centers(MathT* centers,
                     MathT threshold,
                     MappingOpT mapping_op,
                     rmm::cuda_stream_view stream,
-                    rmm::device_async_resource_ref device_memory) -> bool
+                    rmm::device_async_resource_ref device_memory,
+                    const MathT* dataset_norm) -> bool
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "adjust_centers(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
@@ -570,7 +620,8 @@ auto adjust_centers(MathT* centers,
                                                                         average,
                                                                         ofst,
                                                                         update_count.data(),
-                                                                        mapping_op);
+                                                                        mapping_op,
+                                                                        dataset_norm);
   adjusted = update_count.value(stream) > 0;  // NB: rmm scalar performs the sync
 
   return adjusted;
@@ -650,7 +701,8 @@ void balancing_em_iters(const raft::resources& handle,
                                    balancing_threshold,
                                    mapping_op,
                                    stream,
-                                   device_memory)) {
+                                   device_memory,
+                                   dataset_norm)) {
       if (balancing_counter++ >= balancing_pullback) {
         balancing_counter -= balancing_pullback;
         n_iters++;
@@ -695,7 +747,8 @@ void balancing_em_iters(const raft::resources& handle,
                            cluster_labels,
                            true,
                            mapping_op,
-                           device_memory);
+                           device_memory,
+                           dataset_norm);
   }
 }
 
@@ -739,7 +792,8 @@ void build_clusters(const raft::resources& handle,
                          cluster_labels,
                          true,
                          mapping_op,
-                         device_memory);
+                         device_memory,
+                         dataset_norm);
 
   // run EM
   balancing_em_iters(handle,
@@ -904,7 +958,8 @@ auto build_fine_clusters(const raft::resources& handle,
     cub::TransformInputIterator<MathT, MappingOpT, const T*> mapping_itr(dataset_mptr, mapping_op);
     raft::matrix::gather(mapping_itr, dim, n_rows, mc_trainset_ids, k, mc_trainset, stream);
     if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+        params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+        params.metric == cuvs::distance::DistanceType::CosineExpanded) {
       thrust::gather(raft::resource::get_thrust_policy(handle),
                      mc_trainset_ids,
                      mc_trainset_ids + k,
@@ -963,7 +1018,8 @@ void build_hierarchical(const raft::resources& handle,
                         IdxT n_rows,
                         MathT* cluster_centers,
                         IdxT n_clusters,
-                        MappingOpT mapping_op)
+                        MappingOpT mapping_op,
+                        const MathT* dataset_norm = nullptr)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   using LabelT = uint32_t;
@@ -980,21 +1036,32 @@ void build_hierarchical(const raft::resources& handle,
   auto [max_minibatch_size, mem_per_row] =
     calc_minibatch_size<MathT>(n_clusters, n_rows, dim, params.metric, std::is_same_v<T, MathT>);
 
-  // Precompute the L2 norm of the dataset if relevant.
-  const MathT* dataset_norm = nullptr;
+  // Precompute the L2 norm of the dataset if relevant and not yet computed.
   rmm::device_uvector<MathT> dataset_norm_buf(0, stream, device_memory);
-  if (params.metric == cuvs::distance::DistanceType::L2Expanded ||
-      params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+  if (dataset_norm == nullptr && (params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                                  params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                                  params.metric == cuvs::distance::DistanceType::CosineExpanded)) {
     dataset_norm_buf.resize(n_rows, stream);
     for (IdxT offset = 0; offset < n_rows; offset += max_minibatch_size) {
       IdxT minibatch_size = std::min<IdxT>(max_minibatch_size, n_rows - offset);
-      compute_norm(handle,
-                   dataset_norm_buf.data() + offset,
-                   dataset + dim * offset,
-                   dim,
-                   minibatch_size,
-                   mapping_op,
-                   device_memory);
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded)
+        compute_norm(handle,
+                     dataset_norm_buf.data() + offset,
+                     dataset + dim * offset,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::sqrt_op{},
+                     device_memory);
+      else
+        compute_norm(handle,
+                     dataset_norm_buf.data() + offset,
+                     dataset + dim * offset,
+                     dim,
+                     minibatch_size,
+                     mapping_op,
+                     raft::identity_op{},
+                     device_memory);
     }
     dataset_norm = (const MathT*)dataset_norm_buf.data();
   }
