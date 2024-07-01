@@ -18,21 +18,20 @@
 
 #include "../detail/ann_utils.cuh"
 
-#include "../detail/div_utils.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/util/pow2_utils.cuh>
 #include <variant>
 
 namespace cuvs::neighbors::ivf_flat::helpers::codepacker {
 
 namespace {
-
 template <typename T>
 __device__ void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+  using interleaved_group = raft::Pow2<kIndexGroupSize>;
 
   // Interleave dimensions of the source vector while recording it.
   // NB: such `veclen` is selected, that `dim % veclen == 0`
@@ -51,7 +50,7 @@ __device__ void unpack_1(
   const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+  using interleaved_group = raft::Pow2<kIndexGroupSize>;
 
   // NB: such `veclen` is selected, that `dim % veclen == 0`
   auto group_offset = interleaved_group::roundDown(offset);
@@ -168,7 +167,7 @@ template <typename T>
 void pack_1(const T* flat_code, T* block, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+  using interleaved_group = raft::Pow2<kIndexGroupSize>;
 
   // Interleave dimensions of the source vector while recording it.
   // NB: such `veclen` is selected, that `dim % veclen == 0`
@@ -186,7 +185,7 @@ template <typename T>
 void unpack_1(const T* block, T* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   // The data is written in interleaved groups of `index::kGroupSize` vectors
-  using interleaved_group = cuvs::neighbors::detail::div_utils<kIndexGroupSize>;
+  using interleaved_group = raft::Pow2<kIndexGroupSize>;
 
   // NB: such `veclen` is selected, that `dim % veclen == 0`
   auto group_offset = interleaved_group::roundDown(offset);

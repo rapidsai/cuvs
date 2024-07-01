@@ -2033,7 +2033,7 @@ void make_rotation_matrix(raft::resources const& res,
  */
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t> cluster_centers);
+                 raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
  * modified.
@@ -2063,8 +2063,7 @@ void set_centers(raft::resources const& res,
 void recompute_internal_state(const raft::resources& res, index<int64_t>* index);
 
 /**
- * @brief Public helper API for fetching a trained index's IVF centroids into a buffer that may be
- * allocated on either host or device.
+ * @brief Public helper API for fetching a trained index's IVF centroids
  *
  * Usage example:
  * @code{.cpp}
@@ -2082,7 +2081,7 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
  */
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
-                     raft::device_matrix_view<float> cluster_centers);
+                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @}
  */
