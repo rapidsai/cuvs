@@ -13,6 +13,14 @@
 # limitations under the License.
 
 
-from .ivf_pq import Index, IndexParams, SearchParams, build, search
+from .ivf_pq import Index, IndexParams, SearchParams, build, load, save, search
 
-__all__ = ["Index", "IndexParams", "SearchParams", "build", "search"]
+__all__ = [
+    "Index",
+    "IndexParams",
+    "SearchParams",
+    "build",
+    "load",
+    "save",
+    "search",
+]

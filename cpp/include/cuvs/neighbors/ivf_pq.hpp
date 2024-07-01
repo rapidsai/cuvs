@@ -279,6 +279,14 @@ struct index : cuvs::neighbors::index {
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
 
+  /**
+   * @brief Construct an empty index.
+   *
+   * Constructs an empty index. This index will either need to be trained with `build`
+   * or loaded from a saved copy with `deserialize`
+   */
+  index(raft::resources const& handle);
+
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& handle,
         cuvs::distance::DistanceType metric,
@@ -1366,7 +1374,7 @@ void serialize(raft::resources const& handle,
  *
  * using IdxT = int64_t; // type of the index
  * // create an empty index
- * cuvs::neighbors::ivf_pq::index<IdxT> index(handl, index_params, dim);
+ * cuvs::neighbors::ivf_pq::index<IdxT> index(handle);
  *
  * cuvs::neighbors::ivf_pq::deserialize(handle, is, index);
  * @endcode
@@ -1390,8 +1398,8 @@ void deserialize(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * using IdxT = int64_t; // type of the index
- * // create an empty index with
- * ivf_pq::index<IdxT> index(handle, index_params, dim);
+ * // create an empty index
+ * ivf_pq::index<IdxT> index(handle);
  *
  * cuvs::neighbors::ivf_pq::deserialize(handle, filename, &index);
  * @endcode
@@ -2028,8 +2036,7 @@ void set_centers(raft::resources const& res,
                  raft::device_matrix_view<const float, uint32_t> cluster_centers);
 
 /**
- * @brief Public helper API for fetching a trained index's IVF centroids into a buffer that may be
- * allocated on either host or device.
+ * @brief Public helper API for fetching a trained index's IVF centroids
  *
  * Usage example:
  * @code{.cpp}
@@ -2047,7 +2054,7 @@ void set_centers(raft::resources const& res,
  */
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
-                     raft::device_matrix_view<float> cluster_centers);
+                     raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @}
  */
