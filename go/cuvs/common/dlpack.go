@@ -23,7 +23,7 @@ import (
 )
 
 type Tensor[T any] struct {
-	C_tensor C.DLManagedTensor
+	C_tensor *C.DLManagedTensor
 }
 
 // func NewTensor[T any](from_cai bool, shape []int, data []T, use_int64 bool) (Tensor, error) {
@@ -86,35 +86,35 @@ func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 	dlm.manager_ctx = nil
 	dlm.deleter = nil
 
-	return Tensor[T]{c_tensor: dlm}, nil
+	return Tensor[T]{C_tensor: dlm}, nil
 
 }
 
 func (t *Tensor[T]) GetBytes() int {
 	bytes := 1
 
-	for dim := 0; dim < int(t.c_tensor.dl_tensor.ndim); dim++ {
-		offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.c_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.c_tensor.dl_tensor.shape))
+	for dim := 0; dim < int(t.C_tensor.dl_tensor.ndim); dim++ {
+		offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.C_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.C_tensor.dl_tensor.shape))
 
 		// Convert the pointer to the correct type and dereference it to get the value
 		dimSize := *(*C.long)(offset)
 
 		bytes *= int(dimSize)
 	}
-	bytes *= int(t.c_tensor.dl_tensor.dtype.bits / 8)
+	bytes *= int(t.C_tensor.dl_tensor.dtype.bits / 8)
 
 	return bytes
 }
 
 func (t *Tensor[T]) Close() error {
 	// TODO: free memory
-	if t.c_tensor.dl_tensor.device.device_type == C.kDLCUDA {
+	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
 		bytes := t.GetBytes()
 		res, err := NewResource(nil)
 		if err != nil {
 			return err
 		}
-		return CheckCuvs(C.cuvsRMMFree(res.Resource, t.c_tensor.dl_tensor.data, C.size_t(bytes)))
+		return CheckCuvs(CuvsError(C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
 
 		// C.run_callback(t.c_tensor.deleter, t.c_tensor)
 	}
@@ -131,13 +131,13 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
 	// var deviceData *C.void = nil
 	println("host data location:")
-	println(t.c_tensor.dl_tensor.data)
+	println(t.C_tensor.dl_tensor.data)
 	println("device data pointer:")
 	println(DeviceDataPointer)
 	println("host data location:")
-	println(t.c_tensor.dl_tensor.data)
+	println(t.C_tensor.dl_tensor.data)
 
-	err := CheckCuvs(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes)))
+	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes))))
 	if err != nil {
 		//	panic(err)
 		return nil, err
@@ -164,7 +164,7 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	err = CheckCuda(
 		C.cudaMemcpy(
 			DeviceDataPointer,
-			t.c_tensor.dl_tensor.data,
+			t.C_tensor.dl_tensor.data,
 			C.size_t(bytes),
 			C.cudaMemcpyHostToDevice,
 		))
@@ -172,8 +172,8 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	if err != nil {
 		return nil, err
 	}
-	t.c_tensor.dl_tensor.device.device_type = C.kDLCUDA
-	t.c_tensor.dl_tensor.data = DeviceDataPointer
+	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
+	t.C_tensor.dl_tensor.data = DeviceDataPointer
 	println("normal transfer done")
 
 	return t, nil
@@ -190,7 +190,7 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 
 			addr,
 
-			t.c_tensor.dl_tensor.data,
+			t.C_tensor.dl_tensor.data,
 
 			C.size_t(bytes),
 			C.cudaMemcpyDeviceToHost,
@@ -200,20 +200,20 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 		return nil, err
 	}
 
-	t.c_tensor.dl_tensor.device.device_type = C.kDLCPU
-	t.c_tensor.dl_tensor.data = addr
+	t.C_tensor.dl_tensor.device.device_type = C.kDLCPU
+	t.C_tensor.dl_tensor.data = addr
 
 	return t, nil
 }
 
 func (t *Tensor[T]) GetArray() ([][]T, error) {
-	if t.c_tensor.dl_tensor.device.device_type != C.kDLCPU {
+	if t.C_tensor.dl_tensor.device.device_type != C.kDLCPU {
 		return nil, errors.New("Tensor must be on CPU")
 	}
 
-	shape := unsafe.Slice((*int64)(t.c_tensor.dl_tensor.shape), 2)
+	shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
 
-	data_flat := unsafe.Slice((*T)(t.c_tensor.dl_tensor.data), shape[0]*shape[1])
+	data_flat := unsafe.Slice((*T)(t.C_tensor.dl_tensor.data), shape[0]*shape[1])
 
 	data := make([][]T, shape[0])
 	for i := range data {

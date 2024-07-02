@@ -20,13 +20,13 @@ func NewResource(stream C.cudaStream_t) (Resource, error) {
 
 	res := C.cuvsResources_t(0)
 
-	err := CheckCuvs(C.cuvsResourcesCreate(&res))
+	err := CheckCuvs(CuvsError(C.cuvsResourcesCreate(&res)))
 	if err != nil {
 		return Resource{}, err
 	}
 
 	if stream != nil {
-		err := CheckCuvs(C.cuvsStreamSet(res, stream))
+		err := CheckCuvs(CuvsError(C.cuvsStreamSet(res, stream)))
 		if err != nil {
 			return Resource{}, err
 		}
@@ -36,12 +36,12 @@ func NewResource(stream C.cudaStream_t) (Resource, error) {
 }
 
 func (r Resource) Sync() error {
-	return CheckCuvs(C.cuvsStreamSync(r.Resource))
+	return CheckCuvs(CuvsError(C.cuvsStreamSync(r.Resource)))
 }
 
 func (r Resource) GetCudaStream() (C.cudaStream_t, error) {
 	var stream C.cudaStream_t
-	err := CheckCuvs(C.cuvsStreamGet(r.Resource, &stream))
+	err := CheckCuvs(CuvsError(C.cuvsStreamGet(r.Resource, &stream)))
 	if err != nil {
 		return C.cudaStream_t(nil), err
 	}
@@ -49,7 +49,7 @@ func (r Resource) GetCudaStream() (C.cudaStream_t, error) {
 }
 
 func (r Resource) Close() error {
-	err := CheckCuvs(C.cuvsResourcesDestroy(r.Resource))
+	err := CheckCuvs(CuvsError(C.cuvsResourcesDestroy(r.Resource)))
 	if err != nil {
 		return err
 	}

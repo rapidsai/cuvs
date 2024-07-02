@@ -2,13 +2,14 @@ package ivf_flat
 
 import (
 	"math/rand"
+	"rapidsai/cuvs/cuvs/common"
 	"testing"
 	"time"
 )
 
 func TestIvfFlat(t *testing.T) {
 
-	resource, _ := NewResource(nil)
+	resource, _ := common.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -23,7 +24,7 @@ func TestIvfFlat(t *testing.T) {
 		}
 	}
 
-	dataset, _ := NewTensor(true, TestDataset)
+	dataset, _ := common.NewTensor(true, TestDataset)
 
 	IndexParams, _ := CreateIndexParams(2, "L2Expanded", 2.0, 0, 0.5, true)
 
@@ -34,7 +35,7 @@ func TestIvfFlat(t *testing.T) {
 
 	NQueries := 4
 	K := 4
-	queries, _ := NewTensor(true, TestDataset[:NQueries])
+	queries, _ := common.NewTensor(true, TestDataset[:NQueries])
 	NeighborsDataset := make([][]int64, NQueries)
 	for i := range NeighborsDataset {
 		NeighborsDataset[i] = make([]int64, K)
@@ -43,8 +44,8 @@ func TestIvfFlat(t *testing.T) {
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, K)
 	}
-	neighbors, _ := NewTensor(true, NeighborsDataset)
-	distances, _ := NewTensor(true, DistancesDataset)
+	neighbors, _ := common.NewTensor(true, NeighborsDataset)
+	distances, _ := common.NewTensor(true, DistancesDataset)
 
 	_, todeviceerr := neighbors.ToDevice(&resource)
 	if todeviceerr != nil {

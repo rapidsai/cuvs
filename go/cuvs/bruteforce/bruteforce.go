@@ -10,6 +10,7 @@ package common
 import "C"
 import (
 	"errors"
+	"rapidsai/cuvs/cuvs/common"
 	"unsafe"
 )
 
@@ -30,7 +31,7 @@ func CreateIndex() (*Index, error) {
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := CheckCuvs(C.cuvsBruteForceIndexCreate(&index))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsBruteForceIndexCreate(&index)))
 
 	if err != nil {
 		return nil, err
@@ -41,7 +42,7 @@ func CreateIndex() (*Index, error) {
 }
 
 func (index *Index) Close() error {
-	err := CheckCuvs(C.cuvsBruteForceIndexDestroy(index.index))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsBruteForceIndexDestroy(index.index)))
 	if err != nil {
 		return err
 	}
@@ -49,11 +50,11 @@ func (index *Index) Close() error {
 	return nil
 }
 
-func BuildIndex[T any](Resources C.cuvsResources_t, Dataset *Tensor[T], metric string, metric_arg float32, index *Index) error {
+func BuildIndex[T any](Resources common.Resource, Dataset *common.Tensor[T], metric string, metric_arg float32, index *Index) error {
 
-	if Dataset.c_tensor.dl_tensor.device.device_type != C.kDLCUDA {
-		return errors.New("dataset must be on GPU")
-	}
+	// if Dataset.C_tensor.dl_tensor.device.device_type != C.kDLCUDA {
+	// 	return errors.New("dataset must be on GPU")
+	// }
 
 	CMetric := C.cuvsDistanceType(0)
 
@@ -64,24 +65,24 @@ func BuildIndex[T any](Resources C.cuvsResources_t, Dataset *Tensor[T], metric s
 		return errors.New("unsupported metric")
 	}
 
-	println(index.index.addr)
-
-	err := CheckCuvs(C.cuvsBruteForceBuild(Resources, Dataset.c_tensor, CMetric, C.float(metric_arg), index.index))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsBruteForceBuild(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(Dataset.C_tensor)), CMetric, C.float(metric_arg), index.index)))
 	if err != nil {
 		return err
 	}
 	index.trained = true
 
+	println("build done")
+
 	return nil
 
 }
 
-func SearchIndex[T any](resources C.cuvsResources_t, index Index, queries *Tensor[T], neighbors *Tensor[int64], distances *Tensor[T]) error {
+func SearchIndex[T any](resources common.Resource, index Index, queries *common.Tensor[T], neighbors *common.Tensor[int64], distances *common.Tensor[T]) error {
 
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
 
-	return CheckCuvs(C.cuvsBruteForceSearch(resources, index.index, queries.c_tensor, neighbors.c_tensor, distances.c_tensor))
+	return common.CheckCuvs(common.CuvsError(C.cuvsBruteForceSearch(C.ulong(resources.Resource), index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)))))
 
 }

@@ -36,7 +36,7 @@ func CreateIvfFlatIndex(params *IndexParams, dataset *common.Tensor[float32]) (*
 type ManagedTensor = *C.DLManagedTensor
 
 func BuildIvfFlatIndex[T any](Resources common.Resource, params *IndexParams, dataset *common.Tensor[T], index *IvfFlatIndex) error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatBuild(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(&dataset.C_tensor)), index.index)))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatBuild(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(dataset.C_tensor)), index.index)))
 	if err != nil {
 		return err
 	}
@@ -53,12 +53,12 @@ func (index *IvfFlatIndex) Close() error {
 	return nil
 }
 
-func SearchIvfFlatIndex[T any](Resources Resource, params *SearchParams, index *IvfFlatIndex, queries *Tensor[T], neighbors *Tensor[int64], distances *Tensor[T]) error {
+func SearchIvfFlatIndex[T any](Resources common.Resource, params *SearchParams, index *IvfFlatIndex, queries *common.Tensor[T], neighbors *common.Tensor[int64], distances *common.Tensor[T]) error {
 
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
 
-	return CheckCuvs(C.cuvsIvfFlatSearch(Resources.resource, params.params, index.index, queries.c_tensor, neighbors.c_tensor, distances.c_tensor))
+	return common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)))))
 
 }

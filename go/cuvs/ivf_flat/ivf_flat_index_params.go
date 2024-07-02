@@ -10,6 +10,7 @@ package ivf_flat
 import "C"
 import (
 	"errors"
+	"rapidsai/cuvs/cuvs/common"
 	"unsafe"
 )
 
@@ -27,7 +28,7 @@ func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, set_km
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := CheckCuvs(C.cuvsIvfFlatIndexParamsCreate(&params))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatIndexParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, set_km
 }
 
 func (p *IndexParams) Close() error {
-	err := CheckCuvs(C.cuvsIvfFlatIndexParamsDestroy(p.params))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatIndexParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}
