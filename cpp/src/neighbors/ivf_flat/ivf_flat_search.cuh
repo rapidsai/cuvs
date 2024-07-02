@@ -280,17 +280,15 @@ void search_impl(raft::resources const& handle,
 template <typename T,
           typename IdxT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
-inline void search_with_filtering(
-  raft::resources const& handle,
-  const search_params& params,
-  const index<T, IdxT>& index,
-  const T* queries,
-  uint32_t n_queries,
-  uint32_t k,
-  IdxT* neighbors,
-  float* distances,
-  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
-  IvfSampleFilterT sample_filter    = IvfSampleFilterT())
+inline void search_with_filtering(raft::resources const& handle,
+                                  const search_params& params,
+                                  const index<T, IdxT>& index,
+                                  const T* queries,
+                                  uint32_t n_queries,
+                                  uint32_t k,
+                                  IdxT* neighbors,
+                                  float* distances,
+                                  IvfSampleFilterT sample_filter = IvfSampleFilterT())
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::search(k = %u, n_queries = %u, dim = %zu)", k, n_queries, index.dim());
@@ -335,7 +333,7 @@ inline void search_with_filtering(
                                                   cuvs::distance::is_min_close(index.metric()),
                                                   neighbors + offset_q * k,
                                                   distances + offset_q * k,
-                                                  mr,
+                                                  raft::resource::get_workspace_resource(handle),
                                                   sample_filter);
   }
 }
@@ -367,7 +365,6 @@ void search_with_filtering(raft::resources const& handle,
                         static_cast<std::uint32_t>(neighbors.extent(1)),
                         neighbors.data_handle(),
                         distances.data_handle(),
-                        raft::resource::get_workspace_resource(handle),
                         sample_filter);
 }
 
