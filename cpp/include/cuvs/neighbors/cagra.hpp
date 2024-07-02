@@ -114,7 +114,7 @@ struct index_params : cuvs::neighbors::index_params {
    * update the dataset using cuvs::neighbors::cagra::update_dataset. CAGRA does not have `extent`
    * API.
    */
-  bool populate_data = true;
+  bool attach_data_on_build = true;
 };
 
 /**
