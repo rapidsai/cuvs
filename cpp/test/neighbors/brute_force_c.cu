@@ -18,6 +18,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/random/rng.cuh>
+#include <rmm/device_uvector.hpp>
 
 #include "ann_utils.cuh"
 #include <cuvs/neighbors/brute_force.h>
@@ -317,6 +318,7 @@ void recall_eval_with_filter(T* query_data,
                              cuvsDistanceType metric)
 {
   raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   std::vector<T> queries_h(n_queries * n_dim);
   std::vector<T> indices_h(n_rows * n_dim);
@@ -325,7 +327,6 @@ void recall_eval_with_filter(T* query_data,
   std::vector<IdxT> neighbors_h(size);
   std::vector<T> distances_h(size);
 
-  auto stream = raft::resource::get_cuda_stream(handle);
   raft::copy(neighbors_h.data(), neighbors_d, size, stream);
   raft::copy(distances_h.data(), distances_d, size, stream);
   raft::copy(queries_h.data(), query_data, n_queries * n_dim, stream);
@@ -365,46 +366,42 @@ TEST(BruteForceC, BuildSearch)
   int64_t n_dim        = 32;
   uint32_t n_neighbors = 8;
 
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   cuvsDistanceType metric = L2Expanded;
 
-  float *index_data, *query_data, *distances_data;
-  int64_t* neighbors_data;
   uint32_t* filter_data = NULL;
-  cudaMalloc(&index_data, sizeof(float) * n_rows * n_dim);
-  cudaMalloc(&query_data, sizeof(float) * n_queries * n_dim);
-  cudaMalloc(&neighbors_data, sizeof(int64_t) * n_queries * n_neighbors);
-  cudaMalloc(&distances_data, sizeof(float) * n_queries * n_neighbors);
 
-  generate_random_data(index_data, n_rows * n_dim);
-  generate_random_data(query_data, n_queries * n_dim);
+  rmm::device_uvector<float> index_data(n_rows * n_dim, stream);
+  rmm::device_uvector<float> query_data(n_queries * n_dim, stream);
+  rmm::device_uvector<int64_t> neighbors_data(n_queries * n_neighbors, stream);
+  rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
+
+  generate_random_data(index_data.data(), n_rows * n_dim);
+  generate_random_data(query_data.data(), n_queries * n_dim);
 
   run_brute_force(n_rows,
                   n_queries,
                   n_dim,
                   n_neighbors,
-                  index_data,
-                  query_data,
+                  index_data.data(),
+                  query_data.data(),
                   filter_data,
-                  distances_data,
-                  neighbors_data,
+                  distances_data.data(),
+                  neighbors_data.data(),
                   metric);
 
-  recall_eval(query_data,
-              index_data,
+  recall_eval(query_data.data(),
+              index_data.data(),
               filter_data,
-              neighbors_data,
-              distances_data,
+              neighbors_data.data(),
+              distances_data.data(),
               n_queries,
               n_rows,
               n_dim,
               n_neighbors,
               metric);
-
-  // delete device memory
-  cudaFree(index_data);
-  cudaFree(query_data);
-  cudaFree(neighbors_data);
-  cudaFree(distances_data);
 }
 
 TEST(BruteForceC, BuildSearchWithFilter)
@@ -413,6 +410,9 @@ TEST(BruteForceC, BuildSearchWithFilter)
   int64_t n_queries    = 128;
   int64_t n_dim        = 32;
   uint32_t n_neighbors = 8;
+
+  raft::resources handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   float sparsity   = 0.2;
   int64_t n_filter = (n_queries * n_rows + 31) / 32;
@@ -427,45 +427,36 @@ TEST(BruteForceC, BuildSearchWithFilter)
     select_min ? std::numeric_limits<float>::infinity() : std::numeric_limits<float>::lowest());
   std::vector<int64_t> neighbors_ref_h(n_queries * n_neighbors, static_cast<int64_t>(0));
 
-  float *index_data, *query_data, *distances_data;
-  int64_t* neighbors_data;
-  uint32_t* filter_data;
-  cudaMalloc(&index_data, sizeof(float) * n_rows * n_dim);
-  cudaMalloc(&query_data, sizeof(float) * n_queries * n_dim);
-  cudaMalloc(&neighbors_data, sizeof(int64_t) * n_queries * n_neighbors);
-  cudaMalloc(&distances_data, sizeof(float) * n_queries * n_neighbors);
-  cudaMalloc(&filter_data, sizeof(uint32_t) * n_filter);
+  rmm::device_uvector<float> index_data(n_rows * n_dim, stream);
+  rmm::device_uvector<float> query_data(n_queries * n_dim, stream);
+  rmm::device_uvector<int64_t> neighbors_data(n_queries * n_neighbors, stream);
+  rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
+  rmm::device_uvector<uint32_t> filter_data(n_filter, stream);
 
-  cudaMemcpy(neighbors_data,
-             neighbors_ref_h.data(),
-             sizeof(int64_t) * n_queries * n_neighbors,
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(distances_data,
-             distances_ref_h.data(),
-             sizeof(float) * n_queries * n_neighbors,
-             cudaMemcpyHostToDevice);
+  raft::copy(neighbors_data.data(), neighbors_ref_h.data(), n_queries * n_neighbors, stream);
+  raft::copy(distances_data.data(), distances_ref_h.data(), n_queries * n_neighbors, stream);
 
-  generate_random_data(index_data, n_rows * n_dim);
-  generate_random_data(query_data, n_queries * n_dim);
+  generate_random_data(index_data.data(), n_rows * n_dim);
+  generate_random_data(query_data.data(), n_queries * n_dim);
 
-  cudaMemcpy(filter_data, filter_h.data(), n_filter * sizeof(uint32_t), cudaMemcpyHostToDevice);
+  raft::copy(filter_data.data(), filter_h.data(), n_filter, stream);
 
   run_brute_force(n_rows,
                   n_queries,
                   n_dim,
                   n_neighbors,
-                  index_data,
-                  query_data,
-                  filter_data,
-                  distances_data,
-                  neighbors_data,
+                  index_data.data(),
+                  query_data.data(),
+                  filter_data.data(),
+                  distances_data.data(),
+                  neighbors_data.data(),
                   metric);
 
-  recall_eval_with_filter(query_data,
-                          index_data,
+  recall_eval_with_filter(query_data.data(),
+                          index_data.data(),
                           filter_h,
-                          neighbors_data,
-                          distances_data,
+                          neighbors_data.data(),
+                          distances_data.data(),
                           distances_ref_h,
                           neighbors_ref_h,
                           n_queries,
@@ -474,11 +465,4 @@ TEST(BruteForceC, BuildSearchWithFilter)
                           n_neighbors,
                           nnz,
                           metric);
-
-  // delete device memory
-  cudaFree(index_data);
-  cudaFree(query_data);
-  cudaFree(neighbors_data);
-  cudaFree(distances_data);
-  cudaFree(filter_data);
 }

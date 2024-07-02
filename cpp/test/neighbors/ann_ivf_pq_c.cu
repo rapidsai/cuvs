@@ -101,36 +101,37 @@ TEST(IvfPqC, BuildSearch)
   int64_t n_dim        = 32;
   uint32_t n_neighbors = 8;
 
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+
   cuvsDistanceType metric = L2Expanded;
   size_t n_probes         = 20;
   size_t n_lists          = 1024;
 
-  float *index_data, *query_data, *distances_data;
-  int64_t* neighbors_data;
-  cudaMalloc(&index_data, sizeof(float) * n_rows * n_dim);
-  cudaMalloc(&query_data, sizeof(float) * n_queries * n_dim);
-  cudaMalloc(&neighbors_data, sizeof(int64_t) * n_queries * n_neighbors);
-  cudaMalloc(&distances_data, sizeof(float) * n_queries * n_neighbors);
+  rmm::device_uvector<float> index_data(n_rows * n_dim, stream);
+  rmm::device_uvector<float> query_data(n_queries * n_dim, stream);
+  rmm::device_uvector<int64_t> neighbors_data(n_queries * n_neighbors, stream);
+  rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
 
-  generate_random_data(index_data, n_rows * n_dim);
-  generate_random_data(query_data, n_queries * n_dim);
+  generate_random_data(index_data.data(), n_rows * n_dim);
+  generate_random_data(query_data.data(), n_queries * n_dim);
 
   run_ivf_pq(n_rows,
              n_queries,
              n_dim,
              n_neighbors,
-             index_data,
-             query_data,
-             distances_data,
-             neighbors_data,
+             index_data.data(),
+             query_data.data(),
+             distances_data.data(),
+             neighbors_data.data(),
              metric,
              n_probes,
              n_lists);
 
-  recall_eval(query_data,
-              index_data,
-              neighbors_data,
-              distances_data,
+  recall_eval(query_data.data(),
+              index_data.data(),
+              neighbors_data.data(),
+              distances_data.data(),
               n_queries,
               n_rows,
               n_dim,
@@ -138,10 +139,4 @@ TEST(IvfPqC, BuildSearch)
               metric,
               n_probes,
               n_lists);
-
-  // delete device memory
-  cudaFree(index_data);
-  cudaFree(query_data);
-  cudaFree(neighbors_data);
-  cudaFree(distances_data);
 }
