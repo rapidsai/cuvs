@@ -38,6 +38,7 @@ from cuvs.distance import DISTANCE_TYPES
 from cuvs.common.c_api cimport cuvsResources_t
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors.filters import no_filter
 
 
 cdef class Index:
@@ -129,7 +130,8 @@ def search(Index index,
            k,
            neighbors=None,
            distances=None,
-           resources=None):
+           resources=None,
+           prefilter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -147,10 +149,18 @@ def search(Index index,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    prefilter : Optional cuvs.neighbors.cuvsFilter can be used to filter
+                queries and neighbors based on a given bitmap. The filter
+                function should have a row-major layout and logical shape
+                [n_queries, n_samples], using the first n_samples bits to
+                indicate whether queries[0] should compute the distance with
+                index.
+        (default None)
     {resources_docstring}
 
     Examples
     --------
+    >>> # Example without pre-filter
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force
     >>> n_samples = 50000
@@ -168,6 +178,36 @@ def search(Index index,
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
     >>> distances, neighbors = brute_force.search(index, queries, k)
+    >>> neighbors = cp.asarray(neighbors)
+    >>> distances = cp.asarray(distances)
+
+    Examples
+    --------
+    >>> # Example with pre-filter
+    >>> import numpy as np
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force, filters
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> n_queries = 1000
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset, metric="sqeuclidean")
+    >>> # Search using the built index
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build filters
+    >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
+    >>> # Create your own bitmap as the filter by replacing the random one.
+    >>> bitmap = cp.random.randint(1, 1000, size=(n_bitmap,), dtype=cp.uint32)
+    >>> prefilter = filters.from_bitmap(bitmap)
+    >>> k = 10
+    >>> # Using a pooling allocator reduces overhead of temporary array
+    >>> # creation during search. This is useful if multiple searches
+    >>> # are performed with same query size.
+    >>> distances, neighbors = brute_force.search(index, queries, k,
+    ...                                           prefilter=prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
@@ -202,13 +242,17 @@ def search(Index index,
     cdef cydlpack.DLManagedTensor* distances_dlpack = \
         cydlpack.dlpack_c(distances_cai)
 
+    if prefilter is None:
+        prefilter = no_filter()
+
     with cuda_interruptible():
         check_cuvs(cuvsBruteForceSearch(
             res,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            prefilter.prefilter
         ))
 
     return (distances, neighbors)

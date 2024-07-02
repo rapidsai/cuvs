@@ -15,6 +15,7 @@
  */
 
 #include <cuvs/neighbors/brute_force.h>
+#include <stdint.h>
 
 void run_brute_force(int64_t n_rows,
                      int64_t n_queries,
@@ -22,6 +23,7 @@ void run_brute_force(int64_t n_rows,
                      uint32_t n_neighbors,
                      float* index_data,
                      float* query_data,
+                     uint32_t* prefilter_data,
                      float* distances_data,
                      int64_t* neighbors_data,
                      cuvsDistanceType metric)
@@ -85,8 +87,30 @@ void run_brute_force(int64_t n_rows,
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = NULL;
 
+  cuvsFilter prefilter;
+
+  DLManagedTensor prefilter_tensor;
+  if (prefilter_data == NULL) {
+    prefilter.type = NO_FILTER;
+    prefilter.addr = (uintptr_t)NULL;
+  } else {
+    prefilter_tensor.dl_tensor.data               = (void*)prefilter_data;
+    prefilter_tensor.dl_tensor.device.device_type = kDLCUDA;
+    prefilter_tensor.dl_tensor.ndim               = 1;
+    prefilter_tensor.dl_tensor.dtype.code         = kDLUInt;
+    prefilter_tensor.dl_tensor.dtype.bits         = 32;
+    prefilter_tensor.dl_tensor.dtype.lanes        = 1;
+    int64_t prefilter_shape[1]                    = {(n_queries * n_rows + 31) / 32};
+    prefilter_tensor.dl_tensor.shape              = prefilter_shape;
+    prefilter_tensor.dl_tensor.strides            = NULL;
+
+    prefilter.type = BITMAP;
+    prefilter.addr = (uintptr_t)&prefilter_tensor;
+  }
+
   // search index
-  cuvsBruteForceSearch(res, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsBruteForceSearch(
+    res, index, &queries_tensor, &neighbors_tensor, &distances_tensor, prefilter);
 
   // de-allocate index and res
   cuvsBruteForceIndexDestroy(index);

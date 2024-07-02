@@ -18,6 +18,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
@@ -135,9 +136,13 @@ cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
  * DLManagedTensor dataset;
  * DLManagedTensor queries;
  * DLManagedTensor neighbors;
+ * DLManagedTensor bitmap;
+ *
+ * cuvsFilter prefilter{(uintptr_t)&bitmap, BITMAP};
  *
  * // Search the `index` built using `cuvsBruteForceBuild`
- * cuvsError_t search_status = cuvsBruteForceSearch(res, index, &queries, &neighbors, &distances);
+ * cuvsError_t search_status = cuvsBruteForceSearch(res, index, &queries, &neighbors, &distances,
+ * prefilter);
  *
  * // de-allocate `res`
  * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
@@ -148,12 +153,15 @@ cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] prefilter cuvsFilter input prefilter that can be used
+              to filter queries and neighbors based on the given bitmap.
  */
 cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
                                  cuvsBruteForceIndex_t index,
                                  DLManagedTensor* queries,
                                  DLManagedTensor* neighbors,
-                                 DLManagedTensor* distances);
+                                 DLManagedTensor* distances,
+                                 cuvsFilter prefilter);
 /**
  * @}
  */
