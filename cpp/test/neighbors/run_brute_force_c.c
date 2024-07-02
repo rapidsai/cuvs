@@ -87,7 +87,7 @@ void run_brute_force(int64_t n_rows,
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = NULL;
 
-  cuvsPrefilter prefilter;
+  cuvsFilter prefilter;
 
   DLManagedTensor prefilter_tensor;
   if (prefilter_data == NULL) {

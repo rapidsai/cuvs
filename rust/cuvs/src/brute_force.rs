@@ -80,9 +80,9 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
-            let prefilter = ffi::cuvsPrefilter {
+            let prefilter = ffi::cuvsFilter {
                 addr: 0,
-                type_: ffi::cuvsPrefilterType::NO_FILTER,
+                type_: ffi::cuvsFilterType::NO_FILTER,
             };
 
             check_cuvs(ffi::cuvsBruteForceSearch(

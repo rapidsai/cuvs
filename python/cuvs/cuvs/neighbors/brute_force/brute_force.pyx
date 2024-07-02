@@ -149,7 +149,7 @@ def search(Index index,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
-    prefilter : Optional cuvs.neighbors.cuvsPrefilter can be used to filter
+    prefilter : Optional cuvs.neighbors.cuvsFilter can be used to filter
                 queries and neighbors based on a given bitmap. The filter
                 function should have a row-major layout and logical shape
                 [n_queries, n_samples], using the first n_samples bits to

@@ -21,17 +21,17 @@ from libc.stdint cimport uintptr_t
 
 from cuvs.common cimport cydlpack
 
-from .filters cimport BITMAP, NO_FILTER, cuvsPrefilter
+from .filters cimport BITMAP, NO_FILTER, cuvsFilter
 
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.neighbors.common import _check_input_array
 
 
 cdef class Prefilter:
-    cdef public cuvsPrefilter prefilter
+    cdef public cuvsFilter prefilter
     cdef public object parent
 
-    def __init__(self, cuvsPrefilter prefilter, parent=None):
+    def __init__(self, cuvsFilter prefilter, parent=None):
         if parent is not None:
             self.parent = parent
         self.prefilter = prefilter
@@ -41,7 +41,7 @@ def no_filter():
     """
     Create a default pre-filter which filters nothing.
     """
-    cdef cuvsPrefilter filter
+    cdef cuvsFilter filter
     filter.type = NO_FILTER
     filter.addr = <uintptr_t> NULL
     return Prefilter(filter)
@@ -90,7 +90,7 @@ def from_bitmap(bitmap):
     cdef cydlpack.DLManagedTensor* bitmap_dlpack = \
         cydlpack.dlpack_c(bitmap_cai)
 
-    cdef cuvsPrefilter filter
+    cdef cuvsFilter filter
     filter.type = BITMAP
     filter.addr = <uintptr_t> bitmap_dlpack
 

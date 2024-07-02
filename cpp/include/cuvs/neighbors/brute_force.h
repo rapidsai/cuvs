@@ -138,7 +138,7 @@ cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
  * DLManagedTensor neighbors;
  * DLManagedTensor bitmap;
  *
- * cuvsPrefilter prefilter{(uintptr_t)&bitmap, BITMAP};
+ * cuvsFilter prefilter{(uintptr_t)&bitmap, BITMAP};
  *
  * // Search the `index` built using `cuvsBruteForceBuild`
  * cuvsError_t search_status = cuvsBruteForceSearch(res, index, &queries, &neighbors, &distances,
@@ -153,7 +153,7 @@ cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
- * @param[in] prefilter cuvsPrefilter input prefilter that can be used
+ * @param[in] prefilter cuvsFilter input prefilter that can be used
               to filter queries and neighbors based on the given bitmap.
  */
 cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
@@ -161,7 +161,7 @@ cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
                                  DLManagedTensor* queries,
                                  DLManagedTensor* neighbors,
                                  DLManagedTensor* distances,
-                                 cuvsPrefilter prefilter);
+                                 cuvsFilter prefilter);
 /**
  * @}
  */

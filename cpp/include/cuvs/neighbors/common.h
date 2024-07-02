@@ -34,7 +34,7 @@ extern "C" {
 /**
  * @brief Enum to denote filter type.
  */
-enum cuvsPrefilterType {
+enum cuvsFilterType {
   /* No filter */
   NO_FILTER,
   /* Filter an index with a bitset */
@@ -49,8 +49,8 @@ enum cuvsPrefilterType {
  */
 typedef struct {
   uintptr_t addr;
-  enum cuvsPrefilterType type;
-} cuvsPrefilter;
+  enum cuvsFilterType type;
+} cuvsFilter;
 
 /**
  * @}

@@ -55,7 +55,7 @@ void _search(cuvsResources_t res,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
              DLManagedTensor* distances_tensor,
-             cuvsPrefilter prefilter)
+             cuvsFilter prefilter)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::brute_force::index<T>*>(index.addr);
@@ -140,7 +140,7 @@ extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
                                             DLManagedTensor* queries_tensor,
                                             DLManagedTensor* neighbors_tensor,
                                             DLManagedTensor* distances_tensor,
-                                            cuvsPrefilter prefilter)
+                                            cuvsFilter prefilter)
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;

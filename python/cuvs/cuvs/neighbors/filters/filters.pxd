@@ -20,11 +20,11 @@ from libc.stdint cimport uintptr_t
 
 cdef extern from "cuvs/neighbors/common.h" nogil:
 
-    ctypedef enum cuvsPrefilterType:
+    ctypedef enum cuvsFilterType:
         NO_FILTER
         BITSET
         BITMAP
 
-    ctypedef struct cuvsPrefilter:
+    ctypedef struct cuvsFilter:
         uintptr_t addr
-        cuvsPrefilterType type
+        cuvsFilterType type
