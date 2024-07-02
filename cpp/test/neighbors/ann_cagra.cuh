@@ -266,6 +266,8 @@ struct AnnCagraInputs {
   double min_recall;  // = std::nullopt;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
   std::optional<vpq_params> compression           = std::nullopt;
+
+  std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -572,9 +574,30 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
                    additional_dataset.size(),
                    stream_);
 
+        cuvs::neighbors::cagra::extend_memory_buffers<DataT, IdxT> new_memory_buffer;
+        auto new_dataset_buffer = raft::make_device_matrix<DataT, int64_t>(handle_, 0, 0);
+        auto new_graph_buffer   = raft::make_device_matrix<IdxT, int64_t>(handle_, 0, 0);
+        if (ps.non_owning_memory_buffer_flag.has_value() &&
+            ps.non_owning_memory_buffer_flag.value()) {
+          const auto stride =
+            dynamic_cast<const cuvs::neighbors::strided_dataset<DataT, int64_t>*>(&index.data())
+              ->stride();
+          new_dataset_buffer = raft::make_device_matrix<DataT, int64_t>(handle_, ps.n_rows, stride);
+          new_graph_buffer =
+            raft::make_device_matrix<IdxT, int64_t>(handle_, ps.n_rows, index.graph_degree());
+
+          new_memory_buffer = cuvs::neighbors::cagra::extend_memory_buffers<DataT, IdxT>{
+            raft::make_device_strided_matrix_view<DataT, int64_t>(
+              new_dataset_buffer.data_handle(), ps.n_rows, ps.dim, stride),
+            new_graph_buffer.view()};
+        }
+
         cagra::extend_params extend_params;
-        cagra::extend(
-          handle_, extend_params, raft::make_const_mdspan(additional_dataset.view()), index);
+        cagra::extend(handle_,
+                      extend_params,
+                      raft::make_const_mdspan(additional_dataset.view()),
+                      index,
+                      new_memory_buffer);
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
@@ -770,6 +793,26 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {0.99},
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
+    {10},
+    {graph_build_algo::IVF_PQ},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {false},
+    {0.995});
+  for (auto input : inputs2) {
+    input.non_owning_memory_buffer_flag = true;
+    inputs.push_back(input);
+  }
 
   return inputs;
 }
