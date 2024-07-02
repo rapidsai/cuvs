@@ -29,6 +29,9 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/linalg/add.cuh>
+#include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/normalize.cuh>
+#include <raft/linalg/reduce.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
 
@@ -108,37 +111,130 @@ testing::AssertionResult CheckOrder(raft::host_matrix_view<IdxT, int64_t> index_
   return testing::AssertionSuccess();
 }
 
+template <typename T>
+struct fpi_mapper {};
+
+template <>
+struct fpi_mapper<double> {
+  using type                         = int64_t;
+  static constexpr int kBitshiftBase = 53;
+};
+
+template <>
+struct fpi_mapper<float> {
+  using type                         = int32_t;
+  static constexpr int kBitshiftBase = 24;
+};
+
+template <>
+struct fpi_mapper<half> {
+  using type                         = int16_t;
+  static constexpr int kBitshiftBase = 11;
+};
+
 // Generate dataset to ensure no rounding error occurs in the norm computation of any two vectors.
 // When testing the CAGRA index sorting function, rounding errors can affect the norm and alter the
 // order of the index. To ensure the accuracy of the test, we utilize the dataset. The generation
 // method is based on the error-free transformation (EFT) method.
-RAFT_KERNEL GenerateRoundingErrorFreeDataset_kernel(float* const ptr,
+template <typename T>
+RAFT_KERNEL GenerateRoundingErrorFreeDataset_kernel(T* const ptr,
                                                     const uint32_t size,
-                                                    const uint32_t resolution)
+                                                    const typename fpi_mapper<T>::type resolution)
 {
   const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid >= size) { return; }
 
-  const float u32 = *reinterpret_cast<const uint32_t*>(ptr + tid);
+  const float u32 = *reinterpret_cast<const typename fpi_mapper<T>::type*>(ptr + tid);
   ptr[tid]        = u32 / resolution;
 }
 
-void GenerateRoundingErrorFreeDataset(const raft::resources& handle,
-                                      float* const ptr,
-                                      const uint32_t n_row,
-                                      const uint32_t dim,
-                                      raft::random::RngState& rng)
+template <typename T>
+void GenerateRoundingErrorFreeDataset(
+  const raft::resources& handle,
+  T* const ptr,
+  const uint32_t n_row,
+  const uint32_t dim,
+  raft::random::RngState& rng,
+  const bool diff_flag  // true if compute the norm between two vectors
+)
 {
+  using mapper_type         = fpi_mapper<T>;
+  using int_type            = typename mapper_type::type;
   auto cuda_stream          = raft::resource::get_cuda_stream(handle);
   const uint32_t size       = n_row * dim;
   const uint32_t block_size = 256;
   const uint32_t grid_size  = (size + block_size - 1) / block_size;
 
-  const uint32_t resolution = 1u << static_cast<unsigned>(std::floor((24 - std::log2(dim)) / 2));
-  raft::random::uniformInt(handle, rng, reinterpret_cast<uint32_t*>(ptr), size, 0u, resolution - 1);
+  const auto bitshift = (mapper_type::kBitshiftBase - std::log2(dim) - (diff_flag ? 1 : 0)) / 2;
+  // Skip the test when `dim` is too big for type `T` to allow rounding error-free test.
+  if (bitshift <= 1) { GTEST_SKIP(); }
+  const int_type resolution = int_type{1} << static_cast<unsigned>(std::floor(bitshift));
+  raft::random::uniformInt<int_type>(
+    handle, rng, reinterpret_cast<int_type*>(ptr), size, -resolution, resolution - 1);
 
-  GenerateRoundingErrorFreeDataset_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
-    ptr, size, resolution);
+  GenerateRoundingErrorFreeDataset_kernel<T>
+    <<<grid_size, block_size, 0, cuda_stream>>>(ptr, size, resolution);
+}
+
+template <class DataT>
+void InitDataset(const raft::resources& handle,
+                 DataT* const datatset_ptr,
+                 std::uint32_t size,
+                 std::uint32_t dim,
+                 distance::DistanceType metric,
+                 raft::random::RngState& r)
+{
+  if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
+    GenerateRoundingErrorFreeDataset(handle, datatset_ptr, size, dim, r, true);
+
+    if (metric == InnerProduct) {
+      auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
+      raft::linalg::row_normalize(
+        handle, raft::make_const_mdspan(dataset_view), dataset_view, raft::linalg::L2Norm);
+    }
+  } else if constexpr (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>) {
+    if constexpr (std::is_same_v<DataT, std::int8_t>) {
+      raft::random::uniformInt(handle, r, datatset_ptr, size * dim, DataT(-10), DataT(10));
+    } else {
+      raft::random::uniformInt(handle, r, datatset_ptr, size * dim, DataT(1), DataT(20));
+    }
+
+    if (metric == InnerProduct) {
+      // TODO (enp1s0): Change this once row_normalize supports (u)int8 matrices.
+      // https://github.com/rapidsai/raft/issues/2291
+
+      using ComputeT    = float;
+      auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
+      auto dev_row_norm = raft::make_device_vector<ComputeT>(handle, size);
+      const auto normalized_norm =
+        (std::is_same_v<DataT, std::uint8_t> ? 40 : 20) * std::sqrt(static_cast<ComputeT>(dim));
+
+      raft::linalg::reduce(dev_row_norm.data_handle(),
+                           datatset_ptr,
+                           dim,
+                           size,
+                           0.f,
+                           true,
+                           true,
+                           raft::resource::get_cuda_stream(handle),
+                           false,
+                           raft::sq_op(),
+                           raft::add_op(),
+                           raft::sqrt_op());
+      raft::linalg::matrix_vector_op(
+        handle,
+        raft::make_const_mdspan(dataset_view),
+        raft::make_const_mdspan(dev_row_norm.view()),
+        dataset_view,
+        raft::linalg::Apply::ALONG_COLUMNS,
+        [normalized_norm] __device__(DataT elm, ComputeT norm) {
+          const ComputeT v           = elm / norm * normalized_norm;
+          const ComputeT max_v_range = std::numeric_limits<DataT>::max();
+          const ComputeT min_v_range = std::numeric_limits<DataT>::min();
+          return static_cast<DataT>(std::min(max_v_range, std::max(min_v_range, v)));
+        });
+    }
+  }
 }
 
 enum class graph_build_algo {
@@ -170,16 +266,27 @@ struct AnnCagraInputs {
   double min_recall;  // = std::nullopt;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
   std::optional<vpq_params> compression           = std::nullopt;
+
+  std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 {
+  const auto metric_str = [](const cuvs::distance::DistanceType dist) -> std::string {
+    switch (dist) {
+      case InnerProduct: return "InnerProduct";
+      case L2Expanded: return "L2";
+      default: break;
+    }
+    return "Unknown";
+  };
+
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
-     << ", metric=" << static_cast<int>(p.metric) << (p.host_dataset ? ", host" : ", device")
+     << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
      << ", build_algo=" << build_algo.at((int)p.build_algo);
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
@@ -343,16 +450,201 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     search_queries.resize(ps.n_queries * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
-    if constexpr (std::is_same<DataT, float>{}) {
-      raft::random::normal(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
-      raft::random::normal(
-        handle_, r, search_queries.data(), ps.n_queries * ps.dim, DataT(0.1), DataT(2.0));
-    } else {
-      raft::random::uniformInt(
-        handle_, r, database.data(), ps.n_rows * ps.dim, DataT(1), DataT(20));
-      raft::random::uniformInt(
-        handle_, r, search_queries.data(), ps.n_queries * ps.dim, DataT(1), DataT(20));
+    InitDataset(handle_, database.data(), ps.n_rows, ps.dim, ps.metric, r);
+    InitDataset(handle_, search_queries.data(), ps.n_queries, ps.dim, ps.metric, r);
+    raft::resource::sync_stream(handle_);
+  }
+
+  void TearDown() override
+  {
+    raft::resource::sync_stream(handle_);
+    database.resize(0, stream_);
+    search_queries.resize(0, stream_);
+  }
+
+ private:
+  raft::resources handle_;
+  rmm::cuda_stream_view stream_;
+  AnnCagraInputs ps;
+  rmm::device_uvector<DataT> database;
+  rmm::device_uvector<DataT> search_queries;
+};
+
+template <typename DistanceT, typename DataT, typename IdxT>
+class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
+ public:
+  AnnCagraAddNodesTest()
+    : stream_(raft::resource::get_cuda_stream(handle_)),
+      ps(::testing::TestWithParam<AnnCagraInputs>::GetParam()),
+      database(0, stream_),
+      search_queries(0, stream_)
+  {
+  }
+
+ protected:
+  void testCagra()
+  {
+    // TODO (tarang-jain): remove when NN Descent index building support InnerProduct. Reference
+    // issue: https://github.com/rapidsai/raft/issues/2276
+    if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
+    if (ps.compression != std::nullopt) GTEST_SKIP();
+
+    size_t queries_size = ps.n_queries * ps.k;
+    std::vector<IdxT> indices_Cagra(queries_size);
+    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<DistanceT> distances_Cagra(queries_size);
+    std::vector<DistanceT> distances_naive(queries_size);
+
+    {
+      rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
+      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+
+      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
+                                                         distances_naive_dev.data(),
+                                                         indices_naive_dev.data(),
+                                                         search_queries.data(),
+                                                         database.data(),
+                                                         ps.n_queries,
+                                                         ps.n_rows,
+                                                         ps.dim,
+                                                         ps.k,
+                                                         ps.metric);
+      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
+      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
+      raft::resource::sync_stream(handle_);
     }
+
+    {
+      rmm::device_uvector<DistanceT> distances_dev(queries_size, stream_);
+      rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+
+      {
+        cagra::index_params index_params;
+        index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
+                                          // not used for knn_graph building.
+
+        switch (ps.build_algo) {
+          case graph_build_algo::IVF_PQ:
+            index_params.graph_build_params =
+              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            if (ps.ivf_pq_search_refine_ratio) {
+              std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+                index_params.graph_build_params)
+                .refinement_rate = *ps.ivf_pq_search_refine_ratio;
+            }
+            break;
+          case graph_build_algo::NN_DESCENT: {
+            index_params.graph_build_params =
+              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
+        };
+
+        cagra::search_params search_params;
+        search_params.algo        = ps.algo;
+        search_params.max_queries = ps.max_queries;
+        search_params.team_size   = ps.team_size;
+        search_params.itopk_size  = ps.itopk_size;
+
+        const double initial_dataset_ratio      = 0.90;
+        const std::size_t initial_database_size = ps.n_rows * initial_dataset_ratio;
+
+        auto initial_database_view = raft::make_device_matrix_view<const DataT, int64_t>(
+          (const DataT*)database.data(), initial_database_size, ps.dim);
+
+        cagra::index<DataT, IdxT> index(handle_);
+        if (ps.host_dataset) {
+          auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
+          raft::copy(
+            database_host.data_handle(), database.data(), initial_database_view.size(), stream_);
+          auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
+            (const DataT*)database_host.data_handle(), initial_database_size, ps.dim);
+          index = cagra::build(handle_, index_params, database_host_view);
+        } else {
+          index = cagra::build(handle_, index_params, initial_database_view);
+        };
+
+        auto additional_dataset =
+          raft::make_host_matrix<DataT, int64_t>(ps.n_rows - initial_database_size, index.dim());
+        raft::copy(additional_dataset.data_handle(),
+                   static_cast<const DataT*>(database.data()) + initial_database_view.size(),
+                   additional_dataset.size(),
+                   stream_);
+
+        auto new_dataset_buffer = raft::make_device_matrix<DataT, int64_t>(handle_, 0, 0);
+        auto new_graph_buffer   = raft::make_device_matrix<IdxT, int64_t>(handle_, 0, 0);
+        std::optional<raft::device_matrix_view<DataT, int64_t, raft::layout_stride>>
+          new_dataset_buffer_view                                                    = std::nullopt;
+        std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view = std::nullopt;
+        if (ps.non_owning_memory_buffer_flag.has_value() &&
+            ps.non_owning_memory_buffer_flag.value()) {
+          const auto stride =
+            dynamic_cast<const cuvs::neighbors::strided_dataset<DataT, int64_t>*>(&index.data())
+              ->stride();
+          new_dataset_buffer = raft::make_device_matrix<DataT, int64_t>(handle_, ps.n_rows, stride);
+          new_graph_buffer =
+            raft::make_device_matrix<IdxT, int64_t>(handle_, ps.n_rows, index.graph_degree());
+
+          new_dataset_buffer_view = raft::make_device_strided_matrix_view<DataT, int64_t>(
+            new_dataset_buffer.data_handle(), ps.n_rows, ps.dim, stride);
+          new_graph_buffer_view = new_graph_buffer.view();
+        }
+
+        cagra::extend_params extend_params;
+        cagra::extend(handle_,
+                      extend_params,
+                      raft::make_const_mdspan(additional_dataset.view()),
+                      index,
+                      new_dataset_buffer_view,
+                      new_graph_buffer_view);
+
+        auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
+          search_queries.data(), ps.n_queries, ps.dim);
+        auto indices_out_view =
+          raft::make_device_matrix_view<IdxT, int64_t>(indices_dev.data(), ps.n_queries, ps.k);
+        auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
+          distances_dev.data(), ps.n_queries, ps.k);
+
+        cagra::search(
+          handle_, search_params, index, search_queries_view, indices_out_view, dists_out_view);
+        raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
+        raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
+        raft::resource::sync_stream(handle_);
+      }
+
+      double min_recall = ps.min_recall;
+      EXPECT_TRUE(eval_neighbours(indices_naive,
+                                  indices_Cagra,
+                                  distances_naive,
+                                  distances_Cagra,
+                                  ps.n_queries,
+                                  ps.k,
+                                  0.006,
+                                  min_recall));
+      EXPECT_TRUE(eval_distances(handle_,
+                                 database.data(),
+                                 search_queries.data(),
+                                 indices_dev.data(),
+                                 distances_dev.data(),
+                                 ps.n_rows,
+                                 ps.dim,
+                                 ps.n_queries,
+                                 ps.k,
+                                 ps.metric,
+                                 1.0e-4));
+    }
+  }
+
+  void SetUp() override
+  {
+    database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
+    search_queries.resize(ps.n_queries * ps.dim, stream_);
+    raft::random::RngState r(1234ULL);
+    InitDataset(handle_, database.data(), ps.n_rows, ps.dim, ps.metric, r);
+    InitDataset(handle_, search_queries.data(), ps.n_queries, ps.dim, ps.metric, r);
     raft::resource::sync_stream(handle_);
   }
 
@@ -503,6 +795,26 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {0.99},
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
+    {10},
+    {graph_build_algo::IVF_PQ},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {false},
+    {0.995});
+  for (auto input : inputs2) {
+    input.non_owning_memory_buffer_flag = true;
+    inputs.push_back(input);
+  }
 
   return inputs;
 }
