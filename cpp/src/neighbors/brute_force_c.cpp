@@ -27,7 +27,7 @@
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/brute_force.hpp>
-#include <cuvs/neighbors/filters.h>
+#include <cuvs/neighbors/common.h>
 
 namespace {
 
