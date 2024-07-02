@@ -1,4 +1,4 @@
-package common
+package bruteforce
 
 import (
 	"math/rand"

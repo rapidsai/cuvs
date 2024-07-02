@@ -1,4 +1,4 @@
-package ivf_flat
+package ivf_pq
 
 // #include <stdio.h>
 // #include <stdlib.h>
