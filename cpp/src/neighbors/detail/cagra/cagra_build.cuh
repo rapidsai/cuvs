@@ -497,7 +497,7 @@ index<T, IdxT> build(
 
     return idx;
   }
-  if (params.attach_data_on_build) {
+  if (params.attach_dataset_on_build) {
     try {
       return index<T, IdxT>(
         res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));

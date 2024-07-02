@@ -80,7 +80,7 @@ struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree = 64;
   /**
    * Specify compression parameters if compression is desired. If set, overrides the
-   * add_data_on_build argument.
+   * attach_dataset_on_build argument.
    */
   std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
@@ -114,7 +114,7 @@ struct index_params : cuvs::neighbors::index_params {
    * update the dataset using cuvs::neighbors::cagra::update_dataset. CAGRA does not have `extent`
    * API.
    */
-  bool attach_data_on_build = true;
+  bool attach_dataset_on_build = true;
 };
 
 /**
@@ -471,7 +471,7 @@ struct index : cuvs::neighbors::index {
  *   // use default index_parameters
  *   cagra::index_params index_params;
  *   // update index_params to only build the CAGRA graph
- *   index_params.add_data_on_build = false;
+ *   index_params.attach_dataset_on_build = false;
  *   auto index = cagra::build(res, index_params, dataset.view());
  *   // assert that the index is not populated with the dataset
  *   ASSERT(index.dataset().extent(0) == 0);
