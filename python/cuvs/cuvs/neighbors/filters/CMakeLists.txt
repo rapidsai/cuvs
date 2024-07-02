@@ -13,7 +13,7 @@
 # =============================================================================
 
 # Set the list of Cython files to build
-set(cython_sources prefilters.pyx)
+set(cython_sources filters.pyx)
 set(linked_libraries cuvs::cuvs cuvs::c_api)
 
 # Build all of the Cython targets

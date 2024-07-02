@@ -38,7 +38,7 @@ from cuvs.distance import DISTANCE_TYPES
 from cuvs.common.c_api cimport cuvsResources_t
 
 from cuvs.common.exceptions import check_cuvs
-from cuvs.neighbors.prefilters import no_filter
+from cuvs.neighbors.filters import no_filter
 
 
 cdef class Index:
@@ -186,7 +186,7 @@ def search(Index index,
     >>> # Example with pre-filter
     >>> import numpy as np
     >>> import cupy as cp
-    >>> from cuvs.neighbors import brute_force, prefilters
+    >>> from cuvs.neighbors import brute_force, filters
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_queries = 1000
@@ -197,11 +197,11 @@ def search(Index index,
     >>> # Search using the built index
     >>> queries = cp.random.random_sample((n_queries, n_features),
     ...                                   dtype=cp.float32)
-    >>> # Build prefilters
+    >>> # Build filters
     >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
     >>> # Create your own bitmap as the filter by replacing the random one.
     >>> bitmap = cp.random.randint(1, 1000, size=(n_bitmap,), dtype=cp.uint32)
-    >>> prefilter = prefilters.from_bitmap(bitmap)
+    >>> prefilter = filters.from_bitmap(bitmap)
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches

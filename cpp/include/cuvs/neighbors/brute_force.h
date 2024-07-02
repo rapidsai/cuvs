@@ -18,7 +18,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
-#include <cuvs/neighbors/prefilters.h>
+#include <cuvs/neighbors/filters.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 

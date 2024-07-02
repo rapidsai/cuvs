@@ -21,7 +21,7 @@ from libc.stdint cimport uintptr_t
 
 from cuvs.common cimport cydlpack
 
-from .prefilters cimport BITMAP, NO_FILTER, cuvsPrefilter
+from .filters cimport BITMAP, NO_FILTER, cuvsPrefilter
 
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.neighbors.common import _check_input_array
@@ -65,7 +65,7 @@ def from_bitmap(bitmap):
 
     Returns
     -------
-    filter : cuvs.neighbors.prefilters.Prefilter
+    filter : cuvs.neighbors.filters.Prefilter
         An instance of `Prefilter` that can be used to filter neighbors
         based on the given bitmap.
     {resources_docstring}
@@ -75,14 +75,14 @@ def from_bitmap(bitmap):
 
     >>> import cupy as cp
     >>> import numpy as np
-    >>> from cuvs.neighbors import prefilters
+    >>> from cuvs.neighbors import filters
     >>>
     >>> n_samples = 50000
     >>> n_queries = 1000
     >>>
     >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
     >>> bitmap = cp.random.randint(1, 100, size=(n_bitmap,), dtype=cp.uint32)
-    >>> prefilter = prefilters.from_bitmap(bitmap)
+    >>> prefilter = filters.from_bitmap(bitmap)
     """
     bitmap_cai = wrap_array(bitmap)
     _check_input_array(bitmap_cai, [np.dtype('uint32')])

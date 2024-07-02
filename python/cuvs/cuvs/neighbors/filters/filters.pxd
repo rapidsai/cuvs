@@ -18,7 +18,7 @@
 from libc.stdint cimport uintptr_t
 
 
-cdef extern from "cuvs/neighbors/prefilters.h" nogil:
+cdef extern from "cuvs/neighbors/filters.h" nogil:
 
     ctypedef enum cuvsPrefilterType:
         NO_FILTER

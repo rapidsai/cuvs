@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from .prefilters import Prefilter, from_bitmap, no_filter
+from .filters import Prefilter, from_bitmap, no_filter
 
 __all__ = ["no_filter", "from_bitmap", "Prefilter"]

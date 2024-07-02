@@ -18,7 +18,7 @@ import pytest
 from pylibraft.common import device_ndarray
 from scipy.spatial.distance import cdist
 
-from cuvs.neighbors import brute_force, prefilters
+from cuvs.neighbors import brute_force, filters
 
 
 @pytest.mark.parametrize("n_index_rows", [32, 100])
@@ -62,7 +62,7 @@ def test_brute_force_knn(
     indices_device = device_ndarray(indices)
     distances_device = device_ndarray(distances)
 
-    prefilter = prefilters.no_filter()
+    prefilter = filters.no_filter()
 
     brute_force_index = brute_force.build(index_device, metric)
     ret_distances, ret_indices = brute_force.search(
@@ -144,7 +144,7 @@ def test_prefiltered_brute_force_knn(
     indices_device = device_ndarray(indices)
     distances_device = device_ndarray(distances)
     bitmap_device = device_ndarray(bitmap)
-    prefilter = prefilters.from_bitmap(bitmap_device)
+    prefilter = filters.from_bitmap(bitmap_device)
     bitmap_device = None
     brute_force_index = brute_force.build(index_device, metric)
     ret_distances, ret_indices = brute_force.search(

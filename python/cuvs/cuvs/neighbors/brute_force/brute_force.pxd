@@ -20,10 +20,7 @@ from libc.stdint cimport uintptr_t
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
-from cuvs.neighbors.prefilters.prefilters cimport (
-    cuvsPrefilter,
-    cuvsPrefilterType,
-)
+from cuvs.neighbors.filters.filters cimport cuvsPrefilter, cuvsPrefilterType
 
 
 cdef extern from "cuvs/neighbors/brute_force.h" nogil:
