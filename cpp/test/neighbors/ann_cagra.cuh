@@ -574,9 +574,11 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
                    additional_dataset.size(),
                    stream_);
 
-        cuvs::neighbors::cagra::extend_memory_buffers<DataT, IdxT> new_memory_buffer;
         auto new_dataset_buffer = raft::make_device_matrix<DataT, int64_t>(handle_, 0, 0);
         auto new_graph_buffer   = raft::make_device_matrix<IdxT, int64_t>(handle_, 0, 0);
+        std::optional<raft::device_matrix_view<DataT, int64_t, raft::layout_stride>>
+          new_dataset_buffer_view                                                    = std::nullopt;
+        std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view = std::nullopt;
         if (ps.non_owning_memory_buffer_flag.has_value() &&
             ps.non_owning_memory_buffer_flag.value()) {
           const auto stride =
@@ -586,10 +588,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
           new_graph_buffer =
             raft::make_device_matrix<IdxT, int64_t>(handle_, ps.n_rows, index.graph_degree());
 
-          new_memory_buffer = cuvs::neighbors::cagra::extend_memory_buffers<DataT, IdxT>{
-            raft::make_device_strided_matrix_view<DataT, int64_t>(
-              new_dataset_buffer.data_handle(), ps.n_rows, ps.dim, stride),
-            new_graph_buffer.view()};
+          new_dataset_buffer_view = raft::make_device_strided_matrix_view<DataT, int64_t>(
+            new_dataset_buffer.data_handle(), ps.n_rows, ps.dim, stride);
+          new_graph_buffer_view = new_graph_buffer.view();
         }
 
         cagra::extend_params extend_params;
@@ -597,7 +598,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
                       extend_params,
                       raft::make_const_mdspan(additional_dataset.view()),
                       index,
-                      new_memory_buffer);
+                      new_dataset_buffer_view,
+                      new_graph_buffer_view);
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);

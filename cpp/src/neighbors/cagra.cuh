@@ -344,10 +344,10 @@ void extend(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
   cuvs::neighbors::cagra::index<T, IdxT>& index,
   const cagra::extend_params& params,
-  const extend_memory_buffers<T, IdxT>& new_memory_buffers)
+  std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> ndv,
+  std::optional<raft::device_matrix_view<IdxT, int64_t>> ngv)
 {
-  cagra::extend_core<T, IdxT, Accessor>(
-    handle, additional_dataset, index, params, new_memory_buffers);
+  cagra::extend_core<T, IdxT, Accessor>(handle, additional_dataset, index, params, ndv, ngv);
 }
 
 /** @} */  // end group cagra

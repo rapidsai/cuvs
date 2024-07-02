@@ -310,10 +310,11 @@ void extend_core(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> additional_dataset,
   cuvs::neighbors::cagra::index<T, IdxT>& index,
   const cagra::extend_params& params,
-  const extend_memory_buffers<T, IdxT>& new_memory_buffers)
+  std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view,
+  std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view)
 {
   if (dynamic_cast<const non_owning_dataset<T, IdxT>*>(&index.data()) != nullptr &&
-      !new_memory_buffers.dataset.has_value()) {
+      !new_dataset_buffer_view.has_value()) {
     RAFT_LOG_WARN(
       "New memory space for extended dataset will be allocated while the memory space for the old "
       "dataset is allocated by user.");
@@ -324,24 +325,24 @@ void extend_core(
   const std::size_t degree               = index.graph_degree();
   const std::size_t dim                  = index.dim();
 
-  if (new_memory_buffers.dataset.has_value() &&
-      static_cast<std::size_t>(new_memory_buffers.dataset.value().extent(0)) != new_dataset_size) {
+  if (new_dataset_buffer_view.has_value() &&
+      static_cast<std::size_t>(new_dataset_buffer_view.value().extent(0)) != new_dataset_size) {
     RAFT_LOG_ERROR(
       "The extended dataset size (%lu) must be the initial dataset size (%lu) + additional dataset "
       "size (%lu). "
       "Please fix the memory buffer size for the extended dataset.",
-      new_memory_buffers.dataset.value().extent(0),
+      new_dataset_buffer_view.value().extent(0),
       initial_dataset_size,
       num_new_nodes);
   }
 
-  if (new_memory_buffers.graph.has_value() &&
-      static_cast<std::size_t>(new_memory_buffers.graph.value().extent(0)) != new_dataset_size) {
+  if (new_graph_buffer_view.has_value() &&
+      static_cast<std::size_t>(new_graph_buffer_view.value().extent(0)) != new_dataset_size) {
     RAFT_LOG_ERROR(
       "The extended graph size (%lu) must be the initial dataset size (%lu) + additional dataset "
       "size (%lu). "
       "Please fix the memory buffer size for the extended graph.",
-      new_memory_buffers.graph.value().extent(0),
+      new_graph_buffer_view.value().extent(0),
       initial_dataset_size,
       num_new_nodes);
   }
@@ -381,8 +382,8 @@ void extend_core(
                         cudaMemcpyDefault,
                         raft::resource::get_cuda_stream(handle)));
 
-    if (new_memory_buffers.dataset.has_value()) {
-      updated_dataset_view = new_memory_buffers.dataset.value();
+    if (new_dataset_buffer_view.has_value()) {
+      updated_dataset_view = new_dataset_buffer_view.value();
     } else {
       // Deallocate the current dataset memory space if the dataset is `owning'.
       index.update_dataset(
@@ -405,7 +406,7 @@ void extend_core(
       handle, raft::make_const_mdspan(updated_dataset_view), index, updated_graph.view(), params);
 
     // Update index dataset
-    if (new_memory_buffers.dataset.has_value()) {
+    if (new_dataset_buffer_view.has_value()) {
       index.update_dataset(handle, raft::make_const_mdspan(updated_dataset_view));
     } else {
       using out_mdarray_type          = decltype(updated_dataset);
@@ -420,8 +421,8 @@ void extend_core(
     }
 
     // Update index graph
-    if (new_memory_buffers.graph.has_value()) {
-      auto device_graph_view = new_memory_buffers.graph.value();
+    if (new_graph_buffer_view.has_value()) {
+      auto device_graph_view = new_graph_buffer_view.value();
       raft::copy(device_graph_view.data_handle(),
                  updated_graph.data_handle(),
                  updated_graph.size(),
