@@ -61,6 +61,18 @@ struct index_params : cuvs::neighbors::index_params {
    * flag to `true` if you prefer to use as little GPU memory for the database as possible.
    */
   bool conservative_memory_allocation = false;
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build`.
+   *  - `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but
+   * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
+   * NB: for CAGRA index, `false` means `build` only builds the graph and the user is expected to
+   * update the dataset using cuvs::neighbors::cagra::update_dataset. CAGRA does not have `extent`
+   * API.
+   */
+  bool add_data_on_build = true;
 };
 /**
  * @}
