@@ -1043,6 +1043,166 @@ void serialize(raft::resources const& handle,
 void deserialize(raft::resources const& handle,
                  std::istream& is,
                  cuvs::neighbors::cagra::index<uint8_t, uint32_t>* index);
+
+/**
+ * Write the CAGRA built index as a base layer HNSW index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = raft::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ *
+ */
+void serialize_to_hnswlib(raft::resources const& handle,
+                          std::ostream& os,
+                          const cuvs::neighbors::cagra::index<float, uint32_t>& index);
+
+/**
+ * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = raft::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+ * @endcode
+ *
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ *
+ */
+void serialize_to_hnswlib(raft::resources const& handle,
+                          const std::string& filename,
+                          const cuvs::neighbors::cagra::index<float, uint32_t>& index);
+
+/**
+ * Write the CAGRA built index as a base layer HNSW index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = raft::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ *
+ */
+void serialize_to_hnswlib(raft::resources const& handle,
+                          std::ostream& os,
+                          const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index);
+
+/**
+ * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = raft::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+ * @endcode
+ *
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ *
+ */
+void serialize_to_hnswlib(raft::resources const& handle,
+                          const std::string& filename,
+                          const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index);
+
+/**
+ * Write the CAGRA built index as a base layer HNSW index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = raft::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ *
+ */
+void serialize_to_hnswlib(raft::resources const& handle,
+                          std::ostream& os,
+                          const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+
+/**
+ * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra_serialize.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = raft::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
+ * @endcode
+ *
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ *
+ */
+void serialize_to_hnswlib(raft::resources const& handle,
+                          const std::string& filename,
+                          const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+
 /**
  * @}
  */
