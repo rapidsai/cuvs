@@ -310,4 +310,10 @@ void extract_centers(raft::resources const& res,
                                   cudaMemcpyDefault,
                                   stream));
 }
+
+void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
+{
+  ivf::detail::recompute_internal_state(res, *index);
+}
+
 }  // namespace cuvs::neighbors::ivf_pq::helpers

@@ -101,10 +101,10 @@ void resize_list(raft::resources const& res,
   if (old_used_size > 0) {
     auto copied_data_extents = spec.make_list_extents(old_used_size);
     auto copied_view         = raft::make_mdspan<typename ListT::value_type,
-                                                 typename ListT::size_type,
-                                                 raft::row_major,
-                                                 false,
-                                                 true>(new_list->data.data_handle(), copied_data_extents);
+                                         typename ListT::size_type,
+                                         raft::row_major,
+                                         false,
+                                         true>(new_list->data.data_handle(), copied_data_extents);
     raft::copy(copied_view.data_handle(),
                orig_list->data.data_handle(),
                copied_view.size(),
@@ -191,11 +191,5 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
              raft::resource::get_cuda_stream(handle));
   // Make sure the data is copied from host to device before the host arrays get out of the scope.
   raft::resource::sync_stream(handle);
-}
-
-template <typename Index>
-void recompute_internal_state(const raft::resources& res, Index& index)
-{
-  cuvs::neighbors::ivf::detail::recompute_internal_state(res, index);
 }
 }  // namespace cuvs::neighbors::ivf
