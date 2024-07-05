@@ -63,7 +63,7 @@ struct ivf_pq_params {
    *   auto pq_params =
    *     cagra::graph_build_params::ivf_pq_params(dataset.extents());
    *   // modify/update index_params as needed
-   *   pq_params.add_data_on_build = true;
+   *   pq_params.kmeans_trainset_fraction = 0.1;
    * @endcode
    */
   ivf_pq_params(raft::matrix_extent<int64_t> dataset_extents,
@@ -80,7 +80,7 @@ struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree = 64;
   /**
    * Specify compression parameters if compression is desired. If set, overrides the
-   * attach_dataset_on_build argument.
+   * attach_dataset_on_build (and the compressed dataset is always added to the index).
    */
   std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
@@ -113,6 +113,20 @@ struct index_params : cuvs::neighbors::index_params {
    *  - `false` means `build` only builds the graph and the user is expected to
    * update the dataset using cuvs::neighbors::cagra::update_dataset. CAGRA does not have `extent`
    * API.
+   * @code{.cpp}
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
+   *   // use default index_parameters
+   *   cagra::index_params index_params;
+   *   // update index_params to only build the CAGRA graph
+   *   index_params.attach_dataset_on_build = false;
+   *   auto index = cagra::build(res, index_params, dataset.view());
+   *   // assert that the dataset is not attached to the index
+   *   ASSERT(index.dataset().extent(0) == 0);
+   *   // update dataset
+   *   index.update_dataset(res, dataset.view());
+   *   // The index is now ready for search
+   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   * @endcode
    */
   bool attach_dataset_on_build = true;
 };
@@ -463,8 +477,8 @@ struct index : cuvs::neighbors::index {
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
  *   cagra::search(res, search_params, index, queries, neighbors, distances);
  * @endcode
- *   In the above example, the index is populated with the dataset and is ready for search. In
- * contrast, a user can only build the CAGRA graph and separately populate the index with the
+ *   In the above example, the dataset is attached to the index and the index is ready for
+ * search. In contrast, a user can only build the CAGRA graph and separately attach the
  * dataset.
  * @code{.cpp}
  *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
@@ -473,7 +487,7 @@ struct index : cuvs::neighbors::index {
  *   // update index_params to only build the CAGRA graph
  *   index_params.attach_dataset_on_build = false;
  *   auto index = cagra::build(res, index_params, dataset.view());
- *   // assert that the index is not populated with the dataset
+ *   // assert that the dataset is not attached to the index
  *   ASSERT(index.dataset().extent(0) == 0);
  *   // update dataset
  *   index.update_dataset(res, dataset.view());
