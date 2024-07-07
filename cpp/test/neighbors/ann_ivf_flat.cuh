@@ -621,11 +621,14 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs_cosine = {
   // test various dims (aligned and not aligned to vector sizes)
   {3, 20, 1024, 3, 3, 4, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 5, 100, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 5, 100, 60, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 8, 16, 60, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {100, 1000, 5, 32, 40, 124, cuvs::distance::DistanceType::CosineExpanded, true},
   {100, 1000, 8, 64, 40, 124, cuvs::distance::DistanceType::CosineExpanded, true},
-  {100, 1000, 500, 16, 10, 50, cuvs::distance::DistanceType::CosineExpanded, false}};
+  {100, 1000, 500, 16, 10, 50, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 1000, 2056, 16, 10, 50, cuvs::distance::DistanceType::CosineExpanded, false},
+  {10, 1000, 1, 16, 40, 124, cuvs::distance::DistanceType::CosineExpanded, false},
+  {10, 1000, 2, 16, 40, 124, cuvs::distance::DistanceType::CosineExpanded, true}};
 
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // test various dims (aligned and not aligned to vector sizes)

@@ -345,15 +345,13 @@ template <typename DataT,
           typename LabelT,
           typename CounterT,
           typename MappingOpT = raft::identity_op>
-void calc_centers_and_sizes(
-  const raft::resources& handle,
-  raft::device_matrix_view<const DataT, IndexT> X,
-  raft::device_vector_view<const LabelT, IndexT> labels,
-  raft::device_matrix_view<MathT, IndexT> centroids,
-  raft::device_vector_view<CounterT, IndexT> cluster_sizes,
-  bool reset_counters                                                 = true,
-  MappingOpT mapping_op                                               = raft::identity_op(),
-  std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
+void calc_centers_and_sizes(const raft::resources& handle,
+                            raft::device_matrix_view<const DataT, IndexT> X,
+                            raft::device_vector_view<const LabelT, IndexT> labels,
+                            raft::device_matrix_view<MathT, IndexT> centroids,
+                            raft::device_vector_view<CounterT, IndexT> cluster_sizes,
+                            bool reset_counters   = true,
+                            MappingOpT mapping_op = raft::identity_op())
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");
@@ -373,8 +371,7 @@ void calc_centers_and_sizes(
     labels.data_handle(),
     reset_counters,
     mapping_op,
-    raft::resource::get_workspace_resource(handle),
-    X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
+    raft::resource::get_workspace_resource(handle));
 }
 
 }  // namespace helpers

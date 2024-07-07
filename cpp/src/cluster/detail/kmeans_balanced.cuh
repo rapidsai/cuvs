@@ -142,7 +142,56 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
-    case cuvs::distance::DistanceType::CosineExpanded:
+    case cuvs::distance::DistanceType::CosineExpanded: {
+      rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
+
+      MathT alpha = -1.0;
+      MathT beta  = 0.0;
+
+      raft::linalg::gemm(handle,
+                         true,
+                         false,
+                         n_clusters,
+                         n_rows,
+                         dim,
+                         &alpha,
+                         centers,
+                         dim,
+                         dataset,
+                         dim,
+                         &beta,
+                         distances.data(),
+                         n_clusters,
+                         stream);
+
+      auto centroidsNorm =
+        raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
+      raft::linalg::rowNorm<MathT, IdxT>(centroidsNorm.data_handle(),
+                                         centers,
+                                         dim,
+                                         n_clusters,
+                                         raft::linalg::L2Norm,
+                                         true,
+                                         stream,
+                                         raft::sqrt_op{});
+
+      const auto* index_center_norm_ptr = centroidsNorm.data_handle();
+      raft::linalg::map_offset(
+        handle,
+        raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
+          distances.data(), n_rows, n_clusters),
+        [=] __device__(const uint32_t idx, const float dist) {
+          const auto query   = idx / n_clusters;
+          const auto cluster = idx % n_clusters;
+          return dist / (dataset_norm[query] * index_center_norm_ptr[cluster]);
+        },
+        raft::make_device_matrix_view<const MathT, IdxT>(distances.data(), n_rows, n_clusters));
+      auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
+        distances.data(), n_rows, n_clusters);
+      auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
+      raft::matrix::argmin(handle, distances_const_view, labels_view);
+      break;
+    }
     case cuvs::distance::DistanceType::InnerProduct: {
       // TODO: pass buffer
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
@@ -278,8 +327,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
                             const LabelT* labels,
                             bool reset_counters,
                             MappingOpT mapping_op,
-                            rmm::device_async_resource_ref mr,
-                            const MathT* dataset_norm = nullptr)
+                            rmm::device_async_resource_ref mr)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -301,31 +349,13 @@ void calc_centers_and_sizes(const raft::resources& handle,
 
   // Apply mapping only when the data and math types are different.
   if constexpr (std::is_same_v<T, MathT>) {
-    raft::linalg::reduce_rows_by_key(dataset,
-                                     dim,
-                                     labels,
-                                     dataset_norm,
-                                     nullptr,
-                                     n_rows,
-                                     dim,
-                                     n_clusters,
-                                     centers,
-                                     stream,
-                                     reset_counters);
+    raft::linalg::reduce_rows_by_key(
+      dataset, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
   } else {
     // todo(lsugy): use iterator from KV output of fusedL2NN
     cub::TransformInputIterator<MathT, MappingOpT, const T*> mapping_itr(dataset, mapping_op);
-    raft::linalg::reduce_rows_by_key(mapping_itr,
-                                     dim,
-                                     labels,
-                                     dataset_norm,
-                                     nullptr,
-                                     n_rows,
-                                     dim,
-                                     n_clusters,
-                                     centers,
-                                     stream,
-                                     reset_counters);
+    raft::linalg::reduce_rows_by_key(
+      mapping_itr, dim, labels, nullptr, n_rows, dim, n_clusters, centers, stream, reset_counters);
   }
 
   // Compute weight of each cluster
@@ -497,8 +527,7 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
                         IdxT average,
                         IdxT seed,
                         IdxT* count,
-                        MappingOpT mapping_op,
-                        const MathT* dataset_norm = nullptr)
+                        MappingOpT mapping_op)
 {
   IdxT l = threadIdx.y + BlockDimY * static_cast<IdxT>(blockIdx.y);
   if (l >= n_clusters) return;
@@ -524,12 +553,11 @@ __launch_bounds__((raft::WarpSize * BlockDimY)) RAFT_KERNEL
   // We dump it for anomalously small clusters, but keep constant otherwise.
   const MathT wc = min(static_cast<MathT>(csize), static_cast<MathT>(kAdjustCentersWeight));
   // Weight for the datapoint used to shift the center.
-  const MathT wd        = 1.0;
-  const MathT data_norm = dataset_norm == nullptr ? 1.0 : dataset_norm[i];
+  const MathT wd = 1.0;
   for (; j < dim; j += raft::WarpSize) {
     MathT val = 0;
     val += wc * centers[j + dim * li];
-    val += wd * mapping_op(dataset[j + dim * i]) / data_norm;
+    val += wd * mapping_op(dataset[j + dim * i]);
     val /= wc + wd;
     centers[j + dim * l] = val;
   }
@@ -584,8 +612,7 @@ auto adjust_centers(MathT* centers,
                     MathT threshold,
                     MappingOpT mapping_op,
                     rmm::cuda_stream_view stream,
-                    rmm::device_async_resource_ref device_memory,
-                    const MathT* dataset_norm) -> bool
+                    rmm::device_async_resource_ref device_memory) -> bool
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
     "adjust_centers(%zu, %u)", static_cast<size_t>(n_rows), n_clusters);
@@ -620,8 +647,7 @@ auto adjust_centers(MathT* centers,
                                                                         average,
                                                                         ofst,
                                                                         update_count.data(),
-                                                                        mapping_op,
-                                                                        dataset_norm);
+                                                                        mapping_op);
   adjusted = update_count.value(stream) > 0;  // NB: rmm scalar performs the sync
 
   return adjusted;
@@ -701,8 +727,7 @@ void balancing_em_iters(const raft::resources& handle,
                                    balancing_threshold,
                                    mapping_op,
                                    stream,
-                                   device_memory,
-                                   dataset_norm)) {
+                                   device_memory)) {
       if (balancing_counter++ >= balancing_pullback) {
         balancing_counter -= balancing_pullback;
         n_iters++;
@@ -747,8 +772,7 @@ void balancing_em_iters(const raft::resources& handle,
                            cluster_labels,
                            true,
                            mapping_op,
-                           device_memory,
-                           dataset_norm);
+                           device_memory);
   }
 }
 
@@ -792,8 +816,7 @@ void build_clusters(const raft::resources& handle,
                          cluster_labels,
                          true,
                          mapping_op,
-                         device_memory,
-                         dataset_norm);
+                         device_memory);
 
   // run EM
   balancing_em_iters(handle,
