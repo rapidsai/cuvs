@@ -25,4 +25,9 @@ TEST_P(AnnIVFFlatTestF_uint8, AnnIVFFlat) { this->testIVFFlat(); }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_uint8, ::testing::ValuesIn(inputs));
 
+typedef AnnIVFFlatTest<float, uint8_t, int64_t> AnnIVFFlatTestF_cosine_uint8;
+TEST_P(AnnIVFFlatTestF_cosine_uint8, AnnIVFFlat) { this->testIVFFlatCosine(); }
+INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest,
+                        AnnIVFFlatTestF_cosine_uint8,
+                        ::testing::ValuesIn(inputs_cosine));
 }  // namespace cuvs::neighbors::ivf_flat

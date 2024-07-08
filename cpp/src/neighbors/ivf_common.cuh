@@ -254,6 +254,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
         raft::linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
       }
     } break;
+    case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
       float factor = (account_for_max_close ? -1.0 : 1.0) * scaling_factor * scaling_factor;
       if (factor != 1.0) {
@@ -265,25 +266,6 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
           stream);
       } else if (needs_cast || needs_copy) {
         raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
-      }
-    } break;
-    case distance::DistanceType::CosineExpanded: {
-      float factor = (account_for_max_close ? 1.0 : -1.0) * scaling_factor * scaling_factor;
-      if (factor != 1.0) {
-        raft::linalg::unaryOp(out,
-                              in,
-                              len,
-                              raft::compose_op(raft::mul_const_op<ScoreOutT>{factor},
-                                               raft::add_const_op<ScoreOutT>{1},
-                                               raft::cast_op<ScoreOutT>{}),
-                              stream);
-      } else {
-        raft::linalg::unaryOp(
-          out,
-          in,
-          len,
-          raft::compose_op(raft::add_const_op<ScoreOutT>{1}, raft::cast_op<ScoreOutT>{}),
-          stream);
       }
     } break;
     default: RAFT_FAIL("Unexpected metric.");

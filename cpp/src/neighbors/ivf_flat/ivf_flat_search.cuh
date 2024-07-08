@@ -133,9 +133,8 @@ void search_impl(raft::resources const& handle,
                             true,
                             stream,
                             raft::sqrt_op{});
-      select_min = !select_min;
-      alpha      = 1.0f;
-      beta       = 0.0f;
+      alpha = -1.0f;
+      beta  = 0.0f;
       break;
     }
     default: {
