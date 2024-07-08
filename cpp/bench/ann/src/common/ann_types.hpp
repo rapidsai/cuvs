@@ -153,7 +153,7 @@ class algo : public algo_base {
   // and set_search_dataset() should save the passed-in pointer somewhere.
   // The client code should call set_search_dataset() before searching,
   // and should not release dataset before searching is finished.
-  virtual void set_search_dataset(const T* /*dataset*/, size_t /*nrow*/) {};
+  virtual void set_search_dataset(const T* /*dataset*/, size_t /*nrow*/){};
 
   /**
    * Make a shallow copy of the algo wrapper that shares the resources and ensures thread-safe
@@ -163,12 +163,9 @@ class algo : public algo_base {
 
 }  // namespace cuvs::bench
 
-#define REGISTER_ALGO_INSTANCE(DataT)                                    \
-  template auto cuvs::bench::create_algo<DataT>(                         \
-    const std::string&,                                                  \
-    const std::string&,                                                  \
-    int,                                                                 \
-    const nlohmann::json&) -> std::unique_ptr<cuvs::bench::algo<DataT>>; \
-  template auto cuvs::bench::create_search_param<DataT>(                 \
-    const std::string&,                                                  \
-    const nlohmann::json&) -> std::unique_ptr<typename cuvs::bench::algo<DataT>::search_param>;
+#define REGISTER_ALGO_INSTANCE(DataT)                                                              \
+  template auto cuvs::bench::create_algo<DataT>(                                                   \
+    const std::string&, const std::string&, int, const nlohmann::json&)                            \
+    ->std::unique_ptr<cuvs::bench::algo<DataT>>;                                                   \
+  template auto cuvs::bench::create_search_param<DataT>(const std::string&, const nlohmann::json&) \
+    ->std::unique_ptr<typename cuvs::bench::algo<DataT>::search_param>;
