@@ -197,10 +197,12 @@ struct result_buffer {
   explicit result_buffer(size_t size, cudaStream_t stream) : size_{size}, stream_{stream}
   {
     if (size_ == 0) { return; }
-    data_host_ = malloc(size_);
 #ifndef BUILD_CPU_ONLY
     cudaMallocAsync(&data_device_, size_, stream_);
+    cudaMallocHost(&data_host_, size_);
     cudaStreamSynchronize(stream_);
+#else
+    data_host_ = malloc(size_);
 #endif
   }
   result_buffer()                                        = delete;
@@ -213,9 +215,11 @@ struct result_buffer {
     if (size_ == 0) { return; }
 #ifndef BUILD_CPU_ONLY
     cudaFreeAsync(data_device_, stream_);
+    cudaFreeHost(data_host_);
     cudaStreamSynchronize(stream_);
-#endif
+#else
     free(data_host_);
+#endif
   }
 
   [[nodiscard]] auto size() const noexcept { return size_; }
@@ -278,6 +282,31 @@ inline auto get_result_buffer_from_global_pool(size_t size) -> result_buffer&
   return rb;
 }
 
+namespace detail {
+inline std::vector<std::unique_ptr<result_buffer>> global_tmp_buffer_pool(0);
+inline std::mutex gtp_mutex;
+}  // namespace detail
+
+/**
+ * Global temporary buffer pool for use by algorithms.
+ * In contrast to `get_result_buffer_from_global_pool`, the content of these buffers is never
+ * initialized.
+ */
+inline auto get_tmp_buffer_from_global_pool(size_t size) -> result_buffer&
+{
+  auto stream = get_stream_from_global_pool();
+  auto& rb    = [stream, size]() -> result_buffer& {
+    std::lock_guard guard(detail::gtp_mutex);
+    if (static_cast<int>(detail::global_tmp_buffer_pool.size()) < benchmark_n_threads) {
+      detail::global_tmp_buffer_pool.resize(benchmark_n_threads);
+    }
+    auto& rb = detail::global_tmp_buffer_pool[benchmark_thread_id];
+    if (!rb || rb->size() < size) { rb = std::make_unique<result_buffer>(size, stream); }
+    return *rb;
+  }();
+  return rb;
+}
+
 /**
  * Delete all streams and memory allocations in the global pool.
  * It's called at the end of the `main` function - before global/static variables and cuda context
@@ -288,6 +317,7 @@ inline void reset_global_device_resources()
 {
 #ifndef BUILD_CPU_ONLY
   std::lock_guard guard(detail::gsp_mutex);
+  detail::global_tmp_buffer_pool.resize(0);
   detail::global_result_buffer_pool.resize(0);
   detail::global_stream_pool.resize(0);
 #endif
