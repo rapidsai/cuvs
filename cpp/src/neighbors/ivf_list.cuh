@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ivf_list.hpp>
+#pragma once
+
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 #include <raft/core/device_mdarray.hpp>

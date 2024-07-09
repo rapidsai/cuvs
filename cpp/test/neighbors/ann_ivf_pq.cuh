@@ -18,13 +18,13 @@
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
-#include <cuvs/neighbors/sample_filter.hpp>
 
 #include <raft/core/bitset.cuh>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
+#include <rmm/mr/device/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_pq {
@@ -113,7 +113,7 @@ void compare_vectors_l2(
   auto dist =
     raft::make_device_mdarray<double>(res, &managed_memory, raft::make_extents<uint32_t>(n_rows));
   raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
-    raft::spatial::knn::detail::utils::mapping<float> f{};
+    cuvs::spatial::knn::detail::utils::mapping<float> f{};
     double d = 0.0f;
     for (uint32_t j = 0; j < dim; j++) {
       double t = f(a(i, j)) - f(b(i, j));
@@ -204,7 +204,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ipams.add_data_on_build = true;
 
     auto index_view =
-      raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
     return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
   }
 
@@ -224,16 +224,16 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ipams.add_data_on_build = false;
 
     auto database_view =
-      raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
+      raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
     auto idx = cuvs::neighbors::ivf_pq::build(handle_, ipams, database_view);
 
-    auto vecs_2_view = raft::make_device_matrix_view<DataT, IdxT>(vecs_2, size_2, ps.dim);
-    auto inds_2_view = raft::make_device_vector_view<IdxT, IdxT>(inds_2, size_2);
+    auto vecs_2_view = raft::make_device_matrix_view<const DataT, int64_t>(vecs_2, size_2, ps.dim);
+    auto inds_2_view = raft::make_device_vector_view<const IdxT, int64_t>(inds_2, size_2);
     cuvs::neighbors::ivf_pq::extend(handle_, vecs_2_view, inds_2_view, &idx);
 
     auto vecs_1_view =
-      raft::make_device_matrix_view<DataT, IdxT, raft::row_major>(vecs_1, size_1, ps.dim);
-    auto inds_1_view = raft::make_device_vector_view<const IdxT, IdxT>(inds_1, size_1);
+      raft::make_device_matrix_view<const DataT, int64_t, raft::row_major>(vecs_1, size_1, ps.dim);
+    auto inds_1_view = raft::make_device_vector_view<const IdxT, int64_t>(inds_1, size_1);
     cuvs::neighbors::ivf_pq::extend(handle_, vecs_1_view, inds_1_view, &idx);
     return idx;
   }
@@ -242,7 +242,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   {
     std::string filename = "ivf_pq_index";
     cuvs::neighbors::ivf_pq::serialize(handle_, filename, build_only());
-    cuvs::neighbors::ivf_pq::index<IdxT> index(handle_, ps.index_params, ps.dim);
+    cuvs::neighbors::ivf_pq::index<IdxT> index(handle_);
     cuvs::neighbors::ivf_pq::deserialize(handle_, filename, &index);
     return index;
   }
@@ -263,7 +263,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto rec_data  = raft::make_device_matrix<DataT>(handle_, n_take, dim);
     auto orig_data = raft::make_device_matrix<DataT>(handle_, n_take, dim);
 
-    ivf_pq::helpers::reconstruct_list_data(handle_, index, rec_data.view(), label, n_skip);
+    ivf_pq::helpers::codepacker::reconstruct_list_data(
+      handle_, index, rec_data.view(), label, n_skip);
 
     raft::matrix::gather(database.data(),
                          IdxT{dim},
@@ -288,11 +289,13 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
     raft::copy(indices.data_handle(), old_list->indices.data_handle(), n_rows, stream_);
 
-    ivf_pq::helpers::reconstruct_list_data(handle_, *index, vectors_1.view(), label, uint32_t(0));
+    ivf_pq::helpers::codepacker::reconstruct_list_data(
+      handle_, *index, vectors_1.view(), label, uint32_t(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
     // NB: passing the type parameter because const->non-const implicit conversion of the mdspans
     // breaks type inference
-    ivf_pq::helpers::extend_list(handle_, index, vectors_1.view(), indices.view(), label);
+    ivf_pq::helpers::codepacker::extend_list(
+      handle_, index, vectors_1.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
@@ -300,7 +303,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
          "corresponding cluster.";
 
     auto vectors_2 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
-    ivf_pq::helpers::reconstruct_list_data(handle_, *index, vectors_2.view(), label, uint32_t(0));
+    ivf_pq::helpers::codepacker::reconstruct_list_data(
+      handle_, *index, vectors_2.view(), label, uint32_t(0));
     // The code search is unstable, and there's high chance of repeating values of the lvl-2 codes.
     // Hence, encoding-decoding chain often leads to altering both the PQ codes and the
     // reconstructed data.
@@ -322,7 +326,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ivf_pq::helpers::codepacker::unpack_list_data(
       handle_, *index, codes.view(), label, uint32_t(0));
     ivf_pq::helpers::erase_list(handle_, index, label);
-    ivf_pq::helpers::extend_list_with_codes(handle_, index, codes.view(), indices.view(), label);
+    ivf_pq::helpers::codepacker::extend_list_with_codes(
+      handle_, index, codes.view(), indices.view(), label);
 
     auto& new_list = index->lists()[label];
     ASSERT_NE(old_list.get(), new_list.get())
@@ -354,26 +359,16 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                   cuvs::Compare<uint8_t>{}));
 
     // Another test with the API that take list_data directly
-    auto list_data  = index->lists()[label]->data.view();
-    uint32_t n_take = 4;
+    [[maybe_unused]] auto list_data = index->lists()[label]->data.view();
+    uint32_t n_take                 = 4;
     ASSERT_TRUE(row_offset + n_take < n_rows);
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
-    ivf_pq::helpers::codepacker::unpack_list_data(
-      // handle_, list_data, index->pq_bits(), row_offset, codes2.view());
-      handle_,
-      *index,
-      codes2.view(),
-      label,
-      uint32_t(row_offset));
+    ivf_pq::helpers::codepacker::unpack(
+      handle_, list_data, index->pq_bits(), row_offset, codes2.view());
 
     // Write it back
-    ivf_pq::helpers::codepacker::pack_list_data(
-      // handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
-      handle_,
-      index,
-      make_const_mdspan(codes2.view()),
-      label,
-      uint32_t(row_offset));
+    ivf_pq::helpers::codepacker::pack(
+      handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),
                                   list_data_size,
@@ -569,7 +564,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ipams.add_data_on_build = true;
 
     auto index_view =
-      raft::make_device_matrix_view<DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
+      raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.num_db_vecs, ps.dim);
     return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
   }
 

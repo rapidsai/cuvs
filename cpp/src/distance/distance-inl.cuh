@@ -16,7 +16,7 @@
 #pragma once
 
 #include "detail/distance.cuh"
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
@@ -361,9 +361,9 @@ void pairwise_distance(raft::resources const& handle,
  * #include <raft/core/resources.hpp>
  * #include <raft/core/device_mdarray.hpp>
  * #include <raft/random/make_blobs.cuh>
- * #include <raft/distance/distance.cuh>
+ * #include <cuvs/distance/distance.cuh>
  *
- * raft::raft::resources handle;
+ * raft::resources handle;
  * int n_samples = 5000;
  * int n_features = 50;
  *

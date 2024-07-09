@@ -23,7 +23,7 @@
 // We define CUTLASS_NAMESPACE in case
 // RAFT cmake is not used
 #ifndef CUTLASS_NAMESPACE
-#define cutlass raft_cutlass
+#define cutlass cuvs_cutlass
 #endif
 
 #include "pairwise_distance_epilogue_elementwise.h"
@@ -77,14 +77,14 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
   auto dist_op     = distance_op.get_cutlass_op();
   using DistanceFn = decltype(dist_op);
   using EpilogueOutputOp =
-    cutlass::epilogue::thread::PairwiseDistanceEpilogueElementwise<DataT,  // ElementC_
-                                                                   AccT,   // ElementAccumulator_
-                                                                   DataT,  // ElementCompute_
-                                                                   AccT,   // ElementZ_
-                                                                   OutT,   // ElementT_
-                                                                   1,      // Elements per access 1
-                                                                   DistanceFn,
-                                                                   FinalLambda>;
+    epilogue::thread::PairwiseDistanceEpilogueElementwise<DataT,  // ElementC_
+                                                          AccT,   // ElementAccumulator_
+                                                          DataT,  // ElementCompute_
+                                                          AccT,   // ElementZ_
+                                                          OutT,   // ElementT_
+                                                          1,      // Elements per access 1
+                                                          DistanceFn,
+                                                          FinalLambda>;
   constexpr int batch_count = 1;
 
   constexpr auto mode = cutlass::gemm::GemmUniversalMode::kGemm;
@@ -97,15 +97,15 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
   constexpr int Alignment = VecLen;
 
   using cutlassDistKernel =
-    typename cutlass::gemm::kernel::PairwiseDistanceGemm<DataT,
-                                                         Alignment,
-                                                         DataT,
-                                                         Alignment,
-                                                         AccT,
-                                                         AccT,
-                                                         EpilogueOutputOp,
-                                                         NumStages,  // Number of pipeline stages
-                                                         isRowMajor>::GemmKernel;
+    typename gemm::kernel::PairwiseDistanceGemm<DataT,
+                                                Alignment,
+                                                DataT,
+                                                Alignment,
+                                                AccT,
+                                                AccT,
+                                                EpilogueOutputOp,
+                                                NumStages,  // Number of pipeline stages
+                                                isRowMajor>::GemmKernel;
 
   using cutlassDist = cutlass::gemm::device::GemmUniversalAdapter<cutlassDistKernel>;
 

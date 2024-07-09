@@ -48,9 +48,11 @@ function(ConfigureTest)
     ${TEST_NAME}
     PRIVATE cuvs
             cuvs::cuvs
+            raft::raft
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
+            ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
@@ -88,7 +90,23 @@ endfunction()
 # ##################################################################################################
 
 if(BUILD_TESTS)
-  ConfigureTest(NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu GPUS 1 PERCENT 100)
+  ConfigureTest(
+    NAME
+    NEIGHBORS_TEST
+    PATH
+    test/neighbors/brute_force.cu
+    test/neighbors/brute_force_prefiltered.cu
+    test/neighbors/refine.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
+  ConfigureTest(
+    NAME CLUSTER_TEST PATH test/cluster/kmeans.cu test/cluster/kmeans_balanced.cu
+    test/cluster/kmeans_find_k.cu test/cluster/linkage.cu GPUS 1 PERCENT 100
+  )
 
   ConfigureTest(
     NAME
@@ -160,6 +178,8 @@ if(BUILD_TESTS)
     test/distance/dist_l_inf.cu
     test/distance/dist_lp_unexp.cu
     test/distance/dist_russell_rao.cu
+    test/distance/masked_nn.cu
+    test/sparse/neighbors/cross_component_nn.cu
     GPUS
     1
     PERCENT
@@ -169,6 +189,10 @@ endif()
 
 if(BUILD_C_TESTS)
   ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
+  ConfigureTest(
+    NAME DISTANCE_C_TEST PATH test/distance/run_pairwise_distance_c.c
+    test/distance/pairwise_distance_c.cu C_LIB
+  )
 
   ConfigureTest(
     NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu

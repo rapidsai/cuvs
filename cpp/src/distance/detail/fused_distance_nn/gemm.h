@@ -56,9 +56,12 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace gemm {
 namespace kernel {
+
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::gemm::kernel;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /*
@@ -166,7 +169,7 @@ struct FusedDistanceNNGemm {
                                                  Operator>::GemmKernel;
 
   // Replace epilogue
-  using Epilogue = typename cutlass::epilogue::threadblock::FusedDistanceNNEpilogue<
+  using Epilogue = typename cuvs::epilogue::threadblock::FusedDistanceNNEpilogue<
     typename GemmBase::Epilogue::Shape,
     typename GemmBase::Epilogue::WarpMmaOperator,
     GemmBase::Epilogue::kPartitionsK,
@@ -280,7 +283,7 @@ struct FusedDistanceNNGemm<float,  /// Element type for A matrix operand
                                                  Operator>::GemmKernel;
 
   // Replace epilogue
-  using Epilogue = typename cutlass::epilogue::threadblock::FusedDistanceNNEpilogue<
+  using Epilogue = typename cuvs::epilogue::threadblock::FusedDistanceNNEpilogue<
     typename GemmBase::Epilogue::Shape,
     typename GemmBase::Epilogue::WarpMmaOperator,
     GemmBase::Epilogue::kPartitionsK,
@@ -384,7 +387,7 @@ struct FusedDistanceNNGemm<double,
                                                  Operator>::GemmKernel;
 
   // Replace epilogue
-  using Epilogue = typename cutlass::epilogue::threadblock::FusedDistanceNNEpilogue<
+  using Epilogue = typename cuvs::epilogue::threadblock::FusedDistanceNNEpilogue<
     typename GemmBase::Epilogue::Shape,
     typename GemmBase::Epilogue::WarpMmaOperator,
     GemmBase::Epilogue::kPartitionsK,
@@ -406,4 +409,4 @@ struct FusedDistanceNNGemm<double,
 
 }  // namespace kernel
 }  // namespace gemm
-}  // namespace cutlass
+}  // namespace cuvs

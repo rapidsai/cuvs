@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/ann_types.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -25,11 +25,11 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 namespace cuvs::neighbors::nn_descent {
 /**
- * @defgroup nn-descent The nn-descent algorithm.
+ * @defgroup nn_descent_cpp_index_params The nn-descent algorithm parameters.
  * @{
  */
 
@@ -48,13 +48,30 @@ namespace cuvs::neighbors::nn_descent {
  * `termination_threshold`: The delta at which nn-descent will terminate its iterations
  *
  */
-struct index_params : ann::index_params {
+struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree              = 64;      // Degree of output graph.
   size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
   size_t max_iterations            = 20;      // Number of nn-descent iterations.
   float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
+
+  /** @brief Construct NN descent parameters for a specific kNN graph degree
+   *
+   * @param graph_degree output graph degree
+   */
+  index_params(size_t graph_degree = 64)
+    : graph_degree(graph_degree), intermediate_graph_degree(1.5 * graph_degree)
+  {
+  }
 };
 
+/**
+ * @}
+ */
+
+/**
+ * @defgroup nn_descent_cpp_index nn-descent index
+ * @{
+ */
 /**
  * @brief nn-descent Build an nn-descent index
  * The index contains an all-neighbors graph of the input dataset
@@ -69,7 +86,7 @@ struct index_params : ann::index_params {
  * @tparam IdxT dtype to be used for constructing knn-graph
  */
 template <typename IdxT>
-struct index : ann::index {
+struct index : cuvs::neighbors::index {
  public:
   /**
    * @brief Construct a new index object
@@ -83,7 +100,7 @@ struct index : ann::index {
    * @param n_cols number of cols in knn-graph
    */
   index(raft::resources const& res, int64_t n_rows, int64_t n_cols)
-    : ann::index(),
+    : cuvs::neighbors::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(n_rows, n_cols)},
@@ -103,7 +120,7 @@ struct index : ann::index {
    */
   index(raft::resources const& res,
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view)
-    : ann::index(),
+    : cuvs::neighbors::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},
@@ -152,6 +169,11 @@ struct index : ann::index {
 };
 
 /** @} */
+
+/**
+ * @defgroup nn_descent_cpp_index_build nn-descent index build
+ * @{
+ */
 
 /**
  * @brief Build nn-descent Index with dataset in device memory
@@ -307,6 +329,8 @@ auto build(raft::resources const& res,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
+/** @} */
+
 /**
  * @brief Build nn-descent Index with dataset in host memory
  *
@@ -338,5 +362,18 @@ auto build(raft::resources const& res,
            index_params const& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
+
+/**
+ * @brief Test if we have enough GPU memory to run NN descent algorithm.
+ *
+ * @param res
+ * @param dataset shape of the dataset
+ * @param idx_size the size of index type in bytes
+ * @return true if enough GPU memory can be allocated
+ * @return false otherwise
+ */
+bool has_enough_device_memory(raft::resources const& res,
+                              raft::matrix_extent<int64_t> dataset,
+                              size_t idx_size = 4);
 
 }  // namespace cuvs::neighbors::nn_descent

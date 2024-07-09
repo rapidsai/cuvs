@@ -1,6 +1,6 @@
 <!--
 
-Thank you for contributing to RAFT :)
+Thank you for contributing to cuvs :)
 
 Here are some guidelines to help the review process go smoothly.
 

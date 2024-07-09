@@ -17,6 +17,38 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
+index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
+                                        cuvs::distance::DistanceType metric)
+{
+  index_params params;
+  params.n_lists =
+    dataset.extent(0) < 4 * 2500 ? 4 : static_cast<uint32_t>(std::sqrt(dataset.extent(0)));
+  params.n_lists = std::min<uint32_t>(params.n_lists, dataset.extent(0));
+  params.pq_dim =
+    raft::round_up_safe(static_cast<uint32_t>(dataset.extent(1) / 4), static_cast<uint32_t>(8));
+  if (params.pq_dim == 0) params.pq_dim = 8;
+  params.pq_bits                  = 8;
+  params.kmeans_trainset_fraction = dataset.extent(0) < 10000 ? 1 : 0.1;
+  params.metric                   = metric;
+  return params;
+}
+
+template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle)
+  // this constructor is just for a temporary index, for use in the deserialization
+  // api. all the parameters here will get replaced with loaded values - that aren't
+  // necessarily known ahead of time before deserialization.
+  // TODO: do we even need a handle here - could just construct one?
+  : index(handle,
+          cuvs::distance::DistanceType::L2Expanded,
+          codebook_gen::PER_SUBSPACE,
+          0,
+          0,
+          8,
+          0,
+          true)
+{
+}
 
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
@@ -40,20 +72,20 @@ index<IdxT>::index(raft::resources const& handle,
                    uint32_t pq_bits,
                    uint32_t pq_dim,
                    bool conservative_memory_allocation)
-  : ann::index(),
+  : cuvs::neighbors::index(),
     metric_(metric),
     codebook_kind_(codebook_kind),
     dim_(dim),
     pq_bits_(pq_bits),
     pq_dim_(pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim),
     conservative_memory_allocation_(conservative_memory_allocation),
-    pq_centers_{raft::make_device_mdarray<float>(handle, make_pq_centers_extents())},
     lists_{n_lists},
-    rotation_matrix_{
-      raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
+    pq_centers_{raft::make_device_mdarray<float>(handle, make_pq_centers_extents())},
     centers_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->dim_ext())},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
+    rotation_matrix_{
+      raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
@@ -61,6 +93,7 @@ index<IdxT>::index(raft::resources const& handle,
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
+
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
 {

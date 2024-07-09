@@ -1,9 +1,9 @@
 /*
- * raft::copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a raft::copy of the License at
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -21,20 +21,21 @@
 #include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_list.cuh"
-#include <cuvs/distance/distance_types.hpp>
-#include <cuvs/neighbors/ivf_list.hpp>
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/ivf_pq_helpers.hpp>
 
 #include "../detail/ann_utils.cuh"  // utils::mapping
-#include <raft/cluster/kmeans_balanced.cuh>
+
+// TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
+#include "../../cluster/kmeans_balanced.cuh"
+
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger.hpp>
+#include <raft/core/logger-ext.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/distance/distance_types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/detail/qr.cuh>
 #include <raft/linalg/gemm.cuh>
@@ -64,6 +65,7 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
+using raft::RAFT_NAME;                       // TODO: this is required for RAFT_LOG_XXX messages.
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
@@ -139,7 +141,7 @@ void flat_compute_residuals(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,  // [n_lists, dim_ext]
   const T* dataset,                                                          // [n_rows, dim]
   std::variant<uint32_t, const uint32_t*> labels,                            // [n_rows]
-  rmm::mr::device_memory_resource* device_memory)
+  rmm::device_async_resource_ref device_memory)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   auto dim     = rotation_matrix.extent(1);
@@ -313,8 +315,7 @@ void train_per_subset(raft::resources const& handle,
                       const float* trainset,   // [n_rows, dim]
                       const uint32_t* labels,  // [n_rows]
                       uint32_t kmeans_n_iters,
-                      uint32_t max_train_points_per_pq_code,
-                      rmm::mr::device_memory_resource* managed_memory)
+                      uint32_t max_train_points_per_pq_code)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
@@ -375,10 +376,10 @@ void train_per_subset(raft::resources const& handle,
       raft::make_device_vector_view<uint32_t, internal_extents_t>(sub_labels.data(), pq_n_rows);
     auto cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
       pq_cluster_sizes.data(), index.pq_book_size());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
-    raft::cluster::kmeans_balanced::helpers::build_clusters(handle,
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
                                                             kmeans_params,
                                                             sub_trainset_view,
                                                             centers_tmp_view,
@@ -396,11 +397,13 @@ void train_per_cluster(raft::resources const& handle,
                        const float* trainset,   // [n_rows, dim]
                        const uint32_t* labels,  // [n_rows]
                        uint32_t kmeans_n_iters,
-                       uint32_t max_train_points_per_pq_code,
-                       rmm::mr::device_memory_resource* managed_memory)
+                       uint32_t max_train_points_per_pq_code)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
+  // NB: Managed memory is used for small arrays accessed from both device and host. There's no
+  // performance reasoning behind this, just avoiding the boilerplate of explicit copies.
+  rmm::mr::managed_memory_resource managed_memory;
 
   rmm::device_uvector<float> pq_centers_tmp(index.pq_centers().size(), stream, device_memory);
   rmm::device_uvector<uint32_t> cluster_sizes(index.n_lists(), stream, managed_memory);
@@ -463,10 +466,10 @@ void train_per_cluster(raft::resources const& handle,
       raft::make_device_vector_view<uint32_t, internal_extents_t>(pq_labels.data(), pq_n_rows);
     auto pq_cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
       pq_cluster_sizes.data(), index.pq_book_size());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = kmeans_n_iters;
-    kmeans_params.metric  = raft::distance::DistanceType::L2Expanded;
-    raft::cluster::kmeans_balanced::helpers::build_clusters(handle,
+    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters(handle,
                                                             kmeans_params,
                                                             rot_vectors_view,
                                                             centers_tmp_view,
@@ -1266,7 +1269,7 @@ void process_and_fill_codes(raft::resources const& handle,
                             std::variant<IdxT, const IdxT*> src_offset_or_indices,
                             const uint32_t* new_labels,
                             IdxT n_rows,
-                            rmm::mr::device_memory_resource* mr)
+                            rmm::device_async_resource_ref mr)
 {
   auto new_vectors_residual =
     raft::make_device_mdarray<float>(handle, mr, raft::make_extents<IdxT>(n_rows, index.rot_dim()));
@@ -1355,7 +1358,7 @@ void extend_list_with_codes(
   // Allocate memory and write indices
   auto offset = extend_list_prepare(res, index, new_indices, label);
   // Pack the data
-  helpers::codepacker::pack_list_data(res, index, new_codes, label, offset);
+  pack_list_data(res, index, new_codes, label, offset);
   // Update the pointers and the sizes
   ivf::detail::recompute_internal_state(res, *index);
 }
@@ -1463,7 +1466,9 @@ void extend(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
-  rmm::mr::device_memory_resource* device_memory = raft::resource::get_workspace_resource(handle);
+  rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+  rmm::device_async_resource_ref large_memory =
+    raft::resource::get_large_workspace_resource(handle);
 
   // The spec defines how the clusters look like
   auto spec = list_spec<uint32_t, IdxT>{
@@ -1478,12 +1483,22 @@ void extend(raft::resources const& handle,
     n_rows + (kIndexGroupSize - 1) * std::min<IdxT>(n_clusters, n_rows));
 
   // Available device memory
-  size_t free_mem, total_mem;
-  RAFT_CUDA_TRY(cudaMemGetInfo(&free_mem, &total_mem));
+  size_t free_mem = raft::resource::get_workspace_free_bytes(handle);
 
+  // We try to use the workspace memory by default here.
+  // If the workspace limit is too small, we change the resource for batch data to the
+  // `large_workspace_resource`, which does not have the explicit allocation limit. The user may opt
+  // to populate the `large_workspace_resource` memory resource with managed memory for easier
+  // scaling.
+  rmm::device_async_resource_ref labels_mr  = device_memory;
+  rmm::device_async_resource_ref batches_mr = device_memory;
+  if (n_rows * (index->dim() * sizeof(T) + index->pq_dim() + sizeof(IdxT) + sizeof(uint32_t)) >
+      free_mem) {
+    labels_mr = large_memory;
+  }
   // Allocate a buffer for the new labels (classifying the new data)
-  rmm::device_uvector<uint32_t> new_data_labels(n_rows, stream, device_memory);
-  free_mem -= sizeof(uint32_t) * n_rows;
+  rmm::device_uvector<uint32_t> new_data_labels(n_rows, stream, labels_mr);
+  free_mem = raft::resource::get_workspace_free_bytes(handle);
 
   // Calculate the batch size for the input data if it's not accessible directly from the device
   constexpr size_t kReasonableMaxBatchSize = 65536;
@@ -1512,13 +1527,19 @@ void extend(raft::resources const& handle,
     while (size_factor * max_batch_size > free_mem && max_batch_size > 128) {
       max_batch_size >>= 1;
     }
-    // If we're keeping the batches in device memory, update the available mem tracker.
-    free_mem -= size_factor * max_batch_size;
+    if (size_factor * max_batch_size > free_mem) {
+      // if that still doesn't fit, resort to the UVM
+      batches_mr     = large_memory;
+      max_batch_size = kReasonableMaxBatchSize;
+    } else {
+      // If we're keeping the batches in device memory, update the available mem tracker.
+      free_mem -= size_factor * max_batch_size;
+    }
   }
 
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(
-    new_vectors, n_rows, index->dim(), max_batch_size, stream, device_memory);
+    new_vectors, n_rows, index->dim(), max_batch_size, stream, batches_mr);
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
@@ -1543,9 +1564,9 @@ void extend(raft::resources const& handle,
         new_data_labels.data() + batch.offset(), batch.size());
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
-      raft::cluster::kmeans_balanced_params kmeans_params;
-      kmeans_params.metric = static_cast<raft::distance::DistanceType>((int)index->metric());
-      raft::cluster::kmeans_balanced::predict(handle,
+      cuvs::cluster::kmeans::balanced_params kmeans_params;
+      kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
+      cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
                                               batch_data_view,
                                               centers_view,
@@ -1591,7 +1612,7 @@ void extend(raft::resources const& handle,
   // By this point, the index state is updated and valid except it doesn't contain the new data
   // Fill the extended index with the new data (possibly, in batches)
   utils::batch_load_iterator<IdxT> idx_batches(
-    new_indices, n_rows, 1, max_batch_size, stream, device_memory);
+    new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
     process_and_fill_codes(handle,
@@ -1602,7 +1623,7 @@ void extend(raft::resources const& handle,
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
                            new_data_labels.data() + vec_batch.offset(),
                            IdxT(vec_batch.size()),
-                           device_memory);
+                           batches_mr);
   }
 }
 
@@ -1636,6 +1657,9 @@ auto build(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
+  std::cout << "using ivf_pq::index_params nrows " << (int)dataset.extent(0) << ", dim "
+            << (int)dataset.extent(1) << ", n_lits " << (int)params.n_lists << ", pq_dim "
+            << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
@@ -1655,21 +1679,39 @@ auto build(raft::resources const& handle,
       size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
     size_t n_rows_train = n_rows / trainset_ratio;
 
-    auto* device_memory = raft::resource::get_workspace_resource(handle);
-    rmm::mr::managed_memory_resource managed_memory_upstream;
+    rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
+
+    // If the trainset is small enough to comfortably fit into device memory, put it there.
+    // Otherwise, use the managed memory.
+    constexpr size_t kTolerableRatio = 4;
+    rmm::device_async_resource_ref big_memory_resource =
+      raft::resource::get_large_workspace_resource(handle);
+    if (sizeof(float) * n_rows_train * index.dim() * kTolerableRatio <
+        raft::resource::get_workspace_free_bytes(handle)) {
+      big_memory_resource = device_memory;
+    }
 
     // Besides just sampling, we transform the input dataset into floats to make it easier
     // to use gemm operations from cublas.
-    auto trainset = raft::make_device_matrix<float, internal_extents_t>(handle, n_rows_train, dim);
-
+    auto trainset = raft::make_device_mdarray<float>(
+      handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
+    try {
+      trainset = raft::make_device_mdarray<float>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_ERROR(
+        "Insufficient memory for kmeans training set allocation. Please decrease "
+        "kmeans_trainset_fraction, or set large_workspace_resource appropriately.");
+      throw;
+    }
+    // TODO: a proper sampling
     if constexpr (std::is_same_v<T, float>) {
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
       // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
-      // TODO(tfeher): After https://github.com/rapidsai/raft/pull/2194 is merged, change this
-      // to use large workspace allocator.
-      auto trainset_tmp =
-        raft::make_device_matrix<T, internal_extents_t>(handle, n_rows_train, dim);
+      auto trainset_tmp = raft::make_device_mdarray<T>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
 
       raft::linalg::unaryOp(trainset.data_handle(),
@@ -1689,19 +1731,19 @@ auto build(raft::resources const& handle,
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
-    raft::cluster::kmeans_balanced_params kmeans_params;
+    cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<raft::distance::DistanceType>((int)index.metric());
-    raft::cluster::kmeans_balanced::fit(
+    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
 
     // Trainset labels are needed for training PQ codebooks
-    rmm::device_uvector<uint32_t> labels(n_rows_train, stream, device_memory);
+    rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
-    raft::cluster::kmeans_balanced::predict(handle,
+    cuvs::cluster::kmeans_balanced::predict(handle,
                                             kmeans_params,
                                             trainset_const_view,
                                             centers_const_view,
@@ -1709,13 +1751,9 @@ auto build(raft::resources const& handle,
                                             utils::mapping<float>());
 
     // Make rotation matrix
-    helpers::make_rotation_matrix(handle,
-                                  params.force_random_rotation,
-                                  index.rot_dim(),
-                                  index.dim(),
-                                  index.rotation_matrix().data_handle());
+    helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, cluster_centers);
+    helpers::set_centers(handle, &index, raft::make_const_mdspan(centers_view));
 
     // Train PQ codebooks
     switch (index.codebook_kind()) {
@@ -1726,8 +1764,7 @@ auto build(raft::resources const& handle,
                          trainset.data_handle(),
                          labels.data(),
                          params.kmeans_n_iters,
-                         params.max_train_points_per_pq_code,
-                         &managed_memory_upstream);
+                         params.max_train_points_per_pq_code);
         break;
       case codebook_gen::PER_CLUSTER:
         train_per_cluster(handle,
@@ -1736,8 +1773,7 @@ auto build(raft::resources const& handle,
                           trainset.data_handle(),
                           labels.data(),
                           params.kmeans_n_iters,
-                          params.max_train_points_per_pq_code,
-                          &managed_memory_upstream);
+                          params.max_train_points_per_pq_code);
         break;
       default: RAFT_FAIL("Unreachable code");
     }
@@ -1759,11 +1795,13 @@ void build(raft::resources const& handle,
   *index = build(handle, params, dataset);
 }
 
-template <typename T, typename IdxT>
-auto extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
-            const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+auto extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
 {
   ASSERT(new_vectors.extent(1) == orig_index.dim(),
          "new_vectors should have the same dimension as the index");
@@ -1781,11 +1819,13 @@ auto extend(raft::resources const& handle,
                 n_rows);
 }
 
-template <typename T, typename IdxT>
-void extend(raft::resources const& handle,
-            raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,
-            std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,
-            index<IdxT>* index)
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+void extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  index<IdxT>* index)
 {
   ASSERT(new_vectors.extent(1) == index->dim(),
          "new_vectors should have the same dimension as the index");

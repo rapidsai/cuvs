@@ -89,9 +89,12 @@ reduction
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace epilogue {
 namespace threadblock {
+
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::epilogue::threadblock;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,11 +116,11 @@ struct EpilogueWithBroadcastOpBaseCustom {
   using ElementT                      = ElementT_;
   static int const kElementsPerAccess = ElementsPerAccess;
 
-  using FragmentAccumulator = Array<ElementAccumulator, kElementsPerAccess>;
-  using FragmentCompute     = Array<ElementCompute, kElementsPerAccess>;
-  using FragmentC           = Array<ElementOutput, kElementsPerAccess>;
-  using FragmentZ           = Array<ElementZ, kElementsPerAccess>;
-  using FragmentT           = Array<ElementT, kElementsPerAccess>;
+  using FragmentAccumulator = cutlass::Array<ElementAccumulator, kElementsPerAccess>;
+  using FragmentCompute     = cutlass::Array<ElementCompute, kElementsPerAccess>;
+  using FragmentC           = cutlass::Array<ElementOutput, kElementsPerAccess>;
+  using FragmentZ           = cutlass::Array<ElementZ, kElementsPerAccess>;
+  using FragmentT           = cutlass::Array<ElementT, kElementsPerAccess>;
 
   /// If true, the 'Z' tensor is stored
   static bool const kStoreZ = StoreZ;
@@ -222,7 +225,7 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
   using OutputOp                    = OutputOp_;
   using Padding                     = Padding_;
 
-  using Layout    = layout::RowMajor;
+  using Layout    = cutlass::layout::RowMajor;
   using LongIndex = typename Layout::LongIndex;
 
   /// The complete warp-level accumulator tile
@@ -235,14 +238,14 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
   using ElementCompute = typename OutputOp::ElementCompute;
 
   /// Compute fragment
-  using FragmentCompute = Array<ElementCompute, OutputTileIterator::Fragment::kElements>;
+  using FragmentCompute = cutlass::Array<ElementCompute, OutputTileIterator::Fragment::kElements>;
 
   /// Thread map used by output tile iterators
   using ThreadMap = typename OutputTileIterator::ThreadMap;
 
   /// Fragment object used to store the broadcast values
   using BroadcastFragment =
-    Array<ElementCompute, ThreadMap::Iterations::kColumn * ThreadMap::kElementsPerAccess>;
+    cutlass::Array<ElementCompute, ThreadMap::Iterations::kColumn * ThreadMap::kElementsPerAccess>;
 
   /// Output element
   using ElementOutput = typename OutputTileIterator::Element;
@@ -262,19 +265,19 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
   /// Const tensor reference to source tensor
   using ConstTensorRef = typename OutputTileIterator::ConstTensorRef;
 
-  /// Array type used to output
+  /// cutlass::Array type used to output
   using OutputAccessType =
-    Array<typename OutputTileIterator::Element, OutputTileIterator::kElementsPerAccess>;
+    cutlass::Array<typename OutputTileIterator::Element, OutputTileIterator::kElementsPerAccess>;
 
-  /// Array type used by output functor
+  /// cutlass::Array type used by output functor
   using AccumulatorAccessType =
-    Array<typename WarpTileIterator::Element, OutputTileIterator::kElementsPerAccess>;
+    cutlass::Array<typename WarpTileIterator::Element, OutputTileIterator::kElementsPerAccess>;
 
-  /// Array type used by output functor
-  using ComputeAccessType = Array<ElementCompute, OutputTileIterator::kElementsPerAccess>;
+  /// cutlass::Array type used by output functor
+  using ComputeAccessType = cutlass::Array<ElementCompute, OutputTileIterator::kElementsPerAccess>;
 
   /// Tensor access type
-  using TensorAccessType = Array<ElementTensor, OutputTileIterator::kElementsPerAccess>;
+  using TensorAccessType = cutlass::Array<ElementTensor, OutputTileIterator::kElementsPerAccess>;
 
   /// Number of warps
   using WarpCount = typename Base::WarpCount;
@@ -316,7 +319,7 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
       const_max(1, (Shape::kN + kThreadCount - 1) / kThreadCount);
 
     /// Shape of the shared memory allocation for the epilogue
-    using StorageShape = MatrixShape<kThreadRows, Shape::kN>;
+    using StorageShape = cutlass::MatrixShape<kThreadRows, Shape::kN>;
 
     /// Debug printing
     CUTLASS_DEVICE
@@ -392,12 +395,12 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
     OutputTileIterator source_iterator,   ///< Tile iterator for source accumulator matrix
     TensorTileIterator
       tensor_iterator,  ///< Threadblock tile iterator for additional tensor operand
-    MatrixCoord const&
+    cutlass::MatrixCoord const&
       problem_size =  ///< Problem size needed to guard against out-of-bounds accesses
-    MatrixCoord(Shape::kM, Shape::kN),
-    MatrixCoord const&
+    cutlass::MatrixCoord(Shape::kM, Shape::kN),
+    cutlass::MatrixCoord const&
       threadblock_offset =  ///< Threadblock's initial offset within the problem size space
-    MatrixCoord())
+    cutlass::MatrixCoord())
   {
     BroadcastFragment broadcast_fragment;
 
@@ -413,9 +416,9 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
     BroadcastFragment&
       broadcast_fragment,  ///< Fragment containing the accumulated partial reduction over columns
     ElementVector const* broadcast_ptr,  ///< Broadcast vector
-    MatrixCoord const&
+    cutlass::MatrixCoord const&
       problem_size,  ///< Problem size needed to guard against out-of-bounds accesses
-    MatrixCoord const&
+    cutlass::MatrixCoord const&
       threadblock_offset  ///< Threadblock's initial offset within the problem size space
   )
   {
@@ -429,10 +432,11 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
     int thread_column_idx = threadblock_offset.column() + thread_initial_column;
     broadcast_ptr += thread_initial_column;
 
-    NumericArrayConverter<ElementCompute, ElementVector, BroadcastDetail::kElementsPerAccess>
-      converter;
-    using AccessType          = AlignedArray<ElementVector, BroadcastDetail::kElementsPerAccess>;
-    using ComputeFragmentType = Array<ElementCompute, BroadcastDetail::kElementsPerAccess>;
+    cutlass::
+      NumericArrayConverter<ElementCompute, ElementVector, BroadcastDetail::kElementsPerAccess>
+        converter;
+    using AccessType = cutlass::AlignedArray<ElementVector, BroadcastDetail::kElementsPerAccess>;
+    using ComputeFragmentType = cutlass::Array<ElementCompute, BroadcastDetail::kElementsPerAccess>;
 
     ComputeFragmentType* frag_ptr = reinterpret_cast<ComputeFragmentType*>(&broadcast_fragment);
 
@@ -622,8 +626,8 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
                               typename OutputTileIterator::Fragment const& frag_C,
                               BroadcastFragment const& frag_Broadcast)
   {
-    using AccessTypeT         = Array<typename TensorTileIterator::OutValT, kElementsPerAccess>;
-    using AccessTypeBroadcast = Array<ElementCompute, kElementsPerAccess>;
+    using AccessTypeT = cutlass::Array<typename TensorTileIterator::OutValT, kElementsPerAccess>;
+    using AccessTypeBroadcast = cutlass::Array<ElementCompute, kElementsPerAccess>;
 
     AccessTypeT* frag_T_ptr = reinterpret_cast<AccessTypeT*>(&frag_T);
 
@@ -663,6 +667,6 @@ class EpilogueWithBroadcastCustom : public EpilogueBase<Shape_,
 
 }  // namespace threadblock
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 ////////////////////////////////////////////////////////////////////////////////

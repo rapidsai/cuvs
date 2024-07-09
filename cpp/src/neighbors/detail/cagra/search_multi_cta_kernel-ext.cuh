@@ -16,15 +16,15 @@
 #pragma once
 
 #include "compute_distance_vpq.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>  // none_cagra_sample_filter
-#include <raft/util/raft_explicit.hpp>       // RAFT_EXPLICIT
+#include <cuvs/neighbors/common.hpp>    // none_cagra_sample_filter
+#include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #include <cuda_fp16.h>
 
 namespace cuvs::neighbors::cagra::detail {
 namespace multi_cta_search {
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 template <unsigned TEAM_SIZE,
           unsigned MAX_DATASET_DIM,

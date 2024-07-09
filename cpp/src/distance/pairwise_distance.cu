@@ -16,8 +16,7 @@
 
 #include "distance.cuh"
 #include <cstdint>
-#include <cuvs/distance/distance_types.hpp>
-#include <cuvs/distance/pairwise_distance.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 
 namespace cuvs::distance {
