@@ -27,14 +27,14 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/distance/distance_types.hpp>
+#include <cuvs/distance/distance.hpp>
 
 #include <cuvs/neighbors/cagra.hpp>
 
 // TODO: Fix these when ivf methods are moved over
 #include "../../ivf_common.cuh"
 #include "../../ivf_pq/ivf_pq_search.cuh"
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 // TODO: This shouldn't be calling spatial/knn apis
 #include "../ann_utils.cuh"

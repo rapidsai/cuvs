@@ -26,7 +26,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 namespace gemm {
 namespace kernel {
 
@@ -95,29 +95,30 @@ struct PairwiseDistanceGemm {
   typedef typename std::
     conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
 
-  using GemmBase = typename DefaultGemmUniversal<ElementA_,
-                                                 LayoutA_,
-                                                 cutlass::ComplexTransform::kNone,
-                                                 kAlignmentA,
-                                                 ElementB_,
-                                                 LayoutB_,
-                                                 cutlass::ComplexTransform::kNone,
-                                                 kAlignmentB,
-                                                 ElementC_,
-                                                 LayoutOutput,
-                                                 ElementAccumulator,
-                                                 OperatorClass,
-                                                 ArchTag,
-                                                 ThreadblockShape,
-                                                 WarpShape,
-                                                 InstructionShape,
-                                                 EpilogueOutputOp,
-                                                 ThreadblockSwizzle,
-                                                 Stages,
-                                                 Operator>::GemmKernel;
+  using GemmBase =
+    typename cutlass::gemm::kernel::DefaultGemmUniversal<ElementA_,
+                                                         LayoutA_,
+                                                         cutlass::ComplexTransform::kNone,
+                                                         kAlignmentA,
+                                                         ElementB_,
+                                                         LayoutB_,
+                                                         cutlass::ComplexTransform::kNone,
+                                                         kAlignmentB,
+                                                         ElementC_,
+                                                         LayoutOutput,
+                                                         ElementAccumulator,
+                                                         OperatorClass,
+                                                         ArchTag,
+                                                         ThreadblockShape,
+                                                         WarpShape,
+                                                         InstructionShape,
+                                                         EpilogueOutputOp,
+                                                         ThreadblockSwizzle,
+                                                         Stages,
+                                                         Operator>::GemmKernel;
 
   // Replace epilogue
-  using Epilogue = typename cutlass::epilogue::threadblock::PairwiseDistanceEpilogue<
+  using Epilogue = typename cuvs::epilogue::threadblock::PairwiseDistanceEpilogue<
     typename GemmBase::Epilogue::Shape,
     typename GemmBase::Epilogue::WarpMmaOperator,
     GemmBase::Epilogue::kPartitionsK,
@@ -129,7 +130,8 @@ struct PairwiseDistanceGemm {
     GemmBase::Epilogue::kElementsPerAccess>::Epilogue;
 
   // Compose the GEMM kernel
-  using GemmKernel = GemmWithFusedEpilogue<typename GemmBase::Mma, Epilogue, ThreadblockSwizzle>;
+  using GemmKernel = cutlass::gemm::kernel::
+    GemmWithFusedEpilogue<typename GemmBase::Mma, Epilogue, ThreadblockSwizzle>;
 };
 
 template <
@@ -194,29 +196,30 @@ struct PairwiseDistanceGemm<double,
   typedef typename std::
     conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
 
-  using GemmBase = typename DefaultGemmUniversal<double,
-                                                 LayoutA_,
-                                                 cutlass::ComplexTransform::kNone,
-                                                 1,
-                                                 double,
-                                                 LayoutB_,
-                                                 cutlass::ComplexTransform::kNone,
-                                                 1,
-                                                 ElementC_,
-                                                 LayoutOutput,
-                                                 ElementAccumulator,
-                                                 OperatorClass,
-                                                 ArchTag,
-                                                 ThreadblockShape,
-                                                 WarpShape,
-                                                 InstructionShape,
-                                                 EpilogueOutputOp,
-                                                 ThreadblockSwizzle,
-                                                 Stages,
-                                                 Operator>::GemmKernel;
+  using GemmBase =
+    typename cutlass::gemm::kernel::DefaultGemmUniversal<double,
+                                                         LayoutA_,
+                                                         cutlass::ComplexTransform::kNone,
+                                                         1,
+                                                         double,
+                                                         LayoutB_,
+                                                         cutlass::ComplexTransform::kNone,
+                                                         1,
+                                                         ElementC_,
+                                                         LayoutOutput,
+                                                         ElementAccumulator,
+                                                         OperatorClass,
+                                                         ArchTag,
+                                                         ThreadblockShape,
+                                                         WarpShape,
+                                                         InstructionShape,
+                                                         EpilogueOutputOp,
+                                                         ThreadblockSwizzle,
+                                                         Stages,
+                                                         Operator>::GemmKernel;
 
   // Replace epilogue
-  using Epilogue = typename cutlass::epilogue::threadblock::PairwiseDistanceEpilogue<
+  using Epilogue = typename cuvs::epilogue::threadblock::PairwiseDistanceEpilogue<
     typename GemmBase::Epilogue::Shape,
     typename GemmBase::Epilogue::WarpMmaOperator,
     GemmBase::Epilogue::kPartitionsK,
@@ -228,11 +231,12 @@ struct PairwiseDistanceGemm<double,
     GemmBase::Epilogue::kElementsPerAccess>::Epilogue;
 
   // Compose the GEMM kernel
-  using GemmKernel = GemmWithFusedEpilogue<typename GemmBase::Mma, Epilogue, ThreadblockSwizzle>;
+  using GemmKernel = cutlass::gemm::kernel::
+    GemmWithFusedEpilogue<typename GemmBase::Mma, Epilogue, ThreadblockSwizzle>;
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 }  // namespace kernel
 }  // namespace gemm
-}  // namespace cutlass
+}  // namespace cuvs

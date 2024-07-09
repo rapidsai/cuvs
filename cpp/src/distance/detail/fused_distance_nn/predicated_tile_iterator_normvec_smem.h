@@ -75,12 +75,15 @@ Changes:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace cutlass {
+namespace cuvs {
 
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace epilogue {
 namespace threadblock {
+
+// TODO (cjnolet): We shouldn't be doing `using namespace` in this file.
+using namespace cutlass::epilogue::threadblock;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -101,12 +104,12 @@ class PredicatedTileIteratorNormVecSmem {
   using Element = Element_;
 
   using Layout         = Layout_;
-  using TensorRef      = TensorRef<Element, Layout>;
+  using TensorRef      = cutlass::TensorRef<Element, Layout>;
   using ConstTensorRef = typename TensorRef::ConstTensorRef;
 
   using Index       = typename Layout::Index;
   using LongIndex   = typename Layout::LongIndex;
-  using TensorCoord = MatrixCoord;
+  using TensorCoord = cutlass::MatrixCoord;
 
   static int const kElementsPerAccess = ThreadMap::kElementsPerAccess;
   static int const kThreads           = ThreadMap::kThreads;
@@ -121,12 +124,13 @@ class PredicatedTileIteratorNormVecSmem {
   static_assert(ThreadMap::Iterations::kCluster > 0, "ThreadMap::Iterations::kCluster must be > 0");
   static_assert(ThreadMap::Iterations::kColumn > 0, "ThreadMap::Iterations::kColumn must be > 0");
 
-  using Fragment = Array<Element,
-                         ThreadMap::Iterations::kRow * ThreadMap::Iterations::kGroup *
-                           ThreadMap::Iterations::kCluster * ThreadMap::kElementsPerAccess>;
+  using Fragment =
+    cutlass::Array<Element,
+                   ThreadMap::Iterations::kRow * ThreadMap::Iterations::kGroup *
+                     ThreadMap::Iterations::kCluster * ThreadMap::kElementsPerAccess>;
 
   /// Memory access size
-  using AccessType = AlignedArray<Element, ThreadMap::kElementsPerAccess>;
+  using AccessType = cutlass::AlignedArray<Element, ThreadMap::kElementsPerAccess>;
 
   //
   // Parameters struct
@@ -189,17 +193,17 @@ class PredicatedTileIteratorNormVecSmem {
     //
     // Type definitions
     //
-    using Shape = MatrixShape<total_rows, 1>;
+    using Shape = cutlass::MatrixShape<total_rows, 1>;
 
     /// Shape of the shared memory allocation
-    using StorageShape = MatrixShape<Shape::kRow, Shape::kColumn>;
+    using StorageShape = cutlass::MatrixShape<Shape::kRow, Shape::kColumn>;
 
     //
     // Data members
     //
     // Methods
     //
-    AlignedBuffer<Element, StorageShape::kCount> storage;
+    cutlass::AlignedBuffer<Element, StorageShape::kCount> storage;
 
     CUTLASS_DEVICE
     Element* data() { return storage.data(); }
@@ -236,7 +240,7 @@ class PredicatedTileIteratorNormVecSmem {
   /// Byte-level pointer
   uint8_t* byte_pointer_;
 
-  /// Array of boolean values to contain steady-state predicates
+  /// cutlass::Array of boolean values to contain steady-state predicates
   Mask mask_;
 
   /// Extent of the matrix tile in rows
@@ -333,7 +337,7 @@ class PredicatedTileIteratorNormVecSmem {
   CUTLASS_HOST_DEVICE
   void add_pointer_offset(LongIndex pointer_offset)
   {
-    byte_pointer_ += pointer_offset * sizeof_bits<Element>::value / 8;
+    byte_pointer_ += pointer_offset * cutlass::sizeof_bits<Element>::value / 8;
   }
 
   /// Loads a fragment from memory
@@ -372,7 +376,10 @@ class PredicatedTileIteratorNormVecSmem {
   void load(Fragment& frag) const { load_with_byte_offset(frag, 0); }
 
   CUTLASS_DEVICE
-  MatrixCoord thread_start() const { return MatrixCoord(thread_start_row_, thread_start_column_); }
+  cutlass::MatrixCoord thread_start() const
+  {
+    return cutlass::MatrixCoord(thread_start_row_, thread_start_column_);
+  }
 
   /// Need to get the thread start row from the tile iterator
   CUTLASS_DEVICE
@@ -443,6 +450,6 @@ class PredicatedTileIteratorNormVecSmem {
 
 }  // namespace threadblock
 }  // namespace epilogue
-}  // namespace cutlass
+}  // namespace cuvs
 
 ////////////////////////////////////////////////////////////////////////////////

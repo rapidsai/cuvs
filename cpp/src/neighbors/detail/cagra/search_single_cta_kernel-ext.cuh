@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include <cuvs/neighbors/sample_filter.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <raft/util/raft_explicit.hpp>  // RAFT_EXPLICIT
 
 #include <cuda_fp16.h>
@@ -23,7 +23,7 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 template <unsigned TEAM_SIZE,
           unsigned MAX_DATASET_DIM,

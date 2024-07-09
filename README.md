@@ -34,21 +34,23 @@ cuVS contains state-of-the-art implementations of several algorithms for running
 
 cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python). Different packages are available for the different languages supported by cuVS:
 
-| Python | C++ | C |
-|--------|-----|---|
-| `pycuvs`| `libcuvs` | `libcuvs_c` |
+| Python | C/C++                       |
+|--------|-----------------------------|
+| `cuvs` | `libcuvs`, `libcuvs-static` |
 
 ### Stable release
 
-It is recommended to use [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) to install the desired packages. The following command will install the Python package. You can substitute `pycuvs` for any of the packages in the table above:
+It is recommended to use [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) to install the desired packages. The following command will install the Python package. You can substitute `cuvs` for any of the packages in the table above:
+
 ```bash
-mamba install -c conda-forge -c nvidia -c rapidsai pycuvs
+mamba install -c conda-forge -c nvidia -c rapidsai cuvs
 ```
 
 ### Nightlies
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
+
 ```bash
-mamba install -c conda-forge -c nvidia -c rapidsai-nightly pycuvs=24.06
+mamba install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.08
 ```
 
 Please see the [Build and Install Guide](docs/source/build.md) for more information on installing cuVS and building from source.
@@ -65,7 +67,7 @@ from cuvs.neighbors import cagra
 dataset = load_data()
 index_params = cagra.IndexParams()
 
-index = cagra.build_index(build_params, dataset)
+index = cagra.build(build_params, dataset)
 ```
 
 ### C++ API

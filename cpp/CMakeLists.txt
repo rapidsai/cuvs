@@ -55,11 +55,13 @@ option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_C_LIBRARY "Build raft C API library" OFF)
 option(BUILD_C_TESTS "Build raft C API tests" OFF)
+option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
-option(CUDA_STATIC_RUNTIME "Statically link the CUDA toolkit runtime and libraries" OFF)
+option(CUDA_STATIC_RUNTIME "Statically link the CUDA runtime" OFF)
+option(CUDA_STATIC_MATH_LIBRARIES "Statically link the CUDA math libraries" OFF)
 option(CUVS_USE_RAFT_STATIC "Build and statically link the RAFT libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
@@ -92,6 +94,7 @@ include(CMakeDependentOption)
 
 message(VERBOSE "cuVS: Build cuVS unit-tests: ${BUILD_TESTS}")
 message(VERBOSE "cuVS: Build CPU only components: ${BUILD_CPU_ONLY}")
+message(VERBOSE "cuVS: Build ANN benchmarks: ${BUILD_ANN_BENCH}")
 message(VERBOSE "cuVS: Enable detection of conda environment for dependencies: ${DETECT_CONDA_ENV}")
 message(VERBOSE "cuVS: Disable depreaction warnings " ${DISABLE_DEPRECATION_WARNINGS})
 message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
@@ -99,7 +102,10 @@ message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELIN
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
 message(VERBOSE
-        "cuVS: Statically link the CUDA toolkit runtime and libraries: ${CUDA_STATIC_RUNTIME}"
+        "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}"
+)
+message(VERBOSE
+        "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}"
 )
 message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
@@ -130,7 +136,7 @@ endif()
 # * compiler options ----------------------------------------------------------
 
 set(_ctk_static_suffix "")
-if(CUDA_STATIC_RUNTIME)
+if(CUDA_STATIC_MATH_LIBRARIES)
   set(_ctk_static_suffix "_static")
 endif()
 
@@ -184,45 +190,66 @@ endif()
 
 include(cmake/thirdparty/get_cutlass.cmake)
 
+if(BUILD_ANN_BENCH)
+  include(${rapids-cmake-dir}/cpm/gbench.cmake)
+  rapids_cpm_gbench(BUILD_STATIC)
+endif()
+
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 
 add_library(
   cuvs SHARED
-  src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
+  src/cluster/kmeans_balanced_fit_float.cu
+  src/cluster/kmeans_fit_float.cu
+  src/cluster/kmeans_auto_find_k_float.cu
+  src/cluster/kmeans_fit_predict_float.cu
+  src/cluster/kmeans_predict_float.cu
+  src/cluster/kmeans_balanced_fit_float.cu
+  src/cluster/kmeans_balanced_fit_predict_float.cu
+  src/cluster/kmeans_balanced_predict_float.cu
+  src/cluster/kmeans_balanced_fit_int8.cu
+  src/cluster/kmeans_balanced_fit_predict_int8.cu
+  src/cluster/kmeans_balanced_predict_int8.cu
+  src/cluster/kmeans_transform_float.cu
+  src/cluster/single_linkage_float.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
-  src/distance/detail/pairwise_matrix/dispatch_rbf.cu
-  src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_rbf.cu
+  src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
-  src/neighbors/brute_force_index.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cu
   src/neighbors/cagra_build_int8.cu
   src/neighbors/cagra_build_uint8.cu
+  src/neighbors/cagra_extend_float.cu
+  src/neighbors/cagra_extend_int8.cu
+  src/neighbors/cagra_extend_uint8.cu
   src/neighbors/cagra_optimize.cu
   src/neighbors/cagra_search_float.cu
   src/neighbors/cagra_search_int8.cu
@@ -230,6 +257,7 @@ add_library(
   src/neighbors/cagra_serialize_float.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
+  src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim256_t16_8pq_2subd_half.cu
@@ -374,23 +402,17 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
-  src/neighbors/detail/refine_host_float_float.cpp
-  src/neighbors/detail/refine_host_half_float.cpp
-  src/neighbors/detail/refine_host_int8_t_float.cpp
-  src/neighbors/detail/refine_host_uint8_t_float.cpp
   src/neighbors/ivf_flat_index.cpp
-  src/neighbors/ivf_flat/ivf_flat_build_float_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_build_int8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_build_uint8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_extend_float_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_extend_int8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_extend_uint8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cpp
-  src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cpp
+  src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_helpers.cu
+  src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
+  src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
   src/neighbors/ivf_pq_index.cpp
   src/neighbors/ivf_pq/ivf_pq_build_common.cu
   src/neighbors/ivf_pq/ivf_pq_serialize.cu
@@ -418,10 +440,22 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
+  src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
+  src/neighbors/refine/detail/refine_device_float_float.cu
+  src/neighbors/refine/detail/refine_device_half_float.cu
+  src/neighbors/refine/detail/refine_device_int8_t_float.cu
+  src/neighbors/refine/detail/refine_device_uint8_t_float.cu
+  src/neighbors/refine/detail/refine_host_float_float.cpp
+  src/neighbors/refine/detail/refine_host_half_float.cpp
+  src/neighbors/refine/detail/refine_host_int8_t_float.cpp
+  src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_uint32_t.cu
+  src/selection/select_k_half_uint32_t.cu
 )
 
 target_compile_options(
@@ -436,14 +470,28 @@ target_include_directories(
               "$<INSTALL_INTERFACE:include>"
 )
 
+rapids_find_package(
+  OpenMP REQUIRED
+  BUILD_EXPORT_SET cuvs-exports
+  INSTALL_EXPORT_SET cuvs-exports
+)
+
 if(NOT BUILD_CPU_ONLY)
+
+  set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
+  set(CUVS_CUBLAS_DEPENDENCY CUDA::cublas${_ctk_static_suffix})
+  set(CUVS_CURAND_DEPENDENCY CUDA::curand${_ctk_static_suffix})
+  set(CUVS_CUSPARSE_DEPENDENCY CUDA::cusparse${_ctk_static_suffix})
+
+  set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
+                                 ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
+  )
+
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
-    PUBLIC rmm::rmm $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::raft>
-           $<$<NOT:$<BOOL:${CUDA_STATIC_RUNTIME}>>:raft::compiled>
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
-            $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::compiled_static> nvidia::cutlass::cutlass
+    PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
@@ -520,8 +568,14 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 # * cuvs_c -------------------------------------------------------------------------------
 if(BUILD_C_LIBRARY)
   add_library(
-    cuvs_c SHARED src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-                  src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp
+    cuvs_c SHARED
+    src/core/c_api.cpp
+    src/neighbors/brute_force_c.cpp
+    src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp
+    src/neighbors/cagra_c.cpp
+    src/neighbors/refine/refine_c.cpp
+    src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
@@ -547,8 +601,8 @@ if(BUILD_C_LIBRARY)
 
   target_link_libraries(
     cuvs_c
-    PUBLIC cuvs::cuvs
-    PRIVATE $<$<BOOL:${CUDA_STATIC_RUNTIME}>:raft::raft>
+    PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE raft::raft
   )
 
   # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -622,4 +676,11 @@ rapids_export(
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(internal/CMakeLists.txt)
   include(test/CMakeLists.txt)
+endif()
+
+# ##################################################################################################
+# * build ann benchmark executable -----------------------------------------------
+
+if(BUILD_ANN_BENCH)
+  include(bench/ann/CMakeLists.txt)
 endif()

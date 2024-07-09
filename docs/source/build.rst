@@ -50,7 +50,7 @@ C Package
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs_c cuda-version=12.0
+    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.0
 
 Python Package
 ~~~~~~~~~~~~~~
@@ -217,6 +217,11 @@ cuVS has the following configurable cmake flags available:
    - ON, OFF
    - OFF
    - Statically link the CUDA runtime
+
+ * - CUDA_STATIC_MATH_LIBRARIES
+   - ON, OFF
+   - OFF
+   - Statically link the CUDA math libraries
 
  * - DETECT_CONDA_ENV
    - ON, OFF

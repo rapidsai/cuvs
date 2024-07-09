@@ -66,7 +66,7 @@ void _search(cuvsResources_t res,
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
 
   cuvs::neighbors::brute_force::search(
-    *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+    *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds, std::nullopt);
 }
 
 }  // namespace

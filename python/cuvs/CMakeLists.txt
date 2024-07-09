@@ -67,6 +67,7 @@ if(NOT cuvs_FOUND)
 
   # Statically link dependencies if building wheels
   set(CUDA_STATIC_RUNTIME ON)
+  set(CUDA_STATIC_MATH_LIBRARIES ON)
   set(CUVS_USE_RAFT_STATIC ON)
 
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
@@ -81,6 +82,7 @@ endif()
 rapids_cython_init()
 
 add_subdirectory(cuvs/common)
+add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
 
 if(DEFINED cython_lib_dir)
