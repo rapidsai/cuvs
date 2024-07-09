@@ -337,7 +337,6 @@ void build_clusters(const raft::resources& handle,
  *                            centers and sizes using the weighted average principle.
  * @param[in]  mapping_op     (optional) Functor to convert from the input datatype to the
  *                            arithmetic datatype. If DataT == MathT, this must be the identity.
- * @param[in]  X_norm        (optional) Dataset's row norms [dim = n_samples]
  */
 template <typename DataT,
           typename MathT,

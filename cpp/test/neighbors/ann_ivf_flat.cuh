@@ -275,13 +275,13 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       raft::linalg::map(
         handle_,
         database_float.view(),
-        [] __device__(DataT val) { return static_cast<float>(val); },
+        cuvs::spatial::knn::detail::utils::mapping<float>{},
         database_view);
 
       raft::linalg::map(
         handle_,
         search_queries_float.view(),
-        [] __device__(DataT val) { return static_cast<float>(val); },
+        cuvs::spatial::knn::detail::utils::mapping<float>{},
         search_queries_view);
       auto indices_out_view =
         raft::make_device_matrix_view<IdxT, IdxT>(indices_naive_dev.data(), ps.num_queries, ps.k);

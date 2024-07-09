@@ -1194,6 +1194,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            inner_prod_dist<Veclen, T, AccT>,
                            raft::identity_op>({}, {}, std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::CosineExpanded:
+      // NB: "Ascending" is reversed because the post-processing step is done after that sort
       return launch_kernel<Capacity,
                            Veclen,
                            !Ascending,

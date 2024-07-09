@@ -163,37 +163,6 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   }
 }
 
-template <typename InType,
-          typename OutType,
-          typename LayoutPolicy,
-          typename IndexType,
-          typename Lambda = raft::identity_op>
-void myl2rownorm(raft::resources const& handle,
-                 raft::device_matrix_view<const InType, IndexType, LayoutPolicy> in,
-                 raft::device_vector_view<OutType, IndexType> out,
-                 raft::linalg::NormType type,
-                 raft::linalg::Apply apply,
-                 Lambda fin_op = raft::identity_op())
-{
-  // Created to support two different data types for input and output
-  // To be replaced with raft::linalg::rowNorm once it supports different data types
-  auto constexpr row_major = std::is_same_v<LayoutPolicy, raft::row_major>;
-  RAFT_EXPECTS(static_cast<IndexType>(out.size()) == in.extent(0),
-               "Output should be equal to number of rows in Input");
-
-  raft::linalg::reduce(out.data_handle(),
-                       in.data_handle(),
-                       in.extent(1),
-                       in.extent(0),
-                       (OutType)0,
-                       row_major,
-                       apply == raft::linalg::Apply::ALONG_ROWS,
-                       raft::resource::get_cuda_stream(handle),
-                       false,
-                       raft::sq_op(),
-                       raft::add_op(),
-                       fin_op);
-}
 /** See raft::neighbors::ivf_flat::extend docs */
 template <typename T, typename IdxT>
 void extend(raft::resources const& handle,
@@ -239,7 +208,6 @@ void extend(raft::resources const& handle,
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
     auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
       new_labels.data_handle() + batch.offset(), batch.size());
-
     cuvs::cluster::kmeans_balanced::predict(handle,
                                             kmeans_params,
                                             batch_data_view,
