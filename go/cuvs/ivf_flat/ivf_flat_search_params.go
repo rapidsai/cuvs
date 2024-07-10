@@ -34,6 +34,8 @@ func CreateSearchParams(n_probes uint32) (*SearchParams, error) {
 		return nil, err
 	}
 
+	params.n_probes = C.uint32_t(n_probes)
+
 	return &SearchParams{params: params}, nil
 }
 
