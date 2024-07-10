@@ -15,7 +15,7 @@ import (
 )
 
 type SearchParams struct {
-	params C.cuvsIvfFlatSearchParams_t
+	params C.cuvsIvfPqSearchParams_t
 }
 
 func CreateSearchParams(n_probes uint32, lut_dtype string, internal_distance_dtype string) (*SearchParams, error) {
@@ -74,7 +74,7 @@ func CreateSearchParams(n_probes uint32, lut_dtype string, internal_distance_dty
 }
 
 func (p *SearchParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatSearchParamsDestroy(p.params)))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfPqSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

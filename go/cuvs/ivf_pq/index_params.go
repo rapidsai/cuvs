@@ -15,7 +15,7 @@ import (
 )
 
 type IndexParams struct {
-	params C.cuvsIvfFlatIndexParams_t
+	params C.cuvsIvfPqIndexParams_t
 }
 
 func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, kmeans_n_iters uint32, kmeans_trainset_fraction float64, pq_bits uint32, pq_dim uint32, codebook_kind string, force_random_rotation bool, add_data_on_build bool) (*IndexParams, error) {
@@ -43,7 +43,7 @@ func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, kmeans
 		return nil, errors.New("unsupported metric")
 	}
 
-	CCodebookKind := C.codebook_gen(0)
+	CCodebookKind := C.PER_SUBSPACE
 	switch codebook_kind {
 	case "subspace":
 		CCodebookKind = C.PER_SUBSPACE
@@ -60,7 +60,7 @@ func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, kmeans
 	params.kmeans_trainset_fraction = C.double(kmeans_trainset_fraction)
 	params.pq_bits = C.uint32_t(pq_bits)
 	params.pq_dim = C.uint32_t(pq_dim)
-	params.codebook_kind = C.codebook_gen(CCodebookKind)
+	params.codebook_kind = uint32(CCodebookKind)
 	if add_data_on_build {
 		params.add_data_on_build = C._Bool(true)
 	} else {

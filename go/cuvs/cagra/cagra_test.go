@@ -1,4 +1,4 @@
-package ivf_pq
+package cagra
 
 import (
 	"math/rand"
@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-func TestIvfPq(t *testing.T) {
+func TestCagra(t *testing.T) {
 
 	resource, _ := common.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
-	NDataPoints := 1024
+	NDataPoints := 256
 	NFeatures := 16
 
 	TestDataset := make([][]float32, NDataPoints)
@@ -26,7 +26,9 @@ func TestIvfPq(t *testing.T) {
 
 	dataset, _ := common.NewTensor(true, TestDataset)
 
-	IndexParams, err := CreateIndexParams(2, "L2Expanded", 2.0, 10, 0.3, 8, 4, "subspace", false, true)
+	CompressionParams, err := CreateCompressionParams(8, 4, 8, 10, 0.3, 0.3)
+
+	IndexParams, err := CreateIndexParams(5, 5, "nn_descent", 10, CompressionParams)
 
 	if err != nil {
 		panic(err)
@@ -40,9 +42,9 @@ func TestIvfPq(t *testing.T) {
 	NQueries := 4
 	K := 4
 	queries, _ := common.NewTensor(true, TestDataset[:NQueries])
-	NeighborsDataset := make([][]int64, NQueries)
+	NeighborsDataset := make([][]uint32, NQueries)
 	for i := range NeighborsDataset {
-		NeighborsDataset[i] = make([]int64, K)
+		NeighborsDataset[i] = make([]uint32, K)
 	}
 	DistancesDataset := make([][]float32, NQueries)
 	for i := range DistancesDataset {
@@ -50,6 +52,7 @@ func TestIvfPq(t *testing.T) {
 	}
 	neighbors, _ := common.NewTensor(true, NeighborsDataset)
 	distances, _ := common.NewTensor(true, DistancesDataset)
+	println("hello")
 
 	_, todeviceerr := neighbors.ToDevice(&resource)
 	if todeviceerr != nil {
@@ -67,7 +70,7 @@ func TestIvfPq(t *testing.T) {
 
 	queries.ToDevice(&resource)
 
-	SearchParams, err := CreateSearchParams(10, "uint8", "float32")
+	SearchParams, err := CreateSearchParams(0, 5, 0, "single_cta", 16, 5, 0, "auto", 16, 0.5, 3, 234)
 
 	if err != nil {
 		panic(err)
@@ -87,7 +90,7 @@ func TestIvfPq(t *testing.T) {
 	arr, _ := neighbors.GetArray()
 	for i := range arr {
 		println(arr[i][0])
-		if arr[i][0] != int64(i) {
+		if arr[i][0] != uint32(i) {
 			t.Error("wrong neighbor, expected", i, "got", arr[i][0])
 		}
 	}

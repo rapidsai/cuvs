@@ -63,6 +63,12 @@ func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 			lanes: C.ushort(1),
 			code:  C.kDLInt,
 		}
+	case uint32:
+		dtype = C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLUInt,
+		}
 	case float32:
 		dtype = C.DLDataType{
 			bits:  C.uchar(32),
