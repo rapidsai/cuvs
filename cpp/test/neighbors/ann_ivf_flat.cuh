@@ -254,124 +254,6 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
     }
   }
 
-  void testIVFFlatCosine()
-  {
-    size_t queries_size = ps.num_queries * ps.k;
-    std::vector<IdxT> indices_ivfflat(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
-    std::vector<T> distances_ivfflat(queries_size);
-    std::vector<T> distances_naive(queries_size);
-
-    {
-      rmm::device_uvector<T> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-      auto database_view = raft::make_device_matrix_view<const DataT, IdxT>(
-        (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
-      auto database_float = raft::make_device_matrix<float, IdxT>(handle_, ps.num_db_vecs, ps.dim);
-      auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
-        search_queries.data(), ps.num_queries, ps.dim);
-      auto search_queries_float =
-        raft::make_device_matrix<float, IdxT>(handle_, ps.num_queries, ps.dim);
-      raft::linalg::map(
-        handle_,
-        database_float.view(),
-        cuvs::spatial::knn::detail::utils::mapping<float>{},
-        database_view);
-
-      raft::linalg::map(
-        handle_,
-        search_queries_float.view(),
-        cuvs::spatial::knn::detail::utils::mapping<float>{},
-        search_queries_view);
-      auto indices_out_view =
-        raft::make_device_matrix_view<IdxT, IdxT>(indices_naive_dev.data(), ps.num_queries, ps.k);
-      auto dists_out_view =
-        raft::make_device_matrix_view<T, IdxT>(distances_naive_dev.data(), ps.num_queries, ps.k);
-      auto bfi = cuvs::neighbors::brute_force::build(
-        handle_, raft::make_const_mdspan(database_float.view()), ps.metric);
-      cuvs::neighbors::brute_force::search(handle_,
-                                           bfi,
-                                           raft::make_const_mdspan(search_queries_float.view()),
-                                           indices_out_view,
-                                           dists_out_view,
-                                           std::nullopt);
-
-      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
-      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
-      raft::resource::sync_stream(handle_);
-    }
-    {
-      // unless something is really wrong with clustering, this could serve as a lower bound on
-      // recall
-      double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
-
-      rmm::device_uvector<T> distances_ivfflat_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_ivfflat_dev(queries_size, stream_);
-
-      {
-        ivf_flat::index_params index_params;
-        ivf_flat::search_params search_params;
-        index_params.n_lists          = ps.nlist;
-        index_params.metric           = ps.metric;
-        index_params.adaptive_centers = ps.adaptive_centers;
-        search_params.n_probes        = ps.nprobe;
-
-        index_params.add_data_on_build        = true;
-        index_params.kmeans_trainset_fraction = 0.5;
-        index_params.metric_arg               = 0;
-
-        ivf_flat::index<DataT, IdxT> idx(handle_, index_params, ps.dim);
-
-        IdxT half_of_data   = ps.num_db_vecs / 2;
-        auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
-        thrust::sequence(
-          raft::resource::get_thrust_policy(handle_),
-          thrust::device_pointer_cast(vector_indices.data_handle()),
-          thrust::device_pointer_cast(vector_indices.data_handle() + ps.num_db_vecs));
-        raft::resource::sync_stream(handle_);
-
-        auto database_view_half =
-          raft::make_device_matrix_view<const DataT, IdxT>(database.data(), half_of_data, ps.dim);
-        auto database_view_other_half = raft::make_device_matrix_view<const DataT, IdxT>(
-          database.data() + half_of_data * ps.dim, IdxT(ps.num_db_vecs) - half_of_data, ps.dim);
-
-        auto new_half_of_data_indices_view = raft::make_device_vector_view<const IdxT, IdxT>(
-          vector_indices.data_handle() + half_of_data, IdxT(ps.num_db_vecs) - half_of_data);
-
-        idx = ivf_flat::build(handle_, index_params, database_view_half);
-        cuvs::neighbors::ivf_flat::extend(
-          handle_,
-          database_view_other_half,
-          std::make_optional<raft::device_vector_view<const IdxT, IdxT>>(
-            new_half_of_data_indices_view),
-          &idx);
-
-        auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
-          search_queries.data(), ps.num_queries, ps.dim);
-        auto indices_out_view = raft::make_device_matrix_view<IdxT, IdxT>(
-          indices_ivfflat_dev.data(), ps.num_queries, ps.k);
-        auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
-          distances_ivfflat_dev.data(), ps.num_queries, ps.k);
-        ivf_flat::search(
-          handle_, search_params, idx, search_queries_view, indices_out_view, dists_out_view);
-
-        raft::update_host(
-          distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
-        raft::update_host(
-          indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
-      }
-      ASSERT_TRUE(eval_neighbours(indices_naive,
-                                  indices_ivfflat,
-                                  distances_naive,
-                                  distances_ivfflat,
-                                  ps.num_queries,
-                                  ps.k,
-                                  0.001,
-                                  min_recall));
-    }
-  }
-
   void testPacker()
   {
     ivf_flat::index_params index_params;
@@ -638,45 +520,39 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   rmm::device_uvector<DataT> search_queries;
 };
 
-const std::vector<AnnIvfFlatInputs<int64_t>> inputs_cosine = {
-  // test various dims (aligned and not aligned to vector sizes)
-  {3, 20, 1024, 3, 3, 4, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-
-  // test dims that do not fit into kernel shared memory limits
-  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true}};
-
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // test various dims (aligned and not aligned to vector sizes)
   {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
 
   // test dims that do not fit into kernel shared memory limits
   {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
 
   // various random combinations
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
@@ -686,12 +562,14 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {3, 20, 1024, 3, 3, 4, cuvs::distance::DistanceType::CosineExpanded, false},
 
   // host input data
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {100, 1000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
@@ -710,6 +588,7 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
   {1000000, 1024, 32, 10, 256, 256, cuvs::distance::DistanceType::InnerProduct, false},
   {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, true},
+  {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, true},
 
   // test radix_sort for getting the cluster selection
   {1000,

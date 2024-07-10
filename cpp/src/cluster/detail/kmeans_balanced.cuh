@@ -143,26 +143,16 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       break;
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
-      rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
+      auto workspace = raft::make_device_mdarray<char, IdxT>(
+        handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
 
-      MathT alpha = -1.0;
-      MathT beta  = 0.0;
-
-      raft::linalg::gemm(handle,
-                         true,
-                         false,
-                         n_clusters,
-                         n_rows,
-                         dim,
-                         &alpha,
-                         centers,
-                         dim,
-                         dataset,
-                         dim,
-                         &beta,
-                         distances.data(),
-                         n_clusters,
-                         stream);
+      auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
+        handle, mr, raft::make_extents<IdxT>(n_rows));
+      raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
+      thrust::fill(raft::resource::get_thrust_policy(handle),
+                   minClusterAndDistance.data_handle(),
+                   minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
+                   initial_value);
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
@@ -175,21 +165,28 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                                          stream,
                                          raft::sqrt_op{});
 
-      const auto* index_center_norm_ptr = centroidsNorm.data_handle();
-      raft::linalg::map_offset(
-        handle,
-        raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
-          distances.data(), n_rows, n_clusters),
-        [=] __device__(const uint32_t idx, const float dist) {
-          const auto query   = idx / n_clusters;
-          const auto cluster = idx % n_clusters;
-          return dist / (dataset_norm[query] * index_center_norm_ptr[cluster]);
-        },
-        raft::make_device_matrix_view<const MathT, IdxT>(distances.data(), n_rows, n_clusters));
-      auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
-        distances.data(), n_rows, n_clusters);
-      auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
-      raft::matrix::argmin(handle, distances_const_view, labels_view);
+      cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+        minClusterAndDistance.data_handle(),
+        dataset,
+        centers,
+        dataset_norm,
+        centroidsNorm.data_handle(),
+        n_rows,
+        n_clusters,
+        dim,
+        (void*)workspace.data_handle(),
+        false,
+        false,
+        true,
+        params.metric,
+        0.0f,
+        stream);
+      // Copy keys to output labels
+      thrust::transform(raft::resource::get_thrust_policy(handle),
+                        minClusterAndDistance.data_handle(),
+                        minClusterAndDistance.data_handle() + n_rows,
+                        labels,
+                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
     case cuvs::distance::DistanceType::InnerProduct: {
@@ -214,14 +211,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                          distances.data(),
                          n_clusters,
                          stream);
-      if (dataset_norm) {
-        raft::linalg::binary_div_skip_zero(
-          handle,
-          raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
-            distances.data(), n_rows, n_clusters),
-          raft::make_device_vector_view<const MathT, IdxT>(dataset_norm, n_rows),
-          raft::linalg::Apply::ALONG_COLUMNS);
-      }
 
       auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
         distances.data(), n_rows, n_clusters);
