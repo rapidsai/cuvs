@@ -91,16 +91,8 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
-    NAME
-    NEIGHBORS_TEST
-    PATH
-    test/neighbors/brute_force.cu
-    test/neighbors/brute_force_prefiltered.cu
-    test/neighbors/refine.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu
+    test/neighbors/brute_force_prefiltered.cu test/neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -159,6 +151,8 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+
+  ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH test/neighbors/ball_cover.cu GPUS 1 PERCENT 100)
 
   ConfigureTest(
     NAME

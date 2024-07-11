@@ -107,7 +107,7 @@ struct index_params : cuvs::neighbors::index_params {
    *   // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
    *   ivf_pq::index_params index_params =
-   *     ivf_pq::index_params::from_dataset(dataset.extents(), raft::distance::InnerProduct);
+   *     ivf_pq::index_params::from_dataset(dataset.extents(), cuvs::distance::InnerProduct);
    *   // modify/update index_params as needed
    *   index_params.add_data_on_build = true;
    * @endcode
