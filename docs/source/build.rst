@@ -218,6 +218,11 @@ cuVS has the following configurable cmake flags available:
    - OFF
    - Statically link the CUDA runtime
 
+ * - CUDA_STATIC_MATH_LIBRARIES
+   - ON, OFF
+   - OFF
+   - Statically link the CUDA math libraries
+
  * - DETECT_CONDA_ENV
    - ON, OFF
    - ON
