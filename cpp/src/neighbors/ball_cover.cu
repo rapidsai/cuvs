@@ -29,7 +29,7 @@ void all_knn_query(raft::resources const& handle,
                    cuvs::neighbors::ball_cover::index<int64_t, float, int64_t, int64_t>& index,
                    raft::device_matrix_view<int64_t, int64_t, raft::row_major> inds,
                    raft::device_matrix_view<float, int64_t, raft::row_major> dists,
-                   int64_t k,
+                   int k,
                    bool perform_post_filtering,
                    float weight)
 {
@@ -65,7 +65,7 @@ void knn_query(raft::resources const& handle,
                raft::device_matrix_view<const float, int64_t, raft::row_major> query,
                raft::device_matrix_view<int64_t, int64_t, raft::row_major> inds,
                raft::device_matrix_view<float, int64_t, raft::row_major> dists,
-               int64_t k,
+               int k,
                bool perform_post_filtering,
                float weight)
 {
