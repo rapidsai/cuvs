@@ -644,14 +644,14 @@ void compute_landmark_dists(
   RAFT_EXPECTS(n_query_pts * static_cast<size_t>(index.n_landmarks) <
                  static_cast<size_t>(std::numeric_limits<int>::max()),
                "Too large input for pairwise_distance with `int` index.");
-  cuvs::distance::pairwise_distance<value_t, int>(handle,
-                                                  query_pts,
-                                                  index.get_R().data_handle(),
-                                                  R_dists,
-                                                  n_query_pts,
-                                                  index.n_landmarks,
-                                                  index.n,
-                                                  index.get_metric());
+  cuvs::distance::pairwise_distance(handle,
+                                    query_pts,
+                                    index.get_R().data_handle(),
+                                    R_dists,
+                                    n_query_pts,
+                                    index.n_landmarks,
+                                    index.n,
+                                    index.get_metric());
 }
 
 /**

@@ -29,7 +29,7 @@ static_assert(!isPowerOf2(3333), "isPowerOf2");
 template <typename T>
 constexpr __host__ __device__ T nextHighestPowerOf2(T v)
 {
-  return (isPowerOf2(v) ? (T)2 * v : ((T)1 << (log2(v) + (T)1)));
+  return (isPowerOf2(v) ? (T)2 * v : ((T)1 << (raft::log2(v) + (T)1)));
 }
 
 static_assert(nextHighestPowerOf2(1) == 2, "nextHighestPowerOf2");

@@ -126,7 +126,7 @@ struct BlockSelect {
       warpV[i] = initV;
     }
 
-    warpFence();
+    raft::warpFence();
   }
 
   __device__ inline void addThreadQ(K k, V v)
@@ -160,7 +160,7 @@ struct BlockSelect {
       return;
     }
 
-    // This has a trailing warpFence
+    // This has a trailing raft::warpFence
     mergeWarpQ();
 
     // Any top-k elements have been merged into the warp queue; we're
@@ -176,7 +176,7 @@ struct BlockSelect {
     // We have to beat at least this element
     warpKTop = warpK[kMinus1];
 
-    warpFence();
+    raft::warpFence();
   }
 
   /// This function handles sorting and merging together the
@@ -199,7 +199,7 @@ struct BlockSelect {
       warpVRegisters[i] = warpV[i * raft::WarpSize + laneId];
     }
 
-    warpFence();
+    raft::warpFence();
 
     // The warp queue is already sorted, and now that we've sorted the
     // per-thread queue, merge both sorted lists together, producing
@@ -214,7 +214,7 @@ struct BlockSelect {
       warpV[i * raft::WarpSize + laneId] = warpVRegisters[i];
     }
 
-    warpFence();
+    raft::warpFence();
   }
 
   /// WARNING: all threads in a warp must participate in this.
@@ -300,12 +300,12 @@ struct BlockSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
   __device__ inline void reduce()
   {
     // Reduce within the warp
-    KeyValuePair<K, V> pair(threadK, threadV);
+    raft::KeyValuePair<K, V> pair(threadK, threadV);
 
     if (Dir) {
-      pair = warpReduce(pair, max_op{});
+      pair = raft::warpReduce(pair, raft::max_op{});
     } else {
-      pair = warpReduce(pair, min_op{});
+      pair = raft::warpReduce(pair, raft::min_op{});
     }
 
     // Each warp writes out a single value
@@ -540,12 +540,12 @@ struct WarpSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
   __device__ inline void reduce()
   {
     // Reduce within the warp
-    KeyValuePair<K, V> pair(threadK, threadV);
+    raft::KeyValuePair<K, V> pair(threadK, threadV);
 
     if (Dir) {
-      pair = warpReduce(pair, max_op{});
+      pair = raft::warpReduce(pair, raft::max_op{});
     } else {
-      pair = warpReduce(pair, min_op{});
+      pair = raft::warpReduce(pair, raft::min_op{});
     }
 
     threadK = pair.key;

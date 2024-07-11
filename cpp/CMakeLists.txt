@@ -456,8 +456,7 @@ add_library(
 )
 
 target_compile_options(
-  cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
-                 --expt-relaxed-constexpr>
+  cuvs PUBLIC $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda --expt-relaxed-constexpr>
 )
 
 add_library(cuvs::cuvs ALIAS cuvs)
