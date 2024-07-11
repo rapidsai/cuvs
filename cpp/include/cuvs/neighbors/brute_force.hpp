@@ -257,44 +257,6 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
 /**
- * @defgroup bruteforce_cpp_index_search Bruteforce index search
- * @{
- */
-/**
- * @brief Search ANN using the constructed index.
- *
- * See the [brute_force::build](#brute_force::build) documentation for a usage example.
- *
- * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
- * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
- * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`:
- * @code{.cpp}
- *   ...
- *   // Use the same allocator across multiple searches to reduce the number of
- *   // cuda memory allocations
- *   brute_force::search(handle, index, queries1, out_inds1, out_dists1);
- *   brute_force::search(handle, index, queries2, out_inds2, out_dists2);
- *   brute_force::search(handle, index, queries3, out_inds3, out_dists3);
- *   ...
- * @endcode
- *
- * @param[in] handle
- * @param[in] index bruteforce constructed index
- * @param[in] queries a device pointer to a col-major matrix [n_queries, index->dim()]
- * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
- * [n_queries, k]
- * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter a optional device bitmap filter function that greenlights samples for a
- * given query
- */
-void search(raft::resources const& handle,
-            const cuvs::neighbors::brute_force::index<float>& index,
-            raft::device_matrix_view<const float, int64_t, raft::col_major> queries,
-            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
-/**
  * @}
  */
 
