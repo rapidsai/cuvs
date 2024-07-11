@@ -322,6 +322,26 @@ cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup ivf_flat_c_index_extend IVF-Flat index extend
+ * @{
+ */
+/**
+ * @brief Extend the index with the new data.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] new_vectors DLManagedTensor* the new vectors to add to the index
+ * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors
+ * @param[inout] index IVF-Flat index to be extended
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+                              DLManagedTensor* new_vectors,
+                              DLManagedTensor* new_indices,
+                              cuvsIvfFlatIndex_t index);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

@@ -106,6 +106,23 @@ void* _deserialize(cuvsResources_t res, const char* filename)
   cuvs::neighbors::ivf_pq::deserialize(*res_ptr, std::string(filename), index);
   return index;
 }
+
+template <typename IdxT>
+void _extend(cuvsResources_t res,
+             DLManagedTensor* new_vectors,
+             DLManagedTensor* new_indices,
+             cuvsIvfPqIndex index)
+{
+  auto res_ptr              = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr            = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  using vectors_mdspan_type = raft::device_matrix_view<float const, IdxT, raft::row_major>;
+  using indices_mdspan_type = raft::device_vector_view<IdxT, IdxT>;
+
+  auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
+  auto indices_mds = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+
+  cuvs::neighbors::ivf_pq::extend(*res_ptr, vectors_mds, indices_mds, *index_ptr);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
@@ -234,4 +251,21 @@ extern "C" cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res,
                                           cuvsIvfPqIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] { _serialize<int64_t>(res, filename, *index); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                                       DLManagedTensor* new_vectors,
+                                       DLManagedTensor* new_indices,
+                                       cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto vectors = new_vectors->dl_tensor;
+    if ((vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) ||
+        (vectors.dtype.code == kDLInt && vectors.dtype.bits == 8) ||
+        (vectors.dtype.code == kDLUInt && vectors.dtype.bits == 8)) {
+      _extend<int64_t>(res, new_vectors, new_indices, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", vectors.dtype.code, vectors.dtype.bits);
+    }
+  });
 }
