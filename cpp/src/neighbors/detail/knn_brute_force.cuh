@@ -513,11 +513,11 @@ void brute_force_knn_impl(
   if (translations == nullptr) delete id_ranges;
 };
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename QueryLayoutT = raft::row_major>
 void brute_force_search(
   raft::resources const& res,
   const cuvs::neighbors::brute_force::index<T>& idx,
-  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<const T, int64_t, QueryLayoutT> queries,
   raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
   raft::device_matrix_view<T, int64_t, raft::row_major> distances,
   std::optional<raft::device_vector_view<const T, int64_t>> query_norms = std::nullopt)
@@ -544,7 +544,7 @@ void brute_force_search(
                                          distances.data_handle(),
                                          k,
                                          true,
-                                         true,
+                                         std::is_same_v<QueryLayoutT, raft::row_major>,
                                          nullptr,
                                          idx.metric(),
                                          idx.metric_arg(),
@@ -719,28 +719,17 @@ void brute_force_search_filtered(
   return;
 }
 
-template <typename T>
+template <typename T, typename LayoutT = raft::row_major>
 cuvs::neighbors::brute_force::index<T> build(
   raft::resources const& res,
-  raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
+  raft::device_matrix_view<const T, int64_t, LayoutT> dataset,
   cuvs::distance::DistanceType metric,
   T metric_arg)
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time
   std::optional<raft::device_vector<T, int64_t>> norms;
-  auto dataset_storage = std::optional<raft::device_matrix<T, int64_t>>{};
-  auto dataset_view    = [&res, &dataset_storage, dataset]() {
-    if constexpr (std::is_same_v<decltype(dataset),
-                                 raft::device_matrix_view<const T, int64_t, raft::row_major>>) {
-      return dataset;
-    } else {
-      dataset_storage =
-        raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
-      raft::copy(res, dataset_storage->view(), dataset);
-      return raft::make_const_mdspan(dataset_storage->view());
-    }
-  }();
+
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
@@ -748,14 +737,14 @@ cuvs::neighbors::brute_force::index<T> build(
     // cosine needs the l2norm, where as l2 distances needs the squared norm
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       raft::linalg::norm(res,
-                         dataset_view,
+                         dataset,
                          norms->view(),
                          raft::linalg::NormType::L2Norm,
                          raft::linalg::Apply::ALONG_ROWS,
                          raft::sqrt_op{});
     } else {
       raft::linalg::norm(res,
-                         dataset_view,
+                         dataset,
                          norms->view(),
                          raft::linalg::NormType::L2Norm,
                          raft::linalg::Apply::ALONG_ROWS);
