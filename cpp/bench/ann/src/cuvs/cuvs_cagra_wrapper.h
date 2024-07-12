@@ -273,7 +273,11 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::cagra::serialize(handle_, file, *index_);
+  using ds_idx_type = decltype(index_->data().n_rows());
+  bool is_vpq =
+    dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
+    dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
+  cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
 }
 
 template <typename T, typename IdxT>
