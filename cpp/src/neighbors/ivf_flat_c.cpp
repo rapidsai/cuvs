@@ -115,7 +115,7 @@ void _extend(cuvsResources_t res,
   auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
   auto indices_mds = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
 
-  cuvs::neighbors::ivf_flat::extend(*res_ptr, vectors_mds, indices_mds, *index_ptr);
+  cuvs::neighbors::ivf_flat::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
 }
 }  // namespace
 
