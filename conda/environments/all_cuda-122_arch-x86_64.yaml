@@ -12,7 +12,7 @@ dependencies:
 - clang
 - clang-tools=16.0.6
 - clang==16.0.6
-- cmake>=3.26.4
+- cmake>=3.26.4,!=3.30.0
 - cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
@@ -37,6 +37,7 @@ dependencies:
 - ninja
 - numpy>=1.23,<2.0a0
 - numpydoc
+- openblas
 - pre-commit
 - pydata-sphinx-theme
 - pylibraft==24.8.*,>=0.0.0a0

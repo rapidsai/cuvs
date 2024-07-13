@@ -111,7 +111,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - &cmake_ver cmake>=3.26.4
+          - &cmake_ver cmake>=3.26.4,!=3.30.0
           - cython>=3.0.0
           - ninja
       - output_types: [conda]
@@ -324,6 +324,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - *cmake_ver
+          - openblas
   docs:
     common:
       - output_types: [conda]

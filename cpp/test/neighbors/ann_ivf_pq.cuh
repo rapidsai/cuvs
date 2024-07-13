@@ -241,9 +241,9 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   auto build_serialize()
   {
     std::string filename = "ivf_pq_index";
-    cuvs::neighbors::ivf_pq::serialize_file(handle_, filename, build_only());
-    cuvs::neighbors::ivf_pq::index<IdxT> index(handle_, ps.index_params, ps.dim);
-    cuvs::neighbors::ivf_pq::deserialize_file(handle_, filename, &index);
+    cuvs::neighbors::ivf_pq::serialize(handle_, filename, build_only());
+    cuvs::neighbors::ivf_pq::index<IdxT> index(handle_);
+    cuvs::neighbors::ivf_pq::deserialize(handle_, filename, &index);
     return index;
   }
 

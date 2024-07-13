@@ -28,7 +28,7 @@ Index
 Index build
 ###########
 
-.. autofunction:: cuvs.neighbors.cagra.build_index
+.. autofunction:: cuvs.neighbors.cagra.build
 
 Index search
 ############

@@ -20,211 +20,51 @@
 
 namespace cuvs::neighbors::cagra {
 
-/**
- * \defgroup cagra_serialize CAGRA Serialize
- * @{
- */
-
-/**
- * Write the index to an output stream
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create an output stream
- * std::ostream os(std::cout.rdbuf());
- * // create an index with `auto index = raft::cagra::build(...);`
- * raft::cagra::serialize(handle, os, index);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle the raft handle
- * @param[in] os output stream
- * @param[in] index CAGRA index
- * @param[in] include_dataset Whether or not to write out the dataset to the file.
- *
- */
-template <typename T, typename IdxT>
-void serialize(raft::resources const& handle,
-               std::ostream& os,
-               const index<T, IdxT>& index,
-               bool include_dataset = true)
-{
-  detail::serialize(handle, os, index, include_dataset);
-}
-
-/**
- * Save the index to file.
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create a string with a filepath
- * std::string filename("/path/to/index");
- * // create an index with `auto index = raft::cagra::build(...);`
- * raft::cagra::serialize(handle, filename, index);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle the raft handle
- * @param[in] filename the file name for saving the index
- * @param[in] index CAGRA index
- * @param[in] include_dataset Whether or not to write out the dataset to the file.
- *
- */
-template <typename T, typename IdxT>
-void serialize(raft::resources const& handle,
-               const std::string& filename,
-               const index<T, IdxT>& index,
-               bool include_dataset = true)
-{
-  detail::serialize(handle, filename, index, include_dataset);
-}
-
-/**
- * Write the CAGRA built index as a base layer HNSW index to an output stream
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create an output stream
- * std::ostream os(std::cout.rdbuf());
- * // create an index with `auto index = raft::cagra::build(...);`
- * raft::cagra::serialize_to_hnswlib(handle, os, index);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle the raft handle
- * @param[in] os output stream
- * @param[in] index CAGRA index
- *
- */
-template <typename T, typename IdxT>
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<T, IdxT>& index)
-{
-  detail::serialize_to_hnswlib<T, IdxT>(handle, os, index);
-}
-
-/**
- * Save a CAGRA build index in hnswlib base-layer-only serialized format
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create a string with a filepath
- * std::string filename("/path/to/index");
- * // create an index with `auto index = raft::cagra::build(...);`
- * raft::cagra::serialize_to_hnswlib(handle, filename, index);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle the raft handle
- * @param[in] filename the file name for saving the index
- * @param[in] index CAGRA index
- *
- */
-template <typename T, typename IdxT>
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<T, IdxT>& index)
-{
-  detail::serialize_to_hnswlib<T, IdxT>(handle, filename, index);
-}
-
-/**
- * Load index from input stream
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create an input stream
- * std::istream is(std::cin.rdbuf());
- * using T    = float; // data element type
- * using IdxT = int; // type of the index
- * auto index = raft::cagra::deserialize<T, IdxT>(handle, is);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle the raft handle
- * @param[in] is input stream
- *
- * @return cuvs::neighbors::experimental::cagra::index<T, IdxT>
- */
-template <typename T, typename IdxT>
-index<T, IdxT> deserialize(raft::resources const& handle, std::istream& is)
-{
-  return detail::deserialize<T, IdxT>(handle, is);
-}
-
-/**
- * Load index from file.
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create a string with a filepath
- * std::string filename("/path/to/index");
- * using T    = float; // data element type
- * using IdxT = int; // type of the index
- * auto index = raft::cagra::deserialize<T, IdxT>(handle, filename);
- * @endcode
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
- * @param[in] handle the raft handle
- * @param[in] filename the name of the file that stores the index
- *
- * @return cuvs::neighbors::experimental::cagra::index<T, IdxT>
- */
-template <typename T, typename IdxT>
-index<T, IdxT> deserialize(raft::resources const& handle, const std::string& filename)
-{
-  return detail::deserialize<T, IdxT>(handle, filename);
-}
-
-/**@}*/
+#define CUVS_INST_CAGRA_SERIALIZE(DTYPE)                                                      \
+  void serialize(raft::resources const& handle,                                               \
+                 const std::string& filename,                                                 \
+                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,                 \
+                 bool include_dataset)                                                        \
+  {                                                                                           \
+    cuvs::neighbors::cagra::detail::serialize<DTYPE, uint32_t>(                               \
+      handle, filename, index, include_dataset);                                              \
+  };                                                                                          \
+                                                                                              \
+  void deserialize(raft::resources const& handle,                                             \
+                   const std::string& filename,                                               \
+                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)                     \
+  {                                                                                           \
+    cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(handle, filename, index);    \
+  };                                                                                          \
+  void serialize(raft::resources const& handle,                                               \
+                 std::ostream& os,                                                            \
+                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,                 \
+                 bool include_dataset)                                                        \
+  {                                                                                           \
+    cuvs::neighbors::cagra::detail::serialize<DTYPE, uint32_t>(                               \
+      handle, os, index, include_dataset);                                                    \
+  }                                                                                           \
+                                                                                              \
+  void deserialize(raft::resources const& handle,                                             \
+                   std::istream& is,                                                          \
+                   cuvs::neighbors::cagra::index<DTYPE, uint32_t>* index)                     \
+  {                                                                                           \
+    cuvs::neighbors::cagra::detail::deserialize<DTYPE, uint32_t>(handle, is, index);          \
+  }                                                                                           \
+                                                                                              \
+  void serialize_to_hnswlib(raft::resources const& handle,                                    \
+                            std::ostream& os,                                                 \
+                            const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index)      \
+  {                                                                                           \
+    cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(handle, os, index); \
+  }                                                                                           \
+                                                                                              \
+  void serialize_to_hnswlib(raft::resources const& handle,                                    \
+                            const std::string& filename,                                      \
+                            const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index)      \
+  {                                                                                           \
+    cuvs::neighbors::cagra::detail::serialize_to_hnswlib<DTYPE, uint32_t>(                    \
+      handle, filename, index);                                                               \
+  }
 
 }  // namespace cuvs::neighbors::cagra

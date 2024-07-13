@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <cstddef>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>

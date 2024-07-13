@@ -55,11 +55,13 @@ option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_C_LIBRARY "Build raft C API library" OFF)
 option(BUILD_C_TESTS "Build raft C API tests" OFF)
+option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
-option(CUDA_STATIC_RUNTIME "Statically link the CUDA toolkit runtime and libraries" OFF)
+option(CUDA_STATIC_RUNTIME "Statically link the CUDA runtime" OFF)
+option(CUDA_STATIC_MATH_LIBRARIES "Statically link the CUDA math libraries" OFF)
 option(CUVS_USE_RAFT_STATIC "Build and statically link the RAFT libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
@@ -92,6 +94,7 @@ include(CMakeDependentOption)
 
 message(VERBOSE "cuVS: Build cuVS unit-tests: ${BUILD_TESTS}")
 message(VERBOSE "cuVS: Build CPU only components: ${BUILD_CPU_ONLY}")
+message(VERBOSE "cuVS: Build ANN benchmarks: ${BUILD_ANN_BENCH}")
 message(VERBOSE "cuVS: Enable detection of conda environment for dependencies: ${DETECT_CONDA_ENV}")
 message(VERBOSE "cuVS: Disable depreaction warnings " ${DISABLE_DEPRECATION_WARNINGS})
 message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
@@ -99,7 +102,10 @@ message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELIN
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
 message(VERBOSE
-        "cuVS: Statically link the CUDA toolkit runtime and libraries: ${CUDA_STATIC_RUNTIME}"
+        "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}"
+)
+message(VERBOSE
+        "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}"
 )
 message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
@@ -130,7 +136,7 @@ endif()
 # * compiler options ----------------------------------------------------------
 
 set(_ctk_static_suffix "")
-if(CUDA_STATIC_RUNTIME)
+if(CUDA_STATIC_MATH_LIBRARIES)
   set(_ctk_static_suffix "_static")
 endif()
 
@@ -184,6 +190,11 @@ endif()
 
 include(cmake/thirdparty/get_cutlass.cmake)
 
+if(BUILD_ANN_BENCH)
+  include(${rapids-cmake-dir}/cpm/gbench.cmake)
+  rapids_cpm_gbench(BUILD_STATIC)
+endif()
+
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 
@@ -236,6 +247,9 @@ add_library(
   src/neighbors/cagra_build_float.cu
   src/neighbors/cagra_build_int8.cu
   src/neighbors/cagra_build_uint8.cu
+  src/neighbors/cagra_extend_float.cu
+  src/neighbors/cagra_extend_int8.cu
+  src/neighbors/cagra_extend_uint8.cu
   src/neighbors/cagra_optimize.cu
   src/neighbors/cagra_search_float.cu
   src/neighbors/cagra_search_int8.cu
@@ -556,8 +570,13 @@ target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 if(BUILD_C_LIBRARY)
   add_library(
     cuvs_c SHARED
-    src/core/c_api.cpp src/neighbors/brute_force_c.cpp src/neighbors/ivf_flat_c.cpp
-    src/neighbors/ivf_pq_c.cpp src/neighbors/cagra_c.cpp src/distance/pairwise_distance_c.cpp
+    src/core/c_api.cpp
+    src/neighbors/brute_force_c.cpp
+    src/neighbors/ivf_flat_c.cpp
+    src/neighbors/ivf_pq_c.cpp
+    src/neighbors/cagra_c.cpp
+    src/neighbors/refine/refine_c.cpp
+    src/distance/pairwise_distance_c.cpp
   )
 
   add_library(cuvs::c_api ALIAS cuvs_c)
@@ -658,4 +677,11 @@ rapids_export(
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(internal/CMakeLists.txt)
   include(test/CMakeLists.txt)
+endif()
+
+# ##################################################################################################
+# * build ann benchmark executable -----------------------------------------------
+
+if(BUILD_ANN_BENCH)
+  include(bench/ann/CMakeLists.txt)
 endif()
