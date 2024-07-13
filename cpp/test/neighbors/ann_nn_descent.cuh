@@ -22,8 +22,8 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/itertools.hpp>
 
-#include "cuvs/distance/distance.h"
 #include "naive_knn.cuh"
+#include <cuvs/distance/distance.h>
 
 #include <gtest/gtest.h>
 
