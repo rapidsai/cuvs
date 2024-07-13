@@ -22,6 +22,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/itertools.hpp>
 
+#include "cuvs/distance/distance.h"
 #include "naive_knn.cuh"
 
 #include <gtest/gtest.h>
@@ -150,7 +151,9 @@ const std::vector<AnnNNDescentInputs> inputs = raft::util::itertools::product<An
   {1000, 2000},                                              // n_rows
   {3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
   {32, 64},                                                  // graph_degree
-  {cuvs::distance::DistanceType::L2Expanded},
+  {cuvs::distance::DistanceType::L2Expanded,
+   cuvs::distance::DistanceType::InnerProduct,
+   cuvs::distance::DistanceType::CosineExpanded},  // metric
   {false, true},
   {0.90});
 
