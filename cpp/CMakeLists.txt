@@ -60,7 +60,8 @@ option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
 )
-option(CUDA_STATIC_RUNTIME "Statically link the CUDA toolkit runtime and libraries" OFF)
+option(CUDA_STATIC_RUNTIME "Statically link the CUDA runtime" OFF)
+option(CUDA_STATIC_MATH_LIBRARIES "Statically link the CUDA math libraries" OFF)
 option(CUVS_USE_RAFT_STATIC "Build and statically link the RAFT libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
@@ -101,7 +102,10 @@ message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELIN
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
 message(VERBOSE
-        "cuVS: Statically link the CUDA toolkit runtime and libraries: ${CUDA_STATIC_RUNTIME}"
+        "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}"
+)
+message(VERBOSE
+        "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}"
 )
 message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
@@ -132,7 +136,7 @@ endif()
 # * compiler options ----------------------------------------------------------
 
 set(_ctk_static_suffix "")
-if(CUDA_STATIC_RUNTIME)
+if(CUDA_STATIC_MATH_LIBRARIES)
   set(_ctk_static_suffix "_static")
 endif()
 
@@ -243,6 +247,9 @@ add_library(
   src/neighbors/cagra_build_float.cu
   src/neighbors/cagra_build_int8.cu
   src/neighbors/cagra_build_uint8.cu
+  src/neighbors/cagra_extend_float.cu
+  src/neighbors/cagra_extend_int8.cu
+  src/neighbors/cagra_extend_uint8.cu
   src/neighbors/cagra_optimize.cu
   src/neighbors/cagra_search_float.cu
   src/neighbors/cagra_search_int8.cu

@@ -17,6 +17,7 @@ import contextlib
 import doctest
 import inspect
 import io
+from pathlib import Path
 
 import pytest
 
@@ -97,10 +98,13 @@ DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.common))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.distance))
 
 
+def _test_name_from_docstring(docstring):
+    filename = Path(docstring.filename).name.split(".")[0]
+    return f"{filename}:{docstring.name}"
+
+
 @pytest.mark.parametrize(
-    "docstring",
-    DOC_STRINGS,
-    ids=lambda docstring: docstring.name,
+    "docstring", DOC_STRINGS, ids=_test_name_from_docstring
 )
 def test_docstring(docstring):
     # We ignore differences in whitespace in the doctest output, and enable
