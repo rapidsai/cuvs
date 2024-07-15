@@ -85,20 +85,32 @@ function(find_and_configure_faiss)
     include("${rapids-cmake-dir}/export/find_package_root.cmake")
     rapids_export_find_package_root(BUILD faiss [=[${CMAKE_CURRENT_LIST_DIR}]=]
                                     EXPORT_SET cuvs-ann-bench-exports)
+    
+    # Need to tell CMake to rescan the link group of faiss::faiss_gpu and faiss
+    # so that we get proper link order when they are static
+    #
+    # We don't look at the existence of `faiss_avx2` as it will always exist
+    # even when CXX_AVX2_FOUND is false. In addition for arm builds the
+    # faiss_avx2 is marked as `EXCLUDE_FROM_ALL` so we don't want to add
+    # a dependency to it. Adding a dependency will cause it to compile,
+    # and fail due to invalid compiler flags.
+    if(PKG_ENABLE_GPU AND PKG_BUILD_STATIC_LIBS AND CXX_AVX2_FOUND)
+      set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu>,faiss::faiss_avx2>" PARENT_SCOPE)
+    elseif(PKG_ENABLE_GPU AND  PKG_BUILD_STATIC_LIBS)
+      set(CUVS_FAISS_TARGETS "$<LINK_GROUP:RESCAN,$<LINK_LIBRARY:WHOLE_ARCHIVE,faiss_gpu>,faiss::faiss>" PARENT_SCOPE)
+    elseif(CXX_AVX2_FOUND)
+      set(CUVS_FAISS_TARGETS faiss::faiss_avx2 PARENT_SCOPE)
+    else()
+      set(RAFT_FAISS_TARGETS faiss::faiss PARENT_SCOPE)
+    endif()
 endfunction()
 
 if(NOT CUVS_FAISS_GIT_TAG)
-    # TODO: Remove this once faiss supports FAISS_USE_CUDA_TOOLKIT_STATIC
-    # (https://github.com/facebookresearch/faiss/pull/2446)
-    set(CUVS_FAISS_GIT_TAG fea/statically-link-ctk)
-    # set(CUVS_FAISS_GIT_TAG bde7c0027191f29c9dadafe4f6e68ca0ee31fb30)
+    set(CUVS_FAISS_GIT_TAG main)
 endif()
 
 if(NOT CUVS_FAISS_GIT_REPOSITORY)
-    # TODO: Remove this once faiss supports FAISS_USE_CUDA_TOOLKIT_STATIC
-    # (https://github.com/facebookresearch/faiss/pull/2446)
-    set(CUVS_FAISS_GIT_REPOSITORY https://github.com/cjnolet/faiss.git)
-    # set(CUVS_FAISS_GIT_REPOSITORY https://github.com/facebookresearch/faiss.git)
+    set(CUVS_FAISS_GIT_REPOSITORY https://github.com/facebookresearch/faiss.git)
 endif()
 
 find_and_configure_faiss(VERSION    1.7.4
