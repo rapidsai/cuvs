@@ -193,46 +193,71 @@ inline auto get_stream_from_global_pool() -> cudaStream_t
 #endif
 }
 
-struct result_buffer {
-  explicit result_buffer(size_t size, cudaStream_t stream) : size_{size}, stream_{stream}
+/** The workspace buffer for use thread-locally. */
+struct ws_buffer {
+  explicit ws_buffer(size_t size, cudaStream_t stream) : size_{size}, stream_{stream} {}
+  ws_buffer()                                    = delete;
+  ws_buffer(ws_buffer&&)                         = delete;
+  auto operator=(ws_buffer&&) -> ws_buffer&      = delete;
+  ws_buffer(const ws_buffer&)                    = delete;
+  auto operator=(const ws_buffer&) -> ws_buffer& = delete;
+  ~ws_buffer() noexcept
   {
-    if (size_ == 0) { return; }
 #ifndef BUILD_CPU_ONLY
-    cudaMallocAsync(&data_device_, size_, stream_);
-    cudaMallocHost(&data_host_, size_);
-    cudaStreamSynchronize(stream_);
+    if (data_device_ != nullptr) {
+      cudaFreeAsync(data_device_, stream_);
+      cudaStreamSynchronize(stream_);
+    }
+    if (data_host_ != nullptr) { cudaFreeHost(data_host_); }
 #else
-    data_host_ = malloc(size_);
-#endif
-  }
-  result_buffer()                                        = delete;
-  result_buffer(result_buffer&&)                         = delete;
-  auto operator=(result_buffer&&) -> result_buffer&      = delete;
-  result_buffer(const result_buffer&)                    = delete;
-  auto operator=(const result_buffer&) -> result_buffer& = delete;
-  ~result_buffer() noexcept
-  {
-    if (size_ == 0) { return; }
-#ifndef BUILD_CPU_ONLY
-    cudaFreeAsync(data_device_, stream_);
-    cudaFreeHost(data_host_);
-    cudaStreamSynchronize(stream_);
-#else
-    free(data_host_);
+    if (data_host_ != nullptr) { free(data_host_); }
 #endif
   }
 
   [[nodiscard]] auto size() const noexcept { return size_; }
-  [[nodiscard]] auto data(MemoryType loc) const noexcept
+  [[nodiscard]] auto data(MemoryType loc) const noexcept -> void*
   {
+    if (size_ == 0) { return nullptr; }
     switch (loc) {
-      case MemoryType::kDevice: return data_device_;
-      default: return data_host_;
+#ifndef BUILD_CPU_ONLY
+      case MemoryType::kDevice: {
+        if (data_device_ == nullptr) {
+          cudaMallocAsync(&data_device_, size_, stream_);
+          cudaStreamSynchronize(stream_);
+          needs_cleanup_device_ = false;
+        } else if (needs_cleanup_device_) {
+          cudaMemsetAsync(data_device_, 0, size_, stream_);
+          cudaStreamSynchronize(stream_);
+          needs_cleanup_device_ = false;
+        }
+        return data_device_;
+      }
+#endif
+      default: {
+        if (data_host_ == nullptr) {
+#ifndef BUILD_CPU_ONLY
+          cudaMallocHost(&data_host_, size_);
+#else
+          data_host_ = malloc(size_);
+#endif
+          needs_cleanup_host_ = false;
+        } else if (needs_cleanup_host_) {
+          memset(data_host_, 0, size_);
+          needs_cleanup_host_ = false;
+        }
+        return data_host_;
+      }
     }
   }
 
   void transfer_data(MemoryType dst, MemoryType src)
   {
+    // The destination is overwritten and thus does not need cleanup
+    if (dst == MemoryType::kDevice) {
+      needs_cleanup_device_ = false;
+    } else {
+      needs_cleanup_host_ = false;
+    }
     auto dst_ptr = data(dst);
     auto src_ptr = data(src);
     if (dst_ptr == src_ptr) { return; }
@@ -242,15 +267,25 @@ struct result_buffer {
 #endif
   }
 
+  /** Mark the buffer for reuse - it needs to be cleared to make sure the previous results are not
+   * leaked to the new iteration. */
+  void reuse()
+  {
+    needs_cleanup_host_   = true;
+    needs_cleanup_device_ = true;
+  }
+
  private:
   size_t size_{0};
-  cudaStream_t stream_ = nullptr;
-  void* data_host_     = nullptr;
-  void* data_device_   = nullptr;
+  cudaStream_t stream_               = nullptr;
+  mutable void* data_host_           = nullptr;
+  mutable void* data_device_         = nullptr;
+  mutable bool needs_cleanup_host_   = false;
+  mutable bool needs_cleanup_device_ = false;
 };
 
 namespace detail {
-inline std::vector<std::unique_ptr<result_buffer>> global_result_buffer_pool(0);
+inline std::vector<std::unique_ptr<ws_buffer>> global_result_buffer_pool(0);
 inline std::mutex grp_mutex;
 }  // namespace detail
 
@@ -261,29 +296,27 @@ inline std::mutex grp_mutex;
  * This reduces the setup overhead and number of times the context is being blocked
  * (this is relevant if there is a persistent kernel running across multiples benchmark cases).
  */
-inline auto get_result_buffer_from_global_pool(size_t size) -> result_buffer&
+inline auto get_result_buffer_from_global_pool(size_t size) -> ws_buffer&
 {
   auto stream = get_stream_from_global_pool();
-  auto& rb    = [stream, size]() -> result_buffer& {
+  auto& rb    = [stream, size]() -> ws_buffer& {
     std::lock_guard guard(detail::grp_mutex);
     if (static_cast<int>(detail::global_result_buffer_pool.size()) < benchmark_n_threads) {
       detail::global_result_buffer_pool.resize(benchmark_n_threads);
     }
     auto& rb = detail::global_result_buffer_pool[benchmark_thread_id];
-    if (!rb || rb->size() < size) { rb = std::make_unique<result_buffer>(size, stream); }
+    if (!rb || rb->size() < size) {
+      rb = std::make_unique<ws_buffer>(size, stream);
+    } else {
+      rb->reuse();
+    }
     return *rb;
   }();
-
-  memset(rb.data(MemoryType::kHost), 0, size);
-#ifndef BUILD_CPU_ONLY
-  cudaMemsetAsync(rb.data(MemoryType::kDevice), 0, size, stream);
-  cudaStreamSynchronize(stream);
-#endif
   return rb;
 }
 
 namespace detail {
-inline std::vector<std::unique_ptr<result_buffer>> global_tmp_buffer_pool(0);
+inline std::vector<std::unique_ptr<ws_buffer>> global_tmp_buffer_pool(0);
 inline std::mutex gtp_mutex;
 }  // namespace detail
 
@@ -292,16 +325,16 @@ inline std::mutex gtp_mutex;
  * In contrast to `get_result_buffer_from_global_pool`, the content of these buffers is never
  * initialized.
  */
-inline auto get_tmp_buffer_from_global_pool(size_t size) -> result_buffer&
+inline auto get_tmp_buffer_from_global_pool(size_t size) -> ws_buffer&
 {
   auto stream = get_stream_from_global_pool();
-  auto& rb    = [stream, size]() -> result_buffer& {
+  auto& rb    = [stream, size]() -> ws_buffer& {
     std::lock_guard guard(detail::gtp_mutex);
     if (static_cast<int>(detail::global_tmp_buffer_pool.size()) < benchmark_n_threads) {
       detail::global_tmp_buffer_pool.resize(benchmark_n_threads);
     }
     auto& rb = detail::global_tmp_buffer_pool[benchmark_thread_id];
-    if (!rb || rb->size() < size) { rb = std::make_unique<result_buffer>(size, stream); }
+    if (!rb || rb->size() < size) { rb = std::make_unique<ws_buffer>(size, stream); }
     return *rb;
   }();
   return rb;
