@@ -17,82 +17,54 @@
 #include "detail/hnsw.hpp"
 #include <cstdint>
 #include <cuvs/neighbors/hnsw.hpp>
-#include <filesystem>
-#include <memory>
-#include <random>
 #include <sys/types.h>
 
 namespace cuvs::neighbors::hnsw {
 
-template <typename T>
-std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
-                                     cuvs::neighbors::cagra::index<T, uint32_t> cagra_index)
-{
-  std::random_device dev;
-  std::mt19937 rng(dev());
-  std::uniform_int_distribution<std::mt19937::result_type> dist(0);
-  auto uuid            = std::to_string(dist(rng));
-  std::string filepath = "/tmp/" + uuid + ".bin";
-  cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index);
-  index<T>* hnsw_index;
-  cuvs::neighbors::hnsw::deserialize(
-    res, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
-  std::filesystem::remove(filepath);
-  return std::unique_ptr<detail::index_impl<T>>(hnsw_index);
-}
+#define CUVS_INST_HNSW_FROM_CAGRA(T)                                                           \
+  std::unique_ptr<index<T>> from_cagra(                                                        \
+    raft::resources const& res, const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index) \
+  {                                                                                            \
+    return detail::from_cagra<T>(res, cagra_index);                                            \
+  }
 
-template <typename T, typename QueriesT>
-void search(raft::resources const& res,
-            const search_params& params,
-            const index<T>& idx,
-            raft::host_matrix_view<const QueriesT, int64_t, raft::row_major> queries,
-            raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
-            raft::host_matrix_view<float, int64_t, raft::row_major> distances)
-{
-  RAFT_EXPECTS(
-    queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
-    "Number of rows in output neighbors and distances matrices must equal the number of queries.");
+CUVS_INST_HNSW_FROM_CAGRA(float);
+CUVS_INST_HNSW_FROM_CAGRA(uint8_t);
+CUVS_INST_HNSW_FROM_CAGRA(int8_t);
 
-  RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1),
-               "Number of columns in output neighbors and distances matrices must equal k");
-  RAFT_EXPECTS(queries.extent(1) == idx.dim(),
-               "Number of query dimensions should equal number of dimensions in the index.");
+#undef CUVS_INST_HNSW_FROM_CAGRA
 
-  detail::search(res, params, idx, queries, neighbors, distances);
-}
+#define CUVS_INST_HNSW_SEARCH(T, QueriesT)                                              \
+  void search(raft::resources const& res,                                               \
+              const search_params& params,                                              \
+              const index<T>& idx,                                                      \
+              raft::host_matrix_view<const QueriesT, int64_t, raft::row_major> queries, \
+              raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,     \
+              raft::host_matrix_view<float, int64_t, raft::row_major> distances)        \
+  {                                                                                     \
+    detail::search<T, QueriesT>(res, params, idx, queries, neighbors, distances);       \
+  }
 
-template void search<float, float>(
-  raft::resources const& res,
-  const search_params& params,
-  const index<float>& idx,
-  raft::host_matrix_view<const float, int64_t, raft::row_major> queries,
-  raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
-  raft::host_matrix_view<float, int64_t, raft::row_major> distances);
+CUVS_INST_HNSW_SEARCH(float, float);
+CUVS_INST_HNSW_SEARCH(uint8_t, int);
+CUVS_INST_HNSW_SEARCH(int8_t, int);
 
-template void search<uint8_t, int>(
-  raft::resources const& res,
-  const search_params& params,
-  const index<uint8_t>& idx,
-  raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
-  raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
-  raft::host_matrix_view<float, int64_t, raft::row_major> distances);
+#undef CUVS_INST_HNSW_SEARCH
 
-template void search<int8_t, int>(
-  raft::resources const& res,
-  const search_params& params,
-  const index<int8_t>& idx,
-  raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
-  raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
-  raft::host_matrix_view<float, int64_t, raft::row_major> distances);
+#define CUVS_INST_HNSW_DESERIALIZE(T)                           \
+  void deserialize(raft::resources const& handle,               \
+                   const std::string& filename,                 \
+                   int dim,                                     \
+                   cuvs::distance::DistanceType metric,         \
+                   index<T>** idx)                              \
+  {                                                             \
+    detail::deserialize<T>(handle, filename, dim, metric, idx); \
+  }
 
-template <typename T>
-void deserialize(raft::resources const& handle,
-                 const std::string& filename,
-                 int dim,
-                 cuvs::distance::DistanceType metric,
-                 index<T>** idx)
-{
-  *idx = new detail::index_impl<T>(filename, dim, metric);
-}
+CUVS_INST_HNSW_DESERIALIZE(float);
+CUVS_INST_HNSW_DESERIALIZE(uint8_t);
+CUVS_INST_HNSW_DESERIALIZE(int8_t);
+
+#undef CUVS_INST_HNSW_DESERIALIZE
 
 }  // namespace cuvs::neighbors::hnsw

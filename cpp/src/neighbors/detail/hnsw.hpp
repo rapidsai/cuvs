@@ -17,8 +17,11 @@
 #pragma once
 
 #include <cuvs/neighbors/hnsw.hpp>
+#include <filesystem>
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
+#include <memory>
+#include <random>
 
 namespace cuvs::neighbors::hnsw::detail {
 
@@ -90,6 +93,23 @@ struct index_impl : index<T> {
   std::unique_ptr<hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>> space_;
 };
 
+template <typename T>
+std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
+                                     const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
+{
+  std::random_device dev;
+  std::mt19937 rng(dev());
+  std::uniform_int_distribution<std::mt19937::result_type> dist(0);
+  auto uuid            = std::to_string(dist(rng));
+  std::string filepath = "/tmp/" + uuid + ".bin";
+  cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index);
+  index<T>* hnsw_index;
+  cuvs::neighbors::hnsw::deserialize(
+    res, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
+  std::filesystem::remove(filepath);
+  return std::unique_ptr<index<T>>(hnsw_index);
+}
+
 template <typename QueriesT>
 void get_search_knn_results(hnswlib::HierarchicalNSW<QueriesT> const* idx,
                             const QueriesT* query,
@@ -115,6 +135,15 @@ void search(raft::resources const& res,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances)
 {
+  RAFT_EXPECTS(
+    queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
+    "Number of rows in output neighbors and distances matrices must equal the number of queries.");
+
+  RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1),
+               "Number of columns in output neighbors and distances matrices must equal k");
+  RAFT_EXPECTS(queries.extent(1) == idx.dim(),
+               "Number of query dimensions should equal number of dimensions in the index.");
+
   idx.set_ef(params.ef);
   auto const* hnswlib_index =
     reinterpret_cast<hnswlib::HierarchicalNSW<QueriesT> const*>(idx.get_index());
@@ -139,6 +168,16 @@ void search(raft::resources const& res,
                              distances.data_handle() + i * distances.extent(1));
     }
   }
+}
+
+template <typename T>
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 int dim,
+                 cuvs::distance::DistanceType metric,
+                 index<T>** idx)
+{
+  *idx = new detail::index_impl<T>(filename, dim, metric);
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail

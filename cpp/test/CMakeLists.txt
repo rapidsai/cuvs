@@ -162,6 +162,17 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME
+    NEIGHBORS_HNSW_TEST
+    PATH
+    test/neighbors/hnsw.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
+  ConfigureTest(
+    NAME
     DISTANCE_TEST
     PATH
     test/distance/dist_canberra.cu

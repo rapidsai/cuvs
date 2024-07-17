@@ -56,6 +56,7 @@ option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_C_LIBRARY "Build raft C API library" OFF)
 option(BUILD_C_TESTS "Build raft C API tests" OFF)
 option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
+option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
@@ -193,6 +194,10 @@ include(cmake/thirdparty/get_cutlass.cmake)
 if(BUILD_ANN_BENCH)
   include(${rapids-cmake-dir}/cpm/gbench.cmake)
   rapids_cpm_gbench(BUILD_STATIC)
+endif()
+
+if(BUILD_CAGRA_HNSWLIB)
+  include(cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
 # ##################################################################################################
@@ -470,6 +475,10 @@ target_include_directories(
   cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
 )
+
+if(BUILD_CAGRA_HNSWLIB)
+  target_link_libraries(cuvs PRIVATE hnswlib::hnswlib)
+endif()
 
 rapids_find_package(
   OpenMP REQUIRED

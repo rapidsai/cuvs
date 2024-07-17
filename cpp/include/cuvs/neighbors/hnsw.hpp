@@ -98,7 +98,7 @@ struct index : cuvs::neighbors::index {
  * @endcode
  */
 std::unique_ptr<index<float>> from_cagra(
-  raft::resources const& res, cuvs::neighbors::cagra::index<float, uint32_t> cagra_index);
+  raft::resources const& res, const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index);
 
 /**
  * @brief Construct an hnswlib base-layer-only index from a CAGRA index
@@ -122,8 +122,8 @@ std::unique_ptr<index<float>> from_cagra(
  *   auto hnsw_index = hnsw::from_cagra(res, index);
  * @endcode
  */
-std::unique_ptr<index<int8_t>> from_cagra(
-  raft::resources const& res, cuvs::neighbors::cagra::index<int8_t, uint32_t> cagra_index);
+std::unique_ptr<index<uint8_t>> from_cagra(
+  raft::resources const& res, const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index);
 
 /**
  * @brief Construct an hnswlib base-layer-only index from a CAGRA index
@@ -147,8 +147,8 @@ std::unique_ptr<index<int8_t>> from_cagra(
  *   auto hnsw_index = hnsw::from_cagra(res, index);
  * @endcode
  */
-std::unique_ptr<index<uint8_t>> from_cagra(
-  raft::resources const& res, cuvs::neighbors::cagra::index<uint8_t, uint32_t> cagra_index);
+std::unique_ptr<index<int8_t>> from_cagra(
+  raft::resources const& res, const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index);
 
 /**
  * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
@@ -181,7 +181,7 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  *   search_params.num_threads = 10;
  *   auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
  *   auto distances = raft::make_host_matrix<float>(res, n_queries, k);
- *   hnsw::search(res, search_params, index.get(), queries, neighbors, distances);
+ *   hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
  * @endcode
  */
 void search(raft::resources const& res,
@@ -222,7 +222,7 @@ void search(raft::resources const& res,
  *   search_params.num_threads = 10;
  *   auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
  *   auto distances = raft::make_host_matrix<float>(res, n_queries, k);
- *   hnsw::search(res, search_params, index.get(), queries, neighbors, distances);
+ *   hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
  * @endcode
  */
 void search(raft::resources const& res,
@@ -263,7 +263,7 @@ void search(raft::resources const& res,
  *   search_params.num_threads = 10;
  *   auto neighbors = raft::make_host_matrix<uint64_t>(res, n_queries, k);
  *   auto distances = raft::make_host_matrix<float>(res, n_queries, k);
- *   hnsw::search(res, search_params, index.get(), queries, neighbors, distances);
+ *   hnsw::search(res, search_params, *index.get(), queries, neighbors, distances);
  * @endcode
  */
 void search(raft::resources const& res,
