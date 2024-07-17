@@ -80,10 +80,10 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
       naive_knn<DistanceT, DataT, IdxT>(handle_,
                                         distances_naive_dev.data(),
                                         indices_naive_dev.data(),
-                                        database.data(),
                                         queries.data(),
-                                        ps.n_rows,
+                                        database.data(),
                                         ps.n_queries,
+                                        ps.n_rows,
                                         ps.dim,
                                         ps.k,
                                         ps.metric);
@@ -169,14 +169,14 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
 };
 
 const std::vector<AnnHNSWInputs> inputs = raft::util::itertools::product<AnnHNSWInputs>(
-  {1000, 2000},                                              // n_rows
-  {3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
-  {32, 64},                                                  // graph_degree
-  {cuvs::distance::DistanceType::L2Expanded},                // metric
-  {50},                                                      // k
-  {500},                                                     // n_queries
-  {200},                                                     // ef
-  {0.90}                                                     // min_recall
+  {1000, 2000},                                // n_rows
+  {5, 10, 25, 50, 100, 250, 500, 1000},        // dim
+  {32, 64},                                    // graph_degree
+  {cuvs::distance::DistanceType::L2Expanded},  // metric
+  {50},                                        // k
+  {500},                                       // n_queries
+  {200},                                       // ef
+  {0.98}                                       // min_recall
 );
 
 typedef AnnHNSWTest<float, float, uint64_t> AnnHNSW_F;
