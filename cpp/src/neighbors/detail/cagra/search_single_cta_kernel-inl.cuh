@@ -894,8 +894,8 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 // This makes sync atomic significantly faster.
 constexpr size_t kCacheLineBytes = 64;
 
-constexpr uint32_t kMaxJobsNum              = 2048;
-constexpr uint32_t kMaxWorkersNum           = 2048;
+constexpr uint32_t kMaxJobsNum              = 8192;
+constexpr uint32_t kMaxWorkersNum           = 4096;
 constexpr uint32_t kMaxWorkersPerThread     = 256;
 constexpr uint32_t kSoftMaxWorkersPerThread = 16;
 
@@ -1396,7 +1396,10 @@ struct alignas(kCacheLineBytes) launcher_t {
   To ease the competition, we track the expected GPU latency and let a thread sleep for some
   time, and only start to spin when it's about a time to get the result.
   */
-  static inline constexpr auto kDefaultLatency     = std::chrono::nanoseconds(50000);
+  static inline constexpr auto kDefaultLatency = std::chrono::nanoseconds(50000);
+  /* This is the base for computing maximum time a thread is allowed to sleep. */
+  static inline constexpr auto kMaxExpectedLatency =
+    kDefaultLatency * std::max<std::uint32_t>(10, kMaxJobsNum / 128);
   static inline thread_local auto expected_latency = kDefaultLatency;
   const std::chrono::time_point<std::chrono::system_clock> start;
   std::chrono::time_point<std::chrono::system_clock> now;
@@ -1427,11 +1430,24 @@ struct alignas(kCacheLineBytes) launcher_t {
       uint32_t worker_id;
       while (!promised_worker.test(worker_id)) {
         if (pending_reads.try_pop_front(worker_id)) {
-          if (!try_return_worker(worker_id)) { pending_reads.push_front(worker_id); }
+          bool returned_some = false;
+          for (bool keep_returning = true; keep_returning;) {
+            if (try_return_worker(worker_id)) {
+              keep_returning = pending_reads.try_pop_front(worker_id);
+              returned_some  = true;
+            } else {
+              pending_reads.push_front(worker_id);
+              keep_returning = false;
+            }
+          }
+          if (!returned_some) { pause(); }
         } else {
-          pause();
+          // Calmly wait for the promised worker instead of spinning.
+          worker_id = promised_worker.wait();
+          break;
         }
       }
+      pause_count = 0;  // reset the pause behavior
       submit_query(worker_id, i);
       // Try to not hold too many workers in one thread
       if (i >= kSoftMaxWorkersPerThread && pending_reads.try_pop_front(worker_id)) {
@@ -1444,7 +1460,8 @@ struct alignas(kCacheLineBytes) launcher_t {
   {
     // bookkeeping: update the expected latency to wait more efficiently later
     constexpr size_t kWindow = 100;  // moving average memory
-    expected_latency         = ((kWindow - 1) * expected_latency + now - start) / kWindow;
+    expected_latency         = std::min<std::chrono::nanoseconds>(
+      ((kWindow - 1) * expected_latency + now - start) / kWindow, kMaxExpectedLatency);
   }
 
   inline void submit_query(uint32_t worker_id, uint32_t query_id)
@@ -1460,6 +1477,7 @@ struct alignas(kCacheLineBytes) launcher_t {
         pause();
       }
     }
+    pause_count = 0;  // reset the pause behavior
   }
 
   /** Check if the worker has finished the work; if so, return it to the shared pool. */
@@ -1520,7 +1538,7 @@ struct alignas(kCacheLineBytes) launcher_t {
     // It doesn't make much sense to slee less than this
     constexpr auto kPauseTimeMin = std::chrono::nanoseconds(1000);
     // Bound sleeping time
-    constexpr auto kPauseTimeMax = std::chrono::nanoseconds(10000000);
+    constexpr auto kPauseTimeMax = std::chrono::nanoseconds(50000);
     if (pause_count++ < kSpinLimit) {
       std::this_thread::yield();
       return;
@@ -1544,6 +1562,7 @@ struct alignas(kCacheLineBytes) launcher_t {
         if (!is_all_done()) { pause(); }
       }
     }
+    pause_count = 0;  // reset the pause behavior
     // terminal state, should be engaged only after the `pending_reads` is empty
     // and `queries_submitted == n_queries`
     now = std::chrono::system_clock::now();
@@ -1726,6 +1745,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
        &small_hash_reset_interval,
        &sample_filter,
        &metric};
+    cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
     RAFT_CUDA_TRY(cudaLaunchCooperativeKernel<std::remove_pointer_t<kernel_type>>(
       kernel, gs, bs, args, smem_size, stream));
     RAFT_LOG_INFO(
@@ -1757,7 +1777,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     launcher_t launcher{
       job_queue, worker_queue, worker_handles.data(), num_queries, [=](uint32_t job_ix) {
         auto& jd                = job_descriptors.data()[job_ix].input.value;
-        auto cflag              = &job_descriptors.data()[job_ix].completion_flag;
+        auto* cflag             = &job_descriptors.data()[job_ix].completion_flag;
         jd.result_indices_ptr   = result_indices_ptr;
         jd.result_distances_ptr = result_distances_ptr;
         jd.queries_ptr          = queries_ptr;
@@ -1793,7 +1813,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     // kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care.
     // If you suspect this is an issue, you can reduce this number to ~0.9 without a significant
     // impact on the throughput.
-    constexpr double kDeviceUsage = 0.9;
+    constexpr double kDeviceUsage = 1.0;
 
     // determine the grid size
     int ctas_per_sm = 1;
