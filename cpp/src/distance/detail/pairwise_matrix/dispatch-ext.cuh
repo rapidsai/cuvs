@@ -38,8 +38,8 @@ void pairwise_matrix_dispatch(OpT distance_op,
                               IdxT k,
                               const DataT* x,
                               const DataT* y,
-                              const DataT* x_norm,
-                              const DataT* y_norm,
+                              const OutT* x_norm,
+                              const OutT* y_norm,
                               OutT* out,
                               FinOpT fin_op,
                               cudaStream_t stream,
@@ -59,8 +59,8 @@ void pairwise_matrix_dispatch(OpT distance_op,
       IdxT k,                                                                          \
       const DataT* x,                                                                  \
       const DataT* y,                                                                  \
-      const DataT* x_norm,                                                             \
-      const DataT* y_norm,                                                             \
+      const OutT* x_norm,                                                              \
+      const OutT* y_norm,                                                              \
       OutT* out,                                                                       \
       FinOpT fin_op,                                                                   \
       cudaStream_t stream,                                                             \

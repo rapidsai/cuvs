@@ -18,9 +18,13 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
+#include <cuda_fp16.h>
+
 namespace cuvs::neighbors::brute_force {
+
+template <typename T>
 struct KNNInputs {
-  std::vector<std::vector<float>> input;
+  std::vector<std::vector<T>> input;
   int k;
   std::vector<int> labels;
 };
@@ -46,11 +50,11 @@ RAFT_KERNEL build_expected_output(int* output, int n_rows, int k, const int* lab
   }
 }
 
-template <typename T, typename IdxT>
-class KNNTest : public ::testing::TestWithParam<KNNInputs> {
+template <typename T, typename DistT, typename IdxT>
+class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
  public:
   KNNTest()
-    : params_(::testing::TestWithParam<KNNInputs>::GetParam()),
+    : params_(::testing::TestWithParam<KNNInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       actual_labels_(0, stream),
       expected_labels_(0, stream),
@@ -78,7 +82,7 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
     auto indices =
       raft::make_device_matrix_view<IdxT, IdxT, raft::row_major>(indices_.data(), rows_, k_);
     auto distances =
-      raft::make_device_matrix_view<T, IdxT, raft::row_major>(distances_.data(), rows_, k_);
+      raft::make_device_matrix_view<DistT, IdxT, raft::row_major>(distances_.data(), rows_, k_);
 
     auto metric = cuvs::distance::DistanceType::L2Unexpanded;
     auto idx    = cuvs::neighbors::brute_force::build(handle, index, metric);
@@ -112,23 +116,22 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
       cudaMemsetAsync(actual_labels_.data(), 0, actual_labels_.size() * sizeof(int), stream));
     RAFT_CUDA_TRY(
       cudaMemsetAsync(expected_labels_.data(), 0, expected_labels_.size() * sizeof(int), stream));
-    RAFT_CUDA_TRY(cudaMemsetAsync(input_.data(), 0, input_.size() * sizeof(float), stream));
-    RAFT_CUDA_TRY(
-      cudaMemsetAsync(search_data_.data(), 0, search_data_.size() * sizeof(float), stream));
+    RAFT_CUDA_TRY(cudaMemsetAsync(input_.data(), 0, input_.size() * sizeof(T), stream));
+    RAFT_CUDA_TRY(cudaMemsetAsync(search_data_.data(), 0, search_data_.size() * sizeof(T), stream));
     RAFT_CUDA_TRY(cudaMemsetAsync(indices_.data(), 0, indices_.size() * sizeof(IdxT), stream));
-    RAFT_CUDA_TRY(cudaMemsetAsync(distances_.data(), 0, distances_.size() * sizeof(float), stream));
+    RAFT_CUDA_TRY(cudaMemsetAsync(distances_.data(), 0, distances_.size() * sizeof(DistT), stream));
     RAFT_CUDA_TRY(
       cudaMemsetAsync(search_labels_.data(), 0, search_labels_.size() * sizeof(int), stream));
 
-    std::vector<float> row_major_input;
+    std::vector<T> row_major_input;
     for (std::size_t i = 0; i < params_.input.size(); ++i) {
       for (std::size_t j = 0; j < params_.input[i].size(); ++j) {
         row_major_input.push_back(params_.input[i][j]);
       }
     }
     rmm::device_buffer input_d =
-      rmm::device_buffer(row_major_input.data(), row_major_input.size() * sizeof(float), stream);
-    float* input_ptr = static_cast<float*>(input_d.data());
+      rmm::device_buffer(row_major_input.data(), row_major_input.size() * sizeof(T), stream);
+    T* input_ptr = static_cast<T*>(input_d.data());
 
     rmm::device_buffer labels_d =
       rmm::device_buffer(params_.labels.data(), params_.labels.size() * sizeof(int), stream);
@@ -144,13 +147,13 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
   raft::resources handle;
   cudaStream_t stream;
 
-  KNNInputs params_;
+  KNNInputs<T> params_;
   int rows_;
   int cols_;
-  rmm::device_uvector<float> input_;
-  rmm::device_uvector<float> search_data_;
+  rmm::device_uvector<T> input_;
+  rmm::device_uvector<T> search_data_;
   rmm::device_uvector<IdxT> indices_;
-  rmm::device_uvector<float> distances_;
+  rmm::device_uvector<DistT> distances_;
   int k_;
 
   rmm::device_uvector<int> search_labels_;
@@ -158,7 +161,8 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs> {
   rmm::device_uvector<int> expected_labels_;
 };
 
-const std::vector<KNNInputs> inputs = {
+template <typename T>
+const std::vector<KNNInputs<T>> inputs = {
   // 2D
   {{
      {2.7810836, 2.550537003},
@@ -175,8 +179,12 @@ const std::vector<KNNInputs> inputs = {
    2,
    {0, 0, 0, 0, 0, 1, 1, 1, 1, 1}}};
 
-typedef KNNTest<float, int64_t> KNNTestFint64_t;
-TEST_P(KNNTestFint64_t, BruteForce) { this->testBruteForce(); }
+typedef KNNTest<float, float, int64_t> KNNTest_float_int64_t;
+TEST_P(KNNTest_float_int64_t, BruteForce) { this->testBruteForce(); }
 
-INSTANTIATE_TEST_CASE_P(KNNTest, KNNTestFint64_t, ::testing::ValuesIn(inputs));
+typedef KNNTest<half, float, int64_t> KNNTest_half_int64_t;
+TEST_P(KNNTest_half_int64_t, BruteForce) { this->testBruteForce(); }
+
+INSTANTIATE_TEST_CASE_P(KNNTest, KNNTest_float_int64_t, ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(KNNTest, KNNTest_half_int64_t, ::testing::ValuesIn(inputs<half>));
 }  // namespace cuvs::neighbors::brute_force

@@ -96,30 +96,30 @@ void distance(raft::resources const& handle,
               bool isRowMajor  = true,
               DataT metric_arg = 2.0f) RAFT_EXPLICIT;
 
-template <typename Type, typename IdxT = int>
+template <typename Type, typename IdxT = int, typename DistT = Type>
 void pairwise_distance(raft::resources const& handle,
                        const Type* x,
                        const Type* y,
-                       Type* dist,
+                       DistT* dist,
                        IdxT m,
                        IdxT n,
                        IdxT k,
                        rmm::device_uvector<char>& workspace,
                        cuvs::distance::DistanceType metric,
-                       bool isRowMajor = true,
-                       Type metric_arg = 2.0f) RAFT_EXPLICIT;
+                       bool isRowMajor  = true,
+                       DistT metric_arg = DistT(2.0f)) RAFT_EXPLICIT;
 
-template <typename Type, typename IdxT = int>
+template <typename Type, typename IdxT = int, typename DistT = Type>
 void pairwise_distance(raft::resources const& handle,
                        const Type* x,
                        const Type* y,
-                       Type* dist,
+                       DistT* dist,
                        IdxT m,
                        IdxT n,
                        IdxT k,
                        cuvs::distance::DistanceType metric,
-                       bool isRowMajor = true,
-                       Type metric_arg = 2.0f) RAFT_EXPLICIT;
+                       bool isRowMajor  = true,
+                       DistT metric_arg = DistT(2.0f)) RAFT_EXPLICIT;
 
 template <cuvs::distance::DistanceType DistT,
           typename DataT,
@@ -133,13 +133,16 @@ void distance(raft::resources const& handle,
               raft::device_matrix_view<OutT, IdxT, layout> dist,
               DataT metric_arg = 2.0f) RAFT_EXPLICIT;
 
-template <typename Type, typename layout = layout_c_contiguous, typename IdxT = int>
+template <typename Type,
+          typename layout = layout_c_contiguous,
+          typename IdxT   = int,
+          typename DistT  = Type>
 void pairwise_distance(raft::resources const& handle,
                        device_matrix_view<Type, IdxT, layout> const x,
                        device_matrix_view<Type, IdxT, layout> const y,
-                       device_matrix_view<Type, IdxT, layout> dist,
+                       device_matrix_view<DistT, IdxT, layout> dist,
                        cuvs::distance::DistanceType metric,
-                       Type metric_arg = 2.0f) RAFT_EXPLICIT;
+                       DistT metric_arg = DistT(2.0f)) RAFT_EXPLICIT;
 
 };  // namespace distance
 };  // namespace cuvs
@@ -720,39 +723,41 @@ instantiate_raft_distance_getWorkspaceSize(
 
 #undef instantiate_raft_distance_getWorkspaceSize
 
-#define instantiate_raft_distance_pairwise_distance(DataT, IdxT)                               \
+#define instantiate_raft_distance_pairwise_distance(DataT, IdxT, DistT)                        \
   extern template void cuvs::distance::pairwise_distance(raft::resources const& handle,        \
                                                          const DataT* x,                       \
                                                          const DataT* y,                       \
-                                                         DataT* dist,                          \
+                                                         DistT* dist,                          \
                                                          IdxT m,                               \
                                                          IdxT n,                               \
                                                          IdxT k,                               \
                                                          rmm::device_uvector<char>& workspace, \
                                                          cuvs::distance::DistanceType metric,  \
                                                          bool isRowMajor,                      \
-                                                         DataT metric_arg)
+                                                         DistT metric_arg)
 
-instantiate_raft_distance_pairwise_distance(float, int);
-instantiate_raft_distance_pairwise_distance(double, int);
+instantiate_raft_distance_pairwise_distance(float, int, float);
+instantiate_raft_distance_pairwise_distance(double, int, double);
+instantiate_raft_distance_pairwise_distance(half, int, float);
 
 #undef instantiate_raft_distance_pairwise_distance
 
 // Same, but without workspace
-#define instantiate_raft_distance_pairwise_distance(DataT, IdxT)                              \
+#define instantiate_raft_distance_pairwise_distance(DataT, IdxT, DistT)                       \
   extern template void cuvs::distance::pairwise_distance(raft::resources const& handle,       \
                                                          const DataT* x,                      \
                                                          const DataT* y,                      \
-                                                         DataT* dist,                         \
+                                                         DistT* dist,                         \
                                                          IdxT m,                              \
                                                          IdxT n,                              \
                                                          IdxT k,                              \
                                                          cuvs::distance::DistanceType metric, \
                                                          bool isRowMajor,                     \
-                                                         DataT metric_arg)
+                                                         DistT metric_arg)
 
-instantiate_raft_distance_pairwise_distance(float, int);
-instantiate_raft_distance_pairwise_distance(double, int);
+instantiate_raft_distance_pairwise_distance(float, int, float);
+instantiate_raft_distance_pairwise_distance(double, int, double);
+instantiate_raft_distance_pairwise_distance(half, int, float);
 
 #undef instantiate_raft_distance_pairwise_distance
 
@@ -1049,18 +1054,20 @@ instantiate_raft_distance_distance(cuvs::distance::DistanceType::RusselRaoExpand
 
 #undef instantiate_raft_distance_distance
 
-#define instantiate_raft_distance_pairwise_distance(DataT, layout, IdxT) \
-  extern template void cuvs::distance::pairwise_distance(                \
-    raft::resources const& handle,                                       \
-    raft::device_matrix_view<const DataT, IdxT, layout> const x,         \
-    raft::device_matrix_view<const DataT, IdxT, layout> const y,         \
-    raft::device_matrix_view<DataT, IdxT, layout> dist,                  \
-    cuvs::distance::DistanceType metric,                                 \
-    DataT metric_arg)
+#define instantiate_raft_distance_pairwise_distance(DataT, layout, IdxT, DistT) \
+  extern template void cuvs::distance::pairwise_distance(                       \
+    raft::resources const& handle,                                              \
+    raft::device_matrix_view<const DataT, IdxT, layout> const x,                \
+    raft::device_matrix_view<const DataT, IdxT, layout> const y,                \
+    raft::device_matrix_view<DistT, IdxT, layout> dist,                         \
+    cuvs::distance::DistanceType metric,                                        \
+    DistT metric_arg)
 
-instantiate_raft_distance_pairwise_distance(float, raft::layout_c_contiguous, int);
-instantiate_raft_distance_pairwise_distance(float, raft::layout_f_contiguous, int);
-instantiate_raft_distance_pairwise_distance(double, raft::layout_c_contiguous, int);
-instantiate_raft_distance_pairwise_distance(double, raft::layout_f_contiguous, int);
+instantiate_raft_distance_pairwise_distance(float, raft::layout_c_contiguous, int, float);
+instantiate_raft_distance_pairwise_distance(float, raft::layout_f_contiguous, int, float);
+instantiate_raft_distance_pairwise_distance(double, raft::layout_c_contiguous, int, double);
+instantiate_raft_distance_pairwise_distance(double, raft::layout_f_contiguous, int, double);
+instantiate_raft_distance_pairwise_distance(half, raft::layout_c_contiguous, int, float);
+instantiate_raft_distance_pairwise_distance(half, raft::layout_f_contiguous, int, float);
 
 #undef instantiate_raft_distance_pairwise_distance

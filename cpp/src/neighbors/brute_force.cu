@@ -21,12 +21,12 @@
 #include <raft/core/copy.hpp>
 
 namespace cuvs::neighbors::brute_force {
-template <typename T>
-index<T>::index(raft::resources const& res,
-                raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
-                std::optional<raft::device_vector<T, int64_t>>&& norms,
-                cuvs::distance::DistanceType metric,
-                T metric_arg)
+template <typename T, typename DistT>
+index<T, DistT>::index(raft::resources const& res,
+                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
+                       std::optional<raft::device_vector<DistT, int64_t>>&& norms,
+                       cuvs::distance::DistanceType metric,
+                       DistT metric_arg)
   : cuvs::neighbors::index(),
     metric_(metric),
     dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
@@ -38,12 +38,12 @@ index<T>::index(raft::resources const& res,
   raft::resource::sync_stream(res);
 }
 
-template <typename T>
-index<T>::index(raft::resources const& res,
-                raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
-                std::optional<raft::device_vector<T, int64_t>>&& norms,
-                cuvs::distance::DistanceType metric,
-                T metric_arg)
+template <typename T, typename DistT>
+index<T, DistT>::index(raft::resources const& res,
+                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
+                       std::optional<raft::device_vector<DistT, int64_t>>&& norms,
+                       cuvs::distance::DistanceType metric,
+                       DistT metric_arg)
   : cuvs::neighbors::index(),
     metric_(metric),
     dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
@@ -54,12 +54,12 @@ index<T>::index(raft::resources const& res,
   update_dataset(res, dataset);
 }
 
-template <typename T>
-index<T>::index(raft::resources const& res,
-                raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
-                std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
-                cuvs::distance::DistanceType metric,
-                T metric_arg)
+template <typename T, typename DistT>
+index<T, DistT>::index(raft::resources const& res,
+                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
+                       std::optional<raft::device_vector_view<const DistT, int64_t>> norms_view,
+                       cuvs::distance::DistanceType metric,
+                       DistT metric_arg)
   : cuvs::neighbors::index(),
     metric_(metric),
     dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
@@ -69,51 +69,52 @@ index<T>::index(raft::resources const& res,
 {
 }
 
-template <typename T>
-void index<T>::update_dataset(raft::resources const& res,
-                              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
+template <typename T, typename DistT>
+void index<T, DistT>::update_dataset(
+  raft::resources const& res, raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
 {
   dataset_view_ = dataset;
 }
 
-template <typename T>
-void index<T>::update_dataset(raft::resources const& res,
-                              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
+template <typename T, typename DistT>
+void index<T, DistT>::update_dataset(
+  raft::resources const& res, raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
 {
   dataset_ = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
   raft::copy(res, dataset_.view(), dataset);
   dataset_view_ = raft::make_const_mdspan(dataset_.view());
 }
 
-#define CUVS_INST_BFKNN(T)                                                                        \
+#define CUVS_INST_BFKNN(T, DistT)                                                                 \
   auto build(raft::resources const& res,                                                          \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,                 \
              cuvs::distance::DistanceType metric,                                                 \
-             T metric_arg)                                                                        \
-    ->cuvs::neighbors::brute_force::index<T>                                                      \
+             DistT metric_arg)                                                                    \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                               \
   {                                                                                               \
-    return detail::build<T>(res, dataset, metric, metric_arg);                                    \
+    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                             \
   }                                                                                               \
                                                                                                   \
   void search(                                                                                    \
     raft::resources const& res,                                                                   \
-    const cuvs::neighbors::brute_force::index<T>& idx,                                            \
+    const cuvs::neighbors::brute_force::index<T, DistT>& idx,                                     \
     raft::device_matrix_view<const T, int64_t, raft::row_major> queries,                          \
     raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,                        \
-    raft::device_matrix_view<T, int64_t, raft::row_major> distances,                              \
+    raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,                          \
     std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter = std::nullopt) \
   {                                                                                               \
     if (!sample_filter.has_value()) {                                                             \
-      detail::brute_force_search<T, int64_t>(res, idx, queries, neighbors, distances);            \
+      detail::brute_force_search<T, int64_t, DistT>(res, idx, queries, neighbors, distances);     \
     } else {                                                                                      \
-      detail::brute_force_search_filtered<T, int64_t>(                                            \
+      detail::brute_force_search_filtered<T, int64_t, uint32_t, DistT>(                           \
         res, idx, queries, *sample_filter, neighbors, distances);                                 \
     }                                                                                             \
   }                                                                                               \
                                                                                                   \
-  template struct cuvs::neighbors::brute_force::index<T>;
+  template struct cuvs::neighbors::brute_force::index<T, DistT>;
 
-CUVS_INST_BFKNN(float);
+CUVS_INST_BFKNN(float, float);
+CUVS_INST_BFKNN(half, float);
 
 #undef CUVS_INST_BFKNN
 
