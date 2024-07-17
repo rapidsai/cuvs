@@ -301,7 +301,7 @@ void search(raft::resources const& res,
  *   delete hnsw_index;
  * @endcode
  */
-void deserialize(raft::resources const& handle,
+void deserialize(raft::resources const& res,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
@@ -335,7 +335,7 @@ void deserialize(raft::resources const& handle,
  *   delete hnsw_index;
  * @endcode
  */
-void deserialize(raft::resources const& handle,
+void deserialize(raft::resources const& res,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
@@ -369,7 +369,7 @@ void deserialize(raft::resources const& handle,
  *   delete hnsw_index;
  * @endcode
  */
-void deserialize(raft::resources const& handle,
+void deserialize(raft::resources const& res,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,

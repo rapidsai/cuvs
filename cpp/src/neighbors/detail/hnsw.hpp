@@ -171,7 +171,7 @@ void search(raft::resources const& res,
 }
 
 template <typename T>
-void deserialize(raft::resources const& handle,
+void deserialize(raft::resources const& res,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,

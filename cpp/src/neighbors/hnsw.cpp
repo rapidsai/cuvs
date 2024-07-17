@@ -51,14 +51,14 @@ CUVS_INST_HNSW_SEARCH(int8_t, int);
 
 #undef CUVS_INST_HNSW_SEARCH
 
-#define CUVS_INST_HNSW_DESERIALIZE(T)                           \
-  void deserialize(raft::resources const& handle,               \
-                   const std::string& filename,                 \
-                   int dim,                                     \
-                   cuvs::distance::DistanceType metric,         \
-                   index<T>** idx)                              \
-  {                                                             \
-    detail::deserialize<T>(handle, filename, dim, metric, idx); \
+#define CUVS_INST_HNSW_DESERIALIZE(T)                        \
+  void deserialize(raft::resources const& res,               \
+                   const std::string& filename,              \
+                   int dim,                                  \
+                   cuvs::distance::DistanceType metric,      \
+                   index<T>** idx)                           \
+  {                                                          \
+    detail::deserialize<T>(res, filename, dim, metric, idx); \
   }
 
 CUVS_INST_HNSW_DESERIALIZE(float);
