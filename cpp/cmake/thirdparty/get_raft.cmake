@@ -44,8 +44,8 @@ function(find_and_configure_raft)
             INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
-              GIT_REPOSITORY        https://github.com/rhdong/raft.git
-              GIT_TAG               half_knn
+              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
+              GIT_TAG               ${PKG_PINNED_TAG}
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"
@@ -60,8 +60,8 @@ endfunction()
 # To use a different RAFT locally, set the CMake variable
 # CPM_raft_SOURCE=/path/to/local/raft
 find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
-        FORK                     ${RAFT_FORK}
-        PINNED_TAG               ${RAFT_PINNED_TAG}
+        FORK                     rhdong
+        PINNED_TAG               half_knn
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
