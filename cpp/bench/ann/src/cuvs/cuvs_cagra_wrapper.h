@@ -374,7 +374,7 @@ void cuvs_cagra<T, IdxT>::search(
 
     if (mem_type == MemoryType::kHostPinned && uses_stream()) {
       // If the algorithm uses a stream to synchronize (non-persistent kernel), but the data is in
-      // the pinned host memory, we need top synchronize before the refinement operation to wait for
+      // the pinned host memory, we need to synchronize before the refinement operation to wait for
       // the data being available for the host.
       raft::resource::sync_stream(res);
     }
