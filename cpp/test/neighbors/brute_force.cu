@@ -25,6 +25,8 @@
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
 
+#include <cuda_fp16.h>
+
 namespace cuvs::neighbors::brute_force {
 
 template <typename T>
@@ -187,7 +189,11 @@ const std::vector<KNNInputs<T>> inputs = {
 typedef KNNTest<float, float, int64_t> KNNTest_float_int64_t;
 TEST_P(KNNTest_float_int64_t, BruteForce) { this->testBruteForce(); }
 
-INSTANTIATE_TEST_CASE_P(KNNTest, KNNTestFint64_t, ::testing::ValuesIn(inputs));
+typedef KNNTest<half, float, int64_t> KNNTest_half_int64_t;
+TEST_P(KNNTest_half_int64_t, BruteForce) { this->testBruteForce(); }
+
+INSTANTIATE_TEST_CASE_P(KNNTest, KNNTest_float_int64_t, ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(KNNTest, KNNTest_half_int64_t, ::testing::ValuesIn(inputs<half>));
 
 // Also test with larger random inputs, including col-major inputs
 struct RandomKNNInputs {
@@ -207,7 +213,7 @@ std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
             << " row_major:" << input.row_major;
 }
 
-template <typename T>
+template <typename T, typename DistT = T>
 class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs> {
  public:
   RandomBruteForceKNNTest()
@@ -231,35 +237,35 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     raft::matrix::fill(
       handle_,
       raft::make_device_matrix_view(cuvs_distances_.data(), params_.num_queries, params_.k),
-      T{0.0});
+      DistT{0.0});
     raft::matrix::fill(
       handle_,
       raft::make_device_matrix_view(ref_distances_.data(), params_.num_queries, params_.k),
-      T{0.0});
+      DistT{0.0});
   }
 
  protected:
   void testBruteForce()
   {
-    float metric_arg = 3.0;
+    DistT metric_arg = 3.0;
 
     // calculate the naive knn, by calculating the full pairwise distances and doing a k-select
-    rmm::device_uvector<T> temp_distances(num_db_vecs * num_queries, stream_);
+    rmm::device_uvector<DistT> temp_distances(num_db_vecs * num_queries, stream_);
     rmm::device_uvector<char> workspace(0, stream_);
 
     auto temp_dist = temp_distances.data();
-    rmm::device_uvector<T> temp_row_major_dist(num_db_vecs * num_queries, stream_);
+    rmm::device_uvector<DistT> temp_row_major_dist(num_db_vecs * num_queries, stream_);
 
     if (params_.row_major) {
-      distance::pairwise_distance(
-        handle_,
-        raft::make_device_matrix_view<const T, int64_t>(
-          search_queries.data(), params_.num_queries, params_.dim),
-        raft::make_device_matrix_view<const T, int64_t>(
-          database.data(), params_.num_db_vecs, params_.dim),
-        raft::make_device_matrix_view<T, int64_t>(temp_distances.data(), num_queries, num_db_vecs),
-        metric,
-        metric_arg);
+      distance::pairwise_distance(handle_,
+                                  raft::make_device_matrix_view<const T, int64_t>(
+                                    search_queries.data(), params_.num_queries, params_.dim),
+                                  raft::make_device_matrix_view<const T, int64_t>(
+                                    database.data(), params_.num_db_vecs, params_.dim),
+                                  raft::make_device_matrix_view<DistT, int64_t>(
+                                    temp_distances.data(), num_queries, num_db_vecs),
+                                  metric,
+                                  metric_arg);
 
     } else {
       distance::pairwise_distance(handle_,
@@ -267,12 +273,12 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
                                     search_queries.data(), params_.num_queries, params_.dim),
                                   raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
                                     database.data(), params_.num_db_vecs, params_.dim),
-                                  raft::make_device_matrix_view<T, int64_t, raft::col_major>(
+                                  raft::make_device_matrix_view<DistT, int64_t, raft::col_major>(
                                     temp_distances.data(), num_queries, num_db_vecs),
                                   metric,
                                   metric_arg);
 
-      // the pairwisse_distance call assumes that the inputs and outputs are all either row-major
+      // the pairwise_distance call assumes that the inputs and outputs are all either row-major
       // or col-major - meaning we have to transpose the output back for col-major queries
       // for comparison
       raft::linalg::transpose(
@@ -282,16 +288,16 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
     cuvs::selection::select_k(
       handle_,
-      raft::make_device_matrix_view<const T, int64_t>(temp_dist, num_queries, num_db_vecs),
+      raft::make_device_matrix_view<const DistT, int64_t>(temp_dist, num_queries, num_db_vecs),
       std::nullopt,
       raft::make_device_matrix_view(ref_distances_.data(), params_.num_queries, params_.k),
       raft::make_device_matrix_view(ref_indices_.data(), params_.num_queries, params_.k),
       cuvs::distance::is_min_close(metric),
       true);
 
-    auto indices = raft::make_device_matrix_view<int64_t, int64_t>(
+    auto indices = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
       cuvs_indices_.data(), params_.num_queries, params_.k);
-    auto distances = raft::make_device_matrix_view<T, int64_t>(
+    auto distances = raft::make_device_matrix_view<DistT, int64_t, raft::row_major>(
       cuvs_distances_.data(), params_.num_queries, params_.k);
 
     if (params_.row_major) {
@@ -334,7 +340,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
                                                     cuvs_distances_.data(),
                                                     num_queries,
                                                     k_,
-                                                    float(0.001),
+                                                    DistT(0.001),
                                                     stream_,
                                                     true));
   }
@@ -366,16 +372,16 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
   rmm::device_uvector<T> database;
   rmm::device_uvector<T> search_queries;
   rmm::device_uvector<int64_t> cuvs_indices_;
-  rmm::device_uvector<T> cuvs_distances_;
+  rmm::device_uvector<DistT> cuvs_distances_;
   rmm::device_uvector<int64_t> ref_indices_;
-  rmm::device_uvector<T> ref_distances_;
+  rmm::device_uvector<DistT> ref_distances_;
   int k_;
   cuvs::distance::DistanceType metric;
 };
 
 const std::vector<RandomKNNInputs> random_inputs = {
   // test each distance metric on a small-ish input, with row-major inputs
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Expanded, true},
+  {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, true},
@@ -389,7 +395,7 @@ const std::vector<RandomKNNInputs> random_inputs = {
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::Canberra, true},
   // test each distance metric with col-major inputs
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Expanded, false},
+  {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, false},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, false},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, false},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, false},
@@ -412,11 +418,18 @@ const std::vector<RandomKNNInputs> random_inputs = {
   {1000, 5000, 128, 128, cuvs::distance::DistanceType::L2SqrtExpanded, false},
   {1000, 5000, 128, 128, cuvs::distance::DistanceType::InnerProduct, false}};
 
-typedef RandomBruteForceKNNTest<float> RandomBruteForceKNNTestF;
+typedef RandomBruteForceKNNTest<float, float> RandomBruteForceKNNTestF;
 TEST_P(RandomBruteForceKNNTestF, BruteForce) { this->testBruteForce(); }
+
+typedef RandomBruteForceKNNTest<half, float> RandomBruteForceKNNTestH;
+TEST_P(RandomBruteForceKNNTestH, BruteForce) { this->testBruteForce(); }
 
 INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,
                         RandomBruteForceKNNTestF,
+                        ::testing::ValuesIn(random_inputs));
+
+INSTANTIATE_TEST_CASE_P(RandomBruteForceKNNTest,
+                        RandomBruteForceKNNTestH,
                         ::testing::ValuesIn(random_inputs));
 
 }  // namespace cuvs::neighbors::brute_force

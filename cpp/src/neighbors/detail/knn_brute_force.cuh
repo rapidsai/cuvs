@@ -516,10 +516,13 @@ void brute_force_knn_impl(
   if (translations == nullptr) delete id_ranges;
 };
 
-template <typename T, typename IdxT, typename QueryLayoutT = raft::row_major>
+template <typename T,
+          typename IdxT,
+          typename DistanceT    = float,
+          typename QueryLayoutT = raft::row_major>
 void brute_force_search(
   raft::resources const& res,
-  const cuvs::neighbors::brute_force::index<T>& idx,
+  const cuvs::neighbors::brute_force::index<T, DistanceT>& idx,
   raft::device_matrix_view<const T, int64_t, QueryLayoutT> queries,
   raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
   raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
@@ -537,22 +540,23 @@ void brute_force_search(
   std::vector<DistanceT*> norms;
   if (idx.has_norms()) { norms.push_back(const_cast<DistanceT*>(idx.norms().data_handle())); }
 
-  brute_force_knn_impl<int64_t, IdxT, T>(res,
-                                         dataset,
-                                         sizes,
-                                         d,
-                                         const_cast<T*>(queries.data_handle()),
-                                         queries.extent(0),
-                                         neighbors.data_handle(),
-                                         distances.data_handle(),
-                                         k,
-                                         true,
-                                         std::is_same_v<QueryLayoutT, raft::row_major>,
-                                         nullptr,
-                                         idx.metric(),
-                                         idx.metric_arg(),
-                                         norms.size() ? &norms : nullptr,
-                                         query_norms ? query_norms->data_handle() : nullptr);
+  brute_force_knn_impl<int64_t, IdxT, T, DistanceT>(
+    res,
+    dataset,
+    sizes,
+    d,
+    const_cast<T*>(queries.data_handle()),
+    queries.extent(0),
+    neighbors.data_handle(),
+    distances.data_handle(),
+    k,
+    true,
+    std::is_same_v<QueryLayoutT, raft::row_major>,
+    nullptr,
+    idx.metric(),
+    idx.metric_arg(),
+    norms.size() ? &norms : nullptr,
+    query_norms ? query_norms->data_handle() : nullptr);
 }
 
 template <typename T, typename IdxT, typename BitmapT, typename DistanceT = float>
@@ -722,8 +726,8 @@ void brute_force_search_filtered(
   return;
 }
 
-template <typename T, typename LayoutT = raft::row_major>
-cuvs::neighbors::brute_force::index<T> build(
+template <typename T, typename DistT, typename LayoutT = raft::row_major>
+cuvs::neighbors::brute_force::index<T, DistT> build(
   raft::resources const& res,
   raft::device_matrix_view<const T, int64_t, LayoutT> dataset,
   cuvs::distance::DistanceType metric,
@@ -731,7 +735,7 @@ cuvs::neighbors::brute_force::index<T> build(
 {
   // certain distance metrics can benefit by pre-calculating the norms for the index dataset
   // which lets us avoid calculating these at query time
-  std::optional<raft::device_vector<T, int64_t>> norms;
+  std::optional<raft::device_vector<DistT, int64_t>> norms;
 
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||

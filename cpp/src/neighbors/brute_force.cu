@@ -69,12 +69,12 @@ index<T, DistT>::index(raft::resources const& res,
 {
 }
 
-template <typename T>
-index<T>::index(raft::resources const& res,
-                raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-                std::optional<raft::device_vector<T, int64_t>>&& norms,
-                cuvs::distance::DistanceType metric,
-                T metric_arg)
+template <typename T, typename DistT>
+index<T, DistT>::index(raft::resources const& res,
+                       raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
+                       std::optional<raft::device_vector<DistT, int64_t>>&& norms,
+                       cuvs::distance::DistanceType metric,
+                       DistT metric_arg)
   : cuvs::neighbors::index(),
     metric_(metric),
     dataset_(
@@ -99,9 +99,9 @@ index<T>::index(raft::resources const& res,
   dataset_view_ = raft::make_const_mdspan(dataset_.view());
 }
 
-template <typename T>
-void index<T>::update_dataset(raft::resources const& res,
-                              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
+template <typename T, typename DistT>
+void index<T, DistT>::update_dataset(
+  raft::resources const& res, raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
 {
   dataset_view_ = dataset;
 }
@@ -127,10 +127,10 @@ void index<T, DistT>::update_dataset(
   auto build(raft::resources const& res,                                                          \
              raft::device_matrix_view<const T, int64_t, raft::col_major> dataset,                 \
              cuvs::distance::DistanceType metric,                                                 \
-             T metric_arg)                                                                        \
-    ->cuvs::neighbors::brute_force::index<T>                                                      \
+             DistT metric_arg)                                                                    \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                               \
   {                                                                                               \
-    return detail::build<T>(res, dataset, metric, metric_arg);                                    \
+    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                             \
   }                                                                                               \
                                                                                                   \
   void search(                                                                                    \
@@ -150,14 +150,14 @@ void index<T, DistT>::update_dataset(
   }                                                                                               \
   void search(                                                                                    \
     raft::resources const& res,                                                                   \
-    const cuvs::neighbors::brute_force::index<T>& idx,                                            \
+    const cuvs::neighbors::brute_force::index<T, DistT>& idx,                                     \
     raft::device_matrix_view<const T, int64_t, raft::col_major> queries,                          \
     raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,                        \
-    raft::device_matrix_view<T, int64_t, raft::row_major> distances,                              \
+    raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,                          \
     std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter = std::nullopt) \
   {                                                                                               \
     if (!sample_filter.has_value()) {                                                             \
-      detail::brute_force_search<T, int64_t>(res, idx, queries, neighbors, distances);            \
+      detail::brute_force_search<T, int64_t, DistT>(res, idx, queries, neighbors, distances);     \
     } else {                                                                                      \
       RAFT_FAIL("filtered search isn't available with col_major queries yet");                    \
     }                                                                                             \
