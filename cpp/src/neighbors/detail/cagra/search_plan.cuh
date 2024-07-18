@@ -39,7 +39,12 @@ namespace cuvs::neighbors::cagra::detail {
 
 /**
  * A lightweight version of rmm::device_uvector.
- * This version ignores the current device on allocations, thus avoids calling
+ * This version avoids calling cudaSetDevice / cudaGetDevice, and therefore it is required that 
+ * the current cuda device does not change during the lifetime of this object. This is expected
+ * to be useful in multi-threaded scenarios where we want to minimize overhead due to
+ * thread sincronization during cuda API calls.
+ 
+
  * cudaSetDevice/cudaGetDevice.
  * If the size stays at zero, this struct never calls any CUDA driver / RAFT resource functions.
  */
