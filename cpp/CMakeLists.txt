@@ -194,6 +194,21 @@ endif()
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 
+if(BUILD_MG_ALGOS)
+  set(CUVS_MG_ALGOS
+      src/neighbors/ann_mg/ann_mg_flat_float_int64_t.cu
+      src/neighbors/ann_mg/ann_mg_flat_int8_t_int64_t.cu
+      src/neighbors/ann_mg/ann_mg_flat_uint8_t_int64_t.cu
+      src/neighbors/ann_mg/ann_mg_pq_float_int64_t.cu
+      src/neighbors/ann_mg/ann_mg_pq_int8_t_int64_t.cu
+      src/neighbors/ann_mg/ann_mg_pq_uint8_t_int64_t.cu
+      src/neighbors/ann_mg/ann_mg_cagra_float_uint32_t.cu
+      src/neighbors/ann_mg/ann_mg_cagra_int8_t_uint32_t.cu
+      src/neighbors/ann_mg/ann_mg_cagra_uint8_t_uint32_t.cu
+      src/neighbors/ann_mg/nccl_clique.cu
+  )
+endif()
+
 add_library(
   cuvs SHARED
   src/cluster/kmeans_balanced_fit_float.cu
@@ -399,15 +414,6 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
   src/neighbors/ivf_flat_index.cpp
-  src/neighbors/ann_mg/ann_mg_flat_float_int64_t.cu
-  src/neighbors/ann_mg/ann_mg_flat_int8_t_int64_t.cu
-  src/neighbors/ann_mg/ann_mg_flat_uint8_t_int64_t.cu
-  src/neighbors/ann_mg/ann_mg_pq_float_int64_t.cu
-  src/neighbors/ann_mg/ann_mg_pq_int8_t_int64_t.cu
-  src/neighbors/ann_mg/ann_mg_pq_uint8_t_int64_t.cu
-  src/neighbors/ann_mg/ann_mg_cagra_float_uint32_t.cu
-  src/neighbors/ann_mg/ann_mg_cagra_int8_t_uint32_t.cu
-  src/neighbors/ann_mg/ann_mg_cagra_uint8_t_uint32_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
@@ -461,6 +467,7 @@ add_library(
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
+  ${CUVS_MG_ALGOS}
 )
 
 target_compile_options(
@@ -492,11 +499,16 @@ if(NOT BUILD_CPU_ONLY)
                                  ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
   )
 
+  if(BUILD_MG_ALGOS)
+    set(CUVS_COMMS_DEPENDENCY ucp ucs ucxx nccl)
+  endif()
+
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
     PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            ${CUVS_COMMS_DEPENDENCY}
   )
 endif()
 

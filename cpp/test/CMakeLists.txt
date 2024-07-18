@@ -23,7 +23,7 @@ function(ConfigureTest)
 
   set(options OPTIONAL NOCUDA C_LIB)
   set(oneValueArgs NAME GPUS PERCENT)
-  set(multiValueArgs PATH ADDITIONAL_LIBS TARGETS CONFIGURATIONS)
+  set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   if(NOT DEFINED _CUVS_TEST_GPUS AND NOT DEFINED _CUVS_TEST_PERCENT)
@@ -153,10 +153,11 @@ if(BUILD_TESTS)
     100
   )
 
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_MG_TEST PATH test/neighbors/ann_mg/test_float.cu
-    test/neighbors/ann_mg/nccl_clique.cu ADDITIONAL_LIBS ucp ucs ucxx nccl GPUS 1 PERCENT 100
-  )
+  if(BUILD_MG_ALGOS)
+    ConfigureTest(
+      NAME NEIGHBORS_ANN_MG_TEST PATH test/neighbors/ann_mg/test_float.cu GPUS 1 PERCENT 100
+    )
+  endif()
 
   ConfigureTest(
     NAME
