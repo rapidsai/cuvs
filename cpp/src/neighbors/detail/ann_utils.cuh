@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <raft/common/nvtx.hpp>
 #include <cuvs/distance/distance.hpp>
+#include <raft/common/nvtx.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -26,8 +26,8 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/resource_ref.hpp>
 #include <rmm/mr/host/pinned_memory_resource.hpp>
+#include <rmm/resource_ref.hpp>
 
 #include <cuda_fp16.hpp>
 #include <omp.h>
@@ -401,39 +401,6 @@ template <typename T>
 struct batch_load_iterator {
   using size_type = size_t;
 
-  /**
-   * Three prefetch options for batch_load_iterator are supported. 
-   * PREFETCH_NONE - no prefetching, thus no kernel/memcpy overlapping.
-   * PREFETCH_DEFAULT_MEMCPY - prefetching with cudaMemcpyAsync on pageable memory.
-   * PREFETCH_MULTITHREAD_MEMCOPY - prefetching with custom staging copy pipeline using multi-threaded H2H copy.
-   */
-  enum PrefetchOption { PREFETCH_NONE = 0, PREFETCH_DEFAULT_MEMCPY, PREFETCH_MULTITHREAD_MEMCOPY };
-
-  /* Staging buffer for a custom pageable memory copy in order to achieve kernel/copy overlapping. */
-  struct staging_buffer {
-    staging_buffer() : n_(0) { res_ = new rmm::mr::pinned_memory_resource(); }
-
-    ~staging_buffer()
-    {
-      if (n_ != 0) res_->deallocate(arr_, n_ * sizeof(T));
-      delete res_;
-    }
-
-    void allocate(size_type n)
-    {
-      n_   = n;
-      arr_ = static_cast<T*>(res_->allocate(n_ * sizeof(T)));
-    }
-
-    auto data() -> T* { return arr_; }
-    [[nodiscard]] auto size() -> size_type { return n_; }
-
-   private:
-    rmm::mr::host_memory_resource* res_;
-    T* arr_;
-    size_type n_;
-  };
-
   /** A single batch of data residing in device memory. */
   struct batch {
     /** Logical width of a single row in a batch, in elements of type `T`. */
@@ -454,7 +421,7 @@ struct batch_load_iterator {
           size_type batch_size,
           rmm::cuda_stream_view stream,
           rmm::device_async_resource_ref mr,
-          PrefetchOption prefetch = PrefetchOption::PREFETCH_NONE)
+          bool prefetch = false)
       : stream_(stream),
         buf_0_(0, stream, mr),
         buf_1_(0, stream, mr),
@@ -477,15 +444,9 @@ struct batch_load_iterator {
         buf_0_.resize(row_width_ * batch_size_, stream);
         dev_ptr_    = buf_0_.data();
         needs_copy_ = true;
-        if (prefetch_ != PrefetchOption::PREFETCH_NONE) {
+        if (prefetch_) {
           buf_1_.resize(row_width_ * batch_size_, stream);
           prefetch_dev_ptr_ = buf_1_.data();
-          if (prefetch_ == PrefetchOption::PREFETCH_MULTITHREAD_MEMCOPY) {
-            staging_buf_0_.allocate(staging_size_);
-            staging_buf_1_.allocate(staging_size_);
-            current_stg_buf_ = &staging_buf_0_;
-            next_stg_buf_    = &staging_buf_1_;
-          }
         }
       }
     }
@@ -498,20 +459,13 @@ struct batch_load_iterator {
     size_type batch_size_;
     size_type n_iters_;
     bool needs_copy_;
-    PrefetchOption prefetch_;
+    bool prefetch_;
 
     std::optional<size_type> pos_;
     std::optional<size_type> prefetch_pos_;
     size_type batch_len_;
     T* dev_ptr_;
     T* prefetch_dev_ptr_;
-    // Staging buffers are only used if PrefetchOption is PREFETCH_MULTITHREAD_MEMCOPY.
-    staging_buffer staging_buf_0_;
-    staging_buffer staging_buf_1_;
-    staging_buffer* current_stg_buf_;
-    staging_buffer* next_stg_buf_;
-    // Use 1Mi * sizeof(T) byte internal staging buffer if PREFETCH_MULTITHREAD_MEMCOPY is enabled.
-    size_type staging_size_ = 1 << 20;
     friend class batch_load_iterator<T>;
 
     /**
@@ -531,46 +485,23 @@ struct batch_load_iterator {
                          size_t(offset()),
                          size_t(size()),
                          size_t(row_width()));
-          if (prefetch_ != PrefetchOption::PREFETCH_NONE && prefetch_pos_ == pos_) {
+          if (prefetch_ && prefetch_pos_ == pos_) {
             std::swap(dev_ptr_, prefetch_dev_ptr_);
           } else {
             raft::copy(dev_ptr_, source_ + offset() * row_width(), size() * row_width(), stream_);
-          }        }
+          }
+        }
       } else {
         dev_ptr_ = const_cast<T*>(source_) + offset() * row_width();
       }
     }
 
     /**
-     * Helper function for multi-threaded staging copy. Only used if PrefetchOption::PREFETCH_MULTITHREAD_MEMCOPY is enabled.
-     * Number of host threads is determinted by omp_get_max_threads().
-    */
-    void multithread_staging(T* dest, const T* src, size_type size)
-    {
-      auto num_threads = std::min(omp_get_max_threads(), 4);
-#pragma omp parallel num_threads(num_threads)
-      {
-        auto thread_id   = omp_get_thread_num();
-        auto num_threads = omp_get_num_threads();
-
-        size_type thread_chunk_size = size / num_threads;
-        size_type thread_start      = thread_id * thread_chunk_size;
-        size_type thread_end =
-          (thread_id == num_threads - 1) ? size : thread_start + thread_chunk_size;
-        std::memcpy(
-          dest + thread_start, src + thread_start, (thread_end - thread_start) * sizeof(T));
-      }
-    }
-
-    /**
-     * Helper function for prefetch. NOP if PrefetchOption is PREFETCH_NONE (default).
-    */
+     * Helper function for prefetch. NOP if prefetch option is not enabled.
+     */
     void prefetch(const size_type& pos)
     {
-      if (pos >= n_iters_ || prefetch_ == PrefetchOption::PREFETCH_NONE || !needs_copy_ ||
-          source_ == nullptr) {
-        return;
-      }
+      if (pos >= n_iters_ || !prefetch_ || !needs_copy_ || source_ == nullptr) { return; }
       size_type prefetch_offset = batch_size_ * pos;
       size_type prefetch_size = std::min(batch_size_, n_rows_ - std::min(prefetch_offset, n_rows_));
       raft::common::nvtx::push_range(
@@ -578,30 +509,10 @@ struct batch_load_iterator {
         size_t(prefetch_offset),
         size_t(prefetch_size),
         size_t(row_width()));
-      if (prefetch_ == PrefetchOption::PREFETCH_MULTITHREAD_MEMCOPY) {
-        // Multi-threaded staging pipeline is used if PrefetchOption is PREFETCH_MULTITHREAD_MEMCOPY.
-        size_type staging_offset = 0;
-        while (staging_offset < prefetch_size * row_width()) {
-          size_type cur_staging_size =
-            std::min(staging_size_, prefetch_size * row_width() - staging_offset);
-          multithread_staging(next_stg_buf_->data(),
-                              source_ + prefetch_offset * row_width() + staging_offset,
-                              cur_staging_size);
-          stream_.synchronize();
-          std::swap(next_stg_buf_, current_stg_buf_);
-          raft::copy(prefetch_dev_ptr_ + staging_offset,
-               current_stg_buf_->data(),
-               cur_staging_size,
-               stream_);
-          staging_offset += staging_size_;
-        }
-      } else {
-        // Default copy is used if PrefetchOption is PREFETCH_DEFAULT_MEMCPY.
-        raft::copy(prefetch_dev_ptr_,
-             source_ + prefetch_offset * row_width(),
-             prefetch_size * row_width(),
-             stream_);
-      }
+      raft::copy(prefetch_dev_ptr_,
+                 source_ + prefetch_offset * row_width(),
+                 prefetch_size * row_width(),
+                 stream_);
       raft::common::nvtx::pop_range();
       stream_.synchronize();
       prefetch_pos_.emplace(pos);
@@ -633,7 +544,7 @@ struct batch_load_iterator {
                       size_type batch_size,
                       rmm::cuda_stream_view stream,
                       rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
-                      PrefetchOption prefetch           = PrefetchOption::PREFETCH_NONE)
+                      bool prefetch                     = false)
     : cur_batch_(new batch(source, n_rows, row_width, batch_size, stream, mr, prefetch)),
       cur_pos_(0),
       cur_prefetch_pos_(0)
@@ -644,13 +555,13 @@ struct batch_load_iterator {
    * (i.e. the source is inaccessible from the device).
    */
   [[nodiscard]] auto does_copy() const -> bool { return cur_batch_->does_copy(); }
-  /** Reset the iterator position and prefetch posistion to `begin()` */
+  /** Reset the iterator position and prefetch position to `begin()` */
   void reset()
   {
     cur_pos_          = 0;
     cur_prefetch_pos_ = 0;
   }
-  /** Reset the iterator position and prefetch posistion to `end()` */
+  /** Reset the iterator position and prefetch position to `end()` */
   void reset_to_end()
   {
     cur_pos_          = cur_batch_->n_iters_;
@@ -678,7 +589,8 @@ struct batch_load_iterator {
     cur_batch_->load(cur_pos_);
     return cur_batch_.get();
   }
-  /* Prefetch next batch. Users are reponsible for calling this method to enable kernel/copy overlapping. */
+  /* Prefetch next batch. Users are responsible for calling this method to enable kernel/copy
+   * overlapping. */
   void prefetch_next_batch() { cur_batch_->prefetch(cur_prefetch_pos_++); }
   friend auto operator==(const batch_load_iterator<T>& x, const batch_load_iterator<T>& y) -> bool
   {

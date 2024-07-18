@@ -32,11 +32,12 @@ struct AnnBatchLoadIteratorInputs {
   IdxT row_width;
   IdxT batch_size;
   bool host_dataset;
-  typename batch_load_iterator<DataT>::PrefetchOption prefetch;
+  bool prefetch;
 };
 
 template <typename DataT, typename IdxT>
-class AnnBatchLoadIteratorTest : public ::testing::TestWithParam<AnnBatchLoadIteratorInputs<DataT, IdxT>> {
+class AnnBatchLoadIteratorTest
+  : public ::testing::TestWithParam<AnnBatchLoadIteratorInputs<DataT, IdxT>> {
  public:
   AnnBatchLoadIteratorTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
@@ -108,35 +109,67 @@ class AnnBatchLoadIteratorTest : public ::testing::TestWithParam<AnnBatchLoadIte
   std::vector<DataT> host_dataset;
 };
 
-const std::vector<AnnBatchLoadIteratorInputs<float, int64_t>> inputs = {
-  // test device input, batch iterator should directly
-  {10000, 8, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {100000, 8, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {100000, 16, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {1000000, 8, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 8, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 8, 524288, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 16, 524288, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  // test host input without prefetching, batch iterator requires pageable copy
-  {10000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {100000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {100000, 16, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {1000000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 8, 524288, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 16, 524288, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  // test host input with prefetching, batch iterator requires pageable copy
-  {10000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {100000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {100000, 16, 65536, false, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {1000000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 8, 65536, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 8, 524288, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE},
-  {10000000, 16, 524288, true, batch_load_iterator<float>::PrefetchOption::PREFETCH_NONE}};
+const std::vector<AnnBatchLoadIteratorInputs<float, int64_t>> float_inputs = {
+  // test device input without prefetching
+  {10000, 8, 65536, false, false},
+  {100000, 8, 65536, false, false},
+  {100000, 16, 65536, false, false},
+  {1000000, 8, 65536, false, false},
+  {10000000, 8, 65536, false, false},
+  {10000000, 8, 524288, false, false},
+  {10000000, 16, 524288, false, false},
+  // test host input without prefetching
+  {10000, 8, 65536, true, false},
+  {100000, 8, 65536, true, false},
+  {100000, 16, 65536, true, false},
+  {1000000, 8, 65536, true, false},
+  {10000000, 8, 65536, true, false},
+  {10000000, 8, 524288, true, false},
+  {10000000, 16, 524288, true, false},
+  // test host input with prefetching
+  {10000, 8, 65536, true, true},
+  {100000, 8, 65536, true, true},
+  {100000, 16, 65536, true, true},
+  {1000000, 8, 65536, true, true},
+  {10000000, 8, 65536, true, true},
+  {10000000, 8, 524288, true, true},
+  {10000000, 16, 524288, true, true}};
 
 typedef AnnBatchLoadIteratorTest<float, std::int64_t> AnnBatchLoadIteratorTest_float;
 TEST_P(AnnBatchLoadIteratorTest_float, AnnBatchLoadIterator) { this->testBatchedCopy(); }
 INSTANTIATE_TEST_CASE_P(AnnBatchLoadIteratorTest,
                         AnnBatchLoadIteratorTest_float,
-                        ::testing::ValuesIn(inputs));
+                        ::testing::ValuesIn(float_inputs));
+
+const std::vector<AnnBatchLoadIteratorInputs<uint8_t, int64_t>> uint8_inputs = {
+  // test device input without prefetching
+  {10000, 8, 65536, false, false},
+  {100000, 8, 65536, false, false},
+  {100000, 16, 65536, false, false},
+  {1000000, 8, 65536, false, false},
+  {10000000, 8, 65536, false, false},
+  {10000000, 8, 524288, false, false},
+  {10000000, 16, 524288, false, false},
+  // test host input without prefetching
+  {10000, 8, 65536, true, false},
+  {100000, 8, 65536, true, false},
+  {100000, 16, 65536, true, false},
+  {1000000, 8, 65536, true, false},
+  {10000000, 8, 65536, true, false},
+  {10000000, 8, 524288, true, false},
+  {10000000, 16, 524288, true, false},
+  // test host input with prefetching
+  {10000, 8, 65536, true, true},
+  {100000, 8, 65536, true, true},
+  {100000, 16, 65536, true, true},
+  {1000000, 8, 65536, true, true},
+  {10000000, 8, 65536, true, true},
+  {10000000, 8, 524288, true, true},
+  {10000000, 16, 524288, true, true}};
+
+typedef AnnBatchLoadIteratorTest<uint8_t, std::int64_t> AnnBatchLoadIteratorTest_uint8;
+TEST_P(AnnBatchLoadIteratorTest_uint8, AnnBatchLoadIterator) { this->testBatchedCopy(); }
+INSTANTIATE_TEST_CASE_P(AnnBatchLoadIteratorTest,
+                        AnnBatchLoadIteratorTest_uint8,
+                        ::testing::ValuesIn(uint8_inputs));
 }  // namespace cuvs::spatial::knn::detail::utils

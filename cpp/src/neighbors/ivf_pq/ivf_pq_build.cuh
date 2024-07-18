@@ -34,6 +34,7 @@
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/add.cuh>
@@ -1573,9 +1574,16 @@ void extend(raft::resources const& handle,
     }
   }
 
+  // Determine if a stream pool is setup and make sure there is at least one stream in it so we
+  // could use the stream for kernel/copy overlapping.
+  auto copy_stream = raft::resource::get_cuda_stream(handle);  // Using the main stream by default
+  if (raft::resource::get_stream_pool_size(handle) >= 1) {
+    copy_stream = raft::resource::get_stream_from_stream_pool(handle);
+  }
   // Predict the cluster labels for the new data, in batches if necessary
+  bool enable_prefetch = false;
   utils::batch_load_iterator<T> vec_batches(
-    new_vectors, n_rows, index->dim(), max_batch_size, stream, batches_mr);
+    new_vectors, n_rows, index->dim(), max_batch_size, copy_stream, device_memory, enable_prefetch);
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
@@ -1593,6 +1601,7 @@ void extend(raft::resources const& handle,
                                     n_clusters,
                                     cudaMemcpyDefault,
                                     stream));
+    vec_batches.prefetch_next_batch();
     for (const auto& batch : vec_batches) {
       auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
         batch.data(), batch.size(), index->dim());
@@ -1608,6 +1617,10 @@ void extend(raft::resources const& handle,
                                               centers_view,
                                               batch_labels_view,
                                               utils::mapping<float>{});
+      vec_batches.prefetch_next_batch();
+      // User needs to make sure kernel finishes its work before we overwrite batch in the next
+      // iteration if different streams are used for kernel and copy.
+      raft::resource::sync_stream(handle);
     }
   }
 
@@ -1649,6 +1662,8 @@ void extend(raft::resources const& handle,
   // Fill the extended index with the new data (possibly, in batches)
   utils::batch_load_iterator<IdxT> idx_batches(
     new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
+  vec_batches.reset();
+  vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
     process_and_fill_codes(handle,
@@ -1660,6 +1675,10 @@ void extend(raft::resources const& handle,
                            new_data_labels.data() + vec_batch.offset(),
                            IdxT(vec_batch.size()),
                            batches_mr);
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
   }
 }
 
