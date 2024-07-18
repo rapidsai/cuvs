@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#ifdef CUVS_BUILD_CAGRA_HNSWLIB
+
 #pragma once
 
 #include "common.hpp"
@@ -294,7 +296,7 @@ void search(raft::resources const& res,
  *   // save a CAGRA index to a file
  *   cagra::serialize(res, index, "index.bin");
  *   // De-serialize a CAGRA index as a base-layer HNSW index using the filesystem
- *   index<float>* hnsw_index;
+ *   index<float>* hnsw_index = nullptr;
  *   hnsw::deserialize(res, "index.bin", index->dim(), index->metric(), &hnsw_index);
  *
  *   // Delete index after use
@@ -328,7 +330,7 @@ void deserialize(raft::resources const& res,
  *   // save a CAGRA index to a file
  *   cagra::serialize(res, index, "index.bin");
  *   // De-serialize a CAGRA index as a base-layer HNSW index using the filesystem
- *   index<uint8_t>* hnsw_index;
+ *   index<uint8_t>* hnsw_index = nullptr;
  *   hnsw::deserialize(res, "index.bin", index->dim(), index->metric(), &hnsw_index);
  *
  *   // Delete index after use
@@ -362,7 +364,7 @@ void deserialize(raft::resources const& res,
  *   // save a CAGRA index to a file
  *   cagra::serialize(res, index, "index.bin");
  *   // De-serialize a CAGRA index as a base-layer HNSW index using the filesystem
- *   index<int8_t>* hnsw_index;
+ *   index<int8_t>* hnsw_index = nullptr;
  *   hnsw::deserialize(res, "index.bin", index->dim(), index->metric(), &hnsw_index);
  *
  *   // Delete index after use
@@ -378,3 +380,7 @@ void deserialize(raft::resources const& res,
 /**@}*/
 
 }  // namespace cuvs::neighbors::hnsw
+
+#else
+#error "This header is only available if cuVS CMake option `BUILD_CAGRA_HNSWLIB=ON"
+#endif

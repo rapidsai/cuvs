@@ -407,7 +407,7 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
-  src/neighbors/hnsw.cpp
+  $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
@@ -476,10 +476,6 @@ target_include_directories(
               "$<INSTALL_INTERFACE:include>"
 )
 
-if(BUILD_CAGRA_HNSWLIB)
-  target_link_libraries(cuvs PRIVATE hnswlib::hnswlib)
-endif()
-
 rapids_find_package(
   OpenMP REQUIRED
   BUILD_EXPORT_SET cuvs-exports
@@ -503,6 +499,11 @@ if(NOT BUILD_CPU_ONLY)
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
     PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
+endif()
+
+if(BUILD_CAGRA_HNSWLIB)
+  target_link_libraries(cuvs PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
 endif()
 
 # Endian detection

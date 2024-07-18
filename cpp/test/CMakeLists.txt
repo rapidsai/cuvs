@@ -160,16 +160,18 @@ if(BUILD_TESTS)
     100
   )
 
-  ConfigureTest(
-    NAME
-    NEIGHBORS_HNSW_TEST
-    PATH
-    test/neighbors/hnsw.cu
-    GPUS
-    1
-    PERCENT
-    100
-  )
+  if (BUILD_CAGRA_HNSWLIB)
+    ConfigureTest(
+      NAME
+      NEIGHBORS_HNSW_TEST
+      PATH
+      test/neighbors/hnsw.cu
+      GPUS
+      1
+      PERCENT
+      100
+    )
+  endif()
 
   ConfigureTest(
     NAME

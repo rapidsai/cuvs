@@ -103,7 +103,7 @@ std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
   auto uuid            = std::to_string(dist(rng));
   std::string filepath = "/tmp/" + uuid + ".bin";
   cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index);
-  index<T>* hnsw_index;
+  index<T>* hnsw_index = nullptr;
   cuvs::neighbors::hnsw::deserialize(
     res, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
   std::filesystem::remove(filepath);
