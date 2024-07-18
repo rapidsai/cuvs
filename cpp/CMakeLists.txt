@@ -101,12 +101,8 @@ message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
 message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELINFO}")
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
-message(VERBOSE
-        "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}"
-)
-message(VERBOSE
-        "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}"
-)
+message(VERBOSE "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}")
+message(VERBOSE "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}")
 message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
 # Set RMM logging level
@@ -403,6 +399,15 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
   src/neighbors/ivf_flat_index.cpp
+  src/neighbors/ann_mg/ann_mg_flat_float_int64_t.cu
+  src/neighbors/ann_mg/ann_mg_flat_int8_t_int64_t.cu
+  src/neighbors/ann_mg/ann_mg_flat_uint8_t_int64_t.cu
+  src/neighbors/ann_mg/ann_mg_pq_float_int64_t.cu
+  src/neighbors/ann_mg/ann_mg_pq_int8_t_int64_t.cu
+  src/neighbors/ann_mg/ann_mg_pq_uint8_t_int64_t.cu
+  src/neighbors/ann_mg/ann_mg_cagra_float_uint32_t.cu
+  src/neighbors/ann_mg/ann_mg_cagra_int8_t_uint32_t.cu
+  src/neighbors/ann_mg/ann_mg_cagra_uint8_t_uint32_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu

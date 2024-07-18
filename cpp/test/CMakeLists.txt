@@ -23,7 +23,7 @@ function(ConfigureTest)
 
   set(options OPTIONAL NOCUDA C_LIB)
   set(oneValueArgs NAME GPUS PERCENT)
-  set(multiValueArgs PATH TARGETS CONFIGURATIONS)
+  set(multiValueArgs PATH ADDITIONAL_LIBS TARGETS CONFIGURATIONS)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   if(NOT DEFINED _CUVS_TEST_GPUS AND NOT DEFINED _CUVS_TEST_PERCENT)
@@ -56,6 +56,7 @@ function(ConfigureTest)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
+            ${_CUVS_TEST_ADDITIONAL_LIBS}
   )
   set_target_properties(
     ${TEST_NAME}
@@ -91,16 +92,8 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
-    NAME
-    NEIGHBORS_TEST
-    PATH
-    test/neighbors/brute_force.cu
-    test/neighbors/brute_force_prefiltered.cu
-    test/neighbors/refine.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu
+    test/neighbors/brute_force_prefiltered.cu test/neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -158,6 +151,11 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_MG_TEST PATH test/neighbors/ann_mg/test_float.cu
+    src/neighbors/ann_mg/nccl_clique.cu ADDITIONAL_LIBS ucp ucs ucxx nccl GPUS 1 PERCENT 100
   )
 
   ConfigureTest(

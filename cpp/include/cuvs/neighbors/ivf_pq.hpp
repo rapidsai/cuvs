@@ -1122,7 +1122,7 @@ void extend(raft::resources const& handle,
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_pq::search_params& search_params,
-            cuvs::neighbors::ivf_pq::index<int64_t>& index,
+            const cuvs::neighbors::ivf_pq::index<int64_t>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
@@ -1163,7 +1163,7 @@ void search(raft::resources const& handle,
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_pq::search_params& search_params,
-            cuvs::neighbors::ivf_pq::index<int64_t>& index,
+            const cuvs::neighbors::ivf_pq::index<int64_t>& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
@@ -1204,7 +1204,7 @@ void search(raft::resources const& handle,
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_pq::search_params& search_params,
-            cuvs::neighbors::ivf_pq::index<int64_t>& index,
+            const cuvs::neighbors::ivf_pq::index<int64_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
