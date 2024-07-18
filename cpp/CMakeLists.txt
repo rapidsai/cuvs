@@ -102,12 +102,8 @@ message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
 message(VERBOSE "cuVS: Enable kernel resource usage info: ${CUDA_ENABLE_KERNELINFO}")
 message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
-message(VERBOSE
-        "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}"
-)
-message(VERBOSE
-        "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}"
-)
+message(VERBOSE "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}")
+message(VERBOSE "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}")
 message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
 
 # Set RMM logging level
