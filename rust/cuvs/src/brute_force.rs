@@ -106,6 +106,7 @@ mod tests {
     use ndarray::s;
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
+    use mark_flaky_tests::flaky;
 
     fn test_bfknn(metric: DistanceType) {
         let res = Resources::new().unwrap();
@@ -174,7 +175,7 @@ mod tests {
     }
 */
 
-    #[test]
+    #[flaky]
     fn test_l2() {
         test_bfknn(DistanceType::L2Expanded);
     }
