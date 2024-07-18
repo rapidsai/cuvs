@@ -17,10 +17,6 @@
 #include <cuvs/neighbors/ann_mg.hpp>
 #include <raft/comms/std_comms.hpp>
 
-namespace raft::comms {
-void build_comms_nccl_only(resources* handle, ncclComm_t nccl_comm, int num_ranks, int rank);
-}
-
 namespace cuvs::neighbors::mg {
 
 nccl_clique::nccl_clique(const std::vector<int>& device_ids)

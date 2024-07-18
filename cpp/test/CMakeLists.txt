@@ -155,7 +155,7 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME NEIGHBORS_ANN_MG_TEST PATH test/neighbors/ann_mg/test_float.cu
-    src/neighbors/ann_mg/nccl_clique.cu ADDITIONAL_LIBS ucp ucs ucxx nccl GPUS 1 PERCENT 100
+    test/neighbors/ann_mg/nccl_clique.cu ADDITIONAL_LIBS ucp ucs ucxx nccl GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
