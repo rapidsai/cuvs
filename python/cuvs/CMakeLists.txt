@@ -37,7 +37,6 @@ project(
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
        OFF
 )
-set(CUVS_RAFT_CLONE_ON_PIN OFF)
 
 message(
   "CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}"
