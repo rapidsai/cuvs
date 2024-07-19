@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ann_mg.hpp>
 #include <raft/comms/std_comms.hpp>
+
+#include "nccl_helpers.cuh"
+#define NO_NCCL_FORWARD_DECLARATION
+#include <cuvs/neighbors/ann_mg.hpp>
+#undef NO_NCCL_FORWARD_DECLARATION
 
 namespace cuvs::neighbors::mg {
 

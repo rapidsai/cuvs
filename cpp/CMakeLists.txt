@@ -470,6 +470,10 @@ add_library(
   ${CUVS_MG_ALGOS}
 )
 
+if(BUILD_MG_ALGOS)
+  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS=1)
+endif()
+
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
                  --expt-relaxed-constexpr>

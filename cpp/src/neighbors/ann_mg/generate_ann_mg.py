@@ -37,7 +37,6 @@ header = """/*
  *
  */
 
-#include <cuvs/neighbors/ann_mg.hpp>
 """
 
 include_macro = """

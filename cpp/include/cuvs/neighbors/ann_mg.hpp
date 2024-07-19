@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <nccl.h>
 #include <raft/core/device_resources.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
@@ -24,26 +23,9 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-/**
- * @brief Error checking macro for NCCL runtime API functions.
- *
- * Invokes a NCCL runtime API function call, if the call does not return ncclSuccess, throws an
- * exception detailing the NCCL error that occurred
- */
-#define RAFT_NCCL_TRY(call)                        \
-  do {                                             \
-    ncclResult_t const status = (call);            \
-    if (ncclSuccess != status) {                   \
-      std::string msg{};                           \
-      SET_ERROR_MSG(msg,                           \
-                    "NCCL error encountered at: ", \
-                    "call='%s', Reason=%d:%s",     \
-                    #call,                         \
-                    status,                        \
-                    ncclGetErrorString(status));   \
-      throw raft::logic_error(msg);                \
-    }                                              \
-  } while (0);
+#ifndef NO_NCCL_FORWARD_DECLARATION
+class ncclComm_t {};
+#endif
 
 namespace cuvs::neighbors::mg {
 enum parallel_mode { REPLICATED, SHARDED };

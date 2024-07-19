@@ -16,11 +16,17 @@
 
 #pragma once
 
+#ifdef CUVS_BUILD_MG_ALGOS
+
 #include "../detail/knn_merge_parts.cuh"
-#include <cuvs/neighbors/ann_mg.hpp>
-#include <cuvs/neighbors/common.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/util/cuda_dev_essentials.cuh>
+
+#include "nccl_helpers.cuh"
+#define NO_NCCL_FORWARD_DECLARATION
+#include <cuvs/neighbors/ann_mg.hpp>
+#undef NO_NCCL_FORWARD_DECLARATION
+#include <cuvs/neighbors/common.hpp>
 
 namespace cuvs::neighbors::mg {
 using namespace cuvs::neighbors;
@@ -741,3 +747,11 @@ ann_mg_index<cagra::index<T, IdxT>, T, IdxT> distribute_cagra(
 }
 
 }  // namespace cuvs::neighbors::mg::detail
+
+#else
+
+static_assert(false,
+              "FORBIDEN_MG_ALGORITHM_IMPORT\n\n"
+              "Please recompile the cuVS library with MG algorithms.\n");
+
+#endif

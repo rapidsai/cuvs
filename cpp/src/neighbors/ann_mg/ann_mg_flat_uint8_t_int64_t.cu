@@ -23,8 +23,6 @@
  *
  */
 
-#include <cuvs/neighbors/ann_mg.hpp>
-
 #include "ann_mg.cuh"
 
 namespace cuvs::neighbors::mg {
