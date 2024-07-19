@@ -245,6 +245,78 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
   }
 
  protected:
+  void cpu_distance(const T* d_A,
+                    const T* d_B,
+                    DistT* d_vals,
+                    bool is_row_major_A,
+                    bool is_row_major_B,
+                    bool is_row_major_C,
+                    cudaStream_t stream,
+                    DistT alpha = 1.0,
+                    DistT beta  = 0.0)
+  {
+    size_t size_A    = params_.num_queries * params_.dim * sizeof(T);
+    size_t size_B    = params_.num_db_vecs * params_.dim * sizeof(T);
+    size_t size_vals = params_.num_queries * params_.num_db_vecs * sizeof(DistT);
+
+    T* h_A        = static_cast<T*>(malloc(size_A));
+    T* h_B        = static_cast<T*>(malloc(size_B));
+    DistT* h_vals = static_cast<DistT*>(malloc(size_vals));
+
+    cudaMemcpyAsync(h_A, d_A, size_A, cudaMemcpyDeviceToHost, stream);
+    cudaMemcpyAsync(h_B, d_B, size_B, cudaMemcpyDeviceToHost, stream);
+    cudaMemcpyAsync(h_vals, d_vals, size_vals, cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
+
+    bool trans_a = is_row_major_A;
+    bool trans_b = is_row_major_B;
+    bool trans_c = is_row_major_C;
+
+    for (int64_t i = 0; i < params_.num_queries; ++i) {
+      for (int64_t j = 0; j < params_.num_db_vecs; ++j) {
+        DistT sum     = 0;
+        DistT norms_A = 0;
+        DistT norms_B = 0;
+
+        for (int64_t l = 0; l < params_.dim; ++l) {
+          int64_t a_index = trans_a ? i * params_.dim + l : l * params_.num_queries + i;
+          int64_t b_index = trans_b ? j * params_.dim + l : l * params_.num_db_vecs + j;
+          DistT A_v;
+          DistT B_v;
+          if constexpr (sizeof(T) == 2) {
+            A_v = __half2float(h_A[a_index]);
+            B_v = __half2float(h_B[b_index]);
+          } else {
+            A_v = h_A[a_index];
+            B_v = h_B[b_index];
+          }
+
+          sum += A_v * B_v;
+
+          norms_A += A_v * A_v;
+          norms_B += B_v * B_v;
+        }
+
+        int64_t c_index = trans_c ? i * params_.num_db_vecs + j : j * params_.num_queries + i;
+
+        h_vals[c_index] = alpha * sum + beta * h_vals[c_index];
+        if (params_.metric == cuvs::distance::DistanceType::L2Expanded) {
+          h_vals[c_index] = DistT(-2.0) * h_vals[c_index] + norms_A + norms_B;
+        } else if (params_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          h_vals[c_index] = std::sqrt(DistT(-2.0) * h_vals[c_index] + norms_A + norms_B);
+        } else if (params_.metric == cuvs::distance::DistanceType::CosineExpanded) {
+          h_vals[c_index] = DistT(1.0) - h_vals[c_index] / std::sqrt(norms_A * norms_B);
+        }
+      }
+    }
+    cudaMemcpyAsync(d_vals, h_vals, size_vals, cudaMemcpyHostToDevice, stream);
+    cudaStreamSynchronize(stream);
+
+    free(h_A);
+    free(h_B);
+    free(h_vals);
+  }
+
   void testBruteForce()
   {
     DistT metric_arg = 3.0;
@@ -256,34 +328,48 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     auto temp_dist = temp_distances.data();
     rmm::device_uvector<DistT> temp_row_major_dist(num_db_vecs * num_queries, stream_);
 
-    if (params_.row_major) {
-      distance::pairwise_distance(handle_,
-                                  raft::make_device_matrix_view<const T, int64_t>(
-                                    search_queries.data(), params_.num_queries, params_.dim),
-                                  raft::make_device_matrix_view<const T, int64_t>(
-                                    database.data(), params_.num_db_vecs, params_.dim),
-                                  raft::make_device_matrix_view<DistT, int64_t>(
-                                    temp_distances.data(), num_queries, num_db_vecs),
-                                  metric,
-                                  metric_arg);
-
+    // For the complex post processes in these algorithms, we use CPU logic to make the baseline.
+    if (metric == cuvs::distance::DistanceType::L2Expanded ||
+        metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+        metric == cuvs::distance::DistanceType::CosineExpanded) {
+      cpu_distance(search_queries.data(),
+                   database.data(),
+                   temp_distances.data(),
+                   params_.row_major,
+                   params_.row_major,
+                   true,
+                   stream_);
     } else {
-      distance::pairwise_distance(handle_,
-                                  raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
-                                    search_queries.data(), params_.num_queries, params_.dim),
-                                  raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
-                                    database.data(), params_.num_db_vecs, params_.dim),
-                                  raft::make_device_matrix_view<DistT, int64_t, raft::col_major>(
-                                    temp_distances.data(), num_queries, num_db_vecs),
-                                  metric,
-                                  metric_arg);
+      if (params_.row_major) {
+        distance::pairwise_distance(handle_,
+                                    raft::make_device_matrix_view<const T, int64_t>(
+                                      search_queries.data(), params_.num_queries, params_.dim),
+                                    raft::make_device_matrix_view<const T, int64_t>(
+                                      database.data(), params_.num_db_vecs, params_.dim),
+                                    raft::make_device_matrix_view<DistT, int64_t>(
+                                      temp_distances.data(), num_queries, num_db_vecs),
+                                    metric,
+                                    metric_arg);
 
-      // the pairwise_distance call assumes that the inputs and outputs are all either row-major
-      // or col-major - meaning we have to transpose the output back for col-major queries
-      // for comparison
-      raft::linalg::transpose(
-        handle_, temp_dist, temp_row_major_dist.data(), num_queries, num_db_vecs, stream_);
-      temp_dist = temp_row_major_dist.data();
+      } else {
+        distance::pairwise_distance(
+          handle_,
+          raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
+            search_queries.data(), params_.num_queries, params_.dim),
+          raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
+            database.data(), params_.num_db_vecs, params_.dim),
+          raft::make_device_matrix_view<DistT, int64_t, raft::col_major>(
+            temp_distances.data(), num_queries, num_db_vecs),
+          metric,
+          metric_arg);
+
+        // the pairwise_distance call assumes that the inputs and outputs are all either row-major
+        // or col-major - meaning we have to transpose the output back for col-major queries
+        // for comparison
+        raft::linalg::transpose(
+          handle_, temp_dist, temp_row_major_dist.data(), num_queries, num_db_vecs, stream_);
+        temp_dist = temp_row_major_dist.data();
+      }
     }
 
     cuvs::selection::select_k(
@@ -381,7 +467,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
 const std::vector<RandomKNNInputs> random_inputs = {
   // test each distance metric on a small-ish input, with row-major inputs
-  {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, true},
+  {100, 256, 2, 65, cuvs::distance::DistanceType::L2Expanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
   {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, true},
@@ -412,8 +498,8 @@ const std::vector<RandomKNNInputs> random_inputs = {
   {10000, 40000, 32, 30, cuvs::distance::DistanceType::L2Expanded, false},
   {345, 1023, 16, 128, cuvs::distance::DistanceType::CosineExpanded, true},
   {789, 20516, 64, 256, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 500000, 128, 128, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 500000, 128, 128, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 200000, 128, 128, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 200000, 128, 128, cuvs::distance::DistanceType::L2Expanded, false},
   {1000, 5000, 128, 128, cuvs::distance::DistanceType::LpUnexpanded, true},
   {1000, 5000, 128, 128, cuvs::distance::DistanceType::L2SqrtExpanded, false},
   {1000, 5000, 128, 128, cuvs::distance::DistanceType::InnerProduct, false}};
