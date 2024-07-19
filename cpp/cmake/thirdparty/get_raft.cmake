@@ -21,7 +21,7 @@ function(find_and_configure_raft)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
-    if(PKG_CLONE_ON_PIN AND NOT PKG_PINNED_TAG STREQUAL "branch-${CUML_BRANCH_VERSION_raft}")
+    if(PKG_CLONE_ON_PIN AND NOT PKG_PINNED_TAG STREQUAL "branch-${RAFT_VERSION}")
         message(STATUS "cuVS: RAFT pinned tag found: ${PKG_PINNED_TAG}. Cloning raft locally.")
         set(CPM_DOWNLOAD_raft ON)
     elseif(PKG_USE_RAFT_STATIC AND (NOT CPM_raft_SOURCE))
@@ -65,4 +65,9 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
+        # When PINNED_TAG above doesn't match the default rapids branch,
+        # force local raft clone in build directory
+        # even if it's already installed.
+        CLONE_ON_PIN     ${CUVS_RAFT_CLONE_ON_PIN}
+
 )
