@@ -55,7 +55,7 @@ struct index_impl : index<T> {
    * @param[in] dim dimensions of the training dataset
    * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
    */
-  index_impl(std::string filepath, int dim, cuvs::distance::DistanceType metric)
+  index_impl(const std::string & filepath, int dim, cuvs::distance::DistanceType metric)
     : index<T>{dim, metric}
   {
     if constexpr (std::is_same_v<T, float>) {
