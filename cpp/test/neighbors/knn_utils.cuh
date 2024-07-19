@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../test_utils.cuh"
+#include "./ann_utils.cuh"
 
 #include <raft/util/cudart_utils.hpp>
 
@@ -25,20 +26,6 @@
 #include <memory>
 
 namespace cuvs::neighbors {
-template <typename IdxT, typename DistT, typename compareDist>
-struct idx_dist_pair {
-  IdxT idx;
-  DistT dist;
-  compareDist eq_compare;
-  bool operator==(const idx_dist_pair<IdxT, DistT, compareDist>& a) const
-  {
-    if (idx == a.idx) return true;
-    if (eq_compare(dist, a.dist)) return true;
-    return false;
-  }
-  idx_dist_pair(IdxT x, DistT y, compareDist op) : idx(x), dist(y), eq_compare(op) {}
-};
-
 template <typename T, typename DistT>
 testing::AssertionResult devArrMatchKnnPair(const T* expected_idx,
                                             const T* actual_idx,
