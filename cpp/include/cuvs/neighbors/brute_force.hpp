@@ -84,12 +84,25 @@ struct index : cuvs::neighbors::index {
 
   /** Construct a brute force index from dataset
    *
+   * Constructs a brute force index from a dataset. This lets us precompute norms for
+   * the dataset, providing a speed benefit over doing this at query time.
+   * This index will store a non-owning reference to the dataset, but will move
+   * any norms supplied.
+   */
+  index(raft::resources const& res,
+        raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
+        std::optional<raft::device_vector<T, int64_t>>&& norms,
+        cuvs::distance::DistanceType metric,
+        T metric_arg = 0.0);
+
+  /** Construct a brute force index from dataset
+   *
    * This class stores a non-owning reference to the dataset and norms, with
    * the dataset being supplied on device in a col_major format
    */
   index(raft::resources const& res,
         raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-        std::optional<raft::device_vector<T, int64_t>>&& norms,
+        std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
         cuvs::distance::DistanceType metric,
         T metric_arg = 0.0);
 

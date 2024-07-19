@@ -221,6 +221,39 @@ struct list_spec {
   constexpr list_extents make_list_extents(SizeT n_rows) const;
 };
 
+template <typename SizeT, typename IdxT>
+constexpr list_spec<SizeT, IdxT>::list_spec(uint32_t pq_bits,
+                                            uint32_t pq_dim,
+                                            bool conservative_memory_allocation)
+  : pq_bits(pq_bits),
+    pq_dim(pq_dim),
+    align_min(kIndexGroupSize),
+    align_max(conservative_memory_allocation ? kIndexGroupSize : 1024)
+{
+}
+
+template <typename SizeT, typename IdxT>
+template <typename OtherSizeT>
+constexpr list_spec<SizeT, IdxT>::list_spec(const list_spec<OtherSizeT, IdxT>& other_spec)
+  : pq_bits{other_spec.pq_bits},
+    pq_dim{other_spec.pq_dim},
+    align_min{other_spec.align_min},
+    align_max{other_spec.align_max}
+{
+}
+
+template <typename SizeT, typename IdxT>
+constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::make_list_extents(
+  SizeT n_rows) const
+{
+  // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
+  auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
+  return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                                   raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
+                                   kIndexGroupSize,
+                                   kIndexGroupVecLen);
+}
+
 template <typename IdxT, typename SizeT = uint32_t>
 using list_data = ivf::list<list_spec, SizeT, IdxT>;
 

@@ -414,7 +414,6 @@ add_library(
   src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
   src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
   src/neighbors/ivf_pq_index.cpp
-  src/neighbors/ivf_pq/ivf_pq_list.cuh
   src/neighbors/ivf_pq/ivf_pq_build_common.cu
   src/neighbors/ivf_pq/ivf_pq_serialize.cu
   src/neighbors/ivf_pq/ivf_pq_deserialize.cu
