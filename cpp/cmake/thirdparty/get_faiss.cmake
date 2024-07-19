@@ -101,7 +101,7 @@ function(find_and_configure_faiss)
     elseif(CXX_AVX2_FOUND)
       set(CUVS_FAISS_TARGETS faiss::faiss_avx2 PARENT_SCOPE)
     else()
-      set(RAFT_FAISS_TARGETS faiss::faiss PARENT_SCOPE)
+      set(CUVS_FAISS_TARGETS faiss::faiss PARENT_SCOPE)
     endif()
 endfunction()
 
