@@ -17,7 +17,7 @@ set(RAFT_FORK "rapidsai")
 set(RAFT_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
 
 function(find_and_configure_raft)
-    set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES)
+    set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
@@ -55,6 +55,7 @@ function(find_and_configure_raft)
               "RAFT_COMPILE_LIBRARY OFF"
             )
 endfunction()
+
 
 # Change pinned tag here to test a commit in CI
 # To use a different RAFT locally, set the CMake variable
