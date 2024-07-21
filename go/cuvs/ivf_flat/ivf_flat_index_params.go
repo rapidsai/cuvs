@@ -11,6 +11,7 @@ import "C"
 import (
 	"errors"
 	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs/cuvs/distance"
 	"unsafe"
 )
 
@@ -18,7 +19,7 @@ type IndexParams struct {
 	params C.cuvsIvfFlatIndexParams_t
 }
 
-func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, set_kmeans_n_iters uint32, kmeans_trainset_fraction float64, add_data_on_build bool) (*IndexParams, error) {
+func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg float32, set_kmeans_n_iters uint32, kmeans_trainset_fraction float64, add_data_on_build bool) (*IndexParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsIvfFlatIndexParams{})
 
@@ -34,13 +35,10 @@ func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, set_km
 		return nil, err
 	}
 
-	CMetric := C.cuvsDistanceType(0)
+	CMetric, exists := distance.CDistances[metric]
 
-	switch metric {
-	case "L2Expanded":
-		CMetric = C.L2Expanded
-	default:
-		return nil, errors.New("unsupported metric")
+	if !exists {
+		return nil, errors.New("cuvs: invalid distance metric")
 	}
 
 	params.n_lists = C.uint32_t(n_lists)

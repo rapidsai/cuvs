@@ -3,6 +3,7 @@ package ivf_pq
 import (
 	"math/rand"
 	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs/cuvs/distance"
 	"testing"
 	"time"
 )
@@ -26,7 +27,7 @@ func TestIvfPq(t *testing.T) {
 
 	dataset, _ := common.NewTensor(true, TestDataset)
 
-	IndexParams, err := CreateIndexParams(2, "L2Expanded", 2.0, 10, 0.3, 8, 4, "subspace", false, true)
+	IndexParams, err := CreateIndexParams(2, distance.L2, 2.0, 10, 0.3, 8, 4, Subspace, false, true)
 
 	if err != nil {
 		panic(err)
@@ -67,7 +68,7 @@ func TestIvfPq(t *testing.T) {
 
 	queries.ToDevice(&resource)
 
-	SearchParams, err := CreateSearchParams(10, "uint8", "float32")
+	SearchParams, err := CreateSearchParams(10, Lut_Uint8, InternalDistance_Float32)
 
 	if err != nil {
 		panic(err)

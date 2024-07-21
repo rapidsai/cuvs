@@ -26,9 +26,9 @@ func TestCagra(t *testing.T) {
 
 	dataset, _ := common.NewTensor(true, TestDataset)
 
-	CompressionParams, err := CreateCompressionParams(8, 4, 8, 10, 0.3, 0.3)
+	CompressionParams, _ := CreateCompressionParams(8, 4, 8, 10, 0.3, 0.3)
 
-	IndexParams, err := CreateIndexParams(5, 5, "nn_descent", 10, CompressionParams)
+	IndexParams, err := CreateIndexParams(5, 5, AutoSelect, 10, CompressionParams)
 
 	if err != nil {
 		panic(err)

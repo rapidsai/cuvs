@@ -3,6 +3,7 @@ package bruteforce
 import (
 	"math/rand"
 	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs/cuvs/distance"
 	"testing"
 	"time"
 )
@@ -52,7 +53,7 @@ func TestBruteForce(t *testing.T) {
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
 
-	BuildIndex(resource, &dataset, "L2Expanded", 2.0, index)
+	BuildIndex(resource, &dataset, distance.L2, 2.0, index)
 	resource.Sync()
 
 	queries.ToDevice(&resource)
@@ -64,7 +65,6 @@ func TestBruteForce(t *testing.T) {
 
 	resource.Sync()
 
-	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
 	arr, _ := neighbors.GetArray()
 	for i := range arr {
 		println(arr[i][0])

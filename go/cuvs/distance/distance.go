@@ -12,6 +12,7 @@ package distance
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
 import (
+	"errors"
 	"rapidsai/cuvs/cuvs/common"
 	"unsafe"
 )
@@ -66,8 +67,12 @@ var CDistances = map[Distance]int{
 
 func PairwiseDistance[T any](Resources common.Resource, x *common.Tensor[T], y *common.Tensor[T], distances *common.Tensor[float32], metric Distance, metric_arg float32) error {
 
-	CMetric := C.cuvsDistanceType(CDistances[metric])
+	CMetric, exists := CDistances[metric]
 
-	return common.CheckCuvs(common.CuvsError(C.cuvsPairwiseDistance(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(x.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(y.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), CMetric, C.float(metric_arg))))
+	if !exists {
+		return errors.New("cuvs: invalid distance metric")
+	}
+
+	return common.CheckCuvs(common.CuvsError(C.cuvsPairwiseDistance(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(x.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(y.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), C.cuvsDistanceType(CMetric), C.float(metric_arg))))
 
 }

@@ -11,6 +11,7 @@ import "C"
 import (
 	"errors"
 	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs/cuvs/distance"
 	"unsafe"
 )
 
@@ -50,22 +51,19 @@ func (index *Index) Close() error {
 	return nil
 }
 
-func BuildIndex[T any](Resources common.Resource, Dataset *common.Tensor[T], metric string, metric_arg float32, index *Index) error {
+func BuildIndex[T any](Resources common.Resource, Dataset *common.Tensor[T], metric distance.Distance, metric_arg float32, index *Index) error {
 
 	// if Dataset.C_tensor.dl_tensor.device.device_type != C.kDLCUDA {
 	// 	return errors.New("dataset must be on GPU")
 	// }
 
-	CMetric := C.cuvsDistanceType(0)
+	CMetric, exists := distance.CDistances[metric]
 
-	switch metric {
-	case "L2Expanded":
-		CMetric = C.L2Expanded
-	default:
-		return errors.New("unsupported metric")
+	if !exists {
+		return errors.New("cuvs: invalid distance metric")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsBruteForceBuild(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(Dataset.C_tensor)), CMetric, C.float(metric_arg), index.index)))
+	err := common.CheckCuvs(common.CuvsError(C.cuvsBruteForceBuild(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(Dataset.C_tensor)), C.cuvsDistanceType(CMetric), C.float(metric_arg), index.index)))
 	if err != nil {
 		return err
 	}

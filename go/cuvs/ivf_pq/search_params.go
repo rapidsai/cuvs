@@ -18,38 +18,54 @@ type SearchParams struct {
 	params C.cuvsIvfPqSearchParams_t
 }
 
-func CreateSearchParams(n_probes uint32, lut_dtype string, internal_distance_dtype string) (*SearchParams, error) {
+type LutDtype int
 
-	CLutDtype := C.cudaDataType_t(0)
-	switch lut_dtype {
-	case "uint8":
-		CLutDtype = C.CUDA_R_8U
-	case "uint16":
-		CLutDtype = C.CUDA_R_16U
-	case "uint32":
-		CLutDtype = C.CUDA_R_32U
-	case "uint64":
-		CLutDtype = C.CUDA_R_64U
-	case "int8":
-		CLutDtype = C.CUDA_R_8I
-	case "int16":
-		CLutDtype = C.CUDA_R_16I
-	case "int32":
-		CLutDtype = C.CUDA_R_32I
-	case "int64":
-		CLutDtype = C.CUDA_R_64I
-	default:
-		return nil, errors.New("unsupported lut_dtype")
+const (
+	Lut_Uint8 LutDtype = iota
+	Lut_Uint16
+	Lut_Uint32
+	Lut_Uint64
+	Lut_Int8
+	Lut_Int16
+	Lut_Int32
+	Lut_Int64
+)
+
+var CLutDtypes = map[LutDtype]int{
+	Lut_Uint8:  C.CUDA_R_8U,
+	Lut_Uint16: C.CUDA_R_16U,
+	Lut_Uint32: C.CUDA_R_32U,
+	Lut_Uint64: C.CUDA_R_64U,
+	Lut_Int8:   C.CUDA_R_8I,
+	Lut_Int16:  C.CUDA_R_16I,
+	Lut_Int32:  C.CUDA_R_32I,
+	Lut_Int64:  C.CUDA_R_64I,
+}
+
+type InternalDistanceDtype int
+
+const (
+	InternalDistance_Float32 InternalDistanceDtype = iota
+	InternalDistance_Float64
+)
+
+var CInternalDistanceDtypes = map[InternalDistanceDtype]int{
+	InternalDistance_Float32: C.CUDA_R_32F,
+	InternalDistance_Float64: C.CUDA_R_64F,
+}
+
+func CreateSearchParams(n_probes uint32, lut_dtype LutDtype, internal_distance_dtype InternalDistanceDtype) (*SearchParams, error) {
+
+	CLutDtype, exists := CLutDtypes[LutDtype(lut_dtype)]
+
+	if !exists {
+		return nil, errors.New("cuvs: invalid lut_dtype")
 	}
 
-	CInternalDistanceDtype := C.cudaDataType_t(0)
-	switch internal_distance_dtype {
-	case "float32":
-		CInternalDistanceDtype = C.CUDA_R_32F
-	case "float64":
-		CInternalDistanceDtype = C.CUDA_R_64F
-	default:
-		return nil, errors.New("unsupported internal_distance_dtype")
+	CInternalDistanceDtype, exists := CInternalDistanceDtypes[InternalDistanceDtype(internal_distance_dtype)]
+
+	if !exists {
+		return nil, errors.New("cuvs: invalid internal_distance_dtype")
 	}
 
 	size := unsafe.Sizeof(C.struct_cuvsIvfPqSearchParams{})

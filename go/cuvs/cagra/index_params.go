@@ -22,6 +22,20 @@ type CompressionParams struct {
 	params C.cuvsCagraCompressionParams_t
 }
 
+type BuildAlgo int
+
+const (
+	IvfPq BuildAlgo = iota
+	NnDescent
+	AutoSelect
+)
+
+var CBuildAlgos = map[BuildAlgo]int{
+	IvfPq:      C.IVF_PQ,
+	NnDescent:  C.NN_DESCENT,
+	AutoSelect: C.AUTO_SELECT,
+}
+
 func CreateCompressionParams(pq_bits uint32, pq_dim uint32, vq_n_centers uint32, kmeans_n_iters uint32, vq_kmeans_trainset_fraction float64, pq_kmeans_trainset_fraction float64) (*CompressionParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsCagraCompressionParams{})
@@ -48,7 +62,7 @@ func CreateCompressionParams(pq_bits uint32, pq_dim uint32, vq_n_centers uint32,
 	return &CompressionParams{params: params}, nil
 }
 
-func CreateIndexParams(intermediate_graph_degree uintptr, graph_degree uintptr, build_algo string, nn_descent_niter uint32, compression *CompressionParams) (*IndexParams, error) {
+func CreateIndexParams(intermediate_graph_degree uintptr, graph_degree uintptr, build_algo BuildAlgo, nn_descent_niter uint32, compression *CompressionParams) (*IndexParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsCagraIndexParams{})
 
@@ -64,14 +78,10 @@ func CreateIndexParams(intermediate_graph_degree uintptr, graph_degree uintptr, 
 		return nil, err
 	}
 
-	CBuildAlgo := C.NN_DESCENT
-	switch build_algo {
-	case "ivf_pq":
-		CBuildAlgo = C.IVF_PQ
-	case "nn_descent":
-		CBuildAlgo = C.NN_DESCENT
-	default:
-		return nil, errors.New("unsupported build_algo")
+	CBuildAlgo, exists := CBuildAlgos[build_algo]
+
+	if !exists {
+		return nil, errors.New("cuvs: invalid build_algo")
 	}
 
 	params.intermediate_graph_degree = C.size_t(intermediate_graph_degree)

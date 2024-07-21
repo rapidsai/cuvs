@@ -11,6 +11,7 @@ import "C"
 import (
 	"errors"
 	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs/cuvs/distance"
 	"unsafe"
 )
 
@@ -18,7 +19,19 @@ type IndexParams struct {
 	params C.cuvsIvfPqIndexParams_t
 }
 
-func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, kmeans_n_iters uint32, kmeans_trainset_fraction float64, pq_bits uint32, pq_dim uint32, codebook_kind string, force_random_rotation bool, add_data_on_build bool) (*IndexParams, error) {
+type CodebookKind int
+
+const (
+	Subspace CodebookKind = iota
+	Cluster
+)
+
+var CCodebookKinds = map[CodebookKind]int{
+	Subspace: C.PER_SUBSPACE,
+	Cluster:  C.PER_CLUSTER,
+}
+
+func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg float32, kmeans_n_iters uint32, kmeans_trainset_fraction float64, pq_bits uint32, pq_dim uint32, codebook_kind CodebookKind, force_random_rotation bool, add_data_on_build bool) (*IndexParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsIvfPqIndexParams{})
 
@@ -34,23 +47,16 @@ func CreateIndexParams(n_lists uint32, metric string, metric_arg float32, kmeans
 		return nil, err
 	}
 
-	CMetric := C.cuvsDistanceType(0)
+	CMetric, exists := distance.CDistances[metric]
 
-	switch metric {
-	case "L2Expanded":
-		CMetric = C.L2Expanded
-	default:
-		return nil, errors.New("unsupported metric")
+	if !exists {
+		return nil, errors.New("cuvs: invalid distance metric")
 	}
 
-	CCodebookKind := C.PER_SUBSPACE
-	switch codebook_kind {
-	case "subspace":
-		CCodebookKind = C.PER_SUBSPACE
-	case "cluster":
-		CCodebookKind = C.PER_CLUSTER
-	default:
-		return nil, errors.New("unsupported codebook_kind")
+	CCodebookKind, exists := CCodebookKinds[codebook_kind]
+
+	if !exists {
+		return nil, errors.New("cuvs: invalid codebook_kind")
 	}
 
 	params.n_lists = C.uint32_t(n_lists)

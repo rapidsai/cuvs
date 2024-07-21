@@ -3,6 +3,7 @@ package ivf_flat
 import (
 	"math/rand"
 	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs/cuvs/distance"
 	"testing"
 	"time"
 )
@@ -26,7 +27,7 @@ func TestIvfFlat(t *testing.T) {
 
 	dataset, _ := common.NewTensor(true, TestDataset)
 
-	IndexParams, _ := CreateIndexParams(2, "L2Expanded", 2.0, 0, 0.5, true)
+	IndexParams, _ := CreateIndexParams(2, distance.L2, 2.0, 0, 0.5, true)
 
 	index, _ := CreateIndex(IndexParams, &dataset)
 	defer index.Close()
