@@ -10,8 +10,8 @@ package ivf_pq
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
-	"rapidsai/cuvs/cuvs/distance"
+	"rapidsai/cuvs"
+
 	"unsafe"
 )
 
@@ -31,7 +31,7 @@ var CCodebookKinds = map[CodebookKind]int{
 	Cluster:  C.PER_CLUSTER,
 }
 
-func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg float32, kmeans_n_iters uint32, kmeans_trainset_fraction float64, pq_bits uint32, pq_dim uint32, codebook_kind CodebookKind, force_random_rotation bool, add_data_on_build bool) (*IndexParams, error) {
+func CreateIndexParams(n_lists uint32, metric cuvs.Distance, metric_arg float32, kmeans_n_iters uint32, kmeans_trainset_fraction float64, pq_bits uint32, pq_dim uint32, codebook_kind CodebookKind, force_random_rotation bool, add_data_on_build bool) (*IndexParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsIvfPqIndexParams{})
 
@@ -41,13 +41,13 @@ func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg floa
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfPqIndexParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
 	}
 
-	CMetric, exists := distance.CDistances[metric]
+	CMetric, exists := cuvs.CDistances[metric]
 
 	if !exists {
 		return nil, errors.New("cuvs: invalid distance metric")
@@ -87,7 +87,7 @@ func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg floa
 }
 
 func (p *IndexParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfPqIndexParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

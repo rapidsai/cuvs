@@ -1,4 +1,4 @@
-package common
+package cuvs
 
 // #include <stdio.h>
 // #include <stdlib.h>
@@ -17,8 +17,8 @@ package common
 import "C"
 import (
 	"errors"
-	// "rapidsai/cuvs/cuvs"
-	// "rapidsai/cuvs/cuvs/ivf_flat"
+	// "rapidsai/cuvs"
+	// "rapidsai/cuvs/ivf_flat"
 	"unsafe"
 )
 

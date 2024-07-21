@@ -10,7 +10,7 @@ package ivf_pq
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs"
 	"unsafe"
 )
 
@@ -76,7 +76,7 @@ func CreateSearchParams(n_probes uint32, lut_dtype LutDtype, internal_distance_d
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfPqSearchParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearchParamsCreate(&params)))
 
 	params.n_probes = C.uint32_t(n_probes)
 	params.lut_dtype = C.cudaDataType_t(CLutDtype)
@@ -90,7 +90,7 @@ func CreateSearchParams(n_probes uint32, lut_dtype LutDtype, internal_distance_d
 }
 
 func (p *SearchParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfPqSearchParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

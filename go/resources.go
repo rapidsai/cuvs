@@ -1,4 +1,4 @@
-package common
+package cuvs
 
 // #include <cuda_runtime_api.h>
 // #include <cuvs/core/c_api.h>

@@ -10,7 +10,7 @@ package cagra
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs"
 	"unsafe"
 )
 
@@ -46,7 +46,7 @@ func CreateCompressionParams(pq_bits uint32, pq_dim uint32, vq_n_centers uint32,
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsCagraCompressionParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraCompressionParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func CreateIndexParams(intermediate_graph_degree uintptr, graph_degree uintptr, 
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsCagraIndexParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func CreateIndexParams(intermediate_graph_degree uintptr, graph_degree uintptr, 
 }
 
 func (p *IndexParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsCagraIndexParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

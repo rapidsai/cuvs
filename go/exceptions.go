@@ -1,4 +1,4 @@
-package common
+package cuvs
 
 // #include <cuvs/core/c_api.h>
 // #include <cuvs/distance/pairwise_distance.h>

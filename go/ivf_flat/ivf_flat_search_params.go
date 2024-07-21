@@ -10,7 +10,7 @@ package ivf_flat
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs"
 	"unsafe"
 )
 
@@ -28,7 +28,7 @@ func CreateSearchParams(n_probes uint32) (*SearchParams, error) {
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatSearchParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearchParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func CreateSearchParams(n_probes uint32) (*SearchParams, error) {
 }
 
 func (p *SearchParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatSearchParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

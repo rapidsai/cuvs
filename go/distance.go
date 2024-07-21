@@ -1,4 +1,4 @@
-package distance
+package cuvs
 
 // #include <stdio.h>
 // #include <stdlib.h>
@@ -13,7 +13,6 @@ package distance
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
 	"unsafe"
 )
 
@@ -65,7 +64,7 @@ var CDistances = map[Distance]int{
 	Dice:          C.DiceExpanded,
 }
 
-func PairwiseDistance[T any](Resources common.Resource, x *common.Tensor[T], y *common.Tensor[T], distances *common.Tensor[float32], metric Distance, metric_arg float32) error {
+func PairwiseDistance[T any](Resources Resource, x *Tensor[T], y *Tensor[T], distances *Tensor[float32], metric Distance, metric_arg float32) error {
 
 	CMetric, exists := CDistances[metric]
 
@@ -73,6 +72,6 @@ func PairwiseDistance[T any](Resources common.Resource, x *common.Tensor[T], y *
 		return errors.New("cuvs: invalid distance metric")
 	}
 
-	return common.CheckCuvs(common.CuvsError(C.cuvsPairwiseDistance(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(x.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(y.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), C.cuvsDistanceType(CMetric), C.float(metric_arg))))
+	return CheckCuvs(CuvsError(C.cuvsPairwiseDistance(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(x.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(y.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), C.cuvsDistanceType(CMetric), C.float(metric_arg))))
 
 }

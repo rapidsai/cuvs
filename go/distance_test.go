@@ -1,7 +1,6 @@
-package distance
+package cuvs
 
 import (
-	"rapidsai/cuvs/cuvs/common"
 	"testing"
 	"time"
 
@@ -9,7 +8,7 @@ import (
 )
 
 func TestDistance(t *testing.T) {
-	resource, _ := common.NewResource(nil)
+	resource, _ := NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -24,14 +23,14 @@ func TestDistance(t *testing.T) {
 		}
 	}
 
-	dataset, _ := common.NewTensor(true, TestDataset)
+	dataset, _ := NewTensor(true, TestDataset)
 
 	DistancesDataset := make([][]float32, NDataPoints)
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, NDataPoints)
 	}
 
-	distances, _ := common.NewTensor(true, DistancesDataset)
+	distances, _ := NewTensor(true, DistancesDataset)
 
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)

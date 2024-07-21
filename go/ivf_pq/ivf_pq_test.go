@@ -1,19 +1,20 @@
-package cagra
+package ivf_pq
 
 import (
 	"math/rand"
-	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs"
+
 	"testing"
 	"time"
 )
 
-func TestCagra(t *testing.T) {
+func TestIvfPq(t *testing.T) {
 
-	resource, _ := common.NewResource(nil)
+	resource, _ := cuvs.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
-	NDataPoints := 256
+	NDataPoints := 1024
 	NFeatures := 16
 
 	TestDataset := make([][]float32, NDataPoints)
@@ -24,11 +25,9 @@ func TestCagra(t *testing.T) {
 		}
 	}
 
-	dataset, _ := common.NewTensor(true, TestDataset)
+	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
-	CompressionParams, _ := CreateCompressionParams(8, 4, 8, 10, 0.3, 0.3)
-
-	IndexParams, err := CreateIndexParams(5, 5, AutoSelect, 10, CompressionParams)
+	IndexParams, err := CreateIndexParams(2, cuvs.L2, 2.0, 10, 0.3, 8, 4, Subspace, false, true)
 
 	if err != nil {
 		panic(err)
@@ -41,18 +40,17 @@ func TestCagra(t *testing.T) {
 
 	NQueries := 4
 	K := 4
-	queries, _ := common.NewTensor(true, TestDataset[:NQueries])
-	NeighborsDataset := make([][]uint32, NQueries)
+	queries, _ := cuvs.NewTensor(true, TestDataset[:NQueries])
+	NeighborsDataset := make([][]int64, NQueries)
 	for i := range NeighborsDataset {
-		NeighborsDataset[i] = make([]uint32, K)
+		NeighborsDataset[i] = make([]int64, K)
 	}
 	DistancesDataset := make([][]float32, NQueries)
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, K)
 	}
-	neighbors, _ := common.NewTensor(true, NeighborsDataset)
-	distances, _ := common.NewTensor(true, DistancesDataset)
-	println("hello")
+	neighbors, _ := cuvs.NewTensor(true, NeighborsDataset)
+	distances, _ := cuvs.NewTensor(true, DistancesDataset)
 
 	_, todeviceerr := neighbors.ToDevice(&resource)
 	if todeviceerr != nil {
@@ -70,7 +68,7 @@ func TestCagra(t *testing.T) {
 
 	queries.ToDevice(&resource)
 
-	SearchParams, err := CreateSearchParams(0, 5, 0, "single_cta", 16, 5, 0, "auto", 16, 0.5, 3, 234)
+	SearchParams, err := CreateSearchParams(10, Lut_Uint8, InternalDistance_Float32)
 
 	if err != nil {
 		panic(err)
@@ -90,7 +88,7 @@ func TestCagra(t *testing.T) {
 	arr, _ := neighbors.GetArray()
 	for i := range arr {
 		println(arr[i][0])
-		if arr[i][0] != uint32(i) {
+		if arr[i][0] != int64(i) {
 			t.Error("wrong neighbor, expected", i, "got", arr[i][0])
 		}
 	}

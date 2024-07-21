@@ -10,7 +10,7 @@ package cagra
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
+	"rapidsai/cuvs"
 	"unsafe"
 )
 
@@ -54,7 +54,7 @@ func CreateSearchParams(max_queries uintptr, itopk_size uintptr, max_iterations 
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsCagraSearchParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraSearchParamsCreate(&params)))
 
 	params.max_queries = C.size_t(max_queries)
 	params.itopk_size = C.size_t(itopk_size)
@@ -77,7 +77,7 @@ func CreateSearchParams(max_queries uintptr, itopk_size uintptr, max_iterations 
 }
 
 func (p *SearchParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsCagraSearchParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

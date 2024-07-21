@@ -10,8 +10,8 @@ package ivf_flat
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs/cuvs/common"
-	"rapidsai/cuvs/cuvs/distance"
+
+	"rapidsai/cuvs"
 	"unsafe"
 )
 
@@ -19,7 +19,7 @@ type IndexParams struct {
 	params C.cuvsIvfFlatIndexParams_t
 }
 
-func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg float32, set_kmeans_n_iters uint32, kmeans_trainset_fraction float64, add_data_on_build bool) (*IndexParams, error) {
+func CreateIndexParams(n_lists uint32, metric cuvs.Distance, metric_arg float32, set_kmeans_n_iters uint32, kmeans_trainset_fraction float64, add_data_on_build bool) (*IndexParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsIvfFlatIndexParams{})
 
@@ -29,13 +29,13 @@ func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg floa
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatIndexParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
 	}
 
-	CMetric, exists := distance.CDistances[metric]
+	CMetric, exists := cuvs.CDistances[metric]
 
 	if !exists {
 		return nil, errors.New("cuvs: invalid distance metric")
@@ -56,7 +56,7 @@ func CreateIndexParams(n_lists uint32, metric distance.Distance, metric_arg floa
 }
 
 func (p *IndexParams) Close() error {
-	err := common.CheckCuvs(common.CuvsError(C.cuvsIvfFlatIndexParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

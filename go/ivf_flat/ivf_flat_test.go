@@ -2,15 +2,15 @@ package ivf_flat
 
 import (
 	"math/rand"
-	"rapidsai/cuvs/cuvs/common"
-	"rapidsai/cuvs/cuvs/distance"
+	"rapidsai/cuvs"
+
 	"testing"
 	"time"
 )
 
 func TestIvfFlat(t *testing.T) {
 
-	resource, _ := common.NewResource(nil)
+	resource, _ := cuvs.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -25,9 +25,9 @@ func TestIvfFlat(t *testing.T) {
 		}
 	}
 
-	dataset, _ := common.NewTensor(true, TestDataset)
+	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
-	IndexParams, _ := CreateIndexParams(2, distance.L2, 2.0, 0, 0.5, true)
+	IndexParams, _ := CreateIndexParams(2, cuvs.L2, 2.0, 0, 0.5, true)
 
 	index, _ := CreateIndex(IndexParams, &dataset)
 	defer index.Close()
@@ -36,7 +36,7 @@ func TestIvfFlat(t *testing.T) {
 
 	NQueries := 4
 	K := 4
-	queries, _ := common.NewTensor(true, TestDataset[:NQueries])
+	queries, _ := cuvs.NewTensor(true, TestDataset[:NQueries])
 	NeighborsDataset := make([][]int64, NQueries)
 	for i := range NeighborsDataset {
 		NeighborsDataset[i] = make([]int64, K)
@@ -45,8 +45,8 @@ func TestIvfFlat(t *testing.T) {
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, K)
 	}
-	neighbors, _ := common.NewTensor(true, NeighborsDataset)
-	distances, _ := common.NewTensor(true, DistancesDataset)
+	neighbors, _ := cuvs.NewTensor(true, NeighborsDataset)
+	distances, _ := cuvs.NewTensor(true, DistancesDataset)
 
 	_, todeviceerr := neighbors.ToDevice(&resource)
 	if todeviceerr != nil {
