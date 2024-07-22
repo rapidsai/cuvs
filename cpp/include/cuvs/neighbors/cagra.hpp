@@ -497,23 +497,6 @@ struct index : cuvs::neighbors::index {
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
  *   cagra::search(res, search_params, index, queries, neighbors, distances);
  * @endcode
- *   In the above example, the dataset is attached to the index and the index is ready for
- * search. In contrast, a user can only build the CAGRA graph and separately attach the
- * dataset.
- * @code{.cpp}
- *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
- *   // use default index_parameters
- *   cagra::index_params index_params;
- *   // update index_params to only build the CAGRA graph
- *   index_params.attach_dataset_on_build = false;
- *   auto index = cagra::build(res, index_params, dataset.view());
- *   // assert that the dataset is not attached to the index
- *   ASSERT(index.dataset().extent(0) == 0);
- *   // update dataset
- *   index.update_dataset(res, dataset.view());
- *   // The index is now ready for search
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
- * @endcode
  *
  * @param[in] res
  * @param[in] params parameters for building the index
