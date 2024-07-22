@@ -16,6 +16,8 @@
 
 #pragma once
 
+#ifdef CUVS_BUILD_MG_ALGOS
+
 #include <raft/core/device_resources.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
@@ -275,3 +277,11 @@ auto distribute_cagra(const raft::resources& handle,
                       const std::string& filename) -> ann_mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::mg
+
+#else
+
+static_assert(false,
+              "FORBIDEN_MG_ALGORITHM_IMPORT\n\n"
+              "Please recompile the cuVS library with MG algorithms BUILD_MG_ALGOS=ON.\n");
+
+#endif

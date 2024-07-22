@@ -471,7 +471,7 @@ add_library(
 )
 
 if(BUILD_MG_ALGOS)
-  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS=1)
+  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
 endif()
 
 target_compile_options(

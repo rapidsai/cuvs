@@ -16,8 +16,6 @@
 
 #pragma once
 
-#ifdef CUVS_BUILD_MG_ALGOS
-
 #include "../detail/knn_merge_parts.cuh"
 #include <raft/core/serialize.hpp>
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -747,11 +745,3 @@ ann_mg_index<cagra::index<T, IdxT>, T, IdxT> distribute_cagra(
 }
 
 }  // namespace cuvs::neighbors::mg::detail
-
-#else
-
-static_assert(false,
-              "FORBIDEN_MG_ALGORITHM_IMPORT\n\n"
-              "Please recompile the cuVS library with MG algorithms.\n");
-
-#endif
