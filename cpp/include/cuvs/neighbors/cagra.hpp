@@ -112,7 +112,13 @@ struct index_params : cuvs::neighbors::index_params {
    *  - `true` means the index is filled with the dataset vectors and ready to search after calling
    * `build` provided there is enough memory available.
    *  - `false` means `build` only builds the graph and the user is expected to
-   * update the dataset using cuvs::neighbors::cagra::update_dataset. CAGRA does not have `extent`
+   * update the dataset using cuvs::neighbors::cagra::update_dataset.
+   *
+   * Regardless of the value of `attach_dataset_on_build`, the search graph is created using all
+   * the vectors in the dataset.  Setting `attach_dataset_on_build = false` can be useful if the 
+   * the user needs to build only the search graph but does not intend to search it using CAGRA
+   * (e.g. search using another graph search algorithm), or if specific memory placement options 
+   * need to be applied on the dataset before it is attached to the index using `update_dataset`.
    * API.
    * @code{.cpp}
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
