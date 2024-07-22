@@ -15,8 +15,6 @@
  */
 
 
-use std::io::{stderr, Write};
-
 use crate::distance_type::DistanceType;
 use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Result};
@@ -55,7 +53,6 @@ pub fn pairwise_distance(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::s;
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
 
