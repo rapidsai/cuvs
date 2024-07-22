@@ -40,15 +40,7 @@ float queries[4][2] = {{0.48216683, 0.0428398},
 std::vector<uint64_t> neighbors_exp = {3, 0, 3, 1};
 std::vector<float> distances_exp    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 TEST(CagraHnswC, BuildSearch)
-=======
-TEST(CagraC, BuildSearch)
->>>>>>> 6dcb88c (c api and tests)
-=======
-TEST(CagraC, BuildSearch)
->>>>>>> a2893cd (c api and tests)
 {
   // create cuvsResources_t
   cuvsResources_t res;
@@ -131,17 +123,6 @@ TEST(CagraC, BuildSearch)
   ASSERT_TRUE(cuvs::hostVecMatch(neighbors_exp, neighbors, cuvs::Compare<uint64_t>()));
   ASSERT_TRUE(cuvs::hostVecMatch(distances_exp, distances, cuvs::CompareApprox<float>(0.001f)));
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-  // delete device memory
-
->>>>>>> 6dcb88c (c api and tests)
-=======
-  // delete device memory
-
->>>>>>> a2893cd (c api and tests)
-  // de-allocate index and res
   cuvsCagraIndexParamsDestroy(build_params);
   cuvsCagraIndexDestroy(index);
   cuvsHnswSearchParamsDestroy(search_params);
