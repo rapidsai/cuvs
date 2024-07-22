@@ -123,8 +123,6 @@ TEST(CagraC, BuildSearch)
   ASSERT_TRUE(cuvs::hostVecMatch(neighbors_exp, neighbors, cuvs::Compare<uint64_t>()));
   ASSERT_TRUE(cuvs::hostVecMatch(distances_exp, distances, cuvs::CompareApprox<float>(0.001f)));
 
-  // delete device memory
-
   // de-allocate index and res
   cuvsCagraIndexParamsDestroy(build_params);
   cuvsCagraIndexDestroy(index);
