@@ -205,6 +205,10 @@ if(BUILD_C_TESTS)
   )
 
   ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
+
+  if (BUILD_CAGRA_HNSWLIB)
+    ConfigureTest(NAME HNSW_C_TEST PATH test/neighbors/ann_hnsw_c.cu C_LIB)
+  endif()
 endif()
 
 # ##################################################################################################

@@ -58,6 +58,8 @@ struct index : cuvs::neighbors::index {
    */
   index(int dim, cuvs::distance::DistanceType metric) : dim_{dim}, metric_{metric} {}
 
+  virtual ~index() {}
+
   /**
   @brief Get underlying index
   */
