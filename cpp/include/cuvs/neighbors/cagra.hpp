@@ -115,9 +115,9 @@ struct index_params : cuvs::neighbors::index_params {
    * update the dataset using cuvs::neighbors::cagra::update_dataset.
    *
    * Regardless of the value of `attach_dataset_on_build`, the search graph is created using all
-   * the vectors in the dataset.  Setting `attach_dataset_on_build = false` can be useful if the 
+   * the vectors in the dataset.  Setting `attach_dataset_on_build = false` can be useful if
    * the user needs to build only the search graph but does not intend to search it using CAGRA
-   * (e.g. search using another graph search algorithm), or if specific memory placement options 
+   * (e.g. search using another graph search algorithm), or if specific memory placement options
    * need to be applied on the dataset before it is attached to the index using `update_dataset`.
    * API.
    * @code{.cpp}
