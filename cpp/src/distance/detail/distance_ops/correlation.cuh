@@ -70,7 +70,7 @@ struct correlation_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    acc += raft::half2float(x) * raft::half2float(y);
+    acc += raft::to_float(x) * raft::to_float(y);
   };
 
   template <typename Policy>
@@ -94,13 +94,13 @@ struct correlation_distance_op {
     if (gridStrideX == blockIdx.x * Policy::Nblk) {
       for (int i = threadIdx.x; i < Policy::Mblk; i += Policy::Nthreads) {
         auto idx   = gridStrideY + i;
-        sx2Norm[i] = idx < m ? raft::half2float(x2n[idx]) : 0;
+        sx2Norm[i] = idx < m ? raft::to_float(x2n[idx]) : 0;
       }
     }
 
     for (int i = threadIdx.x; i < Policy::Nblk; i += Policy::Nthreads) {
       auto idx   = gridStrideX + i;
-      sy2Norm[i] = idx < n ? raft::half2float(y2n[idx]) : 0;
+      sy2Norm[i] = idx < n ? raft::to_float(y2n[idx]) : 0;
     }
     __syncthreads();
 

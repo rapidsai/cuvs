@@ -48,7 +48,7 @@ struct l1_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    acc += raft::abs(raft::half2float(x) - raft::half2float(y));
+    acc += raft::abs(raft::to_float(x) - raft::to_float(y));
   };
 
   template <typename Policy>

@@ -52,8 +52,8 @@ struct jensen_shannon_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    auto x_           = raft::half2float(x);
-    auto y_           = raft::half2float(y);
+    auto x_           = raft::to_float(x);
+    auto y_           = raft::to_float(y);
     const AccT m      = 0.5f * (x_ + y_);
     const bool m_zero = (m == 0);
     const auto logM   = (!m_zero) * raft::log(m + m_zero);

@@ -50,7 +50,7 @@ struct hellinger_distance_op {
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
     // This is sqrt(x) * sqrt(y).
-    const AccT product = raft::half2float(x) * raft::half2float(y);
+    const AccT product = raft::to_float(x) * raft::to_float(y);
     acc += product;
   };
 

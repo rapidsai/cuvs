@@ -53,8 +53,8 @@ struct lp_unexp_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    const AccT diff = raft::abs(raft::half2float(x) - raft::half2float(y));
-    acc += raft::pow(diff, raft::half2float(p));
+    const AccT diff = raft::abs(raft::to_float(x) - raft::to_float(y));
+    acc += raft::pow(diff, raft::to_float(p));
   };
 
   template <typename Policy>
@@ -64,7 +64,7 @@ struct lp_unexp_distance_op {
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {
-    const AccT one_over_p = 1.0f / static_cast<AccT>(raft::half2float(p));
+    const AccT one_over_p = 1.0f / static_cast<AccT>(raft::to_float(p));
 #pragma unroll
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll

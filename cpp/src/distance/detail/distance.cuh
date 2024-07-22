@@ -27,7 +27,7 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/linalg/unary_op.cuh>
-#include <raft/util/cuda_dev_essentials.cuh>  // half2float
+#include <raft/util/cuda_dev_essentials.cuh>  // to_float
 
 #include <type_traits>
 
@@ -377,7 +377,7 @@ void distance_impl(raft::resources const& handle,
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   auto unaryOp_lambda = [] __device__(DataT input) {
-    auto input_       = raft::half2float(input);
+    auto input_       = raft::to_float(input);
     const bool x_zero = (input_ == 0);
     if constexpr (std::is_same_v<DataT, half>) {
       return __float2half((!x_zero) * raft::log(input_ + x_zero));
@@ -388,7 +388,7 @@ void distance_impl(raft::resources const& handle,
 
   auto unaryOp_lambda_reverse = [] __device__(DataT input) {
     // reverse previous log (x) back to x using (e ^ log(x))
-    auto input_       = raft::half2float(input);
+    auto input_       = raft::to_float(input);
     const bool x_zero = (input_ == 0);
     if constexpr (std::is_same_v<DataT, half>) {
       return __float2half((!x_zero) * raft::exp(input_));

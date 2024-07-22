@@ -54,7 +54,7 @@ struct russel_rao_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    acc += raft::half2float(x) * raft::half2float(y);
+    acc += raft::to_float(x) * raft::to_float(y);
   };
 
   template <typename Policy>
