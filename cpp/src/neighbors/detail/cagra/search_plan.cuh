@@ -43,9 +43,6 @@ namespace cuvs::neighbors::cagra::detail {
  * the current cuda device does not change during the lifetime of this object. This is expected
  * to be useful in multi-threaded scenarios where we want to minimize overhead due to
  * thread sincronization during cuda API calls.
-
-
- * cudaSetDevice/cudaGetDevice.
  * If the size stays at zero, this struct never calls any CUDA driver / RAFT resource functions.
  */
 template <typename T>

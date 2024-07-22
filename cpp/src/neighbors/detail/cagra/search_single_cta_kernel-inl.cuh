@@ -1194,8 +1194,35 @@ struct search_kernel_config {
 /**
  * @brief Resource queue
  *
+ * @tparam T the element type
+ * @tparam Size the maximum capacity of the queue (power-of-two)
+ * @tparam Empty a special element value designating an empty queue slot. NB: storing `Empty` is UB.
+ *
  * A shared atomic ring buffer based queue optimized for throughput when bottlenecked on `pop`
  * operation.
+ *
+ * @code{.cpp}
+ *   // allocate the queue
+ *   resource_queue_t<int32_t, 256> resource_ids;
+ *
+ *   // store couple values
+ *   resource_ids.push(42);
+ *   resource_ids.push(7);
+ *
+ *   // wait to get the value from the queue
+ *   auto id_x = resource_ids.pop().wait();
+ *
+ *   // stand in line to get the value from the queue, but don't wait
+ *   auto ticket_y = resource_ids.pop();
+ *   // do other stuff and check if the value is available
+ *   int32_t id_y;
+ *   while (!ticket_y.test(id_y)) {
+ *     do_some_important_business(...);
+ *     std::this_thread::sleep_for(std::chrono::microseconds(10);
+ *   }
+ *   // `id_y` is set by now and `ticket_y.wait()` won't block anymore
+ *   assert(ticket_y.wait() == id_y);
+ * @endcode
  */
 template <typename T, uint32_t Size, T Empty = std::numeric_limits<T>::max()>
 struct alignas(kCacheLineBytes) resource_queue_t {
@@ -1207,6 +1234,16 @@ struct alignas(kCacheLineBytes) resource_queue_t {
   static_assert(raft::is_a_power_of_two(kSize), "The size must be a power-of-two for efficiency.");
   static constexpr uint32_t kElemsPerCacheLine =
     raft::div_rounding_up_safe<uint32_t>(kCacheLineBytes, sizeof(value_type));
+  /* [Note: cache-friendly indexing]
+     To avoid false sharing, the queue pushes and pops values not sequentially, but with an
+     increment that is larger than the cache line size.
+     Hence we introduce the `kCounterIncrement > kCacheLineBytes`.
+     However, to make sure all indices are used, we choose the increment to be coprime with the
+     buffer size. We also require that the buffer size is a power-of-two for two reasons:
+       1) Fast modulus operation - reduces to binary `and` (with `kCounterLocMask`).
+       2) Easy to ensure GCD(kCounterIncrement, kSize) == 1 by construction
+          (see the definition below).
+   */
   static constexpr uint32_t kCounterIncrement = raft::bound_by_power_of_two(kElemsPerCacheLine) + 1;
   static constexpr uint32_t kCounterLocMask   = kSize - 1;
   // These props hold by design, but we add them here as a documentation and a sanity check.
@@ -1322,7 +1359,7 @@ struct local_deque_t {
     store_[--start_ % capacity()] = x;
   }
 
-  // NB: non-blocking, unsafe functions
+  // NB: unsafe functions - do not check if the queue is full/empty.
   auto pop_back() -> T { return store_[--end_ % capacity()]; }
   auto pop_front() -> T { return store_[start_++ % capacity()]; }
 
