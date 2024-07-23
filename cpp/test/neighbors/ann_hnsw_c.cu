@@ -15,8 +15,8 @@
  */
 
 #include "../test_utils.cuh"
-#include <cuvs/distance/distance.h>
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
 #include <dlpack/dlpack.h>
 
 #include <cstdint>
