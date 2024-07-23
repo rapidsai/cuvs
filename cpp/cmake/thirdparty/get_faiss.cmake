@@ -106,14 +106,14 @@ function(find_and_configure_faiss)
 endfunction()
 
 if(NOT CUVS_FAISS_GIT_TAG)
-    set(CUVS_FAISS_GIT_TAG main)
+    set(CUVS_FAISS_GIT_TAG v1.8.0)
 endif()
 
 if(NOT CUVS_FAISS_GIT_REPOSITORY)
     set(CUVS_FAISS_GIT_REPOSITORY https://github.com/facebookresearch/faiss.git)
 endif()
 
-find_and_configure_faiss(VERSION    1.7.4
+find_and_configure_faiss(VERSION    1.8.0
         REPOSITORY  ${CUVS_FAISS_GIT_REPOSITORY}
         PINNED_TAG  ${CUVS_FAISS_GIT_TAG}
         BUILD_STATIC_LIBS ${CUVS_USE_FAISS_STATIC}
