@@ -4,14 +4,13 @@ import (
 	"math/rand"
 	"rapidsai/cuvs"
 	"testing"
-	"time"
 )
 
 func TestCagra(t *testing.T) {
 
 	resource, _ := cuvs.NewResource(nil)
 
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(5)
 
 	NDataPoints := 256
 	NFeatures := 16
@@ -26,9 +25,9 @@ func TestCagra(t *testing.T) {
 
 	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
-	CompressionParams, _ := CreateCompressionParams(8, 4, 8, 10, 0.3, 0.3)
+	CompressionParams, _ := CreateCompressionParams(8, 0, 0, 10, 0, 0)
 
-	IndexParams, err := CreateIndexParams(5, 5, AutoSelect, 10, CompressionParams)
+	IndexParams, err := CreateIndexParams(128, 64, AutoSelect, 10, CompressionParams)
 
 	if err != nil {
 		panic(err)
@@ -40,7 +39,7 @@ func TestCagra(t *testing.T) {
 	// as their own nearest neighbor
 
 	NQueries := 4
-	K := 4
+	K := 10
 	queries, _ := cuvs.NewTensor(true, TestDataset[:NQueries])
 	NeighborsDataset := make([][]uint32, NQueries)
 	for i := range NeighborsDataset {
