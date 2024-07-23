@@ -53,6 +53,17 @@ RAFT_KERNEL build_expected_output(int* output, int n_rows, int k, const int* lab
   }
 }
 
+// test out the distance epilogue functionality, by shifting distance values by 1
+void plus_one_epilogue(raft::resources const& res,
+                       raft::device_matrix_view<float, int64_t> distances,
+                       int64_t row,
+                       int64_t col)
+{
+  float* distances_ptr = distances.data_handle();
+  raft::linalg::map_offset(
+    res, distances, [=] __device__(int64_t idx) { return distances_ptr[idx] + 1; });
+}
+
 template <typename T, typename IdxT>
 class KNNTest : public ::testing::TestWithParam<KNNInputs> {
  public:
@@ -292,8 +303,10 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     auto distances = raft::make_device_matrix_view<T, int64_t>(
       cuvs_distances_.data(), params_.num_queries, params_.k);
 
+    std::optional<cuvs::neighbors::brute_force::index<T>> idx;
+
     if (params_.row_major) {
-      auto idx =
+      idx =
         cuvs::neighbors::brute_force::build(handle_,
                                             raft::make_device_matrix_view<const T, int64_t>(
                                               database.data(), params_.num_db_vecs, params_.dim),
@@ -302,14 +315,14 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
       cuvs::neighbors::brute_force::search(
         handle_,
-        idx,
+        *idx,
         raft::make_device_matrix_view<const T, int64_t>(
           search_queries.data(), params_.num_queries, params_.dim),
         indices,
         distances,
         std::nullopt);
     } else {
-      auto idx = cuvs::neighbors::brute_force::build(
+      idx = cuvs::neighbors::brute_force::build(
         handle_,
         raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
           database.data(), params_.num_db_vecs, params_.dim),
@@ -318,7 +331,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
       cuvs::neighbors::brute_force::search(
         handle_,
-        idx,
+        *idx,
         raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
           search_queries.data(), params_.num_queries, params_.dim),
         indices,
@@ -335,6 +348,36 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
                                                     float(0.001),
                                                     stream_,
                                                     true));
+
+    if (params_.row_major) {
+      // test out distance epilogue functionality, by squaring distances
+      cuvs::neighbors::brute_force::search(
+        handle_,
+        *idx,
+        raft::make_device_matrix_view<const T, int64_t>(
+          search_queries.data(), params_.num_queries, params_.dim),
+        indices,
+        distances,
+        std::nullopt,
+        plus_one_epilogue);
+
+      // also run the epilogue works on the reference results and verify matches
+      plus_one_epilogue(
+        handle_,
+        raft::make_device_matrix_view(ref_distances_.data(), params_.num_queries, params_.k),
+        0,
+        0);
+
+      ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(ref_indices_.data(),
+                                                      cuvs_indices_.data(),
+                                                      ref_distances_.data(),
+                                                      cuvs_distances_.data(),
+                                                      num_queries,
+                                                      k_,
+                                                      float(0.001),
+                                                      stream_,
+                                                      true));
+    }
   }
 
   void SetUp() override

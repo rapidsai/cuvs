@@ -61,23 +61,26 @@ namespace cuvs::neighbors::detail {
  * Calculates brute force knn, using a fixed memory budget
  * by tiling over both the rows and columns of pairwise_distances
  */
+
 template <typename ElementType = float, typename IndexType = int64_t>
-void tiled_brute_force_knn(const raft::resources& handle,
-                           const ElementType* search,  // size (m ,d)
-                           const ElementType* index,   // size (n ,d)
-                           size_t m,
-                           size_t n,
-                           size_t d,
-                           size_t k,
-                           ElementType* distances,  // size (m, k)
-                           IndexType* indices,      // size (m, k)
-                           cuvs::distance::DistanceType metric,
-                           float metric_arg                            = 2.0,
-                           size_t max_row_tile_size                    = 0,
-                           size_t max_col_tile_size                    = 0,
-                           const ElementType* precomputed_index_norms  = nullptr,
-                           const ElementType* precomputed_search_norms = nullptr,
-                           const uint32_t* filter_bitmap               = nullptr)
+void tiled_brute_force_knn(
+  const raft::resources& handle,
+  const ElementType* search,  // size (m ,d)
+  const ElementType* index,   // size (n ,d)
+  size_t m,
+  size_t n,
+  size_t d,
+  size_t k,
+  ElementType* distances,  // size (m, k)
+  IndexType* indices,      // size (m, k)
+  cuvs::distance::DistanceType metric,
+  float metric_arg                                                            = 2.0,
+  size_t max_row_tile_size                                                    = 0,
+  size_t max_col_tile_size                                                    = 0,
+  const ElementType* precomputed_index_norms                                  = nullptr,
+  const ElementType* precomputed_search_norms                                 = nullptr,
+  const uint32_t* filter_bitmap                                               = nullptr,
+  std::optional<brute_force::DistanceEpilogue<ElementType>> distance_epilogue = std::nullopt)
 {
   // Figure out the number of rows/cols to tile for
   size_t tile_rows   = 0;
@@ -247,6 +250,14 @@ void tiled_brute_force_knn(const raft::resources& handle,
                          });
       }
 
+      if (distance_epilogue.has_value()) {
+        (*distance_epilogue)(handle,
+                             raft::make_device_matrix_view<ElementType, int64_t, raft::row_major>(
+                               temp_distances.data(), current_query_size, current_centroid_size),
+                             i,
+                             j);
+      }
+
       cuvs::selection::select_k(
         handle,
         raft::make_device_matrix_view<const ElementType, int64_t, raft::row_major>(
@@ -346,7 +357,8 @@ void brute_force_knn_impl(
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded,
   float metricArg                     = 0,
   std::vector<value_t*>* input_norms  = nullptr,
-  const value_t* search_norms         = nullptr)
+  const value_t* search_norms         = nullptr,
+  std::optional<brute_force::DistanceEpilogue<value_t>> distance_epilogue = std::nullopt)
 {
   auto userStream = raft::resource::get_cuda_stream(handle);
 
@@ -390,7 +402,7 @@ void brute_force_knn_impl(
 
   // currently we don't support col_major inside tiled_brute_force_knn, because
   // of limitations of the pairwise_distance API:
-  // 1) paiwise_distance takes a single 'isRowMajor' parameter - and we have
+  // 1) pairwise_distance takes a single 'isRowMajor' parameter - and we have
   // multiple options here (like rowMajorQuery/rowMajorIndex)
   // 2) because of tiling, we need to be able to set a custom stride in the PW
   // api, which isn't supported
@@ -423,7 +435,8 @@ void brute_force_knn_impl(
 
     auto stream = raft::resource::get_next_usable_stream(handle, i);
 
-    if (k <= 64 && rowMajorQuery == rowMajorIndex && rowMajorQuery == true &&
+    if (!distance_epilogue.has_value() && k <= 64 && rowMajorQuery == rowMajorIndex &&
+        rowMajorQuery == true &&
         (metric == cuvs::distance::DistanceType::L2Unexpanded ||
          metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
          metric == cuvs::distance::DistanceType::L2Expanded ||
@@ -491,7 +504,9 @@ void brute_force_knn_impl(
                                                   0,
                                                   0,
                                                   input_norms ? (*input_norms)[i] : nullptr,
-                                                  search_norms);
+                                                  search_norms,
+                                                  nullptr,
+                                                  distance_epilogue);
           break;
       }
     }
@@ -520,7 +535,8 @@ void brute_force_search(
   raft::device_matrix_view<const T, int64_t, QueryLayoutT> queries,
   raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
   raft::device_matrix_view<T, int64_t, raft::row_major> distances,
-  std::optional<raft::device_vector_view<const T, int64_t>> query_norms = std::nullopt)
+  std::optional<raft::device_vector_view<const T, int64_t>> query_norms = std::nullopt,
+  std::optional<brute_force::DistanceEpilogue<T>> distance_epilogue     = std::nullopt)
 {
   RAFT_EXPECTS(neighbors.extent(1) == distances.extent(1), "Value of k must match for outputs");
   RAFT_EXPECTS(idx.dataset().extent(1) == queries.extent(1),
@@ -549,7 +565,8 @@ void brute_force_search(
                                          idx.metric(),
                                          idx.metric_arg(),
                                          norms.size() ? &norms : nullptr,
-                                         query_norms ? query_norms->data_handle() : nullptr);
+                                         query_norms ? query_norms->data_handle() : nullptr,
+                                         distance_epilogue);
 }
 
 template <typename T, typename IdxT, typename BitmapT>
