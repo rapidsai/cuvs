@@ -32,6 +32,7 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
     const uint32_t num_queries,                                                                   \
     const typename DATASET_DESC_T::INDEX_T* dev_seed_ptr,                                         \
     uint32_t* const num_executed_iterations,                                                      \
+    const search_params& ps,                                                                      \
     uint32_t topk,                                                                                \
     uint32_t block_size,                                                                          \
     uint32_t result_buffer_size,                                                                  \
@@ -39,13 +40,7 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
     int64_t hash_bitlen,                                                                          \
     typename DATASET_DESC_T::INDEX_T* hashmap_ptr,                                                \
     uint32_t num_cta_per_query,                                                                   \
-    uint32_t num_random_samplings,                                                                \
-    uint64_t rand_xor_mask,                                                                       \
     uint32_t num_seeds,                                                                           \
-    size_t itopk_size,                                                                            \
-    size_t search_width,                                                                          \
-    size_t min_iterations,                                                                        \
-    size_t max_iterations,                                                                        \
     SAMPLE_FILTER_T sample_filter,                                                                \
     cuvs::distance::DistanceType metric,                                                          \
     cudaStream_t stream);
