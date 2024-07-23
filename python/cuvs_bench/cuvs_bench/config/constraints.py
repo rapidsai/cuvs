@@ -20,7 +20,7 @@
 
 dtype_sizes = {
     "float": 4,
-    "fp8": 1
+    "fp8": 1,
     "half": 2,
 }
 
@@ -64,6 +64,7 @@ def cuvs_cagra_search(params, build_params, k, batch_size):
 ###############################################################################
 #                              FAISS constraints                              #
 ###############################################################################
+
 
 def faiss_gpu_ivf_pq_build(params, dims):
     ret = True
