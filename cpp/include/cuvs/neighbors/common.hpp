@@ -99,10 +99,6 @@ struct index_params {
    * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
    */
   bool add_data_on_build = true;
-  /**
-   * Whether to use MST optimization to guarantee graph connectivity.
-   */
-  bool guarantee_connectivity = false;
 };
 
 struct search_params {};

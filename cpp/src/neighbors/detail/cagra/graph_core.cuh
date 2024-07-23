@@ -802,7 +802,7 @@ void mst_optimization(raft::resources const& res,
       raft::copy(label_ptr, d_label_ptr, (size_t)graph_size, raft::resource::get_cuda_stream(res));
       raft::resource::sync_stream(res);
       uint32_t main_cluster_label = graph_size;
-#pragma omp parallel for
+#pragma omp parallel for reduction(min:main_cluster_label)
       for (uint64_t i = 0; i < graph_size; i++) {
         if ((cluster_size_ptr[i] == cluster_size_max) && (main_cluster_label > i)) {
           main_cluster_label = i;
@@ -842,7 +842,7 @@ void mst_optimization(raft::resources const& res,
 
       constexpr uint64_t n_threads = 256;
       const dim3 threads(n_threads, 1, 1);
-      const dim3 blocks((graph_size + n_threads - 1) / n_threads, 1, 1);
+      const dim3 blocks(raft::ceildiv<uint64_t>(graph_size, n_threads), 1, 1);
       kern_mst_opt_update_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
         d_mst_graph_ptr,
         d_candidate_edges_ptr,
@@ -916,7 +916,7 @@ void mst_optimization(raft::resources const& res,
 
       constexpr uint64_t n_threads = 256;
       const dim3 threads(n_threads, 1, 1);
-      const dim3 blocks((graph_size + n_threads - 1) / n_threads, 1, 1);
+      const dim3 blocks(raft::ceildiv<uint64_t>(graph_size, n_threads), 1, 1);
       kern_mst_opt_cluster_size<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
         d_cluster_size_ptr, d_label_ptr, graph_size, d_stats_ptr);
 

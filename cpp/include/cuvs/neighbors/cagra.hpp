@@ -105,6 +105,11 @@ struct index_params : cuvs::neighbors::index_params {
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params>
     graph_build_params;
+
+  /**
+   * Whether to use MST optimization to guarantee graph connectivity.
+   */
+  bool guarantee_connectivity = false;
 };
 
 /**
