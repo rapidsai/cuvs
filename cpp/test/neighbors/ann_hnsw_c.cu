@@ -40,7 +40,7 @@ float queries[4][2] = {{0.48216683, 0.0428398},
 std::vector<uint64_t> neighbors_exp = {3, 0, 3, 1};
 std::vector<float> distances_exp    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
 
-TEST(CagraC, BuildSearch)
+TEST(CagraHnswC, BuildSearch)
 {
   // create cuvsResources_t
   cuvsResources_t res;
