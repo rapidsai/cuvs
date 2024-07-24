@@ -20,7 +20,8 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
-#include <raft/core/detail/popc.cuh>
+#include <raft/core/host_mdspan.hpp>
+#include <raft/core/popc.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/random/rmat_rectangular_generator.cuh>
@@ -192,12 +193,14 @@ class PrefilteredBruteForceTest
       auto nnz_view = raft::make_device_scalar_view<index_t>(nnz.data());
       auto filter_view =
         raft::make_device_vector_view<const uint32_t, index_t>(filter_d.data(), filter_d.size());
+      index_t size_h = m * n;
+      auto size_view = raft::make_host_scalar_view<index_t>(&size_h);
 
       set_bitmap(src, dst, bitmap, n_edges, n, stream);
 
       // TODO(rhdong): Need to switch to the public API,
       // with the issue: https://github.com/rapidsai/cuvs/issues/158
-      raft::detail::popc(handle, filter_view, m * n, nnz_view);
+      raft::popc(handle, filter_view, size_view, nnz_view);
       raft::copy(&nnz_h, nnz.data(), 1, stream);
 
       raft::resource::sync_stream(handle, stream);
