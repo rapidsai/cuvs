@@ -59,8 +59,8 @@ struct kl_divergence_op {
   {
     // TODO: make sure that these branches get hoisted out of main loop.. Could
     // be quite expensive otherwise.
-    auto x_ = raft::to_float(x);
-    auto y_ = raft::to_float(y);
+    AccT x_ = raft::to_float(x);
+    AccT y_ = raft::to_float(y);
     if (x_equal_y) {
       if (is_row_major) {
         const bool x_zero = (x_ == 0);
