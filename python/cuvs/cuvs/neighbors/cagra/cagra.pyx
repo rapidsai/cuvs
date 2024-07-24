@@ -36,6 +36,7 @@ from pylibraft.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
     int8_t,
+    int32_t,
     int64_t,
     uint8_t,
     uint32_t,
@@ -206,16 +207,9 @@ cdef class IndexParams:
 
 
 cdef class Index:
-    """
-    CAGRA index object. This object stores the trained CAGRA index state
-    which can be used to perform nearest neighbors searches.
-    """
-
-    cdef cuvsCagraIndex_t index
-    cdef bool trained
-
     def __cinit__(self):
         self.trained = False
+        self.active_index_type = None
         check_cuvs(cuvsCagraIndexCreate(&self.index))
 
     def __dealloc__(self):
@@ -225,6 +219,12 @@ cdef class Index:
     @property
     def trained(self):
         return self.trained
+
+    @property
+    def dim(self):
+        cdef int32_t dim
+        check_cuvs(cuvsCagraIndexDim(self.index, &dim))
+        return dim
 
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
@@ -299,6 +299,7 @@ def build(IndexParams index_params, dataset, resources=None):
             idx.index
         ))
         idx.trained = True
+        idx.active_index_type = dataset_ai.dtype.name
 
     return idx
 

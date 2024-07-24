@@ -17,6 +17,7 @@
 
 from libc.stdint cimport (
     int8_t,
+    int32_t,
     int64_t,
     uint8_t,
     uint32_t,
@@ -100,6 +101,8 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
 
+    cuvsError_t cuvsCagraIndexDim(cuvsCagraIndex_t index, int32_t* dim)
+
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams* params,
                                DLManagedTensor* dataset,
@@ -117,6 +120,20 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                    cuvsCagraIndex_t index,
                                    bool include_dataset) except +
 
+    cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
+                                            const char * filename,
+                                            cuvsCagraIndex_t index) except +
+
     cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
                                      const char * filename,
                                      cuvsCagraIndex_t index) except +
+
+cdef class Index:
+    """
+    CAGRA index object. This object stores the trained CAGRA index state
+    which can be used to perform nearest neighbors searches.
+    """
+
+    cdef cuvsCagraIndex_t index
+    cdef bool trained
+    cdef str active_index_type

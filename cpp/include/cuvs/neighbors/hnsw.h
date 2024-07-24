@@ -33,7 +33,7 @@ extern "C" {
 
 struct cuvsHnswSearchParams {
   int32_t ef;
-  int32_t numThreads;
+  int32_t num_threads;
 };
 
 typedef struct cuvsHnswSearchParams* cuvsHnswSearchParams_t;
@@ -105,8 +105,10 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
  *        with the same type of `queries`, such that `index.dtype.code ==
  *        queries.dl_tensor.dtype.code`
  *        Supported types for input are:
- *        1. `queries`: `kDLDataType.code == kDLFloat` or `kDLDataType.code == kDLInt` and
- * `kDLDataType.bits = 32`
+ *        1. `queries`:
+ *          a. kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *          b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *          c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
