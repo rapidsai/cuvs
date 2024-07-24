@@ -270,8 +270,8 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 /**
  * @brief Get dimension of the CAGRA index
  *
- * @param[in] CAGRA index
- * @param[out] dim
+ * @param[in] index CAGRA index
+ * @param[out] dim return dimension of the index
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraIndexDim(cuvsCagraIndex_t index, int* dim);
