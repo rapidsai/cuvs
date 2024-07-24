@@ -224,12 +224,6 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
                   SAMPLE_FILTER_T sample_filter)
   {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
-
-    // Set the 'persistent' flag as the first bit of rand_xor_mask to avoid changing the signature
-    // of the select_and_run for now.
-    constexpr uint64_t kPMask = 0x8000000000000000LL;
-    auto rand_xor_mask_augmented =
-      this->persistent ? (rand_xor_mask | kPMask) : (rand_xor_mask & ~kPMask);
     select_and_run<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T>(
       dataset_desc,
       graph,
@@ -239,6 +233,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
       num_queries,
       dev_seed_ptr,
       num_executed_iterations,
+      *this,
       topk,
       num_itopk_candidates,
       static_cast<uint32_t>(thread_block_size),
@@ -247,13 +242,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
       hashmap.data(),
       small_hash_bitlen,
       small_hash_reset_interval,
-      num_random_samplings,
-      rand_xor_mask_augmented,
       num_seeds,
-      itopk_size,
-      search_width,
-      min_iterations,
-      max_iterations,
       sample_filter,
       this->metric,
       stream);

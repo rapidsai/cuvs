@@ -1964,6 +1964,7 @@ void select_and_run(
   const uint32_t num_queries,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* dev_seed_ptr,  // [num_queries, num_seeds]
   uint32_t* const num_executed_iterations,                     // [num_queries,]
+  const search_params& ps,
   uint32_t topk,
   uint32_t num_itopk_candidates,
   uint32_t block_size,  //
@@ -1972,24 +1973,12 @@ void select_and_run(
   typename DATASET_DESCRIPTOR_T::INDEX_T* hashmap_ptr,
   size_t small_hash_bitlen,
   size_t small_hash_reset_interval,
-  uint32_t num_random_samplings,
-  uint64_t rand_xor_mask,
   uint32_t num_seeds,
-  size_t itopk_size,
-  size_t search_width,
-  size_t min_iterations,
-  size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream)
 {
-  // hack: pass the 'is_persistent' flag in the highest bit of the `rand_xor_mask`
-  //       to avoid changing the signature of `select_and_run` and updating all its
-  //       instantiations...
-  uint64_t pmask     = 0x8000000000000000LL;
-  bool is_persistent = rand_xor_mask & pmask;
-  rand_xor_mask &= ~pmask;
-  if (is_persistent) {
+  if (ps.persistent) {
     using runner_type =
       persistent_runner_t<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>;
     get_runner<runner_type>(dataset_desc,
@@ -2000,13 +1989,13 @@ void select_and_run(
                             hash_bitlen,
                             small_hash_bitlen,
                             small_hash_reset_interval,
-                            num_random_samplings,
-                            rand_xor_mask,
+                            ps.num_random_samplings,
+                            ps.rand_xor_mask,
                             num_seeds,
-                            itopk_size,
-                            search_width,
-                            min_iterations,
-                            max_iterations,
+                            ps.itopk_size,
+                            ps.search_width,
+                            ps.min_iterations,
+                            ps.max_iterations,
                             sample_filter,
                             metric)
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
@@ -2016,7 +2005,7 @@ void select_and_run(
                            TEAM_SIZE,
                            DATASET_BLOCK_DIM,
                            DATASET_DESCRIPTOR_T,
-                           SAMPLE_FILTER_T>::choose_itopk_and_mx_candidates(itopk_size,
+                           SAMPLE_FILTER_T>::choose_itopk_and_mx_candidates(ps.itopk_size,
                                                                             num_itopk_candidates,
                                                                             block_size);
     RAFT_CUDA_TRY(cudaFuncSetAttribute(kernel,
@@ -2033,15 +2022,15 @@ void select_and_run(
                                                            queries_ptr,
                                                            graph.data_handle(),
                                                            graph.extent(1),
-                                                           num_random_samplings,
-                                                           rand_xor_mask,
+                                                           ps.num_random_samplings,
+                                                           ps.rand_xor_mask,
                                                            dev_seed_ptr,
                                                            num_seeds,
                                                            hashmap_ptr,
-                                                           itopk_size,
-                                                           search_width,
-                                                           min_iterations,
-                                                           max_iterations,
+                                                           ps.itopk_size,
+                                                           ps.search_width,
+                                                           ps.min_iterations,
+                                                           ps.max_iterations,
                                                            num_executed_iterations,
                                                            hash_bitlen,
                                                            small_hash_bitlen,
