@@ -1,4 +1,4 @@
-package cuvs
+package cuvs_test
 
 import (
 	"testing"

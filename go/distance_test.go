@@ -1,14 +1,14 @@
-package cuvs
+package cuvs_test
 
 import (
+	"math/rand"
+	"rapidsai/cuvs"
 	"testing"
 	"time"
-
-	"math/rand"
 )
 
 func TestDistance(t *testing.T) {
-	resource, _ := NewResource(nil)
+	resource, _ := cuvs.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -23,19 +23,19 @@ func TestDistance(t *testing.T) {
 		}
 	}
 
-	dataset, _ := NewTensor(true, TestDataset)
+	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
 	DistancesDataset := make([][]float32, NDataPoints)
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, NDataPoints)
 	}
 
-	distances, _ := NewTensor(true, DistancesDataset)
+	distances, _ := cuvs.NewTensor(true, DistancesDataset)
 
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
 
-	PairwiseDistance(resource, &dataset, &dataset, &distances, L2, 0.0)
+	cuvs.PairwiseDistance(resource, &dataset, &dataset, &distances, cuvs.L2, 0.0)
 
 	distances.ToHost(&resource)
 
