@@ -188,6 +188,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file that stores the index
+ * @param[in] dim dimensions of the training dataset
+ * @param[in] metric distance metric to search. Supported metrics ("L2Expanded")
  * @param[out] index HNSW index loaded disk
  */
 cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
