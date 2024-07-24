@@ -30,7 +30,6 @@
 #include <raft/core/bitmap.cuh>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/popc.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -47,6 +46,7 @@
 #include <raft/sparse/matrix/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
+#include <raft/util/popc.cuh>
 
 #include <rmm/cuda_device.hpp>
 #include <rmm/device_uvector.hpp>
@@ -597,7 +597,7 @@ void brute_force_search_filtered(
 
   // TODO(rhdong): Need to switch to the public API,
   // with the issue: https://github.com/rapidsai/cuvs/issues/158
-  raft::popc(res, filter_view, size_view, nnz_view);
+  raft::util::popc(res, filter_view, size_view, nnz_view);
   raft::copy(&nnz_h, nnz.data(), 1, stream);
 
   raft::resource::sync_stream(res, stream);
