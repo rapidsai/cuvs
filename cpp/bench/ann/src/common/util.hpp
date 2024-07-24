@@ -383,8 +383,10 @@ inline auto cuda_info()
   props.emplace_back("gpu_pageableMemoryAccess", std::to_string(device_prop.pageableMemoryAccess));
   props.emplace_back("gpu_pageableMemoryAccessUsesHostPageTables",
                      std::to_string(device_prop.pageableMemoryAccessUsesHostPageTables));
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 12000
   props.emplace_back("gpu_gpuDirectRDMASupported",
                      std::to_string(device_prop.gpuDirectRDMASupported));
+#endif
 #endif
   return props;
 }
