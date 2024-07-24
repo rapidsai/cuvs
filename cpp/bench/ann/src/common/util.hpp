@@ -22,8 +22,11 @@
 #include <nvtx3/nvToolsExt.h>
 #endif
 
+#include <sched.h>  // sched_getaffinity
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
@@ -32,9 +35,11 @@
 #include <cstring>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -293,6 +298,64 @@ inline void reset_global_device_resources()
 #endif
 }
 
+inline auto host_info()
+{
+  std::vector<std::tuple<std::string, std::string>> props;
+
+  // Memory info
+  auto page_size = sysconf(_SC_PAGE_SIZE);
+  props.emplace_back("host_pagesize", std::to_string(page_size));
+
+  struct sysinfo sys_info;
+  if (sysinfo(&sys_info) != -1) {
+    props.emplace_back("host_total_ram_size",
+                       std::to_string(size_t(sys_info.totalram) * size_t(sys_info.mem_unit)));
+    props.emplace_back("host_total_swap_size",
+                       std::to_string(size_t(sys_info.totalswap) * size_t(sys_info.mem_unit)));
+  }
+
+  // CPU info
+  int host_processors_configured = sysconf(_SC_NPROCESSORS_CONF);
+  props.emplace_back("host_processors_sysconf", std::to_string(host_processors_configured));
+  std::vector<uint8_t> affinity_mask_buf(CPU_ALLOC_SIZE(host_processors_configured));
+  cpu_set_t* affinity_mask = reinterpret_cast<cpu_set_t*>(affinity_mask_buf.data());
+  sched_getaffinity(0, affinity_mask_buf.size(), affinity_mask);
+  uint64_t cpu_freq_min    = 0;
+  uint64_t cpu_freq_max    = 0;
+  int host_processors_used = 0;
+  int host_cores_used      = 0;
+  std::set<int> host_cores_selected{};
+  for (int cpu_id = 0; cpu_id < host_processors_configured; cpu_id++) {
+    if (CPU_ISSET_S(cpu_id, affinity_mask_buf.size(), affinity_mask) == 0) { continue; }
+    host_processors_used++;
+    std::string cpu_fpath = "/sys/devices/system/cpu/cpu" + std::to_string(cpu_id);
+    if (!std::filesystem::exists(cpu_fpath)) { continue; }
+
+    int this_cpu_core          = 0;
+    uint64_t this_cpu_freq_min = 0;
+    uint64_t this_cpu_freq_max = 0;
+    std::ifstream(cpu_fpath + "/topology/core_id") >> this_cpu_core;
+    std::ifstream(cpu_fpath + "/cpufreq/scaling_min_freq") >> this_cpu_freq_min;
+    std::ifstream(cpu_fpath + "/cpufreq/scaling_max_freq") >> this_cpu_freq_max;
+    host_cores_selected.insert(this_cpu_core);
+    cpu_freq_min = cpu_freq_min == 0
+                     ? (this_cpu_freq_min * 1000ull)
+                     : std::min<uint64_t>(this_cpu_freq_min * 1000ull, cpu_freq_min);
+    cpu_freq_max = std::max<uint64_t>(this_cpu_freq_max * 1000ull, cpu_freq_max);
+  }
+  host_cores_used = host_cores_selected.size();
+  if (host_processors_used != 0) {
+    props.emplace_back("host_processors_used", std::to_string(host_processors_used));
+  }
+  if (host_cores_used != 0) {
+    props.emplace_back("host_cores_used", std::to_string(host_cores_used));
+  }
+  if (cpu_freq_min != 0) { props.emplace_back("host_cpu_freq_min", std::to_string(cpu_freq_min)); }
+  if (cpu_freq_max != 0) { props.emplace_back("host_cpu_freq_max", std::to_string(cpu_freq_max)); }
+
+  return props;
+}
+
 inline auto cuda_info()
 {
   std::vector<std::tuple<std::string, std::string>> props;
@@ -315,6 +378,13 @@ inline auto cuda_info()
                      std::to_string(driver / 1000) + "." + std::to_string((driver % 100) / 10));
   props.emplace_back("gpu_runtime_version",
                      std::to_string(runtime / 1000) + "." + std::to_string((runtime % 100) / 10));
+  props.emplace_back("gpu_hostNativeAtomicSupported",
+                     std::to_string(device_prop.hostNativeAtomicSupported));
+  props.emplace_back("gpu_pageableMemoryAccess", std::to_string(device_prop.pageableMemoryAccess));
+  props.emplace_back("gpu_pageableMemoryAccessUsesHostPageTables",
+                     std::to_string(device_prop.pageableMemoryAccessUsesHostPageTables));
+  props.emplace_back("gpu_gpuDirectRDMASupported",
+                     std::to_string(device_prop.gpuDirectRDMASupported));
 #endif
   return props;
 }
