@@ -248,6 +248,12 @@ void parse_search_param(const nlohmann::json& conf,
   if (conf.contains("search_width")) { param.p.search_width = conf.at("search_width"); }
   if (conf.contains("max_iterations")) { param.p.max_iterations = conf.at("max_iterations"); }
   if (conf.contains("persistent")) { param.p.persistent = conf.at("persistent"); }
+  if (conf.contains("persistent_lifetime")) {
+    param.p.persistent_lifetime = conf.at("persistent_lifetime");
+  }
+  if (conf.contains("persistent_device_usage")) {
+    param.p.persistent_device_usage = conf.at("persistent_device_usage");
+  }
   if (conf.contains("thread_block_size")) {
     param.p.thread_block_size = conf.at("thread_block_size");
   }

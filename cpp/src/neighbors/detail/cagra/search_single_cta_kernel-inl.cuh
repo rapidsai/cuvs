@@ -1406,7 +1406,12 @@ struct persistent_runner_base_t {
   cudaStream_t stream{};
   job_queue_type job_queue{};
   worker_queue_type worker_queue{};
-  persistent_runner_base_t() : job_queue(), worker_queue()
+  // This should be large enough to make the runner live through restarts of the benchmark cases.
+  // Otherwise, the benchmarks slowdown significantly.
+  std::chrono::milliseconds lifetime;
+
+  persistent_runner_base_t(float persistent_lifetime)
+    : lifetime(size_t(persistent_lifetime * 1000)), job_queue(), worker_queue()
   {
     cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
   }
@@ -1639,10 +1644,6 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
   std::atomic<std::chrono::time_point<std::chrono::system_clock>> last_touch;
   uint64_t param_hash;
 
-  // This should be large enough to make the runner live through restarts of the benchmark cases.
-  // Otherwise, the benchmarks slowdown significantly.
-  constexpr static auto kLiveInterval = std::chrono::milliseconds(2000);
-
   /**
    * Calculate the hash of the parameters to detect if they've changed across the calls.
    * NB: this must have the same argument types as the constructor.
@@ -1664,11 +1665,14 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     size_t min_iterations,
     size_t max_iterations,
     SAMPLE_FILTER_T sample_filter,
-    cuvs::distance::DistanceType metric) -> uint64_t
+    cuvs::distance::DistanceType metric,
+    float persistent_lifetime,
+    float persistent_device_usage) -> uint64_t
   {
     return uint64_t(graph.data_handle()) ^ num_itopk_candidates ^ block_size ^ smem_size ^
            hash_bitlen ^ small_hash_reset_interval ^ num_random_samplings ^ rand_xor_mask ^
-           num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^ metric;
+           num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^ metric ^
+           uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000);
   }
 
   persistent_runner_t(DATASET_DESCRIPTOR_T dataset_desc,
@@ -1687,8 +1691,10 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                       size_t min_iterations,
                       size_t max_iterations,
                       SAMPLE_FILTER_T sample_filter,
-                      cuvs::distance::DistanceType metric)
-    : persistent_runner_base_t{},
+                      cuvs::distance::DistanceType metric,
+                      float persistent_lifetime,
+                      float persistent_device_usage)
+    : persistent_runner_base_t{persistent_lifetime},
       kernel{kernel_config_type::choose_itopk_and_mx_candidates(
         itopk_size, num_itopk_candidates, block_size)},
       block_size{block_size},
@@ -1712,14 +1718,16 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                                           min_iterations,
                                           max_iterations,
                                           sample_filter,
-                                          metric))
+                                          metric,
+                                          persistent_lifetime,
+                                          persistent_device_usage))
   {
     // set kernel attributes same as in normal kernel
     RAFT_CUDA_TRY(
       cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
 
     // set kernel launch parameters
-    dim3 gs = calc_coop_grid_size(block_size, smem_size);
+    dim3 gs = calc_coop_grid_size(block_size, smem_size, persistent_device_usage);
     dim3 bs(block_size, 1, 1);
     RAFT_LOG_DEBUG(
       "Launching persistent kernel with %u threads, %u block %u smem", bs.x, gs.y, smem_size);
@@ -1827,7 +1835,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
 
     // Update the state of the keep-alive atomic in the meanwhile
     auto prev_touch = last_touch.load(std::memory_order_relaxed);
-    if (prev_touch + kLiveInterval / 10 < launcher.now) {
+    if (prev_touch + lifetime / 10 < launcher.now) {
       // to avoid congestion at this atomic, we only update it if a significant fraction of the live
       // interval has passed.
       last_touch.store(launcher.now, std::memory_order_relaxed);
@@ -1836,28 +1844,15 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     launcher.wait();
   }
 
-  auto calc_coop_grid_size(uint32_t block_size, uint32_t smem_size) -> dim3
+  auto calc_coop_grid_size(uint32_t block_size, uint32_t smem_size, float persistent_device_usage)
+    -> dim3
   {
-    // We may need to run other kernels alongside this persistent kernel.
-    // So we can leave a few SMs idle.
-    // Note: running any other work on GPU alongside with the persistent kernel make the setup
-    // fragile.
-    //   - Running another kernel in another thread usually works, but no progress guaranteed
-    //   - Any CUDA allocations block the context (this issue may be obscured by using pools)
-    //   - Memory copies to not-pinned host memory may block the context
-    //
-    // Even when we know there are no other kernels working at the same time, setting
-    // kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care.
-    // If you suspect this is an issue, you can reduce this number to ~0.9 without a significant
-    // impact on the throughput.
-    constexpr double kDeviceUsage = 1.0;
-
     // determine the grid size
     int ctas_per_sm = 1;
     cudaOccupancyMaxActiveBlocksPerMultiprocessor<kernel_type>(
       &ctas_per_sm, kernel, block_size, smem_size);
     int num_sm    = raft::getMultiProcessorCount();
-    auto n_blocks = static_cast<uint32_t>(kDeviceUsage * (ctas_per_sm * num_sm));
+    auto n_blocks = static_cast<uint32_t>(persistent_device_usage * (ctas_per_sm * num_sm));
     if (n_blocks > kMaxWorkersNum) {
       RAFT_LOG_WARN("Limiting the grid size limit due to the size of the queue: %u -> %u",
                     n_blocks,
@@ -1900,6 +1895,7 @@ auto create_runner(Args... args) -> std::shared_ptr<RunnerT>  // it's ok.. pass 
     [&runner_outer, &ready](Args... thread_args) {  // pass everything by values
       // create the runner (the lock is acquired in the parent thread).
       runner_outer      = std::make_shared<RunnerT>(thread_args...);
+      auto lifetime     = runner_outer->lifetime;
       persistent.runner = std::static_pointer_cast<persistent_runner_base_t>(runner_outer);
       std::weak_ptr<RunnerT> runner_weak = runner_outer;
       ready.test_and_set(cuda::std::memory_order_release);
@@ -1907,12 +1903,12 @@ auto create_runner(Args... args) -> std::shared_ptr<RunnerT>  // it's ok.. pass 
       // NB: runner_outer is passed by reference and may be dead by this time.
 
       while (true) {
-        std::this_thread::sleep_for(RunnerT::kLiveInterval);
+        std::this_thread::sleep_for(lifetime);
         auto runner = runner_weak.lock();  // runner_weak is local - thread-safe
         if (!runner) {
           return;  // dead already
         }
-        if (runner->last_touch.load(std::memory_order_relaxed) + RunnerT::kLiveInterval <
+        if (runner->last_touch.load(std::memory_order_relaxed) + lifetime <
             std::chrono::system_clock::now()) {
           std::lock_guard<std::mutex> guard(persistent.lock);
           if (runner == persistent.runner) { persistent.runner.reset(); }
@@ -1997,7 +1993,9 @@ void select_and_run(
                             ps.min_iterations,
                             ps.max_iterations,
                             sample_filter,
-                            metric)
+                            metric,
+                            ps.persistent_lifetime,
+                            ps.persistent_device_usage)
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
   } else {
     auto kernel =
