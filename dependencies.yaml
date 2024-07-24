@@ -182,14 +182,30 @@ dependencies:
               - &cuda_python cuda-python
       - output_types: [requirements, pyproject]
         matrices:
-          - matrix: {cuda: "12.*"}
+          - matrix:
+              cuda: "12.*"
+              cuda_suffixed: "true"
             packages:
               - &rmm_cu12 rmm-cu12==24.8.*,>=0.0.0a0
               - &pylibraft_cu12 pylibraft-cu12==24.8.*,>=0.0.0a0
-          - matrix: {cuda: "11.*"}
+          - matrix:
+              cuda: "12.*"
+              cuda_suffixed: "false"
+            packages:
+              - *rmm_conda
+              - *pylibraft_conda
+          - matrix:
+              cuda: "11.*"
+              cuda_suffixed: "true"
             packages:
               - &rmm_cu11 rmm-cu11==24.8.*,>=0.0.0a0
               - &pylibraft_cu11 pylibraft-cu11==24.8.*,>=0.0.0a0
+          - matrix:
+              cuda: "11.*"
+              cuda_suffixed: "false"
+            packages:
+              - *rmm_conda
+              - *pylibraft_conda
           - {matrix: null, packages: [*rmm_conda, *pylibraft_conda] }
   checks:
     common:
