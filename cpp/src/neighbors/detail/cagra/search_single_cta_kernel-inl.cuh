@@ -1447,12 +1447,18 @@ struct alignas(kCacheLineBytes) launcher_t {
   std::chrono::time_point<std::chrono::system_clock> now;
   const int64_t pause_factor;
   int pause_count = 0;
+  /**
+   * Beyond this threshold, the launcher (calling thread) does not wait for the results anymore and
+   * throws an exception.
+   */
+  std::chrono::time_point<std::chrono::system_clock> deadline;
 
   template <typename RecordWork>
   launcher_t(job_queue_type& job_ids,
              worker_queue_type& idle_worker_ids,
              worker_handle_t* worker_handles,
              uint32_t n_queries,
+             std::chrono::milliseconds max_wait_time,
              RecordWork record_work)
     : pending_reads{std::min(n_queries, kMaxWorkersPerThread)},
       job_ids{job_ids},
@@ -1462,7 +1468,8 @@ struct alignas(kCacheLineBytes) launcher_t {
       completion_flag{record_work(job_id)},
       start{std::chrono::system_clock::now()},
       pause_factor{calc_pause_factor(n_queries)},
-      now{start}
+      now{start},
+      deadline{start + max_wait_time + expected_latency}
   {
     // Wait for the first worker and submit the query immediately.
     submit_query(idle_worker_ids.pop().wait(), 0);
@@ -1504,6 +1511,14 @@ struct alignas(kCacheLineBytes) launcher_t {
     constexpr size_t kWindow = 100;  // moving average memory
     expected_latency         = std::min<std::chrono::nanoseconds>(
       ((kWindow - 1) * expected_latency + now - start) / kWindow, kMaxExpectedLatency);
+
+    // Try to gracefully cleanup the queue resources if the launcher is being destructed after an
+    // exception.
+    if (job_id != job_queue_type::kEmpty) { job_ids.push(job_id); }
+    uint32_t worker_id;
+    while (pending_reads.try_pop_front(worker_id)) {
+      idle_worker_ids.push(worker_id);
+    }
   }
 
   inline void submit_query(uint32_t worker_id, uint32_t query_id)
@@ -1588,10 +1603,24 @@ struct alignas(kCacheLineBytes) launcher_t {
     now                  = std::chrono::system_clock::now();
     auto pause_time_base = std::max(now - start, expected_latency);
     auto pause_time      = std::clamp(pause_time_base / pause_factor, kPauseTimeMin, kPauseTimeMax);
-    if (now + pause_time < sleep_limit() || now > overtime_threshold()) {
+    if (now + pause_time < sleep_limit()) {
+      // It's too early: sleep for a bit
+      std::this_thread::sleep_for(pause_time);
+    } else if (now <= overtime_threshold()) {
+      // It's about time to check the results, don't sleep
+      std::this_thread::yield();
+    } else if (now <= deadline) {
+      // Too late; perhaps the system is too busy - sleep again
       std::this_thread::sleep_for(pause_time);
     } else {
-      std::this_thread::yield();
+      // Missed the deadline: throw an exception
+      throw raft::exception(
+        "The calling thread didn't receive the results from the persistent CAGRA kernel within the "
+        "expected kernel lifetime. Here are possible reasons of this failure:\n"
+        "  (1) `persistent_lifetime` search parameter is too small - increase it;\n"
+        "  (2) there is other work being executed on the same device and the kernel failed to "
+        "progress - decreasing `persistent_device_usage` may help (but not guaranteed);\n"
+        "  (3) there is a bug in the implementation - please report it to cuVS team.");
     }
   }
 
@@ -1620,6 +1649,7 @@ struct alignas(kCacheLineBytes) launcher_t {
 
     // Return the job descriptor
     job_ids.push(job_id);
+    job_id = job_queue_type::kEmpty;
   }
 };
 
@@ -1819,19 +1849,24 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
               uint32_t top_k)
   {
     // submit all queries
-    launcher_t launcher{
-      job_queue, worker_queue, worker_handles.data(), num_queries, [=](uint32_t job_ix) {
-        auto& jd                = job_descriptors.data()[job_ix].input.value;
-        auto* cflag             = &job_descriptors.data()[job_ix].completion_flag;
-        jd.result_indices_ptr   = result_indices_ptr;
-        jd.result_distances_ptr = result_distances_ptr;
-        jd.queries_ptr          = queries_ptr;
-        jd.top_k                = top_k;
-        jd.n_queries            = num_queries;
-        cflag->store(false, cuda::memory_order_relaxed);
-        cuda::atomic_thread_fence(cuda::memory_order_release, cuda::thread_scope_system);
-        return cflag;
-      }};
+    launcher_t launcher{job_queue,
+                        worker_queue,
+                        worker_handles.data(),
+                        num_queries,
+                        this->lifetime,
+                        [=](uint32_t job_ix) {
+                          auto& jd                = job_descriptors.data()[job_ix].input.value;
+                          auto* cflag             = &job_descriptors.data()[job_ix].completion_flag;
+                          jd.result_indices_ptr   = result_indices_ptr;
+                          jd.result_distances_ptr = result_distances_ptr;
+                          jd.queries_ptr          = queries_ptr;
+                          jd.top_k                = top_k;
+                          jd.n_queries            = num_queries;
+                          cflag->store(false, cuda::memory_order_relaxed);
+                          cuda::atomic_thread_fence(cuda::memory_order_release,
+                                                    cuda::thread_scope_system);
+                          return cflag;
+                        }};
 
     // Update the state of the keep-alive atomic in the meanwhile
     auto prev_touch = last_touch.load(std::memory_order_relaxed);
