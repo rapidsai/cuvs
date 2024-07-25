@@ -198,7 +198,7 @@ class PrefilteredBruteForceTest
 
       set_bitmap(src, dst, bitmap, n_edges, n, stream);
 
-      raft::util::popc(handle, filter_view, size_view, nnz_view);
+      raft::popc(handle, filter_view, size_view, nnz_view);
       raft::copy(&nnz_h, nnz.data(), 1, stream);
 
       raft::resource::sync_stream(handle, stream);
