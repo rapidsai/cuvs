@@ -595,8 +595,6 @@ void brute_force_search_filtered(
   IdxT size_h    = n_queries * n_dataset;
   auto size_view = raft::make_host_scalar_view<IdxT>(&size_h);
 
-  // TODO(rhdong): Need to switch to the public API,
-  // with the issue: https://github.com/rapidsai/cuvs/issues/158
   raft::util::popc(res, filter_view, size_view, nnz_view);
   raft::copy(&nnz_h, nnz.data(), 1, stream);
 
