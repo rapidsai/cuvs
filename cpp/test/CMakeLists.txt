@@ -56,7 +56,6 @@ function(ConfigureTest)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
-            ${_CUVS_TEST_ADDITIONAL_LIBS}
   )
   set_target_properties(
     ${TEST_NAME}

@@ -206,6 +206,7 @@ if(BUILD_MG_ALGOS)
       src/neighbors/ann_mg/ann_mg_cagra_int8_t_uint32_t.cu
       src/neighbors/ann_mg/ann_mg_cagra_uint8_t_uint32_t.cu
       src/neighbors/ann_mg/nccl_clique.cu
+      src/neighbors/ann_mg/omp_checks.cu
   )
 endif()
 

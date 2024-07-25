@@ -20,7 +20,7 @@
 #include <raft/core/serialize.hpp>
 #include <raft/util/cuda_dev_essentials.cuh>
 
-#include "nccl_helpers.cuh"
+#include "../../utils/nccl_helpers.cuh"
 #define NO_NCCL_FORWARD_DECLARATION
 #include <cuvs/neighbors/ann_mg.hpp>
 #undef NO_NCCL_FORWARD_DECLARATION
@@ -29,6 +29,8 @@
 namespace cuvs::neighbors::mg {
 using namespace cuvs::neighbors;
 using namespace raft;
+
+void check_omp_threads(const int requirements);
 
 template <typename AnnIndexType, typename T, typename IdxT>
 template <typename Accessor>
@@ -83,18 +85,18 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void ann_interface<AnnIndexType, T, IdxT>::search(
   raft::resources const& handle,
   const cuvs::neighbors::search_params* search_params,
-  raft::host_matrix_view<const T, IdxT, row_major> h_query_dataset,
+  raft::host_matrix_view<const T, IdxT, row_major> h_queries,
   raft::device_matrix_view<IdxT, IdxT, row_major> d_neighbors,
   raft::device_matrix_view<float, IdxT, row_major> d_distances) const
 {
-  IdxT n_rows          = h_query_dataset.extent(0);
-  IdxT n_dims          = h_query_dataset.extent(1);
-  auto d_query_dataset = raft::make_device_matrix<T, IdxT, row_major>(handle, n_rows, n_dims);
-  raft::copy(d_query_dataset.data_handle(),
-             h_query_dataset.data_handle(),
+  IdxT n_rows    = h_queries.extent(0);
+  IdxT n_dims    = h_queries.extent(1);
+  auto d_queries = raft::make_device_matrix<T, IdxT, row_major>(handle, n_rows, n_dims);
+  raft::copy(d_queries.data_handle(),
+             h_queries.data_handle(),
              n_rows * n_dims,
              resource::get_cuda_stream(handle));
-  auto d_query_view = raft::make_const_mdspan(d_query_dataset.view());
+  auto d_query_view = raft::make_const_mdspan(d_queries.view());
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, int64_t>>::value) {
     cuvs::neighbors::ivf_flat::search(
@@ -191,7 +193,7 @@ const IdxT ann_interface<AnnIndexType, T, IdxT>::size() const
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-ann_mg_index<AnnIndexType, T, IdxT>::ann_mg_index(parallel_mode mode, int num_ranks_)
+ann_mg_index<AnnIndexType, T, IdxT>::ann_mg_index(distribution_mode mode, int num_ranks_)
   : mode_(mode), num_ranks_(num_ranks_)
 {
 }
@@ -230,7 +232,7 @@ void ann_mg_index<AnnIndexType, T, IdxT>::deserialize_mg_index(
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  mode_      = (cuvs::neighbors::mg::parallel_mode)deserialize_scalar<int>(handle, is);
+  mode_      = (cuvs::neighbors::mg::distribution_mode)deserialize_scalar<int>(handle, is);
   num_ranks_ = deserialize_scalar<int>(handle, is);
 
   for (int rank = 0; rank < num_ranks_; rank++) {
@@ -346,13 +348,13 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void ann_mg_index<AnnIndexType, T, IdxT>::search(
   const cuvs::neighbors::mg::nccl_clique& clique,
   const cuvs::neighbors::search_params* search_params,
-  raft::host_matrix_view<const T, IdxT, row_major> query_dataset,
+  raft::host_matrix_view<const T, IdxT, row_major> queries,
   raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
   raft::host_matrix_view<float, IdxT, row_major> distances,
   IdxT n_rows_per_batch) const
 {
-  IdxT n_rows      = query_dataset.extent(0);
-  IdxT n_cols      = query_dataset.extent(1);
+  IdxT n_rows      = queries.extent(0);
+  IdxT n_cols      = queries.extent(1);
   IdxT n_neighbors = neighbors.extent(1);
 
   IdxT n_batches = raft::ceildiv(n_rows, (IdxT)n_rows_per_batch);
@@ -374,7 +376,7 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
       IdxT n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
 
       auto query_partition = raft::make_host_matrix_view<const T, IdxT, row_major>(
-        query_dataset.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
+        queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
       auto d_neighbors = raft::make_device_matrix<IdxT, IdxT, row_major>(
         dev_res, n_rows_of_current_batch, n_neighbors);
       auto d_distances = raft::make_device_matrix<float, IdxT, row_major>(
@@ -415,9 +417,10 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
       IdxT output_offset           = offset * n_neighbors;
       IdxT n_rows_of_current_batch = std::min((IdxT)n_rows_per_batch, n_rows - offset);
       auto query_partition         = raft::make_host_matrix_view<const T, IdxT, row_major>(
-        query_dataset.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
+        queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
-// should use at least num_ranks_ threads to avoid NCCL hang
+      const int& requirements = num_ranks_;
+      check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(num_ranks_)
       for (int rank = 0; rank < num_ranks_; rank++) {
         int dev_id                            = clique.device_ids_[rank];
@@ -605,14 +608,14 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>& index,
             const ivf_flat::search_params& search_params,
-            raft::host_matrix_view<const T, IdxT, row_major> query_dataset,
+            raft::host_matrix_view<const T, IdxT, row_major> queries,
             raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
             raft::host_matrix_view<float, IdxT, row_major> distances,
             uint64_t n_rows_per_batch)
 {
   index.search(clique,
                static_cast<const cuvs::neighbors::search_params*>(&search_params),
-               query_dataset,
+               queries,
                neighbors,
                distances,
                n_rows_per_batch);
@@ -623,14 +626,14 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>& index,
             const ivf_pq::search_params& search_params,
-            raft::host_matrix_view<const T, IdxT, row_major> query_dataset,
+            raft::host_matrix_view<const T, IdxT, row_major> queries,
             raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
             raft::host_matrix_view<float, IdxT, row_major> distances,
             uint64_t n_rows_per_batch)
 {
   index.search(clique,
                static_cast<const cuvs::neighbors::search_params*>(&search_params),
-               query_dataset,
+               queries,
                neighbors,
                distances,
                n_rows_per_batch);
@@ -641,14 +644,14 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<cagra::index<T, IdxT>, T, IdxT>& index,
             const cagra::search_params& search_params,
-            raft::host_matrix_view<const T, IdxT, row_major> query_dataset,
+            raft::host_matrix_view<const T, IdxT, row_major> queries,
             raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
             raft::host_matrix_view<float, IdxT, row_major> distances,
             uint64_t n_rows_per_batch)
 {
   index.search(clique,
                static_cast<const cuvs::neighbors::search_params*>(&search_params),
-               query_dataset,
+               queries,
                neighbors,
                distances,
                n_rows_per_batch);

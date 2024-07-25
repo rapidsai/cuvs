@@ -23,11 +23,17 @@
 
 namespace cuvs::neighbors::mg {
 
+enum class algo_t { IVF_FLAT, IVF_PQ, CAGRA };
+
+enum class d_mode_t { REPLICATED, SHARDED, LOCAL_THEN_DISTRIBUTED };
+
 struct AnnMGInputs {
   int64_t num_queries;
   int64_t num_db_vecs;
   int64_t dim;
   int64_t k;
+  d_mode_t d_mode;
+  algo_t algo;
   int64_t nprobe;
   int64_t nlist;
   cuvs::distance::DistanceType metric;
@@ -41,9 +47,9 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     : stream_(resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<AnnMGInputs>::GetParam()),
       d_index_dataset(0, stream_),
-      d_query_dataset(0, stream_),
+      d_queries(0, stream_),
       h_index_dataset(0),
-      h_query_dataset(0)
+      h_queries(0)
   {
   }
 
@@ -63,7 +69,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       cuvs::neighbors::naive_knn<T, DataT, int64_t>(handle_,
                                                     distances_naive_dev.data(),
                                                     indices_naive_dev.data(),
-                                                    d_query_dataset.data(),
+                                                    d_queries.data(),
                                                     d_index_dataset.data(),
                                                     ps.num_queries,
                                                     ps.num_db_vecs,
@@ -81,11 +87,18 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     std::vector<int> device_ids(n_devices);
     std::iota(device_ids.begin(), device_ids.end(), 0);
 
-    uint64_t n_rows_per_batch = 3000;  // [3000, 3000, 1000] == 7000 rows
+    uint64_t n_rows_per_search_batch = 3000;  // [3000, 3000, 1000] == 7000 rows
     cuvs::neighbors::mg::nccl_clique clique(device_ids);
 
     // IVF-Flat
-    for (parallel_mode d_mode : {parallel_mode::REPLICATED, parallel_mode::SHARDED}) {
+    if (ps.algo == algo_t::IVF_FLAT &&
+        (ps.d_mode == d_mode_t::REPLICATED || ps.d_mode == d_mode_t::SHARDED)) {
+      distribution_mode d_mode;
+      if (ps.d_mode == d_mode_t::REPLICATED)
+        d_mode = distribution_mode::REPLICATED;
+      else
+        d_mode = distribution_mode::SHARDED;
+
       ivf_flat::mg_index_params index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
@@ -100,8 +113,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
-      auto query_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
-        h_query_dataset.data(), ps.num_queries, ps.dim);
+      auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
+        h_queries.data(), ps.num_queries, ps.dim);
       auto neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
         indices_ann.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
@@ -118,10 +131,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   clique,
                                   new_index,
                                   search_params,
-                                  query_dataset,
+                                  queries,
                                   neighbors,
                                   distances,
-                                  n_rows_per_batch);
+                                  n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
@@ -138,7 +151,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     }
 
     // IVF-PQ
-    for (parallel_mode d_mode : {parallel_mode::REPLICATED, parallel_mode::SHARDED}) {
+    if (ps.algo == algo_t::IVF_PQ &&
+        (ps.d_mode == d_mode_t::REPLICATED || ps.d_mode == d_mode_t::SHARDED)) {
+      distribution_mode d_mode;
+      if (ps.d_mode == d_mode_t::REPLICATED)
+        d_mode = distribution_mode::REPLICATED;
+      else
+        d_mode = distribution_mode::SHARDED;
+
       ivf_pq::mg_index_params index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
@@ -152,8 +172,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
-      auto query_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
-        h_query_dataset.data(), ps.num_queries, ps.dim);
+      auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
+        h_queries.data(), ps.num_queries, ps.dim);
       auto neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
         indices_ann.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
@@ -170,10 +190,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   clique,
                                   new_index,
                                   search_params,
-                                  query_dataset,
+                                  queries,
                                   neighbors,
                                   distances,
-                                  n_rows_per_batch);
+                                  n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
@@ -190,7 +210,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     }
 
     // CAGRA
-    for (parallel_mode d_mode : {parallel_mode::REPLICATED, parallel_mode::SHARDED}) {
+    if (ps.algo == algo_t::CAGRA &&
+        (ps.d_mode == d_mode_t::REPLICATED || ps.d_mode == d_mode_t::SHARDED)) {
+      distribution_mode d_mode;
+      if (ps.d_mode == d_mode_t::REPLICATED)
+        d_mode = distribution_mode::REPLICATED;
+      else
+        d_mode = distribution_mode::SHARDED;
+
       cagra::mg_index_params index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
@@ -201,8 +228,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
-      auto query_dataset = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
-        h_query_dataset.data(), ps.num_queries, ps.dim);
+      auto queries = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
+        h_queries.data(), ps.num_queries, ps.dim);
       auto neighbors = raft::make_host_matrix_view<uint32_t, uint32_t, row_major>(
         indices_ann_32bits.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, uint32_t, row_major>(
@@ -218,10 +245,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   clique,
                                   new_index,
                                   search_params,
-                                  query_dataset,
+                                  queries,
                                   neighbors,
                                   distances,
-                                  n_rows_per_batch);
+                                  n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
@@ -237,7 +264,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       std::fill(distances_ann.begin(), distances_ann.end(), 0);
     }
 
-    {
+    if (ps.algo == algo_t::IVF_FLAT && ps.d_mode == d_mode_t::LOCAL_THEN_DISTRIBUTED) {
       ivf_flat::index_params index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
@@ -258,8 +285,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         ivf_flat::serialize(handle_, "./cpp/build/local_ivf_flat_index", index);
       }
 
-      auto query_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
-        h_query_dataset.data(), ps.num_queries, ps.dim);
+      auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
+        h_queries.data(), ps.num_queries, ps.dim);
       auto neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
         indices_ann.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
@@ -271,10 +298,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   clique,
                                   distributed_index,
                                   search_params,
-                                  query_dataset,
+                                  queries,
                                   neighbors,
                                   distances,
-                                  n_rows_per_batch);
+                                  n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
 
@@ -291,7 +318,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       std::fill(distances_ann.begin(), distances_ann.end(), 0);
     }
 
-    {
+    if (ps.algo == algo_t::IVF_PQ && ps.d_mode == d_mode_t::LOCAL_THEN_DISTRIBUTED) {
       ivf_pq::index_params index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
@@ -311,8 +338,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         ivf_pq::serialize(handle_, "./cpp/build/local_ivf_pq_index", index);
       }
 
-      auto query_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
-        h_query_dataset.data(), ps.num_queries, ps.dim);
+      auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
+        h_queries.data(), ps.num_queries, ps.dim);
       auto neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
         indices_ann.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
@@ -324,10 +351,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   clique,
                                   distributed_index,
                                   search_params,
-                                  query_dataset,
+                                  queries,
                                   neighbors,
                                   distances,
-                                  n_rows_per_batch);
+                                  n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
 
@@ -344,7 +371,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       std::fill(distances_ann.begin(), distances_ann.end(), 0);
     }
 
-    {
+    if (ps.algo == algo_t::CAGRA && ps.d_mode == d_mode_t::LOCAL_THEN_DISTRIBUTED) {
       cagra::index_params index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
@@ -360,8 +387,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         cuvs::neighbors::cagra::serialize(handle_, "./cpp/build/local_cagra_index", index);
       }
 
-      auto query_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
-        h_query_dataset.data(), ps.num_queries, ps.dim);
+      auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
+        h_queries.data(), ps.num_queries, ps.dim);
       auto neighbors = raft::make_host_matrix_view<uint32_t, int64_t, row_major>(
         indices_ann_32bits.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
@@ -373,10 +400,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   clique,
                                   distributed_index,
                                   search_params,
-                                  query_dataset,
+                                  queries,
                                   neighbors,
                                   distances,
-                                  n_rows_per_batch);
+                                  n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
 
@@ -397,31 +424,27 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
   void SetUp() override
   {
     d_index_dataset.resize(ps.num_db_vecs * ps.dim, stream_);
-    d_query_dataset.resize(ps.num_queries * ps.dim, stream_);
+    d_queries.resize(ps.num_queries * ps.dim, stream_);
     h_index_dataset.resize(ps.num_db_vecs * ps.dim);
-    h_query_dataset.resize(ps.num_queries * ps.dim);
+    h_queries.resize(ps.num_queries * ps.dim);
 
     raft::random::RngState r(1234ULL);
     if constexpr (std::is_same<DataT, float>{}) {
       raft::random::uniform(
         handle_, r, d_index_dataset.data(), d_index_dataset.size(), DataT(0.1), DataT(2.0));
-      raft::random::uniform(
-        handle_, r, d_query_dataset.data(), d_query_dataset.size(), DataT(0.1), DataT(2.0));
+      raft::random::uniform(handle_, r, d_queries.data(), d_queries.size(), DataT(0.1), DataT(2.0));
     } else {
       raft::random::uniformInt(
         handle_, r, d_index_dataset.data(), d_index_dataset.size(), DataT(1), DataT(20));
-      raft::random::uniformInt(
-        handle_, r, d_query_dataset.data(), d_query_dataset.size(), DataT(1), DataT(20));
+      raft::random::uniformInt(handle_, r, d_queries.data(), d_queries.size(), DataT(1), DataT(20));
     }
 
     raft::copy(h_index_dataset.data(),
                d_index_dataset.data(),
                d_index_dataset.size(),
                resource::get_cuda_stream(handle_));
-    raft::copy(h_query_dataset.data(),
-               d_query_dataset.data(),
-               d_query_dataset.size(),
-               resource::get_cuda_stream(handle_));
+    raft::copy(
+      h_queries.data(), d_queries.data(), d_queries.size(), resource::get_cuda_stream(handle_));
     resource::sync_stream(handle_);
   }
 
@@ -429,9 +452,9 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
   {
     resource::sync_stream(handle_);
     h_index_dataset.clear();
-    h_query_dataset.clear();
+    h_queries.clear();
     d_index_dataset.resize(0, stream_);
-    d_query_dataset.resize(0, stream_);
+    d_queries.resize(0, stream_);
   }
 
  private:
@@ -439,12 +462,103 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
   rmm::cuda_stream_view stream_;
   AnnMGInputs ps;
   std::vector<DataT> h_index_dataset;
-  std::vector<DataT> h_query_dataset;
+  std::vector<DataT> h_queries;
   rmm::device_uvector<DataT> d_index_dataset;
-  rmm::device_uvector<DataT> d_query_dataset;
+  rmm::device_uvector<DataT> d_queries;
 };
 
 const std::vector<AnnMGInputs> inputs = {
-  {7000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::REPLICATED,
+   algo_t::IVF_FLAT,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::REPLICATED,
+   algo_t::IVF_PQ,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::REPLICATED,
+   algo_t::CAGRA,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::SHARDED,
+   algo_t::IVF_FLAT,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::SHARDED,
+   algo_t::IVF_PQ,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::SHARDED,
+   algo_t::CAGRA,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::LOCAL_THEN_DISTRIBUTED,
+   algo_t::IVF_FLAT,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::LOCAL_THEN_DISTRIBUTED,
+   algo_t::IVF_PQ,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::LOCAL_THEN_DISTRIBUTED,
+   algo_t::CAGRA,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
 };
 }  // namespace cuvs::neighbors::mg

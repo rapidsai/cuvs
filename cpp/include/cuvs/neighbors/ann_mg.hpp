@@ -29,25 +29,27 @@
 class ncclComm_t {};
 #endif
 
+#define DEFAULT_SEARCH_BATCH_SIZE 1 << 20
+
 namespace cuvs::neighbors::mg {
-enum parallel_mode { REPLICATED, SHARDED };
+enum distribution_mode { REPLICATED, SHARDED };
 }
 
 namespace cuvs::neighbors::ivf_flat {
 struct mg_index_params : cuvs::neighbors::ivf_flat::index_params {
-  cuvs::neighbors::mg::parallel_mode mode;
+  cuvs::neighbors::mg::distribution_mode mode;
 };
 }  // namespace cuvs::neighbors::ivf_flat
 
 namespace cuvs::neighbors::ivf_pq {
 struct mg_index_params : cuvs::neighbors::ivf_pq::index_params {
-  cuvs::neighbors::mg::parallel_mode mode;
+  cuvs::neighbors::mg::distribution_mode mode;
 };
 }  // namespace cuvs::neighbors::ivf_pq
 
 namespace cuvs::neighbors::cagra {
 struct mg_index_params : cuvs::neighbors::cagra::index_params {
-  cuvs::neighbors::mg::parallel_mode mode;
+  cuvs::neighbors::mg::distribution_mode mode;
 };
 }  // namespace cuvs::neighbors::cagra
 
@@ -55,7 +57,7 @@ namespace cuvs::neighbors::mg {
 using pool_mr = rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>;
 
 struct nccl_clique {
-  nccl_clique(const std::vector<int>& device_ids);
+  nccl_clique(const std::vector<int>& device_ids, int percent_of_free_memory = 80);
   const raft::device_resources& set_current_device_to_root_rank() const;
   ~nccl_clique();
 
@@ -86,7 +88,7 @@ class ann_interface {
 
   void search(raft::resources const& handle,
               const cuvs::neighbors::search_params* search_params,
-              raft::host_matrix_view<const T, IdxT, row_major> h_query_dataset,
+              raft::host_matrix_view<const T, IdxT, row_major> h_queries,
               raft::device_matrix_view<IdxT, IdxT, row_major> d_neighbors,
               raft::device_matrix_view<float, IdxT, row_major> d_distances) const;
 
@@ -102,7 +104,7 @@ class ann_interface {
 template <typename AnnIndexType, typename T, typename IdxT>
 class ann_mg_index {
  public:
-  ann_mg_index(parallel_mode mode, int num_ranks_);
+  ann_mg_index(distribution_mode mode, int num_ranks_);
   ann_mg_index(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
                const std::string& filename);
@@ -130,7 +132,7 @@ class ann_mg_index {
 
   void search(const cuvs::neighbors::mg::nccl_clique& clique,
               const cuvs::neighbors::search_params* search_params,
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,
+              raft::host_matrix_view<const T, IdxT, row_major> queries,
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
               raft::host_matrix_view<float, IdxT, row_major> distances,
               IdxT n_rows_per_batch) const;
@@ -140,7 +142,7 @@ class ann_mg_index {
                  const std::string& filename) const;
 
  private:
-  parallel_mode mode_;
+  distribution_mode mode_;
   int num_ranks_;
   std::vector<ann_interface<AnnIndexType, T, IdxT>> ann_interfaces_;
 };
@@ -162,10 +164,10 @@ class ann_mg_index {
               const cuvs::neighbors::mg::nccl_clique& clique,                       \
               const ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>& index,         \
               const ivf_flat::search_params& search_params,                         \
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,       \
+              raft::host_matrix_view<const T, IdxT, row_major> queries,             \
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,              \
               raft::host_matrix_view<float, IdxT, row_major> distances,             \
-              uint64_t n_rows_per_batch);                                           \
+              uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);               \
                                                                                     \
   void serialize(const raft::resources& handle,                                     \
                  const cuvs::neighbors::mg::nccl_clique& clique,                    \
@@ -207,10 +209,10 @@ auto distribute_flat(const raft::resources& handle,
               const cuvs::neighbors::mg::nccl_clique& clique,                       \
               const ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>& index,              \
               const ivf_pq::search_params& search_params,                           \
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,       \
+              raft::host_matrix_view<const T, IdxT, row_major> queries,             \
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,              \
               raft::host_matrix_view<float, IdxT, row_major> distances,             \
-              uint64_t n_rows_per_batch);                                           \
+              uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);               \
                                                                                     \
   void serialize(const raft::resources& handle,                                     \
                  const cuvs::neighbors::mg::nccl_clique& clique,                    \
@@ -250,10 +252,10 @@ auto distribute_pq(const raft::resources& handle,
               const cuvs::neighbors::mg::nccl_clique& clique,                       \
               const ann_mg_index<cagra::index<T, IdxT>, T, IdxT>& index,            \
               const cagra::search_params& search_params,                            \
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,       \
+              raft::host_matrix_view<const T, IdxT, row_major> queries,             \
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,              \
               raft::host_matrix_view<float, IdxT, row_major> distances,             \
-              uint64_t n_rows_per_batch);                                           \
+              uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);               \
                                                                                     \
   void serialize(const raft::resources& handle,                                     \
                  const cuvs::neighbors::mg::nccl_clique& clique,                    \

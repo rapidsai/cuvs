@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
+#include "omp.h"
 #include <raft/comms/std_comms.hpp>
 
-#include "nccl_helpers.cuh"
+#include "../../utils/nccl_helpers.cuh"
 #define NO_NCCL_FORWARD_DECLARATION
 #include <cuvs/neighbors/ann_mg.hpp>
 #undef NO_NCCL_FORWARD_DECLARATION
 
 namespace cuvs::neighbors::mg {
 
-nccl_clique::nccl_clique(const std::vector<int>& device_ids)
+nccl_clique::nccl_clique(const std::vector<int>& device_ids, int percent_of_free_memory)
   : root_rank_(0),
     num_ranks_(device_ids.size()),
     device_ids_(device_ids),
@@ -38,8 +39,8 @@ nccl_clique::nccl_clique(const std::vector<int>& device_ids)
 
     // create a pool memory resource for each device
     auto old_mr = rmm::mr::get_current_device_resource();
-    per_device_pools_.push_back(
-      std::make_unique<pool_mr>(old_mr, rmm::percent_of_free_device_memory(80)));
+    per_device_pools_.push_back(std::make_unique<pool_mr>(
+      old_mr, rmm::percent_of_free_device_memory(percent_of_free_memory)));
     rmm::cuda_device_id id(device_ids[rank]);
     rmm::mr::set_per_device_resource(id, per_device_pools_.back().get());
 
@@ -66,12 +67,14 @@ const raft::device_resources& nccl_clique::set_current_device_to_root_rank() con
 
 nccl_clique::~nccl_clique()
 {
+#pragma omp parallel for  // necessary to avoid hangs
   for (int rank = 0; rank < num_ranks_; rank++) {
     cudaSetDevice(device_ids_[rank]);
     ncclCommDestroy(nccl_comms_[rank]);
     rmm::cuda_device_id id(device_ids_[rank]);
     rmm::mr::set_per_device_resource(id, nullptr);
   }
+#pragma omp barrier
 }
 
 }  // namespace cuvs::neighbors::mg

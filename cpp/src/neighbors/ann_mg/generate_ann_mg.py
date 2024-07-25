@@ -74,12 +74,12 @@ flat_macro = """
               const cuvs::neighbors::mg::nccl_clique& clique,                                                             \\
               const ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>& index,                                               \\
               const ivf_flat::search_params& search_params,                                                               \\
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,                                             \\
+              raft::host_matrix_view<const T, IdxT, row_major> queries,                                                   \\
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,                                                    \\
               raft::host_matrix_view<float, IdxT, row_major> distances,                                                   \\
               uint64_t n_rows_per_batch)                                                                                  \\
   {                                                                                                                       \\
-    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, query_dataset,                              \\
+    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
                                         neighbors, distances, n_rows_per_batch);                                          \\
   }                                                                                                                       \\
                                                                                                                           \\
@@ -131,12 +131,12 @@ pq_macro = """
               const cuvs::neighbors::mg::nccl_clique& clique,                                                             \\
               const ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>& index,                                                    \\
               const ivf_pq::search_params& search_params,                                                                 \\
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,                                             \\
+              raft::host_matrix_view<const T, IdxT, row_major> queries,                                                   \\
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,                                                    \\
               raft::host_matrix_view<float, IdxT, row_major> distances,                                                   \\
               uint64_t n_rows_per_batch)                                                                                  \\
   {                                                                                                                       \\
-    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, query_dataset,                              \\
+    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
                                         neighbors, distances, n_rows_per_batch);                                          \\
   }                                                                                                                       \\
                                                                                                                           \\
@@ -179,12 +179,12 @@ cagra_macro = """
               const cuvs::neighbors::mg::nccl_clique& clique,                                                             \\
               const ann_mg_index<cagra::index<T, IdxT>, T, IdxT>& index,                                                  \\
               const cagra::search_params& search_params,                                                                  \\
-              raft::host_matrix_view<const T, IdxT, row_major> query_dataset,                                             \\
+              raft::host_matrix_view<const T, IdxT, row_major> queries,                                                   \\
               raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,                                                    \\
               raft::host_matrix_view<float, IdxT, row_major> distances,                                                   \\
               uint64_t n_rows_per_batch)                                                                                  \\
   {                                                                                                                       \\
-    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, query_dataset,                              \\
+    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
                                         neighbors, distances, n_rows_per_batch);                                          \\
   }                                                                                                                       \\
                                                                                                                           \\
