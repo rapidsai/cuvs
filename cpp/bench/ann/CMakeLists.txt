@@ -33,6 +33,7 @@ option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
+option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
 
 # ##################################################################################################
 # * Process options ----------------------------------------------------------
@@ -50,6 +51,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
+  set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -72,6 +74,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
+   OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -231,6 +234,17 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE)
   ConfigureAnnBench(NAME CUVS_BRUTE_FORCE PATH bench/ann/src/cuvs/cuvs_benchmark.cu LINKS cuvs)
+endif()
+
+if(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE)
+  ConfigureAnnBench(
+    NAME
+    CUVS_KNN_BRUTE_FORCE
+    PATH
+    $<$<BOOL:${CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE}>:bench/ann/src/cuvs/cuvs_brute_force_knn.cu>
+    LINKS
+    cuvs
+  )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
