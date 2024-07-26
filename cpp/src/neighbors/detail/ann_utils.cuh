@@ -30,7 +30,6 @@
 #include <rmm/resource_ref.hpp>
 
 #include <cuda_fp16.hpp>
-#include <omp.h>
 
 #include <memory>
 #include <optional>
@@ -396,6 +395,12 @@ void copy_selected(IdxT n_rows,
  *
  * The iterator can be reused. If the number of iterations is one, at most one raft::copy will ever
  * be invoked (i.e. small datasets are not reloaded multiple times).
+ *
+ * In the case of pageable host buffer input, the iterator is by default (almost) synchronous due to
+ * the behavior of raft::copy. In order to achieve kernel and copy overlapping, a
+ * prefetch_next_batch (synchronous) API is provided. Note that since prefetch API is synchronous,
+ * user may want to schedule kernel, which is asynchronous, first. User is responsible to properly
+ * manage the order of prefetch and kernel to ensure overlapping.
  */
 template <typename T>
 struct batch_load_iterator {
@@ -497,7 +502,7 @@ struct batch_load_iterator {
     }
 
     /**
-     * Helper function for prefetch. NOP if prefetch option is not enabled.
+     * Helper function for prefetch. NOP if prefetch option is not enabled. This API is synchronous.
      */
     void prefetch(const size_type& pos)
     {
@@ -590,7 +595,7 @@ struct batch_load_iterator {
     return cur_batch_.get();
   }
   /* Prefetch next batch. Users are responsible for calling this method to enable kernel/copy
-   * overlapping. */
+   * overlapping. Note that this API is synchronous. */
   void prefetch_next_batch() { cur_batch_->prefetch(cur_prefetch_pos_++); }
   friend auto operator==(const batch_load_iterator<T>& x, const batch_load_iterator<T>& y) -> bool
   {
