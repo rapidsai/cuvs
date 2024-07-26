@@ -53,7 +53,7 @@ If installing a version that has not yet been released, the `rapidsai` channel c
 mamba install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.10
 ```
 
-Please see the [Build and Install Guide](docs/source/build.md) for more information on installing cuVS and building from source.
+Please see the [Build and Install Guide](docs/source/build.rst) for more information on installing cuVS and building from source.
 
 ## Getting Started
 
