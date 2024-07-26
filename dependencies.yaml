@@ -157,8 +157,8 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - &rmm_conda rmm==24.10.*,>=0.0.0a0
-          - &pylibraft_conda pylibraft==24.10.*,>=0.0.0a0
+          - &rmm_unsuffixed rmm==24.8.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==24.8.*,>=0.0.0a0
           - dlpack>=0.8,<1.0
       - output_types: requirements
         packages:
@@ -182,15 +182,19 @@ dependencies:
               - &cuda_python cuda-python
       - output_types: [requirements, pyproject]
         matrices:
-          - matrix: {cuda: "12.*"}
+          - matrix:
+              cuda: "12.*"
+              cuda_suffixed: "true"
             packages:
-              - &rmm_cu12 rmm-cu12==24.10.*,>=0.0.0a0
-              - &pylibraft_cu12 pylibraft-cu12==24.10.*,>=0.0.0a0
-          - matrix: {cuda: "11.*"}
+              - &rmm_cu12 rmm-cu12==24.8.*,>=0.0.0a0
+              - &pylibraft_cu12 pylibraft-cu12==24.8.*,>=0.0.0a0
+          - matrix:
+              cuda: "11.*"
+              cuda_suffixed: "true"
             packages:
-              - &rmm_cu11 rmm-cu11==24.10.*,>=0.0.0a0
-              - &pylibraft_cu11 pylibraft-cu11==24.10.*,>=0.0.0a0
-          - {matrix: null, packages: [*rmm_conda, *pylibraft_conda] }
+              - &rmm_cu11 rmm-cu11==24.8.*,>=0.0.0a0
+              - &pylibraft_cu11 pylibraft-cu11==24.8.*,>=0.0.0a0
+          - {matrix: null, packages: [*rmm_unsuffixed, *pylibraft_unsuffixed] }
   checks:
     common:
       - output_types: [conda, requirements]
@@ -383,8 +387,8 @@ dependencies:
           - &numpy numpy>=1.23,<2.0a0
       - output_types: [conda]
         packages:
-          - *rmm_conda
-          - *pylibraft_conda
+          - *rmm_unsuffixed
+          - *pylibraft_unsuffixed
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -413,7 +417,7 @@ dependencies:
           - matrix: {cuda: "11.*"}
             packages:
               - *pylibraft_cu11
-          - {matrix: null, packages: [*pylibraft_conda]}
+          - {matrix: null, packages: [*pylibraft_unsuffixed]}
   test_python_common:
     common:
       - output_types: [conda, requirements, pyproject]
