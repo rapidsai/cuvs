@@ -24,24 +24,43 @@
 
 namespace cuvs::neighbors::mg {
 
+nccl_clique::nccl_clique(int percent_of_free_memory)
+  : root_rank_(0),
+    percent_of_free_memory_(percent_of_free_memory),
+    per_device_pools_(0),
+    device_resources_(0)
+{
+  cudaGetDeviceCount(&num_ranks_);
+  device_ids_.resize(num_ranks_);
+  std::iota(device_ids_.begin(), device_ids_.end(), 0);
+  nccl_comms_.resize(num_ranks_);
+  nccl_clique_init();
+}
+
 nccl_clique::nccl_clique(const std::vector<int>& device_ids, int percent_of_free_memory)
   : root_rank_(0),
     num_ranks_(device_ids.size()),
+    percent_of_free_memory_(percent_of_free_memory),
     device_ids_(device_ids),
     nccl_comms_(device_ids.size()),
     per_device_pools_(0),
     device_resources_(0)
 {
+  nccl_clique_init();
+}
+
+void nccl_clique::nccl_clique_init()
+{
   RAFT_NCCL_TRY(ncclCommInitAll(nccl_comms_.data(), num_ranks_, device_ids_.data()));
 
   for (int rank = 0; rank < num_ranks_; rank++) {
-    RAFT_CUDA_TRY(cudaSetDevice(device_ids[rank]));
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids_[rank]));
 
     // create a pool memory resource for each device
     auto old_mr = rmm::mr::get_current_device_resource();
     per_device_pools_.push_back(std::make_unique<pool_mr>(
-      old_mr, rmm::percent_of_free_device_memory(percent_of_free_memory)));
-    rmm::cuda_device_id id(device_ids[rank]);
+      old_mr, rmm::percent_of_free_device_memory(percent_of_free_memory_)));
+    rmm::cuda_device_id id(device_ids_[rank]);
     rmm::mr::set_per_device_resource(id, per_device_pools_.back().get());
 
     // create a device resource handle for each device
@@ -53,7 +72,7 @@ nccl_clique::nccl_clique(const std::vector<int>& device_ids, int percent_of_free
   }
 
   for (int rank = 0; rank < num_ranks_; rank++) {
-    RAFT_CUDA_TRY(cudaSetDevice(device_ids[rank]));
+    RAFT_CUDA_TRY(cudaSetDevice(device_ids_[rank]));
     raft::resource::sync_stream(device_resources_[rank]);
   }
 }

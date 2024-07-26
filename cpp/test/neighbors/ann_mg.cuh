@@ -81,14 +81,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       resource::sync_stream(handle_);
     }
 
-    int n_devices;
-    cudaGetDeviceCount(&n_devices);
-    std::cout << n_devices << " GPUs detected" << std::endl;
-    std::vector<int> device_ids(n_devices);
-    std::iota(device_ids.begin(), device_ids.end(), 0);
-
     uint64_t n_rows_per_search_batch = 3000;  // [3000, 3000, 1000] == 7000 rows
-    cuvs::neighbors::mg::nccl_clique clique(device_ids);
+    cuvs::neighbors::mg::nccl_clique clique;
 
     // IVF-Flat
     if (ps.algo == algo_t::IVF_FLAT &&
