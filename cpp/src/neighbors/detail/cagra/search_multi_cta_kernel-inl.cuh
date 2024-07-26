@@ -458,6 +458,7 @@ void select_and_run(
   const uint32_t num_queries,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* dev_seed_ptr,  // [num_queries, num_seeds]
   uint32_t* const num_executed_iterations,                     // [num_queries,]
+  const search_params& ps,
   uint32_t topk,
   // multi_cta_search (params struct)
   uint32_t block_size,  //
@@ -466,13 +467,7 @@ void select_and_run(
   int64_t hash_bitlen,
   typename DATASET_DESCRIPTOR_T::INDEX_T* hashmap_ptr,
   uint32_t num_cta_per_query,
-  uint32_t num_random_samplings,
-  uint64_t rand_xor_mask,
   uint32_t num_seeds,
-  size_t itopk_size,
-  size_t search_width,
-  size_t min_iterations,
-  size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream)
@@ -507,16 +502,16 @@ void select_and_run(
                                                        queries_ptr,
                                                        graph.data_handle(),
                                                        graph.extent(1),
-                                                       num_random_samplings,
-                                                       rand_xor_mask,
+                                                       ps.num_random_samplings,
+                                                       ps.rand_xor_mask,
                                                        dev_seed_ptr,
                                                        num_seeds,
                                                        hashmap_ptr,
                                                        hash_bitlen,
-                                                       itopk_size,
-                                                       search_width,
-                                                       min_iterations,
-                                                       max_iterations,
+                                                       ps.itopk_size,
+                                                       ps.search_width,
+                                                       ps.min_iterations,
+                                                       ps.max_iterations,
                                                        num_executed_iterations,
                                                        sample_filter,
                                                        metric);
