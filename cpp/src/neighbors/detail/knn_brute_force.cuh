@@ -28,8 +28,8 @@
 #include "./knn_utils.cuh"
 
 #include <raft/core/bitmap.cuh>
-#include <raft/core/detail/popc.cuh>
 #include <raft/core/device_csr_matrix.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -46,6 +46,7 @@
 #include <raft/sparse/matrix/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
+#include <raft/util/popc.cuh>
 
 #include <cuda_fp16.h>
 #include <rmm/cuda_device.hpp>
@@ -598,10 +599,10 @@ void brute_force_search_filtered(
   auto nnz_view = raft::make_device_scalar_view<IdxT>(nnz.data());
   auto filter_view =
     raft::make_device_vector_view<const BitmapT, IdxT>(filter.data(), filter.n_elements());
+  IdxT size_h    = n_queries * n_dataset;
+  auto size_view = raft::make_host_scalar_view<IdxT>(&size_h);
 
-  // TODO(rhdong): Need to switch to the public API,
-  // with the issue: https://github.com/rapidsai/cuvs/issues/158
-  raft::detail::popc(res, filter_view, n_queries * n_dataset, nnz_view);
+  raft::popc(res, filter_view, size_view, nnz_view);
   raft::copy(&nnz_h, nnz.data(), 1, stream);
 
   raft::resource::sync_stream(res, stream);
