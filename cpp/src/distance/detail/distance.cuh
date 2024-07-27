@@ -821,7 +821,6 @@ size_t getWorkspaceSize(const InType* x, const InType* y, Index_ m, Index_ n, In
     // accuracy issue is resolved until then we allocate as m + n.
     worksize += numOfBuffers * m * sizeof(AccType);
     worksize += numOfBuffers * n * sizeof(AccType);
-    worksize += alignof(OutType);
   }
 
   return worksize;
