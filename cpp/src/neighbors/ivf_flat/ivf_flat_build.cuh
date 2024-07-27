@@ -199,11 +199,11 @@ void extend(raft::resources const& handle,
   // Determine if a stream pool exist and make sure there is at least one stream in it so we
   // could use the stream for kernel/copy overlapping by enabling prefetch.
   auto copy_stream = raft::resource::get_cuda_stream(handle);  // Using the main stream by default
-  bool enable_prefetch =
-    handle.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL);
-  if (enable_prefetch) {
+  bool enable_prefetch = false;
+  if (handle.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
     if (raft::resource::get_stream_pool_size(handle) >= 1) {
-      copy_stream = raft::resource::get_stream_from_stream_pool(handle);
+      enable_prefetch = true;
+      copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
     }
   }
   // Predict the cluster labels for the new data, in batches if necessary

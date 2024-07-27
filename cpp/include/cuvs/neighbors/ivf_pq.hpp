@@ -452,6 +452,10 @@ struct index : cuvs::neighbors::index {
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -474,6 +478,10 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -499,6 +507,10 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -521,6 +533,10 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -546,6 +562,10 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -568,6 +588,10 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -592,6 +616,10 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -614,6 +642,10 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -639,6 +671,10 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -661,6 +697,10 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -686,6 +726,10 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -708,6 +752,10 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
+ * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -740,6 +788,9 @@ void build(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -769,6 +820,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -796,6 +850,9 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
+ *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -826,6 +883,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -854,6 +914,9 @@ void extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -883,6 +946,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -910,6 +976,9 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
+ *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -940,6 +1009,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -967,6 +1039,9 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
+ *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -997,6 +1072,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -1024,6 +1102,9 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
+ *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1053,6 +1134,9 @@ auto extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
+ *
+ * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
+ * (at least) one stream to enable kernel/copy overlapping.
  *
  * Usage example:
  * @code{.cpp}

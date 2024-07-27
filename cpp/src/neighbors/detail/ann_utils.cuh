@@ -536,12 +536,25 @@ struct batch_load_iterator {
    * row-major matrix of size [n_rows, row_width], and the batches are the sub-matrices of size
    * [x<=batch_size, n_rows].
    *
+   * If prefetch option is enabled, the batch_load_iterator could help to achieve overlapping with
+   * prefetch_next_batch() with other workloads. This is useful if source buffer is in host memory.
+   * To achieve overlapping, the other workloads have to be async and scheduled before
+   * prefetch_next_batch(). Users also need to use a different stream for the workloads. E.g.,
+   * utils::batch_load_iterator<T> batches(..., stream_1, ..., true);
+   * batches.prefetch_next_batch();
+   * for (const auto& batch : batches) {
+   *     // The following kernel and prefetch_next_batch() could be overlapped.
+   *     kernel<<<..., stream_2>>>(...);
+   *     batches.prefetch_next_batch();
+   * }
+   *
    * @param source the input data -- host, device, or nullptr.
    * @param n_rows the size of the input in logical rows.
    * @param row_width the size of the logical row in the elements of type `T`.
    * @param batch_size the desired size of the batch.
    * @param stream the ordering for the host->device copies, if applicable.
    * @param mr a custom memory resource for the intermediate buffer, if applicable.
+   * @param prefetch enable prefetch feature in order to achieve kernel/copy overlapping.
    */
   batch_load_iterator(const T* source,
                       size_type n_rows,
