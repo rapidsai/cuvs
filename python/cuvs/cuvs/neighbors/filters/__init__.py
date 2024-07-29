@@ -13,24 +13,6 @@
 # limitations under the License.
 
 
-from .ivf_pq import (
-    Index,
-    IndexParams,
-    SearchParams,
-    build,
-    extend,
-    load,
-    save,
-    search,
-)
+from .filters import Prefilter, from_bitmap, no_filter
 
-__all__ = [
-    "Index",
-    "IndexParams",
-    "SearchParams",
-    "build",
-    "extend",
-    "load",
-    "save",
-    "search",
-]
+__all__ = ["no_filter", "from_bitmap", "Prefilter"]
