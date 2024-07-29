@@ -266,7 +266,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::build(
       ann_if.build(dev_res, index_params, index_dataset);
       resource::sync_stream(dev_res);
     }
-#pragma omp barrier
   } else if (mode_ == SHARDED) {
     IdxT n_rows           = index_dataset.extent(0);
     IdxT n_cols           = index_dataset.extent(1);
@@ -289,7 +288,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::build(
       ann_if.build(dev_res, index_params, partition);
       resource::sync_stream(dev_res);
     }
-#pragma omp barrier
   }
 }
 
@@ -312,7 +310,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::extend(
       ann_if.extend(dev_res, new_vectors, new_indices);
       resource::sync_stream(dev_res);
     }
-#pragma omp barrier
   } else if (mode_ == SHARDED) {
     IdxT n_cols           = new_vectors.extent(1);
     IdxT n_rows_per_shard = raft::ceildiv(n_rows, (IdxT)num_ranks_);
@@ -340,7 +337,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::extend(
       ann_if.extend(dev_res, new_vectors_part, new_indices_part);
       resource::sync_stream(dev_res);
     }
-#pragma omp barrier
   }
 }
 
@@ -397,7 +393,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
 
       resource::sync_stream(dev_res);
     }
-#pragma omp barrier
   } else if (mode_ == SHARDED) {
     RAFT_LOG_INFO("SHARDED SEARCH: %d*%drows", n_batches, n_rows_per_batch);
 
@@ -480,7 +475,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
           resource::sync_stream(dev_res);
         }
       }
-#pragma omp barrier
 
       const auto& root_handle_ = clique.set_current_device_to_root_rank();
       auto h_trans             = std::vector<IdxT>(num_ranks_);

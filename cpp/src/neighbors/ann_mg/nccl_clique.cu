@@ -93,7 +93,6 @@ nccl_clique::~nccl_clique()
     rmm::cuda_device_id id(device_ids_[rank]);
     rmm::mr::set_per_device_resource(id, nullptr);
   }
-#pragma omp barrier
 }
 
 }  // namespace cuvs::neighbors::mg
