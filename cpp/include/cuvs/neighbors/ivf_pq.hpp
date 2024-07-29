@@ -104,31 +104,19 @@ struct index_params : cuvs::neighbors::index_params {
    * Creates index_params based on shape of the input dataset.
    * Usage example:
    * @code{.cpp}
-   *   using namespace raft::neighbors;
+   *   using namespace cuvs::neighbors;
    *   raft::resources res;
    *   // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
    *   ivf_pq::index_params index_params =
-   *     ivf_pq::index_params::from_dataset(dataset.view(), raft::distance::InnerProduct);
+   *     ivf_pq::index_params::from_dataset(dataset.extents(), raft::distance::InnerProduct);
    *   // modify/update index_params as needed
    *   index_params.add_data_on_build = true;
    * @endcode
    */
-  template <typename DataT, typename Accessor>
   static index_params from_dataset(
-    raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
-  {
-    index_params params;
-    params.n_lists =
-      dataset.extent(0) < 4 * 2500 ? 4 : static_cast<uint32_t>(std::sqrt(dataset.extent(0)));
-    params.pq_dim =
-      raft::round_up_safe(static_cast<uint32_t>(dataset.extent(1) / 4), static_cast<uint32_t>(8));
-    params.pq_bits                  = 8;
-    params.kmeans_trainset_fraction = dataset.extent(0) < 10000 ? 1 : 0.1;
-    params.metric                   = metric;
-    return params;
-  }
+    raft::matrix_extent<int64_t> dataset,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 /**
  * @}
@@ -292,6 +280,14 @@ struct index : cuvs::neighbors::index {
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
+
+  /**
+   * @brief Construct an empty index.
+   *
+   * Constructs an empty index. This index will either need to be trained with `build`
+   * or loaded from a saved copy with `deserialize`
+   */
+  index(raft::resources const& handle);
 
   /** Construct an empty index. It needs to be trained and then populated. */
   index(raft::resources const& handle,
@@ -1498,26 +1494,26 @@ void search_with_filtering(
  * @{
  */
 /**
- * Serialize the index to an output string.
+ * Write the index to an output stream
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
  *
  * raft::resources handle;
  *
- * // create an input string
- * std::string str
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
  * // create an index with `auto index = ivf_pq::build(...);`
- * cuvs::serialize(handle, str, index);
+ * cuvs::neighbors::ivf_pq::serialize(handle, os, index);
  * @endcode
  *
  * @param[in] handle the raft handle
- * @param[out] str output string
+ * @param[in] os output stream
  * @param[in] index IVF-PQ index
  *
  */
 void serialize(raft::resources const& handle,
-               std::string& str,
+               std::ostream& os,
                const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 /**
@@ -1531,7 +1527,7 @@ void serialize(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * // create an index with `auto index = ivf_pq::build(...);`
- * cuvs::serialize(handle, filename, index);
+ * cuvs::neighbors::ivf_pq::serialize(handle, filename, index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1539,25 +1535,26 @@ void serialize(raft::resources const& handle,
  * @param[in] index IVF-PQ index
  *
  */
-void serialize_file(raft::resources const& handle,
-                    const std::string& filename,
-                    const cuvs::neighbors::ivf_pq::index<int64_t>& index);
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::ivf_pq::index<int64_t>& index);
 
 /**
- * Load index from input string.
+ * Load index from input stream
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
  *
  * raft::resources handle;
  *
- * std::string str = ...
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
  *
  * using IdxT = int64_t; // type of the index
  * // create an empty index
- * cuvs::neighbors::ivf_pq::index<IdxT> index(handl, index_params, dim);
+ * cuvs::neighbors::ivf_pq::index<IdxT> index(handle);
  *
- * cuvs::deserialize(handle, filename, &index);
+ * cuvs::neighbors::ivf_pq::deserialize(handle, is, index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1565,9 +1562,8 @@ void serialize_file(raft::resources const& handle,
  * @param[out] index IVF-PQ index
  *
  */
-
 void deserialize(raft::resources const& handle,
-                 const std::string& str,
+                 std::istream& str,
                  cuvs::neighbors::ivf_pq::index<int64_t>* index);
 /**
  * Load index from file.
@@ -1580,10 +1576,10 @@ void deserialize(raft::resources const& handle,
  * // create a string with a filepath
  * std::string filename("/path/to/index");
  * using IdxT = int64_t; // type of the index
- * // create an empty index with
- * ivf_pq::index<IdxT> index(handle, index_params, dim);
+ * // create an empty index
+ * ivf_pq::index<IdxT> index(handle);
  *
- * cuvs::deserialize(handle, filename, &index);
+ * cuvs::neighbors::ivf_pq::deserialize(handle, filename, &index);
  * @endcode
  *
  * @param[in] handle the raft handle
@@ -1591,9 +1587,9 @@ void deserialize(raft::resources const& handle,
  * @param[out] index IVF-PQ index
  *
  */
-void deserialize_file(raft::resources const& handle,
-                      const std::string& filename,
-                      cuvs::neighbors::ivf_pq::index<int64_t>* index);
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::ivf_pq::index<int64_t>* index);
 /**
  * @}
  */

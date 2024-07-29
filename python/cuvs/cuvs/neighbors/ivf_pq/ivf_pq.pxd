@@ -91,3 +91,16 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
                                 DLManagedTensor* distances) except +
+
+    cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res,
+                                   const char * filename,
+                                   cuvsIvfPqIndex_t index) except +
+
+    cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res,
+                                     const char * filename,
+                                     cuvsIvfPqIndex_t index) except +
+
+    cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                                DLManagedTensor* new_vectors,
+                                DLManagedTensor* new_indices,
+                                cuvsIvfPqIndex_t index)

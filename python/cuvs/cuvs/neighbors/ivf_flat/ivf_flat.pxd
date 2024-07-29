@@ -72,3 +72,16 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
                                   DLManagedTensor* queries,
                                   DLManagedTensor* neighbors,
                                   DLManagedTensor* distances) except +
+
+    cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
+                                     const char * filename,
+                                     cuvsIvfFlatIndex_t index) except +
+
+    cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
+                                       const char * filename,
+                                       cuvsIvfFlatIndex_t index) except +
+
+    cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+                                  DLManagedTensor* new_vectors,
+                                  DLManagedTensor* new_indices,
+                                  cuvsIvfFlatIndex_t index)

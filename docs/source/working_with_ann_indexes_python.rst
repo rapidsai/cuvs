@@ -16,15 +16,20 @@ Building an index
     dataset = load_data()
     index_params = cagra.IndexParams()
 
-    index = cagra.build_index(build_params, dataset)
+    index = cagra.build(build_params, dataset)
 
 
 Searching an index
 ------------------
 
+.. code-block:: python
 
-CPU/GPU interoperability
-------------------------
+    from cuvs.neighbors import cagra
 
-Serializing an index
---------------------
+    queries = load_queries()
+
+    search_params = cagra.SearchParams()
+
+    index = // ... build index ...
+
+    neighbors, distances = cagra.search(search_params, index, queries, k)

@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -452,14 +453,6 @@ __device__ inline void hashmap_restore(INDEX_T* const hashmap_ptr,
   }
 }
 
-template <class T, unsigned BLOCK_SIZE>
-__device__ inline void set_value_device(T* const ptr, const T fill, const std::uint32_t count)
-{
-  for (std::uint32_t i = threadIdx.x; i < count; i += BLOCK_SIZE) {
-    ptr[i] = fill;
-  }
-}
-
 // One query one thread block
 template <uint32_t TEAM_SIZE,
           uint32_t DATASET_BLOCK_DIM,
@@ -795,10 +788,11 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
     num_executed_iterations[query_id] = iter + 1;
   }
 #ifdef _CLK_BREAKDOWN
-  if ((threadIdx.x == 0 || threadIdx.x == BLOCK_SIZE - 1) && ((query_id * 3) % gridDim.y < 3)) {
-    RAFT_LOG_DEBUG(
+  if ((threadIdx.x == 0 || threadIdx.x == blockDim.x - 1) && ((query_id * 3) % gridDim.y < 3)) {
+    printf(
+      "%s:%d "
       "query, %d, thread, %d"
-      ", init, %d"
+      ", init, %lu"
       ", 1st_distance, %lu"
       ", topk, %lu"
       ", reset_hash, %lu"
@@ -806,6 +800,8 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
       ", restore_hash, %lu"
       ", distance, %lu"
       "\n",
+      __FILE__,
+      __LINE__,
       query_id,
       threadIdx.x,
       clk_init,
@@ -923,6 +919,7 @@ void select_and_run(
   const uint32_t num_queries,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* dev_seed_ptr,  // [num_queries, num_seeds]
   uint32_t* const num_executed_iterations,                     // [num_queries,]
+  const search_params& ps,
   uint32_t topk,
   uint32_t num_itopk_candidates,
   uint32_t block_size,  //
@@ -931,20 +928,14 @@ void select_and_run(
   typename DATASET_DESCRIPTOR_T::INDEX_T* hashmap_ptr,
   size_t small_hash_bitlen,
   size_t small_hash_reset_interval,
-  uint32_t num_random_samplings,
-  uint64_t rand_xor_mask,
   uint32_t num_seeds,
-  size_t itopk_size,
-  size_t search_width,
-  size_t min_iterations,
-  size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream)
 {
   auto kernel =
     search_kernel_config<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>::
-      choose_itopk_and_mx_candidates(itopk_size, num_itopk_candidates, block_size);
+      choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
   RAFT_CUDA_TRY(cudaFuncSetAttribute(kernel,
                                      cudaFuncAttributeMaxDynamicSharedMemorySize,
                                      smem_size + DATASET_DESCRIPTOR_T::smem_buffer_size_in_byte));
@@ -959,15 +950,15 @@ void select_and_run(
                                                          queries_ptr,
                                                          graph.data_handle(),
                                                          graph.extent(1),
-                                                         num_random_samplings,
-                                                         rand_xor_mask,
+                                                         ps.num_random_samplings,
+                                                         ps.rand_xor_mask,
                                                          dev_seed_ptr,
                                                          num_seeds,
                                                          hashmap_ptr,
-                                                         itopk_size,
-                                                         search_width,
-                                                         min_iterations,
-                                                         max_iterations,
+                                                         ps.itopk_size,
+                                                         ps.search_width,
+                                                         ps.min_iterations,
+                                                         ps.max_iterations,
                                                          num_executed_iterations,
                                                          hash_bitlen,
                                                          small_hash_bitlen,

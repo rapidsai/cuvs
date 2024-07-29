@@ -55,6 +55,7 @@ requirements:
     - libcuvs {{ version }}
     - python x.x
     - rmm ={{ minor_version }}
+    - rapids-build-backend>=0.3.0,<0.4.0.dev0
     - scikit-build-core >=0.7.0
     - setuptools
   run:

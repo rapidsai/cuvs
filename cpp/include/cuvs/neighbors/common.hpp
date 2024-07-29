@@ -25,6 +25,7 @@
 #include <raft/util/cudart_utils.hpp>   // get_device_for_address
 #include <raft/util/integer_utils.hpp>  // rounding up
 
+#include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
 #include <raft/core/detail/macros.hpp>
 

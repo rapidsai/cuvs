@@ -30,9 +30,8 @@
 
 #include <cuvs/distance/distance.hpp>
 
-#include <raft/matrix/select_k.cuh>
-
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/selection/select_k.hpp>
 
 // TODO: This shouldn't be invoking anything from spatial/knn
 #include "../ann_utils.cuh"
@@ -817,7 +816,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
       output_values_storage.resize(sizeBatch * topK, stream);
     }
 
-    raft::matrix::select_k<float, INDEX_T>(
+    cuvs::selection::select_k(
       handle,
       raft::make_device_matrix_view<const float, int64_t>(inputKeys, sizeBatch, numElements),
       raft::make_device_matrix_view<const INDEX_T, int64_t>(inputVals, sizeBatch, numElements),

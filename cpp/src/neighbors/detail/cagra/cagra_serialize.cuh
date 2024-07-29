@@ -62,19 +62,16 @@ void serialize(raft::resources const& res,
   dtype_string.resize(4);
   os << dtype_string;
 
-  printf("Inside serialize...\n");
   raft::serialize_scalar(res, os, serialization_version);
   raft::serialize_scalar(res, os, index_.size());
   raft::serialize_scalar(res, os, index_.dim());
   raft::serialize_scalar(res, os, index_.graph_degree());
   raft::serialize_scalar(res, os, index_.metric());
 
-  printf("Serializing mdspan\n");
   raft::serialize_mdspan(res, os, index_.graph());
 
   include_dataset &= (index_.data().n_rows() > 0);
 
-  printf("Serializing include dataset\n");
   raft::serialize_scalar(res, os, include_dataset);
   if (include_dataset) {
     RAFT_LOG_INFO("Saving CAGRA index with dataset");
@@ -122,9 +119,9 @@ void serialize_to_hnswlib(raft::resources const& res,
   os.write(reinterpret_cast<char*>(&curr_element_count), sizeof(std::size_t));
   // Example:M: 16, dim = 128, data_t = float, index_t = uint32_t, list_size_type = uint32_t,
   // labeltype: size_t size_data_per_element_ = M * 2 * sizeof(index_t) + sizeof(list_size_type) +
-  // dim * sizeof(data_t) + sizeof(labeltype)
-  auto size_data_per_element = static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) + 4 +
-                                                        index_.dim() * sizeof(T) + 8);
+  // dim * 4 + sizeof(labeltype)
+  auto size_data_per_element =
+    static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) + 4 + index_.dim() * 4 + 8);
   os.write(reinterpret_cast<char*>(&size_data_per_element), sizeof(std::size_t));
   // label_offset
   std::size_t label_offset = size_data_per_element - 8;
@@ -187,17 +184,17 @@ void serialize_to_hnswlib(raft::resources const& res,
     }
 
     auto data_row = host_dataset.data_handle() + (index_.dim() * i);
-    // if constexpr (std::is_same_v<T, float>) {
-    for (std::size_t j = 0; j < index_.dim(); ++j) {
-      auto data_elem = host_dataset(i, j);
-      os.write(reinterpret_cast<char*>(&data_elem), sizeof(T));
+    if constexpr (std::is_same_v<T, float>) {
+      for (std::size_t j = 0; j < index_.dim(); ++j) {
+        auto data_elem = static_cast<float>(host_dataset(i, j));
+        os.write(reinterpret_cast<char*>(&data_elem), sizeof(float));
+      }
+    } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
+      for (std::size_t j = 0; j < index_.dim(); ++j) {
+        auto data_elem = static_cast<int>(host_dataset(i, j));
+        os.write(reinterpret_cast<char*>(&data_elem), sizeof(int));
+      }
     }
-    // } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
-    //   for (std::size_t j = 0; j < index_.dim(); ++j) {
-    //     auto data_elem = static_cast<int>(host_dataset(i, j));
-    //     os.write(reinterpret_cast<char*>(&data_elem), sizeof(int));
-    //   }
-    // }
 
     os.write(reinterpret_cast<char*>(&i), sizeof(std::size_t));
   }
@@ -233,7 +230,7 @@ void serialize_to_hnswlib(raft::resources const& res,
  *
  */
 template <typename T, typename IdxT>
-auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
+void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* index_)
 {
   raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::deserialize");
 
@@ -252,26 +249,23 @@ auto deserialize(raft::resources const& res, std::istream& is) -> index<T, IdxT>
   auto graph = raft::make_host_matrix<IdxT, int64_t>(n_rows, graph_degree);
   deserialize_mdspan(res, is, graph.view());
 
-  index<T, IdxT> idx(res, metric);
-  idx.update_graph(res, raft::make_const_mdspan(graph.view()));
+  *index_ = index<T, IdxT>(res, metric);
+  index_->update_graph(res, raft::make_const_mdspan(graph.view()));
   bool has_dataset = raft::deserialize_scalar<bool>(res, is);
   if (has_dataset) {
-    idx.update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
+    index_->update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
   }
-  return idx;
 }
 
 template <typename T, typename IdxT>
-auto deserialize(raft::resources const& res, const std::string& filename) -> index<T, IdxT>
+void deserialize(raft::resources const& res, const std::string& filename, index<T, IdxT>* index_)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
 
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  auto index = detail::deserialize<T, IdxT>(res, is);
+  detail::deserialize<T, IdxT>(res, is, index_);
 
   is.close();
-
-  return index;
 }
 }  // namespace cuvs::neighbors::cagra::detail

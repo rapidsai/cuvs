@@ -33,7 +33,7 @@ if [ "$1" == "clean" ]; then
 fi
 
 ################################################################################
-# Add individual libcudf examples build scripts down below
+# Add individual libcuvs examples build scripts down below
 
 build_example() {
   example_dir=${1}

@@ -54,9 +54,9 @@ def run_cagra_build_search_test(
     )
 
     if array_type == "device":
-        index = cagra.build_index(build_params, dataset_device)
+        index = cagra.build(build_params, dataset_device)
     else:
-        index = cagra.build_index(build_params, dataset)
+        index = cagra.build(build_params, dataset)
 
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]

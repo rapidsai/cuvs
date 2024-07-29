@@ -15,6 +15,8 @@
 #
 # cython: language_level=3
 
+import warnings
+
 import numpy as np
 
 cimport cuvs.common.cydlpack
@@ -23,6 +25,7 @@ from cuvs.common.resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libcpp cimport bool, cast
+from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
 
@@ -230,7 +233,7 @@ cdef class Index:
 
 
 @auto_sync_resources
-def build_index(IndexParams index_params, dataset, resources=None):
+def build(IndexParams index_params, dataset, resources=None):
     """
     Build the CAGRA index from the dataset for efficient search.
 
@@ -267,7 +270,7 @@ def build_index(IndexParams index_params, dataset, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
-    >>> index = cagra.build_index(build_params, dataset)
+    >>> index = cagra.build(build_params, dataset)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
     ...                                      index, dataset,
     ...                                      k)
@@ -282,7 +285,6 @@ def build_index(IndexParams index_params, dataset, resources=None):
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
-    cdef cuvsError_t build_status
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
     cdef cuvsCagraIndexParams* params = index_params.params
@@ -299,6 +301,12 @@ def build_index(IndexParams index_params, dataset, resources=None):
         idx.trained = True
 
     return idx
+
+
+def build_index(IndexParams index_params, dataset, resources=None):
+    warnings.warn("cagra.build_index is deprecated, use cagra.build instead",
+                  FutureWarning)
+    return build(index_params, dataset, resources=resources)
 
 
 cdef class SearchParams:
@@ -501,7 +509,7 @@ def search(SearchParams search_params,
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = cagra.build_index(cagra.IndexParams(), dataset)
+    >>> index = cagra.build(cagra.IndexParams(), dataset)
     >>> # Search using the built index
     >>> queries = cp.random.random_sample((n_queries, n_features),
     ...                                   dtype=cp.float32)
@@ -544,7 +552,6 @@ def search(SearchParams search_params,
                        exp_rows=n_queries, exp_cols=k)
 
     cdef cuvsCagraSearchParams* params = &search_params.params
-    cdef cuvsError_t search_status
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
     cdef cydlpack.DLManagedTensor* neighbors_dlpack = \
@@ -564,3 +571,80 @@ def search(SearchParams search_params,
         ))
 
     return (distances, neighbors)
+
+
+@auto_sync_resources
+def save(filename, Index index, bool include_dataset=True, resources=None):
+    """
+    Saves the index to a file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    index : Index
+        Trained CAGRA index.
+    include_dataset : bool
+        Whether or not to write out the dataset along with the index. Including
+        the dataset in the serialized index will use extra disk space, and
+        might not be desired if you already have a copy of the dataset on
+        disk. If this option is set to false, you will have to call
+        `index.update_dataset(dataset)` after loading the index.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import cagra
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = cagra.build(cagra.IndexParams(), dataset)
+    >>> # Serialize and deserialize the cagra index built
+    >>> cagra.save("my_index.bin", index)
+    >>> index_loaded = cagra.load("my_index.bin")
+    """
+    cdef string c_filename = filename.encode('utf-8')
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsCagraSerialize(res,
+                                  c_filename.c_str(),
+                                  index.index,
+                                  include_dataset))
+
+
+@auto_sync_resources
+def load(filename, resources=None):
+    """
+    Loads index from file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change, therefore loading an index saved with a previous
+    version of cuvs is not guaranteed to work.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+
+    """
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef string c_filename = filename.encode('utf-8')
+
+    check_cuvs(cuvsCagraDeserialize(
+        res,
+        c_filename.c_str(),
+        idx.index
+    ))
+    idx.trained = True
+    return idx
