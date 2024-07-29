@@ -16,9 +16,10 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
+#include "cuvs_ann_bench_utils.h"
 
-#include <raft/core/host_mdspan.hpp>
 #include <cuvs/neighbors/cagra.hpp>
+#include <raft/core/host_mdspan.hpp>
 
 #include <index.h>
 #include <omp.h>
@@ -52,26 +53,23 @@ class diskann_memory : public algo<T>, public algo_gpu {
     uint32_t cagra_intermediate_graph_degree;
   };
 
-  using typename algo<T>::AnnSearchParam;
-  struct SearchParam : public AnnSearchParam {
+  using search_param_base = typename algo<T>::search_param;
+  struct search_param : public search_param_base {
     uint32_t L_search;
   };
 
-  diskann_memory(Metric metric, int dim, const BuildParam& param);
+  diskann_memory(Metric metric, int dim, const build_param& param);
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const AnnSearchParam& param) override;
+  void set_search_param(const search_param_base& param) override;
   void search(
     const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const override;
 
   void save(const std::string& path_to_index) const override;
   void load(const std::string& path_to_index) override;
   diskann_memory(const diskann_memory<T>& other) = default;
-  std::unique_ptr<algo<T>> copy() override
-  {
-    return std::make_unique<diskann_memory<T>>(*this);
-  }
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<diskann_memory<T>>(*this); }
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -87,7 +85,7 @@ class diskann_memory : public algo<T>, public algo_gpu {
   uint32_t build_pq_bytes_ = 0;
   std::shared_ptr<diskann::Index<T>> diskann_index_{nullptr};
   uint32_t L_search_;
-  uint32_t cagra_graph_degree_ = 64;
+  uint32_t cagra_graph_degree_              = 64;
   uint32_t cagra_intermediate_graph_degree_ = 128;
   uint32_t max_points_;
   // std::shared_ptr<FixedThreadPool> thread_pool_;
@@ -95,7 +93,7 @@ class diskann_memory : public algo<T>, public algo_gpu {
 };
 
 template <typename T>
-diskann_memory<T>::diskann_memory(Metric metric, int dim, const BuildParam& param)
+diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& param)
   : algo<T>(metric, dim)
 {
   assert(this->dim_ > 0);
@@ -112,8 +110,7 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const BuildParam& para
   cagra_intermediate_graph_degree_ = param.cagra_intermediate_graph_degree;
   cuvs::neighbors::cagra::index_params cuvs_cagra_index_params;
   cuvs_cagra_index_params.intermediate_graph_degree = param.cagra_intermediate_graph_degree;
-  cuvs_cagra_index_params.graph_degree = param.cagra_graph_degree;
-  
+  cuvs_cagra_index_params.graph_degree              = param.cagra_graph_degree;
 
   this->diskann_index_ = std::make_shared<diskann::Index<T>>(parse_metric_to_diskann(metric),
                                                              dim,
@@ -173,9 +170,9 @@ void diskann_memory<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void diskann_memory<T>::set_search_param(const AnnSearchParam& param_)
+void diskann_memory<T>::set_search_param(const search_param_base& param_)
 {
-  auto param        = dynamic_cast<const SearchParam&>(param_);
+  auto param        = dynamic_cast<const search_param&>(param_);
   this->L_search_   = param.L_search;
   metric_objective_ = param.metric_objective;
 }
@@ -185,7 +182,7 @@ void diskann_memory<T>::search(
   const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const
 {
   // std::cout << "num_search_threads" << diskann_index_write_params_->num_threads << std::endl;
-  if (this->metric_objective_ == Objective::LATENCY) {
+  if (this->metric_objective_ == Mode::kLatency) {
     omp_set_num_threads(omp_get_num_procs());
 #pragma omp parallel for
     for (int64_t i = 0; i < (int64_t)batch_size; i++) {
@@ -218,14 +215,13 @@ void diskann_memory<T>::load(const std::string& path_to_index)
   diskann_index_->load(path_to_index.c_str(), 80, 100);
 }
 
-
 /*******************************************************************
-*/
+ */
 
 template <typename T>
-class DiskANNSSD : public ANN<T> {
+class diskann_ssd : public algo<T> {
  public:
-  struct BuildParam {
+  struct build_param {
     uint32_t R;
     uint32_t L_build;
     float alpha;
@@ -236,12 +232,12 @@ class DiskANNSSD : public ANN<T> {
     uint32_t cagra_intermediate_graph_degree;
   };
 
-  using typename ANN<T>::AnnSearchParam;
+  using typename algo<T>::AnnSearchParam;
   struct SearchParam : public AnnSearchParam {
     uint32_t L_search;
   };
 
-  DiskANNSSD(Metric metric, int dim, const BuildParam& param);
+  diskann_ssd(Metric metric, int dim, const build_param& param);
 
   void build(const char* dataset_path, size_t nrow) override;
 
@@ -251,40 +247,64 @@ class DiskANNSSD : public ANN<T> {
 
   void save(const std::string& path_to_index) const override;
   void load(const std::string& path_to_index) override;
-  DiskANNSSD(const DiskANNSSD<T>& other) = default;
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<DiskANNSSD<T>>(*this); }
+  diskann_ssd(const diskann_ssd<T>& other) = default;
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<diskann_ssd<T>>(*this); }
 
-  AlgoProperty get_preference() const override
+  algo_property get_preference() const override
   {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::Host;
-    property.query_memory_type   = MemoryType::Host;
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kHost;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
 
  private:
-  bool use_cagra_graph_;
-  bool use_pq_build_       = false;
   uint32_t build_pq_bytes_ = 0;
-  // std::shared_ptr<diskann::IndexWriteParameters> diskann_index_write_params_{nullptr};
-  std::shared_ptr<diskann::IndexSearchParams> diskann_index_search_params_{nullptr};
-  std::shared_ptr<diskann::Index<T>> diskann_index_{nullptr};
-  // uint32_t L_load_;
-  uint32_t L_search_;
-  uint32_t cagra_graph_degree_ = 0;
+  bool use_cagra_graph_;
+  std::shared_ptr<diskann::IndexSearchParams> diskann_index_write_params_{nullptr};
+  uint32_t max_points_;
+  std::shared_ptr<diskann::Index<T>> mem_index_{nullptr};
+  std::unique_ptr<diskann::PQFlashIndex<T, uint32_t>> p_flash_index_;
+  uint32_t cagra_graph_degree_;
   uint32_t cagra_intermediate_graph_degree_;
-  // uint32_t max_points_;
+
   // std::shared_ptr<FixedThreadPool> thread_pool_;
-  Objective metric_objective_;
+  uint32_t L_search_;
+  Mode metric_objective_;
   uint32_t num_nodes_to_cache_;
-  std::unique_ptr<diskann::PQFlashIndex<T, uint32_t>> _pFlashIndex;
 };
 
 template <typename T>
 void diskann_ssd<T>::build(std::string dataset_file, size_t nrow)
 {
-  this->diskann_index_.resize(nrow);
-  diskann_index_->build(dataset_file.c_str(), nrow);
+  std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params_ptr{nullptr};
+  if (use_cagra_graph_) {
+    cuvs::neighbors::cagra::index_params cagra_index_params;
+    cagra_index_params.graph_degree              = cagra_graph_degree_;
+    cagra_index_params.intermediate_graph_degree = cagra_intermediate_graph_degree_;
+    auto ivf_pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+      raft::matrix_extent<int64_t>(nrow, this->dim_), parse_metric_type(this->metric_));
+    if (build_pq_bytes_ > 0) ivf_pq_params.build_params.pq_dim = build_pq_bytes_;
+    ivf_pq_params.build_params.pq_bits = 8;
+    cagra_index_params.graph_build_params = ivf_pq_params;
+    cagra_index_params_ptr.reset(&cagra_index_params);
+  }
+  this->mem_index_ = std::make_shared<diskann::Index<T>>(parse_metric_to_diskann(this->metric_),
+                                                             this->dim_,
+                                                             nrow,
+                                                             diskann_index_write_params_,
+                                                             nullptr,
+                                                             0,
+                                                             false,
+                                                             false,
+                                                             false,
+                                                             build_pq_bytes_ > 0,
+                                                             this->build_pq_bytes_,
+                                                             false,
+                                                             false,
+                                                             use_cagra_graph_,
+                                                             cagra_index_params_ptr);
+  this->mem_index_->build(dataset_file.c_str(), nrow);
 }
 
 template <typename T>
@@ -300,8 +320,8 @@ void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const
 {
   std::vector<uint32_t> node_list;
-  _pFlashIndex->cache_bfs_levels(num_nodes_to_cache_, node_list);
-  _pFlashIndex->load_cache_list(node_list);
+  p_flash_index_->cache_bfs_levels(num_nodes_to_cache_, node_list);
+  p_flash_index_->load_cache_list(node_list);
   node_list.clear();
   node_list.shrink_to_fit();
 
@@ -309,7 +329,7 @@ void diskann_ssd<T>::search(
     omp_set_num_threads(omp_get_num_procs());
 #pragma omp parallel for
     for (int64_t i = 0; i < (int64_t)batch_size; i++) {
-      _pFlashIndex->cached_beam_search(queries + (i * this->dim_),
+      p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
                                        L_search_,
                                        neighbors + i * k,
@@ -318,7 +338,7 @@ void diskann_ssd<T>::search(
     }
   } else {
     for (int64_t i = 0; i < (int64_t)batch_size; i++) {
-      _pFlashIndex->cached_beam_search(queries + (i * this->dim_),
+      p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
                                        L_search_,
                                        neighbors + i * k,
@@ -339,166 +359,7 @@ void diskann_ssd<T>::load(const std::string& path_to_index)
 {
   std::shared_ptr<AlignedFileReader> reader = nullptr;
   reader.reset(new LinuxAlignedFileReader());
-  int result = _pFlashIndex->load(omp_get_num_procs(), path_to_index.c_str());
+  int result = p_flash_index_->load(omp_get_num_procs(), path_to_index.c_str());
 }
 
-
-};  // namespace raft::bench::ann
-
-template <typename T>
-class DiskANNSSD : public ANN<T> {
- public:
-  struct BuildParam {
-    uint32_t R;
-    uint32_t L_build;
-    float alpha;
-    int num_threads = omp_get_num_procs();
-    bool use_cagra_graph;
-    bool filtered_index;
-    uint32_t cagra_graph_degree;
-    uint32_t cagra_intermediate_graph_degree;
-  };
-
-  using typename ANN<T>::AnnSearchParam;
-  struct SearchParam : public AnnSearchParam {
-    uint32_t L_search;
-  };
-
-  DiskANNSSD(Metric metric, int dim, const BuildParam& param);
-
-  void build(const char* dataset_path, size_t nrow) override;
-
-  void set_search_param(const AnnSearchParam& param) override;
-  void search(
-    const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const override;
-
-  void save(const std::string& path_to_index) const override;
-  void load(const std::string& path_to_index) override;
-  DiskANNSSD(const DiskANNSSD<T>& other) = default;
-  std::unique_ptr<ANN<T>> copy() override { return std::make_unique<DiskANNSSD<T>>(*this); }
-
-  AlgoProperty get_preference() const override
-  {
-    AlgoProperty property;
-    property.dataset_memory_type = MemoryType::Host;
-    property.query_memory_type   = MemoryType::Host;
-    return property;
-  }
-
- private:
-  bool use_cagra_graph_;
-  bool use_pq_build_       = false;
-  uint32_t build_pq_bytes_ = 0;
-  // std::shared_ptr<diskann::IndexWriteParameters> diskann_index_write_params_{nullptr};
-  std::shared_ptr<diskann::IndexSearchParams> diskann_index_search_params_{nullptr};
-  std::shared_ptr<diskann::Index<T>> diskann_index_{nullptr};
-  // uint32_t L_load_;
-  uint32_t L_search_;
-  uint32_t cagra_graph_degree_ = 0;
-  uint32_t cagra_intermediate_graph_degree_;
-  // uint32_t max_points_;
-  // std::shared_ptr<FixedThreadPool> thread_pool_;
-  Objective metric_objective_;
-  uint32_t num_nodes_to_cache_;
-  std::unique_ptr<diskann::PQFlashIndex<T, uint32_t>> _pFlashIndex;
-};
-
-template <typename T>
-DiskANNSSD<T>::DiskANNSSD(Metric metric, int dim, const BuildParam& param) : ANN<T>(metric, dim)
-{
-  assert(this->dim_ > 0);
-  auto diskann_index_write_params = std::make_shared<diskann::IndexWriteParameters>(
-    diskann::IndexWriteParametersBuilder(param.R, param.R)
-      .with_filter_list_size(0)
-      .with_alpha(1.2)
-      .with_saturate_graph(false)
-      .with_num_threads(param.num_threads)
-      .build());
-  use_cagra_graph_ = param.use_cagra_graph;
-  build_pq_bytes_  = param.build_pq_bytes;
-  cuvs::neighbors::cagra::index_params cagra_index_params;
-  cagra_index_params.graph_degree = param.cagra_graph_degree;
-  cagra_index_params.intermediate_graph_degree = param.cagra_intermediate_graph_degree;
-  cuvs::neighbors::cagra::graph_build_params::ivf_pq_params graph_build_params(raft::matrix_extents<uint32_t>(n_row, this->dim_));
-  cagra_index_params.graph_build_params graph_build_params = cuvs::neighbors::ivf_pq::index_params;
-  graph_build_params.pq_bits = 8;
-  graph_build_params.pq_dim = build_pq_bytes_;
-
-  this->diskann_index_ = std::make_shared<diskann::Index<T>>(parse_metric_type(metric),
-                                                             dim,
-                                                             0,
-                                                             diskann_index_write_params,
-                                                             nullptr,
-                                                             0,
-                                                             false,
-                                                             false,
-                                                             false,
-                                                             this->pq_dist_build_,
-                                                             this->build_pq_bytes_,
-                                                             false,
-                                                             false,
-                                                             param.use_cagra_graph,
-                                                             cagra_index_params);
-}
-
-template <typename T>
-void DiskANNSSD<T>::build(std::string dataset_file, size_t nrow)
-{
-  this->diskann_index_.resize(nrow);
-  diskann_index_->build(dataset_file.c_str(), nrow);
-}
-
-template <typename T>
-void DiskANNSSD<T>::set_search_param(const AnnSearchParam& param_)
-{
-  auto param        = dynamic_cast<const SearchParam&>(param_);
-  this->L_search_   = param.L_search;
-  metric_objective_ = param.metric_objective;
-}
-
-template <typename T>
-void DiskANNSSD<T>::search(
-  const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const
-{
-  std::vector<uint32_t> node_list;
-  _pFlashIndex->cache_bfs_levels(num_nodes_to_cache_, node_list);
-  _pFlashIndex->load_cache_list(node_list);
-  node_list.clear();
-  node_list.shrink_to_fit();
-
-  if (this->metric_objective_ == Objective::LATENCY) {
-    omp_set_num_threads(omp_get_num_procs());
-#pragma omp parallel for
-    for (int64_t i = 0; i < (int64_t)batch_size; i++) {
-      _pFlashIndex->cached_beam_search(queries + (i * this->dim_),
-                                       static_cast<size_t>(k),
-                                       L_search_,
-                                       neighbors + i * k,
-                                       distances + i * k,
-                                       2);
-    }
-  } else {
-    for (int64_t i = 0; i < (int64_t)batch_size; i++) {
-      _pFlashIndex->cached_beam_search(queries + (i * this->dim_),
-                                       static_cast<size_t>(k),
-                                       L_search_,
-                                       neighbors + i * k,
-                                       distances + i * k,
-                                       2);
-    }
-  }
-}
-
-template <typename T>
-void DiskANNSSD<T>::save(const std::string& path_to_index) const
-{
-  this->diskann_index_->save(path_to_index.c_str());
-}
-
-template <typename T>
-void DiskANNSSD<T>::load(const std::string& path_to_index)
-{
-  std::shared_ptr<AlignedFileReader> reader = nullptr;
-  reader.reset(new LinuxAlignedFileReader());
-  int result = _pFlashIndex->load(omp_get_num_procs(), path_to_index.c_str());
-}
+};  // namespace cuvs::bench

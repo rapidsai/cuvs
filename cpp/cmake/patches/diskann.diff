@@ -1,0 +1,1163 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3d3d2b8..6496b15 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -23,6 +23,25 @@ set(CMAKE_STANDARD 17)
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
++cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
++
++# ------------- configure rapids-cmake --------------#
++
++include(cmake/thirdparty/fetch_rapids.cmake)
++include(rapids-cmake)
++include(rapids-cpm)
++include(rapids-cuda)
++include(rapids-export)
++include(rapids-find)
++
++# ------------- configure project --------------#
++
++rapids_cuda_init_architectures(${PROJECT_NAME})
++
++project(${PROJECT_NAME} LANGUAGES CXX CUDA)
++
++rapids_cpm_init()
++
+ if(NOT MSVC)
+ 	set(CMAKE_CXX_COMPILER g++)
+ endif()
+@@ -286,7 +305,7 @@ if(MSVC)
+ 	set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${PROJECT_SOURCE_DIR}/x64/Release)
+ else()
+     set(ENV{TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD} 500000000000)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2")
++    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma -msse2 -ftree-vectorize -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fopenmp -fopenmp-simd -funroll-loops -Wfatal-errors -DUSE_AVX2 -fno-finite-math-only")
+     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG")
+     if (NOT PYBIND)
+         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG -Ofast")
+@@ -300,10 +319,6 @@ else()
+ endif()
+ 
+ add_subdirectory(src)
+-if (NOT PYBIND)
+-    add_subdirectory(apps)
+-    add_subdirectory(apps/utils)
+-endif()
+ 
+ if (UNIT_TEST)
+     enable_testing()
+@@ -331,3 +346,7 @@ include(clang-format.cmake)
+ if(PYBIND)
+     add_subdirectory(python)
+ endif()
++
++if(NOT TARGET cuvs::cuvs)
++    find_package(cuvs)
++endif()
+diff --git a/apps/CMakeLists.txt b/apps/CMakeLists.txt
+index e42c0b6..2401163 100644
+--- a/apps/CMakeLists.txt
++++ b/apps/CMakeLists.txt
+@@ -2,7 +2,7 @@
+ # Licensed under the MIT license.
+ 
+ set(CMAKE_CXX_STANDARD 17)
+-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
++set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
+ 
+ add_executable(build_memory_index build_memory_index.cpp)
+ target_link_libraries(build_memory_index ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::program_options)
+diff --git a/apps/build_memory_index.cpp b/apps/build_memory_index.cpp
+index 544e42d..eedb04e 100644
+--- a/apps/build_memory_index.cpp
++++ b/apps/build_memory_index.cpp
+@@ -1,6 +1,7 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT license.
+ 
++#include <cstdint>
+ #include <omp.h>
+ #include <cstring>
+ #include <boost/program_options.hpp>
+@@ -27,7 +28,7 @@ int main(int argc, char **argv)
+     std::string data_type, dist_fn, data_path, index_path_prefix, label_file, universal_label, label_type;
+     uint32_t num_threads, R, L, Lf, build_PQ_bytes;
+     float alpha;
+-    bool use_pq_build, use_opq;
++    bool use_pq_build, use_opq, cuvs_cagra_index;
+ 
+     po::options_description desc{
+         program_options_utils::make_program_description("build_memory_index", "Build a memory-based DiskANN index.")};
+@@ -70,6 +71,8 @@ int main(int argc, char **argv)
+                                        program_options_utils::FILTERED_LBUILD);
+         optional_configs.add_options()("label_type", po::value<std::string>(&label_type)->default_value("uint"),
+                                        program_options_utils::LABEL_TYPE_DESCRIPTION);
++        optional_configs.add_options()("cuvs_cagra_index", po::value<bool>(&cuvs_cagra_index)->default_value(true),
++                                       program_options_utils::cuvs_cagra_INDEX);
+ 
+         // Merge required and optional parameters
+         desc.add(required_configs).add(optional_configs);
+@@ -146,6 +149,7 @@ int main(int argc, char **argv)
+                           .is_use_opq(use_opq)
+                           .is_pq_dist_build(use_pq_build)
+                           .with_num_pq_chunks(build_PQ_bytes)
++                          .is_cuvs_cagra_index(cuvs_cagra_index)
+                           .build();
+ 
+         auto index_factory = diskann::IndexFactory(config);
+diff --git a/apps/restapi/CMakeLists.txt b/apps/restapi/CMakeLists.txt
+index c73b427..de0b794 100644
+--- a/apps/restapi/CMakeLists.txt
++++ b/apps/restapi/CMakeLists.txt
+@@ -37,4 +37,4 @@ if(MSVC)
+ 	target_link_libraries(client optimized ${CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE}/diskann_dll.lib Boost::program_options)
+ else() 
+ 	target_link_libraries(client ${PROJECT_NAME} -lboost_system -lcrypto -lssl -lcpprest Boost::program_options)
+-endif()
+\ No newline at end of file
++endif()
+diff --git a/apps/search_disk_index.cpp b/apps/search_disk_index.cpp
+index 7e2a7ac..538b55a 100644
+--- a/apps/search_disk_index.cpp
++++ b/apps/search_disk_index.cpp
+@@ -179,7 +179,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
+     std::string recall_string = "Recall@" + std::to_string(recall_at);
+     diskann::cout << std::setw(6) << "L" << std::setw(12) << "Beamwidth" << std::setw(16) << "QPS" << std::setw(16)
+                   << "Mean Latency" << std::setw(16) << "99.9 Latency" << std::setw(16) << "Mean IOs" << std::setw(16)
+-                  << "CPU (s)";
++                  << "CPU (s)" << std::setw(16) << "n_hops" << std::setw(16) << "n_cmps";
+     if (calc_recall_flag)
+     {
+         diskann::cout << std::setw(16) << recall_string << std::endl;
+@@ -269,6 +269,12 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
+ 
+         auto mean_cpuus = diskann::get_mean_stats<float>(stats, query_num,
+                                                          [](const diskann::QueryStats &stats) { return stats.cpu_us; });
++        
++        auto mean_n_hops = diskann::get_mean_stats<float>(stats, query_num,
++                                                         [](const diskann::QueryStats &stats) { return stats.n_hops; });
++        
++        auto mean_n_cmps = diskann::get_mean_stats<float>(stats, query_num,
++                                                         [](const diskann::QueryStats &stats) { return stats.n_cmps; });
+ 
+         double recall = 0;
+         if (calc_recall_flag)
+@@ -280,7 +286,7 @@ int search_disk_index(diskann::Metric &metric, const std::string &index_path_pre
+ 
+         diskann::cout << std::setw(6) << L << std::setw(12) << optimized_beamwidth << std::setw(16) << qps
+                       << std::setw(16) << mean_latency << std::setw(16) << latency_999 << std::setw(16) << mean_ios
+-                      << std::setw(16) << mean_cpuus;
++                      << std::setw(16) << mean_cpuus << std::setw(16) << mean_n_hops << std::setw(16) << mean_n_cmps;
+         if (calc_recall_flag)
+         {
+             diskann::cout << std::setw(16) << recall << std::endl;
+diff --git a/cmake/thirdparty/fetch_rapids.cmake b/cmake/thirdparty/fetch_rapids.cmake
+new file mode 100644
+index 0000000..2703ec4
+--- /dev/null
++++ b/cmake/thirdparty/fetch_rapids.cmake
+@@ -0,0 +1,21 @@
++# =============================================================================
++# Copyright (c) 2023, NVIDIA CORPORATION.
++#
++# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
++# in compliance with the License. You may obtain a copy of the License at
++#
++# http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software distributed under the License
++# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
++# or implied. See the License for the specific language governing permissions and limitations under
++# the License.
++
++# Use this variable to update RAPIDS and RAFT versions
++set(RAPIDS_VERSION "24.08")
++
++if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
++    file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-${RAPIDS_VERSION}/RAPIDS.cmake
++            ${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
++endif()
++include(${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
+diff --git a/grid_search_disk_index_build.py b/grid_search_disk_index_build.py
+new file mode 100644
+index 0000000..5c76f9f
+--- /dev/null
++++ b/grid_search_disk_index_build.py
+@@ -0,0 +1,120 @@
++import subprocess
++import os
++import itertools
++
++params = {
++    'R': [64, 96],
++    'Lb': [64, 128, 256, 384],
++    'use_cagra_graph': [False],
++    'QD' : [192]
++}
++
++params_cagra = {
++    'R': [64, 96],
++    'use_cagra_graph': [True],
++    'cagra_graph_degree': [32, 64, 96],
++    'cagra_intermediate_graph_degree': [64, 96, 128],
++    'QD' : [192]
++}
++
++# Define the constraints
++constraints = [
++    lambda x: x['R'] <= x['Lb'],
++    # lambda x: x['R'] == 96 or (x['R'] == 64 and x['Lb'] == 384)
++]
++
++cagra_constraints = [
++    lambda x: x['cagra_graph_degree'] <= x['R'] and x['cagra_graph_degree'] <= x['cagra_intermediate_graph_degree']    
++]
++
++output_dir = '/datasets/tarangj/datasets/wiki_all_1M/DiskANNSSD'
++ssd_builder_path = os.path.join("/home/nfs/tarangj/DiskANN/build", "apps", "build_disk_index")
++vectors_bin_path = '/datasets/tarangj/datasets/wiki_all_1M/base.1M.fbin'
++
++# Define a function to generate the output file name
++def generate_output_file(dir, params):
++    if not params['use_cagra_graph']:
++        print("here in generate_output_file")
++        output_file = f"diskann.R{params['R']}.Lb{params['Lb']}.QD{params['QD']}.use_cagra_graphFalse"
++    else:
++        output_file = f"diskann.R{params['R']}.QD{params['QD']}.use_cagra_graphTrue.cagra_graph_degree{params['cagra_graph_degree']}.cagra_intermediate_graph_degree{params['cagra_intermediate_graph_degree']}"
++    print("output_file", output_file)
++    return os.path.join(dir, output_file)
++
++count = 0
++# Run the grid search
++for combo in itertools.product(*params.values()):
++    # if count > 0:
++    #     continue
++    # Create a dictionary from the combination
++    combo_dict = dict(zip(params.keys(), combo))
++    
++    # Check the constraints
++    if all(constraint(combo_dict) for constraint in constraints):
++        # Generate the output file name
++        output_file = generate_output_file(output_dir, combo_dict)
++
++        args = [
++            ssd_builder_path,
++            "--data_type", "float",
++            "--dist_fn", "l2",
++            "--data_path", vectors_bin_path,
++            "--index_path_prefix", output_file,
++            "-R", str(combo_dict["R"]),
++            "-L", str(combo_dict["Lb"]),
++            "--QD", str(combo_dict["QD"]),
++            "--search_DRAM_budget", "100",
++            "--build_DRAM_budget", "100",
++            "--num_threads", "80",
++            "--build_PQ_bytes", str(combo_dict["QD"]),
++            # "--use_cuvs_cagra_graph", "false"
++        ]
++
++        completed = subprocess.run(args, timeout=3600)
++
++        output_file
++
++        if completed.returncode != 0:
++            command_run = " ".join(args)
++            raise Exception(f"Unable to build a disk index with the command: '{command_run}'\ncompleted_process: {completed}\nstdout: {completed.stdout}\nstderr: {completed.stderr}")
++    # count += 1
++
++# Run the grid search
++count = 0
++for combo in itertools.product(*params_cagra.values()):
++    # if count > 0:
++    #     continue
++    print("here")
++    # Create a dictionary from the combination
++    combo_dict = dict(zip(params_cagra.keys(), combo))
++    
++    # Check the constraints
++    if all(constraint(combo_dict) for constraint in cagra_constraints):
++        # Generate the output file name
++        output_file = generate_output_file(output_dir, combo_dict)
++
++        args = [
++            ssd_builder_path,
++            "--data_type", "float",
++            "--dist_fn", "l2",
++            "--data_path", vectors_bin_path,
++            "--index_path_prefix", output_file,
++            "-R", str(combo_dict["R"]),
++            "-L", "128",
++            "--QD", str(combo_dict["QD"]),
++            "--search_DRAM_budget", "100",
++            "--build_DRAM_budget", "100",
++            "--num_threads", "80",
++            "--build_PQ_bytes", str(combo_dict["QD"]),
++            "--use_cuvs_cagra_graph", "true"
++        ]
++
++        completed = subprocess.run(args, timeout=3600)
++
++        output_file
++
++        if completed.returncode != 0:
++            command_run = " ".join(args)
++            raise Exception(f"Unable to build a disk index with the command: '{command_run}'\ncompleted_process: {completed}\nstdout: {completed.stdout}\nstderr: {completed.stderr}")
++    
++    # count += 1
+\ No newline at end of file
+diff --git a/include/disk_utils.h b/include/disk_utils.h
+index 08f046d..dc468d6 100644
+--- a/include/disk_utils.h
++++ b/include/disk_utils.h
+@@ -82,7 +82,7 @@ DISKANN_DLLEXPORT int build_merged_vamana_index(std::string base_file, diskann::
+                                                 uint32_t num_threads, bool use_filters = false,
+                                                 const std::string &label_file = std::string(""),
+                                                 const std::string &labels_to_medoids_file = std::string(""),
+-                                                const std::string &universal_label = "", const uint32_t Lf = 0);
++                                                const std::string &universal_label = "", const uint32_t Lf = 0, bool use_cuvs_cagra_graph = false);
+ 
+ template <typename T, typename LabelT>
+ DISKANN_DLLEXPORT uint32_t optimize_beamwidth(std::unique_ptr<diskann::PQFlashIndex<T, LabelT>> &_pFlashIndex,
+@@ -98,7 +98,8 @@ DISKANN_DLLEXPORT int build_disk_index(
+     bool use_filters = false,
+     const std::string &label_file = std::string(""), // default is empty string for no label_file
+     const std::string &universal_label = "", const uint32_t filter_threshold = 0,
+-    const uint32_t Lf = 0); // default is empty string for no universal label
++    const uint32_t Lf = 0,
++    bool use_cuvs_cagra_graph = false); // default is empty string for no universal label
+ 
+ template <typename T>
+ DISKANN_DLLEXPORT void create_disk_layout(const std::string base_file, const std::string mem_index_file,
+diff --git a/include/distance.h b/include/distance.h
+index f3b1de2..4e92738 100644
+--- a/include/distance.h
++++ b/include/distance.h
+@@ -77,6 +77,7 @@ class DistanceCosineInt8 : public Distance<int8_t>
+     DistanceCosineInt8() : Distance<int8_t>(diskann::Metric::COSINE)
+     {
+     }
++    // using Distance<int8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t length) const;
+ };
+ 
+@@ -86,6 +87,7 @@ class DistanceL2Int8 : public Distance<int8_t>
+     DistanceL2Int8() : Distance<int8_t>(diskann::Metric::L2)
+     {
+     }
++    // using Distance<int8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t size) const;
+ };
+ 
+@@ -96,6 +98,7 @@ class AVXDistanceL2Int8 : public Distance<int8_t>
+     AVXDistanceL2Int8() : Distance<int8_t>(diskann::Metric::L2)
+     {
+     }
++    // using Distance<int8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t length) const;
+ };
+ 
+@@ -105,6 +108,7 @@ class DistanceCosineFloat : public Distance<float>
+     DistanceCosineFloat() : Distance<float>(diskann::Metric::COSINE)
+     {
+     }
++    // using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
+ };
+ 
+@@ -114,6 +118,7 @@ class DistanceL2Float : public Distance<float>
+     DistanceL2Float() : Distance<float>(diskann::Metric::L2)
+     {
+     }
++    // using Distance<float>::compare;
+ 
+ #ifdef _WINDOWS
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t size) const;
+@@ -128,6 +133,7 @@ class AVXDistanceL2Float : public Distance<float>
+     AVXDistanceL2Float() : Distance<float>(diskann::Metric::L2)
+     {
+     }
++    // using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
+ };
+ 
+@@ -146,6 +152,7 @@ class SlowDistanceCosineUInt8 : public Distance<uint8_t>
+     SlowDistanceCosineUInt8() : Distance<uint8_t>(diskann::Metric::COSINE)
+     {
+     }
++    using Distance<uint8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const uint8_t *a, const uint8_t *b, uint32_t length) const;
+ };
+ 
+@@ -155,6 +162,7 @@ class DistanceL2UInt8 : public Distance<uint8_t>
+     DistanceL2UInt8() : Distance<uint8_t>(diskann::Metric::L2)
+     {
+     }
++    // using Distance<uint8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const uint8_t *a, const uint8_t *b, uint32_t size) const;
+ };
+ 
+@@ -170,6 +178,8 @@ template <typename T> class DistanceInnerProduct : public Distance<T>
+     }
+     inline float inner_product(const T *a, const T *b, unsigned size) const;
+ 
++    // using Distance<T>::compare;
++
+     inline float compare(const T *a, const T *b, unsigned size) const
+     {
+         float result = inner_product(a, b, size);
+@@ -198,6 +208,7 @@ class AVXDistanceInnerProductFloat : public Distance<float>
+     AVXDistanceInnerProductFloat() : Distance<float>(diskann::Metric::INNER_PRODUCT)
+     {
+     }
++    using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
+ };
+ 
+@@ -213,6 +224,7 @@ class AVXNormalizedCosineDistanceFloat : public Distance<float>
+     AVXNormalizedCosineDistanceFloat() : Distance<float>(diskann::Metric::COSINE)
+     {
+     }
++    using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const
+     {
+         // Inner product returns negative values to indicate distance.
+diff --git a/include/in_mem_data_store.h b/include/in_mem_data_store.h
+index d1ad795..e04f744 100644
+--- a/include/in_mem_data_store.h
++++ b/include/in_mem_data_store.h
+@@ -70,9 +70,10 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
+     virtual location_t load_impl(AlignedFileReader &reader);
+ #endif
+ 
+-  private:
++  public:
+     data_t *_data = nullptr;
+ 
++  private:
+     size_t _aligned_dim;
+ 
+     // It may seem weird to put distance metric along with the data store class,
+@@ -85,4 +86,4 @@ template <typename data_t> class InMemDataStore : public AbstractDataStore<data_
+     std::shared_ptr<float[]> _pre_computed_norms;
+ };
+ 
+-} // namespace diskann
+\ No newline at end of file
++} // namespace diskann
+diff --git a/include/index.h b/include/index.h
+index b9bf4f3..e365fdc 100644
+--- a/include/index.h
++++ b/include/index.h
+@@ -29,6 +29,11 @@
+ #define EXPAND_IF_FULL 0
+ #define DEFAULT_MAXC 750
+ 
++// namespace cuvs::neighbors::cagra{
++// template <typename T, typename IdxT>
++// class index;
++// }
++
+ namespace diskann
+ {
+ 
+@@ -66,7 +71,7 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
+                             const size_t num_frozen_pts = 0, const bool dynamic_index = false,
+                             const bool enable_tags = false, const bool concurrent_consolidate = false,
+                             const bool pq_dist_build = false, const size_t num_pq_chunks = 0,
+-                            const bool use_opq = false, const bool filtered_index = false);
++                            const bool use_opq = false, const bool filtered_index = false, const bool cuvs_cagra_index = false, const std::shared_ptr<cuvs::neighbors::cagra::index_params> cuvs_cagra_index_params = nullptr);
+ 
+     DISKANN_DLLEXPORT ~Index();
+ 
+@@ -236,6 +241,11 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
+     Index(const Index<T, TagT, LabelT> &) = delete;
+     Index<T, TagT, LabelT> &operator=(const Index<T, TagT, LabelT> &) = delete;
+ 
++    // Build the raft CAGRA index
++    void build_cuvs_cagra_index(const T* data);
++
++    void build_cuvs_cagra_index_quantized(const uint8_t *data);
++
+     // Use after _data and _nd have been populated
+     // Acquire exclusive _update_lock before calling
+     void build_with_data_populated(const std::vector<TagT> &tags);
+@@ -286,6 +296,8 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
+     // Acquire exclusive _update_lock before calling
+     void link();
+ 
++    void add_cuvs_cagra_nbrs();
++
+     // Acquire exclusive _tag_lock and _delete_lock before calling
+     int reserve_location();
+ 
+@@ -444,5 +456,9 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
+     std::vector<non_recursive_mutex> _locks;
+ 
+     static const float INDEX_GROWTH_FACTOR;
++
++    bool _cuvs_cagra_index = true;
++    std::shared_ptr<cuvs::neighbors::cagra::index_params> _cuvs_cagra_index_params = nullptr;
++    std::vector<uint32_t> host_cagra_graph;
+ };
+ } // namespace diskann
+diff --git a/include/index_config.h b/include/index_config.h
+index 452498b..3393747 100644
+--- a/include/index_config.h
++++ b/include/index_config.h
+@@ -1,5 +1,8 @@
+ #include "common_includes.h"
+ #include "parameters.h"
++#include <memory>
++
++#include <cuvs/neighbors/cagra.hpp>
+ 
+ namespace diskann
+ {
+@@ -41,18 +44,23 @@ struct IndexConfig
+     // Params for searching index
+     std::shared_ptr<IndexSearchParams> index_search_params;
+ 
++    bool cuvs_cagra_index;
++    std::shared_ptr<cuvs::neighbors::cagra::index_params> cuvs_cagra_index_params;
++
+   private:
+     IndexConfig(DataStoreStrategy data_strategy, GraphStoreStrategy graph_strategy, Metric metric, size_t dimension,
+                 size_t max_points, size_t num_pq_chunks, size_t num_frozen_points, bool dynamic_index, bool enable_tags,
+-                bool pq_dist_build, bool concurrent_consolidate, bool use_opq, bool filtered_index,
++                bool pq_dist_build, bool concurrent_consolidate, bool use_opq, bool filtered_index, bool cuvs_cagra_index,
+                 std::string &data_type, const std::string &tag_type, const std::string &label_type,
+                 std::shared_ptr<IndexWriteParameters> index_write_params,
+-                std::shared_ptr<IndexSearchParams> index_search_params)
++                std::shared_ptr<IndexSearchParams> index_search_params,
++                std::shared_ptr<cuvs::neighbors::cagra::index_params> cuvs_cagra_index_params
++                )
+         : data_strategy(data_strategy), graph_strategy(graph_strategy), metric(metric), dimension(dimension),
+           max_points(max_points), dynamic_index(dynamic_index), enable_tags(enable_tags), pq_dist_build(pq_dist_build),
+-          concurrent_consolidate(concurrent_consolidate), use_opq(use_opq), filtered_index(filtered_index),
++          concurrent_consolidate(concurrent_consolidate), use_opq(use_opq), filtered_index(filtered_index), cuvs_cagra_index(cuvs_cagra_index),
+           num_pq_chunks(num_pq_chunks), num_frozen_pts(num_frozen_points), label_type(label_type), tag_type(tag_type),
+-          data_type(data_type), index_write_params(index_write_params), index_search_params(index_search_params)
++          data_type(data_type), index_write_params(index_write_params), index_search_params(index_search_params), cuvs_cagra_index_params{cuvs_cagra_index_params}
+     {
+     }
+ 
+@@ -194,6 +202,18 @@ class IndexConfigBuilder
+         return *this;
+     }
+ 
++    IndexConfigBuilder &is_cuvs_cagra_index(bool is_cuvs_cagra_index)
++    {
++        this->_cuvs_cagra_index = is_cuvs_cagra_index;
++        return *this;
++    }
++
++    IndexConfigBuilder &with_cuvs_cagra_index_params(std::shared_ptr<cuvs::neighbors::cagra::index_params> cuvs_cagra_index_params_ptr)
++    {
++        this->_cuvs_cagra_index_params = cuvs_cagra_index_params_ptr;
++        return *this;
++    }
++
+     IndexConfig build()
+     {
+         if (_data_type == "" || _data_type.empty())
+@@ -219,8 +239,8 @@ class IndexConfigBuilder
+ 
+         return IndexConfig(_data_strategy, _graph_strategy, _metric, _dimension, _max_points, _num_pq_chunks,
+                            _num_frozen_pts, _dynamic_index, _enable_tags, _pq_dist_build, _concurrent_consolidate,
+-                           _use_opq, _filtered_index, _data_type, _tag_type, _label_type, _index_write_params,
+-                           _index_search_params);
++                           _use_opq, _filtered_index, _cuvs_cagra_index, _data_type, _tag_type, _label_type, _index_write_params,
++                           _index_search_params, _cuvs_cagra_index_params);
+     }
+ 
+     IndexConfigBuilder(const IndexConfigBuilder &) = delete;
+@@ -240,6 +260,7 @@ class IndexConfigBuilder
+     bool _concurrent_consolidate = false;
+     bool _use_opq = false;
+     bool _filtered_index{defaults::HAS_LABELS};
++    bool _cuvs_cagra_index = true;
+ 
+     size_t _num_pq_chunks = 0;
+     size_t _num_frozen_pts{defaults::NUM_FROZEN_POINTS_STATIC};
+@@ -250,5 +271,6 @@ class IndexConfigBuilder
+ 
+     std::shared_ptr<IndexWriteParameters> _index_write_params;
+     std::shared_ptr<IndexSearchParams> _index_search_params;
++    std::shared_ptr<cuvs::neighbors::cagra::index_params> _cuvs_cagra_index_params;
+ };
+ } // namespace diskann
+diff --git a/include/index_factory.h b/include/index_factory.h
+index 80bc40d..138adcb 100644
+--- a/include/index_factory.h
++++ b/include/index_factory.h
+@@ -46,4 +46,4 @@ class IndexFactory
+     std::unique_ptr<IndexConfig> _config;
+ };
+ 
+-} // namespace diskann
++} // namespace diskann
+\ No newline at end of file
+diff --git a/include/program_options_utils.hpp b/include/program_options_utils.hpp
+index 2be6059..fb6be55 100644
+--- a/include/program_options_utils.hpp
++++ b/include/program_options_utils.hpp
+@@ -77,5 +77,6 @@ const char *UNIVERSAL_LABEL =
+     "in the labels file instead of listing all labels for a node.  DiskANN will not automatically assign a "
+     "universal label to a node.";
+ const char *FILTERED_LBUILD = "Build complexity for filtered points, higher value results in better graphs";
++const char *RAFT_CAGRA_INDEX = "Use the raft CAGRA graph instead of the Vamana graph";
+ 
+ } // namespace program_options_utils
+diff --git a/include/utils.h b/include/utils.h
+index d3af5c3..2cb2181 100644
+--- a/include/utils.h
++++ b/include/utils.h
+@@ -1,4 +1,4 @@
+-﻿// Copyright (c) Microsoft Corporation. All rights reserved.
++// Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT license.
+ 
+ #pragma once
+@@ -29,6 +29,7 @@ typedef int FileHandle;
+ #include "types.h"
+ #include "tag_uint128.h"
+ #include <any>
++#include <xmmintrin.h>
+ 
+ #ifdef EXEC_ENV_OLS
+ #include "content_buf.h"
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index cbca264..2278b27 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -2,14 +2,14 @@
+ #Licensed under the MIT                        license.
+ 
+ set(CMAKE_CXX_STANDARD 17)
+-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
++set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
+ 
+ if(MSVC)
+     add_subdirectory(dll)
+ else()
+     #file(GLOB CPP_SOURCES *.cpp)
+     set(CPP_SOURCES abstract_data_store.cpp ann_exception.cpp disk_utils.cpp 
+-        distance.cpp index.cpp in_mem_graph_store.cpp in_mem_data_store.cpp
++        distance.cpp index.cu in_mem_graph_store.cpp in_mem_data_store.cpp
+         linux_aligned_file_reader.cpp math_utils.cpp natural_number_map.cpp
+         in_mem_data_store.cpp in_mem_graph_store.cpp
+         natural_number_set.cpp memory_mapper.cpp partition.cpp pq.cpp
+@@ -19,6 +19,9 @@ else()
+     endif()
+     add_library(${PROJECT_NAME} ${CPP_SOURCES})
+     add_library(${PROJECT_NAME}_s STATIC ${CPP_SOURCES})
++
++    target_link_libraries(${PROJECT_NAME} PRIVATE cuvs)
++    target_link_libraries(${PROJECT_NAME}_s PRIVATE cuvs)
+ endif()
+ 
+ if (NOT MSVC)
+diff --git a/src/disk_utils.cpp b/src/disk_utils.cpp
+index 0165602..dee8675 100644
+--- a/src/disk_utils.cpp
++++ b/src/disk_utils.cpp
+@@ -2,6 +2,7 @@
+ // Licensed under the MIT license.
+ 
+ #include "common_includes.h"
++#include "pq_common.h"
+ 
+ #if defined(DISKANN_RELEASE_UNUSED_TCMALLOC_MEMORY_AT_CHECKPOINTS) && defined(DISKANN_BUILD)
+ #include "gperftools/malloc_extension.h"
+@@ -127,6 +128,7 @@ size_t calculate_num_pq_chunks(double final_index_ram_limit, size_t points_num,
+     num_pq_chunks = num_pq_chunks > dim ? dim : num_pq_chunks;
+     num_pq_chunks = num_pq_chunks > MAX_PQ_CHUNKS ? MAX_PQ_CHUNKS : num_pq_chunks;
+ 
++    std::cout << "num_pq_chunks" << num_pq_chunks << "MAX_PQ_CHUNKS" << MAX_PQ_CHUNKS << std::endl;
+     diskann::cout << "Compressing " << dim << "-dimensional data into " << num_pq_chunks << " bytes per vector."
+                   << std::endl;
+     return num_pq_chunks;
+@@ -630,8 +632,9 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
+                               std::string medoids_file, std::string centroids_file, size_t build_pq_bytes, bool use_opq,
+                               uint32_t num_threads, bool use_filters, const std::string &label_file,
+                               const std::string &labels_to_medoids_file, const std::string &universal_label,
+-                              const uint32_t Lf)
++                              const uint32_t Lf, bool use_cuvs_cagra_graph)
+ {
++    std::cout << "inside build_merged_vamana_index" << std::endl;
+     size_t base_num, base_dim;
+     diskann::get_bin_metadata(base_file, base_num, base_dim);
+ 
+@@ -652,7 +655,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
+         diskann::Index<T, TagT, LabelT> _index(compareMetric, base_dim, base_num,
+                                                std::make_shared<diskann::IndexWriteParameters>(paras), nullptr,
+                                                defaults::NUM_FROZEN_POINTS_STATIC, false, false, false,
+-                                               build_pq_bytes > 0, build_pq_bytes, use_opq, use_filters);
++                                               build_pq_bytes > 0, build_pq_bytes, use_opq, use_filters, use_cuvs_cagra_graph);
+         if (!use_filters)
+             _index.build(base_file.c_str(), base_num);
+         else
+@@ -723,7 +726,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
+         diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts,
+                                  std::make_shared<diskann::IndexWriteParameters>(low_degree_params), nullptr,
+                                  defaults::NUM_FROZEN_POINTS_STATIC, false, false, false, build_pq_bytes > 0,
+-                                 build_pq_bytes, use_opq);
++                                 build_pq_bytes, use_opq, use_cuvs_cagra_graph);
+         if (!use_filters)
+         {
+             _index.build(shard_base_file.c_str(), shard_base_pts);
+@@ -1101,8 +1104,9 @@ template <typename T, typename LabelT>
+ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const char *indexBuildParameters,
+                      diskann::Metric compareMetric, bool use_opq, const std::string &codebook_prefix, bool use_filters,
+                      const std::string &label_file, const std::string &universal_label, const uint32_t filter_threshold,
+-                     const uint32_t Lf)
++                     const uint32_t Lf, bool use_cuvs_cagra_graph)
+ {
++    std::cout << "inside build_disk_index: use_cuvs_cagra_graph: " << use_cuvs_cagra_graph << std::endl;
+     std::stringstream parser;
+     parser << std::string(indexBuildParameters);
+     std::string cur_param;
+@@ -1289,7 +1293,9 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+     Timer timer;
+     diskann::get_bin_metadata(data_file_to_use.c_str(), points_num, dim);
+     const double p_val = ((double)MAX_PQ_TRAINING_SET_SIZE / (double)points_num);
+-
++    
++    if (!use_cuvs_cagra_graph) {
++        std::cout << "entered !use_cuvs_cagra_graph if block" << std::endl;
+     if (use_disk_pq)
+     {
+         generate_disk_quantized_data<T>(data_file_to_use, disk_pq_pivots_path, disk_pq_compressed_vectors_path,
+@@ -1309,12 +1315,14 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+         num_pq_chunks = atoi(param_list[8].c_str());
+     }
+ 
++    std::cout << "line 1318" << "num_pq_chunks" << num_pq_chunks << "MAX_PQ_CHUNKS" << MAX_PQ_CHUNKS << std::endl;
+     diskann::cout << "Compressing " << dim << "-dimensional data into " << num_pq_chunks << " bytes per vector."
+                   << std::endl;
+ 
+     generate_quantized_data<T>(data_file_to_use, pq_pivots_path, pq_compressed_vectors_path, compareMetric, p_val,
+                                num_pq_chunks, use_opq, codebook_prefix);
+     diskann::cout << timer.elapsed_seconds_for_step("generating quantized data") << std::endl;
++}
+ 
+ // Gopal. Splitting diskann_dll into separate DLLs for search and build.
+ // This code should only be available in the "build" DLL.
+@@ -1323,10 +1331,11 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+ #endif
+     // Whether it is cosine or inner product, we still L2 metric due to the pre-processing.
+     timer.reset();
++    std::cout << "now running build_merged_vamana_index" << std::endl;
+     diskann::build_merged_vamana_index<T, LabelT>(data_file_to_use.c_str(), diskann::Metric::L2, L, R, p_val,
+                                                   indexing_ram_budget, mem_index_path, medoids_path, centroids_path,
+                                                   build_pq_bytes, use_opq, num_threads, use_filters, labels_file_to_use,
+-                                                  labels_to_medoids_path, universal_label, Lf);
++                                                  labels_to_medoids_path, universal_label, Lf, use_cuvs_cagra_graph);
+     diskann::cout << timer.elapsed_seconds_for_step("building merged vamana index") << std::endl;
+ 
+     timer.reset();
+@@ -1432,21 +1441,21 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint32_t>(const char *da
+                                                                   const std::string &codebook_prefix, bool use_filters,
+                                                                   const std::string &label_file,
+                                                                   const std::string &universal_label,
+-                                                                  const uint32_t filter_threshold, const uint32_t Lf);
++                                                                  const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_disk_index<uint8_t, uint32_t>(const char *dataFilePath, const char *indexFilePath,
+                                                                    const char *indexBuildParameters,
+                                                                    diskann::Metric compareMetric, bool use_opq,
+                                                                    const std::string &codebook_prefix, bool use_filters,
+                                                                    const std::string &label_file,
+                                                                    const std::string &universal_label,
+-                                                                   const uint32_t filter_threshold, const uint32_t Lf);
++                                                                   const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_disk_index<float, uint32_t>(const char *dataFilePath, const char *indexFilePath,
+                                                                  const char *indexBuildParameters,
+                                                                  diskann::Metric compareMetric, bool use_opq,
+                                                                  const std::string &codebook_prefix, bool use_filters,
+                                                                  const std::string &label_file,
+                                                                  const std::string &universal_label,
+-                                                                 const uint32_t filter_threshold, const uint32_t Lf);
++                                                                 const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ // LabelT = uint16
+ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *dataFilePath, const char *indexFilePath,
+                                                                   const char *indexBuildParameters,
+@@ -1454,51 +1463,51 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *da
+                                                                   const std::string &codebook_prefix, bool use_filters,
+                                                                   const std::string &label_file,
+                                                                   const std::string &universal_label,
+-                                                                  const uint32_t filter_threshold, const uint32_t Lf);
++                                                                  const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_disk_index<uint8_t, uint16_t>(const char *dataFilePath, const char *indexFilePath,
+                                                                    const char *indexBuildParameters,
+                                                                    diskann::Metric compareMetric, bool use_opq,
+                                                                    const std::string &codebook_prefix, bool use_filters,
+                                                                    const std::string &label_file,
+                                                                    const std::string &universal_label,
+-                                                                   const uint32_t filter_threshold, const uint32_t Lf);
++                                                                   const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_disk_index<float, uint16_t>(const char *dataFilePath, const char *indexFilePath,
+                                                                  const char *indexBuildParameters,
+                                                                  diskann::Metric compareMetric, bool use_opq,
+                                                                  const std::string &codebook_prefix, bool use_filters,
+                                                                  const std::string &label_file,
+                                                                  const std::string &universal_label,
+-                                                                 const uint32_t filter_threshold, const uint32_t Lf);
++                                                                 const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ 
+ template DISKANN_DLLEXPORT int build_merged_vamana_index<int8_t, uint32_t>(
+     std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
+     double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
+     size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
+-    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_merged_vamana_index<float, uint32_t>(
+     std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
+     double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
+     size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
+-    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_merged_vamana_index<uint8_t, uint32_t>(
+     std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
+     double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
+     size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
+-    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ // Label=16_t
+ template DISKANN_DLLEXPORT int build_merged_vamana_index<int8_t, uint16_t>(
+     std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
+     double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
+     size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
+-    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_merged_vamana_index<float, uint16_t>(
+     std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
+     double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
+     size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
+-    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ template DISKANN_DLLEXPORT int build_merged_vamana_index<uint8_t, uint16_t>(
+     std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
+     double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
+     size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
+-    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
+ }; // namespace diskann
+diff --git a/src/dll/CMakeLists.txt b/src/dll/CMakeLists.txt
+index 096d1b7..e36fe7c 100644
+--- a/src/dll/CMakeLists.txt
++++ b/src/dll/CMakeLists.txt
+@@ -2,7 +2,7 @@
+ #Licensed under the MIT                        license.
+ 
+ add_library(${PROJECT_NAME} SHARED dllmain.cpp ../abstract_data_store.cpp ../partition.cpp ../pq.cpp ../pq_flash_index.cpp ../logger.cpp ../utils.cpp 
+-    ../windows_aligned_file_reader.cpp ../distance.cpp ../pq_l2_distance.cpp ../memory_mapper.cpp ../index.cpp 
++    ../windows_aligned_file_reader.cpp ../distance.cpp ../pq_l2_distance.cpp ../memory_mapper.cpp ../index.cu 
+     ../in_mem_data_store.cpp ../pq_data_store.cpp ../in_mem_graph_store.cpp ../math_utils.cpp ../disk_utils.cpp ../filter_utils.cpp 
+     ../ann_exception.cpp ../natural_number_set.cpp ../natural_number_map.cpp ../scratch.cpp ../index_factory.cpp ../abstract_index.cpp)
+ 
+@@ -32,4 +32,4 @@ foreach(RUNTIME_FILE ${RUNTIME_FILES_TO_COPY})
+     add_custom_command(TARGET ${PROJECT_NAME}
+                        POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy "${RUNTIME_FILE}" "${TARGET_DIR}")
+-endforeach()
+\ No newline at end of file
++endforeach()
+diff --git a/src/index.cpp b/src/index.cpp
+index bf93344..c7a3c96 100644
+--- a/src/index.cpp
++++ b/src/index.cpp
+@@ -1,6 +1,7 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT license.
+ 
++#include <memory>
+ #include <omp.h>
+ 
+ #include <type_traits>
+@@ -22,11 +23,27 @@
+ #endif
+ 
+ #include "index.h"
++#include <xmmintrin.h>
++#include <cuvs/neighbors/cagra.hpp>
+ 
+ #define MAX_POINTS_FOR_USING_BITSET 10000000
+ 
+ namespace diskann
+ {
++
++cuvs::distance::DistanceType parse_metric_to_cuvs(diskann::Metric m)
++{
++    switch (m)
++    {
++    case diskann::Metric::L2:
++        return cuvs::distance::DistanceType::L2Expanded;
++    case diskann::Metric::INNER_PRODUCT:
++        return cuvs::distance::DistanceType::InnerProduct;
++    default:
++        throw ANNException("ERROR: RAFT only supports L2 and INNER_PRODUCT.", -1, __FUNCSIG__, __FILE__, __LINE__);
++    }
++}
++
+ // Initialize an index with metric m, load the data of type T with filename
+ // (bin), and initialize max_points
+ template <typename T, typename TagT, typename LabelT>
+@@ -38,8 +55,11 @@ Index<T, TagT, LabelT>::Index(const IndexConfig &index_config, std::shared_ptr<A
+       _enable_tags(index_config.enable_tags), _indexingMaxC(DEFAULT_MAXC), _query_scratch(nullptr),
+       _pq_dist(index_config.pq_dist_build), _use_opq(index_config.use_opq),
+       _filtered_index(index_config.filtered_index), _num_pq_chunks(index_config.num_pq_chunks),
+-      _delete_set(new tsl::robin_set<uint32_t>), _conc_consolidate(index_config.concurrent_consolidate)
++      _delete_set(new tsl::robin_set<uint32_t>), _conc_consolidate(index_config.concurrent_consolidate),
++      _cuvs_cagra_index(index_config.cuvs_cagra_index)
+ {
++    std::cout << "inside params function index_config.cuvs_cagra_index" << index_config.cuvs_cagra_index
++              << " _cuvs_cagra_index " << _cuvs_cagra_index << std::endl;
+     if (_dynamic_index && !_enable_tags)
+     {
+         throw ANNException("ERROR: Dynamic Indexing must have tags enabled.", -1, __FUNCSIG__, __FILE__, __LINE__);
+@@ -109,6 +129,21 @@ Index<T, TagT, LabelT>::Index(const IndexConfig &index_config, std::shared_ptr<A
+                                      _indexingQueueSize, _indexingRange, _indexingMaxC, _data_store->get_dims());
+         }
+     }
++
++    if (_cuvs_cagra_index)
++    {
++        if (index_config.cuvs_cagra_index_params != nullptr)
++        {
++            assert(parse_metric_to_cuvs(dist_metric) == cuvs_cagra_index_params->metric);
++            _cuvs_cagra_index_params = index_config.cuvs_cagra_index_params;
++        }
++        else
++        {
++            cuvs::neighbors::cagra::index_params cuvs_cagra_index_params;
++            cuvs_cagra_index_params.metric = parse_metric_to_cuvs(_dist_metric);
++            _cuvs_cagra_index_params = std::make_shared<cuvs::neighbors::cagra::index_params>(cuvs_cagra_index_params);
++        }
++    }
+ }
+ 
+ template <typename T, typename TagT, typename LabelT>
+@@ -117,7 +152,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
+                               const std::shared_ptr<IndexSearchParams> index_search_params, const size_t num_frozen_pts,
+                               const bool dynamic_index, const bool enable_tags, const bool concurrent_consolidate,
+                               const bool pq_dist_build, const size_t num_pq_chunks, const bool use_opq,
+-                              const bool filtered_index)
++                              const bool filtered_index, const bool cuvs_cagra_index,
++                              const std::shared_ptr<cuvs::neighbors::cagra::index_params> cuvs_cagra_index_params)
+     : Index(
+           IndexConfigBuilder()
+               .with_metric(m)
+@@ -134,6 +170,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
+               .is_use_opq(use_opq)
+               .is_filtered(filtered_index)
+               .with_data_type(diskann_type_to_name<T>())
++              .is_cuvs_cagra_index(cuvs_cagra_index)
++              .with_cuvs_cagra_index_params(cuvs_cagra_index_params)
+               .build(),
+           IndexFactory::construct_datastore<T>(DataStoreStrategy::MEMORY,
+                                                (max_points == 0 ? (size_t)1 : max_points) +
+@@ -145,7 +183,9 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
+                                              (size_t)((index_parameters == nullptr ? 0 : index_parameters->max_degree) *
+                                                       defaults::GRAPH_SLACK_FACTOR * 1.05)))
+ {
+-    if (_pq_dist)
++    std::cout << "inside index build cuvs_cagra_index: " << cuvs_cagra_index
++              << " _cuvs_cagra_index: " << _cuvs_cagra_index << std::endl;
++    if (_pq_dist && !cuvs_cagra_index)
+     {
+         _pq_data_store = IndexFactory::construct_pq_datastore<T>(DataStoreStrategy::MEMORY, max_points + num_frozen_pts,
+                                                                  dim, m, num_pq_chunks, use_opq);
+@@ -732,6 +772,7 @@ template <typename T, typename TagT, typename LabelT> int Index<T, TagT, LabelT>
+ 
+ template <typename T, typename TagT, typename LabelT> uint32_t Index<T, TagT, LabelT>::calculate_entry_point()
+ {
++    std::cout << "inside calculate entry point" << std::endl;
+     // REFACTOR TODO: This function does not support multi-threaded calculation of medoid.
+     // Must revisit if perf is a concern.
+     return _data_store->calculate_medoid();
+@@ -739,6 +780,7 @@ template <typename T, typename TagT, typename LabelT> uint32_t Index<T, TagT, La
+ 
+ template <typename T, typename TagT, typename LabelT> std::vector<uint32_t> Index<T, TagT, LabelT>::get_init_ids()
+ {
++    // std::cout << "num_frozen_pts" << _num_frozen_pts << std::endl;
+     std::vector<uint32_t> init_ids;
+     init_ids.reserve(1 + _num_frozen_pts);
+ 
+@@ -839,6 +881,8 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
+         _pq_data_store->get_distance(scratch->aligned_query(), ids, dists_out, scratch);
+     };
+ 
++    // raft::print_host_vector("init_ids", init_ids.data(), init_ids.size(), std::cout);
++
+     // Initialize the candidate pool with starting points
+     for (auto id : init_ids)
+     {
+@@ -1270,6 +1314,7 @@ void Index<T, TagT, LabelT>::inter_insert(uint32_t n, std::vector<uint32_t> &pru
+ 
+ template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::link()
+ {
++    std::cout << "inside link()" << std::endl;
+     uint32_t num_threads = _indexingThreads;
+     if (num_threads != 0)
+         omp_set_num_threads(num_threads);
+@@ -1371,6 +1416,57 @@ template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT
+     }
+ }
+ 
++template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::add_cuvs_cagra_nbrs()
++{
++    std::cout << "add_cuvs_cagra_neighbors" << std::endl;
++    uint32_t num_threads = _indexingThreads;
++    if (num_threads != 0)
++        omp_set_num_threads(num_threads);
++
++    assert(_num_frozen_pts == 0);
++
++    /* visit_order is a vector that is initialized to the entire graph */
++    std::vector<uint32_t> visit_order;
++    tsl::robin_set<uint32_t> visited;
++    visit_order.reserve(_nd + _num_frozen_pts);
++    for (uint32_t i = 0; i < (uint32_t)_nd; i++)
++    {
++        visit_order.emplace_back(i);
++    }
++
++    // if there are frozen points, the first such one is set to be the _start
++    if (_num_frozen_pts > 0)
++        _start = (uint32_t)_max_points;
++    else
++        _start = calculate_entry_point();
++
++#pragma omp parallel for schedule(dynamic, 2048)
++    for (int64_t node_ctr = 0; node_ctr < (int64_t)(visit_order.size()); node_ctr++)
++    {
++        auto node = visit_order[node_ctr];
++
++        std::vector<uint32_t> cagra_nbrs(_indexingRange);
++        uint32_t *nbr_start_ptr = host_cagra_graph.data() + node * _indexingRange;
++        uint32_t *nbr_end_ptr = nbr_start_ptr + _indexingRange;
++        std::copy(nbr_start_ptr, nbr_end_ptr, cagra_nbrs.data());
++
++        assert(cagra_nbrs.size() > 0);
++
++        {
++            LockGuard guard(_locks[node]);
++
++            _graph_store->set_neighbours(node, cagra_nbrs);
++            assert(_graph_store->get_neighbours((location_t)node).size() <= _indexingRange);
++        }
++
++        if (node_ctr % 100000 == 0)
++        {
++            diskann::cout << "\r" << (100.0 * node_ctr) / (visit_order.size()) << "% of index build completed."
++                          << std::flush;
++        }
++    }
++}
++
+ template <typename T, typename TagT, typename LabelT>
+ void Index<T, TagT, LabelT>::prune_all_neighbors(const uint32_t max_degree, const uint32_t max_occlusion_size,
+                                                  const float alpha)
+@@ -1448,8 +1544,6 @@ void Index<T, TagT, LabelT>::set_start_points(const T *data, size_t data_count)
+     if (data_count != _num_frozen_pts * _dim)
+         throw ANNException("Invalid number of points", -1, __FUNCSIG__, __FILE__, __LINE__);
+ 
+-    //     memcpy(_data + _aligned_dim * _max_points, data, _aligned_dim *
+-    //     sizeof(T) * _num_frozen_pts);
+     for (location_t i = 0; i < _num_frozen_pts; i++)
+     {
+         _data_store->set_vector((location_t)(i + _max_points), data + i * _dim);
+@@ -1505,6 +1599,21 @@ void Index<T, TagT, LabelT>::set_start_points_at_random(T radius, uint32_t rando
+     set_start_points(points_data.data(), points_data.size());
+ }
+ 
++template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::build_cuvs_cagra_index(const T *data)
++{
++    raft::device_resources handle;
++    auto dataset_view = raft::make_host_matrix_view<const T, int64_t>(data, int64_t(_nd), _dim);
++    auto cuvs_index = cuvs::neighbors::cagra::build<T, uint32_t>(handle, *_cuvs_cagra_index_params, dataset_view);
++    auto stream = handle.get_stream();
++    auto device_graph = cuvs_index.graph();
++    host_cagra_graph.resize(device_graph.extent(0) * device_graph.extent(1));
++
++    thrust::copy(handle.get_thrust_policy(), thrust::device_ptr<const uint32_t>(device_graph.data_handle()),
++                 thrust::device_ptr<const uint32_t>(device_graph.data_handle() + device_graph.size()),
++                 host_cagra_graph.data());
++    handle.sync_stream();
++}
++
+ template <typename T, typename TagT, typename LabelT>
+ void Index<T, TagT, LabelT>::build_with_data_populated(const std::vector<TagT> &tags)
+ {
+@@ -1542,7 +1651,14 @@ void Index<T, TagT, LabelT>::build_with_data_populated(const std::vector<TagT> &
+     }
+ 
+     generate_frozen_point();
+-    link();
++    if (_cuvs_cagra_index)
++    {
++        add_cuvs_cagra_nbrs();
++    }
++    else
++    {
++        link();
++    }
+ 
+     size_t max = 0, min = SIZE_MAX, total = 0, cnt = 0;
+     for (size_t i = 0; i < _nd; i++)
+@@ -1559,6 +1675,7 @@ void Index<T, TagT, LabelT>::build_with_data_populated(const std::vector<TagT> &
+ 
+     _has_built = true;
+ }
++
+ template <typename T, typename TagT, typename LabelT>
+ void Index<T, TagT, LabelT>::_build(const DataType &data, const size_t num_points_to_load, TagVector &tags)
+ {
+@@ -1597,7 +1714,12 @@ void Index<T, TagT, LabelT>::build(const T *data, const size_t num_points_to_loa
+         _data_store->populate_data(data, (location_t)num_points_to_load);
+     }
+ 
+-    build_with_data_populated(tags);
++    if (_cuvs_cagra_index)
++        build_cuvs_cagra_index(data);
++    else
++    {
++        build_with_data_populated(tags);
++    }
+ }
+ 
+ template <typename T, typename TagT, typename LabelT>
+@@ -1657,7 +1779,7 @@ void Index<T, TagT, LabelT>::build(const char *filename, const size_t num_points
+ 
+     // REFACTOR PQ TODO: We can remove this if and add a check in the InMemDataStore
+     // to not populate_data if it has been called once.
+-    if (_pq_dist)
++    if (_pq_dist && !_cuvs_cagra_index)
+     {
+ #ifdef EXEC_ENV_OLS
+         std::stringstream ss;
+@@ -1683,6 +1805,13 @@ void Index<T, TagT, LabelT>::build(const char *filename, const size_t num_points
+         std::unique_lock<std::shared_timed_mutex> tl(_tag_lock);
+         _nd = num_points_to_load;
+     }
++
++    if (_cuvs_cagra_index)
++    {
++        auto _in_mem_data_store = std::static_pointer_cast<InMemDataStore<T>>(_data_store);
++        build_cuvs_cagra_index(_in_mem_data_store->_data);
++    }
++    // else
+     build_with_data_populated(tags);
+ }
+ 
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 6af8405..a44caab 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -38,4 +38,3 @@ add_executable(${PROJECT_NAME}_unit_tests ${DISKANN_SOURCES} ${DISKANN_UNIT_TEST
+ target_link_libraries(${PROJECT_NAME}_unit_tests ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::unit_test_framework)
+ 
+ add_test(NAME ${PROJECT_NAME}_unit_tests COMMAND ${PROJECT_NAME}_unit_tests)
+-

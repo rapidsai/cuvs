@@ -143,7 +143,10 @@ void bench_build(::benchmark::State& state,
 
   const auto algo_property = parse_algo_property(algo->get_preference(), index.build_param);
 
-  const T* base_set      = dataset->base_set(algo_property.dataset_memory_type);
+  bool parse_base_file = (index.algo == "diskann_memory" || index.algo == "diskann_ssd");
+
+  const T* base_set;
+  if (parse_base_file) base_set = dataset->base_set(algo_property.dataset_memory_type);
   std::size_t index_size = dataset->base_set_size();
 
   cuda_timer gpu_timer{algo};
@@ -153,7 +156,11 @@ void bench_build(::benchmark::State& state,
       [[maybe_unused]] auto ntx_lap = nvtx.lap();
       [[maybe_unused]] auto gpu_lap = gpu_timer.lap();
       try {
-        algo->build(base_set, index_size);
+        if (!parse_base_file)
+          algo->build(base_set, index_size);
+        else {
+          algo->build(dataset->base_filename(), index_size);
+        }
       } catch (const std::exception& e) {
         state.SkipWithError(std::string(e.what()));
       }
@@ -416,7 +423,8 @@ inline void printf_usage()
 template <typename T>
 void register_build(std::shared_ptr<const dataset<T>> dataset,
                     std::vector<configuration::index> indices,
-                    bool force_overwrite)
+                    bool force_overwrite,
+                    bool disk_index)
 {
   for (auto index : indices) {
     auto suf      = static_cast<std::string>(index.build_param["override_suffix"]);

@@ -114,6 +114,11 @@ class bin_file {
     }
   }
 
+  std::string file() const
+  {
+    return file_;
+  }
+
  private:
   void check_suffix();
   void open_file() const;
@@ -378,6 +383,7 @@ class bin_dataset : public dataset<T> {
   auto max_k() const -> uint32_t override;
   auto base_set_size() const -> size_t override;
   auto query_set_size() const -> size_t override;
+  std::string base_filename() const;
 
  private:
   void load_base_set() const;
@@ -493,6 +499,11 @@ template <typename T>
 void bin_dataset<T>::map_base_set() const
 {
   this->mapped_base_set_ = base_file_.map();
+}
+
+template <typename T>
+std::string bin_dataset<T>::base_filename() const {
+  return base_file_.file();
 }
 
 }  // namespace  cuvs::bench

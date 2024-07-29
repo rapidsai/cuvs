@@ -127,6 +127,8 @@ class algo : public algo_base {
 
   virtual void build(const T* dataset, size_t nrow) = 0;
 
+  virtual void build(std::string dataset_file, size_t nrow);
+
   virtual void set_search_param(const search_param& param) = 0;
   // TODO(snanditale): this assumes that an algorithm can always return k results.
   // This is not always possible.

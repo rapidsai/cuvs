@@ -32,7 +32,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
-option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN "Include cuVS CAGRA with DISKANN search in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_DISKANN "Include cuVS CAGRA with DISKANN search in benchmark" ON)
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -83,7 +83,7 @@ if(CUVS_ANN_BENCH_USE_FAISS)
   include(cmake/thirdparty/get_faiss)
 endif()
 
-if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
+if(CUVS_ANN_BENCH_USE_DISKANN)
   include(cmake/thirdparty/get_diskann)
 endif()
 
@@ -300,8 +300,8 @@ if(CUVS_ANN_BENCH_USE_GGNN)
   )
 endif()
 
-if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
-  ConfigureAnnBench(NAME DISKANN PATH src/diskann/cuvs_cagra_diskann.cu LINKS cuvs diskann::diskann)
+if(CUVS_ANN_BENCH_USE_DISKANN)
+  ConfigureAnnBench(NAME DISKANN PATH src/diskann/diskann_benchmark.cu LINKS cuvs diskann::diskann)
 endif()
 
 # ##################################################################################################
