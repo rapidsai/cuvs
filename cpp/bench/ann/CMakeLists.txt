@@ -30,6 +30,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN "Include cuVS CAGRA with DISKANN search in benchmark" ON)
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -50,6 +51,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -95,6 +97,10 @@ if(CUVS_ANN_BENCH_USE_FAISS)
   # will have the conda includes/link dirs
   link_libraries($<TARGET_NAME_IF_EXISTS:conda_env>)
   include(cmake/thirdparty/get_faiss.cmake)
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
+  include(cmake/thirdparty/get_diskann.cmake)
 endif()
 
 # ##################################################################################################
@@ -308,6 +314,10 @@ if(CUVS_ANN_BENCH_USE_GGNN)
   ConfigureAnnBench(
     NAME GGNN PATH bench/ann/src/ggnn/ggnn_benchmark.cu LINKS glog::glog ggnn::ggnn CUDA::curand
   )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
+  ConfigureAnnBench(NAME DISKANN PATH src/diskann/cuvs_cagra_diskann.cu LINKS cuvs diskann::diskann)
 endif()
 
 # ##################################################################################################
