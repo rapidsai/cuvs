@@ -397,6 +397,16 @@ auto build(raft::resources const& handle,
 
 auto build(raft::resources const& handle,
            const cuvs::neighbors::cagra::index_params& params,
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::cagra::index_params& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
@@ -462,6 +472,13 @@ void search(raft::resources const& handle,
 
 void search(raft::resources const& handle,
             cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+void search(raft::resources const& handle,
+            cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
@@ -489,6 +506,16 @@ void serialize_file(raft::resources const& handle,
 void deserialize_file(raft::resources const& handle,
                       const std::string& filename,
                       cuvs::neighbors::cagra::index<float, uint32_t>* index);
+
+void serialize_file(raft::resources const& handle,
+                    const std::string& filename,
+                    const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+                    bool include_dataset = true);
+
+void deserialize_file(raft::resources const& handle,
+                      const std::string& filename,
+                      cuvs::neighbors::cagra::index<half, uint32_t>* index);
+
 void serialize(raft::resources const& handle,
                std::string& str,
                const cuvs::neighbors::cagra::index<float, uint32_t>& index,
@@ -497,6 +524,15 @@ void serialize(raft::resources const& handle,
 void deserialize(raft::resources const& handle,
                  const std::string& str,
                  cuvs::neighbors::cagra::index<float, uint32_t>* index);
+
+void serialize(raft::resources const& handle,
+               std::string& str,
+               const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+               bool include_dataset = true);
+
+void deserialize(raft::resources const& handle,
+                 const std::string& str,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
 
 void serialize_file(raft::resources const& handle,
                     const std::string& filename,
