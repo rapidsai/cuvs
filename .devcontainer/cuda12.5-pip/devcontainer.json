@@ -13,9 +13,7 @@
     "--name",
     "${localEnv:USER:anon}-rapids-${localWorkspaceFolderBasename}-24.08-cuda12.5-pip"
   ],
-  "hostRequirements": {
-    "gpu": "optional"
-  },
+  "hostRequirements": {"gpu": "optional"},
   "features": {
     "ghcr.io/rapidsai/devcontainers/features/ucx:24.8": {
       "version": "1.15.0"
@@ -34,16 +32,8 @@
     "ghcr.io/rapidsai/devcontainers/features/cuda",
     "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils"
   ],
-  "initializeCommand": [
-    "/bin/bash",
-    "-c",
-    "mkdir -m 0755 -p ${localWorkspaceFolder}/../.{aws,cache,config/pip,local/share/${localWorkspaceFolderBasename}-cuda12.5-venvs}"
-  ],
-  "postAttachCommand": [
-    "/bin/bash",
-    "-c",
-    "if [ ${CODESPACES:-false} = 'true' ]; then . devcontainer-utils-post-attach-command; . rapids-post-attach-command; fi"
-  ],
+  "initializeCommand": ["/bin/bash", "-c", "mkdir -m 0755 -p ${localWorkspaceFolder}/../.{aws,cache,config/pip,local/share/${localWorkspaceFolderBasename}-cuda12.5-venvs}"],
+  "postAttachCommand": ["/bin/bash", "-c", "if [ ${CODESPACES:-false} = 'true' ]; then . devcontainer-utils-post-attach-command; . rapids-post-attach-command; fi"],
   "workspaceFolder": "/home/coder",
   "workspaceMount": "source=${localWorkspaceFolder},target=/home/coder/cuvs,type=bind,consistency=consistent",
   "mounts": [
