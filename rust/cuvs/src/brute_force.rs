@@ -80,12 +80,18 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
+            let prefilter = ffi::cuvsFilter {
+                addr: 0,
+                type_: ffi::cuvsFilterType::NO_FILTER,
+            };
+
             check_cuvs(ffi::cuvsBruteForceSearch(
                 res.0,
                 self.0,
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
+                prefilter,
             ))
         }
     }
@@ -117,9 +123,7 @@ mod tests {
         let dataset_host =
             ndarray::Array::<f32, _>::random((n_datapoints, n_features), Uniform::new(0., 1.0));
 
-        let dataset = ManagedTensor::from(&dataset_host)
-            .to_device(&res)
-            .unwrap();
+        let dataset = ManagedTensor::from(&dataset_host).to_device(&res).unwrap();
 
         println!("dataset {:#?}", dataset_host);
 
@@ -168,12 +172,12 @@ mod tests {
         assert_eq!(neighbors_host[[3, 0]], 3);
     }
 
-/*
-    #[test]
-    fn test_cosine() {
-        test_bfknn(DistanceType::CosineExpanded);
-    }
-*/
+    /*
+        #[test]
+        fn test_cosine() {
+            test_bfknn(DistanceType::CosineExpanded);
+        }
+    */
 
     #[flaky]
     fn test_l2() {
