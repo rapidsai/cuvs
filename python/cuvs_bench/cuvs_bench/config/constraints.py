@@ -79,7 +79,8 @@ def faiss_gpu_ivf_pq_build(params, dims):
     if "useFloat16" in params and params["useFloat16"]:
         lookup_table_size = 2
     # FAISS constraint to check if lookup table fits in shared memory
-    # for now hard code maximum shared memory per block to 49 kB (the value for A100 and V100)
+    # for now hard code maximum shared memory per block to 49 kB
+    # (the value for A100 and V100)
     return ret and lookup_table_size * params["M"] * (2**pq_bits) <= 49152
 
 
