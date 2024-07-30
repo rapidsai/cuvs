@@ -212,6 +212,10 @@ static_assert(std::is_aggregate_v<search_params>);
  */
 template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index {
+  using index_params_type  = cagra::index_params;
+  using search_params_type = cagra::search_params;
+  using index_type         = IdxT;
+  using value_type         = T;
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 

@@ -269,5 +269,18 @@ void parse_search_param(const nlohmann::json& conf,
   }
   // Same ratio as in IVF-PQ
   param.refine_ratio = conf.value("refine_ratio", 1.0f);
+
+  // enable dynamic batching
+  if (conf.contains("dynamic_batching")) { param.dynamic_batching = conf.at("dynamic_batching"); }
+  if (conf.contains("dynamic_batching_max_batch_size")) {
+    param.dynamic_batching_max_batch_size = conf.at("dynamic_batching_max_batch_size");
+  }
+  if (conf.contains("dynamic_batching_soft_deadline_ms")) {
+    param.dynamic_batching_soft_deadline_ms = conf.at("dynamic_batching_soft_deadline_ms");
+  }
+  if (conf.contains("dynamic_batching_n_queues")) {
+    param.dynamic_batching_n_queues = conf.at("dynamic_batching_n_queues");
+  }
+  param.dynamic_batching_k = conf.at("k");
 }
 #endif

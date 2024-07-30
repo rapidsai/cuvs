@@ -404,6 +404,7 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
+  src/neighbors/dynamic_batching.cpp
   $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
