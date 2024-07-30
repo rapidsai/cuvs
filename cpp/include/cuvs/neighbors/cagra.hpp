@@ -550,7 +550,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
@@ -586,7 +586,7 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
 /**
  * @brief Build the index from the dataset for efficient search.
