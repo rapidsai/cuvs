@@ -29,6 +29,8 @@
 #include <raft/core/serialize.hpp>
 #include <raft/util/integer_utils.hpp>
 
+#include "ivf_common.cuh"
+
 #include <thrust/fill.h>
 
 #include <atomic>
