@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "omp.h"
+#include <omp.h>
 #include <raft/core/logger.hpp>
 
 namespace cuvs::neighbors::mg {

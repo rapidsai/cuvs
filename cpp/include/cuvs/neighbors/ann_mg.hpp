@@ -161,20 +161,20 @@ class ann_interface {
   template <typename Accessor>
   void build(raft::resources const& handle,
              const cuvs::neighbors::index_params* index_params,
-             raft::mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> index_dataset);
+             raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
 
   template <typename Accessor1, typename Accessor2>
   void extend(
     raft::resources const& handle,
-    raft::mdspan<const T, matrix_extent<IdxT>, row_major, Accessor1> new_vectors,
-    std::optional<raft::mdspan<const IdxT, vector_extent<IdxT>, layout_c_contiguous, Accessor2>>
+    raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
+    std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
       new_indices);
 
   void search(raft::resources const& handle,
               const cuvs::neighbors::search_params* search_params,
-              raft::host_matrix_view<const T, IdxT, row_major> h_queries,
-              raft::device_matrix_view<IdxT, IdxT, row_major> d_neighbors,
-              raft::device_matrix_view<float, IdxT, row_major> d_distances) const;
+              raft::host_matrix_view<const T, int64_t, row_major> h_queries,
+              raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+              raft::device_matrix_view<float, int64_t, row_major> d_distances) const;
 
   void serialize(raft::resources const& handle, std::ostream& os) const;
   void deserialize(raft::resources const& handle, std::istream& is);
@@ -208,18 +208,18 @@ class ann_mg_index {
 
   void build(const cuvs::neighbors::mg::nccl_clique& clique,
              const cuvs::neighbors::index_params* index_params,
-             raft::host_matrix_view<const T, IdxT, row_major> index_dataset);
+             raft::host_matrix_view<const T, int64_t, row_major> index_dataset);
 
   void extend(const cuvs::neighbors::mg::nccl_clique& clique,
-              raft::host_matrix_view<const T, IdxT, row_major> new_vectors,
-              std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices);
+              raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
+              std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices);
 
   void search(const cuvs::neighbors::mg::nccl_clique& clique,
               const cuvs::neighbors::search_params* search_params,
-              raft::host_matrix_view<const T, IdxT, row_major> queries,
-              raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
-              raft::host_matrix_view<float, IdxT, row_major> distances,
-              IdxT n_rows_per_batch) const;
+              raft::host_matrix_view<const T, int64_t, row_major> queries,
+              raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+              raft::host_matrix_view<float, int64_t, row_major> distances,
+              int64_t n_rows_per_batch) const;
 
   void serialize(raft::resources const& handle,
                  const cuvs::neighbors::mg::nccl_clique& clique,
@@ -398,7 +398,7 @@ auto build(const raft::resources& handle,
 auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const cagra::mg_index_params& index_params,
-           raft::host_matrix_view<const float, uint32_t, row_major> index_dataset)
+           raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
   -> ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>;
 
 /// \ingroup ann_mg_cpp_index_build
@@ -422,7 +422,7 @@ auto build(const raft::resources& handle,
 auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const cagra::mg_index_params& index_params,
-           raft::host_matrix_view<const int8_t, uint32_t, row_major> index_dataset)
+           raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
 
 /// \ingroup ann_mg_cpp_index_build
@@ -446,7 +446,7 @@ auto build(const raft::resources& handle,
 auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const cagra::mg_index_params& index_params,
-           raft::host_matrix_view<const uint8_t, uint32_t, row_major> index_dataset)
+           raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
   -> ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
 
 /// \defgroup ann_mg_cpp_index_extend ANN MG index extend
@@ -630,8 +630,8 @@ void extend(const raft::resources& handle,
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
-            raft::host_matrix_view<const float, uint32_t, row_major> new_vectors,
-            std::optional<raft::host_vector_view<const uint32_t, uint32_t>> new_indices);
+            raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
 /// \ingroup ann_mg_cpp_index_extend
 /**
@@ -656,8 +656,8 @@ void extend(const raft::resources& handle,
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
-            raft::host_matrix_view<const int8_t, uint32_t, row_major> new_vectors,
-            std::optional<raft::host_vector_view<const uint32_t, uint32_t>> new_indices);
+            raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
 /// \ingroup ann_mg_cpp_index_extend
 /**
@@ -682,8 +682,8 @@ void extend(const raft::resources& handle,
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
-            raft::host_matrix_view<const uint8_t, uint32_t, row_major> new_vectors,
-            std::optional<raft::host_vector_view<const uint32_t, uint32_t>> new_indices);
+            raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
 /// \defgroup ann_mg_cpp_index_search ANN MG index search
 
@@ -718,7 +718,7 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -751,7 +751,7 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -784,7 +784,7 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -817,7 +817,7 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -850,7 +850,7 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -883,7 +883,7 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -913,10 +913,10 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             const cagra::search_params& search_params,
-            raft::host_matrix_view<const float, uint32_t, row_major> queries,
-            raft::host_matrix_view<uint32_t, uint32_t, row_major> neighbors,
-            raft::host_matrix_view<float, uint32_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<const float, int64_t, row_major> queries,
+            raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances,
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -946,10 +946,10 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
             const cagra::search_params& search_params,
-            raft::host_matrix_view<const int8_t, uint32_t, row_major> queries,
-            raft::host_matrix_view<uint32_t, uint32_t, row_major> neighbors,
-            raft::host_matrix_view<float, uint32_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
+            raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances,
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -979,10 +979,10 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
             const cagra::search_params& search_params,
-            raft::host_matrix_view<const uint8_t, uint32_t, row_major> queries,
-            raft::host_matrix_view<uint32_t, uint32_t, row_major> neighbors,
-            raft::host_matrix_view<float, uint32_t, row_major> distances,
-            uint64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
+            raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances,
+            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \defgroup ann_mg_cpp_serialize ANN MG index serialization
 

@@ -37,7 +37,7 @@ template <typename Accessor>
 void ann_interface<AnnIndexType, T, IdxT>::build(
   raft::resources const& handle,
   const cuvs::neighbors::index_params* index_params,
-  raft::mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> index_dataset)
+  raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset)
 {
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx = cuvs::neighbors::ivf_flat::build(
@@ -48,14 +48,9 @@ void ann_interface<AnnIndexType, T, IdxT>::build(
       handle, *static_cast<const ivf_pq::index_params*>(index_params), index_dataset);
     index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
-    auto extents = raft::make_extents<int64_t>(index_dataset.extent(0), index_dataset.extent(1));
-    const bool host_acc   = decltype(index_dataset)::accessor_type::is_host_type::value;
-    const bool device_acc = decltype(index_dataset)::accessor_type::is_device_type::value;
-    auto dataset          = raft::make_mdspan<const T, int64_t, row_major, host_acc, device_acc>(
-      index_dataset.data_handle(), extents);
     cagra::index<T, IdxT> idx(handle);
     idx = cuvs::neighbors::cagra::build(
-      handle, *static_cast<const cagra::index_params*>(index_params), dataset);
+      handle, *static_cast<const cagra::index_params*>(index_params), index_dataset);
     index_.emplace(std::move(idx));
   }
   resource::sync_stream(handle);
@@ -65,8 +60,8 @@ template <typename AnnIndexType, typename T, typename IdxT>
 template <typename Accessor1, typename Accessor2>
 void ann_interface<AnnIndexType, T, IdxT>::extend(
   raft::resources const& handle,
-  raft::mdspan<const T, matrix_extent<IdxT>, row_major, Accessor1> new_vectors,
-  std::optional<raft::mdspan<const IdxT, vector_extent<IdxT>, layout_c_contiguous, Accessor2>>
+  raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
+  std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices)
 {
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
@@ -85,13 +80,13 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void ann_interface<AnnIndexType, T, IdxT>::search(
   raft::resources const& handle,
   const cuvs::neighbors::search_params* search_params,
-  raft::host_matrix_view<const T, IdxT, row_major> h_queries,
-  raft::device_matrix_view<IdxT, IdxT, row_major> d_neighbors,
-  raft::device_matrix_view<float, IdxT, row_major> d_distances) const
+  raft::host_matrix_view<const T, int64_t, row_major> h_queries,
+  raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+  raft::device_matrix_view<float, int64_t, row_major> d_distances) const
 {
-  IdxT n_rows    = h_queries.extent(0);
-  IdxT n_dims    = h_queries.extent(1);
-  auto d_queries = raft::make_device_matrix<T, IdxT, row_major>(handle, n_rows, n_dims);
+  int64_t n_rows = h_queries.extent(0);
+  int64_t n_dims = h_queries.extent(1);
+  auto d_queries = raft::make_device_matrix<T, int64_t, row_major>(handle, n_rows, n_dims);
   raft::copy(d_queries.data_handle(),
              h_queries.data_handle(),
              n_rows * n_dims,
@@ -250,10 +245,10 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void ann_mg_index<AnnIndexType, T, IdxT>::build(
   const cuvs::neighbors::mg::nccl_clique& clique,
   const cuvs::neighbors::index_params* index_params,
-  raft::host_matrix_view<const T, IdxT, row_major> index_dataset)
+  raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   if (mode_ == REPLICATED) {
-    IdxT n_rows = index_dataset.extent(0);
+    int64_t n_rows = index_dataset.extent(0);
     RAFT_LOG_INFO("REPLICATED BUILD: %d*%drows", num_ranks_, n_rows);
 
     ann_interfaces_.resize(num_ranks_);
@@ -267,9 +262,9 @@ void ann_mg_index<AnnIndexType, T, IdxT>::build(
       resource::sync_stream(dev_res);
     }
   } else if (mode_ == SHARDED) {
-    IdxT n_rows           = index_dataset.extent(0);
-    IdxT n_cols           = index_dataset.extent(1);
-    IdxT n_rows_per_shard = raft::ceildiv(n_rows, (IdxT)num_ranks_);
+    int64_t n_rows           = index_dataset.extent(0);
+    int64_t n_cols           = index_dataset.extent(1);
+    int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)num_ranks_);
 
     RAFT_LOG_INFO("SHARDED BUILD: %d*%drows", num_ranks_, n_rows_per_shard);
 
@@ -279,10 +274,10 @@ void ann_mg_index<AnnIndexType, T, IdxT>::build(
       int dev_id                            = clique.device_ids_[rank];
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-      IdxT offset                  = rank * n_rows_per_shard;
-      IdxT n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
-      const T* partition_ptr       = index_dataset.data_handle() + (offset * n_cols);
-      auto partition               = raft::make_host_matrix_view<const T, IdxT, row_major>(
+      int64_t offset                  = rank * n_rows_per_shard;
+      int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
+      const T* partition_ptr          = index_dataset.data_handle() + (offset * n_cols);
+      auto partition                  = raft::make_host_matrix_view<const T, int64_t, row_major>(
         partition_ptr, n_rows_of_current_shard, n_cols);
       auto& ann_if = ann_interfaces_[rank];
       ann_if.build(dev_res, index_params, partition);
@@ -294,10 +289,10 @@ void ann_mg_index<AnnIndexType, T, IdxT>::build(
 template <typename AnnIndexType, typename T, typename IdxT>
 void ann_mg_index<AnnIndexType, T, IdxT>::extend(
   const cuvs::neighbors::mg::nccl_clique& clique,
-  raft::host_matrix_view<const T, IdxT, row_major> new_vectors,
-  std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices)
+  raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
+  std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)
 {
-  IdxT n_rows = new_vectors.extent(0);
+  int64_t n_rows = new_vectors.extent(0);
   if (mode_ == REPLICATED) {
     RAFT_LOG_INFO("REPLICATED EXTEND: %d*%drows", num_ranks_, n_rows);
 
@@ -311,8 +306,8 @@ void ann_mg_index<AnnIndexType, T, IdxT>::extend(
       resource::sync_stream(dev_res);
     }
   } else if (mode_ == SHARDED) {
-    IdxT n_cols           = new_vectors.extent(1);
-    IdxT n_rows_per_shard = raft::ceildiv(n_rows, (IdxT)num_ranks_);
+    int64_t n_cols           = new_vectors.extent(1);
+    int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)num_ranks_);
 
     RAFT_LOG_INFO("SHARDED EXTEND: %d*%drows", num_ranks_, n_rows_per_shard);
 
@@ -321,17 +316,17 @@ void ann_mg_index<AnnIndexType, T, IdxT>::extend(
       int dev_id                            = clique.device_ids_[rank];
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-      IdxT offset                  = rank * n_rows_per_shard;
-      IdxT n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
-      const T* new_vectors_ptr     = new_vectors.data_handle() + (offset * n_cols);
-      auto new_vectors_part        = raft::make_host_matrix_view<const T, IdxT, row_major>(
+      int64_t offset                  = rank * n_rows_per_shard;
+      int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
+      const T* new_vectors_ptr        = new_vectors.data_handle() + (offset * n_cols);
+      auto new_vectors_part           = raft::make_host_matrix_view<const T, IdxT, row_major>(
         new_vectors_ptr, n_rows_of_current_shard, n_cols);
 
-      std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices_part = std::nullopt;
+      std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices_part = std::nullopt;
       if (new_indices.has_value()) {
         const IdxT* new_indices_ptr = new_indices.value().data_handle() + offset;
-        new_indices_part =
-          raft::make_host_vector_view<const IdxT, IdxT>(new_indices_ptr, n_rows_of_current_shard);
+        new_indices_part            = raft::make_host_vector_view<const IdxT, int64_t>(
+          new_indices_ptr, n_rows_of_current_shard);
       }
       auto& ann_if = ann_interfaces_[rank];
       ann_if.extend(dev_res, new_vectors_part, new_indices_part);
@@ -344,38 +339,38 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void ann_mg_index<AnnIndexType, T, IdxT>::search(
   const cuvs::neighbors::mg::nccl_clique& clique,
   const cuvs::neighbors::search_params* search_params,
-  raft::host_matrix_view<const T, IdxT, row_major> queries,
-  raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
-  raft::host_matrix_view<float, IdxT, row_major> distances,
-  IdxT n_rows_per_batch) const
+  raft::host_matrix_view<const T, int64_t, row_major> queries,
+  raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+  raft::host_matrix_view<float, int64_t, row_major> distances,
+  int64_t n_rows_per_batch) const
 {
-  IdxT n_rows      = queries.extent(0);
-  IdxT n_cols      = queries.extent(1);
-  IdxT n_neighbors = neighbors.extent(1);
+  int64_t n_rows      = queries.extent(0);
+  int64_t n_cols      = queries.extent(1);
+  int64_t n_neighbors = neighbors.extent(1);
 
-  IdxT n_batches = raft::ceildiv(n_rows, (IdxT)n_rows_per_batch);
+  int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
   if (n_batches == 1) n_rows_per_batch = n_rows;
 
   if (mode_ == REPLICATED) {
     RAFT_LOG_INFO("REPLICATED SEARCH: %d*%drows", n_batches, n_rows_per_batch);
 
 #pragma omp parallel for
-    for (IdxT batch_idx = 0; batch_idx < n_batches; batch_idx++) {
+    for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
       int rank                              = batch_idx % num_ranks_;  // alternate GPUs
       int dev_id                            = clique.device_ids_[rank];
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
 
-      IdxT offset                  = batch_idx * n_rows_per_batch;
-      IdxT query_offset            = offset * n_cols;
-      IdxT output_offset           = offset * n_neighbors;
-      IdxT n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
+      int64_t offset                  = batch_idx * n_rows_per_batch;
+      int64_t query_offset            = offset * n_cols;
+      int64_t output_offset           = offset * n_neighbors;
+      int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
 
-      auto query_partition = raft::make_host_matrix_view<const T, IdxT, row_major>(
+      auto query_partition = raft::make_host_matrix_view<const T, int64_t, row_major>(
         queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
-      auto d_neighbors = raft::make_device_matrix<IdxT, IdxT, row_major>(
+      auto d_neighbors = raft::make_device_matrix<IdxT, int64_t, row_major>(
         dev_res, n_rows_of_current_batch, n_neighbors);
-      auto d_distances = raft::make_device_matrix<float, IdxT, row_major>(
+      auto d_distances = raft::make_device_matrix<float, int64_t, row_major>(
         dev_res, n_rows_of_current_batch, n_neighbors);
 
       auto& ann_if = ann_interfaces_[rank];
@@ -406,12 +401,12 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
     auto out_distances =
       raft::make_device_matrix<float, IdxT, row_major>(root_handle, n_rows_per_batch, n_neighbors);
 
-    for (IdxT batch_idx = 0; batch_idx < n_batches; batch_idx++) {
-      IdxT offset                  = batch_idx * n_rows_per_batch;
-      IdxT query_offset            = offset * n_cols;
-      IdxT output_offset           = offset * n_neighbors;
-      IdxT n_rows_of_current_batch = std::min((IdxT)n_rows_per_batch, n_rows - offset);
-      auto query_partition         = raft::make_host_matrix_view<const T, IdxT, row_major>(
+    for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
+      int64_t offset                  = batch_idx * n_rows_per_batch;
+      int64_t query_offset            = offset * n_cols;
+      int64_t output_offset           = offset * n_neighbors;
+      int64_t n_rows_of_current_batch = std::min((int64_t)n_rows_per_batch, n_rows - offset);
+      auto query_partition            = raft::make_host_matrix_view<const T, int64_t, row_major>(
         queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
       const int& requirements = num_ranks_;
@@ -426,9 +421,9 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
 
         if (rank == clique.root_rank_) {  // root rank
           uint64_t batch_offset = clique.root_rank_ * n_rows_of_current_batch * n_neighbors;
-          auto d_neighbors      = raft::make_device_matrix_view<IdxT, IdxT, row_major>(
+          auto d_neighbors      = raft::make_device_matrix_view<IdxT, int64_t, row_major>(
             in_neighbors.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
-          auto d_distances = raft::make_device_matrix_view<float, IdxT, row_major>(
+          auto d_distances = raft::make_device_matrix_view<float, int64_t, row_major>(
             in_distances.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
           ann_if.search(dev_res,
                         search_params,
@@ -454,9 +449,9 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
           RAFT_NCCL_TRY(ncclGroupEnd());
           resource::sync_stream(dev_res);
         } else {  // non-root ranks
-          auto d_neighbors = raft::make_device_matrix<IdxT, IdxT, row_major>(
+          auto d_neighbors = raft::make_device_matrix<IdxT, int64_t, row_major>(
             dev_res, n_rows_of_current_batch, n_neighbors);
-          auto d_distances = raft::make_device_matrix<float, IdxT, row_major>(
+          auto d_distances = raft::make_device_matrix<float, int64_t, row_major>(
             dev_res, n_rows_of_current_batch, n_neighbors);
           ann_if.search(
             dev_res, search_params, query_partition, d_neighbors.view(), d_distances.view());
@@ -476,9 +471,9 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
         }
       }
 
-      const auto& root_handle_ = clique.set_current_device_to_root_rank();
-      auto h_trans             = std::vector<IdxT>(num_ranks_);
-      IdxT translation_offset  = 0;
+      const auto& root_handle_   = clique.set_current_device_to_root_rank();
+      auto h_trans               = std::vector<IdxT>(num_ranks_);
+      int64_t translation_offset = 0;
       for (int rank = 0; rank < num_ranks_; rank++) {
         h_trans[rank] = translation_offset;
         translation_offset += ann_interfaces_[rank].size();
@@ -543,7 +538,7 @@ ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT> build(
   const raft::resources& handle,
   const cuvs::neighbors::mg::nccl_clique& clique,
   const ivf_flat::mg_index_params& index_params,
-  raft::host_matrix_view<const T, IdxT, row_major> index_dataset)
+  raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);
   index.build(
@@ -556,7 +551,7 @@ ann_mg_index<ivf_pq::index<IdxT>, T, IdxT> build(
   const raft::resources& handle,
   const cuvs::neighbors::mg::nccl_clique& clique,
   const ivf_pq::mg_index_params& index_params,
-  raft::host_matrix_view<const T, IdxT, row_major> index_dataset)
+  raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   ann_mg_index<ivf_pq::index<IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);
   index.build(
@@ -569,7 +564,7 @@ ann_mg_index<cagra::index<T, IdxT>, T, IdxT> build(
   const raft::resources& handle,
   const cuvs::neighbors::mg::nccl_clique& clique,
   const cagra::mg_index_params& index_params,
-  raft::host_matrix_view<const T, IdxT, row_major> index_dataset)
+  raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   ann_mg_index<cagra::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);
   index.build(
@@ -581,8 +576,8 @@ template <typename T, typename IdxT>
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>& index,
-            raft::host_matrix_view<const T, IdxT, row_major> new_vectors,
-            std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices)
+            raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, IdxT>> new_indices)
 {
   index.extend(clique, new_vectors, new_indices);
 }
@@ -591,8 +586,8 @@ template <typename T, typename IdxT>
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>& index,
-            raft::host_matrix_view<const T, IdxT, row_major> new_vectors,
-            std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices)
+            raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)
 {
   index.extend(clique, new_vectors, new_indices);
 }
@@ -602,10 +597,10 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>& index,
             const ivf_flat::search_params& search_params,
-            raft::host_matrix_view<const T, IdxT, row_major> queries,
-            raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
-            raft::host_matrix_view<float, IdxT, row_major> distances,
-            uint64_t n_rows_per_batch)
+            raft::host_matrix_view<const T, int64_t, row_major> queries,
+            raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances,
+            int64_t n_rows_per_batch)
 {
   index.search(clique,
                static_cast<const cuvs::neighbors::search_params*>(&search_params),
@@ -620,10 +615,10 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>& index,
             const ivf_pq::search_params& search_params,
-            raft::host_matrix_view<const T, IdxT, row_major> queries,
-            raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
-            raft::host_matrix_view<float, IdxT, row_major> distances,
-            uint64_t n_rows_per_batch)
+            raft::host_matrix_view<const T, int64_t, row_major> queries,
+            raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances,
+            int64_t n_rows_per_batch)
 {
   index.search(clique,
                static_cast<const cuvs::neighbors::search_params*>(&search_params),
@@ -638,10 +633,10 @@ void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const ann_mg_index<cagra::index<T, IdxT>, T, IdxT>& index,
             const cagra::search_params& search_params,
-            raft::host_matrix_view<const T, IdxT, row_major> queries,
-            raft::host_matrix_view<IdxT, IdxT, row_major> neighbors,
-            raft::host_matrix_view<float, IdxT, row_major> distances,
-            uint64_t n_rows_per_batch)
+            raft::host_matrix_view<const T, int64_t, row_major> queries,
+            raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances,
+            int64_t n_rows_per_batch)
 {
   index.search(clique,
                static_cast<const cuvs::neighbors::search_params*>(&search_params),

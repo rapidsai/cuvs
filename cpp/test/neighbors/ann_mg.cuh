@@ -81,7 +81,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       resource::sync_stream(handle_);
     }
 
-    uint64_t n_rows_per_search_batch = 3000;  // [3000, 3000, 1000] == 7000 rows
+    int64_t n_rows_per_search_batch = 3000;  // [3000, 3000, 1000] == 7000 rows
     cuvs::neighbors::mg::nccl_clique clique;
 
     // IVF-Flat

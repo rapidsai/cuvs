@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "omp.h"
+#include <omp.h>
 #include <raft/comms/std_comms.hpp>
 
 #include "../../utils/nccl_helpers.cuh"
