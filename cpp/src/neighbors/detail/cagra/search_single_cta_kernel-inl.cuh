@@ -919,6 +919,7 @@ void select_and_run(
   const uint32_t num_queries,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* dev_seed_ptr,  // [num_queries, num_seeds]
   uint32_t* const num_executed_iterations,                     // [num_queries,]
+  const search_params& ps,
   uint32_t topk,
   uint32_t num_itopk_candidates,
   uint32_t block_size,  //
@@ -927,20 +928,14 @@ void select_and_run(
   typename DATASET_DESCRIPTOR_T::INDEX_T* hashmap_ptr,
   size_t small_hash_bitlen,
   size_t small_hash_reset_interval,
-  uint32_t num_random_samplings,
-  uint64_t rand_xor_mask,
   uint32_t num_seeds,
-  size_t itopk_size,
-  size_t search_width,
-  size_t min_iterations,
-  size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream)
 {
   auto kernel =
     search_kernel_config<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>::
-      choose_itopk_and_mx_candidates(itopk_size, num_itopk_candidates, block_size);
+      choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
   RAFT_CUDA_TRY(cudaFuncSetAttribute(kernel,
                                      cudaFuncAttributeMaxDynamicSharedMemorySize,
                                      smem_size + DATASET_DESCRIPTOR_T::smem_buffer_size_in_byte));
@@ -955,15 +950,15 @@ void select_and_run(
                                                          queries_ptr,
                                                          graph.data_handle(),
                                                          graph.extent(1),
-                                                         num_random_samplings,
-                                                         rand_xor_mask,
+                                                         ps.num_random_samplings,
+                                                         ps.rand_xor_mask,
                                                          dev_seed_ptr,
                                                          num_seeds,
                                                          hashmap_ptr,
-                                                         itopk_size,
-                                                         search_width,
-                                                         min_iterations,
-                                                         max_iterations,
+                                                         ps.itopk_size,
+                                                         ps.search_width,
+                                                         ps.min_iterations,
+                                                         ps.max_iterations,
                                                          num_executed_iterations,
                                                          hash_bitlen,
                                                          small_hash_bitlen,
