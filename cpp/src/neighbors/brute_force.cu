@@ -100,6 +100,36 @@ index<T>::index(raft::resources const& res,
 }
 
 template <typename T>
+index<T>::index(raft::resources const& res,
+                raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
+                std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
+                cuvs::distance::DistanceType metric,
+                T metric_arg)
+  : cuvs::neighbors::index(),
+    metric_(metric),
+    dataset_(
+      raft::make_device_matrix<T, int64_t>(res, dataset_view.extent(0), dataset_view.extent(1))),
+    norms_view_(norms_view),
+    metric_arg_(metric_arg)
+{
+  // currently we don't support col_major inside tiled_brute_force_knn, because
+  // of limitations of the pairwise_distance API:
+  // 1) paiwise_distance takes a single 'isRowMajor' parameter - and we have
+  // multiple options here (both dataset and queries)
+  // 2) because of tiling, we need to be able to set a custom stride in the PW
+  // api, which isn't supported
+  // Instead, transpose the input matrices if they are passed as col-major.
+  // (note: we're doing the transpose here to avoid doing per query)
+  raft::linalg::transpose(res,
+                          const_cast<T*>(dataset_view.data_handle()),
+                          dataset_.data_handle(),
+                          dataset_view.extent(0),
+                          dataset_view.extent(1),
+                          raft::resource::get_cuda_stream(res));
+  dataset_view_ = raft::make_const_mdspan(dataset_.view());
+}
+
+template <typename T>
 void index<T>::update_dataset(raft::resources const& res,
                               raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
 {
