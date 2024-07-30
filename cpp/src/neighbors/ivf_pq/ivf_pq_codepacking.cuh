@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "ivf_pq_list.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_mdspan.hpp>

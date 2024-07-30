@@ -16,10 +16,12 @@
 
 #include <cstdint>
 
+#include "../ivf_common.cuh"
 #include "ivf_flat_helpers.cuh"
 #include <cuvs/neighbors/ivf_flat.hpp>
 
 namespace cuvs::neighbors::ivf_flat::helpers {
+
 namespace codepacker {
 
 void pack(raft::resources const& res,
@@ -195,6 +197,21 @@ void reset_index(const raft::resources& res, index<int8_t, int64_t>* index)
 void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index)
 {
   detail::reset_index<uint8_t, int64_t>(res, index);
+}
+
+void recompute_internal_state(const raft::resources& res, index<float, int64_t>* index)
+{
+  ivf::detail::recompute_internal_state(res, *index);
+}
+
+void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>* index)
+{
+  ivf::detail::recompute_internal_state(res, *index);
+}
+
+void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t>* index)
+{
+  ivf::detail::recompute_internal_state(res, *index);
 }
 
 }  // namespace cuvs::neighbors::ivf_flat::helpers
