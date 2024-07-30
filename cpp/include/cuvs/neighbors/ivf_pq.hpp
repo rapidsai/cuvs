@@ -494,10 +494,6 @@ struct index : cuvs::neighbors::index {
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
- * overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -520,10 +516,6 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
- *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
- * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -549,10 +541,6 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
- * overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -575,10 +563,6 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
- *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
- * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -604,10 +588,6 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
- * overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -630,10 +610,6 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
- *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
- * overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -658,8 +634,8 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
  *
  * Usage example:
@@ -667,6 +643,9 @@ void build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   auto index = ivf_pq::build(handle, index_params, dataset);
  * @endcode
@@ -685,8 +664,8 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
  *
  * Usage example:
@@ -694,6 +673,9 @@ auto build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
  *   ivf_pq::build(handle, index_params, dataset, index);
@@ -713,8 +695,8 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
  *
  * Usage example:
@@ -722,6 +704,9 @@ void build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   auto index = ivf_pq::build(handle, index_params, dataset);
  * @endcode
@@ -740,8 +725,8 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
  *
  * Usage example:
@@ -749,6 +734,9 @@ auto build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
  *   ivf_pq::build(handle, index_params, dataset, index);
@@ -768,8 +756,8 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
  *
  * Usage example:
@@ -777,6 +765,9 @@ void build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   auto index = ivf_pq::build(handle, index_params, dataset);
  * @endcode
@@ -795,8 +786,8 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * Note, if dataset is in host memory and index_params.add_data_on_build = true, user could set a
- * stream pool in the input raft::resource with (at least) one stream to enable kernel/copy
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
  *
  * Usage example:
@@ -804,6 +795,9 @@ auto build(raft::resources const& handle,
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_pq::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   ivf_pq::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
  *   ivf_pq::build(handle, index_params, dataset, index);
@@ -830,9 +824,6 @@ void build(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -862,9 +853,6 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -892,9 +880,6 @@ void extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
- *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -925,9 +910,6 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -956,9 +938,6 @@ void extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -988,9 +967,6 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -1019,8 +995,8 @@ void extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1030,14 +1006,17 @@ void extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping 
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
  * @endcode
  *
  * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
@@ -1051,8 +1030,8 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1062,14 +1041,17 @@ auto extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping 
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
  * @endcode
  *
  * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
@@ -1082,8 +1064,8 @@ void extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1093,14 +1075,17 @@ void extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping 
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
  * @endcode
  *
  * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
@@ -1114,8 +1099,8 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1125,14 +1110,17 @@ auto extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping 
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
  * @endcode
  *
  * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
@@ -1145,8 +1133,8 @@ void extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1156,14 +1144,17 @@ void extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping 
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
  * @endcode
  *
  * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
@@ -1177,8 +1168,8 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
- * Note, if dataset is in host memory, user could set a stream pool in the input raft::resource with
- * (at least) one stream to enable kernel/copy overlapping.
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
  * @code{.cpp}
@@ -1188,14 +1179,17 @@ auto extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping 
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
  * @endcode
  *
  * @param[in] handle
- * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
- * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
