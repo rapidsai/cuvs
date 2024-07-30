@@ -42,6 +42,15 @@ enum distribution_mode {
   /** Index is split on several devices, favors scaling */
   SHARDED
 };
+
+/** Merge mode when using a sharded index */
+/// \ingroup ann_mg_cpp_index_params
+enum sharded_merge_mode {
+  /** Search batches are merged on the root rank */
+  MERGE_ON_ROOT_RANK,
+  /** Search batches are merged in a tree reduction fashion */
+  TREE_MERGE
+};
 }  // namespace cuvs::neighbors::mg
 
 namespace cuvs::neighbors::ivf_flat {
@@ -219,6 +228,7 @@ class ann_mg_index {
               raft::host_matrix_view<const T, int64_t, row_major> queries,
               raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
               raft::host_matrix_view<float, int64_t, row_major> distances,
+              cuvs::neighbors::mg::sharded_merge_mode merge_mode,
               int64_t n_rows_per_batch) const;
 
   void serialize(raft::resources const& handle,
@@ -226,6 +236,28 @@ class ann_mg_index {
                  const std::string& filename) const;
 
  private:
+  void sharded_search_with_direct_merge(const cuvs::neighbors::mg::nccl_clique& clique,
+                                        const cuvs::neighbors::search_params* search_params,
+                                        raft::host_matrix_view<const T, int64_t, row_major> queries,
+                                        raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+                                        raft::host_matrix_view<float, int64_t, row_major> distances,
+                                        int64_t n_rows_per_batch,
+                                        int64_t n_rows,
+                                        int64_t n_cols,
+                                        int64_t n_neighbors,
+                                        int64_t n_batches) const;
+
+  void sharded_search_with_tree_merge(const cuvs::neighbors::mg::nccl_clique& clique,
+                                      const cuvs::neighbors::search_params* search_params,
+                                      raft::host_matrix_view<const T, int64_t, row_major> queries,
+                                      raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
+                                      raft::host_matrix_view<float, int64_t, row_major> distances,
+                                      int64_t n_rows_per_batch,
+                                      int64_t n_rows,
+                                      int64_t n_cols,
+                                      int64_t n_neighbors,
+                                      int64_t n_batches) const;
+
   distribution_mode mode_;
   int num_ranks_;
   std::vector<ann_interface<AnnIndexType, T, IdxT>> ann_interfaces_;
@@ -708,7 +740,8 @@ void extend(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -718,7 +751,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -741,7 +775,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -751,7 +786,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -774,7 +810,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -784,7 +821,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -807,7 +845,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -817,7 +856,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -840,7 +880,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -850,7 +891,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -873,7 +915,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -883,7 +926,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -906,7 +950,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -916,7 +961,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -939,7 +985,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -949,7 +996,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \ingroup ann_mg_cpp_index_search
 /**
@@ -972,7 +1020,8 @@ void search(const raft::resources& handle,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch search batch size
+ * @param[in] merge_mode (optional) merge mode to use when using a sharded index
+ * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
 void search(const raft::resources& handle,
@@ -982,7 +1031,8 @@ void search(const raft::resources& handle,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
+            int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
 /// \defgroup ann_mg_cpp_serialize ANN MG index serialization
 

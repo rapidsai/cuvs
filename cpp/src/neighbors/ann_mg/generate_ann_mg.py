@@ -77,10 +77,11 @@ flat_macro = """
               raft::host_matrix_view<const T, int64_t, row_major> queries,                                                  \\
               raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,                                                   \\
               raft::host_matrix_view<float, int64_t, row_major> distances,                                                  \\
+              cuvs::neighbors::mg::sharded_merge_mode merge_mode,                                                           \\
               int64_t n_rows_per_batch)                                                                                     \\
   {                                                                                                                         \\
     cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                      \\
-                                        neighbors, distances, n_rows_per_batch);                                            \\
+                                        neighbors, distances, merge_mode, n_rows_per_batch);                                \\
   }                                                                                                                         \\
                                                                                                                             \\
   void serialize(const raft::resources& handle,                                                                             \\
@@ -134,10 +135,11 @@ pq_macro = """
               raft::host_matrix_view<const T, int64_t, row_major> queries,                                                \\
               raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,                                                 \\
               raft::host_matrix_view<float, int64_t, row_major> distances,                                                \\
+              cuvs::neighbors::mg::sharded_merge_mode merge_mode,                                                         \\
               int64_t n_rows_per_batch)                                                                                   \\
   {                                                                                                                       \\
     cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
-                                        neighbors, distances, n_rows_per_batch);                                          \\
+                                        neighbors, distances, merge_mode, n_rows_per_batch);                              \\
   }                                                                                                                       \\
                                                                                                                           \\
   void serialize(const raft::resources& handle,                                                                           \\
@@ -182,10 +184,11 @@ cagra_macro = """
               raft::host_matrix_view<const T, int64_t, row_major> queries,                                                \\
               raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,                                                 \\
               raft::host_matrix_view<float, int64_t, row_major> distances,                                                \\
+              cuvs::neighbors::mg::sharded_merge_mode merge_mode,                                                         \\
               int64_t n_rows_per_batch)                                                                                   \\
   {                                                                                                                       \\
     cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
-                                        neighbors, distances, n_rows_per_batch);                                          \\
+                                        neighbors, distances, merge_mode, n_rows_per_batch);                              \\
   }                                                                                                                       \\
                                                                                                                           \\
   void serialize(const raft::resources& handle,                                                                           \\

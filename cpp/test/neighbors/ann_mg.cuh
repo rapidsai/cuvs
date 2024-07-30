@@ -24,8 +24,8 @@
 namespace cuvs::neighbors::mg {
 
 enum class algo_t { IVF_FLAT, IVF_PQ, CAGRA };
-
 enum class d_mode_t { REPLICATED, SHARDED, LOCAL_THEN_DISTRIBUTED };
+enum class m_mode_t { MERGE_ON_ROOT_RANK, TREE_MERGE, UNDEFINED };
 
 struct AnnMGInputs {
   int64_t num_queries;
@@ -33,6 +33,7 @@ struct AnnMGInputs {
   int64_t dim;
   int64_t k;
   d_mode_t d_mode;
+  m_mode_t m_mode;
   algo_t algo;
   int64_t nprobe;
   int64_t nlist;
@@ -121,6 +122,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       }
       auto new_index = cuvs::neighbors::mg::deserialize_flat<DataT, int64_t>(
         handle_, clique, "./cpp/build/ann_mg_ivf_flat_index");
+
+      cuvs::neighbors::mg::sharded_merge_mode merge_mode;
+      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
+        merge_mode = MERGE_ON_ROOT_RANK;
+      else
+        merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   new_index,
@@ -128,6 +135,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
+                                  merge_mode,
                                   n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
@@ -180,6 +188,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       }
       auto new_index = cuvs::neighbors::mg::deserialize_pq<DataT, int64_t>(
         handle_, clique, "./cpp/build/ann_mg_ivf_pq_index");
+
+      cuvs::neighbors::mg::sharded_merge_mode merge_mode;
+      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
+        merge_mode = MERGE_ON_ROOT_RANK;
+      else
+        merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   new_index,
@@ -187,6 +201,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
+                                  merge_mode,
                                   n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
@@ -235,6 +250,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       }
       auto new_index = cuvs::neighbors::mg::deserialize_cagra<DataT, uint32_t>(
         handle_, clique, "./cpp/build/ann_mg_cagra_index");
+
+      cuvs::neighbors::mg::sharded_merge_mode merge_mode;
+      if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
+        merge_mode = MERGE_ON_ROOT_RANK;
+      else
+        merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   new_index,
@@ -242,6 +263,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
+                                  merge_mode,
                                   n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
@@ -288,6 +310,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto distributed_index = cuvs::neighbors::mg::distribute_flat<DataT, int64_t>(
         handle_, clique, "./cpp/build/local_ivf_flat_index");
+      cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   distributed_index,
@@ -295,6 +318,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
+                                  merge_mode,
                                   n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
@@ -341,6 +365,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto distributed_index = cuvs::neighbors::mg::distribute_pq<DataT, int64_t>(
         handle_, clique, "./cpp/build/local_ivf_pq_index");
+      cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   distributed_index,
@@ -348,6 +373,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
+                                  merge_mode,
                                   n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
@@ -390,6 +416,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto distributed_index = cuvs::neighbors::mg::distribute_cagra<DataT, uint32_t>(
         handle_, clique, "./cpp/build/local_cagra_index");
+
+      cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   distributed_index,
@@ -397,6 +425,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
+                                  merge_mode,
                                   n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
@@ -467,6 +496,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::REPLICATED,
+   m_mode_t::UNDEFINED,
    algo_t::IVF_FLAT,
    40,
    1024,
@@ -477,6 +507,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::REPLICATED,
+   m_mode_t::UNDEFINED,
    algo_t::IVF_PQ,
    40,
    1024,
@@ -487,6 +518,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::REPLICATED,
+   m_mode_t::UNDEFINED,
    algo_t::CAGRA,
    40,
    1024,
@@ -498,6 +530,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::SHARDED,
+   m_mode_t::MERGE_ON_ROOT_RANK,
    algo_t::IVF_FLAT,
    40,
    1024,
@@ -508,6 +541,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::SHARDED,
+   m_mode_t::MERGE_ON_ROOT_RANK,
    algo_t::IVF_PQ,
    40,
    1024,
@@ -518,6 +552,41 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::SHARDED,
+   m_mode_t::MERGE_ON_ROOT_RANK,
+   algo_t::CAGRA,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::SHARDED,
+   m_mode_t::TREE_MERGE,
+   algo_t::IVF_FLAT,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::SHARDED,
+   m_mode_t::TREE_MERGE,
+   algo_t::IVF_PQ,
+   40,
+   1024,
+   cuvs::distance::DistanceType::L2Expanded,
+   true},
+  {7000,
+   10000,
+   8,
+   16,
+   d_mode_t::SHARDED,
+   m_mode_t::TREE_MERGE,
    algo_t::CAGRA,
    40,
    1024,
@@ -529,6 +598,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::LOCAL_THEN_DISTRIBUTED,
+   m_mode_t::UNDEFINED,
    algo_t::IVF_FLAT,
    40,
    1024,
@@ -539,6 +609,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::LOCAL_THEN_DISTRIBUTED,
+   m_mode_t::UNDEFINED,
    algo_t::IVF_PQ,
    40,
    1024,
@@ -549,6 +620,7 @@ const std::vector<AnnMGInputs> inputs = {
    8,
    16,
    d_mode_t::LOCAL_THEN_DISTRIBUTED,
+   m_mode_t::UNDEFINED,
    algo_t::CAGRA,
    40,
    1024,
