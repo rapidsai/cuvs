@@ -18,6 +18,7 @@
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 
@@ -28,6 +29,8 @@
 #include <queue>
 
 namespace cuvs::neighbors::dynamic_batching::detail {
+
+constexpr size_t kCacheLineBytes = 64;
 
 template <typename Upstream, typename T, typename IdxT>
 using upstream_search_type_const = void(raft::resources const&,
@@ -52,32 +55,37 @@ using function_search_type = void(raft::resources const&,
                                   raft::device_matrix_view<float, int64_t, raft::row_major>);
 
 template <typename T, typename IdxT>
-struct batch {
+struct alignas(kCacheLineBytes) batch {
   using time_point = std::chrono::time_point<std::chrono::system_clock>;
   static_assert(cuda::std::atomic<int64_t>::is_always_lock_free);
   static_assert(cuda::std::atomic<time_point>::is_always_lock_free);
 
+  std::mutex lock;
+  raft::resources res;
   cuda::std::atomic<int64_t> size{0};
   cuda::std::atomic<time_point> deadline{time_point::max()};
-  // cudaStream_t stream = nullptr;
-  cudaEvent_t event = nullptr;
+  cudaStream_t stream = nullptr;
+  cudaEvent_t event   = nullptr;
   raft::device_matrix<T, int64_t, raft::row_major> queries;
   raft::device_matrix<IdxT, int64_t, raft::row_major> neighbors;
   raft::device_matrix<float, int64_t, raft::row_major> distances;
 
-  batch(const raft::resources& res,
+  batch(const raft::resources& res_from_runner,
         rmm::device_async_resource_ref mr,
         int64_t batch_size,
         int64_t dim,
         int64_t k)
-    : queries{raft::make_device_mdarray<T>(res, mr, raft::make_extents<int64_t>(batch_size, dim))},
-      neighbors{
-        raft::make_device_mdarray<IdxT>(res, mr, raft::make_extents<int64_t>(batch_size, k))},
-      distances{
-        raft::make_device_mdarray<float>(res, mr, raft::make_extents<int64_t>(batch_size, k))}
+    : res{res_from_runner},
+      queries{raft::make_device_mdarray<T>(
+        res_from_runner, mr, raft::make_extents<int64_t>(batch_size, dim))},
+      neighbors{raft::make_device_mdarray<IdxT>(
+        res_from_runner, mr, raft::make_extents<int64_t>(batch_size, k))},
+      distances{raft::make_device_mdarray<float>(
+        res_from_runner, mr, raft::make_extents<int64_t>(batch_size, k))}
   {
     RAFT_CUDA_TRY(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-    // RAFT_CUDA_TRY(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    RAFT_CUDA_TRY(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    raft::resource::set_cuda_stream(res, stream);
   }
 
   batch(const raft::resources& res, int64_t batch_size, int64_t dim, int64_t k)
@@ -92,7 +100,7 @@ struct batch {
 
   ~batch() noexcept
   {
-    // RAFT_CUDA_TRY_NO_THROW(cudaStreamDestroy(stream));
+    RAFT_CUDA_TRY_NO_THROW(cudaStreamDestroy(stream));
     RAFT_CUDA_TRY_NO_THROW(cudaEventDestroy(event));
   }
 
@@ -154,22 +162,26 @@ class batch_runner {
     auto deadline    = std::chrono::system_clock::now() +
                     std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1000000.0));
     int64_t submitted_queries     = queries.extent(0);
-    int64_t my_submit_counter     = 0;
+    int64_t my_submit_counter     = submit_counter.load();
     int64_t batch_offset          = 0;
     batch<T, IdxT>* current_batch = nullptr;
-    {
-      std::lock_guard<std::mutex> guard(lock_);
-      my_submit_counter = submit_counter.load();
-      current_batch     = &batch_bufs_[my_submit_counter % n_queues_];
+    auto check_counter            = [&global_counter = submit_counter, &my_submit_counter]() {
+      auto x = global_counter.load();
+      if (x == my_submit_counter) { return true; }
+      my_submit_counter = x;
+      return false;
+    };
+    while (true) {
+      current_batch = &batch_bufs_[my_submit_counter % n_queues_];
+      std::lock_guard<std::mutex> guard(current_batch->lock);
+      if (!check_counter()) { continue; }
       batch_offset      = current_batch->size.load();
       auto free_spots   = current_batch->capacity() - batch_offset;
       submitted_queries = std::min(submitted_queries, free_spots);
-      // RAFT_CUDA_TRY(cudaStreamWaitEvent(user_stream, current_batch->event));
       raft::copy(current_batch->queries.data_handle() + batch_offset * queries.extent(1),
                  queries.data_handle(),
                  submitted_queries * queries.extent(1),
-                 user_stream);
-      RAFT_CUDA_TRY(cudaEventRecord(current_batch->event, user_stream));
+                 current_batch->stream);
       current_batch->size += submitted_queries;
       deadline = std::min(current_batch->deadline.load(), deadline);
       current_batch->deadline.store(deadline);
@@ -186,8 +198,9 @@ class batch_runner {
       users can wait for the event again in their streams to copy the results back.
       */
       if (submitted_queries == free_spots || deadline <= std::chrono::system_clock::now()) {
-        submit(res);
+        submit(*current_batch);
       }
+      break;
     }
 
     // submit the rest of the queries if these didn't fit in the batch
@@ -212,12 +225,12 @@ class batch_runner {
 
     while (my_submit_counter == submit_counter.load()) {
       {
-        std::lock_guard<std::mutex> guard(lock_);
+        std::lock_guard<std::mutex> guard(current_batch->lock);
         // Check the counter again, just in case
         if (my_submit_counter != submit_counter.load()) { break; }
         // Submit the query if the deadline has passed.
         if (deadline <= std::chrono::system_clock::now()) {
-          submit(res);
+          submit(*current_batch);
           break;
         }
       }
@@ -243,16 +256,11 @@ class batch_runner {
   std::function<function_search_type<T, IdxT>> upstream_search_;
   size_t n_queues_;
 
-  mutable batch<T, IdxT>* batch_bufs_;
-  mutable std::mutex lock_;
-  mutable cuda::std::atomic<int64_t> submit_counter{0};
+  mutable alignas(kCacheLineBytes) batch<T, IdxT>* batch_bufs_;
+  mutable alignas(kCacheLineBytes) cuda::std::atomic<int64_t> submit_counter{0};
 
-  void submit(raft::resources const& res) const
+  void submit(batch<T, IdxT>& current_batch) const
   {
-    auto user_stream    = raft::resource::get_cuda_stream(res);
-    auto& current_batch = batch_bufs_[submit_counter.load(cuda::memory_order_relaxed) % n_queues_];
-    RAFT_CUDA_TRY(
-      cudaStreamWaitEvent(user_stream, current_batch.event));  // wait for all input queries
     auto batch_size = current_batch.size.load(cuda::memory_order_relaxed);
     auto queries    = raft::make_device_matrix_view<const T>(
       current_batch.queries.data_handle(), batch_size, current_batch.queries.extent(1));
@@ -263,8 +271,9 @@ class batch_runner {
     current_batch.size.store(0, cuda::memory_order_relaxed);
     current_batch.deadline.store(batch<T, IdxT>::time_point::max(), cuda::memory_order_relaxed);
 
-    upstream_search_(res, queries, neighbors, distances);
-    RAFT_CUDA_TRY(cudaEventRecord(current_batch.event, user_stream));
+    upstream_search_(current_batch.res, queries, neighbors, distances);
+    RAFT_CUDA_TRY(cudaEventRecord(current_batch.event, current_batch.stream));
+    // ^ event captures the job by the time the submit counter is incremented
     submit_counter.fetch_add(1, cuda::memory_order_release);
   }
 };
