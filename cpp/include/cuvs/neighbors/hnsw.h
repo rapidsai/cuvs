@@ -161,7 +161,7 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 
 /**
  * Load hnswlib index from file which was serialized from a HNSW index.
- *
+ * NOTE: The loaded hnswlib index is immutable.
  * Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}
@@ -186,6 +186,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file that stores the index
+ * @param[in] dim the dimension of the vectors in the index
+ * @param[in] metric the distance metric used to build the index
  * @param[out] index HNSW index loaded disk
  */
 cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
