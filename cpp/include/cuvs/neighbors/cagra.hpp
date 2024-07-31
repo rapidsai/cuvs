@@ -210,7 +210,8 @@ struct search_params : cuvs::neighbors::search_params {
    * Value 1.0 means the kernel grid size is maximum possible for the selected device.
    * The value must be greater than 0.0 and not greater than 1.0.
    *
-   * One may need to run other kernels alongside this persistent kernel. So leave a few SMs idle.
+   * One may need to run other kernels alongside this persistent kernel. This parameter can
+   * be used to reduce the grid size of the persistent kernel to leave a few SMs idle.
    * Note: running any other work on GPU alongside with the persistent kernel makes the setup
    * fragile.
    *   - Running another kernel in another thread usually works, but no progress guaranteed
