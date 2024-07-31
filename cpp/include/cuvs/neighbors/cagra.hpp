@@ -1018,9 +1018,6 @@ void extend(
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] res raft resources
  * @param[in] params configure the search
  * @param[in] idx cagra index
@@ -1043,9 +1040,6 @@ void search(raft::resources const& res,
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] res raft resources
  * @param[in] params configure the search
  * @param[in] index cagra index
@@ -1067,9 +1061,6 @@ void search(raft::resources const& res,
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] res raft resources
  * @param[in] params configure the search
  * @param[in] index cagra index
@@ -1090,9 +1081,6 @@ void search(raft::resources const& res,
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -1591,58 +1579,6 @@ void serialize_to_hnswlib(raft::resources const& handle,
 void serialize_to_hnswlib(raft::resources const& handle,
                           const std::string& filename,
                           const cuvs::neighbors::cagra::index<float, uint32_t>& index);
-/**
- * Write the CAGRA built index as a base layer HNSW index to an output stream
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create an output stream
- * std::ostream os(std::cout.rdbuf());
- * // create an index with `auto index = raft::cagra::build(...);`
- * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
- * @endcode
- *
- * @param[in] handle the raft handle
- * @param[in] os output stream
- * @param[in] index CAGRA index
- *
- */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<half, uint32_t>& index);
-
-/**
- * Save a CAGRA build index in hnswlib base-layer-only serialized format
- *
- * Experimental, both the API and the serialization format are subject to change.
- *
- * @code{.cpp}
- * #include <raft/core/resources.hpp>
- * #include <cuvs/neighbors/cagra_serialize.hpp>
- *
- * raft::resources handle;
- *
- * // create a string with a filepath
- * std::string filename("/path/to/index");
- * // create an index with `auto index = raft::cagra::build(...);`
- * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
- * @endcode
- *
- *
- * @param[in] handle the raft handle
- * @param[in] filename the file name for saving the index
- * @param[in] index CAGRA index
- *
- */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<half, uint32_t>& index);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
