@@ -207,7 +207,8 @@ void cagra_build_search_variants(
   time_it("persistent/async B", search_async, false, search_params_persistent,
           queries_b, neighbors_b, distances_b);
   /*
-Here's an example output:
+Here's an example output, which shows the wall time of processing the same
+amount of data in a single batch vs in async mode (1 query per job):
 ```
 CAGRA index has 1000000 vectors
 CAGRA graph has degree 64, graph size [1000000, 64]
@@ -221,13 +222,14 @@ CAGRA graph has degree 64, graph size [1000000, 64]
 [persistent/async B] execution time: 1316.97 ms
 [I] [15:56:55.756952] Destroyed the persistent runner.
 ```
-Note, the persistent kernel time in async mode (1 query per job) is up to 2x
-slower than the standard kernel with the huge batch size (100K queries).
-One reason for this is the non-optimal CTA size: CAGRA kernels are automatically
-tuned for latency and so use large CTA sizes when the batch size is small.
-Try explicitly setting the search parameter `thread_block_size` to a small
-value, such as `64` or `128` if this is an issue for you. This increases the
-latency of individual jobs though.
+Note, while the persistent kernel provides minimal latency for each search
+request, the wall time to process all the queries in async mode (1 query per
+job) is up to 2x slower than the standard kernel with the huge batch
+size (100K queries). One reason for this is the non-optimal CTA size: CAGRA
+kernels are automatically tuned for latency and so use large CTA sizes when the
+batch size is small. Try explicitly setting the search parameter
+`thread_block_size` to a small value, such as `64` or `128` if this is an issue
+for you. This increases the latency of individual jobs though.
   */
 }
 
