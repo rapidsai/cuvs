@@ -42,6 +42,8 @@ TEST(CagraC, BuildSearch)
   // create cuvsResources_t
   cuvsResources_t res;
   cuvsResourcesCreate(&res);
+  cudaStream_t stream;
+  cuvsStreamGet(res, &stream);
 
   // create dataset DLTensor
   DLManagedTensor dataset_tensor;
@@ -65,12 +67,11 @@ TEST(CagraC, BuildSearch)
   cuvsCagraBuild(res, build_params, &dataset_tensor, index);
 
   // create queries DLTensor
-  float* queries_d;
-  cudaMalloc(&queries_d, sizeof(float) * 4 * 2);
-  cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault);
+  rmm::device_uvector<float> queries_d(4 * 2, stream);
+  raft::copy(queries_d.data(), (float*)queries, 4 * 2, stream);
 
   DLManagedTensor queries_tensor;
-  queries_tensor.dl_tensor.data               = queries_d;
+  queries_tensor.dl_tensor.data               = queries_d.data();
   queries_tensor.dl_tensor.device.device_type = kDLCUDA;
   queries_tensor.dl_tensor.ndim               = 2;
   queries_tensor.dl_tensor.dtype.code         = kDLFloat;
@@ -81,11 +82,10 @@ TEST(CagraC, BuildSearch)
   queries_tensor.dl_tensor.strides            = nullptr;
 
   // create neighbors DLTensor
-  uint32_t* neighbors_d;
-  cudaMalloc(&neighbors_d, sizeof(uint32_t) * 4);
+  rmm::device_uvector<uint32_t> neighbors_d(4, stream);
 
   DLManagedTensor neighbors_tensor;
-  neighbors_tensor.dl_tensor.data               = neighbors_d;
+  neighbors_tensor.dl_tensor.data               = neighbors_d.data();
   neighbors_tensor.dl_tensor.device.device_type = kDLCUDA;
   neighbors_tensor.dl_tensor.ndim               = 2;
   neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
@@ -96,11 +96,10 @@ TEST(CagraC, BuildSearch)
   neighbors_tensor.dl_tensor.strides            = nullptr;
 
   // create distances DLTensor
-  float* distances_d;
-  cudaMalloc(&distances_d, sizeof(float) * 4);
+  rmm::device_uvector<float> distances_d(4, stream);
 
   DLManagedTensor distances_tensor;
-  distances_tensor.dl_tensor.data               = distances_d;
+  distances_tensor.dl_tensor.data               = distances_d.data();
   distances_tensor.dl_tensor.device.device_type = kDLCUDA;
   distances_tensor.dl_tensor.ndim               = 2;
   distances_tensor.dl_tensor.dtype.code         = kDLFloat;
@@ -116,14 +115,10 @@ TEST(CagraC, BuildSearch)
   cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
 
   // verify output
-  ASSERT_TRUE(cuvs::devArrMatchHost(neighbors_exp, neighbors_d, 4, cuvs::Compare<uint32_t>()));
   ASSERT_TRUE(
-    cuvs::devArrMatchHost(distances_exp, distances_d, 4, cuvs::CompareApprox<float>(0.001f)));
-
-  // delete device memory
-  cudaFree(queries_d);
-  cudaFree(neighbors_d);
-  cudaFree(distances_d);
+    cuvs::devArrMatchHost(neighbors_exp, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    distances_exp, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);

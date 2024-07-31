@@ -50,7 +50,7 @@ mamba install -c conda-forge -c nvidia -c rapidsai cuvs
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
 
 ```bash
-mamba install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.08
+mamba install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.10
 ```
 
 Please see the [Build and Install Guide](docs/source/build.md) for more information on installing cuVS and building from source.
