@@ -382,7 +382,8 @@ template <
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
+  const bool guarantee_connectivity = false)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -400,7 +401,8 @@ void optimize(
       knn_graph.extent(0),
       knn_graph.extent(1));
 
-  cagra::detail::graph::optimize(res, knn_graph_internal, new_graph_internal);
+  cagra::detail::graph::optimize(
+    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
 }
 
 template <typename T,
@@ -476,7 +478,7 @@ index<T, IdxT> build(
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
 
   RAFT_LOG_INFO("optimizing graph");
-  optimize<IdxT>(res, knn_graph->view(), cagra_graph.view());
+  optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
 
   // free intermediate graph before trying to create the index
   knn_graph.reset();
