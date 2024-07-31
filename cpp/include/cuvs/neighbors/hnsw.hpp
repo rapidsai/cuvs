@@ -80,10 +80,9 @@ struct index : cuvs::neighbors::index {
 };
 
 /**
- * @brief Construct an hnswlib base-layer-only index from a CAGRA index
- * NOTE: 1. This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
+ * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
+ * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
  * before reading it as an hnswlib index, then deleting the temporary file.
- *       2. This function is only offered as a compiled symbol in `libraft.so`
  *
  * @param[in] res raft resources
  * @param[in] cagra_index cagra index
@@ -105,10 +104,9 @@ std::unique_ptr<index<float>> from_cagra(
   raft::resources const& res, const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index);
 
 /**
- * @brief Construct an hnswlib base-layer-only index from a CAGRA index
- * NOTE: 1. This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
+ * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
+ * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
  * before reading it as an hnswlib index, then deleting the temporary file.
- *       2. This function is only offered as a compiled symbol in `libraft.so`
  *
  * @param[in] res raft resources
  * @param[in] cagra_index cagra index
@@ -130,10 +128,9 @@ std::unique_ptr<index<uint8_t>> from_cagra(
   raft::resources const& res, const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index);
 
 /**
- * @brief Construct an hnswlib base-layer-only index from a CAGRA index
- * NOTE: 1. This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
+ * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
+ * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
  * before reading it as an hnswlib index, then deleting the temporary file.
- *       2. This function is only offered as a compiled symbol in `libraft.so`
  *
  * @param[in] res raft resources
  * @param[in] cagra_index cagra index
@@ -278,7 +275,8 @@ void search(raft::resources const& res,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
 /**
- * @brief De-serialize a CAGRA index saved to a file as an hnsw index
+ * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
+ * NOTE: The loaded hnswlib index is immutable.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the file containing the serialized CAGRA index
@@ -312,7 +310,8 @@ void deserialize(raft::resources const& res,
                  index<float>** index);
 
 /**
- * @brief De-serialize a CAGRA index saved to a file as an hnsw index
+ * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
+ * NOTE: The loaded hnswlib index is immutable.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the file containing the serialized CAGRA index
@@ -346,7 +345,8 @@ void deserialize(raft::resources const& res,
                  index<uint8_t>** index);
 
 /**
- * @brief De-serialize a CAGRA index saved to a file as an hnsw index
+ * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
+ * NOTE: The loaded hnswlib index is immutable.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the file containing the serialized CAGRA index
