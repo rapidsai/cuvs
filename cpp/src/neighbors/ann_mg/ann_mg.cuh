@@ -18,6 +18,7 @@
 
 #include "../detail/knn_merge_parts.cuh"
 #include <raft/core/serialize.hpp>
+#include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
 #include "../../utils/nccl_helpers.cuh"
@@ -566,13 +567,6 @@ void ann_mg_index<AnnIndexType, T, IdxT>::sharded_search_with_tree_merge(
     auto query_partition            = raft::make_host_matrix_view<const T, int64_t, row_major>(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
-    auto h_trans               = std::vector<IdxT>(num_ranks_);
-    int64_t translation_offset = 0;
-    for (int rank = 0; rank < num_ranks_; rank++) {
-      h_trans[rank] = translation_offset;
-      translation_offset += ann_interfaces_[rank].size();
-    }
-
     const int& requirements = num_ranks_;
     check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(num_ranks_)
@@ -582,6 +576,8 @@ void ann_mg_index<AnnIndexType, T, IdxT>::sharded_search_with_tree_merge(
       auto& ann_if                          = ann_interfaces_[rank];
       const auto& comms                     = resource::get_comms(dev_res);
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
+
+      int64_t part_size = n_rows_of_current_batch * n_neighbors;
 
       auto tmp_neighbors = raft::make_device_matrix<IdxT, int64_t, row_major>(
         dev_res, 2 * n_rows_of_current_batch, n_neighbors);
@@ -593,11 +589,20 @@ void ann_mg_index<AnnIndexType, T, IdxT>::sharded_search_with_tree_merge(
         tmp_distances.data_handle(), n_rows_of_current_batch, n_neighbors);
       ann_if.search(dev_res, search_params, query_partition, neighbors_view, distances_view);
 
-      auto d_trans = raft::make_device_vector<IdxT, IdxT>(dev_res, num_ranks_);
-      raft::copy(
-        d_trans.data_handle(), h_trans.data(), num_ranks_, resource::get_cuda_stream(dev_res));
+      int64_t translation_offset = 0;
+      for (int r = 0; r < rank; r++) {
+        translation_offset += ann_interfaces_[r].size();
+      }
+      raft::linalg::addScalar(neighbors_view.data_handle(),
+                              neighbors_view.data_handle(),
+                              (IdxT)translation_offset,
+                              part_size,
+                              resource::get_cuda_stream(dev_res));
 
-      int64_t part_size = n_rows_of_current_batch * n_neighbors;
+      auto d_trans = raft::make_device_vector<IdxT, IdxT>(dev_res, 2);
+      cudaMemsetAsync(
+        d_trans.data_handle(), 0, 2 * sizeof(IdxT), resource::get_cuda_stream(dev_res));
+
       int64_t remaining = num_ranks_;
       int64_t radix     = 2;
 
