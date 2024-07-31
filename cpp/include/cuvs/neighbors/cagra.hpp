@@ -64,7 +64,7 @@ struct ivf_pq_params {
    *   auto pq_params =
    *     cagra::graph_build_params::ivf_pq_params(dataset.extents());
    *   // modify/update index_params as needed
-   *   index_params.add_data_on_build = true;
+   *   pq_params.kmeans_trainset_fraction = 0.1;
    * @endcode
    */
   ivf_pq_params(raft::matrix_extent<int64_t> dataset_extents,
@@ -80,7 +80,8 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Specify compression parameters if compression is desired.
+   * Specify compression parameters if compression is desired. If set, overrides the
+   * attach_dataset_on_build (and the compressed dataset is always added to the index).
    */
   std::optional<cuvs::neighbors::vpq_params> compression = std::nullopt;
 
@@ -105,6 +106,36 @@ struct index_params : cuvs::neighbors::index_params {
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params>
     graph_build_params;
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build` provided there is enough memory available.
+   *  - `false` means `build` only builds the graph and the user is expected to
+   * update the dataset using cuvs::neighbors::cagra::update_dataset.
+   *
+   * Regardless of the value of `attach_dataset_on_build`, the search graph is created using all
+   * the vectors in the dataset.  Setting `attach_dataset_on_build = false` can be useful if
+   * the user needs to build only the search graph but does not intend to search it using CAGRA
+   * (e.g. search using another graph search algorithm), or if specific memory placement options
+   * need to be applied on the dataset before it is attached to the index using `update_dataset`.
+   * API.
+   * @code{.cpp}
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
+   *   // use default index_parameters
+   *   cagra::index_params index_params;
+   *   // update index_params to only build the CAGRA graph
+   *   index_params.attach_dataset_on_build = false;
+   *   auto index = cagra::build(res, index_params, dataset.view());
+   *   // assert that the dataset is not attached to the index
+   *   ASSERT(index.dataset().extent(0) == 0);
+   *   // update dataset
+   *   index.update_dataset(res, dataset.view());
+   *   // The index is now ready for search
+   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   * @endcode
+   */
+  bool attach_dataset_on_build = true;
 };
 
 /**
@@ -351,7 +382,6 @@ struct index : cuvs::neighbors::index {
    *   // the index only stores a reference to these.
    *   cagra::search(res, search_params, index, queries, neighbors, distances);
    * @endcode
-   *
    */
   template <typename data_accessor, typename graph_accessor>
   index(raft::resources const& res,
@@ -376,7 +406,7 @@ struct index : cuvs::neighbors::index {
    *
    * If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the
    * dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the
-   * index.
+   * index. It is expected that the same set of vectors are used for update_dataset and index build.
    */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
@@ -394,7 +424,8 @@ struct index : cuvs::neighbors::index {
   /**
    * Replace the dataset with a new dataset.
    *
-   * We create a copy of the dataset on the device. The index manages the lifetime of this copy.
+   * We create a copy of the dataset on the device. The index manages the lifetime of this copy. It
+   * is expected that the same set of vectors are used for update_dataset and index build.
    */
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
@@ -402,7 +433,10 @@ struct index : cuvs::neighbors::index {
     dataset_ = make_aligned_dataset(res, dataset, 16);
   }
 
-  /** Replace the dataset with a new dataset. */
+  /**
+   * Replace the dataset with a new dataset. It is expected that the same set of vectors are used
+   * for update_dataset and index build.
+   */
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
     -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<int64_t>, DatasetT>>
@@ -476,6 +510,7 @@ struct index : cuvs::neighbors::index {
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -512,6 +547,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -548,6 +584,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -584,6 +621,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -620,6 +658,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
@@ -656,6 +695,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
  *
  * Usage example:
  * @code{.cpp}
