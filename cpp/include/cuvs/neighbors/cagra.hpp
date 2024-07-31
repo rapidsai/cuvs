@@ -206,7 +206,7 @@ struct search_params : cuvs::neighbors::search_params {
   /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
   float persistent_lifetime = 2;
   /**
-   * Reduce the grid size of the persistent kernel artificially.
+   * Set the fraction of maximum grid size used by persistent kernel.
    * Value 1.0 means the kernel grid size is maximum possible for the selected device.
    * The value must be greater than 0.0 and not greater than 1.0.
    *
