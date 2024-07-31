@@ -1,0 +1,896 @@
+dataset:
+  base_file: deep-100M/base.1B.fbin
+  distance: euclidean
+  groundtruth_neighbors_file: deep-100M/groundtruth.neighbors.ibin
+  name: deep-100M
+  query_file: deep-100M/query.public.10K.fbin
+  subset_size: 100000000
+index:
+- algo: hnswlib
+  build_param:
+    M: 12
+    efConstruction: 500
+    numThreads: 32
+  file: deep-100M/hnswlib/M12
+  name: hnswlib.M12
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: hnswlib
+  build_param:
+    M: 16
+    efConstruction: 500
+    numThreads: 32
+  file: deep-100M/hnswlib/M16
+  name: hnswlib.M16
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: hnswlib
+  build_param:
+    M: 24
+    efConstruction: 500
+    numThreads: 32
+  file: deep-100M/hnswlib/M24
+  name: hnswlib.M24
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: hnswlib
+  build_param:
+    M: 36
+    efConstruction: 500
+    numThreads: 32
+  file: deep-100M/hnswlib/M36
+  name: hnswlib.M36
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: faiss_gpu_ivf_flat
+  build_param:
+    nlist: 50000
+  file: deep-100M/faiss_gpu_ivf_flat/nlist50K
+  name: faiss_gpu_ivf_flat.nlist50K
+  search_params:
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+  - nprobe: 1000
+- algo: faiss_gpu_ivf_flat
+  build_param:
+    nlist: 100000
+  file: deep-100M/faiss_gpu_ivf_flat/nlist100K
+  name: faiss_gpu_ivf_flat.nlist100K
+  search_params:
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+  - nprobe: 1000
+- algo: faiss_gpu_ivf_flat
+  build_param:
+    nlist: 200000
+  file: deep-100M/faiss_gpu_ivf_flat/nlist200K
+  name: faiss_gpu_ivf_flat.nlist200K
+  search_params:
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+  - nprobe: 1000
+- algo: faiss_gpu_ivf_pq
+  build_param:
+    M: 48
+    nlist: 16384
+  file: deep-100M/faiss_gpu_ivf_pq/M48-nlist16K
+  name: faiss_gpu_ivf_pq.M48-nlist16K
+  search_params:
+  - nprobe: 10
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+- algo: faiss_gpu_ivf_pq
+  build_param:
+    M: 48
+    nlist: 50000
+  file: deep-100M/faiss_gpu_ivf_pq/M48-nlist50K
+  name: faiss_gpu_ivf_pq.M48-nlist50K
+  search_params:
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+  - nprobe: 1000
+- algo: faiss_gpu_ivf_pq
+  build_param:
+    M: 48
+    nlist: 100000
+  file: deep-100M/faiss_gpu_ivf_pq/M48-nlist100K
+  name: faiss_gpu_ivf_pq.M48-nlist100K
+  search_params:
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+  - nprobe: 1000
+- algo: faiss_gpu_ivf_pq
+  build_param:
+    M: 48
+    nlist: 200000
+  file: deep-100M/faiss_gpu_ivf_pq/M48-nlist200K
+  name: faiss_gpu_ivf_pq.M48-nlist200K
+  search_params:
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+  - nprobe: 1000
+- algo: raft_ivf_flat
+  build_param:
+    niter: 25
+    nlist: 50000
+    ratio: 5
+  file: deep-100M/raft_ivf_flat/nlist50K
+  name: raft_ivf_flat.nlist50K
+  search_params:
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 20
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 30
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 40
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 50
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 100
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 200
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 500
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 1000
+- algo: raft_ivf_flat
+  build_param:
+    niter: 25
+    nlist: 100000
+    ratio: 5
+  file: deep-100M/raft_ivf_flat/nlist100K
+  name: raft_ivf_flat.nlist100K
+  search_params:
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 20
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 30
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 40
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 50
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 100
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 200
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 500
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 1000
+- algo: raft_ivf_flat
+  build_param:
+    niter: 25
+    nlist: 200000
+    ratio: 5
+  file: deep-100M/raft_ivf_flat/nlist200K
+  name: raft_ivf_flat.nlist200K
+  search_params:
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 20
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 30
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 40
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 50
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 100
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 200
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 500
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 1000
+- algo: raft_ivf_pq
+  build_param:
+    niter: 25
+    nlist: 50000
+    pq_bits: 5
+    pq_dim: 96
+    ratio: 10
+  file: deep-100M/raft_ivf_pq/d96b5n50K
+  name: raft_ivf_pq.d96b5n50K
+  search_params:
+  - internalDistanceDtype: float
+    nprobe: 20
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 30
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 40
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 50
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 100
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 200
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 1000
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 2000
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 5000
+    refine_ratio: 2
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 20
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 30
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 40
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 50
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 100
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 200
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 1000
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 2000
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 5000
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 20
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 30
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 40
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 50
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 100
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 200
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 1000
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 2000
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 5000
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 1000
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 2000
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 5000
+    refine_ratio: 2
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 1000
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 2000
+    refine_ratio: 2
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 5000
+    refine_ratio: 2
+    smemLutDtype: fp8
+- algo: raft_ivf_pq
+  build_param:
+    niter: 25
+    nlist: 50000
+    pq_bits: 5
+    pq_dim: 64
+    ratio: 10
+  file: deep-100M/raft_ivf_pq/d64b5n50K
+  name: raft_ivf_pq.d64b5n50K
+  search_params:
+  - internalDistanceDtype: float
+    nprobe: 20
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 1000
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 2000
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 5000
+    refine_ratio: 4
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 20
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 1000
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 2000
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 5000
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: float
+    nprobe: 20
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 1000
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 2000
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 5000
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 1000
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 2000
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 5000
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 1000
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 2000
+    refine_ratio: 4
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 5000
+    refine_ratio: 4
+    smemLutDtype: fp8
+- algo: raft_ivf_pq
+  build_param:
+    niter: 25
+    nlist: 1024
+    pq_dim: 512
+    ratio: 1
+  file: index/deep-image-96-angular/raft_ivf_pq/dimpq512-cluster1024-float-float
+  name: raft_ivf_pq.dimpq512-cluster1024-float-float
+  search_params:
+  - internalDistanceDtype: float
+    nprobe: 10
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 50
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 100
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 200
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 500
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 1024
+    smemLutDtype: float
+  search_result_file: result/deep-image-96-angular/raft_ivf_pq/dimpq512-cluster1024-float-float
+- algo: raft_cagra
+  build_param:
+    graph_degree: 32
+    intermediate_graph_degree: 48
+  file: deep-100M/raft_cagra/dim32
+  name: raft_cagra.dim32
+  search_params:
+  - algo: single_cta
+    itopk: 32
+    max_iterations: 0
+    search_width: 1
+  - algo: single_cta
+    itopk: 32
+    max_iterations: 32
+    search_width: 1
+  - algo: single_cta
+    itopk: 64
+    max_iterations: 16
+    search_width: 4
+  - algo: single_cta
+    itopk: 64
+    max_iterations: 64
+    search_width: 1
+  - algo: single_cta
+    itopk: 96
+    max_iterations: 48
+    search_width: 2
+  - algo: single_cta
+    itopk: 128
+    max_iterations: 16
+    search_width: 8
+  - algo: single_cta
+    itopk: 128
+    max_iterations: 64
+    search_width: 2
+  - algo: single_cta
+    itopk: 192
+    max_iterations: 24
+    search_width: 8
+  - algo: single_cta
+    itopk: 192
+    max_iterations: 96
+    search_width: 2
+  - algo: single_cta
+    itopk: 256
+    max_iterations: 32
+    search_width: 8
+  - algo: single_cta
+    itopk: 384
+    max_iterations: 48
+    search_width: 8
+  - algo: single_cta
+    itopk: 512
+    max_iterations: 64
+    search_width: 8
+- algo: raft_cagra
+  build_param:
+    graph_degree: 32
+    intermediate_graph_degree: 48
+  file: deep-100M/raft_cagra/dim32
+  name: raft_cagra.dim32.multi_cta
+  search_params:
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 0
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 32
+    search_width: 1
+  - algo: multi_cta
+    itopk: 64
+    max_iterations: 16
+    search_width: 4
+  - algo: multi_cta
+    itopk: 64
+    max_iterations: 64
+    search_width: 1
+  - algo: multi_cta
+    itopk: 96
+    max_iterations: 48
+    search_width: 2
+  - algo: multi_cta
+    itopk: 128
+    max_iterations: 16
+    search_width: 8
+  - algo: multi_cta
+    itopk: 128
+    max_iterations: 64
+    search_width: 2
+  - algo: multi_cta
+    itopk: 192
+    max_iterations: 24
+    search_width: 8
+  - algo: multi_cta
+    itopk: 192
+    max_iterations: 96
+    search_width: 2
+  - algo: multi_cta
+    itopk: 256
+    max_iterations: 32
+    search_width: 8
+  - algo: multi_cta
+    itopk: 384
+    max_iterations: 48
+    search_width: 8
+  - algo: multi_cta
+    itopk: 512
+    max_iterations: 64
+    search_width: 8
+- algo: raft_cagra
+  build_param:
+    graph_degree: 32
+    intermediate_graph_degree: 48
+  file: deep-100M/raft_cagra/dim32
+  name: raft_cagra.dim32.multi_kernel
+  search_params:
+  - algo: multi_kernel
+    itopk: 32
+    max_iterations: 0
+    search_width: 1
+  - algo: multi_kernel
+    itopk: 32
+    max_iterations: 32
+    search_width: 1
+  - algo: multi_kernel
+    itopk: 64
+    max_iterations: 16
+    search_width: 4
+  - algo: multi_kernel
+    itopk: 64
+    max_iterations: 64
+    search_width: 1
+  - algo: multi_kernel
+    itopk: 96
+    max_iterations: 48
+    search_width: 2
+  - algo: multi_kernel
+    itopk: 128
+    max_iterations: 16
+    search_width: 8
+  - algo: multi_kernel
+    itopk: 128
+    max_iterations: 64
+    search_width: 2
+  - algo: multi_kernel
+    itopk: 192
+    max_iterations: 24
+    search_width: 8
+  - algo: multi_kernel
+    itopk: 192
+    max_iterations: 96
+    search_width: 2
+  - algo: multi_kernel
+    itopk: 256
+    max_iterations: 32
+    search_width: 8
+  - algo: multi_kernel
+    itopk: 384
+    max_iterations: 48
+    search_width: 8
+  - algo: multi_kernel
+    itopk: 512
+    max_iterations: 64
+    search_width: 8
+- algo: raft_cagra
+  build_param:
+    graph_degree: 64
+  file: deep-100M/raft_cagra/dim64
+  name: raft_cagra.dim64
+  search_params:
+  - itopk: 32
+    max_iterations: 0
+    search_width: 1
+  - itopk: 32
+    max_iterations: 32
+    search_width: 1
+  - itopk: 64
+    max_iterations: 16
+    search_width: 4
+  - itopk: 64
+    max_iterations: 64
+    search_width: 1
+  - itopk: 96
+    max_iterations: 48
+    search_width: 2
+  - itopk: 128
+    max_iterations: 16
+    search_width: 8
+  - itopk: 128
+    max_iterations: 64
+    search_width: 2
+  - itopk: 192
+    max_iterations: 24
+    search_width: 8
+  - itopk: 192
+    max_iterations: 96
+    search_width: 2
+  - itopk: 256
+    max_iterations: 32
+    search_width: 8
+  - itopk: 384
+    max_iterations: 48
+    search_width: 8
+  - itopk: 512
+    max_iterations: 64
+    search_width: 8
+search_basic_param:
+  batch_size: 10000
+  k: 10
