@@ -1007,7 +1007,7 @@ void extend(raft::resources const& handle,
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
  *   // optional: create a stream pool with at least one stream to enable kernel and copy
- *   // overlapping 
+ *   // overlapping
  *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
@@ -1042,7 +1042,7 @@ auto extend(raft::resources const& handle,
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
  *   // optional: create a stream pool with at least one stream to enable kernel and copy
- *   // overlapping 
+ *   // overlapping
  *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
@@ -1076,7 +1076,7 @@ void extend(raft::resources const& handle,
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
  *   // optional: create a stream pool with at least one stream to enable kernel and copy
- *   // overlapping 
+ *   // overlapping
  *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
@@ -1111,7 +1111,7 @@ auto extend(raft::resources const& handle,
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
  *   // optional: create a stream pool with at least one stream to enable kernel and copy
- *   // overlapping 
+ *   // overlapping
  *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
@@ -1145,7 +1145,7 @@ void extend(raft::resources const& handle,
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
  *   // optional: create a stream pool with at least one stream to enable kernel and copy
- *   // overlapping 
+ *   // overlapping
  *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
@@ -1180,15 +1180,12 @@ auto extend(raft::resources const& handle,
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
  *   // optional: create a stream pool with at least one stream to enable kernel and copy
- *   // overlapping 
+ *   // overlapping
  *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
- * 
- * 
- * 
- * 
+ *
  * @endcode
  *
  * @param[in] handle
