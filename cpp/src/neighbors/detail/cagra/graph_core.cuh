@@ -802,7 +802,7 @@ void mst_optimization(raft::resources const& res,
       raft::copy(label_ptr, d_label_ptr, (size_t)graph_size, raft::resource::get_cuda_stream(res));
       raft::resource::sync_stream(res);
       uint32_t main_cluster_label = graph_size;
-#pragma omp parallel for reduction(min:main_cluster_label)
+#pragma omp parallel for reduction(min : main_cluster_label)
       for (uint64_t i = 0; i < graph_size; i++) {
         if ((cluster_size_ptr[i] == cluster_size_max) && (main_cluster_label > i)) {
           main_cluster_label = i;
