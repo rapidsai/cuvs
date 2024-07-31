@@ -153,7 +153,7 @@ void cagra_build_search_variants(
     4. Although the API defines the arguments as device-side mdspans, we advise
        to use the host-side buffers accessible from the device, such as
        allocated by cudaHostAlloc/cudaHostRegister (or any host memory if
-       HMM/AKS is enabled).
+       HMM/ATS is enabled).
        This way, you can save some GPU resources by not manually copying the
        data in cuda streams.
   */
