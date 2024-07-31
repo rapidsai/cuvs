@@ -235,6 +235,8 @@ using DistanceEpilogue = std::function<void(raft::resources const&,
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
  * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
  * given query
+ * @param[in] distance_epilogue An optional host function that allows you to transform the
+ * distances calculated
  */
 void search(
   raft::resources const& handle,
@@ -258,6 +260,8 @@ void search(
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
  * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
  * given query
+ * @param[in] distance_epilogue An optional host function that allows you to transform the
+ * distances calculated
  */
 void search(
   raft::resources const& handle,
