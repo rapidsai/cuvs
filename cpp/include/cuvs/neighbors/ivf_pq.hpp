@@ -1185,6 +1185,10 @@ auto extend(raft::resources const& handle,
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
+ * 
+ * 
+ * 
+ * 
  * @endcode
  *
  * @param[in] handle
