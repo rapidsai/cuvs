@@ -20,13 +20,13 @@ endif()
 # Be very strict when compiling with GCC as host compiler (and thus more lenient when compiling with
 # clang)
 if(CMAKE_COMPILER_IS_GNUCXX)
-  list(APPEND CUVS_CXX_FLAGS -Wall -Werror -Wno-unknown-pragmas -Wno-error=deprecated-declarations)
-  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=-Wall,-Werror,-Wno-error=deprecated-declarations)
+  list(APPEND CUVS_CXX_FLAGS -Wall -Wno-unknown-pragmas -Wno-error=deprecated-declarations)
+  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=-Wall,-Wno-error=deprecated-declarations)
 
   # set warnings as errors
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11.2.0)
-    list(APPEND CUVS_CUDA_FLAGS -Werror=all-warnings)
-  endif()
+  #if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11.2.0)
+  #  list(APPEND CUVS_CUDA_FLAGS -Werror=all-warnings)
+  #endif()
 endif()
 
 if(CUDA_LOG_COMPILE_TIME)

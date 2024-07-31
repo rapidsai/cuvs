@@ -423,8 +423,7 @@ inline void printf_usage()
 template <typename T>
 void register_build(std::shared_ptr<const dataset<T>> dataset,
                     std::vector<configuration::index> indices,
-                    bool force_overwrite,
-                    bool disk_index)
+                    bool force_overwrite)
 {
   for (auto index : indices) {
     auto suf      = static_cast<std::string>(index.build_param["override_suffix"]);

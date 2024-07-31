@@ -262,6 +262,7 @@ class dataset {
   virtual auto max_k() const -> uint32_t        = 0;
   virtual auto base_set_size() const -> size_t  = 0;
   virtual auto query_set_size() const -> size_t = 0;
+  std::string base_filename() const = 0;
 
   // load data lazily, so don't pay the overhead of reading unneeded set
   // e.g. don't load base set when searching
@@ -383,7 +384,7 @@ class bin_dataset : public dataset<T> {
   auto max_k() const -> uint32_t override;
   auto base_set_size() const -> size_t override;
   auto query_set_size() const -> size_t override;
-  std::string base_filename() const;
+  std::string base_filename() const override;
 
  private:
   void load_base_set() const;
