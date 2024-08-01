@@ -1,0 +1,371 @@
+dataset:
+  base_file: wiki_all_1M/base.1M.fbin
+  distance: euclidean
+  groundtruth_neighbors_file: wiki_all_1M/groundtruth.1M.neighbors.ibin
+  name: wiki_all_1M
+  query_file: wiki_all_1M/queries.fbin
+  subset_size: 1000000
+index:
+- algo: hnswlib
+  build_param:
+    M: 16
+    efConstruction: 50
+    numThreads: 56
+  file: wiki_all_1M/hnswlib/M16.ef50
+  name: hnswlib.M16.ef50
+  search_params:
+  - ef: 10
+    numThreads: 56
+  - ef: 20
+    numThreads: 56
+  - ef: 40
+    numThreads: 56
+  - ef: 60
+    numThreads: 56
+  - ef: 80
+    numThreads: 56
+  - ef: 120
+    numThreads: 56
+  - ef: 200
+    numThreads: 56
+  - ef: 400
+    numThreads: 56
+  - ef: 600
+    numThreads: 56
+  - ef: 800
+    numThreads: 56
+- algo: faiss_gpu_ivf_pq
+  build_param:
+    M: 32
+    nlist: 16384
+    ratio: 2
+  file: wiki_all_1M/faiss_ivf_pq/M32-nlist16K_ratio2
+  name: faiss_ivf_pq.M32-nlist16K
+  search_params:
+  - nprobe: 10
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+- algo: faiss_gpu_ivf_pq
+  build_param:
+    M: 64
+    nlist: 16384
+    ratio: 2
+  file: wiki_all_1M/faiss_ivf_pq/M64-nlist16K_ratio2
+  name: faiss_ivf_pq.M64-nlist16K
+  search_params:
+  - nprobe: 10
+  - nprobe: 20
+  - nprobe: 30
+  - nprobe: 40
+  - nprobe: 50
+  - nprobe: 100
+  - nprobe: 200
+  - nprobe: 500
+- algo: raft_ivf_pq
+  build_param:
+    niter: 10
+    nlist: 16384
+    pq_bits: 8
+    pq_dim: 128
+    ratio: 10
+  file: wiki_all_1M/raft_ivf_pq/d128-nlist16K
+  name: raft_ivf_pq.d128-nlist16K
+  search_params:
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 1
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 1
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 1
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 1
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 1
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 1
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    refine_ratio: 1
+    smemLutDtype: half
+- algo: raft_ivf_pq
+  build_param:
+    niter: 10
+    nlist: 16384
+    pq_bits: 8
+    pq_dim: 64
+    ratio: 10
+  file: wiki_all_1M/raft_ivf_pq/d64-nlist16K
+  name: raft_ivf_pq.d64-nlist16K
+  search_params:
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    refine_ratio: 4
+    smemLutDtype: half
+- algo: raft_ivf_pq
+  build_param:
+    niter: 10
+    nlist: 16384
+    pq_bits: 8
+    pq_dim: 32
+    ratio: 10
+  file: wiki_all_1M/raft_ivf_pq/d32-nlist16K
+  name: raft_ivf_pq.d32-nlist16K
+  search_params:
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 32
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 32
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 32
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 32
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 32
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 32
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    refine_ratio: 32
+    smemLutDtype: half
+- algo: raft_ivf_pq
+  build_param:
+    niter: 10
+    nlist: 16384
+    pq_bits: 8
+    pq_dim: 32
+    ratio: 10
+  file: wiki_all_1M/raft_ivf_pq/d32-nlist16K
+  name: raft_ivf_pq.d32X-nlist16K
+  search_params:
+  - internalDistanceDtype: half
+    nprobe: 20
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    refine_ratio: 16
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 8
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 8
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 8
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 8
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 8
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    refine_ratio: 8
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    refine_ratio: 4
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    refine_ratio: 4
+    smemLutDtype: half
+- algo: raft_cagra
+  build_param:
+    graph_build_algo: NN_DESCENT
+    graph_degree: 32
+    intermediate_graph_degree: 48
+    ivf_pq_build_niter: 10
+    ivf_pq_build_nlist: 16384
+    ivf_pq_build_pq_bits: 8
+    ivf_pq_build_pq_dim: 32
+    ivf_pq_build_ratio: 10
+    ivf_pq_search_internalDistanceDtype: half
+    ivf_pq_search_nprobe: 30
+    ivf_pq_search_refine_ratio: 8
+    ivf_pq_search_smemLutDtype: half
+    nn_descent_intermediate_graph_degree: 72
+    nn_descent_max_iterations: 10
+    nn_descent_termination_threshold: 0.001
+  file: wiki_all_1M/raft_cagra/dim32.ibin
+  name: raft_cagra.dim32.multi_cta
+  search_params:
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 0
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 32
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 36
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 40
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 44
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 48
+    search_width: 1
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 16
+    search_width: 2
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 24
+    search_width: 2
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 26
+    search_width: 2
+  - algo: multi_cta
+    itopk: 32
+    max_iterations: 32
+    search_width: 2
+  - algo: multi_cta
+    itopk: 64
+    max_iterations: 16
+    search_width: 4
+  - algo: multi_cta
+    itopk: 64
+    max_iterations: 64
+    search_width: 1
+  - algo: multi_cta
+    itopk: 96
+    max_iterations: 48
+    search_width: 2
+  - algo: multi_cta
+    itopk: 128
+    max_iterations: 16
+    search_width: 8
+  - algo: multi_cta
+    itopk: 128
+    max_iterations: 64
+    search_width: 2
+  - algo: multi_cta
+    itopk: 192
+    max_iterations: 24
+    search_width: 8
+  - algo: multi_cta
+    itopk: 192
+    max_iterations: 96
+    search_width: 2
+  - algo: multi_cta
+    itopk: 256
+    max_iterations: 32
+    search_width: 8
+  - algo: multi_cta
+    itopk: 384
+    max_iterations: 48
+    search_width: 8
+  - algo: multi_cta
+    itopk: 512
+    max_iterations: 64
+    search_width: 8
+search_basic_param:
+  batch_size: 10000
+  k: 10

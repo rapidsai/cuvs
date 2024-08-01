@@ -187,7 +187,7 @@ struct search_plan_impl : public search_plan_impl_base {
     while (hashmap_mode == hash_mode::AUTO || hashmap_mode == hash_mode::SMALL) {
       //
       // The small-hash reduces hash table size by initializing the hash table
-      // for each iteraton and re-registering only the nodes that should not be
+      // for each iteration and re-registering only the nodes that should not be
       // re-visited in that iteration. Therefore, the size of small-hash should
       // be determined based on the internal topk size and the number of nodes
       // visited per iteration.

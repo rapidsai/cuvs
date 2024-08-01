@@ -90,15 +90,6 @@ struct index_params {
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
   /** The argument used by some distance metrics. */
   float metric_arg = 2.0f;
-  /**
-   * Whether to add the dataset content to the index, i.e.:
-   *
-   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
-   * `build`.
-   *  - `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but
-   * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
-   */
-  bool add_data_on_build = true;
 };
 
 struct search_params {};
@@ -596,7 +587,6 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                std::shared_ptr<ListT>& ld,
                                                const typename ListT::spec_type& store_spec,
                                                const typename ListT::spec_type& device_spec);
-
 }  // namespace ivf
 
 };  // namespace cuvs::neighbors
