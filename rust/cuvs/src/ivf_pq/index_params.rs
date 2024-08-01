@@ -124,6 +124,18 @@ impl IndexParams {
         self
     }
 
+    /// The max number of data points to use per PQ code during PQ codebook training. Using more data
+    /// points per PQ code may increase the quality of PQ codebook but may also increase the build
+    /// time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and
+    /// PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training
+    /// points to train each codebook.
+    pub fn set_max_train_points_per_pq_code(self, max_pq_points: u32)-> IndexParams {
+        unsafe {
+            (*self.0).max_train_points_per_pq_code = max_pq_points;
+        }
+        self
+    }
+
     /// After training the coarse and fine quantizers, we will populate
     /// the index with the dataset if add_data_on_build == true, otherwise
     /// the index is left empty, and the extend method can be used
