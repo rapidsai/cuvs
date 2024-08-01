@@ -646,7 +646,7 @@ void brute_force_search_filtered(
     auto dataset_view = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
       idx.dataset().data_handle(), n_dataset, dim);
 
-    auto csr_view = raft::make_device_csr_matrix_view<T, IdxT, IdxT, IdxT>(
+    auto csr_view = raft::make_device_csr_matrix_view<DistanceT, IdxT, IdxT, IdxT>(
       csr.get_elements().data(), compressed_csr_view);
 
     raft::sparse::linalg::masked_matmul(res, queries, dataset_view, filter, csr_view);

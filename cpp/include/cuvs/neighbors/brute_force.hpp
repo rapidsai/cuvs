@@ -93,9 +93,9 @@ struct index : cuvs::neighbors::index {
    */
   index(raft::resources const& res,
         raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-        std::optional<raft::device_vector<T, int64_t>>&& norms,
+        std::optional<raft::device_vector<DistT, int64_t>>&& norms,
         cuvs::distance::DistanceType metric,
-        T metric_arg = 0.0);
+        DistT metric_arg = 0.0);
 
   /** Construct a brute force index from dataset
    *

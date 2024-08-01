@@ -100,11 +100,11 @@ index<T, DistT>::index(raft::resources const& res,
 }
 
 template <typename T, typename DistT>
-index<T, Dist>::index(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-                      std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
-                      cuvs::distance::DistanceType metric,
-                      DistT metric_arg)
+index<T, DistT>::index(raft::resources const& res,
+                       raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
+                       std::optional<raft::device_vector_view<const DistT, int64_t>> norms_view,
+                       cuvs::distance::DistanceType metric,
+                       DistT metric_arg)
   : cuvs::neighbors::index(),
     metric_(metric),
     dataset_(

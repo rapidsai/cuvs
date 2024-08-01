@@ -130,8 +130,8 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_BRUTE_FORCE_TEST
     PATH
-    test/neighbors/ann_brute_force/test_float.cu
-    test/neighbors/ann_brute_force/test_half.cu
+    neighbors/ann_brute_force/test_float.cu
+    neighbors/ann_brute_force/test_half.cu
     GPUS
     1
     PERCENT
