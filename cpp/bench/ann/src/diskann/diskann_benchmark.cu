@@ -62,7 +62,7 @@ std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
                                                 int dim,
                                                 const nlohmann::json& conf)
 {
-  typename Algo<T>::BuildParam param;
+  typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
   return std::make_unique<Algo<T>>(metric, dim, param);
 }
@@ -73,7 +73,7 @@ std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
                                                 const nlohmann::json& conf,
                                                 const std::vector<int>& dev_list)
 {
-  typename Algo<T>::BuildParam param;
+  typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
 
   (void)dev_list;
@@ -81,15 +81,11 @@ std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
 }
 
 template <typename T>
-std::unique_ptr<cuvs::bench::algo<T>> create_algo(const std::string& algo_name,
-                                                  const std::string& distance,
-                                                  int dim,
-                                                  const nlohmann::json& conf,
-                                                  const std::vector<int>& dev_list)
+auto create_algo(const std::string& algo_name,
+                 const std::string& distance,
+                 int dim,
+                 const nlohmann::json& conf) -> std::unique_ptr<cuvs::bench::algo<T>>
 {
-  // stop compiler warning; not all algorithms support multi-GPU so it may not be used
-  (void)dev_list;
-
   cuvs::bench::Metric metric = parse_metric(distance);
   std::unique_ptr<cuvs::bench::algo<T>> a;
 

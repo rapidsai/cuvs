@@ -16,13 +16,14 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
+#include "cuvs/neighbors/nn_descent.hpp"
 
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/host_mdspan.hpp>
 
 #include <index.h>
-#include <pq_flash_index.h>
 #include <omp.h>
+#include <pq_flash_index.h>
 #include <utils.h>
 
 #include <chrono>
@@ -48,8 +49,9 @@ class diskann_memory : public algo<T> {
   struct build_param {
     uint32_t R;
     uint32_t L_build;
-    float alpha = 1.2;
-    int num_threads = omp_get_num_procs();
+    uint32_t build_pq_bytes = 0;
+    float alpha             = 1.2;
+    int num_threads         = omp_get_num_procs();
     bool use_cagra_graph;
     uint32_t cagra_graph_degree;
     uint32_t cagra_intermediate_graph_degree;
@@ -59,6 +61,7 @@ class diskann_memory : public algo<T> {
   struct search_param : public search_param_base {
     uint32_t L_search;
     uint32_t num_threads = omp_get_num_procs();
+    Mode metric_objective;
   };
 
   diskann_memory(Metric metric, int dim, const build_param& param);
@@ -66,8 +69,12 @@ class diskann_memory : public algo<T> {
   void build(const T* dataset, size_t nrow) override;
 
   void set_search_param(const search_param_base& param) override;
-  void search(
-    const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const override;
+
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* indices,
+              float* distances) const override;
 
   void save(const std::string& path_to_index) const override;
   void load(const std::string& path_to_index) override;
@@ -84,13 +91,13 @@ class diskann_memory : public algo<T> {
 
  private:
   bool use_cagra_graph_;
-  std::shared_ptr<diskann::IndexSearchParams> diskann_index_write_params_{nullptr};
+  std::shared_ptr<diskann::IndexWriteParameters> diskann_index_write_params_{nullptr};
   uint32_t max_points_;
+  uint32_t build_pq_bytes_;
   std::shared_ptr<diskann::Index<T>> mem_index_{nullptr};
   std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params_{nullptr};
   int num_threads_;
 
-  // std::shared_ptr<FixedThreadPool> thread_pool_;
   uint32_t L_search_;
   Mode metric_objective_;
   int num_search_threads_;
@@ -101,7 +108,7 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
   : algo<T>(metric, dim)
 {
   assert(this->dim_ > 0);
-  num_threads_ = param.num_threads;
+  num_threads_                = param.num_threads;
   diskann_index_write_params_ = std::make_shared<diskann::IndexWriteParameters>(
     diskann::IndexWriteParametersBuilder(param.L_build, param.R)
       .with_filter_list_size(0)
@@ -114,10 +121,9 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
     cuvs::neighbors::cagra::index_params cagra_index_params;
     cagra_index_params.intermediate_graph_degree = param.cagra_intermediate_graph_degree;
     cagra_index_params.graph_degree              = param.cagra_graph_degree;
-    cagra_index_params.graph_build_params.nn_descent_params.graph_degree =
-      cagra_index_params.intermediate_graph_degree;
-    cagra_index_params.graph_build_params.nn_descent_params.intermediate_graph_degree =
-      1.5 * cagra_index_params.intermediate_graph_degree;
+    auto nn_descent_params = cuvs::neighbors::nn_descent::index_params(
+      cagra_index_params.intermediate_graph_degree);
+    cagra_index_params.graph_build_params = nn_descent_params;
     cagra_index_params_ =
       std::make_shared<cuvs::neighbors::cagra::index_params>(cagra_index_params);
   }
@@ -136,8 +142,8 @@ void diskann_memory<T>::build(const T* dataset, size_t nrow)
                                                          false,
                                                          false,
                                                          false,
-                                                         false,
-                                                         0,
+                                                         !use_cagra_graph_ && build_pq_bytes_ > 0,
+                                                         use_cagra_graph_ ? 0 : build_pq_bytes_,
                                                          false,
                                                          false,
                                                          use_cagra_graph_,
@@ -147,15 +153,18 @@ void diskann_memory<T>::build(const T* dataset, size_t nrow)
 template <typename T>
 void diskann_memory<T>::set_search_param(const search_param_base& param_)
 {
-  auto param        = dynamic_cast<const search_param&>(param_);
-  this->L_search_   = param.L_search;
-  metric_objective_ = param.metric_objective;
+  auto param          = dynamic_cast<const search_param&>(param_);
+  this->L_search_     = param.L_search;
+  metric_objective_   = param.metric_objective;
   num_search_threads_ = param.num_threads;
 }
 
 template <typename T>
-void diskann_memory<T>::search(
-  const T* queries, int batch_size, int k, size_t* neighbors, float* distances) const
+void diskann_memory<T>::search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* indices,
+              float* distances) const
 {
   if (this->metric_objective_ == Mode::kLatency) {
     omp_set_num_threads(num_search_threads_);
@@ -164,7 +173,7 @@ void diskann_memory<T>::search(
       mem_index_->search(queries + i * this->dim_,
                          static_cast<size_t>(k),
                          L_search_,
-                         neighbors + i * k,
+                         indices + i * k,
                          distances + i * k);
     }
   } else {
@@ -172,7 +181,7 @@ void diskann_memory<T>::search(
       mem_index_->search(queries + i * this->dim_,
                          static_cast<size_t>(k),
                          L_search_,
-                         neighbors + i * k,
+                         indices + i * k,
                          distances + i * k);
     }
   }

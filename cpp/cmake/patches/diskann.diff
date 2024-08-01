@@ -743,7 +743,7 @@ index 096d1b7..6d01516 100644
 \ No newline at end of file
 +endforeach()
 diff --git a/src/index.cpp b/src/index.cpp
-index bf93344..269f314 100644
+index bf93344..531cd75 100644
 --- a/src/index.cpp
 +++ b/src/index.cpp
 @@ -1,6 +1,7 @@
@@ -845,17 +845,15 @@ index bf93344..269f314 100644
                .build(),
            IndexFactory::construct_datastore<T>(DataStoreStrategy::MEMORY,
                                                 (max_points == 0 ? (size_t)1 : max_points) +
-@@ -145,7 +185,9 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
+@@ -145,6 +185,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
                                               (size_t)((index_parameters == nullptr ? 0 : index_parameters->max_degree) *
                                                        defaults::GRAPH_SLACK_FACTOR * 1.05)))
  {
--    if (_pq_dist)
 +    std::cout << "inside index build cuvs_cagra_index: " << cuvs_cagra_index
 +              << " _cuvs_cagra_index: " << _cuvs_cagra_index << std::endl;
-+    if (_pq_dist && !cuvs_cagra_index)
+     if (_pq_dist)
      {
          _pq_data_store = IndexFactory::construct_pq_datastore<T>(DataStoreStrategy::MEMORY, max_points + num_frozen_pts,
-                                                                  dim, m, num_pq_chunks, use_opq);
 @@ -372,7 +414,36 @@ void Index<T, TagT, LabelT>::save(const char *filename, bool compact_before_save
          // the error code for delete_file, but will ignore now because
          // delete should succeed if save will succeed.
