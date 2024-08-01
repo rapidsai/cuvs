@@ -695,13 +695,13 @@ rapids_export(
 # * build test executable ----------------------------------------------------
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
-  include(internal/CMakeLists.txt)
-  include(test/CMakeLists.txt)
+  add_subdirectory(internal)
+  add_subdirectory(test)
 endif()
 
 # ##################################################################################################
 # * build ann benchmark executable -----------------------------------------------
 
 if(BUILD_ANN_BENCH)
-  include(bench/ann/CMakeLists.txt)
+  add_subdirectory(bench/ann/)
 endif()

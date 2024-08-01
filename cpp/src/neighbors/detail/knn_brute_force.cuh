@@ -42,7 +42,7 @@
 #include <raft/sparse/convert/coo.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/distance/detail/utils.cuh>
-#include <raft/sparse/linalg/sddmm.hpp>
+#include <raft/sparse/linalg/masked_matmul.hpp>
 #include <raft/sparse/matrix/select_k.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -643,36 +643,13 @@ void brute_force_search_filtered(
                                       rows.data(),
                                       compressed_csr_view.get_nnz(),
                                       stream);
-    if (n_queries > 10) {
-      auto csr_view = raft::make_device_csr_matrix_view<DistanceT, IdxT, IdxT, IdxT>(
-        csr.get_elements().data(), compressed_csr_view);
+    auto dataset_view = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
+      idx.dataset().data_handle(), n_dataset, dim);
 
-      // create dataset view
-      auto dataset_view = raft::make_device_matrix_view<const T, IdxT, raft::col_major>(
-        idx.dataset().data_handle(), dim, n_dataset);
+    auto csr_view = raft::make_device_csr_matrix_view<T, IdxT, IdxT, IdxT>(
+      csr.get_elements().data(), compressed_csr_view);
 
-      // calc dot
-      DistanceT alpha = static_cast<DistanceT>(1.0f);
-      DistanceT beta  = static_cast<DistanceT>(0.0f);
-      raft::sparse::linalg::sddmm(res,
-                                  queries,
-                                  dataset_view,
-                                  csr_view,
-                                  raft::linalg::Operation::NON_TRANSPOSE,
-                                  raft::linalg::Operation::NON_TRANSPOSE,
-                                  raft::make_host_scalar_view<DistanceT>(&alpha),
-                                  raft::make_host_scalar_view<DistanceT>(&beta));
-    } else {
-      raft::sparse::distance::detail::faster_dot_on_csr(res,
-                                                        csr.get_elements().data(),
-                                                        compressed_csr_view.get_nnz(),
-                                                        compressed_csr_view.get_indptr().data(),
-                                                        compressed_csr_view.get_indices().data(),
-                                                        queries.data_handle(),
-                                                        idx.dataset().data_handle(),
-                                                        compressed_csr_view.get_n_rows(),
-                                                        dim);
-    }
+    raft::sparse::linalg::masked_matmul(res, queries, dataset_view, filter, csr_view);
 
     // post process
     std::optional<raft::device_vector<DistanceT, IdxT>> query_norms_;

@@ -86,12 +86,25 @@ struct index : cuvs::neighbors::index {
 
   /** Construct a brute force index from dataset
    *
+   * Constructs a brute force index from a dataset. This lets us precompute norms for
+   * the dataset, providing a speed benefit over doing this at query time.
+   * This index will store a non-owning reference to the dataset, but will move
+   * any norms supplied.
+   */
+  index(raft::resources const& res,
+        raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
+        std::optional<raft::device_vector<T, int64_t>>&& norms,
+        cuvs::distance::DistanceType metric,
+        T metric_arg = 0.0);
+
+  /** Construct a brute force index from dataset
+   *
    * This class stores a non-owning reference to the dataset and norms, with
    * the dataset being supplied on device in a col_major format
    */
   index(raft::resources const& res,
         raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-        std::optional<raft::device_vector<DistT, int64_t>>&& norms,
+        std::optional<raft::device_vector_view<const DistT, int64_t>> norms_view,
         cuvs::distance::DistanceType metric,
         DistT metric_arg = 0.0);
 
@@ -167,7 +180,7 @@ struct index : cuvs::neighbors::index {
  * @param[in] metric cuvs::distance::DistanceType
  * @param[in] metric_arg metric argument
  *
- * @return the constructed bruteforce index
+ * @return the constructed brute-force index
  */
 auto build(raft::resources const& handle,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -264,13 +277,14 @@ auto build(raft::resources const& handle,
  * @endcode
  *
  * @param[in] handle
- * @param[in] index bruteforce constructed index
+ * @param[in] index brute-force constructed index
  * @param[in] queries a device pointer to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter An optional device bitmap filter function with a `row-major` layout and
+ * the shape of [n_queries, index->size()], which means the filter will use the first
+ * `index->size()` bits to indicate whether queries[0] should compute the distance with dataset.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::index<float, float>& index,
