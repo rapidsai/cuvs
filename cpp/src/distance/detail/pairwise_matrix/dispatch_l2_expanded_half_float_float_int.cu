@@ -24,9 +24,9 @@
  */
 
 #include "../distance_ops/all_ops.cuh"  // ops::*
-#include "../kernels/rbf_fin_op.cuh"    // rbf_fin_op
 #include "dispatch-inl.cuh"             // dispatch
 #include "dispatch_sm60.cuh"
+#include "dispatch_sm80.cuh"
 #include <raft/core/operators.hpp>  // raft::identity_op
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
@@ -46,27 +46,6 @@
       bool is_row_major)
 
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
-  float,
-  float,
-  float,
-  cuvs::distance::kernels::detail::rbf_fin_op<float>,
-  int64_t);
-
-instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
-  double,
-  double,
-  double,
-  cuvs::distance::kernels::detail::rbf_fin_op<double>,
-  int64_t);
-
-instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
-  half,
-  float,
-  float,
-  cuvs::distance::kernels::detail::rbf_fin_op<half>,
-  int64_t);
+  cuvs::distance::detail::ops::l2_exp_distance_op, half, float, float, raft::identity_op, int);
 
 #undef instantiate_raft_distance_detail_pairwise_matrix_dispatch
