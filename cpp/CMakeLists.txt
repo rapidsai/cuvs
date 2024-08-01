@@ -451,6 +451,7 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
   src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
+  src/neighbors/nn_descent_half.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
   src/neighbors/refine/detail/refine_device_float_float.cu
@@ -484,6 +485,9 @@ rapids_find_package(
   BUILD_EXPORT_SET cuvs-exports
   INSTALL_EXPORT_SET cuvs-exports
 )
+
+target_compile_definitions(cuvs PRIVATE "CUVS_COMPILED")
+target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
 
 if(NOT BUILD_CPU_ONLY)
 

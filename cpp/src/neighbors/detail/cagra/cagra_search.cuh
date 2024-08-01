@@ -19,7 +19,7 @@
 #include "compute_distance_vpq.cuh"
 #include "factory.cuh"
 #include "search_plan.cuh"
-#include "search_single_cta_inst.cuh"
+// #include "search_single_cta_inst.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>

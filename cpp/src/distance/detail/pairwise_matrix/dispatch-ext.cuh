@@ -47,7 +47,7 @@ void pairwise_matrix_dispatch(OpT distance_op,
 
 };  // namespace cuvs::distance::detail
 
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \

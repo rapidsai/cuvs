@@ -19,6 +19,6 @@
 #include "search_multi_cta_kernel-inl.cuh"
 #endif
 
-#ifdef RAFT_COMPILED
+#ifdef CUVS_COMPILED
 #include "search_multi_cta_kernel-ext.cuh"
 #endif

@@ -24,7 +24,7 @@
 
 #include <rmm/device_uvector.hpp>  // rmm::device_uvector
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifdef XCUVS_EXPLICIT_INSTANTIATE_ONLY
 
 namespace cuvs {
 namespace distance {
@@ -144,7 +144,7 @@ void pairwise_distance(raft::resources const& handle,
 };  // namespace distance
 };  // namespace cuvs
 
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 /*
  * Hierarchy of instantiations:
