@@ -100,6 +100,23 @@ void* _deserialize(cuvsResources_t res, const char* filename)
   cuvs::neighbors::ivf_flat::deserialize(*res_ptr, std::string(filename), index);
   return index;
 }
+
+template <typename T, typename IdxT>
+void _extend(cuvsResources_t res,
+             DLManagedTensor* new_vectors,
+             DLManagedTensor* new_indices,
+             cuvsIvfFlatIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_flat::index<T, IdxT>*>(index.addr);
+  using vectors_mdspan_type = raft::device_matrix_view<T const, IdxT, raft::row_major>;
+  using indices_mdspan_type = raft::device_vector_view<IdxT, IdxT>;
+
+  auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
+  auto indices_mds = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+
+  cuvs::neighbors::ivf_flat::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
@@ -269,6 +286,24 @@ extern "C" cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
       _serialize<int8_t, int64_t>(res, filename, *index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       _serialize<uint8_t, int64_t>(res, filename, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+                                         DLManagedTensor* new_vectors,
+                                         DLManagedTensor* new_indices,
+                                         cuvsIvfFlatIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _extend<float, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _extend<int8_t, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _extend<uint8_t, int64_t>(res, new_vectors, new_indices, *index);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
