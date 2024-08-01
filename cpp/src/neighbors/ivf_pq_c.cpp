@@ -215,7 +215,8 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .pq_dim                         = 0,
                                        .codebook_kind                  = codebook_gen::PER_SUBSPACE,
                                        .force_random_rotation          = false,
-                                       .conservative_memory_allocation = false};
+                                       .conservative_memory_allocation = false,
+                                       .max_train_points_per_pq_code   = 256};
   });
 }
 
