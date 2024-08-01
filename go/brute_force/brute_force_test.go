@@ -53,7 +53,7 @@ func TestBruteForce(t *testing.T) {
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
 
-	BuildIndex(resource, &dataset, cuvs.L2, 2.0, index)
+	BuildIndex(resource, &dataset, cuvs.DistanceL2, 2.0, index)
 	resource.Sync()
 
 	queries.ToDevice(&resource)

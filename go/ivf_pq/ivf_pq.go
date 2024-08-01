@@ -17,12 +17,12 @@ import (
 	"unsafe"
 )
 
-type IvfPqIndex struct {
+type ivfPqIndex struct {
 	index   C.cuvsIvfPqIndex_t
 	trained bool
 }
 
-func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*IvfPqIndex, error) {
+func CreateIndex(params *indexParams, dataset *cuvs.Tensor[float32]) (*ivfPqIndex, error) {
 
 	index := (C.cuvsIvfPqIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsIvfPqIndex{}))))
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexCreate(&index)))
@@ -30,12 +30,10 @@ func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*IvfPqInde
 		return nil, err
 	}
 
-	return &IvfPqIndex{index: index}, nil
+	return &ivfPqIndex{index: index}, nil
 }
 
-type ManagedTensor = *C.DLManagedTensor
-
-func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cuvs.Tensor[T], index *IvfPqIndex) error {
+func BuildIndex[T any](Resources cuvs.Resource, params *indexParams, dataset *cuvs.Tensor[T], index *ivfPqIndex) error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqBuild(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(dataset.C_tensor)), index.index)))
 	if err != nil {
 		return err
@@ -44,7 +42,7 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 	return nil
 }
 
-func (index *IvfPqIndex) Close() error {
+func (index *ivfPqIndex) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexDestroy(index.index)))
 	if err != nil {
 		return err
@@ -53,7 +51,7 @@ func (index *IvfPqIndex) Close() error {
 	return nil
 }
 
-func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *IvfPqIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
+func SearchIndex[T any](Resources cuvs.Resource, params *searchParams, index *ivfPqIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
 
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")

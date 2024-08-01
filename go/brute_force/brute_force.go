@@ -15,7 +15,7 @@ import (
 	"unsafe"
 )
 
-type Index struct {
+type bruteForceIndex struct {
 	index   C.cuvsBruteForceIndex_t
 	trained bool
 }
@@ -24,7 +24,7 @@ type Index struct {
 // 	// C.free(index.index)
 // }
 
-func CreateIndex() (*Index, error) {
+func CreateIndex() (*bruteForceIndex, error) {
 
 	index := (C.cuvsBruteForceIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsBruteForceIndex{}))))
 
@@ -38,11 +38,11 @@ func CreateIndex() (*Index, error) {
 		return nil, err
 	}
 
-	return &Index{index: index, trained: false}, nil
+	return &bruteForceIndex{index: index, trained: false}, nil
 
 }
 
-func (index *Index) Close() error {
+func (index *bruteForceIndex) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsBruteForceIndexDestroy(index.index)))
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (index *Index) Close() error {
 	return nil
 }
 
-func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric cuvs.Distance, metric_arg float32, index *Index) error {
+func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric cuvs.Distance, metric_arg float32, index *bruteForceIndex) error {
 
 	// if Dataset.C_tensor.dl_tensor.device.device_type != C.kDLCUDA {
 	// 	return errors.New("dataset must be on GPU")
@@ -75,7 +75,7 @@ func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric 
 
 }
 
-func SearchIndex[T any](resources cuvs.Resource, index Index, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
+func SearchIndex[T any](resources cuvs.Resource, index bruteForceIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
 
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")

@@ -14,11 +14,11 @@ import (
 	"unsafe"
 )
 
-type SearchParams struct {
+type searchParams struct {
 	params C.cuvsIvfFlatSearchParams_t
 }
 
-func CreateSearchParams(n_probes uint32) (*SearchParams, error) {
+func CreateSearchParams() (*searchParams, error) {
 
 	size := unsafe.Sizeof(C.struct_cuvsIvfFlatSearchParams{})
 
@@ -34,12 +34,15 @@ func CreateSearchParams(n_probes uint32) (*SearchParams, error) {
 		return nil, err
 	}
 
-	params.n_probes = C.uint32_t(n_probes)
-
-	return &SearchParams{params: params}, nil
+	return &searchParams{params: params}, nil
 }
 
-func (p *SearchParams) Close() error {
+func (p *searchParams) SetNProbes(n_probes uint32) (*searchParams, error) {
+	p.params.n_probes = C.uint32_t(n_probes)
+	return p, nil
+}
+
+func (p *searchParams) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err

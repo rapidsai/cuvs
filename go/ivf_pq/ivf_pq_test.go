@@ -27,7 +27,7 @@ func TestIvfPq(t *testing.T) {
 
 	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
-	IndexParams, err := CreateIndexParams(2, cuvs.L2, 2.0, 10, 0.3, 8, 4, Subspace, false, true)
+	IndexParams, err := CreateIndexParams()
 
 	if err != nil {
 		panic(err)
@@ -68,7 +68,7 @@ func TestIvfPq(t *testing.T) {
 
 	queries.ToDevice(&resource)
 
-	SearchParams, err := CreateSearchParams(10, Lut_Uint8, InternalDistance_Float32)
+	SearchParams, err := CreateSearchParams()
 
 	if err != nil {
 		panic(err)

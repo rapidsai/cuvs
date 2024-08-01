@@ -232,33 +232,3 @@ func (t *Tensor[T]) GetArray() ([][]T, error) {
 	return data, nil
 
 }
-
-func TestCuda() {
-
-	var DeviceDataPointer unsafe.Pointer
-	CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(8)))
-
-	array := make([]float32, 2)
-
-	for i := range array {
-		array[i] = float32(i)
-	}
-
-	CheckCuda(
-		C.cudaMemcpy(
-			// DeviceDataPointer,
-			DeviceDataPointer,
-			unsafe.Pointer(&array[0]),
-			// unsafe.Pointer(&hostData[0]),
-			// DeviceDataPointer,
-			// C.size_t(bytes),
-			C.size_t(8),
-			C.cudaMemcpyHostToDevice,
-
-			// res.get_cuda_stream(),
-			// GetCudaStream(res.resource),
-		))
-
-	println("cuda test done")
-
-}

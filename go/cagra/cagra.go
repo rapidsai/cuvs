@@ -17,12 +17,12 @@ import (
 	"unsafe"
 )
 
-type CagraIndex struct {
+type cagraIndex struct {
 	index   C.cuvsCagraIndex_t
 	trained bool
 }
 
-func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*CagraIndex, error) {
+func CreateIndex(params *indexParams, dataset *cuvs.Tensor[float32]) (*cagraIndex, error) {
 
 	index := (C.cuvsCagraIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsCagraIndex{}))))
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexCreate(&index)))
@@ -30,12 +30,10 @@ func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*CagraInde
 		return nil, err
 	}
 
-	return &CagraIndex{index: index}, nil
+	return &cagraIndex{index: index}, nil
 }
 
-type ManagedTensor = *C.DLManagedTensor
-
-func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cuvs.Tensor[T], index *CagraIndex) error {
+func BuildIndex[T any](Resources cuvs.Resource, params *indexParams, dataset *cuvs.Tensor[T], index *cagraIndex) error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraBuild(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(dataset.C_tensor)), index.index)))
 	if err != nil {
 		return err
@@ -44,7 +42,7 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 	return nil
 }
 
-func (index *CagraIndex) Close() error {
+func (index *cagraIndex) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexDestroy(index.index)))
 	if err != nil {
 		return err
@@ -53,7 +51,7 @@ func (index *CagraIndex) Close() error {
 	return nil
 }
 
-func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *CagraIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[uint32], distances *cuvs.Tensor[T]) error {
+func SearchIndex[T any](Resources cuvs.Resource, params *searchParams, index *cagraIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[uint32], distances *cuvs.Tensor[T]) error {
 
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")

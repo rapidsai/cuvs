@@ -27,7 +27,9 @@ func TestIvfFlat(t *testing.T) {
 
 	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
-	IndexParams, _ := CreateIndexParams(2, cuvs.L2, 2.0, 0, 0.5, true)
+	IndexParams, _ := CreateIndexParams()
+
+	IndexParams.SetNLists(2)
 
 	index, _ := CreateIndex(IndexParams, &dataset)
 	defer index.Close()
@@ -63,7 +65,7 @@ func TestIvfFlat(t *testing.T) {
 
 	queries.ToDevice(&resource)
 
-	SearchParams, _ := CreateSearchParams(10)
+	SearchParams, _ := CreateSearchParams()
 
 	err = SearchIndex(resource, SearchParams, index, &queries, &neighbors, &distances)
 	if err != nil {

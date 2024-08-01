@@ -19,49 +19,49 @@ import (
 type Distance int
 
 const (
-	L2 Distance = iota
-	SQEuclidean
-	Euclidean
-	L1
-	Cityblock
-	InnerProduct
-	Chebyshev
-	Canberra
-	Cosine
-	Lp
-	Correlation
-	Jaccard
-	Hellinger
-	BrayCurtis
-	JensenShannon
-	Hamming
-	KLDivergence
-	Minkowski
-	RusselRao
-	Dice
+	DistanceL2 Distance = iota
+	DistanceSQEuclidean
+	DistanceEuclidean
+	DistanceL1
+	DistanceCityblock
+	DistanceInnerProduct
+	DistanceChebyshev
+	DistanceCanberra
+	DistanceCosine
+	DistanceLp
+	DistanceCorrelation
+	DistanceJaccard
+	DistanceHellinger
+	DistanceBrayCurtis
+	DistanceJensenShannon
+	DistanceHamming
+	DistanceKLDivergence
+	DistanceMinkowski
+	DistanceRusselRao
+	DistanceDice
 )
 
 var CDistances = map[Distance]int{
-	L2:            C.L2SqrtExpanded,
-	SQEuclidean:   C.L2Expanded,
-	Euclidean:     C.L2SqrtExpanded,
-	L1:            C.L1,
-	Cityblock:     C.L1,
-	InnerProduct:  C.InnerProduct,
-	Chebyshev:     C.Linf,
-	Canberra:      C.Canberra,
-	Cosine:        C.CosineExpanded,
-	Lp:            C.LpUnexpanded,
-	Correlation:   C.CorrelationExpanded,
-	Jaccard:       C.JaccardExpanded,
-	Hellinger:     C.HellingerExpanded,
-	BrayCurtis:    C.BrayCurtis,
-	JensenShannon: C.JensenShannon,
-	Hamming:       C.HammingUnexpanded,
-	KLDivergence:  C.KLDivergence,
-	Minkowski:     C.LpUnexpanded,
-	RusselRao:     C.RusselRaoExpanded,
-	Dice:          C.DiceExpanded,
+	DistanceL2:            C.L2SqrtExpanded,
+	DistanceSQEuclidean:   C.L2Expanded,
+	DistanceEuclidean:     C.L2SqrtExpanded,
+	DistanceL1:            C.L1,
+	DistanceCityblock:     C.L1,
+	DistanceInnerProduct:  C.InnerProduct,
+	DistanceChebyshev:     C.Linf,
+	DistanceCanberra:      C.Canberra,
+	DistanceCosine:        C.CosineExpanded,
+	DistanceLp:            C.LpUnexpanded,
+	DistanceCorrelation:   C.CorrelationExpanded,
+	DistanceJaccard:       C.JaccardExpanded,
+	DistanceHellinger:     C.HellingerExpanded,
+	DistanceBrayCurtis:    C.BrayCurtis,
+	DistanceJensenShannon: C.JensenShannon,
+	DistanceHamming:       C.HammingUnexpanded,
+	DistanceKLDivergence:  C.KLDivergence,
+	DistanceMinkowski:     C.LpUnexpanded,
+	DistanceRusselRao:     C.RusselRaoExpanded,
+	DistanceDice:          C.DiceExpanded,
 }
 
 func PairwiseDistance[T any](Resources Resource, x *Tensor[T], y *Tensor[T], distances *Tensor[float32], metric Distance, metric_arg float32) error {

@@ -22,7 +22,7 @@ type IvfFlatIndex struct {
 	trained bool
 }
 
-func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*IvfFlatIndex, error) {
+func CreateIndex(params *indexParams, dataset *cuvs.Tensor[float32]) (*IvfFlatIndex, error) {
 
 	index := (C.cuvsIvfFlatIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsIvfFlatIndex{}))))
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexCreate(&index)))
@@ -35,7 +35,7 @@ func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*IvfFlatIn
 
 type ManagedTensor = *C.DLManagedTensor
 
-func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cuvs.Tensor[T], index *IvfFlatIndex) error {
+func BuildIndex[T any](Resources cuvs.Resource, params *indexParams, dataset *cuvs.Tensor[T], index *IvfFlatIndex) error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatBuild(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(dataset.C_tensor)), index.index)))
 	if err != nil {
 		return err
@@ -53,7 +53,7 @@ func (index *IvfFlatIndex) Close() error {
 	return nil
 }
 
-func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *IvfFlatIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
+func SearchIndex[T any](Resources cuvs.Resource, params *searchParams, index *IvfFlatIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
 
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")

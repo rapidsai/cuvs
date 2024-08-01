@@ -1,4 +1,4 @@
-package ivf_pq
+package ivf_flat
 
 // #include <cuda_runtime_api.h>
 // #include <cuvs/core/c_api.h>
@@ -10,38 +10,26 @@ package ivf_pq
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs"
 
+	"rapidsai/cuvs"
 	"unsafe"
 )
 
 type indexParams struct {
-	params C.cuvsIvfPqIndexParams_t
-}
-
-type codebookKind int
-
-const (
-	Subspace codebookKind = iota
-	Cluster
-)
-
-var cCodebookKinds = map[codebookKind]int{
-	Subspace: C.PER_SUBSPACE,
-	Cluster:  C.PER_CLUSTER,
+	params C.cuvsIvfFlatIndexParams_t
 }
 
 func CreateIndexParams() (*indexParams, error) {
 
-	size := unsafe.Sizeof(C.struct_cuvsIvfPqIndexParams{})
+	size := unsafe.Sizeof(C.struct_cuvsIvfFlatIndexParams{})
 
-	params := (C.cuvsIvfPqIndexParams_t)(C.malloc(C.size_t(size)))
+	params := (C.cuvsIvfFlatIndexParams_t)(C.malloc(C.size_t(size)))
 
 	if params == nil {
 		return nil, errors.New("memory allocation failed")
 	}
 
-	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexParamsCreate(&params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsCreate(&params)))
 
 	if err != nil {
 		return nil, err
@@ -81,36 +69,6 @@ func (p *indexParams) SetKMeansTrainsetFraction(kmeans_trainset_fraction float64
 	return p, nil
 }
 
-func (p *indexParams) SetPQBits(pq_bits uint32) (*indexParams, error) {
-	p.params.pq_bits = C.uint32_t(pq_bits)
-	return p, nil
-}
-
-func (p *indexParams) SetPQDim(pq_dim uint32) (*indexParams, error) {
-	p.params.pq_dim = C.uint32_t(pq_dim)
-	return p, nil
-}
-
-func (p *indexParams) SetCodebookKind(codebook_kind codebookKind) (*indexParams, error) {
-	CCodebookKind, exists := cCodebookKinds[codebook_kind]
-
-	if !exists {
-		return nil, errors.New("cuvs: invalid codebook_kind")
-	}
-	p.params.codebook_kind = uint32(CCodebookKind)
-
-	return p, nil
-}
-
-func (p *indexParams) SetForceRandomRotation(force_random_rotation bool) (*indexParams, error) {
-	if force_random_rotation {
-		p.params.force_random_rotation = C._Bool(true)
-	} else {
-		p.params.force_random_rotation = C._Bool(false)
-	}
-	return p, nil
-}
-
 func (p *indexParams) SetAddDataOnBuild(add_data_on_build bool) (*indexParams, error) {
 	if add_data_on_build {
 		p.params.add_data_on_build = C._Bool(true)
@@ -121,7 +79,7 @@ func (p *indexParams) SetAddDataOnBuild(add_data_on_build bool) (*indexParams, e
 }
 
 func (p *indexParams) Close() error {
-	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexParamsDestroy(p.params)))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsDestroy(p.params)))
 	if err != nil {
 		return err
 	}

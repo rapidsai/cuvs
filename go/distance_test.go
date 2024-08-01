@@ -35,7 +35,7 @@ func TestDistance(t *testing.T) {
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
 
-	cuvs.PairwiseDistance(resource, &dataset, &dataset, &distances, cuvs.L2, 0.0)
+	cuvs.PairwiseDistance(resource, &dataset, &dataset, &distances, cuvs.DistanceL2, 0.0)
 
 	distances.ToHost(&resource)
 
