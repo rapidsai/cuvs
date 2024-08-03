@@ -143,7 +143,7 @@ void bench_build(::benchmark::State& state,
 
   const auto algo_property = parse_algo_property(algo->get_preference(), index.build_param);
 
-  bool parse_base_file = (index.algo == "diskann_memory" || index.algo == "diskann_ssd");
+  bool parse_base_file = index.algo == "diskann_ssd";
 
   const T* base_set;
   if (parse_base_file) base_set = dataset->base_set(algo_property.dataset_memory_type);
@@ -159,7 +159,8 @@ void bench_build(::benchmark::State& state,
         if (!parse_base_file)
           algo->build(base_set, index_size);
         else {
-          algo->build(dataset->base_filename(), index_size);
+          make_sure_parent_dir_exists(index.file);
+          algo->build_from_bin(dataset->base_filename(), index.file, index_size);
         }
       } catch (const std::exception& e) {
         state.SkipWithError(std::string(e.what()));

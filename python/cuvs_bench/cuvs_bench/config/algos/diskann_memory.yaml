@@ -1,7 +1,7 @@
 name: diskann_memory
 constraints:
   build: cuvs_bench.constraints.diskann_memory_build_constraints
-  # search: cuvs_bench.constraints.diskann_memory_search_constraints
+  search: cuvs_bench.constraints.diskann_memory_search_constraints
 groups:
   base:
     build:

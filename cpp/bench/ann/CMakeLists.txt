@@ -301,7 +301,11 @@ if(CUVS_ANN_BENCH_USE_GGNN)
 endif()
 
 if(CUVS_ANN_BENCH_USE_DISKANN)
-  ConfigureAnnBench(NAME DISKANN PATH src/diskann/diskann_benchmark.cu LINKS cuvs diskann::diskann)
+  ConfigureAnnBench(NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann)
+endif()
+
+if(CUVS_ANN_BENCH_USE_DISKANN)
+  ConfigureAnnBench(NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann)
 endif()
 
 # ##################################################################################################

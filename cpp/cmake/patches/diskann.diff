@@ -200,25 +200,34 @@ index 0000000..2703ec4
 +endif()
 +include(${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
 diff --git a/include/disk_utils.h b/include/disk_utils.h
-index 08f046d..dc468d6 100644
+index 08f046d..9d88637 100644
 --- a/include/disk_utils.h
 +++ b/include/disk_utils.h
-@@ -82,7 +82,7 @@ DISKANN_DLLEXPORT int build_merged_vamana_index(std::string base_file, diskann::
+@@ -31,6 +31,8 @@ typedef int FileHandle;
+ #include "utils.h"
+ #include "windows_customizations.h"
+ 
++#include <cuvs/neighbors/cagra.hpp>
++
+ namespace diskann
+ {
+ const size_t MAX_SAMPLE_POINTS_FOR_WARMUP = 100000;
+@@ -82,7 +84,7 @@ DISKANN_DLLEXPORT int build_merged_vamana_index(std::string base_file, diskann::
                                                  uint32_t num_threads, bool use_filters = false,
                                                  const std::string &label_file = std::string(""),
                                                  const std::string &labels_to_medoids_file = std::string(""),
 -                                                const std::string &universal_label = "", const uint32_t Lf = 0);
-+                                                const std::string &universal_label = "", const uint32_t Lf = 0, bool use_cuvs_cagra_graph = false);
++                                                const std::string &universal_label = "", const uint32_t Lf = 0, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params = nullptr);
  
  template <typename T, typename LabelT>
  DISKANN_DLLEXPORT uint32_t optimize_beamwidth(std::unique_ptr<diskann::PQFlashIndex<T, LabelT>> &_pFlashIndex,
-@@ -98,7 +98,8 @@ DISKANN_DLLEXPORT int build_disk_index(
+@@ -98,7 +100,8 @@ DISKANN_DLLEXPORT int build_disk_index(
      bool use_filters = false,
      const std::string &label_file = std::string(""), // default is empty string for no label_file
      const std::string &universal_label = "", const uint32_t filter_threshold = 0,
 -    const uint32_t Lf = 0); // default is empty string for no universal label
 +    const uint32_t Lf = 0,
-+    bool use_cuvs_cagra_graph = false); // default is empty string for no universal label
++    std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params = nullptr); // default is empty string for no universal label
  
  template <typename T>
  DISKANN_DLLEXPORT void create_disk_layout(const std::string base_file, const std::string mem_index_file,
@@ -547,7 +556,7 @@ index cbca264..de3dadd 100644
  
  if (NOT MSVC)
 diff --git a/src/disk_utils.cpp b/src/disk_utils.cpp
-index 0165602..dee8675 100644
+index 0165602..ee550c1 100644
 --- a/src/disk_utils.cpp
 +++ b/src/disk_utils.cpp
 @@ -2,6 +2,7 @@
@@ -571,7 +580,7 @@ index 0165602..dee8675 100644
                                uint32_t num_threads, bool use_filters, const std::string &label_file,
                                const std::string &labels_to_medoids_file, const std::string &universal_label,
 -                              const uint32_t Lf)
-+                              const uint32_t Lf, bool use_cuvs_cagra_graph)
++                              const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params)
  {
 +    std::cout << "inside build_merged_vamana_index" << std::endl;
      size_t base_num, base_dim;
@@ -582,31 +591,38 @@ index 0165602..dee8675 100644
                                                 std::make_shared<diskann::IndexWriteParameters>(paras), nullptr,
                                                 defaults::NUM_FROZEN_POINTS_STATIC, false, false, false,
 -                                               build_pq_bytes > 0, build_pq_bytes, use_opq, use_filters);
-+                                               build_pq_bytes > 0, build_pq_bytes, use_opq, use_filters, use_cuvs_cagra_graph);
++                                               build_pq_bytes > 0, build_pq_bytes, use_opq, use_filters, cagra_index_params != nullptr, cagra_index_params);
          if (!use_filters)
              _index.build(base_file.c_str(), base_num);
          else
-@@ -723,7 +726,7 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
-         diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts,
+@@ -719,11 +722,12 @@ int build_merged_vamana_index(std::string base_file, diskann::Metric compareMetr
+ 
+         uint64_t shard_base_dim, shard_base_pts;
+         get_bin_metadata(shard_base_file, shard_base_pts, shard_base_dim);
++        bool use_cuvs_cagra_graph = cagra_index_params != nullptr;
+ 
+-        diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts,
++               diskann::Index<T> _index(compareMetric, shard_base_dim, shard_base_pts,
                                   std::make_shared<diskann::IndexWriteParameters>(low_degree_params), nullptr,
                                   defaults::NUM_FROZEN_POINTS_STATIC, false, false, false, build_pq_bytes > 0,
 -                                 build_pq_bytes, use_opq);
-+                                 build_pq_bytes, use_opq, use_cuvs_cagra_graph);
++                                 build_pq_bytes, use_opq, false, use_cuvs_cagra_graph, cagra_index_params);
          if (!use_filters)
          {
              _index.build(shard_base_file.c_str(), shard_base_pts);
-@@ -1101,8 +1104,9 @@ template <typename T, typename LabelT>
+@@ -1101,8 +1105,10 @@ template <typename T, typename LabelT>
  int build_disk_index(const char *dataFilePath, const char *indexFilePath, const char *indexBuildParameters,
                       diskann::Metric compareMetric, bool use_opq, const std::string &codebook_prefix, bool use_filters,
                       const std::string &label_file, const std::string &universal_label, const uint32_t filter_threshold,
 -                     const uint32_t Lf)
-+                     const uint32_t Lf, bool use_cuvs_cagra_graph)
++                     const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params)
  {
-+    std::cout << "inside build_disk_index: use_cuvs_cagra_graph: " << use_cuvs_cagra_graph << std::endl;
++    bool use_cuvs_cagra_graph = cagra_index_params != nullptr;
++    // std::cout << "inside build_disk_index: use_cuvs_cagra_graph: " << use_cuvs_cagra_graph << std::endl;
      std::stringstream parser;
      parser << std::string(indexBuildParameters);
      std::string cur_param;
-@@ -1289,7 +1293,9 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+@@ -1289,7 +1295,9 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
      Timer timer;
      diskann::get_bin_metadata(data_file_to_use.c_str(), points_num, dim);
      const double p_val = ((double)MAX_PQ_TRAINING_SET_SIZE / (double)points_num);
@@ -617,7 +633,7 @@ index 0165602..dee8675 100644
      if (use_disk_pq)
      {
          generate_disk_quantized_data<T>(data_file_to_use, disk_pq_pivots_path, disk_pq_compressed_vectors_path,
-@@ -1309,12 +1315,14 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+@@ -1309,12 +1317,14 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
          num_pq_chunks = atoi(param_list[8].c_str());
      }
  
@@ -632,7 +648,7 @@ index 0165602..dee8675 100644
  
  // Gopal. Splitting diskann_dll into separate DLLs for search and build.
  // This code should only be available in the "build" DLL.
-@@ -1323,10 +1331,11 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+@@ -1323,10 +1333,11 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
  #endif
      // Whether it is cosine or inner product, we still L2 metric due to the pre-processing.
      timer.reset();
@@ -641,16 +657,16 @@ index 0165602..dee8675 100644
                                                    indexing_ram_budget, mem_index_path, medoids_path, centroids_path,
                                                    build_pq_bytes, use_opq, num_threads, use_filters, labels_file_to_use,
 -                                                  labels_to_medoids_path, universal_label, Lf);
-+                                                  labels_to_medoids_path, universal_label, Lf, use_cuvs_cagra_graph);
++                                                  labels_to_medoids_path, universal_label, Lf, cagra_index_params);
      diskann::cout << timer.elapsed_seconds_for_step("building merged vamana index") << std::endl;
  
      timer.reset();
-@@ -1432,21 +1441,21 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint32_t>(const char *da
+@@ -1432,21 +1443,21 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint32_t>(const char *da
                                                                    const std::string &codebook_prefix, bool use_filters,
                                                                    const std::string &label_file,
                                                                    const std::string &universal_label,
 -                                                                  const uint32_t filter_threshold, const uint32_t Lf);
-+                                                                  const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
++                                                                  const uint32_t filter_threshold, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_disk_index<uint8_t, uint32_t>(const char *dataFilePath, const char *indexFilePath,
                                                                     const char *indexBuildParameters,
                                                                     diskann::Metric compareMetric, bool use_opq,
@@ -658,7 +674,7 @@ index 0165602..dee8675 100644
                                                                     const std::string &label_file,
                                                                     const std::string &universal_label,
 -                                                                   const uint32_t filter_threshold, const uint32_t Lf);
-+                                                                   const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
++                                                                   const uint32_t filter_threshold, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_disk_index<float, uint32_t>(const char *dataFilePath, const char *indexFilePath,
                                                                   const char *indexBuildParameters,
                                                                   diskann::Metric compareMetric, bool use_opq,
@@ -666,16 +682,16 @@ index 0165602..dee8675 100644
                                                                   const std::string &label_file,
                                                                   const std::string &universal_label,
 -                                                                 const uint32_t filter_threshold, const uint32_t Lf);
-+                                                                 const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
++                                                                 const uint32_t filter_threshold, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  // LabelT = uint16
  template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *dataFilePath, const char *indexFilePath,
                                                                    const char *indexBuildParameters,
-@@ -1454,51 +1463,51 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *da
+@@ -1454,51 +1465,51 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *da
                                                                    const std::string &codebook_prefix, bool use_filters,
                                                                    const std::string &label_file,
                                                                    const std::string &universal_label,
 -                                                                  const uint32_t filter_threshold, const uint32_t Lf);
-+                                                                  const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
++                                                                  const uint32_t filter_threshold, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_disk_index<uint8_t, uint16_t>(const char *dataFilePath, const char *indexFilePath,
                                                                     const char *indexBuildParameters,
                                                                     diskann::Metric compareMetric, bool use_opq,
@@ -683,7 +699,7 @@ index 0165602..dee8675 100644
                                                                     const std::string &label_file,
                                                                     const std::string &universal_label,
 -                                                                   const uint32_t filter_threshold, const uint32_t Lf);
-+                                                                   const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
++                                                                   const uint32_t filter_threshold, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_disk_index<float, uint16_t>(const char *dataFilePath, const char *indexFilePath,
                                                                   const char *indexBuildParameters,
                                                                   diskann::Metric compareMetric, bool use_opq,
@@ -691,45 +707,45 @@ index 0165602..dee8675 100644
                                                                   const std::string &label_file,
                                                                   const std::string &universal_label,
 -                                                                 const uint32_t filter_threshold, const uint32_t Lf);
-+                                                                 const uint32_t filter_threshold, const uint32_t Lf, bool use_cuvs_cagra_graph);
++                                                                 const uint32_t filter_threshold, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  
  template DISKANN_DLLEXPORT int build_merged_vamana_index<int8_t, uint32_t>(
      std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
      double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
      size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
 -    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
-+    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_merged_vamana_index<float, uint32_t>(
      std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
      double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
      size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
 -    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
-+    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_merged_vamana_index<uint8_t, uint32_t>(
      std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
      double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
      size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
 -    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
-+    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  // Label=16_t
  template DISKANN_DLLEXPORT int build_merged_vamana_index<int8_t, uint16_t>(
      std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
      double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
      size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
 -    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
-+    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_merged_vamana_index<float, uint16_t>(
      std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
      double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
      size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
 -    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
-+    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  template DISKANN_DLLEXPORT int build_merged_vamana_index<uint8_t, uint16_t>(
      std::string base_file, diskann::Metric compareMetric, uint32_t L, uint32_t R, double sampling_rate,
      double ram_budget, std::string mem_index_path, std::string medoids_path, std::string centroids_file,
      size_t build_pq_bytes, bool use_opq, uint32_t num_threads, bool use_filters, const std::string &label_file,
 -    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf);
-+    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, bool use_cuvs_cagra_graph);
++    const std::string &labels_to_medoids_file, const std::string &universal_label, const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params);
  }; // namespace diskann
 diff --git a/src/dll/CMakeLists.txt b/src/dll/CMakeLists.txt
 index 096d1b7..6d01516 100644

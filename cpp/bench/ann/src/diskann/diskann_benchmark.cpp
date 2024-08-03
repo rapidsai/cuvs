@@ -50,8 +50,26 @@ void parse_build_param(const nlohmann::json& conf,
 }
 
 template <typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::diskann_ssd<T>::build_param& param)
+{
+  param.R = conf.at("R");
+  if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
+  if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
+  // param.use_cagra_graph = conf.at("use_cagra_graph");
+}
+
+template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_memory<T>::search_param& param)
+{
+  param.L_search    = conf.at("L_search");
+  param.num_threads = conf.at("num_threads");
+}
+
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::diskann_ssd<T>::search_param& param)
 {
   param.L_search    = conf.at("L_search");
   param.num_threads = conf.at("num_threads");
@@ -92,6 +110,8 @@ auto create_algo(const std::string& algo_name,
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
     if (algo_name == "diskann_memory") { a = make_algo<T, cuvs::bench::diskann_memory>(metric, dim, conf); }
+    else if (algo_name == "diskann_ssd") { a = make_algo<T, cuvs::bench::diskann_ssd>(metric, dim, conf); }
+
   }
   if (!a) { throw std::runtime_error("invalid algo: '" + algo_name + "'"); }
 
@@ -104,6 +124,10 @@ std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param
 {
   if (algo_name == "diskann_memory") {
     auto param = std::make_unique<typename cuvs::bench::diskann_memory<T>::search_param>();
+    parse_search_param<T>(conf, *param);
+    return param;
+  } else if (algo_name == "diskann_ssd") {
+    auto param = std::make_unique<typename cuvs::bench::diskann_ssd<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
   }
