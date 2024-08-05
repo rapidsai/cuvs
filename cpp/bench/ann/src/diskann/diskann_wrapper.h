@@ -253,7 +253,6 @@ std::shared_ptr<diskann::PQFlashIndex<T, uint32_t>> p_flash_index_;
   uint32_t max_points_;
   std::shared_ptr<diskann::Index<T>> mem_index_{nullptr};
   std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params_{nullptr};
-  int num_threads_;
 
   // uint32_t L_search_;
   Mode metric_objective_;
@@ -278,8 +277,6 @@ diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : 
 template <typename T>
 void diskann_ssd<T>::build_from_bin(std::string dataset_path, std::string path_to_index, size_t nrow)
 {
-  // const std::string &b = "";
-  // const std::string &c = "";
   diskann::build_disk_index<float>(dataset_path.c_str(), path_to_index.c_str(),
                             index_build_params_str.c_str(),
                             parse_metric_to_diskann(this->metric_),
