@@ -2,7 +2,8 @@ package ivf_flat
 
 import (
 	"math/rand"
-	"rapidsai/cuvs"
+
+	cuvs "github.com/ajit283/cuvs/go"
 
 	"testing"
 	"time"

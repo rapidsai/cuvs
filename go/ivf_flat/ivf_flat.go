@@ -13,8 +13,9 @@ package ivf_flat
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs"
 	"unsafe"
+
+	cuvs "github.com/ajit283/cuvs/go"
 )
 
 type IvfFlatIndex struct {

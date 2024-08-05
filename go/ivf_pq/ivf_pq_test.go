@@ -2,7 +2,8 @@ package ivf_pq
 
 import (
 	"math/rand"
-	"rapidsai/cuvs"
+
+	cuvs "github.com/ajit283/cuvs/go"
 
 	"testing"
 	"time"

@@ -2,7 +2,8 @@ package brute_force
 
 import (
 	"math/rand"
-	"rapidsai/cuvs"
+
+	cuvs "github.com/ajit283/cuvs/go"
 
 	"testing"
 	"time"

@@ -2,9 +2,10 @@ package cagra
 
 import (
 	"math/rand"
-	"rapidsai/cuvs"
 	"testing"
 	"time"
+
+	cuvs "github.com/ajit283/cuvs/go"
 )
 
 func TestCagra(t *testing.T) {

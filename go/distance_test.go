@@ -2,9 +2,10 @@ package cuvs_test
 
 import (
 	"math/rand"
-	"rapidsai/cuvs"
 	"testing"
 	"time"
+
+	cuvs "github.com/ajit283/cuvs/go"
 )
 
 func TestDistance(t *testing.T) {

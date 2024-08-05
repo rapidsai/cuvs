@@ -10,7 +10,8 @@ package ivf_pq
 import "C"
 import (
 	"errors"
-	"rapidsai/cuvs"
+
+	cuvs "github.com/ajit283/cuvs/go"
 
 	"unsafe"
 )
