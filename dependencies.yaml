@@ -28,6 +28,7 @@ files:
       arch: [x86_64, aarch64]
     includes:
       - rapids_build
+      - build_py_cuvs
       - cuda
       - cuda_version
       - develop

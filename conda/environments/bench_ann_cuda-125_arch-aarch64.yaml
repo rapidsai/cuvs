@@ -16,9 +16,11 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
+- cuda-python>=12.0,<13.0a0
 - cuda-version=12.5
 - cxx-compiler
 - cython>=3.0.0
+- dlpack>=0.8,<1.0
 - gcc_linux-aarch64=11.*
 - glog>=0.6.0
 - h5py>=3.8.0
@@ -33,6 +35,7 @@ dependencies:
 - nlohmann_json>=3.11.2
 - openblas
 - pandas
+- pylibraft==24.10.*,>=0.0.0a0
 - pyyaml
 - rmm==24.10.*,>=0.0.0a0
 - sysroot_linux-aarch64==2.17

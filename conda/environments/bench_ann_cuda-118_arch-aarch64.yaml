@@ -14,10 +14,12 @@ dependencies:
 - cmake>=3.26.4,!=3.30.0
 - cuda-nvtx=11.8
 - cuda-profiler-api=11.8.86
+- cuda-python>=11.7.1,<12.0a0
 - cuda-version=11.8
 - cudatoolkit
 - cxx-compiler
 - cython>=3.0.0
+- dlpack>=0.8,<1.0
 - gcc_linux-aarch64=11.*
 - glog>=0.6.0
 - h5py>=3.8.0
@@ -37,6 +39,7 @@ dependencies:
 - nvcc_linux-aarch64=11.8
 - openblas
 - pandas
+- pylibraft==24.10.*,>=0.0.0a0
 - pyyaml
 - rmm==24.10.*,>=0.0.0a0
 - sysroot_linux-aarch64==2.17
