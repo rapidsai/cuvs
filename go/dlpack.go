@@ -17,7 +17,7 @@ package cuvs
 import "C"
 import (
 	"errors"
-	// "github.com/ajit283/cuvs/go"
+	// "github.com/rapidsai/cuvs/go"
 	// "rapidsai/cuvs/ivf_flat"
 	"unsafe"
 )

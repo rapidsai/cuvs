@@ -15,7 +15,7 @@ import (
 	"errors"
 	"unsafe"
 
-	cuvs "github.com/ajit283/cuvs/go"
+	cuvs "github.com/rapidsai/cuvs/go"
 )
 
 type IvfFlatIndex struct {

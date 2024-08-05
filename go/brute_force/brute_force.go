@@ -11,7 +11,7 @@ import "C"
 import (
 	"errors"
 
-	cuvs "github.com/ajit283/cuvs/go"
+	cuvs "github.com/rapidsai/cuvs/go"
 
 	"unsafe"
 )
