@@ -102,13 +102,6 @@ files:
       - test_python_common
       - test_py_cuvs
       - cupy
-  py_build_cuvs_bench:
-    output: pyproject
-    pyproject_dir: python/cuvs_bench
-    extras:
-      table: build-system
-    includes:
-      - rapids_build
   py_run_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
@@ -475,3 +468,4 @@ dependencies:
           - pandas
           - pyyaml
           - pandas
+          - click
