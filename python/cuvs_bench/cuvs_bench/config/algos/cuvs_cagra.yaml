@@ -1,7 +1,7 @@
 name: cuvs_cagra
 constraints:
-  build: cuvs_bench.constraints.raft_cagra_build_constraints
-  search: cuvs_bench.constraints.raft_cagra_search_constraints
+  build: cuvs_bench.config.algos.constraints.cuvs_cagra_build
+  search: cuvs_bench.config.algos.constraints.cuvs_cagra_search
 groups:
   base:
     build:
