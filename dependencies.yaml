@@ -109,6 +109,7 @@ files:
       table: build-system
     includes:
       - rapids_build
+      - build_py_cuvs
   py_run_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
@@ -460,7 +461,7 @@ dependencies:
     common:
       - output_types: [conda, pyproject, requirements]
         packages:
-          - hnswlib=0.7.0
+          - hnswlib=0.6.2
           - nlohmann_json>=3.11.2
           - glog>=0.6.0
           - h5py>=3.8.0
