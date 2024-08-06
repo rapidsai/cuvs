@@ -30,6 +30,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_CUVS_ANN_MG "Include cuVS ann mg algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -50,6 +51,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_ANN_MG OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -72,6 +74,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
+   OR CUVS_ANN_BENCH_USE_CUVS_ANN_MGs
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -252,6 +255,20 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
   ConfigureAnnBench(
     NAME CUVS_CAGRA_HNSWLIB PATH bench/ann/src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs
     hnswlib::hnswlib
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_ANN_MG)
+  ConfigureAnnBench(
+    NAME
+    CUVS_ANN_MG
+    PATH
+    bench/ann/src/cuvs/cuvs_benchmark.cu
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:bench/ann/src/cuvs/cuvs_ann_mg_ivf_flat.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:bench/ann/src/cuvs/cuvs_ann_mg_ivf_pq.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:bench/ann/src/cuvs/cuvs_ann_mg_cagra.cu>
+    LINKS
+    cuvs
   )
 endif()
 

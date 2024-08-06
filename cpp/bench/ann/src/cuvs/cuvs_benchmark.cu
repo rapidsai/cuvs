@@ -72,6 +72,64 @@ auto create_algo(const std::string& algo_name,
     a = std::make_unique<cuvs::bench::cuvs_cagra<T, uint32_t>>(metric, dim, param);
   }
 #endif
+#ifdef CUVS_ANN_BENCH_USE_CUVS_ANN_MG
+  if (algo_name == "raft_ann_mg_ivf_flat" || algo_name == "cuvs_ann_mg_ivf_flat") {
+    typename cuvs::bench::cuvs_ann_mg_ivf_flat<T, int64_t>::build_param param;
+    parse_build_param<T, int64_t>(conf, param);
+    if (conf.contains("distribution_mode")) {
+      std::string distribution_mode = conf.at("distribution_mode");
+      if (distribution_mode == "replicated") {
+        param.mode = cuvs::neighbors::mg::distribution_mode::REPLICATED;
+      } else if (distribution_mode == "sharded") {
+        param.mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+      } else {
+        throw std::runtime_error("invalid value for distribution_mode");
+      }
+    } else {
+      // default
+      param.mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+    }
+    a = std::make_unique<cuvs::bench::cuvs_ann_mg_ivf_flat<T, int64_t>>(metric, dim, param);
+  }
+
+  if (algo_name == "raft_ann_mg_ivf_pq" || algo_name == "cuvs_ann_mg_ivf_pq") {
+    typename cuvs::bench::cuvs_ann_mg_ivf_pq<T, int64_t>::build_param param;
+    parse_build_param<T, int64_t>(conf, param);
+    if (conf.contains("distribution_mode")) {
+      std::string distribution_mode = conf.at("distribution_mode");
+      if (distribution_mode == "replicated") {
+        param.mode = cuvs::neighbors::mg::distribution_mode::REPLICATED;
+      } else if (distribution_mode == "sharded") {
+        param.mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+      } else {
+        throw std::runtime_error("invalid value for distribution_mode");
+      }
+    } else {
+      // default
+      param.mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+    }
+    a = std::make_unique<cuvs::bench::cuvs_ann_mg_ivf_pq<T, int64_t>>(metric, dim, param);
+  }
+
+  if (algo_name == "raft_ann_mg_cagra" || algo_name == "cuvs_ann_mg_cagra") {
+    typename cuvs::bench::cuvs_ann_mg_cagra<T, uint32_t>::build_param param;
+    parse_build_param<T, uint32_t>(conf, param);
+    if (conf.contains("distribution_mode")) {
+      std::string distribution_mode = conf.at("distribution_mode");
+      if (distribution_mode == "replicated") {
+        param.cagra_params.mode = cuvs::neighbors::mg::distribution_mode::REPLICATED;
+      } else if (distribution_mode == "sharded") {
+        param.cagra_params.mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+      } else {
+        throw std::runtime_error("invalid value for distribution_mode");
+      }
+    } else {
+      // default
+      param.cagra_params.mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+    }
+    a = std::make_unique<cuvs::bench::cuvs_ann_mg_cagra<T, uint32_t>>(metric, dim, param);
+  }
+#endif
 
   if (!a) { throw std::runtime_error("invalid algo: '" + algo_name + "'"); }
 
@@ -110,6 +168,67 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
   if (algo_name == "raft_cagra" || algo_name == "cuvs_cagra") {
     auto param = std::make_unique<typename cuvs::bench::cuvs_cagra<T, uint32_t>::search_param>();
     parse_search_param<T, uint32_t>(conf, *param);
+    return param;
+  }
+#endif
+#ifdef CUVS_ANN_BENCH_USE_CUVS_ANN_MG
+  if (algo_name == "raft_ann_mg_ivf_flat" || algo_name == "cuvs_ann_mg_ivf_flat") {
+    auto param =
+      std::make_unique<typename cuvs::bench::cuvs_ann_mg_ivf_flat<T, int64_t>::search_param>();
+    parse_search_param<T, int64_t>(conf, *param);
+    if (conf.contains("merge_mode")) {
+      std::string merge_mode = conf.at("merge_mode");
+      if (merge_mode == "tree_merge") {
+        param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+      } else if (merge_mode == "merge_on_root_rank") {
+        param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::MERGE_ON_ROOT_RANK;
+      } else {
+        throw std::runtime_error("invalid value for merge_mode");
+      }
+    } else {
+      // default
+      param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+    }
+    return param;
+  }
+
+  if (algo_name == "raft_ann_mg_ivf_pq" || algo_name == "cuvs_ann_mg_ivf_pq") {
+    auto param =
+      std::make_unique<typename cuvs::bench::cuvs_ann_mg_ivf_pq<T, int64_t>::search_param>();
+    parse_search_param<T, int64_t>(conf, *param);
+    if (conf.contains("merge_mode")) {
+      std::string merge_mode = conf.at("merge_mode");
+      if (merge_mode == "tree_merge") {
+        param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+      } else if (merge_mode == "merge_on_root_rank") {
+        param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::MERGE_ON_ROOT_RANK;
+      } else {
+        throw std::runtime_error("invalid value for merge_mode");
+      }
+    } else {
+      // default
+      param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+    }
+    return param;
+  }
+
+  if (algo_name == "raft_ann_mg_cagra" || algo_name == "cuvs_ann_mg_cagra") {
+    auto param =
+      std::make_unique<typename cuvs::bench::cuvs_ann_mg_cagra<T, uint32_t>::search_param>();
+    parse_search_param<T, uint32_t>(conf, *param);
+    if (conf.contains("merge_mode")) {
+      std::string merge_mode = conf.at("merge_mode");
+      if (merge_mode == "tree_merge") {
+        param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+      } else if (merge_mode == "merge_on_root_rank") {
+        param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::MERGE_ON_ROOT_RANK;
+      } else {
+        throw std::runtime_error("invalid value for merge_mode");
+      }
+    } else {
+      // default
+      param->merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+    }
     return param;
   }
 #endif
