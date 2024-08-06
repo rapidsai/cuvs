@@ -15,6 +15,10 @@
 #=============================================================================
 
 function(find_and_configure_diskann)
+  set(oneValueArgs VERSION REPOSITORY PINNED_TAG)
+  cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
+                        "${multiValueArgs}" ${ARGN} )
+
     include(${rapids-cmake-dir}/cpm/package_override.cmake)
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/diskann_override.json")
@@ -35,8 +39,7 @@ function(find_and_configure_diskann)
           "PYBIND OFF"
           "UNIT_TEST OFF"
           "RESTAPI OFF"
-          "PORTABLE OFF"
-          "-DMKL_PATH /raid/tarangj/miniconda3/envs/all_cuda-125_arch-x86_64/lib")
+          "PORTABLE OFF")
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(diskann)
