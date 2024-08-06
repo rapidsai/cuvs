@@ -16,6 +16,7 @@ add_subdirectory(brute_force)
 add_subdirectory(cagra)
 add_subdirectory(ivf_flat)
 add_subdirectory(ivf_pq)
+add_subdirectory(filters)
 
 # Set the list of Cython files to build
 set(cython_sources refine.pyx)

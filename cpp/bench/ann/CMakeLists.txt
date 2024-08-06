@@ -12,6 +12,8 @@
 # the License.
 # =============================================================================
 
+list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
+
 # ##################################################################################################
 # * benchmark options ------------------------------------------------------------------------------
 
@@ -40,11 +42,12 @@ option(CUVS_ANN_BENCH_SINGLE_EXE
 
 find_package(Threads REQUIRED)
 
+set(CUVS_ANN_BENCH_USE_FAISS ON)
+set(CUVS_FAISS_ENABLE_GPU ON)
+set(CUVS_USE_FAISS_STATIC ON)
+
 if(BUILD_CPU_ONLY)
   set(CUVS_FAISS_ENABLE_GPU OFF)
-  set(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT OFF)
-  set(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT OFF)
-  set(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA OFF)
@@ -52,20 +55,6 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_ANN_MG OFF)
-else()
-  set(CUVS_FAISS_ENABLE_GPU ON)
-endif()
-
-set(CUVS_ANN_BENCH_USE_FAISS OFF)
-if(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT
-   OR CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ
-   OR CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT
-   OR CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT
-   OR CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ
-   OR CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT
-)
-  set(CUVS_ANN_BENCH_USE_FAISS ON)
-  set(CUVS_USE_FAISS_STATIC ON)
 endif()
 
 set(CUVS_ANN_BENCH_USE_CUVS OFF)
@@ -74,7 +63,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
-   OR CUVS_ANN_BENCH_USE_CUVS_ANN_MGs
+   OR CUVS_ANN_BENCH_USE_CUVS_ANN_MG
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -83,21 +72,17 @@ endif()
 # * Fetch requirements -------------------------------------------------------------
 
 if(CUVS_ANN_BENCH_USE_HNSWLIB OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
-  include(cmake/thirdparty/get_hnswlib.cmake)
+  include(cmake/thirdparty/get_hnswlib)
 endif()
 
-include(cmake/thirdparty/get_nlohmann_json.cmake)
+include(cmake/thirdparty/get_nlohmann_json)
 
 if(CUVS_ANN_BENCH_USE_GGNN)
-  include(cmake/thirdparty/get_ggnn.cmake)
+  include(cmake/thirdparty/get_ggnn)
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS)
-  # We need to ensure that faiss has all the conda information. So we currently use the very ugly
-  # hammer of `link_libraries` to ensure that all targets in this directory and the faiss directory
-  # will have the conda includes/link dirs
-  link_libraries($<TARGET_NAME_IF_EXISTS:conda_env>)
-  include(cmake/thirdparty/get_faiss.cmake)
+  include(cmake/thirdparty/get_faiss)
 endif()
 
 # ##################################################################################################
@@ -157,8 +142,6 @@ function(ConfigureAnnBench)
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            -static-libgcc
-            -static-libstdc++
   )
 
   set_target_properties(
@@ -212,28 +195,24 @@ if(NOT TARGET CUVS_ANN_BENCH_ALL)
 endif()
 
 if(CUVS_ANN_BENCH_USE_HNSWLIB)
-  ConfigureAnnBench(
-    NAME HNSWLIB PATH bench/ann/src/hnswlib/hnswlib_benchmark.cpp LINKS hnswlib::hnswlib
-  )
+  ConfigureAnnBench(NAME HNSWLIB PATH src/hnswlib/hnswlib_benchmark.cpp LINKS hnswlib::hnswlib)
 
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigureAnnBench(
-    NAME CUVS_IVF_PQ PATH bench/ann/src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_IVF_PQ}>:bench/ann/src/cuvs/cuvs_ivf_pq.cu> LINKS cuvs
+    NAME CUVS_IVF_PQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_pq.cu LINKS cuvs
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   ConfigureAnnBench(
-    NAME CUVS_IVF_FLAT PATH bench/ann/src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT}>:bench/ann/src/cuvs/cuvs_ivf_flat.cu> LINKS cuvs
+    NAME CUVS_IVF_FLAT PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_flat.cu LINKS cuvs
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE)
-  ConfigureAnnBench(NAME CUVS_BRUTE_FORCE PATH bench/ann/src/cuvs/cuvs_benchmark.cu LINKS cuvs)
+  ConfigureAnnBench(NAME CUVS_BRUTE_FORCE PATH src/cuvs/cuvs_benchmark.cu LINKS cuvs)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
@@ -241,11 +220,11 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
     NAME
     CUVS_CAGRA
     PATH
-    bench/ann/src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_CAGRA}>:bench/ann/src/cuvs/cuvs_cagra_float.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_CAGRA}>:bench/ann/src/cuvs/cuvs_cagra_half.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_CAGRA}>:bench/ann/src/cuvs/cuvs_cagra_int8_t.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_CAGRA}>:bench/ann/src/cuvs/cuvs_cagra_uint8_t.cu>
+    src/cuvs/cuvs_benchmark.cu
+    src/cuvs/cuvs_cagra_float.cu
+    src/cuvs/cuvs_cagra_half.cu
+    src/cuvs/cuvs_cagra_int8_t.cu
+    src/cuvs/cuvs_cagra_uint8_t.cu
     LINKS
     cuvs
   )
@@ -253,8 +232,7 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
   ConfigureAnnBench(
-    NAME CUVS_CAGRA_HNSWLIB PATH bench/ann/src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs
-    hnswlib::hnswlib
+    NAME CUVS_CAGRA_HNSWLIB PATH src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs hnswlib::hnswlib
   )
 endif()
 
@@ -263,96 +241,71 @@ if(CUVS_ANN_BENCH_USE_CUVS_ANN_MG)
     NAME
     CUVS_ANN_MG
     PATH
-    bench/ann/src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:bench/ann/src/cuvs/cuvs_ann_mg_ivf_flat.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:bench/ann/src/cuvs/cuvs_ann_mg_ivf_pq.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:bench/ann/src/cuvs/cuvs_ann_mg_cagra.cu>
+    src/cuvs/cuvs_benchmark.cu
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:src/cuvs/cuvs_ann_mg_ivf_flat.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:src/cuvs/cuvs_ann_mg_ivf_pq.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:src/cuvs/cuvs_ann_mg_cagra.cu>
     LINKS
     cuvs
   )
-endif()
-
-set(CUVS_FAISS_TARGETS faiss::faiss)
-if(TARGET faiss::faiss_avx2)
-  set(CUVS_FAISS_TARGETS faiss::faiss_avx2)
 endif()
 
 message("CUVS_FAISS_TARGETS: ${CUVS_FAISS_TARGETS}")
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT)
   ConfigureAnnBench(
-    NAME FAISS_CPU_FLAT PATH bench/ann/src/faiss/faiss_cpu_benchmark.cpp LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_CPU_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT)
   ConfigureAnnBench(
-    NAME FAISS_CPU_IVF_FLAT PATH bench/ann/src/faiss/faiss_cpu_benchmark.cpp LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_CPU_IVF_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ)
   ConfigureAnnBench(
-    NAME FAISS_CPU_IVF_PQ PATH bench/ann/src/faiss/faiss_cpu_benchmark.cpp LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_CPU_IVF_PQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
-if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT)
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_IVF_FLAT PATH bench/ann/src/faiss/faiss_gpu_benchmark.cu LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
-if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ)
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_IVF_PQ PATH bench/ann/src/faiss/faiss_gpu_benchmark.cu LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
-if(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT)
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_FLAT PATH bench/ann/src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_GGNN)
-  include(cmake/thirdparty/get_glog.cmake)
+  include(cmake/thirdparty/get_glog)
   ConfigureAnnBench(
-    NAME GGNN PATH bench/ann/src/ggnn/ggnn_benchmark.cu LINKS glog::glog ggnn::ggnn CUDA::curand
+    NAME GGNN PATH src/ggnn/ggnn_benchmark.cu LINKS glog::glog ggnn::ggnn CUDA::curand
   )
 endif()
 
 # ##################################################################################################
 # * Dynamically-loading ANN_BENCH executable -------------------------------------------------------
 if(CUVS_ANN_BENCH_SINGLE_EXE)
-  add_executable(ANN_BENCH bench/ann/src/common/benchmark.cpp)
-
-  # Build and link static version of the GBench to keep ANN_BENCH self-contained.
-  get_target_property(TMP_PROP benchmark::benchmark SOURCES)
-  add_library(benchmark_static STATIC ${TMP_PROP})
-  get_target_property(TMP_PROP benchmark::benchmark INCLUDE_DIRECTORIES)
-  target_include_directories(benchmark_static PUBLIC ${TMP_PROP})
-  get_target_property(TMP_PROP benchmark::benchmark LINK_LIBRARIES)
-  target_link_libraries(benchmark_static PUBLIC ${TMP_PROP})
+  add_executable(ANN_BENCH src/common/benchmark.cpp)
 
   target_include_directories(ANN_BENCH PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
   target_link_libraries(
     ANN_BENCH
-    PRIVATE raft::raft
-            nlohmann_json::nlohmann_json
-            benchmark_static
-            dl
-            -static-libgcc
-            fmt::fmt-header-only
-            spdlog::spdlog_header_only
-            -static-libstdc++
-            $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
+    PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl fmt::fmt-header-only
+            spdlog::spdlog_header_only $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
   )
   set_target_properties(
     ANN_BENCH

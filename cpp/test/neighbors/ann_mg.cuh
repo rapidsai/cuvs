@@ -230,8 +230,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       cagra::mg_index_params index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
-      index_params.add_data_on_build = true;
-      index_params.mode              = d_mode;
+      index_params.mode = d_mode;
 
       cagra::search_params search_params;
 
