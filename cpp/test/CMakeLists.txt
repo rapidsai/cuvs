@@ -200,10 +200,10 @@ if(BUILD_C_TESTS)
 
   ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu C_LIB)
 
-  ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
+  ConfigureTest(NAME CAGRA_C_TEST PATH neighbors/ann_cagra_c.cu C_LIB)
 
   if(BUILD_CAGRA_HNSWLIB)
-    ConfigureTest(NAME HNSW_C_TEST PATH test/neighbors/ann_hnsw_c.cu C_LIB)
+    ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
   endif()
 endif()
 
