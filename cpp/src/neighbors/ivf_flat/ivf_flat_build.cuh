@@ -406,7 +406,8 @@ inline auto build(raft::resources const& handle,
                 "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
+               "Cosine metric requires more than one dim");
   index<T, IdxT> index(handle, params, dim);
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
