@@ -55,8 +55,18 @@ void parse_build_param(const nlohmann::json& conf,
 {
   param.R = conf.at("R");
   if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
-  if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
-  // param.use_cagra_graph = conf.at("use_cagra_graph");
+  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
+  if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
+  param.use_cagra_graph = conf.at("use_cagra_graph");
+  if (param.use_cagra_graph) {
+    if (conf.contains("cagra_graph_degree")) {
+      param.cagra_graph_degree = conf.at("cagra_graph_degree");
+    } else {
+      param.cagra_graph_degree = param.R;
+    }
+    param.cagra_intermediate_graph_degree = conf.at("cagra_intermediate_graph_degree");
+  }
+  if (conf.contains("QD")) { param.QD = conf.at("QD"); }
 }
 
 template <typename T>
@@ -73,6 +83,9 @@ void parse_search_param(const nlohmann::json& conf,
 {
   param.L_search    = conf.at("L_search");
   param.num_threads = conf.at("num_threads");
+  if (conf.contains("num_nodes_to_cache")) {
+    param.num_nodes_to_cache = conf.at("num_nodes_to_cache");
+  }
 }
 
 template <typename T, template <typename> class Algo>
@@ -109,9 +122,11 @@ auto create_algo(const std::string& algo_name,
 
   if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
                 std::is_same_v<T, int8_t>) {
-    if (algo_name == "diskann_memory") { a = make_algo<T, cuvs::bench::diskann_memory>(metric, dim, conf); }
-    else if (algo_name == "diskann_ssd") { a = make_algo<T, cuvs::bench::diskann_ssd>(metric, dim, conf); }
-
+    if (algo_name == "diskann_memory") {
+      a = make_algo<T, cuvs::bench::diskann_memory>(metric, dim, conf);
+    } else if (algo_name == "diskann_ssd") {
+      a = make_algo<T, cuvs::bench::diskann_ssd>(metric, dim, conf);
+    }
   }
   if (!a) { throw std::runtime_error("invalid algo: '" + algo_name + "'"); }
 

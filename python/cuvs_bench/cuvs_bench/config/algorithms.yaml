@@ -40,3 +40,9 @@ hnswlib:
 cuvs_cagra_hnswlib:
   executable: CUVS_CAGRA_HNSWLIB_ANN_BENCH
   requires_gpu: true
+diskann_memory:
+  executable: DISKANN_MEMORY_ANN_BENCH
+  requires_gpu: true
+diskann_ssd:
+  executable: DISKANN_SSD_ANN_BENCH
+  requires_gpu: true

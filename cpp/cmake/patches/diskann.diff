@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3d3d2b8..5b6941a 100644
+index 3d3d2b8..0aca533 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -23,6 +23,25 @@ set(CMAKE_STANDARD 17)
@@ -28,7 +28,7 @@ index 3d3d2b8..5b6941a 100644
  if(NOT MSVC)
  	set(CMAKE_CXX_COMPILER g++)
  endif()
-@@ -145,62 +164,56 @@ if (MSVC)
+@@ -145,62 +164,16 @@ if (MSVC)
          "${DISKANN_MKL_LIB_PATH}/mkl_intel_thread.lib")
  else()
      # expected path for manual intel mkl installs
@@ -43,7 +43,8 @@ index 3d3d2b8..5b6941a 100644
 -        message(FATAL_ERROR "Could not find Intel OMP in standard locations; use -DOMP_PATH to specify the install location for your environment")
 -    endif()
 -    link_directories(${OMP_PATH})
--
++    find_package(MKL CONFIG REQUIRED)
+ 
 -    set(POSSIBLE_MKL_LIB_PATHS "/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_core.so;/usr/lib/x86_64-linux-gnu/libmkl_core.so;/opt/intel/mkl/lib/intel64/libmkl_core.so")
 -    foreach(POSSIBLE_MKL_LIB_PATH ${POSSIBLE_MKL_LIB_PATHS})
 -        if (EXISTS ${POSSIBLE_MKL_LIB_PATH})
@@ -71,39 +72,9 @@ index 3d3d2b8..5b6941a 100644
 -    endif()
 -    link_directories(${MKL_PATH})
 -    include_directories(${MKL_INCLUDE_PATH})
-+    find_package(MKL CONFIG REQUIRED)
-+
 +    #target_compile_options(${PROJECT_NAME} PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
 +    include_directories($<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
 +    link_libraries($<LINK_ONLY:MKL::MKL>)
-+
-+#    set(POSSIBLE_MKL_LIB_PATHS "/raid/tarangj/miniconda3/envs/all_cuda-125_arch-x86_64/lib/libmkl_core.so;/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_core.so;/usr/lib/x86_64-linux-gnu/libmkl_core.so;/opt/intel/mkl/lib/intel64/libmkl_core.so")
-+#    foreach(POSSIBLE_MKL_LIB_PATH ${POSSIBLE_MKL_LIB_PATHS})
-+#        if (EXISTS ${POSSIBLE_MKL_LIB_PATH})
-+#            get_filename_component(MKL_PATH ${POSSIBLE_MKL_LIB_PATH} DIRECTORY)
-+#        endif()
-+#    endforeach()
-+
-+#    set(POSSIBLE_MKL_INCLUDE_PATHS "/raid/tarangj/miniconda3/envs/all_cuda-125_arch-x86_64/include;/opt/intel/oneapi/mkl/latest/include;/usr/include/mkl;/opt/intel/mkl/include/;")
-+#    foreach(POSSIBLE_MKL_INCLUDE_PATH ${POSSIBLE_MKL_INCLUDE_PATHS})
-+#        if (EXISTS ${POSSIBLE_MKL_INCLUDE_PATH})
-+#            set(MKL_INCLUDE_PATH ${POSSIBLE_MKL_INCLUDE_PATH})
-+#        endif()
-+#    endforeach()
-+#    if(NOT MKL_PATH)
-+#        message(FATAL_ERROR "Could not find Intel MKL in standard locations; use -DMKL_PATH to specify the install location for your environment")
-+#   elseif(NOT MKL_INCLUDE_PATH)
-+#        message(FATAL_ERROR "Could not find Intel MKL in standard locations; use -DMKL_INCLUDE_PATH to specify the install location for headers for your environment")
-+#    endif()
-+#    if (EXISTS ${MKL_PATH}/libmkl_def.so.2)
-+#        set(MKL_DEF_SO ${MKL_PATH}/libmkl_def.so.2)
-+#    elseif(EXISTS ${MKL_PATH}/libmkl_def.so)
-+#        set(MKL_DEF_SO ${MKL_PATH}/libmkl_def.so)
-+#    else()
-+#        message(FATAL_ERROR "Despite finding MKL, libmkl_def.so was not found in expected locations.")
-+#    endif()
-+#    link_directories(${MKL_PATH})
-+#    include_directories(${MKL_INCLUDE_PATH})
  
      # compile flags and link libraries
      add_compile_options(-m64 -Wl,--no-as-needed)
@@ -121,22 +92,10 @@ index 3d3d2b8..5b6941a 100644
 -                m
 -                dl
 -        )
-+#    else()
-+#        # static linking for python so as to minimize customer dependency issues
-+#        link_libraries(
-+#                ${MKL_PATH}/libmkl_intel_ilp64.a
-+#                ${MKL_PATH}/libmkl_intel_thread.a
-+#                ${MKL_PATH}/libmkl_core.a
-+#                ${MKL_DEF_SO}
-+#                iomp5
-+#                pthread
-+#                m
-+#                dl
-+#        )
      endif()
  endif()
  
-@@ -286,7 +299,7 @@ if(MSVC)
+@@ -286,7 +259,7 @@ if(MSVC)
  	set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${PROJECT_SOURCE_DIR}/x64/Release)
  else()
      set(ENV{TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD} 500000000000)
@@ -145,7 +104,7 @@ index 3d3d2b8..5b6941a 100644
      set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG")
      if (NOT PYBIND)
          set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG -Ofast")
-@@ -300,10 +313,6 @@ else()
+@@ -300,10 +273,6 @@ else()
  endif()
  
  add_subdirectory(src)
@@ -156,7 +115,7 @@ index 3d3d2b8..5b6941a 100644
  
  if (UNIT_TEST)
      enable_testing()
-@@ -331,3 +340,7 @@ include(clang-format.cmake)
+@@ -331,3 +300,7 @@ include(clang-format.cmake)
  if(PYBIND)
      add_subdirectory(python)
  endif()
@@ -261,6 +220,49 @@ index 7e2a7ac..538b55a 100644
          if (calc_recall_flag)
          {
              diskann::cout << std::setw(16) << recall << std::endl;
+diff --git a/build.sh b/build.sh
+new file mode 100755
+index 0000000..79f0fa0
+--- /dev/null
++++ b/build.sh
+@@ -0,0 +1,37 @@
++#!/bin/bash
++
++# NOTE: This file is temporary for the proof-of-concept branch and will be removed before this PR is merged
++
++BUILD_TYPE=Release
++BUILD_DIR=build/
++
++RAFT_REPO_REL=""
++EXTRA_CMAKE_ARGS=""
++set -e
++
++if [[ ${RAFT_REPO_REL} != "" ]]; then
++  RAFT_REPO_PATH="`readlink -f \"${RAFT_REPO_REL}\"`"
++  EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS} -DCPM_raft_SOURCE=${RAFT_REPO_PATH}"
++fi
++
++if [ "$1" == "clean" ]; then
++  rm -rf build
++  rm -rf .cache
++  exit 0
++fi
++
++mkdir -p $BUILD_DIR
++cd $BUILD_DIR
++
++cmake \
++ -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
++ -DCMAKE_CUDA_ARCHITECTURES="NATIVE" \
++ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
++  ../
++#  -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache \
++#  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
++#  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
++#  ${EXTRA_CMAKE_ARGS} \
++#  ../
++
++make -j30
 diff --git a/cmake/thirdparty/fetch_rapids.cmake b/cmake/thirdparty/fetch_rapids.cmake
 new file mode 100644
 index 0000000..2703ec4
@@ -437,7 +439,7 @@ index 0a0a617..c4ee71d 100644
 \ No newline at end of file
 +} // namespace diskann
 diff --git a/include/index.h b/include/index.h
-index b9bf4f3..e365fdc 100644
+index b9bf4f3..60ef863 100644
 --- a/include/index.h
 +++ b/include/index.h
 @@ -29,6 +29,11 @@
@@ -461,28 +463,17 @@ index b9bf4f3..e365fdc 100644
  
      DISKANN_DLLEXPORT ~Index();
  
-@@ -236,6 +241,11 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
+@@ -236,6 +241,9 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
      Index(const Index<T, TagT, LabelT> &) = delete;
      Index<T, TagT, LabelT> &operator=(const Index<T, TagT, LabelT> &) = delete;
  
-+    // Build the raft CAGRA index
++    // Build the cuVS CAGRA index
 +    void build_cuvs_cagra_index(const T* data);
-+
-+    void build_cuvs_cagra_index_quantized(const uint8_t *data);
 +
      // Use after _data and _nd have been populated
      // Acquire exclusive _update_lock before calling
      void build_with_data_populated(const std::vector<TagT> &tags);
-@@ -286,6 +296,8 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
-     // Acquire exclusive _update_lock before calling
-     void link();
- 
-+    void add_cuvs_cagra_nbrs();
-+
-     // Acquire exclusive _tag_lock and _delete_lock before calling
-     int reserve_location();
- 
-@@ -444,5 +456,9 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
+@@ -444,5 +452,9 @@ template <typename T, typename TagT = uint32_t, typename LabelT = uint32_t> clas
      std::vector<non_recursive_mutex> _locks;
  
      static const float INDEX_GROWTH_FACTOR;
@@ -581,26 +572,15 @@ index a8e64d0..7fbc1bb 100644
 +    std::shared_ptr<cuvs::neighbors::cagra::index_params> _cuvs_cagra_index_params;
  };
  } // namespace diskann
-diff --git a/include/index_factory.h b/include/index_factory.h
-index 76fb0b9..f672bc6 100644
---- a/include/index_factory.h
-+++ b/include/index_factory.h
-@@ -48,4 +48,4 @@ class IndexFactory
-     std::unique_ptr<IndexConfig> _config;
- };
- 
--} // namespace diskann
-+} // namespace diskann
-\ No newline at end of file
 diff --git a/include/program_options_utils.hpp b/include/program_options_utils.hpp
-index 2be6059..fb6be55 100644
+index 2be6059..922fbe5 100644
 --- a/include/program_options_utils.hpp
 +++ b/include/program_options_utils.hpp
 @@ -77,5 +77,6 @@ const char *UNIVERSAL_LABEL =
      "in the labels file instead of listing all labels for a node.  DiskANN will not automatically assign a "
      "universal label to a node.";
  const char *FILTERED_LBUILD = "Build complexity for filtered points, higher value results in better graphs";
-+const char *RAFT_CAGRA_INDEX = "Use the raft CAGRA graph instead of the Vamana graph";
++const char *CUVS_CAGRA_INDEX = "Use the raft CAGRA graph instead of the Vamana graph";
  
  } // namespace program_options_utils
 diff --git a/include/utils.h b/include/utils.h
@@ -645,7 +625,7 @@ index cbca264..de3dadd 100644
  
  if (NOT MSVC)
 diff --git a/src/disk_utils.cpp b/src/disk_utils.cpp
-index 0165602..ee550c1 100644
+index 0165602..ee06fab 100644
 --- a/src/disk_utils.cpp
 +++ b/src/disk_utils.cpp
 @@ -2,6 +2,7 @@
@@ -699,7 +679,7 @@ index 0165602..ee550c1 100644
          if (!use_filters)
          {
              _index.build(shard_base_file.c_str(), shard_base_pts);
-@@ -1101,8 +1105,10 @@ template <typename T, typename LabelT>
+@@ -1101,8 +1105,9 @@ template <typename T, typename LabelT>
  int build_disk_index(const char *dataFilePath, const char *indexFilePath, const char *indexBuildParameters,
                       diskann::Metric compareMetric, bool use_opq, const std::string &codebook_prefix, bool use_filters,
                       const std::string &label_file, const std::string &universal_label, const uint32_t filter_threshold,
@@ -707,22 +687,19 @@ index 0165602..ee550c1 100644
 +                     const uint32_t Lf, std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params)
  {
 +    bool use_cuvs_cagra_graph = cagra_index_params != nullptr;
-+    // std::cout << "inside build_disk_index: use_cuvs_cagra_graph: " << use_cuvs_cagra_graph << std::endl;
      std::stringstream parser;
      parser << std::string(indexBuildParameters);
      std::string cur_param;
-@@ -1289,7 +1295,9 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+@@ -1289,7 +1294,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
      Timer timer;
      diskann::get_bin_metadata(data_file_to_use.c_str(), points_num, dim);
      const double p_val = ((double)MAX_PQ_TRAINING_SET_SIZE / (double)points_num);
 -
 +    
-+    if (!use_cuvs_cagra_graph) {
-+        std::cout << "entered !use_cuvs_cagra_graph if block" << std::endl;
      if (use_disk_pq)
      {
          generate_disk_quantized_data<T>(data_file_to_use, disk_pq_pivots_path, disk_pq_compressed_vectors_path,
-@@ -1309,12 +1317,14 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
+@@ -1309,6 +1314,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
          num_pq_chunks = atoi(param_list[8].c_str());
      }
  
@@ -730,18 +707,7 @@ index 0165602..ee550c1 100644
      diskann::cout << "Compressing " << dim << "-dimensional data into " << num_pq_chunks << " bytes per vector."
                    << std::endl;
  
-     generate_quantized_data<T>(data_file_to_use, pq_pivots_path, pq_compressed_vectors_path, compareMetric, p_val,
-                                num_pq_chunks, use_opq, codebook_prefix);
-     diskann::cout << timer.elapsed_seconds_for_step("generating quantized data") << std::endl;
-+}
- 
- // Gopal. Splitting diskann_dll into separate DLLs for search and build.
- // This code should only be available in the "build" DLL.
-@@ -1323,10 +1333,11 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
- #endif
-     // Whether it is cosine or inner product, we still L2 metric due to the pre-processing.
-     timer.reset();
-+    std::cout << "now running build_merged_vamana_index" << std::endl;
+@@ -1326,7 +1332,7 @@ int build_disk_index(const char *dataFilePath, const char *indexFilePath, const
      diskann::build_merged_vamana_index<T, LabelT>(data_file_to_use.c_str(), diskann::Metric::L2, L, R, p_val,
                                                    indexing_ram_budget, mem_index_path, medoids_path, centroids_path,
                                                    build_pq_bytes, use_opq, num_threads, use_filters, labels_file_to_use,
@@ -750,7 +716,7 @@ index 0165602..ee550c1 100644
      diskann::cout << timer.elapsed_seconds_for_step("building merged vamana index") << std::endl;
  
      timer.reset();
-@@ -1432,21 +1443,21 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint32_t>(const char *da
+@@ -1432,21 +1438,21 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint32_t>(const char *da
                                                                    const std::string &codebook_prefix, bool use_filters,
                                                                    const std::string &label_file,
                                                                    const std::string &universal_label,
@@ -775,7 +741,7 @@ index 0165602..ee550c1 100644
  // LabelT = uint16
  template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *dataFilePath, const char *indexFilePath,
                                                                    const char *indexBuildParameters,
-@@ -1454,51 +1465,51 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *da
+@@ -1454,51 +1460,51 @@ template DISKANN_DLLEXPORT int build_disk_index<int8_t, uint16_t>(const char *da
                                                                    const std::string &codebook_prefix, bool use_filters,
                                                                    const std::string &label_file,
                                                                    const std::string &universal_label,
@@ -848,7 +814,7 @@ index 096d1b7..6d01516 100644
 \ No newline at end of file
 +endforeach()
 diff --git a/src/index.cpp b/src/index.cpp
-index bf93344..531cd75 100644
+index bf93344..d6c22f7 100644
 --- a/src/index.cpp
 +++ b/src/index.cpp
 @@ -1,6 +1,7 @@
@@ -896,7 +862,7 @@ index bf93344..531cd75 100644
  // Initialize an index with metric m, load the data of type T with filename
  // (bin), and initialize max_points
  template <typename T, typename TagT, typename LabelT>
-@@ -38,8 +57,11 @@ Index<T, TagT, LabelT>::Index(const IndexConfig &index_config, std::shared_ptr<A
+@@ -38,7 +57,8 @@ Index<T, TagT, LabelT>::Index(const IndexConfig &index_config, std::shared_ptr<A
        _enable_tags(index_config.enable_tags), _indexingMaxC(DEFAULT_MAXC), _query_scratch(nullptr),
        _pq_dist(index_config.pq_dist_build), _use_opq(index_config.use_opq),
        _filtered_index(index_config.filtered_index), _num_pq_chunks(index_config.num_pq_chunks),
@@ -904,12 +870,9 @@ index bf93344..531cd75 100644
 +      _delete_set(new tsl::robin_set<uint32_t>), _conc_consolidate(index_config.concurrent_consolidate),
 +      _cuvs_cagra_index(index_config.cuvs_cagra_index)
  {
-+    std::cout << "inside params function index_config.cuvs_cagra_index" << index_config.cuvs_cagra_index
-+              << " _cuvs_cagra_index " << _cuvs_cagra_index << std::endl;
      if (_dynamic_index && !_enable_tags)
      {
-         throw ANNException("ERROR: Dynamic Indexing must have tags enabled.", -1, __FUNCSIG__, __FILE__, __LINE__);
-@@ -109,6 +131,21 @@ Index<T, TagT, LabelT>::Index(const IndexConfig &index_config, std::shared_ptr<A
+@@ -109,6 +129,22 @@ Index<T, TagT, LabelT>::Index(const IndexConfig &index_config, std::shared_ptr<A
                                       _indexingQueueSize, _indexingRange, _indexingMaxC, _data_store->get_dims());
          }
      }
@@ -924,6 +887,7 @@ index bf93344..531cd75 100644
 +        else
 +        {
 +            cuvs::neighbors::cagra::index_params cuvs_cagra_index_params;
++            cuvs_cagra_index_params.graph_degree = _indexingRange;
 +            cuvs_cagra_index_params.metric = parse_metric_to_cuvs(_dist_metric);
 +            _cuvs_cagra_index_params = std::make_shared<cuvs::neighbors::cagra::index_params>(cuvs_cagra_index_params);
 +        }
@@ -931,7 +895,7 @@ index bf93344..531cd75 100644
  }
  
  template <typename T, typename TagT, typename LabelT>
-@@ -117,7 +154,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
+@@ -117,7 +153,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
                                const std::shared_ptr<IndexSearchParams> index_search_params, const size_t num_frozen_pts,
                                const bool dynamic_index, const bool enable_tags, const bool concurrent_consolidate,
                                const bool pq_dist_build, const size_t num_pq_chunks, const bool use_opq,
@@ -941,7 +905,7 @@ index bf93344..531cd75 100644
      : Index(
            IndexConfigBuilder()
                .with_metric(m)
-@@ -134,6 +172,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
+@@ -134,6 +171,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
                .is_use_opq(use_opq)
                .is_filtered(filtered_index)
                .with_data_type(diskann_type_to_name<T>())
@@ -950,16 +914,7 @@ index bf93344..531cd75 100644
                .build(),
            IndexFactory::construct_datastore<T>(DataStoreStrategy::MEMORY,
                                                 (max_points == 0 ? (size_t)1 : max_points) +
-@@ -145,6 +185,8 @@ Index<T, TagT, LabelT>::Index(Metric m, const size_t dim, const size_t max_point
-                                              (size_t)((index_parameters == nullptr ? 0 : index_parameters->max_degree) *
-                                                       defaults::GRAPH_SLACK_FACTOR * 1.05)))
- {
-+    std::cout << "inside index build cuvs_cagra_index: " << cuvs_cagra_index
-+              << " _cuvs_cagra_index: " << _cuvs_cagra_index << std::endl;
-     if (_pq_dist)
-     {
-         _pq_data_store = IndexFactory::construct_pq_datastore<T>(DataStoreStrategy::MEMORY, max_points + num_frozen_pts,
-@@ -372,7 +414,36 @@ void Index<T, TagT, LabelT>::save(const char *filename, bool compact_before_save
+@@ -372,7 +411,36 @@ void Index<T, TagT, LabelT>::save(const char *filename, bool compact_before_save
          // the error code for delete_file, but will ignore now because
          // delete should succeed if save will succeed.
          delete_file(graph_file);
@@ -974,19 +929,19 @@ index bf93344..531cd75 100644
 +            size_t file_offset = 0;
 +            out.seekp(file_offset, out.beg);
 +            size_t index_size = 24;
-+            uint32_t max_degree = _indexingRange;
++            uint32_t max_degree = _cuvs_cagra_index_params->graph_degree;
 +            out.write((char *)&index_size, sizeof(uint64_t));
 +            out.write((char *)&max_degree, sizeof(uint32_t));
 +            uint32_t ep_u32 = _start;
 +            out.write((char *)&ep_u32, sizeof(uint32_t));
 +            out.write((char *)&_num_frozen_pts, sizeof(size_t));
 +
-+            uint32_t GK = (uint32_t)_indexingRange;
++            uint32_t GK = max_degree;
 +            for (uint32_t i = 0; i < _nd + _num_frozen_pts; i++)
 +            {
 +
 +                out.write((char *)&GK, sizeof(uint32_t));
-+                out.write((char *)(host_cagra_graph.data() + _indexingRange * i), GK * sizeof(uint32_t));
++                out.write((char *)(host_cagra_graph.data() + GK * i), GK * sizeof(uint32_t));
 +                index_size += (size_t)(sizeof(uint32_t) * (GK + 1));
 +            }
 +            out.seekp(file_offset, out.beg);
@@ -997,40 +952,7 @@ index bf93344..531cd75 100644
          delete_file(data_file);
          save_data(data_file);
          delete_file(tags_file);
-@@ -732,6 +803,7 @@ template <typename T, typename TagT, typename LabelT> int Index<T, TagT, LabelT>
- 
- template <typename T, typename TagT, typename LabelT> uint32_t Index<T, TagT, LabelT>::calculate_entry_point()
- {
-+    std::cout << "inside calculate entry point" << std::endl;
-     // REFACTOR TODO: This function does not support multi-threaded calculation of medoid.
-     // Must revisit if perf is a concern.
-     return _data_store->calculate_medoid();
-@@ -739,6 +811,7 @@ template <typename T, typename TagT, typename LabelT> uint32_t Index<T, TagT, La
- 
- template <typename T, typename TagT, typename LabelT> std::vector<uint32_t> Index<T, TagT, LabelT>::get_init_ids()
- {
-+    // std::cout << "num_frozen_pts" << _num_frozen_pts << std::endl;
-     std::vector<uint32_t> init_ids;
-     init_ids.reserve(1 + _num_frozen_pts);
- 
-@@ -839,6 +912,8 @@ std::pair<uint32_t, uint32_t> Index<T, TagT, LabelT>::iterate_to_fixed_point(
-         _pq_data_store->get_distance(scratch->aligned_query(), ids, dists_out, scratch);
-     };
- 
-+    // raft::print_host_vector("init_ids", init_ids.data(), init_ids.size(), std::cout);
-+
-     // Initialize the candidate pool with starting points
-     for (auto id : init_ids)
-     {
-@@ -1270,6 +1345,7 @@ void Index<T, TagT, LabelT>::inter_insert(uint32_t n, std::vector<uint32_t> &pru
- 
- template <typename T, typename TagT, typename LabelT> void Index<T, TagT, LabelT>::link()
- {
-+    std::cout << "inside link()" << std::endl;
-     uint32_t num_threads = _indexingThreads;
-     if (num_threads != 0)
-         omp_set_num_threads(num_threads);
-@@ -1448,8 +1524,6 @@ void Index<T, TagT, LabelT>::set_start_points(const T *data, size_t data_count)
+@@ -1448,8 +1516,6 @@ void Index<T, TagT, LabelT>::set_start_points(const T *data, size_t data_count)
      if (data_count != _num_frozen_pts * _dim)
          throw ANNException("Invalid number of points", -1, __FUNCSIG__, __FILE__, __LINE__);
  
@@ -1039,7 +961,7 @@ index bf93344..531cd75 100644
      for (location_t i = 0; i < _num_frozen_pts; i++)
      {
          _data_store->set_vector((location_t)(i + _max_points), data + i * _dim);
-@@ -1505,6 +1579,20 @@ void Index<T, TagT, LabelT>::set_start_points_at_random(T radius, uint32_t rando
+@@ -1505,6 +1571,20 @@ void Index<T, TagT, LabelT>::set_start_points_at_random(T radius, uint32_t rando
      set_start_points(points_data.data(), points_data.size());
  }
  
@@ -1060,7 +982,7 @@ index bf93344..531cd75 100644
  template <typename T, typename TagT, typename LabelT>
  void Index<T, TagT, LabelT>::build_with_data_populated(const std::vector<TagT> &tags)
  {
-@@ -1559,6 +1647,7 @@ void Index<T, TagT, LabelT>::build_with_data_populated(const std::vector<TagT> &
+@@ -1559,6 +1639,7 @@ void Index<T, TagT, LabelT>::build_with_data_populated(const std::vector<TagT> &
  
      _has_built = true;
  }
@@ -1068,7 +990,7 @@ index bf93344..531cd75 100644
  template <typename T, typename TagT, typename LabelT>
  void Index<T, TagT, LabelT>::_build(const DataType &data, const size_t num_points_to_load, TagVector &tags)
  {
-@@ -1597,7 +1686,12 @@ void Index<T, TagT, LabelT>::build(const T *data, const size_t num_points_to_loa
+@@ -1597,7 +1678,12 @@ void Index<T, TagT, LabelT>::build(const T *data, const size_t num_points_to_loa
          _data_store->populate_data(data, (location_t)num_points_to_load);
      }
  
@@ -1082,7 +1004,7 @@ index bf93344..531cd75 100644
  }
  
  template <typename T, typename TagT, typename LabelT>
-@@ -1683,7 +1777,14 @@ void Index<T, TagT, LabelT>::build(const char *filename, const size_t num_points
+@@ -1683,7 +1769,14 @@ void Index<T, TagT, LabelT>::build(const char *filename, const size_t num_points
          std::unique_lock<std::shared_timed_mutex> tl(_tag_lock);
          _nd = num_points_to_load;
      }
@@ -1098,12 +1020,3 @@ index bf93344..531cd75 100644
  }
  
  template <typename T, typename TagT, typename LabelT>
-diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 6af8405..a44caab 100644
---- a/tests/CMakeLists.txt
-+++ b/tests/CMakeLists.txt
-@@ -38,4 +38,3 @@ add_executable(${PROJECT_NAME}_unit_tests ${DISKANN_SOURCES} ${DISKANN_UNIT_TEST
- target_link_libraries(${PROJECT_NAME}_unit_tests ${PROJECT_NAME} ${DISKANN_TOOLS_TCMALLOC_LINK_OPTIONS} Boost::unit_test_framework)
- 
- add_test(NAME ${PROJECT_NAME}_unit_tests COMMAND ${PROJECT_NAME}_unit_tests)
--

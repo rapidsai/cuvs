@@ -100,11 +100,25 @@ def hnswlib_search(params, build_params, k, batch_size):
     if "ef" in params:
         return params["ef"] >= k
 
+###############################################################################
+#                              DiskANN constraints                            #
+###############################################################################
 
-def diskann_memory_build(params, build_params, k, batch_size):
+def diskann_memory_build(params, dim):
     ret = True
-    if "cagra_graph_degree" in params:
-        ret = params["cagra_graph_degree"] <= params["cagra_intermediate_graph_degree"]
+    if "cagra_intermediate_graph_degree" in params:
+        ret = params["R"] <= params["cagra_intermediate_graph_degree"]
     if "R" in params and "L_build" in params:
         ret = params["R"] <= params["L_build"]
+    return ret
+
+
+def diskann_ssd_build(params, dim):
+    ret = True
+    if "cagra_intermediate_graph_degree" in params:
+        ret = params["R"] <= params["cagra_intermediate_graph_degree"]
+    if "R" in params and "L_build" in params:
+        ret = params["R"] <= params["L_build"]
+    if "QD" in params:
+        ret = params["QD"] <= dim
     return ret

@@ -146,7 +146,7 @@ void bench_build(::benchmark::State& state,
   bool parse_base_file = index.algo == "diskann_ssd";
 
   const T* base_set;
-  if (parse_base_file) base_set = dataset->base_set(algo_property.dataset_memory_type);
+  if (!parse_base_file) base_set = dataset->base_set(algo_property.dataset_memory_type);
   std::size_t index_size = dataset->base_set_size();
 
   cuda_timer gpu_timer{algo};
