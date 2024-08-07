@@ -91,13 +91,13 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
-    NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu
-    neighbors/brute_force_prefiltered.cu neighbors/refine.cu GPUS 1 PERCENT 100
+    NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
+    neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
-    NAME CLUSTER_TEST PATH cluster/kmeans.cu cluster/kmeans_balanced.cu
-    cluster/kmeans_find_k.cu cluster/linkage.cu GPUS 1 PERCENT 100
+    NAME CLUSTER_TEST PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
+    cluster/linkage.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -186,27 +186,23 @@ endif()
 if(BUILD_C_TESTS)
   ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu C_LIB)
   ConfigureTest(
-    NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c
-    distance/pairwise_distance_c.cu C_LIB
-  )
-
-  ConfigureTest(
-    NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu
+    NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu
-    C_LIB
+    NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu C_LIB
+    NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu C_LIB
   )
+
+  ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu C_LIB)
 
   ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
 
-  if (BUILD_CAGRA_HNSWLIB)
+  if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME HNSW_C_TEST PATH test/neighbors/ann_hnsw_c.cu C_LIB)
   endif()
 endif()
