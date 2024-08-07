@@ -22,8 +22,10 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 #include <raft/core/bitset.cuh>
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
+#include <rmm/cuda_stream_pool.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
@@ -205,6 +207,33 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     auto index_view =
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
+    return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
+  }
+
+  auto build_only_host_input()
+  {
+    auto ipams              = ps.index_params;
+    ipams.add_data_on_build = true;
+
+    auto host_database = raft::make_host_matrix<DataT, int64_t>(ps.num_db_vecs, ps.dim);
+    raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+    auto index_view = raft::make_host_matrix_view<const DataT, int64_t>(
+      host_database.data_handle(), ps.num_db_vecs, ps.dim);
+    return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
+  }
+
+  auto build_only_host_input_overlap()
+  {
+    auto ipams              = ps.index_params;
+    ipams.add_data_on_build = true;
+
+    size_t n_streams = 1;
+    raft::resource::set_cuda_stream_pool(handle_,
+                                         std::make_shared<rmm::cuda_stream_pool>(n_streams));
+    auto host_database = raft::make_host_matrix<DataT, int64_t>(ps.num_db_vecs, ps.dim);
+    raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
+    auto index_view = raft::make_host_matrix_view<const DataT, int64_t>(
+      host_database.data_handle(), ps.num_db_vecs, ps.dim);
     return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
   }
 
@@ -966,6 +995,18 @@ inline auto special_cases() -> test_cases_t
   TEST_P(type, build_search) /* NOLINT */               \
   {                                                     \
     this->run([this]() { return this->build_only(); }); \
+  }
+
+#define TEST_BUILD_HOST_INPUT_SEARCH(type)                         \
+  TEST_P(type, build_host_input_search) /* NOLINT */               \
+  {                                                                \
+    this->run([this]() { return this->build_only_host_input(); }); \
+  }
+
+#define TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(type)                         \
+  TEST_P(type, build_host_input_overlap_search) /* NOLINT */               \
+  {                                                                        \
+    this->run([this]() { return this->build_only_host_input_overlap(); }); \
   }
 
 #define TEST_BUILD_EXTEND_SEARCH(type)                       \
