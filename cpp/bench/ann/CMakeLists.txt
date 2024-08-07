@@ -233,7 +233,7 @@ if(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE)
     NAME
     CUVS_KNN_BRUTE_FORCE
     PATH
-    $<$<BOOL:${CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE}>:bench/ann/src/cuvs/cuvs_brute_force_knn.cu>
+    $<$<BOOL:${CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE}>:src/cuvs/cuvs_brute_force_knn.cu>
     LINKS
     cuvs
   )
