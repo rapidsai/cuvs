@@ -136,12 +136,12 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	var DeviceDataPointer unsafe.Pointer
 	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
 	// var deviceData *C.void = nil
-	println("host data location:")
-	println(t.C_tensor.dl_tensor.data)
-	println("device data pointer:")
-	println(DeviceDataPointer)
-	println("host data location:")
-	println(t.C_tensor.dl_tensor.data)
+	// println("host data location:")
+	// println(t.C_tensor.dl_tensor.data)
+	// println("device data pointer:")
+	// println(DeviceDataPointer)
+	// println("host data location:")
+	// println(t.C_tensor.dl_tensor.data)
 
 	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes))))
 	if err != nil {
@@ -156,16 +156,6 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	println("bytes:")
 	println(bytes)
 	// bytes = 0
-
-	hostData := make([]float32, 2)
-
-	// Initialize host memory in Go
-	for i := range hostData {
-		hostData[i] = float32(i)
-	}
-
-	println("host data:")
-	println(unsafe.Pointer(&hostData[0]))
 
 	err = CheckCuda(
 		C.cudaMemcpy(
@@ -186,6 +176,121 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 
 }
 
+func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
+
+	if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
+		return &Tensor[T]{}, errors.New("Tensor must be on GPU")
+	}
+
+	new_shape := make([]int64, 2)
+	new_shape[0] = int64(len(newData))
+	new_shape[1] = int64(len(newData[0]))
+
+	data_flat := make([]T, len(newData)*len(newData[0]))
+	for i := range newData {
+		for j := range newData[i] {
+			data_flat[i*len(newData[0])+j] = newData[i][j]
+		}
+	}
+
+	old_shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
+
+	if old_shape[1] != new_shape[1] {
+		return &Tensor[T]{}, errors.New("new shape must be same as old shape")
+	}
+
+	if len(new_shape) < 2 {
+		return &Tensor[T]{}, errors.New("shape must be atleast 2")
+	}
+
+	newDataSize := 0
+
+	switch any(newData[0][0]).(type) {
+	case int64:
+		// dtype = C.DLDataType{
+		// 	bits:  C.uchar(64),
+		// 	lanes: C.ushort(1),
+		// 	code:  C.kDLInt,
+		// }
+		newDataSize = len(newData) * len(newData[0]) * 8
+	case uint32:
+		// dtype = C.DLDataType{
+		// 	bits:  C.uchar(32),
+		// 	lanes: C.ushort(1),
+		// 	code:  C.kDLUInt,
+		// }
+		newDataSize = len(newData) * len(newData[0]) * 4
+	case float32:
+		// dtype = C.DLDataType{
+		// 	bits:  C.uchar(32),
+		// 	lanes: C.ushort(1),
+		// 	code:  C.kDLFloat,
+		// }
+		newDataSize = len(newData) * len(newData[0]) * 4
+	default:
+		return &Tensor[T]{}, errors.New("unsupported data type")
+	}
+
+	bytes := t.GetBytes()
+
+	var NewDeviceDataPointer unsafe.Pointer
+	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
+	// var deviceData *C.void = nil
+	println("host data location:")
+	println(t.C_tensor.dl_tensor.data)
+	println("device data pointer:")
+	println(NewDeviceDataPointer)
+	println("host data location:")
+	println(t.C_tensor.dl_tensor.data)
+
+	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &NewDeviceDataPointer, C.size_t(bytes+newDataSize))))
+	if err != nil {
+		//	panic(err)
+		return nil, err
+	}
+
+	err = CheckCuda(
+		C.cudaMemcpy(
+			NewDeviceDataPointer,
+			t.C_tensor.dl_tensor.data,
+			C.size_t(bytes),
+			C.cudaMemcpyDeviceToDevice,
+		))
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = CheckCuda(
+		C.cudaMemcpy(
+			unsafe.Pointer(uintptr(NewDeviceDataPointer)+uintptr(bytes)),
+			unsafe.Pointer(&data_flat[0]),
+			C.size_t(newDataSize),
+			C.cudaMemcpyHostToDevice,
+		))
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = CheckCuvs(CuvsError(
+		C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+
+	if err != nil {
+		return nil, err
+	}
+
+	shape := make([]int64, 2)
+	shape[0] = int64(*t.C_tensor.dl_tensor.shape) + int64(len(newData))
+	println(old_shape[1])
+	shape[1] = new_shape[1]
+
+	t.C_tensor.dl_tensor.data = NewDeviceDataPointer
+	t.C_tensor.dl_tensor.shape = (*C.int64_t)(unsafe.Pointer(&shape[0]))
+
+	return t, nil
+}
+
 func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	bytes := t.GetBytes()
 
@@ -201,6 +306,13 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 			C.size_t(bytes),
 			C.cudaMemcpyDeviceToHost,
 		))
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = CheckCuvs(CuvsError(
+		C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
 
 	if err != nil {
 		return nil, err
