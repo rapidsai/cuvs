@@ -51,7 +51,7 @@ dependencies:
 - recommonmark
 - rmm==24.8.*,>=0.0.0a0
 - rust
-- scikit-build-core>=0.7.0
+- scikit-build-core>=0.10.0
 - scikit-learn
 - sphinx-copybutton
 - sphinx-markdown-tables
