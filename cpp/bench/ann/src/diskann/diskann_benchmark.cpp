@@ -37,7 +37,7 @@ void parse_build_param(const nlohmann::json& conf,
   param.R = conf.at("R");
   if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
-  if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
+  if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   param.use_cagra_graph = conf.at("use_cagra_graph");
   if (param.use_cagra_graph) {
     if (conf.contains("cagra_graph_degree")) {
@@ -95,19 +95,6 @@ std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
 {
   typename Algo<T>::build_param param;
   parse_build_param<T>(conf, param);
-  return std::make_unique<Algo<T>>(metric, dim, param);
-}
-
-template <typename T, template <typename> class Algo>
-std::unique_ptr<cuvs::bench::algo<T>> make_algo(cuvs::bench::Metric metric,
-                                                int dim,
-                                                const nlohmann::json& conf,
-                                                const std::vector<int>& dev_list)
-{
-  typename Algo<T>::build_param param;
-  parse_build_param<T>(conf, param);
-
-  (void)dev_list;
   return std::make_unique<Algo<T>>(metric, dim, param);
 }
 
