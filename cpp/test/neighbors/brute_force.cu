@@ -350,7 +350,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
                                                     true));
 
     if (params_.row_major) {
-      // test out distance epilogue functionality, by squaring distances
+      // test out distance epilogue functionality, by adding one to distances
       cuvs::neighbors::brute_force::search(
         handle_,
         *idx,
