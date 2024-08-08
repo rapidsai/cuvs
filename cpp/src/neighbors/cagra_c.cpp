@@ -318,10 +318,8 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionPar
 
 extern "C" cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
 {
-  return cuvs::core::translate_exceptions([=] {
-    // auto ps = cuvs::neighbors::cagra::extend_params();
-    *params = new cuvsCagraExtendParams{.max_chunk_size = 0};
-  });
+  return cuvs::core::translate_exceptions(
+    [=] { *params = new cuvsCagraExtendParams{.max_chunk_size = 0}; });
 }
 
 extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
