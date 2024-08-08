@@ -116,6 +116,15 @@ struct cuvsIvfPqIndexParams {
    * flag to `true` if you prefer to use as little GPU memory for the database as possible.
    */
   bool conservative_memory_allocation;
+
+  /**
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and
+   * PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training
+   * points to train each codebook.
+   */
+  uint32_t max_train_points_per_pq_code;
 };
 
 typedef struct cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t;
@@ -351,6 +360,66 @@ cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup ivf_pq_c_serialize IVF-PQ C-API serialize functions
+ * @{
+ */
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <cuvs/neighbors/ivf_pq.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsIvfPqBuild`
+ * cuvsIvfPqSerialize(res, "/path/to/index", index, true);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index IVF-PQ index
+ */
+cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res, const char* filename, cuvsIvfPqIndex_t index);
+
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index IVF-PQ index loaded disk
+ */
+cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res, const char* filename, cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
+
+/**
+ * @defgroup ivf_pq_c_index_extend IVF-PQ index extend
+ * @{
+ */
+/**
+ * @brief Extend the index with the new data.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] new_vectors DLManagedTensor* the new vectors to add to the index
+ * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors
+ * @param[inout] index IVF-PQ index to be extended
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                            DLManagedTensor* new_vectors,
+                            DLManagedTensor* new_indices,
+                            cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

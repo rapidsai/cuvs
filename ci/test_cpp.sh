@@ -8,7 +8,7 @@ set -euo pipefail
 rapids-logger "Generate C++ testing dependencies"
 rapids-dependency-file-generator \
   --output conda \
-  --file_key test_cpp \
+  --file-key test_cpp \
   --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch)" | tee env.yaml
 
 rapids-mamba-retry env create --yes -f env.yaml -n test

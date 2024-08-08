@@ -21,6 +21,7 @@
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
@@ -83,6 +84,39 @@ void _search(cuvsResources_t res,
     *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
 }
 
+template <typename T, typename IdxT>
+void _serialize(cuvsResources_t res, const char* filename, cuvsIvfFlatIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_flat::index<T, IdxT>*>(index.addr);
+  cuvs::neighbors::ivf_flat::serialize(*res_ptr, std::string(filename), *index_ptr);
+}
+
+template <typename T, typename IdxT>
+void* _deserialize(cuvsResources_t res, const char* filename)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto index   = new cuvs::neighbors::ivf_flat::index<T, IdxT>(*res_ptr);
+  cuvs::neighbors::ivf_flat::deserialize(*res_ptr, std::string(filename), index);
+  return index;
+}
+
+template <typename T, typename IdxT>
+void _extend(cuvsResources_t res,
+             DLManagedTensor* new_vectors,
+             DLManagedTensor* new_indices,
+             cuvsIvfFlatIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_flat::index<T, IdxT>*>(index.addr);
+  using vectors_mdspan_type = raft::device_matrix_view<T const, IdxT, raft::row_major>;
+  using indices_mdspan_type = raft::device_vector_view<IdxT, IdxT>;
+
+  auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
+  auto indices_mds = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+
+  cuvs::neighbors::ivf_flat::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
@@ -120,18 +154,16 @@ extern "C" cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
 
+    index->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<float, int64_t>(res, *params, dataset_tensor));
-      index->dtype.code = kDLFloat;
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<int8_t, int64_t>(res, *params, dataset_tensor));
-      index->dtype.code = kDLInt;
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<uint8_t, int64_t>(res, *params, dataset_tensor));
-      index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -212,4 +244,68 @@ extern "C" cuvsError_t cuvsIvfFlatSearchParamsCreate(cuvsIvfFlatSearchParams_t* 
 extern "C" cuvsError_t cuvsIvfFlatSearchParamsDestroy(cuvsIvfFlatSearchParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
+                                              const char* filename,
+                                              cuvsIvfFlatIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // read the numpy dtype from the beginning of the file
+    std::ifstream is(filename, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", filename); }
+    char dtype_string[4];
+    is.read(dtype_string, 4);
+    auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
+
+    index->dtype.bits = dtype.itemsize * 8;
+    if (dtype.kind == 'f' && dtype.itemsize == 4) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float, int64_t>(res, filename));
+      index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t, int64_t>(res, filename));
+      index->dtype.code = kDLInt;
+    } else if (dtype.kind == 'u' && dtype.itemsize == 1) {
+      index->addr = reinterpret_cast<uintptr_t>(_deserialize<uint8_t, int64_t>(res, filename));
+      index->dtype.code = kDLUInt;
+    } else {
+      RAFT_FAIL(
+        "Unsupported dtype in file %s itemsize %i kind %i", filename, dtype.itemsize, dtype.kind);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
+                                            const char* filename,
+                                            cuvsIvfFlatIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize<float, int64_t>(res, filename, *index);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize<int8_t, int64_t>(res, filename, *index);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize<uint8_t, int64_t>(res, filename, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+                                         DLManagedTensor* new_vectors,
+                                         DLManagedTensor* new_indices,
+                                         cuvsIvfFlatIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _extend<float, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _extend<int8_t, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _extend<uint8_t, int64_t>(res, new_vectors, new_indices, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
 }

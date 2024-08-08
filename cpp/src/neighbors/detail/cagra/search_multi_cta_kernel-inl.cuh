@@ -41,6 +41,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -214,7 +215,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 
 #if 0
     /* debug */
-    for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += BLOCK_SIZE) {
+    for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
         result_indices_buffer[i] = utils::get_max_value<INDEX_T>();
         result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
     }
@@ -356,16 +357,19 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
   }
 
 #ifdef _CLK_BREAKDOWN
-  if ((threadIdx.x == 0 || threadIdx.x == BLOCK_SIZE - 1) && (blockIdx.x == 0) &&
+  if ((threadIdx.x == 0 || threadIdx.x == blockDim.x - 1) && (blockIdx.x == 0) &&
       ((query_id * 3) % gridDim.y < 3)) {
-    RAFT_LOG_DEBUG(
+    printf(
+      "%s:%d "
       "query, %d, thread, %d"
-      ", init, %d"
+      ", init, %lu"
       ", 1st_distance, %lu"
       ", topk, %lu"
       ", pickup_parents, %lu"
       ", distance, %lu"
       "\n",
+      __FILE__,
+      __LINE__,
       query_id,
       threadIdx.x,
       clk_init,
@@ -454,6 +458,7 @@ void select_and_run(
   const uint32_t num_queries,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* dev_seed_ptr,  // [num_queries, num_seeds]
   uint32_t* const num_executed_iterations,                     // [num_queries,]
+  const search_params& ps,
   uint32_t topk,
   // multi_cta_search (params struct)
   uint32_t block_size,  //
@@ -462,13 +467,7 @@ void select_and_run(
   int64_t hash_bitlen,
   typename DATASET_DESCRIPTOR_T::INDEX_T* hashmap_ptr,
   uint32_t num_cta_per_query,
-  uint32_t num_random_samplings,
-  uint64_t rand_xor_mask,
   uint32_t num_seeds,
-  size_t itopk_size,
-  size_t search_width,
-  size_t min_iterations,
-  size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream)
@@ -503,16 +502,16 @@ void select_and_run(
                                                        queries_ptr,
                                                        graph.data_handle(),
                                                        graph.extent(1),
-                                                       num_random_samplings,
-                                                       rand_xor_mask,
+                                                       ps.num_random_samplings,
+                                                       ps.rand_xor_mask,
                                                        dev_seed_ptr,
                                                        num_seeds,
                                                        hashmap_ptr,
                                                        hash_bitlen,
-                                                       itopk_size,
-                                                       search_width,
-                                                       min_iterations,
-                                                       max_iterations,
+                                                       ps.itopk_size,
+                                                       ps.search_width,
+                                                       ps.min_iterations,
+                                                       ps.max_iterations,
                                                        num_executed_iterations,
                                                        sample_filter,
                                                        metric);
