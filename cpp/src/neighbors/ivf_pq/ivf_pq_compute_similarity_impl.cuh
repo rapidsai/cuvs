@@ -382,7 +382,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
           float2 pvals;
           for (uint32_t i = threadIdx.x; i < dim; i += blockDim.x) {
             pvals.x = query[i];
-            pvals.y = cluster_center[i];
+            pvals.y = cluster_center[i] * pvals.x;
             reinterpret_cast<float2*>(lut_end)[i] = pvals;
           }
         }

@@ -180,7 +180,7 @@ void select_clusters(raft::resources const& handle,
                                  n_lists,
                                  n_queries,
                                  true,
-                                 false,
+                                 true,
                                  op,
                                  stream);
   }
@@ -394,7 +394,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     } break;
     case distance::DistanceType::InnerProduct:
     case distance::DistanceType::CosineExpanded: {
-      // stores two components (query[i] * center[i], query[i] * center[i])
+      // stores two components (query[i], query[i] * center[i])
       precomp_data_count = index.rot_dim() * 2;
     } break;
     default: {
@@ -538,6 +538,7 @@ struct ivfpq_search {
   {
     bool signed_metric = false;
     switch (metric) {
+      case cuvs::distance::DistanceType::CosineExpanded:
       case cuvs::distance::DistanceType::InnerProduct: signed_metric = true; break;
       default: break;
     }

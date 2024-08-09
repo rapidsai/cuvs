@@ -180,7 +180,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
         auto op = [] __device__(MathT a, MathT b) { return a / raft::sqrt(b); };
         raft::linalg::matrixVectorOp(
-          distances.data(), distances.data(), centroidsNorm.data_handle(), n_clusters, n_rows, true, false, op, stream);
+          distances.data(), distances.data(), centroidsNorm.data_handle(), n_clusters, n_rows, true, true, op, stream);
       }
 
       auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(

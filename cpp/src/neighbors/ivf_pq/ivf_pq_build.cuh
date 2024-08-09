@@ -1679,7 +1679,7 @@ auto build(raft::resources const& handle,
                 "Unsupported data type");
 
   std::cout << "using ivf_pq::index_params nrows " << (int)dataset.extent(0) << ", dim "
-            << (int)dataset.extent(1) << ", n_lits " << (int)params.n_lists << ", pq_dim "
+            << (int)dataset.extent(1) << ", n_lists " << (int)params.n_lists << ", pq_dim "
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
