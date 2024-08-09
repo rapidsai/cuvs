@@ -22,6 +22,7 @@
 #include <raft/core/resources.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
+#include <rmm/mr/device/pool_memory_resource.hpp>
 #include <thread>
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
@@ -80,6 +81,24 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
     auto mr      = rmm::mr::get_current_device_resource();
     mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
   });
+}
+
+extern "C" cuvsError_t cuvsRMMEnablePoolMemoryResource(int initial_pool_size_percent,
+                                                       int max_pool_size_percent)
+{
+  return cuvs::core::translate_exceptions([=] {
+    rmm::mr::cuda_memory_resource cuda_mr;
+    auto initial_size = rmm::percent_of_free_device_memory(initial_pool_size_percent);
+    auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
+    rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource> pool_mr{
+      &cuda_mr, initial_size, max_size};
+    rmm::mr::set_current_device_resource(&pool_mr);
+  });
+}
+
+extern "C" cuvsError_t cuvsRMMResetMemoryResource()
+{
+  return cuvs::core::translate_exceptions([=] { rmm::mr::set_current_device_resource(nullptr); });
 }
 
 thread_local std::string last_error_text = "";
