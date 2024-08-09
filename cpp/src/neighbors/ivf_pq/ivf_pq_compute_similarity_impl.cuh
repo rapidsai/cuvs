@@ -27,6 +27,7 @@
 #include <raft/util/vectorized.cuh>          // raft::TxN_t
 
 #include <rmm/cuda_stream_view.hpp>  // rmm::cuda_stream_view
+#include <vector_types.h>
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
@@ -377,6 +378,14 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
             reinterpret_cast<float2*>(lut_end)[i] = pvals;
           }
         } break;
+        case distance::DistanceType::CosineExpanded: {
+          float2 pvals;
+          for (uint32_t i = threadIdx.x; i < dim; i += blockDim.x) {
+            pvals.x = query[i];
+            pvals.y = cluster_center[i];
+            reinterpret_cast<float2*>(lut_end)[i] = pvals;
+          }
+        }
         default: __builtin_unreachable();
       }
       __syncthreads();
@@ -393,6 +402,8 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
         auto cur_pq_center   = pq_center + (i & PqMask) +
                              (codebook_kind == codebook_gen::PER_SUBSPACE ? j * PqShift : 0u);
         float score = 0.0;
+        float q_norm = 1.0;
+        float c_norm = 1.0;
         do {
           float pq_c = *cur_pq_center;
           cur_pq_center += PqShift;
@@ -421,10 +432,26 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               }
               score -= q * pq_c;
             } break;
+            case distance::DistanceType::CosineExpanded: {
+              // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
+              float q, c, quantized;
+              if constexpr (PrecompBaseDiff) {
+                float2 pvals = reinterpret_cast<float2*>(lut_end)[j];
+                q            = pvals.x;
+                c = pvals.y;
+              } else {
+                q = query[j];
+                c = cluster_center[j];
+              }
+              quantized = c + pq_c;
+              score -= q * quantized;
+              q_norm += q * q;
+              c_norm += quantized * quantized;
+            } break;
             default: __builtin_unreachable();
           }
         } while (++j < j_end);
-        lut_scores[i] = LutT(score);
+        lut_scores[i] = LutT(score / (sqrt(q_norm * c_norm)));
       }
     }
 

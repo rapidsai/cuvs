@@ -37,6 +37,9 @@
 #include <raft/core/resources.hpp>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/norm.cuh>
+#include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cache.hpp>
@@ -47,6 +50,7 @@
 #include <raft/util/vectorized.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
+#include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
 #include <cub/cub.cuh>
@@ -110,6 +114,7 @@ void select_clusters(raft::resources const& handle,
   switch (metric) {
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
@@ -133,6 +138,7 @@ void select_clusters(raft::resources const& handle,
       gemm_k = dim + 1;
       RAFT_EXPECTS(gemm_k <= dim_ext, "unexpected gemm_k or dim_ext");
     } break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: {
       alpha = -1.0;
       beta  = 0.0;
@@ -155,6 +161,29 @@ void select_clusters(raft::resources const& handle,
                      qc_distances.data(),
                      n_lists,
                      stream);
+
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    auto centroidsNorm =
+      raft::make_device_mdarray<float, uint32_t>(handle, mr, raft::make_extents<uint32_t>(n_lists));
+    raft::linalg::rowNorm<float, uint32_t>(centroidsNorm.data_handle(),
+                                           cluster_centers,
+                                           dim,
+                                           n_lists,
+                                           raft::linalg::L2Norm,
+                                           true,
+                                           stream);
+
+    auto op = [] __device__(float a, float b) { return a / raft::sqrt(b); };
+    raft::linalg::matrixVectorOp(qc_distances.data(),
+                                 qc_distances.data(),
+                                 centroidsNorm.data_handle(),
+                                 n_lists,
+                                 n_queries,
+                                 true,
+                                 false,
+                                 op,
+                                 stream);
+  }
 
   // Select neighbor clusters for each query.
   rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
@@ -363,7 +392,8 @@ void ivfpq_search_worker(raft::resources const& handle,
       // stores basediff (query[i] - center[i])
       precomp_data_count = index.rot_dim();
     } break;
-    case distance::DistanceType::InnerProduct: {
+    case distance::DistanceType::InnerProduct:
+    case distance::DistanceType::CosineExpanded: {
       // stores two components (query[i] * center[i], query[i] * center[i])
       precomp_data_count = index.rot_dim() * 2;
     } break;

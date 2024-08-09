@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../distance/fused_distance_nn.cuh"
+#include "cuvs/distance/distance.h"
 #include "kmeans_common.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -25,6 +26,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/common/nvtx.hpp>
 #include <raft/core/cudart_utils.hpp>
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -141,6 +143,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                         raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: {
       // TODO: pass buffer
       rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
@@ -164,12 +167,50 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                          n_clusters,
                          stream);
 
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+        auto centroidsNorm =
+          raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
+        raft::linalg::rowNorm<MathT, IdxT>(centroidsNorm.data_handle(),
+                                           centers,
+                                           dim,
+                                           n_clusters,
+                                           raft::linalg::L2Norm,
+                                           true,
+                                           stream);
+
+        auto op = [] __device__(MathT a, MathT b) { return a / raft::sqrt(b); };
+        raft::linalg::matrixVectorOp(
+          distances.data(), distances.data(), centroidsNorm.data_handle(), n_clusters, n_rows, true, false, op, stream);
+      }
+
       auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT, raft::row_major>(
         distances.data(), n_rows, n_clusters);
       auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
       raft::matrix::argmin(handle, distances_const_view, labels_view);
       break;
     }
+      // case cuvs::distance::DistanceType::CosineExpanded: {
+      //   auto stream = raft::resource::get_cuda_stream(handle);
+      //   rmm::device_uvector<char> workspace(0, stream, mr);
+      //   workspace.resize((n_rows + n_clusters) * sizeof(MathT), stream);
+      //   rmm::device_uvector<MathT> distances(n_rows * n_clusters, stream, mr);
+
+      //   pairwise_distance_kmeans(
+      //     handle,
+      //     raft::make_device_matrix_view<const MathT, IdxT>(dataset, n_rows, dim),
+      //     raft::make_device_matrix_view<const MathT, IdxT>(centers, n_clusters, dim),
+      //     raft::make_device_matrix_view<MathT, IdxT>(distances.data(), n_rows, n_clusters),
+      //     workspace,
+      //     params.metric);
+
+      //   auto distances_const_view = raft::make_device_matrix_view<const MathT, IdxT,
+      //   raft::row_major>(
+      //     distances.data(), n_rows, n_clusters);
+      //   auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels, n_rows);
+      //   raft::matrix::argmin(handle, distances_const_view, labels_view);
+      //   break;
+      // }
+
     default: {
       RAFT_FAIL("The chosen distance metric is not supported (%d)", int(params.metric));
     }
