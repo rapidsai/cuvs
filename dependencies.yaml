@@ -157,8 +157,8 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - &rmm_unsuffixed rmm==24.8.*,>=0.0.0a0
-          - &pylibraft_unsuffixed pylibraft==24.8.*,>=0.0.0a0
+          - &rmm_unsuffixed rmm==24.10.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==24.10.*,>=0.0.0a0
           - dlpack>=0.8,<1.0
       - output_types: requirements
         packages:
@@ -186,14 +186,14 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - &rmm_cu12 rmm-cu12==24.8.*,>=0.0.0a0
-              - &pylibraft_cu12 pylibraft-cu12==24.8.*,>=0.0.0a0
+              - &rmm_cu12 rmm-cu12==24.10.*,>=0.0.0a0
+              - &pylibraft_cu12 pylibraft-cu12==24.10.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - &rmm_cu11 rmm-cu11==24.8.*,>=0.0.0a0
-              - &pylibraft_cu11 pylibraft-cu11==24.8.*,>=0.0.0a0
+              - &rmm_cu11 rmm-cu11==24.10.*,>=0.0.0a0
+              - &pylibraft_cu11 pylibraft-cu11==24.10.*,>=0.0.0a0
           - {matrix: null, packages: [*rmm_unsuffixed, *pylibraft_unsuffixed] }
   checks:
     common:
