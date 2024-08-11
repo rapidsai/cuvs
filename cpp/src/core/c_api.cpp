@@ -65,8 +65,6 @@ extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
   });
 }
 
-thread_local std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>> pool_mr;
-
 extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -84,6 +82,8 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
     mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
   });
 }
+
+thread_local std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>> pool_mr;
 
 extern "C" cuvsError_t cuvsRMMEnablePoolMemoryResource(int initial_pool_size_percent,
                                                        int max_pool_size_percent)
