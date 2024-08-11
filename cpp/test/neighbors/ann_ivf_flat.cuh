@@ -24,9 +24,11 @@
 #include <raft/stats/mean.cuh>
 #include <thrust/sequence.h>
 
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/util/fast_int_div.cuh>
+#include <rmm/cuda_stream_pool.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -44,7 +46,9 @@ struct AnnIvfFlatInputs {
   IdxT nlist;
   cuvs::distance::DistanceType metric;
   bool adaptive_centers;
-  bool host_dataset;
+  bool host_dataset = false;
+  // The kernel_copy_overlapping option is only applicable when host dataset is enabled.
+  bool kernel_copy_overlapping = false;
 };
 
 template <typename IdxT>
@@ -52,7 +56,8 @@ template <typename IdxT>
 {
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
      << p.nprobe << ", " << p.nlist << ", " << static_cast<int>(p.metric) << ", "
-     << p.adaptive_centers << '}' << std::endl;
+     << p.adaptive_centers << "," << p.host_dataset << "," << p.kernel_copy_overlapping << '}'
+     << std::endl;
   return os;
 }
 
@@ -74,6 +79,12 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
     std::vector<IdxT> indices_naive(queries_size);
     std::vector<T> distances_ivfflat(queries_size);
     std::vector<T> distances_naive(queries_size);
+
+    if (ps.kernel_copy_overlapping) {
+      size_t n_streams = 1;
+      raft::resource::set_cuda_stream_pool(handle_,
+                                           std::make_shared<rmm::cuda_stream_pool>(n_streams));
+    }
 
     {
       rmm::device_uvector<T> distances_naive_dev(queries_size, stream_);
@@ -184,9 +195,9 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
           distances_ivfflat_dev.data(), ps.num_queries, ps.k);
         const std::string filename = "ivf_flat_index";
-        cuvs::neighbors::ivf_flat::serialize_file(handle_, filename, index_2);
-        cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_loaded(handle_, index_params, ps.dim);
-        cuvs::neighbors::ivf_flat::deserialize_file(handle_, filename, &index_loaded);
+        cuvs::neighbors::ivf_flat::serialize(handle_, filename, index_2);
+        cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_loaded(handle_);
+        cuvs::neighbors::ivf_flat::deserialize(handle_, filename, &index_loaded);
         ASSERT_EQ(index_2.size(), index_loaded.size());
 
         cuvs::neighbors::ivf_flat::search(handle_,
@@ -555,6 +566,15 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
   {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+
+  // // host input data with prefetching for kernel copy overlapping
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
 
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
   {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},

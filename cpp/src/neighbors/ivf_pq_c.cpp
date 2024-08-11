@@ -20,15 +20,17 @@
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 namespace {
 
-template <typename IdxT>
+template <typename T, typename IdxT>
 void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -46,13 +48,14 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
     static_cast<cuvs::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind);
   build_params.force_random_rotation          = params.force_random_rotation;
   build_params.conservative_memory_allocation = params.conservative_memory_allocation;
+  build_params.max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
 
   auto dataset = dataset_tensor->dl_tensor;
   auto dim     = dataset.shape[0];
 
   auto index = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr, build_params, dim);
 
-  using mdspan_type = raft::device_matrix_view<float const, IdxT, raft::row_major>;
+  using mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
   cuvs::neighbors::ivf_pq::build(*res_ptr, build_params, mds, index);
@@ -60,7 +63,7 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
   return index;
 }
 
-template <typename IdxT>
+template <typename T, typename IdxT>
 void _search(cuvsResources_t res,
              cuvsIvfPqSearchParams params,
              cuvsIvfPqIndex index,
@@ -77,7 +80,7 @@ void _search(cuvsResources_t res,
   search_params.internal_distance_dtype  = params.internal_distance_dtype;
   search_params.preferred_shmem_carveout = params.preferred_shmem_carveout;
 
-  using queries_mdspan_type   = raft::device_matrix_view<float const, IdxT, raft::row_major>;
+  using queries_mdspan_type   = raft::device_matrix_view<const T, IdxT, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, IdxT, raft::row_major>;
   using distances_mdspan_type = raft::device_matrix_view<float, IdxT, raft::row_major>;
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
@@ -88,30 +91,55 @@ void _search(cuvsResources_t res,
     *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
 }
 
+template <typename IdxT>
+void _serialize(cuvsResources_t res, const char* filename, cuvsIvfPqIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::neighbors::ivf_pq::serialize(*res_ptr, std::string(filename), *index_ptr);
+}
+
+template <typename IdxT>
+void* _deserialize(cuvsResources_t res, const char* filename)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto index   = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr);
+  cuvs::neighbors::ivf_pq::deserialize(*res_ptr, std::string(filename), index);
+  return index;
+}
+
+template <typename T, typename IdxT>
+void _extend(cuvsResources_t res,
+             DLManagedTensor* new_vectors,
+             DLManagedTensor* new_indices,
+             cuvsIvfPqIndex index)
+{
+  auto res_ptr              = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr            = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  using vectors_mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
+  using indices_mdspan_type = raft::device_vector_view<IdxT, IdxT>;
+
+  auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
+  auto indices_mds = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+
+  cuvs::neighbors::ivf_pq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
 {
-  try {
-    *index = new cuvsIvfPqIndex{};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { *index = new cuvsIvfPqIndex{}; });
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index_c_ptr)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index.addr);
     delete index_ptr;
     delete index_c_ptr;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
@@ -119,23 +147,26 @@ extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                                       DLManagedTensor* dataset_tensor,
                                       cuvsIvfPqIndex_t index)
 {
-  try {
-    auto dataset = dataset_tensor->dl_tensor;
+  return cuvs::core::translate_exceptions([=] {
+    auto dataset      = dataset_tensor->dl_tensor;
+    index->dtype.code = dataset.dtype.code;
+    index->dtype.bits = dataset.dtype.bits;
 
-    if ((dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) ||
-        (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) ||
-        (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8)) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<int64_t>(res, *params, dataset_tensor));
-      index->dtype.code = dataset.dtype.code;
+    if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_build<float, int64_t>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_build<int8_t, int64_t>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_build<uint8_t, int64_t>(res, *params, dataset_tensor));
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
                 dataset.dtype.bits);
     }
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
@@ -145,7 +176,7 @@ extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                                        DLManagedTensor* neighbors_tensor,
                                        DLManagedTensor* distances_tensor)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
     auto neighbors = neighbors_tensor->dl_tensor;
     auto distances = distances_tensor->dl_tensor;
@@ -163,27 +194,26 @@ extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                  "distances should be of type float32");
 
     auto index = *index_c_ptr;
-    RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
-
-    if ((queries.dtype.code == kDLFloat && queries.dtype.bits == 32) ||
-        (queries.dtype.code == kDLInt && queries.dtype.bits == 8) ||
-        (queries.dtype.code == kDLUInt && queries.dtype.bits == 8)) {
-      _search<int64_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+    if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
+      _search<float, int64_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+    } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
+      _search<int8_t, int64_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+    } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
+      _search<uint8_t, int64_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
                 queries.dtype.bits);
     }
-
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     *params = new cuvsIvfPqIndexParams{.metric                         = L2Expanded,
                                        .metric_arg                     = 2.0f,
                                        .add_data_on_build              = true,
@@ -194,42 +224,62 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .pq_dim                         = 0,
                                        .codebook_kind                  = codebook_gen::PER_SUBSPACE,
                                        .force_random_rotation          = false,
-                                       .conservative_memory_allocation = false};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+                                       .conservative_memory_allocation = false,
+                                       .max_train_points_per_pq_code   = 256};
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexParamsDestroy(cuvsIvfPqIndexParams_t params)
 {
-  try {
-    delete params;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
 extern "C" cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* params)
 {
-  try {
+  return cuvs::core::translate_exceptions([=] {
     *params = new cuvsIvfPqSearchParams{.n_probes                 = 20,
                                         .lut_dtype                = CUDA_R_32F,
                                         .internal_distance_dtype  = CUDA_R_32F,
                                         .preferred_shmem_carveout = 1.0};
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfPqSearchParamsDestroy(cuvsIvfPqSearchParams_t params)
 {
-  try {
-    delete params;
-    return CUVS_SUCCESS;
-  } catch (...) {
-    return CUVS_ERROR;
-  }
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res,
+                                            const char* filename,
+                                            cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { index->addr = reinterpret_cast<uintptr_t>(_deserialize<int64_t>(res, filename)); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res,
+                                          const char* filename,
+                                          cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] { _serialize<int64_t>(res, filename, *index); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                                       DLManagedTensor* new_vectors,
+                                       DLManagedTensor* new_indices,
+                                       cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto vectors = new_vectors->dl_tensor;
+
+    if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
+      _extend<float, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (vectors.dtype.code == kDLInt && vectors.dtype.bits == 8) {
+      _extend<int8_t, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (vectors.dtype.code == kDLUInt && vectors.dtype.bits == 8) {
+      _extend<uint8_t, int64_t>(res, new_vectors, new_indices, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", vectors.dtype.code, vectors.dtype.bits);
+    }
+  });
 }

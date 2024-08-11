@@ -31,6 +31,8 @@
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/cuda_stream_pool.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
@@ -184,7 +186,8 @@ void extend(raft::resources const& handle,
   RAFT_EXPECTS(new_indices != nullptr || index->size() == 0,
                "You must pass data indices when the index is non-empty.");
 
-  auto new_labels = raft::make_device_vector<LabelT, IdxT>(handle, n_rows);
+  auto new_labels = raft::make_device_mdarray<LabelT>(
+    handle, raft::resource::get_large_workspace_resource(handle), raft::make_extents<IdxT>(n_rows));
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = index->metric();
   auto orig_centroids_view =
@@ -193,13 +196,25 @@ void extend(raft::resources const& handle,
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size                    = std::min<size_t>(n_rows, kReasonableMaxBatchSize);
 
+  // Determine if a stream pool exist and make sure there is at least one stream in it so we
+  // could use the stream for kernel/copy overlapping by enabling prefetch.
+  auto copy_stream = raft::resource::get_cuda_stream(handle);  // Using the main stream by default
+  bool enable_prefetch = false;
+  if (handle.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
+    if (raft::resource::get_stream_pool_size(handle) >= 1) {
+      enable_prefetch = true;
+      copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
+    }
+  }
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(new_vectors,
                                             n_rows,
                                             index->dim(),
                                             max_batch_size,
-                                            stream,
-                                            raft::resource::get_workspace_resource(handle));
+                                            copy_stream,
+                                            raft::resource::get_workspace_resource(handle),
+                                            enable_prefetch);
+  vec_batches.prefetch_next_batch();
 
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
@@ -212,10 +227,15 @@ void extend(raft::resources const& handle,
                                             orig_centroids_view,
                                             batch_labels_view,
                                             utils::mapping<float>{});
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
   }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
-  auto old_list_sizes_dev = raft::make_device_vector<uint32_t, IdxT>(handle, n_lists);
+  auto old_list_sizes_dev = raft::make_device_mdarray<uint32_t>(
+    handle, raft::resource::get_workspace_resource(handle), raft::make_extents<IdxT>(n_lists));
   raft::copy(old_list_sizes_dev.data_handle(), list_sizes_ptr, n_lists, stream);
 
   // Calculate the centers and sizes on the new data, starting from the original values
@@ -274,6 +294,8 @@ void extend(raft::resources const& handle,
 
   utils::batch_load_iterator<IdxT> vec_indices(
     new_indices, n_rows, 1, max_batch_size, stream, raft::resource::get_workspace_resource(handle));
+  vec_batches.reset();
+  vec_batches.prefetch_next_batch();
   utils::batch_load_iterator<IdxT> idx_batch = vec_indices.begin();
   size_t next_report_offset                  = 0;
   size_t d_report_offset                     = n_rows * 5 / 100;
@@ -294,6 +316,10 @@ void extend(raft::resources const& handle,
                                            dim,
                                            index->veclen(),
                                            batch.offset());
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     if (batch.offset() > next_report_offset) {
@@ -371,7 +397,8 @@ inline auto build(raft::resources const& handle,
     auto trainset_ratio = std::max<size_t>(
       1, n_rows / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
     auto n_rows_train = n_rows / trainset_ratio;
-    rmm::device_uvector<T> trainset(n_rows_train * index.dim(), stream);
+    rmm::device_uvector<T> trainset(
+      n_rows_train * index.dim(), stream, raft::resource::get_large_workspace_resource(handle));
     // TODO: a proper sampling
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
                                     sizeof(T) * index.dim(),
@@ -431,7 +458,8 @@ inline void fill_refinement_index(raft::resources const& handle,
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::fill_refinement_index(%zu, %u)", size_t(n_queries));
 
-  rmm::device_uvector<LabelT> new_labels(n_queries * n_candidates, stream);
+  rmm::device_uvector<LabelT> new_labels(
+    n_queries * n_candidates, stream, raft::resource::get_workspace_resource(handle));
   auto new_labels_view =
     raft::make_device_vector_view<LabelT, IdxT>(new_labels.data(), n_queries * n_candidates);
   raft::linalg::map_offset(

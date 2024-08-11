@@ -34,7 +34,7 @@ def run_ivf_pq_build_search_test(
     pq_bits=8,
     pq_dim=0,
     codebook_kind="subspace",
-    add_data_on_build="True",
+    add_data_on_build=True,
     n_probes=100,
     lut_dtype=np.float32,
     internal_distance_dtype=np.float32,
@@ -62,6 +62,18 @@ def run_ivf_pq_build_search_test(
     )
 
     index = ivf_pq.build(build_params, dataset_device)
+    if not add_data_on_build:
+        dataset_1 = dataset[: n_rows // 2, :]
+        dataset_2 = dataset[n_rows // 2 :, :]
+        indices_1 = np.arange(n_rows // 2, dtype=np.int64)
+        indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.int64)
+
+        dataset_1_device = device_ndarray(dataset_1)
+        dataset_2_device = device_ndarray(dataset_2)
+        indices_1_device = device_ndarray(indices_1)
+        indices_2_device = device_ndarray(indices_2)
+        index = ivf_pq.extend(index, dataset_1_device, indices_1_device)
+        index = ivf_pq.extend(index, dataset_2_device, indices_2_device)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.int64)
@@ -165,4 +177,27 @@ def test_ivf_pq_search_params(params):
         dtype=np.float32,
         lut_dtype=params["lut"],
         internal_distance_dtype=params["idd"],
+    )
+
+
+@pytest.mark.parametrize("dtype", [np.float32])
+def test_extend(dtype):
+    run_ivf_pq_build_search_test(
+        n_rows=10000,
+        n_cols=10,
+        n_queries=100,
+        k=10,
+        n_lists=100,
+        metric="sqeuclidean",
+        dtype=dtype,
+        add_data_on_build=False,
+    )
+
+
+@pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+def test_ivf_pq_dtype(inplace, dtype):
+    run_ivf_pq_build_search_test(
+        dtype=dtype,
+        inplace=inplace,
     )

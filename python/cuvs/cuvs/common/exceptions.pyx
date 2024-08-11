@@ -28,7 +28,7 @@ def get_last_error_text():
     if c_err is NULL:
         return
     cdef bytes err = c_err
-    return err.decode("utf8")
+    return err.decode("utf8", "ignore")
 
 
 def check_cuvs(status: cuvsError_t):

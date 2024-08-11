@@ -23,6 +23,7 @@ from cuvs.common.resources import auto_sync_resources
 
 from cython.operator cimport dereference as deref
 from libcpp cimport bool, cast
+from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
 from cuvs.distance_type cimport cuvsDistanceType
@@ -219,7 +220,6 @@ def build(IndexParams index_params, dataset, resources=None):
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
-    cdef cuvsError_t build_status
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
     cdef cuvsIvfFlatIndexParams* params = index_params.params
@@ -358,3 +358,145 @@ def search(SearchParams search_params,
         ))
 
     return (distances, neighbors)
+
+
+@auto_sync_resources
+def save(filename, Index index, bool include_dataset=True, resources=None):
+    """
+    Saves the index to a file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    index : Index
+        Trained IVF-Flat index.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_flat
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+    >>> # Serialize and deserialize the ivf_flat index built
+    >>> ivf_flat.save("my_index.bin", index)
+    >>> index_loaded = ivf_flat.load("my_index.bin")
+    """
+    cdef string c_filename = filename.encode('utf-8')
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsIvfFlatSerialize(res,
+                                    c_filename.c_str(),
+                                    index.index))
+
+
+@auto_sync_resources
+def load(filename, resources=None):
+    """
+    Loads index from file.
+
+    Saving / loading the index is experimental. The serialization format is
+    subject to change, therefore loading an index saved with a previous
+    version of cuvs is not guaranteed to work.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+
+    """
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef string c_filename = filename.encode('utf-8')
+
+    check_cuvs(cuvsIvfFlatDeserialize(
+        res,
+        c_filename.c_str(),
+        idx.index
+    ))
+    idx.trained = True
+    return idx
+
+
+@auto_sync_resources
+def extend(Index index, new_vectors, new_indices, resources=None):
+    """
+    Extend an existing index with new vectors.
+
+    The input array can be either CUDA array interface compliant matrix or
+    array interface compliant matrix in host memory.
+
+
+    Parameters
+    ----------
+    index : ivf_flat.Index
+        Trained ivf_flat object.
+    new_vectors : array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float, int8, uint8]
+    new_indices : array interface compliant vector shape (n_samples)
+        Supported dtype [int64]
+    {resources_docstring}
+
+    Returns
+    -------
+    index: py:class:`cuvs.neighbors.ivf_flat.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_flat
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> n_queries = 1000
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+    >>> n_rows = 100
+    >>> more_data = cp.random.random_sample((n_rows, n_features),
+    ...                                     dtype=cp.float32)
+    >>> indices = n_samples + cp.arange(n_rows, dtype=cp.int64)
+    >>> index = ivf_flat.extend(index, more_data, indices)
+    >>> # Search using the built index
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
+    >>> distances, neighbors = ivf_flat.search(ivf_flat.SearchParams(),
+    ...                                      index, queries,
+    ...                                      k=10)
+    """
+
+    new_vectors_ai = wrap_array(new_vectors)
+    _check_input_array(new_vectors_ai, [np.dtype('float32'), np.dtype('byte'),
+                                        np.dtype('ubyte')])
+
+    new_indices_ai = wrap_array(new_indices)
+    _check_input_array(new_indices_ai, [np.dtype('int64')])
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef cydlpack.DLManagedTensor* new_vectors_dlpack = \
+        cydlpack.dlpack_c(new_vectors_ai)
+
+    cdef cydlpack.DLManagedTensor* new_indices_dlpack = \
+        cydlpack.dlpack_c(new_indices_ai)
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfFlatExtend(
+            res,
+            new_vectors_dlpack,
+            new_indices_dlpack,
+            index.index
+        ))
+
+    return index
