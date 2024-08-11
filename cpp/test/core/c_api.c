@@ -31,45 +31,36 @@ int main()
   cuvsError_t stream_error = cuvsStreamSet(res, stream);
   if (stream_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
-  // // Allocate memory
-  // void* ptr;
-  // size_t bytes            = 1024;
-  // cuvsError_t alloc_error = cuvsRMMAlloc(res, &ptr, bytes);
-  // if (alloc_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+  // Allocate memory
+  void* ptr;
+  size_t bytes            = 1024;
+  cuvsError_t alloc_error = cuvsRMMAlloc(res, &ptr, bytes);
+  if (alloc_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
-  // // Free memory
-  // cuvsError_t free_error = cuvsRMMFree(res, ptr, bytes);
-  // if (free_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+  // Free memory
+  cuvsError_t free_error = cuvsRMMFree(res, ptr, bytes);
+  if (free_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Enable pool memory resource
   cuvsError_t pool_error = cuvsRMMEnablePoolMemoryResource(10, 100);
   if (pool_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
-  printf("This should not be printed\n");
   // Allocate memory again
   void* ptr2;
   cuvsError_t alloc_error_pool = cuvsRMMAlloc(res, &ptr2, 1024);
-  printf("This should not be printed\n");
-  printf(cuvsGetLastErrorText());
   if (alloc_error_pool == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Free memory
   cuvsError_t free_error_pool = cuvsRMMFree(res, ptr2, 1024);
   if (free_error_pool == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
-  // exit(EXIT_FAILURE);
-  printf("This should not be printed\n");
-  printf("This should not be printed\n");
-
   // Reset pool memory resource
   cuvsError_t reset_error = cuvsRMMResetMemoryResource();
   if (reset_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
-  printf("This should not be printed\n");
 
   // Destroy resources
   cuvsError_t destroy_error = cuvsResourcesDestroy(res);
   if (destroy_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
-  printf("This should not be printed\n");
 
   return 0;
 }
