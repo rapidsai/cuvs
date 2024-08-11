@@ -127,6 +127,24 @@ cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
  */
 cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
 
+/**
+ * @brief Switches the memory resource to use the pool memory resource
+ *
+ * @param[in] initial_pool_size_percent The initial pool size as a percentage of the total
+ * available memory
+ * @param[in] max_pool_size_percent The maximum pool size as a percentage of the total
+ * available memory
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMEnablePoolMemoryResource(int initial_pool_size_percent,
+                                            int max_pool_size_percent);
+/**
+ * @brief Resets the memory resource to use the default
+ * memory resource (cuda_memory_resource)
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMResetMemoryResource();
+
 /** @} */
 
 #ifdef __cplusplus
