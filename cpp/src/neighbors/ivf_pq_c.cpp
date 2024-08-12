@@ -48,6 +48,7 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
     static_cast<cuvs::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind);
   build_params.force_random_rotation          = params.force_random_rotation;
   build_params.conservative_memory_allocation = params.conservative_memory_allocation;
+  build_params.max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
 
   auto dataset = dataset_tensor->dl_tensor;
   auto dim     = dataset.shape[0];
@@ -214,7 +215,8 @@ extern "C" cuvsError_t cuvsIvfPqIndexParamsCreate(cuvsIvfPqIndexParams_t* params
                                        .pq_dim                         = 0,
                                        .codebook_kind                  = codebook_gen::PER_SUBSPACE,
                                        .force_random_rotation          = false,
-                                       .conservative_memory_allocation = false};
+                                       .conservative_memory_allocation = false,
+                                       .max_train_points_per_pq_code   = 256};
   });
 }
 
