@@ -192,3 +192,12 @@ def test_extend(dtype):
         dtype=dtype,
         add_data_on_build=False,
     )
+
+
+@pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+def test_ivf_pq_dtype(inplace, dtype):
+    run_ivf_pq_build_search_test(
+        dtype=dtype,
+        inplace=inplace,
+    )
