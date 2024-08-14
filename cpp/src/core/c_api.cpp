@@ -85,7 +85,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
 
 thread_local std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>> pool_mr;
 
-extern "C" cuvsError_t cuvsRMMEnablePoolMemoryResource(int initial_pool_size_percent,
+extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                                        int max_pool_size_percent)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -103,7 +103,7 @@ extern "C" cuvsError_t cuvsRMMEnablePoolMemoryResource(int initial_pool_size_per
   });
 }
 
-extern "C" cuvsError_t cuvsRMMResetMemoryResource()
+extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
   return cuvs::core::translate_exceptions([=] {
     rmm::mr::set_current_device_resource(nullptr);

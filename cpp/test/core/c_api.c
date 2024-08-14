@@ -42,7 +42,7 @@ int main()
   if (free_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Enable pool memory resource
-  cuvsError_t pool_error = cuvsRMMEnablePoolMemoryResource(10, 100);
+  cuvsError_t pool_error = cuvsRMMPoolMemoryResourceEnable(10, 100);
   if (pool_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Allocate memory again
@@ -55,7 +55,7 @@ int main()
   if (free_error_pool == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Reset pool memory resource
-  cuvsError_t reset_error = cuvsRMMResetMemoryResource();
+  cuvsError_t reset_error = cuvsRMMMemoryResourceReset();
   if (reset_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Destroy resources
