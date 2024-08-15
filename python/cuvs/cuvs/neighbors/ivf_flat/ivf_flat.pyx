@@ -58,12 +58,14 @@ cdef class IndexParams:
     metric : str, default = "sqeuclidean"
         String denoting the metric type.
         Valid values for metric: ["sqeuclidean", "inner_product",
-        "euclidean"], where
+        "euclidean", "cosine"], where
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,
             - euclidean is the euclidean distance
             - inner product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
         building.
@@ -220,7 +222,6 @@ def build(IndexParams index_params, dataset, resources=None):
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
-    cdef cuvsError_t build_status
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
     cdef cuvsIvfFlatIndexParams* params = index_params.params
@@ -429,3 +430,75 @@ def load(filename, resources=None):
     ))
     idx.trained = True
     return idx
+
+
+@auto_sync_resources
+def extend(Index index, new_vectors, new_indices, resources=None):
+    """
+    Extend an existing index with new vectors.
+
+    The input array can be either CUDA array interface compliant matrix or
+    array interface compliant matrix in host memory.
+
+
+    Parameters
+    ----------
+    index : ivf_flat.Index
+        Trained ivf_flat object.
+    new_vectors : array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float, int8, uint8]
+    new_indices : array interface compliant vector shape (n_samples)
+        Supported dtype [int64]
+    {resources_docstring}
+
+    Returns
+    -------
+    index: py:class:`cuvs.neighbors.ivf_flat.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_flat
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> n_queries = 1000
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> index = ivf_flat.build(ivf_flat.IndexParams(), dataset)
+    >>> n_rows = 100
+    >>> more_data = cp.random.random_sample((n_rows, n_features),
+    ...                                     dtype=cp.float32)
+    >>> indices = n_samples + cp.arange(n_rows, dtype=cp.int64)
+    >>> index = ivf_flat.extend(index, more_data, indices)
+    >>> # Search using the built index
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
+    >>> distances, neighbors = ivf_flat.search(ivf_flat.SearchParams(),
+    ...                                      index, queries,
+    ...                                      k=10)
+    """
+
+    new_vectors_ai = wrap_array(new_vectors)
+    _check_input_array(new_vectors_ai, [np.dtype('float32'), np.dtype('byte'),
+                                        np.dtype('ubyte')])
+
+    new_indices_ai = wrap_array(new_indices)
+    _check_input_array(new_indices_ai, [np.dtype('int64')])
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef cydlpack.DLManagedTensor* new_vectors_dlpack = \
+        cydlpack.dlpack_c(new_vectors_ai)
+
+    cdef cydlpack.DLManagedTensor* new_indices_dlpack = \
+        cydlpack.dlpack_c(new_indices_ai)
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfFlatExtend(
+            res,
+            new_vectors_dlpack,
+            new_indices_dlpack,
+            index.index
+        ))
+
+    return index

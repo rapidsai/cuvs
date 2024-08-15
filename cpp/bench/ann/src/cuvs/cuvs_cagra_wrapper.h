@@ -157,14 +157,13 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
-  auto dataset_view =
-    raft::make_host_matrix_view<const T, int64_t>(dataset, IdxT(nrow), dimension_);
+  auto dataset_extents = raft::make_extents<IdxT>(nrow, dimension_);
 
   auto& params = index_params_.cagra_params;
 
   if (index_params_.algo == CagraBuildAlgo::kIvfPq) {
-    auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
-      dataset_view.extents(), params.metric);
+    auto pq_params =
+      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extents, params.metric);
     if (index_params_.ivf_pq_build_params) {
       pq_params.build_params = *index_params_.ivf_pq_build_params;
     }
@@ -181,8 +180,15 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
     if (index_params_.nn_descent_params) { nn_params = *index_params_.nn_descent_params; }
     params.graph_build_params = nn_params;
   }
-  index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-    std::move(cuvs::neighbors::cagra::build(handle_, params, dataset_view)));
+  auto dataset_view_host =
+    raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);
+  auto dataset_view_device =
+    raft::make_mdspan<const T, IdxT, raft::row_major, false, true>(dataset, dataset_extents);
+  bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
+
+  index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
+    dataset_is_on_host ? cuvs::neighbors::cagra::build(handle_, params, dataset_view_host)
+                       : cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
 }
 
 inline auto allocator_to_string(AllocatorType mem_type) -> std::string

@@ -20,13 +20,17 @@
 #include "naive_knn.cuh"
 
 #include <cuvs/core/bitset.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/stats/mean.cuh>
 #include <thrust/sequence.h>
 
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/util/fast_int_div.cuh>
+#include <rmm/cuda_stream_pool.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -44,7 +48,9 @@ struct AnnIvfFlatInputs {
   IdxT nlist;
   cuvs::distance::DistanceType metric;
   bool adaptive_centers;
-  bool host_dataset;
+  bool host_dataset = false;
+  // The kernel_copy_overlapping option is only applicable when host dataset is enabled.
+  bool kernel_copy_overlapping = false;
 };
 
 template <typename IdxT>
@@ -52,7 +58,8 @@ template <typename IdxT>
 {
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
      << p.nprobe << ", " << p.nlist << ", " << static_cast<int>(p.metric) << ", "
-     << p.adaptive_centers << '}' << std::endl;
+     << p.adaptive_centers << "," << p.host_dataset << "," << p.kernel_copy_overlapping << '}'
+     << std::endl;
   return os;
 }
 
@@ -74,6 +81,12 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
     std::vector<IdxT> indices_naive(queries_size);
     std::vector<T> distances_ivfflat(queries_size);
     std::vector<T> distances_naive(queries_size);
+
+    if (ps.kernel_copy_overlapping) {
+      size_t n_streams = 1;
+      raft::resource::set_cuda_stream_pool(handle_,
+                                           std::make_shared<rmm::cuda_stream_pool>(n_streams));
+    }
 
     {
       rmm::device_uvector<T> distances_naive_dev(queries_size, stream_);
@@ -522,54 +535,109 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // test various dims (aligned and not aligned to vector sizes)
   {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
 
   // test dims that do not fit into kernel shared memory limits
   {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
 
   // various random combinations
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
 
   // host input data
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
   {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+
+  // // host input data with prefetching for kernel copy overlapping
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
 
   {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, true},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
 
   {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
 
   // test splitting the big query batches  (> max gridDim.y) into smaller batches
   {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000000, 1024, 32, 10, 256, 256, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000000, 1024, 32, 10, 256, 256, cuvs::distance::DistanceType::CosineExpanded, false},
   {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, true},
+  {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, true},
 
   // test radix_sort for getting the cluster selection
   {1000,
@@ -587,6 +655,14 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
    raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
    raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
    cuvs::distance::DistanceType::InnerProduct,
+   false},
+  {1000,
+   10000,
+   16,
+   10,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   cuvs::distance::DistanceType::CosineExpanded,
    false},
 
   // The following two test cases should show very similar recall.

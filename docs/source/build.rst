@@ -43,21 +43,21 @@ C++ Package
 
 .. code-block:: bash
 
-  mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.0
+  mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
 
 C Package
 ~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.0
+    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.0
+    mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.5
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
@@ -102,7 +102,7 @@ Create a build environment
 
 .. code-block:: bash
 
-    mamba env create --name cuvs -f conda/environments/all_cuda-120_arch-x86_64.yaml
+    mamba env create --name cuvs -f conda/environments/all_cuda-125_arch-x86_64.yaml
     mamba activate cuvs
 
 The process for building from source with CUDA 11 differs slightly in that your host system will also need to have CUDA toolkit installed which is greater than, or equal to, the version you install into you conda environment. Installing CUDA toolkit into your host system is necessary because `nvcc` is not provided with Conda's cudatoolkit dependencies for CUDA 11. The following example will install create and install dependencies for a CUDA 11.8 conda environment

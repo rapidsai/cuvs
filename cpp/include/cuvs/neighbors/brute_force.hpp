@@ -49,7 +49,8 @@ struct index : cuvs::neighbors::index {
    *
    * Constructs a brute force index from a dataset. This lets us precompute norms for
    * the dataset, providing a speed benefit over doing this at query time.
-   * This index will store a non-owning reference to the dataset.
+   * This index will copy the host dataset onto the device, and take ownership of any
+   * precaculated norms.
    */
   index(raft::resources const& res,
         raft::host_matrix_view<const T, int64_t, raft::row_major> dataset_view,
@@ -61,7 +62,8 @@ struct index : cuvs::neighbors::index {
    *
    * Constructs a brute force index from a dataset. This lets us precompute norms for
    * the dataset, providing a speed benefit over doing this at query time.
-   * The dataset will be copied to the device and the index will own the device memory.
+   * This index will store a non-owning reference to the dataset, but will move
+   * any norms supplied.
    */
   index(raft::resources const& res,
         raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
@@ -71,11 +73,35 @@ struct index : cuvs::neighbors::index {
 
   /** Construct a brute force index from dataset
    *
-   * This class stores a non-owning reference to the dataset and norms here.
+   * This class stores a non-owning reference to the dataset and norms.
    * Having precomputed norms gives us a performance advantage at query time.
    */
   index(raft::resources const& res,
         raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
+        std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
+        cuvs::distance::DistanceType metric,
+        T metric_arg = 0.0);
+
+  /** Construct a brute force index from dataset
+   *
+   * Constructs a brute force index from a dataset. This lets us precompute norms for
+   * the dataset, providing a speed benefit over doing this at query time.
+   * This index will store a non-owning reference to the dataset, but will move
+   * any norms supplied.
+   */
+  index(raft::resources const& res,
+        raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
+        std::optional<raft::device_vector<T, int64_t>>&& norms,
+        cuvs::distance::DistanceType metric,
+        T metric_arg = 0.0);
+
+  /** Construct a brute force index from dataset
+   *
+   * This class stores a non-owning reference to the dataset and norms, with
+   * the dataset being supplied on device in a col_major format
+   */
+  index(raft::resources const& res,
+        raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
         std::optional<raft::device_vector_view<const T, int64_t>> norms_view,
         cuvs::distance::DistanceType metric,
         T metric_arg = 0.0);
@@ -152,10 +178,32 @@ struct index : cuvs::neighbors::index {
  * @param[in] metric cuvs::distance::DistanceType
  * @param[in] metric_arg metric argument
  *
- * @return the constructed ivf-flat index
+ * @return the constructed brute-force index
  */
 auto build(raft::resources const& handle,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded,
+           float metric_arg                    = 0) -> cuvs::neighbors::brute_force::index<float>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = brute_force::build(handle, dataset, metric);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] dataset a device pointer to a col-major matrix [n_rows, dim]
+ * @param[in] metric cuvs::distance::DistanceType
+ * @param[in] metric_arg metric argument
+ *
+ * @return the constructed bruteforce index
+ */
+auto build(raft::resources const& handle,
+           raft::device_matrix_view<const float, int64_t, raft::col_major> dataset,
            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded,
            float metric_arg                    = 0) -> cuvs::neighbors::brute_force::index<float>;
 /**
@@ -169,7 +217,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Search ANN using the constructed index.
  *
- * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
+ * See the [brute_force::build](#brute_force::build) documentation for a usage example.
  *
  * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
  * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
@@ -186,21 +234,42 @@ auto build(raft::resources const& handle,
  * @endcode
  *
  * @param[in] handle
- * @param[in] index ivf-flat constructed index
+ * @param[in] index brute-force constructed index
  * @param[in] queries a device pointer to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter a optional device bitmap filter function that greenlights samples for a
- * given
+ * @param[in] sample_filter An optional device bitmap filter function with a `row-major` layout and
+ * the shape of [n_queries, index->size()], which means the filter will use the first
+ * `index->size()` bits to indicate whether queries[0] should compute the distance with dataset.
  */
-void search(
-  raft::resources const& handle,
-  const cuvs::neighbors::brute_force::index<float>& index,
-  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
-  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-  std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter = std::nullopt);
+void search(raft::resources const& handle,
+            const cuvs::neighbors::brute_force::index<float>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [brute_force::build](#brute_force::build) documentation for a usage example.
+ *
+ * @param[in] handle
+ * @param[in] index bruteforce constructed index
+ * @param[in] queries a device pointer to a col-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
+ * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
+ * given query
+ */
+void search(raft::resources const& handle,
+            const cuvs::neighbors::brute_force::index<float>& index,
+            raft::device_matrix_view<const float, int64_t, raft::col_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
 /**
  * @}
  */

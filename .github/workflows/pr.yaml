@@ -24,29 +24,29 @@ jobs:
       - wheel-tests-cuvs
       - devcontainer
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@branch-24.10
   checks:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/checks.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/checks.yaml@branch-24.10
     with:
       enable_check_generated_files: false
   conda-cpp-build:
     needs: checks
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@branch-24.10
     with:
       build_type: pull-request
       node_type: cpu16
   conda-cpp-tests:
     needs: conda-cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@branch-24.10
     with:
       build_type: pull-request
   conda-cpp-checks:
     needs: conda-cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@branch-24.10
     with:
       build_type: pull-request
       enable_check_symbols: true
@@ -54,19 +54,19 @@ jobs:
   conda-python-build:
     needs: conda-cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@branch-24.10
     with:
       build_type: pull-request
   conda-python-tests:
     needs: conda-python-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@branch-24.10
     with:
       build_type: pull-request
   docs-build:
     needs: conda-python-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.10
     with:
       build_type: pull-request
       node_type: "gpu-v100-latest-1"
@@ -76,7 +76,7 @@ jobs:
   rust-build:
     needs: conda-cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.10
     with:
       build_type: pull-request
       node_type: "gpu-v100-latest-1"
@@ -86,23 +86,23 @@ jobs:
   wheel-build-cuvs:
     needs: checks
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-24.10
     with:
       build_type: pull-request
       script: ci/build_wheel_cuvs.sh
   wheel-tests-cuvs:
     needs: wheel-build-cuvs
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@branch-24.10
     with:
       build_type: pull-request
       script: ci/test_wheel_cuvs.sh
   devcontainer:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@branch-24.08
+    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@branch-24.10
     with:
       arch: '["amd64"]'
-      cuda: '["12.2"]'
+      cuda: '["12.5"]'
       build_command: |
         sccache -z;
         build-all --verbose;

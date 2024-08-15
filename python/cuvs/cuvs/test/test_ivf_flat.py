@@ -29,6 +29,7 @@ def run_ivf_flat_build_search_test(
     n_queries=100,
     k=10,
     dtype=np.float32,
+    add_data_on_build=True,
     metric="euclidean",
     compare=True,
     inplace=True,
@@ -41,9 +42,23 @@ def run_ivf_flat_build_search_test(
 
     build_params = ivf_flat.IndexParams(
         metric=metric,
+        add_data_on_build=add_data_on_build,
     )
 
     index = ivf_flat.build(build_params, dataset_device)
+
+    if not add_data_on_build:
+        dataset_1 = dataset[: n_rows // 2, :]
+        dataset_2 = dataset[n_rows // 2 :, :]
+        indices_1 = np.arange(n_rows // 2, dtype=np.int64)
+        indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.int64)
+
+        dataset_1_device = device_ndarray(dataset_1)
+        dataset_2_device = device_ndarray(dataset_2)
+        indices_1_device = device_ndarray(indices_1)
+        indices_2_device = device_ndarray(indices_2)
+        index = ivf_flat.extend(index, dataset_1_device, indices_1_device)
+        index = ivf_flat.extend(index, dataset_2_device, indices_2_device)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.int64)
@@ -77,6 +92,7 @@ def run_ivf_flat_build_search_test(
     skl_metric = {
         "sqeuclidean": "sqeuclidean",
         "inner_product": "cosine",
+        "cosine": "cosine",
         "euclidean": "euclidean",
     }[metric]
     nn_skl = NearestNeighbors(
@@ -92,11 +108,24 @@ def run_ivf_flat_build_search_test(
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32])
 @pytest.mark.parametrize(
-    "metric", ["sqeuclidean", "inner_product", "euclidean"]
+    "metric", ["sqeuclidean", "inner_product", "euclidean", "cosine"]
 )
 def test_ivf_flat(inplace, dtype, metric):
     run_ivf_flat_build_search_test(
         dtype=dtype,
         inplace=inplace,
         metric=metric,
+    )
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+def test_extend(dtype):
+    run_ivf_flat_build_search_test(
+        n_rows=10000,
+        n_cols=10,
+        n_queries=100,
+        k=10,
+        metric="sqeuclidean",
+        dtype=dtype,
+        add_data_on_build=False,
     )
