@@ -23,8 +23,6 @@
 
 #include <cstdint>  // uint32_t
 
-#if defined(RAFT_EXPLICIT_INSTANTIATE_ONLY)
-
 namespace cuvs::neighbors::detail {
 
 template <typename value_idx,
@@ -102,8 +100,6 @@ void rbc_eps_pass(
   value_idx* vd) RAFT_EXPLICIT;
 
 };  // namespace cuvs::neighbors::detail
-
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(                                \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdims, Mdist_func)                            \

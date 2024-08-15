@@ -240,6 +240,7 @@ add_library(
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
   src/neighbors/ball_cover.cu
+  src/neighbors/ball_cover/ball_cover.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cu
   src/neighbors/cagra_build_int8.cu
