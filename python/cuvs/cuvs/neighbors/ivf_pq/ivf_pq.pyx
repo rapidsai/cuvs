@@ -97,11 +97,27 @@ cdef class IndexParams:
         default, if `dim == rot_dim`, the rotation transform is
         initialized with the identity matrix. When
         `force_random_rotation == True`, a random orthogonal transform
+        matrix is generated regardless of the values of `dim` and `pq_dim`.
     add_data_on_build : bool, default = True
         After training the coarse and fine quantizers, we will populate
         the index with the dataset if add_data_on_build == True, otherwise
         the index is left empty, and the extend method can be used
         to add new vectors to the index.
+    conservative_memory_allocation : bool, default = True
+        By default, the algorithm allocates more space than necessary for
+        individual clusters (`list_data`). This allows to amortize the cost
+        of memory allocation and reduce the number of data copies during
+        repeated calls to `extend` (extending the database).
+        To disable this behavior and use as little GPU memory for the
+        database as possible, set this flat to `True`.
+    max_train_points_per_pq_code : int, default = 256
+        The max number of data points to use per PQ code during PQ codebook
+        training. Using more data points per PQ code may increase the
+        quality of PQ codebook but may also increase the build time. The
+        parameter is applied to both PQ codebook generation methods, i.e.,
+        PER_SUBSPACE and PER_CLUSTER. In both cases, we will use
+        pq_book_size * max_train_points_per_pq_code training points to
+        train each codebook.
     """
 
     cdef cuvsIvfPqIndexParams* params
@@ -124,7 +140,8 @@ cdef class IndexParams:
                  codebook_kind="subspace",
                  force_random_rotation=False,
                  add_data_on_build=True,
-                 conservative_memory_allocation=False):
+                 conservative_memory_allocation=False,
+                 max_train_points_per_pq_code=256):
         self.params.n_lists = n_lists
         self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -143,6 +160,8 @@ cdef class IndexParams:
         self.params.add_data_on_build = add_data_on_build
         self.params.conservative_memory_allocation = \
             conservative_memory_allocation
+        self.params.max_train_points_per_pq_code = \
+            max_train_points_per_pq_code
 
     @property
     def metric(self):
@@ -192,6 +211,9 @@ cdef class IndexParams:
     def conservative_memory_allocation(self):
         return self.params.conservative_memory_allocation
 
+    @property
+    def max_train_points_per_pq_code(self):
+        return self.params.max_train_points_per_pq_code
 
 cdef class Index:
     """
