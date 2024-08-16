@@ -17,7 +17,7 @@
 #pragma once
 
 #include "search_multi_cta.cuh"
-#include "search_multi_kernel.cuh"
+// #include "search_multi_kernel.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
 
@@ -25,70 +25,47 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <typename DATASET_DESCRIPTOR_T,
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
           typename CagraSampleFilterT = cuvs::neighbors::filtering::none_cagra_sample_filter>
 class factory {
-  using T         = typename DATASET_DESCRIPTOR_T::DATA_T;
-  using IdxT      = typename DATASET_DESCRIPTOR_T::INDEX_T;
-  using DistanceT = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
-
  public:
   /**
    * Create a search structure for dataset with dim features.
    */
-  static std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>> create(
+  static std::unique_ptr<search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT>> create(
     raft::resources const& res,
     search_params const& params,
+    const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
     int64_t dim,
     int64_t graph_degree,
     uint32_t topk,
     const cuvs::distance::DistanceType metric)
   {
     search_plan_impl_base plan(params, dim, graph_degree, topk, metric);
-    switch (plan.dataset_block_dim) {
-      case 128:
-        switch (plan.team_size) {
-          case 8: return dispatch_kernel<128, 8>(res, plan); break;
-          default: THROW("Incorrect team size %lu", plan.team_size);
-        }
-        break;
-      case 256:
-        switch (plan.team_size) {
-          case 16: return dispatch_kernel<256, 16>(res, plan); break;
-          default: THROW("Incorrect team size %lu", plan.team_size);
-        }
-        break;
-      case 512:
-        switch (plan.team_size) {
-          case 32: return dispatch_kernel<512, 32>(res, plan); break;
-          default: THROW("Incorrect team size %lu", plan.team_size);
-        }
-        break;
-      default: THROW("Incorrect dataset_block_dim (%lu)\n", plan.dataset_block_dim);
-    }
-    return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>();
+    return dispatch_kernel(res, plan, dataset_desc);
   }
 
  private:
-  template <unsigned DATASET_BLOCK_DIM, unsigned TEAM_SIZE>
-  static std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>
-  dispatch_kernel(raft::resources const& res, search_plan_impl_base& plan)
+  static std::unique_ptr<search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT>>
+  dispatch_kernel(raft::resources const& res,
+                  search_plan_impl_base& plan,
+                  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc)
   {
     if (plan.algo == search_algo::SINGLE_CTA) {
-      return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>(
-        new single_cta_search::
-          search<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
-            res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
+      return std::make_unique<
+        single_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+        res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk, plan.metric);
     } else if (plan.algo == search_algo::MULTI_CTA) {
-      return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>(
-        new multi_cta_search::
-          search<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
-            res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
+      return std::make_unique<
+        multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+        res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk, plan.metric);
     } else {
-      return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>(
-        new multi_kernel_search::
-          search<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
-            res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
+      // return std::make_unique<
+      //   multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+      //   res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk, plan.metric);
+      RAFT_FAIL("WIP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     }
   }
 };
