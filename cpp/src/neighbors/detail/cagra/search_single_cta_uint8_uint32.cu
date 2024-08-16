@@ -28,7 +28,9 @@
 #include "compute_distance.hpp"
 
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
-instantiate_kernel_selection(
-  uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
+instantiate_kernel_selection(uint8_t,
+                             uint32_t,
+                             float,
+                             cuvs::neighbors::filtering::none_cagra_sample_filter);
 
 }  // namespace cuvs::neighbors::cagra::detail::single_cta_search
