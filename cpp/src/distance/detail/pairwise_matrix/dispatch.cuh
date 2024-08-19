@@ -19,6 +19,4 @@
 #include "dispatch-inl.cuh"
 #endif
 
-#ifdef RAFT_COMPILED
 #include "dispatch-ext.cuh"
-#endif

@@ -24,7 +24,7 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace multi_cta_search {
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifdef _CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 template <unsigned TEAM_SIZE,
           unsigned DATASET_BLOCK_DIM,
@@ -53,7 +53,7 @@ void select_and_run(
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream) RAFT_EXPLICIT;
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_kernel_selection(                                                           \
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                     \
