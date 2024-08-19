@@ -42,17 +42,18 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   using typename base_type::INDEX_T;
   using typename base_type::ws_handle;
 
-  static_assert(std::is_same_v<CODE_BOOK_T, half>, "Only CODE_BOOK_T = `half` is supported now");
+  static_assert(std::is_same_v<CODE_BOOK_T, half>,
+                "Only CODE_BOOK_T = "
+                "`half` is supported "
+                "now");
 
   const std::uint8_t* encoded_dataset_ptr;
+  const CODE_BOOK_T* vq_code_book_ptr;
+  const CODE_BOOK_T* pq_code_book_ptr;
   std::uint32_t encoded_dataset_dim;
   std::uint32_t n_subspace;
-  const CODE_BOOK_T* vq_code_book_ptr;
   float vq_scale;
-  const CODE_BOOK_T* pq_code_book_ptr;
   float pq_scale;
-
-  uint32_t smem_query_buffer_length;
 
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN * utils::size_of<CODE_BOOK_T>();
@@ -73,10 +74,11 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
       vq_code_book_ptr(vq_code_book_ptr),
       vq_scale(vq_scale),
       pq_code_book_ptr(pq_code_book_ptr),
-      pq_scale(pq_scale),
-      smem_query_buffer_length{raft::round_up_safe<uint32_t>(dim, DatasetBlockDim)}
+      pq_scale(pq_scale)
   {
+    base_type::template assert_struct_size<sizeof(*this)>();
   }
+  _RAFT_HOST_DEVICE [[nodiscard]] auto team_size() const -> uint32_t { return TeamSize; }
 
   _RAFT_HOST_DEVICE [[nodiscard]] auto smem_ws_size_in_bytes() const -> uint32_t
   {
@@ -84,7 +86,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
       1. Codebook (kSMemCodeBookSizeInBytes bytes)
       2. Queries (smem_query_buffer_length elems)
     */
-    return kSMemCodeBookSizeInBytes + smem_query_buffer_length * sizeof(QUERY_T);
+    return kSMemCodeBookSizeInBytes +
+           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 
   _RAFT_DEVICE [[nodiscard]] auto set_smem_ws(void* smem_ptr) const -> ws_handle
@@ -126,66 +129,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
         (reinterpret_cast<half2*>(smem_query_ptr + i))[0] = buf2;
       }
     }
-  }
-
-  _RAFT_DEVICE void compute_distance_to_random_nodes(
-    ws_handle smem_workspace,
-    INDEX_T* const result_indices_ptr,       // [num_pickup]
-    DISTANCE_T* const result_distances_ptr,  // [num_pickup]
-    const size_t num_pickup,
-    const unsigned num_distilation,
-    const uint64_t rand_xor_mask,
-    const INDEX_T* const seed_ptr,  // [num_seeds]
-    const uint32_t num_seeds,
-    INDEX_T* const visited_hash_ptr,
-    const uint32_t hash_bitlen,
-    const cuvs::distance::DistanceType metric,
-    const uint32_t block_id   = 0,
-    const uint32_t num_blocks = 1) const
-  {
-    return device::compute_distance_to_random_nodes<TeamSize, DatasetBlockDim>(result_indices_ptr,
-                                                                               result_distances_ptr,
-                                                                               smem_workspace,
-                                                                               *this,
-                                                                               num_pickup,
-                                                                               num_distilation,
-                                                                               rand_xor_mask,
-                                                                               seed_ptr,
-                                                                               num_seeds,
-                                                                               visited_hash_ptr,
-                                                                               hash_bitlen,
-                                                                               metric,
-                                                                               block_id,
-                                                                               num_blocks);
-  }
-
-  _RAFT_DEVICE void compute_distance_to_child_nodes(ws_handle smem_workspace,
-                                                    INDEX_T* const result_child_indices_ptr,
-                                                    DISTANCE_T* const result_child_distances_ptr,
-                                                    // [knn_k, dataset_size]
-                                                    const INDEX_T* const knn_graph,
-                                                    const uint32_t knn_k,
-                                                    // hashmap
-                                                    INDEX_T* const visited_hashmap_ptr,
-                                                    const uint32_t hash_bitlen,
-                                                    const INDEX_T* const parent_indices,
-                                                    const INDEX_T* const internal_topk_list,
-                                                    const uint32_t search_width,
-                                                    const cuvs::distance::DistanceType metric) const
-  {
-    return device::compute_distance_to_child_nodes<TeamSize, DatasetBlockDim>(
-      result_child_indices_ptr,
-      result_child_distances_ptr,
-      smem_workspace,
-      *this,
-      knn_graph,
-      knn_k,
-      visited_hashmap_ptr,
-      hash_bitlen,
-      parent_indices,
-      internal_topk_list,
-      search_width,
-      metric);
   }
 
   _RAFT_DEVICE auto compute_distance(ws_handle smem_workspace,

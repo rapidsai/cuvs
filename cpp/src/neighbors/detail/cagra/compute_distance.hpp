@@ -32,180 +32,27 @@
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
-namespace device {
-
-// using LOAD_256BIT_T = ulonglong4;
-using LOAD_128BIT_T = uint4;
-using LOAD_64BIT_T  = uint64_t;
-
-template <class LOAD_T, class DATA_T>
-RAFT_DEVICE_INLINE_FUNCTION constexpr unsigned get_vlen()
-{
-  return utils::size_of<LOAD_T>() / utils::size_of<DATA_T>();
-}
-
-template <unsigned TeamSize,
-          unsigned DatasetBlockDim,
-          class DATASET_DESCRIPTOR_T,
-          class DISTANCE_T,
-          class INDEX_T>
-RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
-  INDEX_T* const result_indices_ptr,       // [num_pickup]
-  DISTANCE_T* const result_distances_ptr,  // [num_pickup]
-  typename DATASET_DESCRIPTOR_T::ws_handle workspace,
-  const DATASET_DESCRIPTOR_T& dataset_desc,
-  const size_t num_pickup,
-  const unsigned num_distilation,
-  const uint64_t rand_xor_mask,
-  const INDEX_T* const seed_ptr,  // [num_seeds]
-  const uint32_t num_seeds,
-  INDEX_T* const visited_hash_ptr,
-  const uint32_t hash_bitlen,
-  const cuvs::distance::DistanceType metric,
-  const uint32_t block_id   = 0,
-  const uint32_t num_blocks = 1)
-{
-  uint32_t max_i = num_pickup;
-  if (max_i % (32 / TeamSize)) { max_i += (32 / TeamSize) - (max_i % (32 / TeamSize)); }
-
-  for (uint32_t i = threadIdx.x / TeamSize; i < max_i; i += blockDim.x / TeamSize) {
-    const bool valid_i = (i < num_pickup);
-
-    INDEX_T best_index_team_local;
-    DISTANCE_T best_norm2_team_local = utils::get_max_value<DISTANCE_T>();
-    for (uint32_t j = 0; j < num_distilation; j++) {
-      // Select a node randomly and compute the distance to it
-      INDEX_T seed_index;
-      if (valid_i) {
-        // uint32_t gid = i + (num_pickup * (j + (num_distilation * block_id)));
-        uint32_t gid = block_id + (num_blocks * (i + (num_pickup * j)));
-        if (seed_ptr && (gid < num_seeds)) {
-          seed_index = seed_ptr[gid];
-        } else {
-          seed_index = device::xorshift64(gid ^ rand_xor_mask) % dataset_desc.size;
-        }
-      }
-
-      DISTANCE_T norm2;
-      switch (metric) {
-        case cuvs::distance::DistanceType::L2Expanded:
-          norm2 =
-            dataset_desc.template compute_similarity<cuvs::distance::DistanceType::L2Expanded>(
-              workspace, seed_index, valid_i);
-          break;
-        case cuvs::distance::DistanceType::InnerProduct:
-          norm2 =
-            dataset_desc.template compute_similarity<cuvs::distance::DistanceType::InnerProduct>(
-              workspace, seed_index, valid_i);
-          break;
-        default: break;
-      }
-
-      if (valid_i && (norm2 < best_norm2_team_local)) {
-        best_norm2_team_local = norm2;
-        best_index_team_local = seed_index;
-      }
-    }
-
-    const unsigned lane_id = threadIdx.x % TeamSize;
-    if (valid_i && lane_id == 0) {
-      if (hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
-        result_distances_ptr[i] = best_norm2_team_local;
-        result_indices_ptr[i]   = best_index_team_local;
-      } else {
-        result_distances_ptr[i] = utils::get_max_value<DISTANCE_T>();
-        result_indices_ptr[i]   = utils::get_max_value<INDEX_T>();
-      }
-    }
-  }
-}
-
-template <unsigned TeamSize,
-          unsigned DatasetBlockDim,
-          typename DATASET_DESCRIPTOR_T,
-          typename DISTANCE_T,
-          typename INDEX_T>
-RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
-  INDEX_T* result_child_indices_ptr,
-  DISTANCE_T* result_child_distances_ptr,
-  // query
-  typename DATASET_DESCRIPTOR_T::ws_handle workspace,
-  // [dataset_dim, dataset_size]
-  const DATASET_DESCRIPTOR_T& dataset_desc,
-  // [knn_k, dataset_size]
-  const INDEX_T* knn_graph,
-  uint32_t knn_k,
-  // hashmap
-  INDEX_T* visited_hashmap_ptr,
-  uint32_t hash_bitlen,
-  const INDEX_T* parent_indices,
-  const INDEX_T* internal_topk_list,
-  uint32_t search_width,
-  cuvs::distance::DistanceType metric)
-{
-  constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-  const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
-
-  // Read child indices of parents from knn graph and check if the distance
-  // computaiton is necessary.
-  for (uint32_t i = threadIdx.x; i < knn_k * search_width; i += blockDim.x) {
-    const INDEX_T smem_parent_id = parent_indices[i / knn_k];
-    INDEX_T child_id             = invalid_index;
-    if (smem_parent_id != invalid_index) {
-      const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
-      child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
-    }
-    if (child_id != invalid_index) {
-      if (hashmap::insert(visited_hashmap_ptr, hash_bitlen, child_id) == 0) {
-        child_id = invalid_index;
-      }
-    }
-    result_child_indices_ptr[i] = child_id;
-  }
-  __syncthreads();
-
-  // Compute the distance to child nodes
-  uint32_t max_i = knn_k * search_width;
-  if (max_i % (32 / TeamSize)) { max_i += (32 / TeamSize) - (max_i % (32 / TeamSize)); }
-  for (uint32_t tid = threadIdx.x; tid < max_i * TeamSize; tid += blockDim.x) {
-    const auto i       = tid / TeamSize;
-    const bool valid_i = (i < (knn_k * search_width));
-    INDEX_T child_id   = invalid_index;
-    if (valid_i) { child_id = result_child_indices_ptr[i]; }
-
-    DISTANCE_T norm2;
-    switch (metric) {
-      case cuvs::distance::DistanceType::L2Expanded:
-        norm2 = dataset_desc.template compute_similarity<cuvs::distance::DistanceType::L2Expanded>(
-          workspace, child_id, child_id != invalid_index);
-        break;
-      case cuvs::distance::DistanceType::InnerProduct:
-        norm2 =
-          dataset_desc.template compute_similarity<cuvs::distance::DistanceType::InnerProduct>(
-            workspace, child_id, child_id != invalid_index);
-        break;
-      default: break;
-    }
-
-    // Store the distance
-    const unsigned lane_id = threadIdx.x % TeamSize;
-    if (valid_i && lane_id == 0) {
-      if (child_id != invalid_index) {
-        result_child_distances_ptr[i] = norm2;
-      } else {
-        result_child_distances_ptr[i] = utils::get_max_value<DISTANCE_T>();
-      }
-    }
-  }
-}
-
-}  // namespace device
 
 template <typename DataT, typename IndexT, typename DistanceT>
 struct dataset_descriptor_base_t {
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
+
+  /**
+   * Maximum expected size of the descriptor struct.
+   * This covers all standard and VPQ descriptors; we need this to copy the descriptor from global
+   * memory. Increase this if new fields are needed (but try to keep the descriptors small really).
+   */
+  static constexpr size_t kMaxStructSize = 64;
+
+  template <size_t ActualSize, size_t MaximumSize = kMaxStructSize>
+  static inline constexpr void assert_struct_size()
+  {
+    static_assert(ActualSize <= MaximumSize,
+                  "The maximum descriptor size is tracked in the dataset_descriptor_base_t. "
+                  "Update this constant if implementing a new, larger descriptor.");
+  }
 
   struct distance_workspace;
   using ws_handle = distance_workspace*;
@@ -214,6 +61,9 @@ struct dataset_descriptor_base_t {
   uint32_t dim;
 
   _RAFT_HOST_DEVICE dataset_descriptor_base_t(INDEX_T size, uint32_t dim) : size(size), dim(dim) {}
+
+  /** How many threads are involved in computing a single distance. */
+  _RAFT_HOST_DEVICE [[nodiscard]] virtual auto team_size() const -> uint32_t = 0;
 
   /** Total dynamic shared memory required by the descriptor.  */
   _RAFT_HOST_DEVICE [[nodiscard]] virtual auto smem_ws_size_in_bytes() const -> uint32_t = 0;
@@ -230,36 +80,6 @@ struct dataset_descriptor_base_t {
                                              INDEX_T dataset_index,
                                              cuvs::distance::DistanceType metric,
                                              bool valid) const -> DISTANCE_T = 0;
-
-  _RAFT_DEVICE virtual void compute_distance_to_random_nodes(
-    ws_handle smem_workspace,
-    INDEX_T* const result_indices_ptr,       // [num_pickup]
-    DISTANCE_T* const result_distances_ptr,  // [num_pickup]
-    const size_t num_pickup,
-    const unsigned num_distilation,
-    const uint64_t rand_xor_mask,
-    const INDEX_T* const seed_ptr,  // [num_seeds]
-    const uint32_t num_seeds,
-    INDEX_T* const visited_hash_ptr,
-    const uint32_t hash_bitlen,
-    const cuvs::distance::DistanceType metric,
-    const uint32_t block_id   = 0,
-    const uint32_t num_blocks = 1) const = 0;
-
-  _RAFT_DEVICE virtual void compute_distance_to_child_nodes(
-    ws_handle smem_workspace,
-    INDEX_T* const result_child_indices_ptr,
-    DISTANCE_T* const result_child_distances_ptr,
-    // [knn_k, dataset_size]
-    const INDEX_T* const knn_graph,
-    const uint32_t knn_k,
-    // hashmap
-    INDEX_T* const visited_hashmap_ptr,
-    const uint32_t hash_bitlen,
-    const INDEX_T* const parent_indices,
-    const INDEX_T* const internal_topk_list,
-    const uint32_t search_width,
-    const cuvs::distance::DistanceType metric) const = 0;
 };
 
 template <typename DataT, typename IndexT, typename DistanceT>
@@ -341,7 +161,10 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
       ld(ld),
       smem_query_buffer_length{raft::round_up_safe<uint32_t>(dim, DatasetBlockDim)}
   {
+    base_type::template assert_struct_size<sizeof(*this)>();
   }
+
+  _RAFT_HOST_DEVICE [[nodiscard]] auto team_size() const -> uint32_t { return TeamSize; }
 
   _RAFT_HOST_DEVICE [[nodiscard]] auto smem_ws_size_in_bytes() const -> uint32_t
   {
@@ -364,66 +187,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
         buf[j] = 0.0;
       }
     }
-  }
-
-  _RAFT_DEVICE void compute_distance_to_random_nodes(
-    ws_handle smem_workspace,
-    INDEX_T* const result_indices_ptr,       // [num_pickup]
-    DISTANCE_T* const result_distances_ptr,  // [num_pickup]
-    const size_t num_pickup,
-    const unsigned num_distilation,
-    const uint64_t rand_xor_mask,
-    const INDEX_T* const seed_ptr,  // [num_seeds]
-    const uint32_t num_seeds,
-    INDEX_T* const visited_hash_ptr,
-    const uint32_t hash_bitlen,
-    const cuvs::distance::DistanceType metric,
-    const uint32_t block_id   = 0,
-    const uint32_t num_blocks = 1) const
-  {
-    return device::compute_distance_to_random_nodes<TeamSize, DatasetBlockDim>(result_indices_ptr,
-                                                                               result_distances_ptr,
-                                                                               smem_workspace,
-                                                                               *this,
-                                                                               num_pickup,
-                                                                               num_distilation,
-                                                                               rand_xor_mask,
-                                                                               seed_ptr,
-                                                                               num_seeds,
-                                                                               visited_hash_ptr,
-                                                                               hash_bitlen,
-                                                                               metric,
-                                                                               block_id,
-                                                                               num_blocks);
-  }
-
-  _RAFT_DEVICE void compute_distance_to_child_nodes(ws_handle smem_workspace,
-                                                    INDEX_T* const result_child_indices_ptr,
-                                                    DISTANCE_T* const result_child_distances_ptr,
-                                                    // [knn_k, dataset_size]
-                                                    const INDEX_T* const knn_graph,
-                                                    const uint32_t knn_k,
-                                                    // hashmap
-                                                    INDEX_T* const visited_hashmap_ptr,
-                                                    const uint32_t hash_bitlen,
-                                                    const INDEX_T* const parent_indices,
-                                                    const INDEX_T* const internal_topk_list,
-                                                    const uint32_t search_width,
-                                                    const cuvs::distance::DistanceType metric) const
-  {
-    return device::compute_distance_to_child_nodes<TeamSize, DatasetBlockDim>(
-      result_child_indices_ptr,
-      result_child_distances_ptr,
-      smem_workspace,
-      *this,
-      knn_graph,
-      knn_k,
-      visited_hashmap_ptr,
-      hash_bitlen,
-      parent_indices,
-      internal_topk_list,
-      search_width,
-      metric);
   }
 
   template <typename T, cuvs::distance::DistanceType METRIC>

@@ -227,19 +227,20 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
   uint32_t block_id                   = cta_id + (num_cta_per_query * query_id);
   uint32_t num_blocks                 = num_cta_per_query * num_queries;
 
-  dataset_desc->compute_distance_to_random_nodes(distance_workspace,
-                                                 result_indices_buffer,
-                                                 result_distances_buffer,
-                                                 result_buffer_size,
-                                                 num_distilation,
-                                                 rand_xor_mask,
-                                                 local_seed_ptr,
-                                                 num_seeds,
-                                                 local_visited_hashmap_ptr,
-                                                 hash_bitlen,
-                                                 metric,
-                                                 block_id,
-                                                 num_blocks);
+  device::compute_distance_to_random_nodes(result_indices_buffer,
+                                           result_distances_buffer,
+                                           distance_workspace,
+                                           *dataset_desc,
+                                           result_buffer_size,
+                                           num_distilation,
+                                           rand_xor_mask,
+                                           local_seed_ptr,
+                                           num_seeds,
+                                           local_visited_hashmap_ptr,
+                                           hash_bitlen,
+                                           metric,
+                                           block_id,
+                                           num_blocks);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -269,17 +270,18 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 
     // compute the norms between child nodes and query node
     _CLK_START();
-    dataset_desc->compute_distance_to_child_nodes(distance_workspace,
-                                                  result_indices_buffer + itopk_size,
-                                                  result_distances_buffer + itopk_size,
-                                                  knn_graph,
-                                                  graph_degree,
-                                                  local_visited_hashmap_ptr,
-                                                  hash_bitlen,
-                                                  parent_indices_buffer,
-                                                  result_indices_buffer,
-                                                  search_width,
-                                                  metric);
+    device::compute_distance_to_child_nodes(result_indices_buffer + itopk_size,
+                                            result_distances_buffer + itopk_size,
+                                            distance_workspace,
+                                            *dataset_desc,
+                                            knn_graph,
+                                            graph_degree,
+                                            local_visited_hashmap_ptr,
+                                            hash_bitlen,
+                                            parent_indices_buffer,
+                                            result_indices_buffer,
+                                            search_width,
+                                            metric);
     _CLK_REC(clk_compute_distance);
     __syncthreads();
 

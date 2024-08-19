@@ -96,7 +96,6 @@ void get_value(T* const host_ptr, const T* const dev_ptr, cudaStream_t cuda_stre
 template <class DATASET_DESCRIPTOR_T>
 RAFT_KERNEL random_pickup_kernel(
   const DATASET_DESCRIPTOR_T* dataset_desc,
-  uint32_t team_size,
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
   const std::size_t num_pickup,
   const unsigned num_distilation,
@@ -114,6 +113,7 @@ RAFT_KERNEL random_pickup_kernel(
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
+  const auto team_size         = dataset_desc->team_size();
   const auto ldb               = hashmap::get_size(hash_bitlen);
   const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) / team_size;
   const uint32_t query_id      = blockIdx.y;
@@ -182,7 +182,6 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
 
   random_pickup_kernel<<<grid_size, block_size, dataset_desc.smem_ws_size_in_bytes, cuda_stream>>>(
     dataset_desc.dev_ptr,
-    dataset_desc.team_size,
     queries_ptr,
     num_pickup,
     num_distilation,
@@ -309,7 +308,6 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const std::size_t lds,
   const std::uint32_t search_width,
   const DATASET_DESCRIPTOR_T* dataset_desc,
-  uint32_t team_size,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const
     neighbor_graph_ptr,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
@@ -326,6 +324,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
+  const auto team_size      = dataset_desc->team_size();
   const uint32_t ldb        = hashmap::get_size(hash_bitlen);
   const auto tid            = threadIdx.x + blockDim.x * blockIdx.x;
   const auto global_team_id = tid / team_size;
@@ -422,7 +421,6 @@ void compute_distance_to_child_nodes(
                                                           lds,
                                                           search_width,
                                                           dataset_desc.dev_ptr,
-                                                          dataset_desc.team_size,
                                                           neighbor_graph_ptr,
                                                           graph_degree,
                                                           query_ptr,

@@ -562,17 +562,18 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
   // compute distance to randomly selecting nodes
   _CLK_START();
   const INDEX_T* const local_seed_ptr = seed_ptr ? seed_ptr + (num_seeds * query_id) : nullptr;
-  dataset_desc->compute_distance_to_random_nodes(distance_workspace,
-                                                 result_indices_buffer,
-                                                 result_distances_buffer,
-                                                 result_buffer_size,
-                                                 num_distilation,
-                                                 rand_xor_mask,
-                                                 local_seed_ptr,
-                                                 num_seeds,
-                                                 local_visited_hashmap_ptr,
-                                                 hash_bitlen,
-                                                 metric);
+  device::compute_distance_to_random_nodes(result_indices_buffer,
+                                           result_distances_buffer,
+                                           distance_workspace,
+                                           *dataset_desc,
+                                           result_buffer_size,
+                                           num_distilation,
+                                           rand_xor_mask,
+                                           local_seed_ptr,
+                                           num_seeds,
+                                           local_visited_hashmap_ptr,
+                                           hash_bitlen,
+                                           metric);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -693,17 +694,18 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 
     // compute the norms between child nodes and query node
     _CLK_START();
-    dataset_desc->compute_distance_to_child_nodes(distance_workspace,
-                                                  result_indices_buffer + internal_topk,
-                                                  result_distances_buffer + internal_topk,
-                                                  knn_graph,
-                                                  graph_degree,
-                                                  local_visited_hashmap_ptr,
-                                                  hash_bitlen,
-                                                  parent_list_buffer,
-                                                  result_indices_buffer,
-                                                  search_width,
-                                                  metric);
+    device::compute_distance_to_child_nodes(result_indices_buffer + internal_topk,
+                                            result_distances_buffer + internal_topk,
+                                            distance_workspace,
+                                            *dataset_desc,
+                                            knn_graph,
+                                            graph_degree,
+                                            local_visited_hashmap_ptr,
+                                            hash_bitlen,
+                                            parent_list_buffer,
+                                            result_indices_buffer,
+                                            search_width,
+                                            metric);
     __syncthreads();
     _CLK_REC(clk_compute_distance);
 
