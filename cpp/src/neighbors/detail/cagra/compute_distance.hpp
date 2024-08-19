@@ -224,6 +224,13 @@ struct dataset_descriptor_base_t {
   /** Copy the query to the shared memory. */
   _RAFT_DEVICE virtual void copy_query(ws_handle smem_workspace, const DATA_T* query_ptr) const = 0;
 
+  /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
+   * given by the dataset_index. */
+  _RAFT_DEVICE virtual auto compute_distance(ws_handle smem_workspace,
+                                             INDEX_T dataset_index,
+                                             cuvs::distance::DistanceType metric,
+                                             bool valid) const -> DISTANCE_T = 0;
+
   _RAFT_DEVICE virtual void compute_distance_to_random_nodes(
     ws_handle smem_workspace,
     INDEX_T* const result_indices_ptr,       // [num_pickup]
@@ -432,6 +439,22 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::InnerProduct, T>
   {
     return -a * b;
+  }
+
+  _RAFT_DEVICE auto compute_distance(ws_handle smem_workspace,
+                                     INDEX_T dataset_index,
+                                     cuvs::distance::DistanceType metric,
+                                     bool valid) const -> DISTANCE_T
+  {
+    switch (metric) {
+      case cuvs::distance::DistanceType::L2Expanded:
+        return compute_similarity<cuvs::distance::DistanceType::L2Expanded>(
+          smem_workspace, dataset_index, valid);
+      case cuvs::distance::DistanceType::InnerProduct:
+        return compute_similarity<cuvs::distance::DistanceType::InnerProduct>(
+          smem_workspace, dataset_index, valid);
+      default: return 0;
+    }
   }
 
   template <cuvs::distance::DistanceType METRIC>

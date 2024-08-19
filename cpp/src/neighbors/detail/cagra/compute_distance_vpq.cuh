@@ -188,6 +188,22 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
       metric);
   }
 
+  _RAFT_DEVICE auto compute_distance(ws_handle smem_workspace,
+                                     INDEX_T dataset_index,
+                                     cuvs::distance::DistanceType metric,
+                                     bool valid) const -> DISTANCE_T
+  {
+    switch (metric) {
+      case cuvs::distance::DistanceType::L2Expanded:
+        return compute_similarity<cuvs::distance::DistanceType::L2Expanded>(
+          smem_workspace, dataset_index, valid);
+      case cuvs::distance::DistanceType::InnerProduct:
+        return compute_similarity<cuvs::distance::DistanceType::InnerProduct>(
+          smem_workspace, dataset_index, valid);
+      default: return 0;
+    }
+  }
+
   template <cuvs::distance::DistanceType METRIC>
   RAFT_DEVICE_INLINE_FUNCTION DISTANCE_T compute_similarity(ws_handle smem_workspace,
                                                             const INDEX_T node_id,

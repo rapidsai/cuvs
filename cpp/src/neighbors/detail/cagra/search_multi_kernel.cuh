@@ -93,9 +93,10 @@ void get_value(T* const host_ptr, const T* const dev_ptr, cudaStream_t cuda_stre
 }
 
 // MAX_DATASET_DIM : must equal to or greater than dataset_dim
-template <unsigned TEAM_SIZE, unsigned DATASET_BLOCK_DIM, class DATASET_DESCRIPTOR_T>
+template <class DATASET_DESCRIPTOR_T>
 RAFT_KERNEL random_pickup_kernel(
-  const DATASET_DESCRIPTOR_T dataset_desc,
+  const DATASET_DESCRIPTOR_T* dataset_desc,
+  uint32_t team_size,
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
   const std::size_t num_pickup,
   const unsigned num_distilation,
@@ -114,22 +115,14 @@ RAFT_KERNEL random_pickup_kernel(
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
   const auto ldb               = hashmap::get_size(hash_bitlen);
-  const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) / TEAM_SIZE;
+  const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) / team_size;
   const uint32_t query_id      = blockIdx.y;
   if (global_team_index >= num_pickup) { return; }
+  extern __shared__ uint8_t smem[];
+  auto distance_workspace = dataset_desc->set_smem_ws(smem);
   // Load a query
-  extern __shared__ float query_buffer[];
-  const auto query_smem_buffer_length =
-    raft::ceildiv<uint32_t>(dataset_desc.dim, DATASET_BLOCK_DIM) * DATASET_BLOCK_DIM;
-  for (uint32_t i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
-    unsigned j = device::swizzling(i);
-    if (i < dataset_desc.dim) {
-      query_buffer[j] = cuvs::spatial::knn::detail::utils::mapping<float>{}(
-        (queries_ptr + query_id * dataset_desc.dim)[i]);
-    } else {
-      query_buffer[j] = 0.0;
-    }
-  }
+  dataset_desc->copy_query(distance_workspace, queries_ptr + query_id * dataset_desc->dim);
+
   __syncthreads();
 
   INDEX_T best_index_team_local;
@@ -141,27 +134,10 @@ RAFT_KERNEL random_pickup_kernel(
     } else {
       // Chose a seed node randomly
       seed_index =
-        device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_desc.size;
+        device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_desc->size;
     }
 
-    DISTANCE_T norm2;
-    switch (metric) {
-      case cuvs::distance::DistanceType::L2Expanded:
-        norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                         TEAM_SIZE,
-                                                         cuvs::distance::DistanceType::L2Expanded>(
-          query_buffer, seed_index, true);
-        break;
-      case cuvs::distance::DistanceType::InnerProduct:
-        norm2 =
-          dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                   TEAM_SIZE,
-                                                   cuvs::distance::DistanceType::InnerProduct>(
-            query_buffer, seed_index, true);
-        break;
-      default: break;
-    }
-
+    DISTANCE_T norm2 = dataset_desc->compute_distance(distance_workspace, seed_index, metric, true);
     if (norm2 < best_norm2_team_local) {
       best_norm2_team_local = norm2;
       best_index_team_local = seed_index;
@@ -169,7 +145,7 @@ RAFT_KERNEL random_pickup_kernel(
   }
 
   const auto store_gmem_index = global_team_index + (ldr * query_id);
-  if (threadIdx.x % TEAM_SIZE == 0) {
+  if (threadIdx.x % team_size == 0) {
     if (hashmap::insert(
           visited_hashmap_ptr + (ldb * query_id), hash_bitlen, best_index_team_local)) {
       result_distances_ptr[store_gmem_index] = best_norm2_team_local;
@@ -182,47 +158,43 @@ RAFT_KERNEL random_pickup_kernel(
 }
 
 // MAX_DATASET_DIM : must be equal to or greater than dataset_dim
-template <unsigned TEAM_SIZE, unsigned DATASET_BLOCK_DIM, class DATASET_DESCRIPTOR_T>
-void random_pickup(
-  const DATASET_DESCRIPTOR_T dataset_desc,
-  const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
-  const std::size_t num_queries,
-  const std::size_t num_pickup,
-  const unsigned num_distilation,
-  const uint64_t rand_xor_mask,
-  const typename DATASET_DESCRIPTOR_T::INDEX_T* seed_ptr,  // [num_queries, num_seeds]
-  const uint32_t num_seeds,
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const result_indices_ptr,       // [num_queries, ldr]
-  typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldr]
-  const std::size_t ldr,                                                  // (*) ldr >= num_pickup
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const visited_hashmap_ptr,  // [num_queries, 1 << bitlen]
-  const std::uint32_t hash_bitlen,
-  const cuvs::distance::DistanceType metric,
-  cudaStream_t const cuda_stream = 0)
+template <typename DataT, typename IndexT, typename DistanceT>
+void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+                   const DataT* queries_ptr,  // [num_queries, dataset_dim]
+                   std::size_t num_queries,
+                   std::size_t num_pickup,
+                   unsigned num_distilation,
+                   uint64_t rand_xor_mask,
+                   const IndexT* seed_ptr,  // [num_queries, num_seeds]
+                   uint32_t num_seeds,
+                   IndexT* result_indices_ptr,       // [num_queries, ldr]
+                   DistanceT* result_distances_ptr,  // [num_queries, ldr]
+                   std::size_t ldr,                  // (*) ldr >= num_pickup
+                   IndexT* visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
+                   std::uint32_t hash_bitlen,
+                   cuvs::distance::DistanceType metric,
+                   cudaStream_t cuda_stream)
 {
   const auto block_size                = 256u;
-  const auto num_teams_per_threadblock = block_size / TEAM_SIZE;
+  const auto num_teams_per_threadblock = block_size / dataset_desc.team_size;
   const dim3 grid_size((num_pickup + num_teams_per_threadblock - 1) / num_teams_per_threadblock,
                        num_queries);
 
-  const auto query_smem_buffer_length =
-    raft::ceildiv<uint32_t>(dataset_desc.dim, DATASET_BLOCK_DIM) * DATASET_BLOCK_DIM;
-  const auto smem_size = query_smem_buffer_length * sizeof(float);
-
-  random_pickup_kernel<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T>
-    <<<grid_size, block_size, smem_size, cuda_stream>>>(dataset_desc,
-                                                        queries_ptr,
-                                                        num_pickup,
-                                                        num_distilation,
-                                                        rand_xor_mask,
-                                                        seed_ptr,
-                                                        num_seeds,
-                                                        result_indices_ptr,
-                                                        result_distances_ptr,
-                                                        ldr,
-                                                        visited_hashmap_ptr,
-                                                        hash_bitlen,
-                                                        metric);
+  random_pickup_kernel<<<grid_size, block_size, dataset_desc.smem_ws_size_in_bytes, cuda_stream>>>(
+    dataset_desc.dev_ptr,
+    dataset_desc.team_size,
+    queries_ptr,
+    num_pickup,
+    num_distilation,
+    rand_xor_mask,
+    seed_ptr,
+    num_seeds,
+    result_indices_ptr,
+    result_distances_ptr,
+    ldr,
+    visited_hashmap_ptr,
+    hash_bitlen,
+    metric);
 }
 
 template <class INDEX_T>
@@ -325,9 +297,7 @@ void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries,
                                                   terminate_flag);
 }
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          class DATASET_DESCRIPTOR_T,
+template <class DATASET_DESCRIPTOR_T,
           class SAMPLE_FILTER_T>
 RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const
@@ -338,7 +308,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
     parent_distance_ptr,  // [num_queries, search_width]
   const std::size_t lds,
   const std::uint32_t search_width,
-  const DATASET_DESCRIPTOR_T dataset_desc,
+  const DATASET_DESCRIPTOR_T* dataset_desc,
+  uint32_t team_size,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const
     neighbor_graph_ptr,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
@@ -357,21 +328,14 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
 
   const uint32_t ldb        = hashmap::get_size(hash_bitlen);
   const auto tid            = threadIdx.x + blockDim.x * blockIdx.x;
-  const auto global_team_id = tid / TEAM_SIZE;
+  const auto global_team_id = tid / team_size;
   const auto query_id       = blockIdx.y;
 
-  extern __shared__ float query_buffer[];
-  const auto query_smem_buffer_length =
-    raft::ceildiv<uint32_t>(dataset_desc.dim, DATASET_BLOCK_DIM) * DATASET_BLOCK_DIM;
-  for (uint32_t i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
-    unsigned j = device::swizzling(i);
-    if (i < dataset_desc.dim) {
-      query_buffer[j] = cuvs::spatial::knn::detail::utils::mapping<float>{}(
-        (query_ptr + query_id * dataset_desc.dim)[i]);
-    } else {
-      query_buffer[j] = 0.0;
-    }
-  }
+  extern __shared__ uint8_t smem[];
+  auto distance_workspace = dataset_desc->set_smem_ws(smem);
+  // Load a query
+  dataset_desc->copy_query(distance_workspace, query_ptr + query_id * dataset_desc->dim);
+
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
 
@@ -393,33 +357,19 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
 
   const std::size_t child_id = neighbor_list_head_ptr[global_team_id % graph_degree];
 
-  const auto compute_distance_flag = hashmap::insert<TEAM_SIZE, INDEX_T>(
-    visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
+  const auto compute_distance_flag = hashmap::insert<INDEX_T>(
+    team_size, visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
 
-  DISTANCE_T norm2;
-  switch (metric) {
-    case cuvs::distance::DistanceType::L2Expanded:
-      norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                       TEAM_SIZE,
-                                                       cuvs::distance::DistanceType::L2Expanded>(
-        query_buffer, child_id, compute_distance_flag);
-      break;
-    case cuvs::distance::DistanceType::InnerProduct:
-      norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                       TEAM_SIZE,
-                                                       cuvs::distance::DistanceType::InnerProduct>(
-        query_buffer, child_id, compute_distance_flag);
-      break;
-    default: break;
-  }
+  DISTANCE_T norm2 =
+    dataset_desc->compute_distance(distance_workspace, child_id, metric, compute_distance_flag);
 
   if (compute_distance_flag) {
-    if (threadIdx.x % TEAM_SIZE == 0) {
+    if (threadIdx.x % team_size == 0) {
       result_indices_ptr[ldd * blockIdx.y + global_team_id]   = child_id;
       result_distances_ptr[ldd * blockIdx.y + global_team_id] = norm2;
     }
   } else {
-    if (threadIdx.x % TEAM_SIZE == 0) {
+    if (threadIdx.x % team_size == 0) {
       result_distances_ptr[ldd * blockIdx.y + global_team_id] = utils::get_max_value<DISTANCE_T>();
     }
   }
@@ -434,66 +384,55 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   }
 }
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          class SAMPLE_FILTER_T,
-          class DATASET_DESCRIPTOR_T>
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          class SAMPLE_FILTER_T>
 void compute_distance_to_child_nodes(
-  const typename DATASET_DESCRIPTOR_T::INDEX_T* const
-    parent_node_list,  // [num_queries, search_width]
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const
-    parent_candidates_ptr,  // [num_queries, search_width]
-  typename DATASET_DESCRIPTOR_T::DISTANCE_T* const
-    parent_distance_ptr,  // [num_queries, search_width]
-  const std::size_t lds,
-  const uint32_t search_width,
-  const DATASET_DESCRIPTOR_T dataset_desc,
-  const typename DATASET_DESCRIPTOR_T::INDEX_T* const
-    neighbor_graph_ptr,  // [dataset_size, graph_degree]
-  const std::uint32_t graph_degree,
-  const typename DATASET_DESCRIPTOR_T::DATA_T* query_ptr,  // [num_queries, data_dim]
-  const std::uint32_t num_queries,
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const
-    visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
-  const std::uint32_t hash_bitlen,
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const result_indices_ptr,       // [num_queries, ldd]
-  typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldd]
-  const std::uint32_t ldd,  // (*) ldd >= search_width * graph_degree
+  const IndexT* parent_node_list,        // [num_queries, search_width]
+  IndexT* const parent_candidates_ptr,   // [num_queries, search_width]
+  DistanceT* const parent_distance_ptr,  // [num_queries, search_width]
+  std::size_t lds,
+  uint32_t search_width,
+  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+  const IndexT* neighbor_graph_ptr,  // [dataset_size, graph_degree]
+  std::uint32_t graph_degree,
+  const DataT* query_ptr,  // [num_queries, data_dim]
+  std::uint32_t num_queries,
+  IndexT* visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
+  std::uint32_t hash_bitlen,
+  IndexT* result_indices_ptr,       // [num_queries, ldd]
+  DistanceT* result_distances_ptr,  // [num_queries, ldd]
+  std::uint32_t ldd,                // (*) ldd >= search_width * graph_degree
   SAMPLE_FILTER_T sample_filter,
-  const cuvs::distance::DistanceType metric,
-  cudaStream_t cuda_stream = 0)
+  cuvs::distance::DistanceType metric,
+  cudaStream_t cuda_stream)
 {
-  const auto block_size = 128;
-  const dim3 grid_size(
-    (search_width * graph_degree + (block_size / TEAM_SIZE) - 1) / (block_size / TEAM_SIZE),
-    num_queries);
+  const auto block_size      = 128;
+  const auto teams_per_block = block_size / dataset_desc.team_size;
+  const dim3 grid_size((search_width * graph_degree + teams_per_block - 1) / teams_per_block,
+                       num_queries);
 
-  const auto query_smem_buffer_length =
-    raft::ceildiv<uint32_t>(dataset_desc.dim, DATASET_BLOCK_DIM) * DATASET_BLOCK_DIM;
-
-  const auto smem_size =
-    query_smem_buffer_length * sizeof(float) + DATASET_DESCRIPTOR_T::smem_buffer_size_in_byte;
-
-  compute_distance_to_child_nodes_kernel<TEAM_SIZE,
-                                         DATASET_BLOCK_DIM,
-                                         DATASET_DESCRIPTOR_T,
-                                         SAMPLE_FILTER_T>
-    <<<grid_size, block_size, smem_size, cuda_stream>>>(parent_node_list,
-                                                        parent_candidates_ptr,
-                                                        parent_distance_ptr,
-                                                        lds,
-                                                        search_width,
-                                                        dataset_desc,
-                                                        neighbor_graph_ptr,
-                                                        graph_degree,
-                                                        query_ptr,
-                                                        visited_hashmap_ptr,
-                                                        hash_bitlen,
-                                                        result_indices_ptr,
-                                                        result_distances_ptr,
-                                                        ldd,
-                                                        sample_filter,
-                                                        metric);
+  compute_distance_to_child_nodes_kernel<<<grid_size,
+                                           block_size,
+                                           dataset_desc.smem_ws_size_in_bytes,
+                                           cuda_stream>>>(parent_node_list,
+                                                          parent_candidates_ptr,
+                                                          parent_distance_ptr,
+                                                          lds,
+                                                          search_width,
+                                                          dataset_desc.dev_ptr,
+                                                          dataset_desc.team_size,
+                                                          neighbor_graph_ptr,
+                                                          graph_degree,
+                                                          query_ptr,
+                                                          visited_hashmap_ptr,
+                                                          hash_bitlen,
+                                                          result_indices_ptr,
+                                                          result_distances_ptr,
+                                                          ldd,
+                                                          sample_filter,
+                                                          metric);
 }
 
 template <class INDEX_T>
@@ -863,21 +802,21 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
     }
 
     // Choose initial entry point candidates at random
-    random_pickup<TEAM_SIZE, DATASET_BLOCK_DIM>(dataset_desc,
-                                                queries_ptr,
-                                                num_queries,
-                                                result_buffer_size,
-                                                num_random_samplings,
-                                                rand_xor_mask,
-                                                dev_seed_ptr,
-                                                num_seeds,
-                                                result_indices.data(),
-                                                result_distances.data(),
-                                                result_buffer_allocation_size,
-                                                hashmap.data(),
-                                                hash_bitlen,
-                                                this->metric,
-                                                stream);
+    random_pickup<DataT, IndexT, DistanceT>(dataset_desc,
+                                            queries_ptr,
+                                            num_queries,
+                                            result_buffer_size,
+                                            num_random_samplings,
+                                            rand_xor_mask,
+                                            dev_seed_ptr,
+                                            num_seeds,
+                                            result_indices.data(),
+                                            result_distances.data(),
+                                            result_buffer_allocation_size,
+                                            hashmap.data(),
+                                            hash_bitlen,
+                                            this->metric,
+                                            stream);
 
     unsigned iter = 0;
     while (1) {
@@ -929,7 +868,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
       }
 
       // Compute distance to child nodes that are adjacent to the parent node
-      compute_distance_to_child_nodes<TEAM_SIZE, DATASET_BLOCK_DIM, SAMPLE_FILTER_T>(
+      compute_distance_to_child_nodes(
         parent_node_list.data(),
         result_indices.data() + (1 - (iter & 0x1)) * result_buffer_size,
         result_distances.data() + (1 - (iter & 0x1)) * result_buffer_size,
@@ -1020,70 +959,6 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
       }
     }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
-  }
-};
-
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          class CODE_BOOK_T,
-          unsigned PQ_BITS,
-          unsigned PQ_CODE_BOOK_DIM,
-          class DATA_T,
-          class DISTANCE_T_,
-          class INDEX_T_,
-          typename SAMPLE_FILTER_T>
-struct search<TEAM_SIZE,
-              DATASET_BLOCK_DIM,
-              cagra_q_dataset_descriptor_t<DATA_T,
-                                           CODE_BOOK_T,
-                                           PQ_BITS,
-                                           PQ_CODE_BOOK_DIM,
-                                           DISTANCE_T_,
-                                           INDEX_T_>,
-              SAMPLE_FILTER_T>
-  : public search_plan_impl<cagra_q_dataset_descriptor_t<DATA_T,
-                                                         CODE_BOOK_T,
-                                                         PQ_BITS,
-                                                         PQ_CODE_BOOK_DIM,
-
-                                                         DISTANCE_T_,
-                                                         INDEX_T_>,
-                            SAMPLE_FILTER_T> {
-  using DATASET_DESCRIPTOR_T = cagra_q_dataset_descriptor_t<DATA_T,
-                                                            CODE_BOOK_T,
-                                                            PQ_BITS,
-                                                            PQ_CODE_BOOK_DIM,
-
-                                                            DISTANCE_T_,
-                                                            INDEX_T_>;
-  using INDEX_T              = typename DATASET_DESCRIPTOR_T::INDEX_T;
-  using DISTANCE_T           = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
-
-  search(raft::resources const& res,
-         search_params params,
-         int64_t dim,
-         int64_t graph_degree,
-         uint32_t topk,
-         cuvs::distance::DistanceType metric)
-    : base_type(res, params, dim, graph_degree, topk, metric)
-  {
-    THROW("The multi-kernel mode does not support VPQ");
-  }
-
-  void set_params(raft::resources const& res) {}
-
-  void operator()(raft::resources const& res,
-                  DATASET_DESCRIPTOR_T dataset_desc,
-                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
-                  DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
-                  const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
-                  const uint32_t num_queries,
-                  const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
-                  uint32_t* const num_executed_iterations,  // [num_queries,]
-                  uint32_t topk,
-                  SAMPLE_FILTER_T sample_filter)
-  {
   }
 };
 

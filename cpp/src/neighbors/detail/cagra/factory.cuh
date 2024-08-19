@@ -17,7 +17,7 @@
 #pragma once
 
 #include "search_multi_cta.cuh"
-// #include "search_multi_kernel.cuh"
+#include "search_multi_kernel.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta.cuh"
 
@@ -62,10 +62,9 @@ class factory {
         multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
         res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk, plan.metric);
     } else {
-      // return std::make_unique<
-      //   multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-      //   res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk, plan.metric);
-      RAFT_FAIL("WIP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      return std::make_unique<
+        multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+        res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk, plan.metric);
     }
   }
 };
