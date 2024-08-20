@@ -42,8 +42,9 @@ static_assert((kMaxCapacity >= 32) && !(kMaxCapacity & (kMaxCapacity - 1)),
               "kMaxCapacity must be a power of two, not smaller than the WarpSize.");
 
 // using weak attribute here, because it may be compiled multiple times.
-auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, uint32_t n_queries)
-  -> bool
+auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k,
+                                               uint32_t n_probes,
+                                               uint32_t n_queries) -> bool
 {
   if (k > kMaxCapacity) { return false; }            // warp_sort not possible
   if (n_queries * n_probes <= 16) { return false; }  // overall amount of work is too small
@@ -381,11 +382,11 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
         case distance::DistanceType::CosineExpanded: {
           float2 pvals;
           for (uint32_t i = threadIdx.x; i < dim; i += blockDim.x) {
-            pvals.x = query[i];
-            pvals.y = cluster_center[i] * pvals.x;
+            pvals.x                               = query[i];
+            pvals.y                               = cluster_center[i];
             reinterpret_cast<float2*>(lut_end)[i] = pvals;
           }
-        }
+        } break;
         default: __builtin_unreachable();
       }
       __syncthreads();
@@ -401,7 +402,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
         const uint32_t j_end = pq_len + j;
         auto cur_pq_center   = pq_center + (i & PqMask) +
                              (codebook_kind == codebook_gen::PER_SUBSPACE ? j * PqShift : 0u);
-        float score = 0.0;
+        float score  = 0.0;
         float q_norm = 1.0;
         float c_norm = 1.0;
         do {
@@ -438,7 +439,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               if constexpr (PrecompBaseDiff) {
                 float2 pvals = reinterpret_cast<float2*>(lut_end)[j];
                 q            = pvals.x;
-                c = pvals.y;
+                c            = pvals.y;
               } else {
                 q = query[j];
                 c = cluster_center[j];
@@ -451,7 +452,9 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
             default: __builtin_unreachable();
           }
         } while (++j < j_end);
-        lut_scores[i] = LutT(score / (sqrt(q_norm * c_norm)));
+        lut_scores[i] = LutT(score);
+        if (metric == distance::DistanceType::CosineExpanded)
+          lut_scores[i] = LutT(score / sqrt(q_norm * c_norm));
       }
     }
 
@@ -552,8 +555,8 @@ template <typename OutT,
           typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
 struct compute_similarity_kernel_config {
  public:
-  static auto get(uint32_t pq_bits, uint32_t k_max)
-    -> compute_similarity_kernel_t<OutT, LutT, IvfSampleFilterT>
+  static auto get(uint32_t pq_bits,
+                  uint32_t k_max) -> compute_similarity_kernel_t<OutT, LutT, IvfSampleFilterT>
   {
     return kernel_choose_bits(pq_bits, k_max);
   }
