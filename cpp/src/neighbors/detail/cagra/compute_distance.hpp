@@ -74,6 +74,19 @@ struct dataset_descriptor_base_t {
   {
   }
 
+  RAFT_DEVICE_INLINE_FUNCTION void copy_descriptor_per_block(
+    dataset_descriptor_base_t* target) const
+  {
+    using word_type             = uint32_t;
+    constexpr auto kStructWords = kMaxStructSize / sizeof(word_type);
+    auto* dst                   = reinterpret_cast<word_type*>(target);
+    auto* src                   = reinterpret_cast<const word_type*>(this);
+    for (unsigned i = threadIdx.x; i < kStructWords; i += blockDim.x) {
+      dst[i] = src[i];
+    }
+    __syncthreads();
+  }
+
   /** Setup the shared memory workspace (e.g. assign pointers or prepare a lookup table). */
   _RAFT_DEVICE [[nodiscard]] virtual auto set_smem_ws(void* smem_ptr) const -> ws_handle = 0;
 
@@ -90,10 +103,11 @@ struct dataset_descriptor_base_t {
 
 template <typename DataT, typename IndexT, typename DistanceT>
 struct dataset_descriptor_host {
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr = nullptr;
-  uint32_t smem_ws_size_in_bytes                               = 0;
-  uint32_t team_size                                           = 0;
-  uint32_t dataset_block_dim                                   = 0;
+  using dev_descriptor_t         = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  dev_descriptor_t* dev_ptr      = nullptr;
+  uint32_t smem_ws_size_in_bytes = 0;
+  uint32_t team_size             = 0;
+  uint32_t dataset_block_dim     = 0;
 
   template <typename DescriptorImpl>
   dataset_descriptor_host(const DescriptorImpl& dd_host,
@@ -104,7 +118,7 @@ struct dataset_descriptor_host {
       team_size{dd_host.team_size},
       dataset_block_dim{dataset_block_dim}
   {
-    RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, sizeof(DescriptorImpl), stream_));
+    RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, dev_descriptor_t::kMaxStructSize, stream_));
   }
 
   ~dataset_descriptor_host() noexcept
@@ -222,17 +236,16 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
                                                       const INDEX_T dataset_i,
                                                       const bool valid) const -> DISTANCE_T
   {
-    auto query_ptr          = smem_query_buffer(smem_workspace);
-    const auto dataset_ptr  = ptr + dataset_i * ld;
-    const unsigned lane_id  = threadIdx.x % TeamSize;
-    constexpr unsigned vlen = device::get_vlen<LOAD_T, DATA_T>();
-    // #include <raft/util/cuda_dev_essentials.cuh
-    constexpr unsigned reg_nelem = raft::ceildiv<unsigned>(DatasetBlockDim, TeamSize * vlen);
-    raft::TxN_t<DATA_T, vlen> dl_buff[reg_nelem];
+    auto query_ptr         = smem_query_buffer(smem_workspace);
+    const auto dataset_ptr = ptr + dataset_i * ld;
+    const unsigned lane_id = threadIdx.x % TeamSize;
 
     DISTANCE_T norm2 = 0;
     if (valid) {
       for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += DatasetBlockDim) {
+        constexpr unsigned vlen      = device::get_vlen<LOAD_T, DATA_T>();
+        constexpr unsigned reg_nelem = raft::ceildiv<unsigned>(DatasetBlockDim, TeamSize * vlen);
+        raft::TxN_t<DATA_T, vlen> dl_buff[reg_nelem];
 #pragma unroll
         for (uint32_t e = 0; e < reg_nelem; e++) {
           const uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset;
@@ -257,6 +270,7 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
         }
       }
     }
+#pragma unroll
     for (uint32_t offset = TeamSize / 2; offset > 0; offset >>= 1) {
       norm2 += __shfl_xor_sync(0xffffffff, norm2, offset);
     }
@@ -269,8 +283,7 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return reinterpret_cast<QUERY_T*>(smem_workspace);
   }
 
-  _RAFT_HOST_DEVICE [[nodiscard]] constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim)
-    -> uint32_t
+  RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
     return raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }

@@ -248,6 +248,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
         }
       }
     }
+#pragma unroll
     for (uint32_t offset = TeamSize / 2; offset > 0; offset >>= 1) {
       norm += __shfl_xor_sync(0xffffffff, norm, offset);
     }
@@ -267,8 +268,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
                                       kSMemCodeBookSizeInBytes);
   }
 
-  _RAFT_HOST_DEVICE [[nodiscard]] constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim)
-    -> uint32_t
+  RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
     /* SMEM workspace layout:
       1. Codebook (kSMemCodeBookSizeInBytes bytes)
