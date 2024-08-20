@@ -37,6 +37,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   using LOAD_T      = device::LOAD_128BIT_T;
   using QUERY_T     = half;
   using base_type::dim;
+  using base_type::smem_ws_size_in_bytes;
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
@@ -67,7 +68,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
                                                  float pq_scale,
                                                  std::size_t size,
                                                  std::uint32_t dim)
-    : base_type(size, dim),
+    : base_type(size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)),
       encoded_dataset_ptr(encoded_dataset_ptr),
       encoded_dataset_dim(encoded_dataset_dim),
       n_subspace(n_subspace),
@@ -77,17 +78,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
       pq_scale(pq_scale)
   {
     base_type::template assert_struct_size<sizeof(*this)>();
-  }
-  _RAFT_HOST_DEVICE [[nodiscard]] auto team_size() const -> uint32_t { return TeamSize; }
-
-  _RAFT_HOST_DEVICE [[nodiscard]] auto smem_ws_size_in_bytes() const -> uint32_t
-  {
-    /* SMEM workspace layout:
-      1. Codebook (kSMemCodeBookSizeInBytes bytes)
-      2. Queries (smem_query_buffer_length elems)
-    */
-    return kSMemCodeBookSizeInBytes +
-           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 
   _RAFT_DEVICE [[nodiscard]] auto set_smem_ws(void* smem_ptr) const -> ws_handle
@@ -147,6 +137,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     }
   }
 
+ private:
   template <cuvs::distance::DistanceType METRIC>
   RAFT_DEVICE_INLINE_FUNCTION DISTANCE_T compute_similarity(ws_handle smem_workspace,
                                                             const INDEX_T node_id,
@@ -263,7 +254,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     return norm;
   }
 
- private:
   RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_pq_code_book_ptr(ws_handle smem_workspace) const
     -> CODE_BOOK_T*
   {
@@ -275,6 +265,17 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   {
     return reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_workspace) +
                                       kSMemCodeBookSizeInBytes);
+  }
+
+  _RAFT_HOST_DEVICE [[nodiscard]] constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim)
+    -> uint32_t
+  {
+    /* SMEM workspace layout:
+      1. Codebook (kSMemCodeBookSizeInBytes bytes)
+      2. Queries (smem_query_buffer_length elems)
+    */
+    return kSMemCodeBookSizeInBytes +
+           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 };
 
@@ -421,8 +422,7 @@ auto vpq_dataset_descriptor_init(const vpq_dataset<CodeBookT, DatasetIdxT>& data
             pq_scale,
             IndexT(dataset.n_rows()),
             dataset.dim()};
-  dataset_descriptor_host<DataT, IndexT, DistanceT> result{
-    dd_host, stream, TeamSize, DatasetBlockDim};
+  dataset_descriptor_host<DataT, IndexT, DistanceT> result{dd_host, stream, DatasetBlockDim};
   vpq_dataset_descriptor_init_kernel<TeamSize,
                                      DatasetBlockDim,
                                      PqBits,

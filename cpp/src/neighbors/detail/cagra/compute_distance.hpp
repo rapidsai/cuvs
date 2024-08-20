@@ -44,7 +44,7 @@ struct dataset_descriptor_base_t {
    * This covers all standard and VPQ descriptors; we need this to copy the descriptor from global
    * memory. Increase this if new fields are needed (but try to keep the descriptors small really).
    */
-  static constexpr size_t kMaxStructSize = 64;
+  static constexpr size_t kMaxStructSize = 72;
 
   template <size_t ActualSize, size_t MaximumSize = kMaxStructSize>
   static inline constexpr void assert_struct_size()
@@ -57,18 +57,24 @@ struct dataset_descriptor_base_t {
   struct distance_workspace;
   using ws_handle = distance_workspace*;
 
+  /** Number of records in the database. */
   INDEX_T size;
+  /** Dimensionality of the data/queries. */
   uint32_t dim;
-
-  _RAFT_HOST_DEVICE dataset_descriptor_base_t(INDEX_T size, uint32_t dim) : size(size), dim(dim) {}
-
   /** How many threads are involved in computing a single distance. */
-  _RAFT_HOST_DEVICE [[nodiscard]] virtual auto team_size() const -> uint32_t = 0;
-
+  uint32_t team_size;
   /** Total dynamic shared memory required by the descriptor.  */
-  _RAFT_HOST_DEVICE [[nodiscard]] virtual auto smem_ws_size_in_bytes() const -> uint32_t = 0;
+  uint32_t smem_ws_size_in_bytes;
 
-  /** Set shared memory workspace (pointers). */
+  _RAFT_HOST_DEVICE dataset_descriptor_base_t(INDEX_T size,
+                                              uint32_t dim,
+                                              uint32_t team_size,
+                                              uint32_t smem_ws_size_in_bytes)
+    : size(size), dim(dim), team_size(team_size), smem_ws_size_in_bytes(smem_ws_size_in_bytes)
+  {
+  }
+
+  /** Setup the shared memory workspace (e.g. assign pointers or prepare a lookup table). */
   _RAFT_DEVICE [[nodiscard]] virtual auto set_smem_ws(void* smem_ptr) const -> ws_handle = 0;
 
   /** Copy the query to the shared memory. */
@@ -92,11 +98,10 @@ struct dataset_descriptor_host {
   template <typename DescriptorImpl>
   dataset_descriptor_host(const DescriptorImpl& dd_host,
                           rmm::cuda_stream_view stream,
-                          uint32_t team_size,
                           uint32_t dataset_block_dim)
     : stream_{stream},
-      smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
-      team_size{team_size},
+      smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes},
+      team_size{dd_host.team_size},
       dataset_block_dim{dataset_block_dim}
   {
     RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, sizeof(DescriptorImpl), stream_));
@@ -143,6 +148,7 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
   using LOAD_T    = device::LOAD_128BIT_T;
   using QUERY_T   = float;
   using base_type::dim;
+  using base_type::smem_ws_size_in_bytes;
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
@@ -150,25 +156,14 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
 
   const DATA_T* ptr;
   size_t ld;
-  uint32_t smem_query_buffer_length;
 
   _RAFT_HOST_DEVICE standard_dataset_descriptor_t(const DATA_T* ptr,
                                                   INDEX_T size,
                                                   uint32_t dim,
                                                   size_t ld)
-    : base_type(size, dim),
-      ptr(ptr),
-      ld(ld),
-      smem_query_buffer_length{raft::round_up_safe<uint32_t>(dim, DatasetBlockDim)}
+    : base_type(size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)), ptr(ptr), ld(ld)
   {
     base_type::template assert_struct_size<sizeof(*this)>();
-  }
-
-  _RAFT_HOST_DEVICE [[nodiscard]] auto team_size() const -> uint32_t { return TeamSize; }
-
-  _RAFT_HOST_DEVICE [[nodiscard]] auto smem_ws_size_in_bytes() const -> uint32_t
-  {
-    return smem_query_buffer_length * sizeof(QUERY_T);
   }
 
   _RAFT_DEVICE [[nodiscard]] auto set_smem_ws(void* smem_ptr) const -> ws_handle
@@ -178,8 +173,9 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
 
   _RAFT_DEVICE void copy_query(ws_handle smem_workspace, const DATA_T* query_ptr) const
   {
-    auto buf = smem_query_buffer(smem_workspace);
-    for (unsigned i = threadIdx.x; i < smem_query_buffer_length; i += blockDim.x) {
+    auto buf     = smem_query_buffer(smem_workspace);
+    auto buf_len = smem_ws_size_in_bytes / sizeof(QUERY_T);
+    for (unsigned i = threadIdx.x; i < buf_len; i += blockDim.x) {
       unsigned j = device::swizzling(i);
       if (i < dim) {
         buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(query_ptr[i]);
@@ -187,21 +183,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
         buf[j] = 0.0;
       }
     }
-  }
-
-  template <typename T, cuvs::distance::DistanceType METRIC>
-  RAFT_DEVICE_INLINE_FUNCTION auto dist_op(T a, T b) const
-    -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::L2Expanded, T>
-  {
-    T diff = a - b;
-    return diff * diff;
-  }
-
-  template <typename T, cuvs::distance::DistanceType METRIC>
-  RAFT_DEVICE_INLINE_FUNCTION auto dist_op(T a, T b) const
-    -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::InnerProduct, T>
-  {
-    return -a * b;
   }
 
   _RAFT_DEVICE auto compute_distance(ws_handle smem_workspace,
@@ -218,6 +199,22 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
           smem_workspace, dataset_index, valid);
       default: return 0;
     }
+  }
+
+ private:
+  template <typename T, cuvs::distance::DistanceType METRIC>
+  RAFT_DEVICE_INLINE_FUNCTION constexpr static auto dist_op(T a, T b)
+    -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::L2Expanded, T>
+  {
+    T diff = a - b;
+    return diff * diff;
+  }
+
+  template <typename T, cuvs::distance::DistanceType METRIC>
+  RAFT_DEVICE_INLINE_FUNCTION constexpr static auto dist_op(T a, T b)
+    -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::InnerProduct, T>
+  {
+    return -a * b;
   }
 
   template <cuvs::distance::DistanceType METRIC>
@@ -266,11 +263,16 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return norm2;
   }
 
- private:
   RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_query_buffer(ws_handle smem_workspace) const
     -> QUERY_T*
   {
     return reinterpret_cast<QUERY_T*>(smem_workspace);
+  }
+
+  _RAFT_HOST_DEVICE [[nodiscard]] constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim)
+    -> uint32_t
+  {
+    return raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 };
 
@@ -327,8 +329,7 @@ auto standard_dataset_descriptor_init(const strided_dataset<DataT, DatasetIdxT>&
 {
   standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT> dd_host{
     dataset.view().data_handle(), IndexT(dataset.n_rows()), dataset.dim(), dataset.stride()};
-  dataset_descriptor_host<DataT, IndexT, DistanceT> result{
-    dd_host, stream, TeamSize, DatasetBlockDim};
+  dataset_descriptor_host<DataT, IndexT, DistanceT> result{dd_host, stream, DatasetBlockDim};
   standard_dataset_descriptor_init_kernel<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>
     <<<1, 1, 0, stream>>>(result.dev_ptr, dd_host.ptr, dd_host.size, dd_host.dim, dd_host.ld);
   return result;

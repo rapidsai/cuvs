@@ -113,7 +113,7 @@ RAFT_KERNEL random_pickup_kernel(
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
-  const auto team_size         = dataset_desc->team_size();
+  const auto team_size         = dataset_desc->team_size;
   const auto ldb               = hashmap::get_size(hash_bitlen);
   const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) / team_size;
   const uint32_t query_id      = blockIdx.y;
@@ -324,7 +324,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
-  const auto team_size      = dataset_desc->team_size();
+  const auto team_size      = dataset_desc->team_size;
   const uint32_t ldb        = hashmap::get_size(hash_bitlen);
   const auto tid            = threadIdx.x + blockDim.x * blockIdx.x;
   const auto global_team_id = tid / team_size;

@@ -198,7 +198,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
   auto distance_workspace = dataset_desc->set_smem_ws(smem);
 
   auto result_indices_buffer =
-    reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes());
+    reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes);
   auto result_distances_buffer =
     reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
   auto parent_indices_buffer =

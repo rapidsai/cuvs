@@ -88,7 +88,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   uint32_t block_id   = 0,
   uint32_t num_blocks = 1)
 {
-  const auto team_size = dataset_desc.team_size();
+  const auto team_size = dataset_desc.team_size;
   uint32_t max_i       = num_pickup;
   if (max_i % (warp_size / team_size)) {
     max_i += (warp_size / team_size) - (max_i % (warp_size / team_size));
@@ -175,7 +175,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
 
   // Compute the distance to child nodes
   uint32_t max_i       = knn_k * search_width;
-  const auto team_size = dataset_desc.team_size();
+  const auto team_size = dataset_desc.team_size;
   if (max_i % (warp_size / team_size)) {
     max_i += (warp_size / team_size) - (max_i % (warp_size / team_size));
   }
