@@ -350,12 +350,14 @@ void ann_mg_index<AnnIndexType, T, IdxT>::search(
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
 
-  int64_t n_rows_per_rank = raft::ceildiv(n_rows, (int64_t)num_ranks_);
-  n_rows_per_batch =
-    std::min(n_rows_per_batch, n_rows_per_rank);  // get at least num_ranks_ batches
+  if (mode_ == REPLICATED) {
+    int64_t n_rows_per_rank = raft::ceildiv(n_rows, (int64_t)num_ranks_);
+    n_rows_per_batch =
+      std::min(n_rows_per_batch, n_rows_per_rank);  // get at least num_ranks_ batches
+  }
 
   int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
-  if (n_batches == 1) n_rows_per_batch = n_rows;
+  if (n_batches <= 1) n_rows_per_batch = n_rows;
 
   if (mode_ == REPLICATED) {
     RAFT_LOG_INFO("REPLICATED SEARCH: %d*%drows", n_batches, n_rows_per_batch);
