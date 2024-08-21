@@ -27,7 +27,8 @@ from . import run_benchmark
 @click.option(
     "--subset-size",
     type=click.IntRange(min=1),
-    help="the number of subset rows of the dataset to build the index"
+    prompt='Enter the subset size',
+    help="The number of subset rows of the dataset to build the index"
 )
 @click.option(
     "-k",
@@ -35,39 +36,45 @@ from . import run_benchmark
     default=10,
     show_default=True,
     type=click.IntRange(min=1),
-    help="the number of nearest neighbors to search for"
+    prompt='Enter the number of  neighbors to search for',
+    help="The number of nearest neighbors to search for"
 )
 @click.option(
     "-bs", "--batch-size",
     default=10000,
     show_default=True,
     type=click.IntRange(min=1),
-    help="number of query vectors to use in each query trial"
+    prompt='Enter the batch size',
+    help="Number of query vectors to use in each query trial"
 )
 @click.option(
     "--dataset-configuration",
-    help="path to YAML configuration file for datasets"
+    prompt='Enter the path to YAML configuration file for datasets',
+    help="Path to YAML configuration file for datasets"
 )
 @click.option(
     "--configuration",
-    help="path to YAML configuration file or directory for algorithms"
+    prompt='Enter the path to YAML configuration file or directory for algorithms',
+    help="Path to YAML configuration file or directory for algorithms. "
          "Any run groups found in the specified file/directory will "
          "automatically override groups of the same name present in the "
-         "default configurations, including `base`",
+         "default configurations, including `base`."
 )
 @click.option(
     "--dataset",
     default="glove-100-inner",
     show_default=True,
-    help="name of dataset"
+    prompt='Enter the name of dataset',
+    help="Name of dataset"
 )
 @click.option(
     "--dataset-path",
     default=lambda: os.environ.get("RAPIDS_DATASET_ROOT_DIR",
                                    os.path.join(Path(__file__).parent, "datasets/")),
     show_default=True,
-    help="path to dataset folder, by default will look in RAPIDS_DATASET_ROOT_DIR if defined, "
-         "otherwise a datasets subdirectory from the calling directory",
+    prompt='Enter the path to dataset folder',
+    help="Path to dataset folder, by default will look in RAPIDS_DATASET_ROOT_DIR if defined, "
+         "otherwise a datasets subdirectory from the calling directory."
 )
 @click.option(
     "--build",
@@ -83,56 +90,62 @@ from . import run_benchmark
     "--algorithms",
     default=None,
     show_default=True,
-    help="run only comma separated list of named algorithms. If parameters `groups` and `algo-groups` are both undefined, "
-         "then group `base` is run by default",
+    prompt='Enter the comma separated list of named algorithms to run',
+    help="Run only comma separated list of named algorithms. If parameters `groups` and `algo-groups` are both undefined, "
+         "then group `base` is run by default."
 )
 @click.option(
     "--groups",
     default="base",
     show_default=True,
-    help="run only comma separated groups of parameters"
+    prompt='Enter the comma separated groups of parameters',
+    help="Run only comma separated groups of parameters"
 )
 @click.option(
     "--algo-groups",
-    help='add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large"',
+    prompt='Enter the comma separated <algorithm>.<group> to run',
+    help='Add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large".',
 )
 @click.option(
     "-f",
     "--force",
     is_flag=True,
-    help="re-run algorithms even if their results already exist"
+    help="Re-run algorithms even if their results already exist"
 )
 @click.option(
     "-m",
     "--search-mode",
     default="latency",
     show_default=True,
-    help="run search in 'latency' (measure individual batches) or 'throughput' (pipeline batches and measure end-to-end) mode",
+    prompt='Enter the search mode ("latency" or "throughput")',
+    help="Run search in 'latency' (measure individual batches) or 'throughput' (pipeline batches and measure end-to-end) mode."
 )
 @click.option(
     "-t",
     "--search-threads",
     default=None,
     show_default=True,
-    help="specify the number threads to use for throughput benchmark. Single value or a pair of min and max separated by ':'. "
+    prompt='Enter the number of threads to use for throughput benchmark',
+    help="Specify the number threads to use for throughput benchmark. Single value or a pair of min and max separated by ':'. "
          "Example: --search-threads=1:4. Power of 2 values between 'min' and 'max' will be used. "
-         "If only 'min' is specified, then a single test is run with 'min' threads. By default min=1, max=<num hyper threads>.",
+         "If only 'min' is specified, then a single test is run with 'min' threads. By default min=1, max=<num hyper threads>."
 )
 @click.option(
     "-r",
     "--dry-run",
     is_flag=True,
-    help="dry-run mode will convert the yaml config for the specified algorithms and datasets to the json format that's consumed "
+    help="Dry-run mode will convert the yaml config for the specified algorithms and datasets to the json format that’s consumed "
          "by the lower-level c++ binaries and then print the command to run execute the benchmarks but will not actually execute "
-         "the command.",
+         "the command."
 )
 @click.option(
     "--raft-log-level",
     default="info",
     show_default=True,
+    prompt='Enter the log level',
     help="Log level, possible values are [off, error, warn, info, debug, trace]. Default: 'info'. "
          "Note that 'debug' or more detailed logging level requires that the library is compiled with "
-         "-DRAFT_ACTIVE_LEVEL=<L> where <L> >= <requested log level>",
+         "-DRAFT_ACTIVE_LEVEL=<L> where <L> >= <requested log level>."
 )
 def main(
     subset_size: Optional[int],
