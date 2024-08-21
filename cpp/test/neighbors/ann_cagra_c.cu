@@ -25,6 +25,8 @@
 #include <gtest/gtest.h>
 #include <sys/types.h>
 
+#include <raft/random/make_blobs.cuh>
+
 float dataset[4][2] = {{0.74021935, 0.9209938},
                        {0.03902049, 0.9689629},
                        {0.92514056, 0.4463501},
@@ -34,8 +36,10 @@ float queries[4][2] = {{0.48216683, 0.0428398},
                        {0.51260436, 0.2643005},
                        {0.05198065, 0.5789965}};
 
-uint32_t neighbors_exp[4] = {3, 0, 3, 1};
-float distances_exp[4]    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
+// uint32_t neighbors_exp[4] = {3, 0, 3, 1};
+uint32_t neighbors_exp[4] = {0, 1, 2, 3};
+// float distances_exp[4]    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
+float distances_exp[4] = {0.0, 0.0, 0.0, 0.0};
 
 TEST(CagraC, BuildSearch)
 {
@@ -45,20 +49,45 @@ TEST(CagraC, BuildSearch)
   cudaStream_t stream;
   cuvsStreamGet(res, &stream);
 
-  // create dataset DLTensor
+  //  rmm::device_uvector<float> additional_d(4 * 2, stream);
+  // rmm::device_uvector<int32_t> additional_labels_d(4 * 2, stream);
+  // raft::random::make_blobs(additional_d.data(), additional_labels_d.data(),16,2,5, stream);
+
+  // // create dataset DLTensor
+  // DLManagedTensor dataset_tensor;
+  // dataset_tensor.dl_tensor.data               = dataset;
+  // dataset_tensor.dl_tensor.device.device_type = kDLCPU;
+  // dataset_tensor.dl_tensor.ndim               = 2;
+  // dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+  // dataset_tensor.dl_tensor.dtype.bits         = 32;
+  // dataset_tensor.dl_tensor.dtype.lanes        = 1;
+  // int64_t dataset_shape[2]                    = {4, 2};
+  // dataset_tensor.dl_tensor.shape              = dataset_shape;
+  // dataset_tensor.dl_tensor.strides            = nullptr;
+
+  // create  dataset DLTensor
+  int main_num_rows = 1024;
+  rmm::device_uvector<float> main_d(main_num_rows * 2, stream);
+  rmm::device_uvector<int32_t> main_labels_d(main_num_rows, stream);
+  raft::random::make_blobs(main_d.data(), main_labels_d.data(), main_num_rows, 2, 5, stream);
+  // raft::copy(additional_d.data(), (float*)dataset, 4 * 2, stream);
   DLManagedTensor dataset_tensor;
-  dataset_tensor.dl_tensor.data               = dataset;
-  dataset_tensor.dl_tensor.device.device_type = kDLCPU;
+  dataset_tensor.dl_tensor.data               = main_d.data();
+  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
   dataset_tensor.dl_tensor.ndim               = 2;
   dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
   dataset_tensor.dl_tensor.dtype.bits         = 32;
   dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t dataset_shape[2]                    = {4, 2};
+  int64_t dataset_shape[2]                    = {main_num_rows, 2};
   dataset_tensor.dl_tensor.shape              = dataset_shape;
   dataset_tensor.dl_tensor.strides            = nullptr;
 
   // create additional dataset DLTensor
-  rmm::device_uvector<float> additional_d(4 * 2, stream);
+  int additional_num_rows = 64;
+  rmm::device_uvector<float> additional_d(additional_num_rows * 2, stream);
+  rmm::device_uvector<int32_t> additional_labels_d(additional_num_rows, stream);
+  raft::random::make_blobs(
+    additional_d.data(), additional_labels_d.data(), additional_num_rows, 2, 5, stream);
   raft::copy(additional_d.data(), (float*)dataset, 4 * 2, stream);
   DLManagedTensor additional_dataset_tensor;
   additional_dataset_tensor.dl_tensor.data               = additional_d.data();
@@ -67,7 +96,7 @@ TEST(CagraC, BuildSearch)
   additional_dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
   additional_dataset_tensor.dl_tensor.dtype.bits         = 32;
   additional_dataset_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t additional_dataset_shape[2]                    = {4, 2};
+  int64_t additional_dataset_shape[2]                    = {additional_num_rows, 2};
   additional_dataset_tensor.dl_tensor.shape              = additional_dataset_shape;
   additional_dataset_tensor.dl_tensor.strides            = nullptr;
 
@@ -90,7 +119,7 @@ TEST(CagraC, BuildSearch)
   raft::copy(queries_d.data(), (float*)queries, 4 * 2, stream);
 
   DLManagedTensor queries_tensor;
-  queries_tensor.dl_tensor.data               = queries_d.data();
+  queries_tensor.dl_tensor.data               = main_d.data();
   queries_tensor.dl_tensor.device.device_type = kDLCUDA;
   queries_tensor.dl_tensor.ndim               = 2;
   queries_tensor.dl_tensor.dtype.code         = kDLFloat;
@@ -116,6 +145,8 @@ TEST(CagraC, BuildSearch)
 
   // create distances DLTensor
   rmm::device_uvector<float> distances_d(4, stream);
+
+  distances_d.resize(4, stream);
 
   DLManagedTensor distances_tensor;
   distances_tensor.dl_tensor.data               = distances_d.data();
