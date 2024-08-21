@@ -254,6 +254,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
         raft::linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
       }
     } break;
+    case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
       float factor = (account_for_max_close ? -1.0 : 1.0) * scaling_factor * scaling_factor;
       if (factor != 1.0) {
