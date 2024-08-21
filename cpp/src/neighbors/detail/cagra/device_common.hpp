@@ -57,7 +57,7 @@ _RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
 }
 
 template <class T, unsigned X_MAX = 1024>
-_RAFT_DEVICE inline T swizzling(T x)
+RAFT_DEVICE_INLINE_FUNCTION constexpr T swizzling(T x)
 {
   // Address swizzling reduces bank conflicts in shared memory, but increases
   // the amount of operation instead.

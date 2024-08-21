@@ -279,79 +279,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   }
 };
 
-extern template struct standard_dataset_descriptor_t<8, 128, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 256, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 512, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 1024, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 128, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 256, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 512, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 1024, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 128, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 256, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 512, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 1024, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 128, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 256, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 512, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 1024, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 128, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 256, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 512, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 1024, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 128, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 256, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 512, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 1024, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 1024, 8, 4, half, half, uint64_t, float>;
-
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PqBits,
@@ -394,22 +321,21 @@ template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PqBits,
           uint32_t PqLen,
-          typename CodeBookT,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename DatasetIdxT>
-auto vpq_dataset_descriptor_init(const vpq_dataset<CodeBookT, DatasetIdxT>& dataset,
-                                 rmm::cuda_stream_view stream)
+          typename DatasetT>
+auto vpq_dataset_descriptor_init(const DatasetT& dataset, rmm::cuda_stream_view stream)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
+  using codebook_type  = typename DatasetT::math_type;
   const float vq_scale = 1.0f;
   const float pq_scale = 1.0f;
   cagra_q_dataset_descriptor_t<TeamSize,
                                DatasetBlockDim,
                                PqBits,
                                PqLen,
-                               CodeBookT,
+                               codebook_type,
                                DataT,
                                IndexT,
                                DistanceT>
@@ -427,7 +353,7 @@ auto vpq_dataset_descriptor_init(const vpq_dataset<CodeBookT, DatasetIdxT>& data
                                      DatasetBlockDim,
                                      PqBits,
                                      PqLen,
-                                     CodeBookT,
+                                     codebook_type,
                                      DataT,
                                      IndexT,
                                      DistanceT><<<1, 1, 0, stream>>>(result.dev_ptr,
@@ -448,30 +374,17 @@ template <uint32_t TeamSize,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename DatasetIdxT>
-auto vpq_dataset_descriptor_init_runtime(const vpq_dataset<half, DatasetIdxT>& dataset,
-                                         rmm::cuda_stream_view stream)
+          typename DatasetT>
+auto vpq_dataset_descriptor_init_runtime(const DatasetT& dataset, rmm::cuda_stream_view stream)
 
 {
   if (dataset.pq_bits() == 8) {
     if (dataset.pq_len() == 2) {
-      return vpq_dataset_descriptor_init<TeamSize,
-                                         DatasetBlockDim,
-                                         8,
-                                         2,
-                                         half,
-                                         DataT,
-                                         IndexT,
-                                         DistanceT>(dataset, stream);
+      return vpq_dataset_descriptor_init<TeamSize, DatasetBlockDim, 8, 2, DataT, IndexT, DistanceT>(
+        dataset, stream);
     } else if (dataset.pq_len() == 4) {
-      return vpq_dataset_descriptor_init<TeamSize,
-                                         DatasetBlockDim,
-                                         8,
-                                         4,
-                                         half,
-                                         DataT,
-                                         IndexT,
-                                         DistanceT>(dataset, stream);
+      return vpq_dataset_descriptor_init<TeamSize, DatasetBlockDim, 8, 4, DataT, IndexT, DistanceT>(
+        dataset, stream);
     } else {
       RAFT_FAIL("Subspace dimension must be 2 or 4");
     }
@@ -480,26 +393,27 @@ auto vpq_dataset_descriptor_init_runtime(const vpq_dataset<half, DatasetIdxT>& d
   }
 }
 
-template <typename DataT, typename IndexT, typename DistanceT, typename DatasetIdxT>
-auto dataset_descriptor_init(const vpq_dataset<half, DatasetIdxT>& dataset,
-                             rmm::cuda_stream_view stream)
-  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
+template <typename DatasetT, typename ReturnT>
+using enable_vpq = std::enable_if_t<is_vpq_dataset_v<DatasetT>, ReturnT>;
+
+template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+auto dataset_descriptor_init(const DatasetT& dataset, rmm::cuda_stream_view stream)
+  -> enable_vpq<DatasetT, dataset_descriptor_host<DataT, IndexT, DistanceT>>
 {
-  constexpr int64_t max_dataset_block_dim = 512;
-  int64_t dataset_block_dim               = 128;
+  constexpr int64_t max_dataset_block_dim = 256;
+  int64_t dataset_block_dim               = 64;
   while (dataset_block_dim < dataset.dim() && dataset_block_dim < max_dataset_block_dim) {
     dataset_block_dim *= 2;
   }
   switch (dataset_block_dim) {
+    case 64:
+      return vpq_dataset_descriptor_init_runtime<8, 64, DataT, IndexT, DistanceT>(dataset, stream);
     case 128:
-      return vpq_dataset_descriptor_init_runtime<8, 128, DataT, IndexT, DistanceT, DatasetIdxT>(
-        dataset, stream);
-    case 256:
-      return vpq_dataset_descriptor_init_runtime<16, 256, DataT, IndexT, DistanceT, DatasetIdxT>(
-        dataset, stream);
+      return vpq_dataset_descriptor_init_runtime<16, 128, DataT, IndexT, DistanceT>(dataset,
+                                                                                    stream);
     default:
-      return vpq_dataset_descriptor_init_runtime<32, 512, DataT, IndexT, DistanceT, DatasetIdxT>(
-        dataset, stream);
+      return vpq_dataset_descriptor_init_runtime<32, 256, DataT, IndexT, DistanceT>(dataset,
+                                                                                    stream);
   }
 }
 

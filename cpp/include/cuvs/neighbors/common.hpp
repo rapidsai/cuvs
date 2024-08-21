@@ -172,6 +172,22 @@ struct owning_dataset : public strided_dataset<DataT, IdxT> {
   };
 };
 
+template <typename DatasetT>
+struct is_strided_dataset : std::false_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<strided_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<non_owning_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
+struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPolicy>>
+  : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
+
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
  *
@@ -284,23 +300,25 @@ auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t 
  */
 template <typename MathT, typename IdxT>
 struct vpq_dataset : public dataset<IdxT> {
+  using index_type = IdxT;
+  using math_type  = MathT;
   /** Vector Quantization codebook - "coarse cluster centers". */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> vq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book;
   /** Product Quantization codebook - "fine cluster centers".  */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> pq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book;
   /** Compressed dataset.  */
-  raft::device_matrix<uint8_t, IdxT, raft::row_major> data;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data;
 
-  vpq_dataset(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq_code_book,
-              raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq_code_book,
-              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data)
+  vpq_dataset(raft::device_matrix<math_type, uint32_t, raft::row_major>&& vq_code_book,
+              raft::device_matrix<math_type, uint32_t, raft::row_major>&& pq_code_book,
+              raft::device_matrix<uint8_t, index_type, raft::row_major>&& data)
     : vq_code_book{std::move(vq_code_book)},
       pq_code_book{std::move(pq_code_book)},
       data{std::move(data)}
   {
   }
 
-  [[nodiscard]] auto n_rows() const noexcept -> IdxT final { return data.extent(0); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book.extent(1); }
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 
@@ -353,6 +371,15 @@ struct vpq_dataset : public dataset<IdxT> {
     return pq_code_book.extent(0);
   }
 };
+
+template <typename DatasetT>
+struct is_vpq_dataset : std::false_type {};
+
+template <typename MathT, typename IdxT>
+struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
