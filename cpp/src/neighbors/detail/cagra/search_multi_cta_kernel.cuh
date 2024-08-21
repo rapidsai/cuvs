@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "compute_distance.hpp"
+#include "compute_distance-ext.cuh"
 
 #include <cuvs/neighbors/cagra.hpp>
 

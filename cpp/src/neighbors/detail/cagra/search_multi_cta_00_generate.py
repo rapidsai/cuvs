@@ -39,8 +39,6 @@ header = """/*
 
 #include "search_multi_cta_inst.cuh"
 
-#include "compute_distance.hpp"
-
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 """
 

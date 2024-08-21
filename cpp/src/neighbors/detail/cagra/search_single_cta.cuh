@@ -16,7 +16,7 @@
 #pragma once
 
 #include "bitonic.hpp"
-#include "compute_distance.hpp"
+#include "compute_distance-ext.cuh"
 #include "device_common.hpp"
 #include "hashmap.hpp"
 #include "search_plan.cuh"

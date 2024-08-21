@@ -22,9 +22,6 @@
 #include <raft/core/logger-macros.hpp>
 #include <raft/core/operators.hpp>
 
-// TODO: This shouldn't be invoking spatial/knn
-#include "../ann_utils.cuh"
-
 #include <raft/util/vectorized.cuh>
 
 #include <type_traits>
@@ -188,120 +185,46 @@ template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
-          typename DistanceT,
-          typename DatasetT>
-auto standard_dataset_descriptor_init(const DatasetT& dataset, rmm::cuda_stream_view stream)
-  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
-{
-  standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT> dd_host{
-    dataset.view().data_handle(), IndexT(dataset.n_rows()), dataset.dim(), dataset.stride()};
-  dataset_descriptor_host<DataT, IndexT, DistanceT> result{dd_host, stream, DatasetBlockDim};
-  standard_dataset_descriptor_init_kernel<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>
-    <<<1, 1, 0, stream>>>(result.dev_ptr, dd_host.ptr, dd_host.size, dd_host.dim, dd_host.ld);
-  return result;
-}
+          typename DistanceT>
+struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
+  using base_type = instance_spec<DataT, IndexT, DistanceT>;
+  using typename base_type::data_type;
+  using typename base_type::distance_type;
+  using typename base_type::host_type;
+  using typename base_type::index_type;
 
-template <typename DatasetT, typename ReturnT>
-using enable_strided = std::enable_if_t<is_strided_dataset_v<DatasetT>, ReturnT>;
-
-template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
-auto dataset_descriptor_init(const DatasetT& dataset, rmm::cuda_stream_view stream)
-  -> enable_strided<DatasetT, dataset_descriptor_host<DataT, IndexT, DistanceT>>
-{
-  constexpr int64_t max_dataset_block_dim = 256;
-  int64_t dataset_block_dim               = 64;
-  while (dataset_block_dim < dataset.dim() && dataset_block_dim < max_dataset_block_dim) {
-    dataset_block_dim *= 2;
+  template <typename DatasetT>
+  constexpr static inline bool accepts_dataset()
+  {
+    return is_strided_dataset_v<DatasetT>;
   }
-  switch (dataset_block_dim) {
-    case 64:
-      return standard_dataset_descriptor_init<8, 64, DataT, IndexT, DistanceT>(dataset, stream);
-    case 128:
-      return standard_dataset_descriptor_init<16, 128, DataT, IndexT, DistanceT>(dataset, stream);
-    default:
-      return standard_dataset_descriptor_init<32, 256, DataT, IndexT, DistanceT>(dataset, stream);
+
+  using descriptor_type =
+    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+  static constexpr auto init_kernel =
+    standard_dataset_descriptor_init_kernel<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+
+  template <typename DatasetT>
+  static auto init(const cagra::search_params& params,
+                   const DatasetT& dataset,
+                   rmm::cuda_stream_view stream) -> host_type
+  {
+    descriptor_type dd_host{
+      dataset.view().data_handle(), IndexT(dataset.n_rows()), dataset.dim(), dataset.stride()};
+    host_type result{dd_host, stream, DatasetBlockDim};
+    init_kernel<<<1, 1, 0, stream>>>(
+      result.dev_ptr, dd_host.ptr, dd_host.size, dd_host.dim, dd_host.ld);
+    return result;
   }
-}
 
-// template <typename DataT, typename IndexT, typename DistanceT>
-// struct descriptor_instance_spec {
-//   template <uint32_t TeamSize, uint32_t DatasetBlockDim>
-//   struct standard_descriptor {
-//     template <typename DatasetT>
-//     struct dataset_instance_spec {
-//       static auto init(const cagra::search_params& params,
-//                        const DatasetT& dataset,
-//                        rmm::cuda_stream_view stream)
-//         -> dataset_descriptor_host<DataT, IndexT, DistanceT>
-//       {
-//         standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>
-//         dd_host{
-//           dataset.view().data_handle(), IndexT(dataset.n_rows()), dataset.dim(),
-//           dataset.stride()};
-//         dataset_descriptor_host<DataT, IndexT, DistanceT> result{dd_host, stream,
-//         DatasetBlockDim}; standard_dataset_descriptor_init_kernel<TeamSize, DatasetBlockDim,
-//         DataT, IndexT, DistanceT>
-//           <<<1, 1, 0, stream>>>(result.dev_ptr, dd_host.ptr, dd_host.size, dd_host.dim,
-//           dd_host.ld);
-//         return result;
-//       }
-
-//       static auto error(const cagra::search_params& params,
-//                         const DatasetT& dataset,
-//                         rmm::cuda_stream_view stream)
-//         -> dataset_descriptor_host<DataT, IndexT, DistanceT>
-//       {
-//         RAFT_FAIL("Invalid team_size {%u} - no kernel instance found for this value.");
-//       }
-
-//       static auto priority(const cagra::search_params& params, const DatasetT& dataset) -> double
-//       {
-//         // If explicit team_size is specified and doesn't match the instance, discard it
-//         if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
-//         // Otherwise, favor the closest dataset dimensionality.
-//         return 1.0 / (0.1 + std::abs(dataset.dim() - DatasetBlockDim));
-//       }
-//     };
-//   };
-// };
-
-// template <typename... Specs>
-// struct instance_selector {
-//   template <typename ReturnT, typename DatasetT>
-//   static auto init(const cagra::search_params& params,
-//                    const DatasetT& dataset,
-//                    rmm::cuda_stream_view stream) -> ReturnT = 0;
-// };
-
-// template <typename Spec>
-// struct instance_selector<Spec> {
-//   template <typename DatasetT>
-//   static auto select_worker(const cagra::search_params& params, const DatasetT& dataset)
-//   {
-//     auto p = Spec::priority(params, dataset);
-//     return std::make_tuple(p >= 0 ? &(Spec::init) : &(Spec::error), p);
-//   }
-// }
-
-// template <typename Spec0, typename... Specs>
-// struct instance_selector<Spec, Specs...> {
-//   template <typename DatasetT>
-//   static auto select_worker(const cagra::search_params& params, const DatasetT& dataset)
-//   {
-//     auto p0  = Spec::priority(params, dataset);
-//     auto sel = instance_selector<Specs...>::select_worker<DatasetT>(params, dataset);
-//     return p0 > std::get<double>(sel) ? std::make_tuple(&(Spec::init), p0) : sel;
-//   }
-// }
-
-// template <typename DatasetT, typename... Specs>
-
-// template <typename DataT, typename IndexT, typename DistanceT, typename DatasetIdxT>
-// auto dataset_descriptor_init(const cagra::search_params& params,
-//                              const strided_dataset<DataT, DatasetIdxT>& dataset,
-//                              rmm::cuda_stream_view stream)
-//   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
-// {
-// }
+  template <typename DatasetT>
+  static auto priority(const cagra::search_params& params, const DatasetT& dataset) -> double
+  {
+    // If explicit team_size is specified and doesn't match the instance, discard it
+    if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
+    // Otherwise, favor the closest dataset dimensionality.
+    return 1.0 / (0.1 + std::abs(double(dataset.dim()) - double(DatasetBlockDim)));
+  }
+};
 
 }  // namespace cuvs::neighbors::cagra::detail

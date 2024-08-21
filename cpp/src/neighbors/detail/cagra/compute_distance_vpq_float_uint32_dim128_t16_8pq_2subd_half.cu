@@ -28,5 +28,6 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, float, uint32_t, float>;
+template struct vpq_descriptor_spec<16, 128, 8, 2, half, float, uint32_t, float>;
 
 }  // namespace cuvs::neighbors::cagra::detail

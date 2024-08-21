@@ -20,6 +20,7 @@
 #include "utils.hpp"
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/logger-macros.hpp>
 #include <raft/core/operators.hpp>
@@ -150,6 +151,82 @@ struct dataset_descriptor_host {
 
  private:
   rmm::cuda_stream_view stream_;
+};
+
+template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+using init_desc_type = dataset_descriptor_host<DataT, IndexT, DistanceT> (*)(
+  const cagra::search_params&, const DatasetT&, rmm::cuda_stream_view);
+
+template <typename DataT, typename IndexT, typename DistanceT>
+struct instance_spec {
+  using data_type     = DataT;
+  using index_type    = IndexT;
+  using distance_type = DistanceT;
+  using host_type     = dataset_descriptor_host<DataT, IndexT, DistanceT>;
+  /** Use this to constrain the input dataset type. */
+  template <typename DatasetT>
+  constexpr static inline bool accepts_dataset()
+  {
+    return false;
+  }
+};
+
+template <typename InstanceSpec,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename DatasetT>
+constexpr bool spec_sound = std::is_same_v<DataT, typename InstanceSpec::data_type> &&
+                            std::is_same_v<IndexT, typename InstanceSpec::index_type> &&
+                            std::is_same_v<DistanceT, typename InstanceSpec::distance_type> &&
+                            InstanceSpec::template accepts_dataset<DatasetT>();
+
+template <typename InstanceSpec,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename DatasetT>
+constexpr auto spec_match(const cagra::search_params& params, const DatasetT& dataset)
+  -> std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>
+{
+  if constexpr (spec_sound<InstanceSpec, DataT, IndexT, DistanceT, DatasetT>) {
+    return std::make_tuple(InstanceSpec::template init<DatasetT>,
+                           InstanceSpec::template priority(params, dataset));
+  }
+  return std::make_tuple(nullptr, -1.0);
+}
+
+template <typename... Specs>
+struct instance_selector {
+  template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+  static auto select(const cagra::search_params&, const DatasetT&)
+    -> std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>
+  {
+    return std::make_tuple(nullptr, -1.0);
+  }
+};
+
+template <typename Spec, typename... Specs>
+struct instance_selector<Spec, Specs...> {
+  template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+  static auto select(const cagra::search_params& params, const DatasetT& dataset)
+    -> std::enable_if_t<spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
+                        std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
+  {
+    auto s0 = spec_match<Spec, DataT, IndexT, DistanceT, DatasetT>(params, dataset);
+    auto ss = instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
+      params, dataset);
+    return std::get<double>(s0) >= std::get<double>(ss) ? s0 : ss;
+  }
+
+  template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+  static auto select(const cagra::search_params& params, const DatasetT& dataset)
+    -> std::enable_if_t<!spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
+                        std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
+  {
+    return instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
+      params, dataset);
+  }
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

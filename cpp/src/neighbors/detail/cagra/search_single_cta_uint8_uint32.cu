@@ -25,8 +25,6 @@
 
 #include "search_single_cta_inst.cuh"
 
-#include "compute_distance.hpp"
-
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 instantiate_kernel_selection(uint8_t,
                              uint32_t,

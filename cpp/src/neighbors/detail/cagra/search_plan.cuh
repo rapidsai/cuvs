@@ -18,7 +18,7 @@
 
 #include "hashmap.hpp"
 
-#include "compute_distance.hpp"
+#include "compute_distance-ext.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 // #include "search_single_cta_inst.cuh"

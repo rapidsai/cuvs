@@ -43,7 +43,7 @@ template = """/*
 
 namespace cuvs::neighbors::cagra::detail {{
 
-{instances}
+{content}
 
 }}  // namespace cuvs::neighbors::cagra::detail
 """
@@ -71,7 +71,8 @@ search_types = dict(
     half_uint64=("half", "uint64_t", "float"),
 )
 
-compute_distance_ext = []
+specs = []
+descs = []
 cmake_list = []
 
 
@@ -89,10 +90,16 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
         # CAGRA
         path = f"compute_distance_standard_{type_path}_dim{mxdim}_t{team}.cu"
         includes = '#include "compute_distance_standard.cuh"'
-        decl = f"template struct standard_dataset_descriptor_t<{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}>;"
-        compute_distance_ext.append(f"extern {decl}")
+        spec = f"standard_descriptor_spec<{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}>"
+        desc = f"standard_dataset_descriptor_t<{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}>"
+        content = f"""
+template struct {desc};
+template struct {spec};
+"""
+        descs.append(desc)
+        specs.append(spec)
         with open(path, "w") as f:
-            f.write(template.format(includes=includes, instances=decl));
+            f.write(template.format(includes=includes, content=content))
             cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
         # CAGRA-Q
@@ -100,19 +107,48 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
             for pq_len in pq_lens:
                 for pq_bit in pq_bits:
                     path = f"compute_distance_vpq_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
-                    decl = f"template struct cagra_q_dataset_descriptor_t<{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}>;"
                     includes = '#include "compute_distance_vpq.cuh"'
-                    compute_distance_ext.append(f"extern {decl}")
+                    spec = f"vpq_descriptor_spec<{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}>"
+                    desc = f"cagra_q_dataset_descriptor_t<{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}>"
+                    content = f"""
+template struct {desc};
+template struct {spec};
+"""
+                    descs.append(desc)
+                    specs.append(spec)
                     with open(path, "w") as f:
-                        f.write(template.format(includes=includes, instances=decl));
+                        f.write(template.format(includes=includes, content=content))
                         cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
-with open("compute_distance-ext.hpp", "w") as f:
+with open("compute_distance-ext.cuh", "w") as f:
     includes = '''
+#pragma once
+
 #include "compute_distance_standard.cuh"
 #include "compute_distance_vpq.cuh"
 '''
-    f.write(template.format(includes=includes, instances="\n".join(compute_distance_ext)))
+    newline = "\n"
+    contents = f'''
+{newline.join(map(lambda s: "extern template struct " + s + ";", descs))}
+{newline.join(map(lambda s: "extern template struct " + s + ";", specs))}
+
+using descriptor_instances =
+  instance_selector<{("," + newline + "                    ").join(specs)}>;
+
+template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+auto dataset_descriptor_init(const cagra::search_params& params,
+                             const DatasetT& dataset,
+                             rmm::cuda_stream_view stream)
+  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
+{{
+  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset);
+  if (init == nullptr || priority < 0) {{
+    RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
+  }}
+  return init(params, dataset, stream);
+}}
+'''
+    f.write(template.format(includes=includes, content=contents))
 
 cmake_list.sort()
 for path in cmake_list:

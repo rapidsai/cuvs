@@ -321,100 +321,89 @@ template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PqBits,
           uint32_t PqLen,
+          typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT,
-          typename DatasetT>
-auto vpq_dataset_descriptor_init(const DatasetT& dataset, rmm::cuda_stream_view stream)
-  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
-{
-  using codebook_type  = typename DatasetT::math_type;
-  const float vq_scale = 1.0f;
-  const float pq_scale = 1.0f;
-  cagra_q_dataset_descriptor_t<TeamSize,
-                               DatasetBlockDim,
-                               PqBits,
-                               PqLen,
-                               codebook_type,
-                               DataT,
-                               IndexT,
-                               DistanceT>
-    dd_host{dataset.data.data_handle(),
-            dataset.encoded_row_length(),
-            dataset.pq_dim(),
-            dataset.vq_code_book.data_handle(),
-            vq_scale,
-            dataset.pq_code_book.data_handle(),
-            pq_scale,
-            IndexT(dataset.n_rows()),
-            dataset.dim()};
-  dataset_descriptor_host<DataT, IndexT, DistanceT> result{dd_host, stream, DatasetBlockDim};
-  vpq_dataset_descriptor_init_kernel<TeamSize,
-                                     DatasetBlockDim,
-                                     PqBits,
-                                     PqLen,
-                                     codebook_type,
-                                     DataT,
-                                     IndexT,
-                                     DistanceT><<<1, 1, 0, stream>>>(result.dev_ptr,
-                                                                     dd_host.encoded_dataset_ptr,
-                                                                     dd_host.encoded_dataset_dim,
-                                                                     dd_host.n_subspace,
-                                                                     dd_host.vq_code_book_ptr,
-                                                                     dd_host.vq_scale,
-                                                                     dd_host.pq_code_book_ptr,
-                                                                     dd_host.pq_scale,
-                                                                     dd_host.size,
-                                                                     dd_host.dim);
-  return result;
-}
+          typename DistanceT>
+struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
+  using base_type = instance_spec<DataT, IndexT, DistanceT>;
+  using typename base_type::data_type;
+  using typename base_type::distance_type;
+  using typename base_type::host_type;
+  using typename base_type::index_type;
 
-template <uint32_t TeamSize,
-          uint32_t DatasetBlockDim,
-          typename DataT,
-          typename IndexT,
-          typename DistanceT,
-          typename DatasetT>
-auto vpq_dataset_descriptor_init_runtime(const DatasetT& dataset, rmm::cuda_stream_view stream)
-
-{
-  if (dataset.pq_bits() == 8) {
-    if (dataset.pq_len() == 2) {
-      return vpq_dataset_descriptor_init<TeamSize, DatasetBlockDim, 8, 2, DataT, IndexT, DistanceT>(
-        dataset, stream);
-    } else if (dataset.pq_len() == 4) {
-      return vpq_dataset_descriptor_init<TeamSize, DatasetBlockDim, 8, 4, DataT, IndexT, DistanceT>(
-        dataset, stream);
-    } else {
-      RAFT_FAIL("Subspace dimension must be 2 or 4");
-    }
-  } else {
-    RAFT_FAIL("Only 8-bit PQ is supported now");
+  template <typename DatasetT>
+  constexpr static inline auto accepts_dataset()
+    -> std::enable_if_t<is_vpq_dataset_v<DatasetT>, bool>
+  {
+    return std::is_same_v<typename DatasetT::math_type, CodebookT>;
   }
-}
 
-template <typename DatasetT, typename ReturnT>
-using enable_vpq = std::enable_if_t<is_vpq_dataset_v<DatasetT>, ReturnT>;
+  template <typename DatasetT>
+  constexpr static inline auto accepts_dataset()
+    -> std::enable_if_t<!is_vpq_dataset_v<DatasetT>, bool>
+  {
+    return false;
+  }
 
-template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
-auto dataset_descriptor_init(const DatasetT& dataset, rmm::cuda_stream_view stream)
-  -> enable_vpq<DatasetT, dataset_descriptor_host<DataT, IndexT, DistanceT>>
-{
-  constexpr int64_t max_dataset_block_dim = 256;
-  int64_t dataset_block_dim               = 64;
-  while (dataset_block_dim < dataset.dim() && dataset_block_dim < max_dataset_block_dim) {
-    dataset_block_dim *= 2;
+  using descriptor_type             = cagra_q_dataset_descriptor_t<TeamSize,
+                                                       DatasetBlockDim,
+                                                       PqBits,
+                                                       PqLen,
+                                                       CodebookT,
+                                                       DataT,
+                                                       IndexT,
+                                                       DistanceT>;
+  static constexpr auto init_kernel = vpq_dataset_descriptor_init_kernel<TeamSize,
+                                                                         DatasetBlockDim,
+                                                                         PqBits,
+                                                                         PqLen,
+                                                                         CodebookT,
+                                                                         DataT,
+                                                                         IndexT,
+                                                                         DistanceT>;
+
+  template <typename DatasetT>
+  static auto init(const cagra::search_params& params,
+                   const DatasetT& dataset,
+                   rmm::cuda_stream_view stream) -> host_type
+  {
+    const float vq_scale = 1.0f;
+    const float pq_scale = 1.0f;
+    descriptor_type dd_host{dataset.data.data_handle(),
+                            dataset.encoded_row_length(),
+                            dataset.pq_dim(),
+                            dataset.vq_code_book.data_handle(),
+                            vq_scale,
+                            dataset.pq_code_book.data_handle(),
+                            pq_scale,
+                            IndexT(dataset.n_rows()),
+                            dataset.dim()};
+    host_type result{dd_host, stream, DatasetBlockDim};
+    init_kernel<<<1, 1, 0, stream>>>(result.dev_ptr,
+                                     dd_host.encoded_dataset_ptr,
+                                     dd_host.encoded_dataset_dim,
+                                     dd_host.n_subspace,
+                                     dd_host.vq_code_book_ptr,
+                                     dd_host.vq_scale,
+                                     dd_host.pq_code_book_ptr,
+                                     dd_host.pq_scale,
+                                     dd_host.size,
+                                     dd_host.dim);
+    return result;
   }
-  switch (dataset_block_dim) {
-    case 64:
-      return vpq_dataset_descriptor_init_runtime<8, 64, DataT, IndexT, DistanceT>(dataset, stream);
-    case 128:
-      return vpq_dataset_descriptor_init_runtime<16, 128, DataT, IndexT, DistanceT>(dataset,
-                                                                                    stream);
-    default:
-      return vpq_dataset_descriptor_init_runtime<32, 256, DataT, IndexT, DistanceT>(dataset,
-                                                                                    stream);
+
+  template <typename DatasetT>
+  static auto priority(const cagra::search_params& params, const DatasetT& dataset) -> double
+  {
+    // If explicit team_size is specified and doesn't match the instance, discard it
+    if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
+    // Match codebook params
+    if (dataset.pq_bits() != PqBits) { return -1.0; }
+    if (dataset.pq_len() != PqLen) { return -1.0; }
+    // Otherwise, favor the closest dataset dimensionality.
+    return 1.0 / (0.1 + std::abs(double(dataset.dim()) - double(DatasetBlockDim)));
   }
-}
+};
 
 }  // namespace cuvs::neighbors::cagra::detail
