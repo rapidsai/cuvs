@@ -37,6 +37,7 @@ project(
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
        OFF
 )
+option(USE_CUDA_MATH_WHEELS "Use the CUDA math wheels instead of the system libraries" OFF)
 
 message(
   "CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}"
@@ -62,6 +63,8 @@ else()
 endif()
 
 if(NOT cuvs_FOUND)
+  find_package(CUDAToolkit REQUIRED)
+
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY ON)
 
@@ -70,7 +73,25 @@ if(NOT cuvs_FOUND)
   set(CUDA_STATIC_MATH_LIBRARIES ON)
   set(CUVS_USE_RAFT_STATIC ON)
 
+  if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.0)
+    set(CUDA_STATIC_MATH_LIBRARIES OFF)
+  elseif(USE_CUDA_MATH_WHEELS)
+    message(FATAL_ERROR "Cannot use CUDA math wheels with CUDA < 12.0")
+  endif()
+
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
+
+  if(NOT CUDA_STATIC_MATH_LIBRARIES AND USE_CUDA_MATH_WHEELS)
+    set(rpaths
+      "$ORIGIN/../nvidia/cublas/lib"
+      "$ORIGIN/../nvidia/curand/lib"
+      "$ORIGIN/../nvidia/cusolver/lib"
+      "$ORIGIN/../nvidia/cusparse/lib"
+      "$ORIGIN/../nvidia/nvjitlink/lib"
+    )
+    set_property(TARGET cuvs PROPERTY INSTALL_RPATH ${rpaths} APPEND)
+    set_property(TARGET cuvs_c PROPERTY INSTALL_RPATH ${rpaths} APPEND)
+  endif()
 
   set(cython_lib_dir cuvs)
   install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
