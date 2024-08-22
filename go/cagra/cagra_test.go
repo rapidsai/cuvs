@@ -14,7 +14,7 @@ func TestCagra(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 
-	NDataPoints := 256
+	NDataPoints := 1024
 	NFeatures := 16
 
 	TestDataset := make([][]float32, NDataPoints)
@@ -25,13 +25,34 @@ func TestCagra(t *testing.T) {
 		}
 	}
 
+	ExtendDataPoints := 64
+	ExtendDataset := make([][]float32, ExtendDataPoints)
+	for i := range ExtendDataset {
+		ExtendDataset[i] = make([]float32, NFeatures)
+		for j := range ExtendDataset[i] {
+			ExtendDataset[i][j] = rand.Float32()
+		}
+	}
+
+	ExtendReturnEmptyDataset := make([][]float32, NDataPoints+ExtendDataPoints)
+	for i := range ExtendReturnEmptyDataset {
+		ExtendReturnEmptyDataset[i] = make([]float32, NFeatures)
+		// for j := range ExtendReturnEmptyDataset[i] {
+		// 	ExtendReturnEmptyDataset[i][j] = rand.Float32()
+		// }
+	}
+
 	dataset, _ := cuvs.NewTensor(true, TestDataset)
 
-	CompressionParams, _ := CreateCompressionParams()
+	extend_dataset, _ := cuvs.NewTensor(true, ExtendDataset)
+
+	extend_return_dataset, _ := cuvs.NewTensor(true, ExtendReturnEmptyDataset)
+
+	// CompressionParams, _ := CreateCompressionParams()
 
 	IndexParams, err := CreateIndexParams()
 
-	IndexParams.SetCompression(CompressionParams)
+	// IndexParams.SetCompression(CompressionParams)
 
 	if err != nil {
 		panic(err)
@@ -63,12 +84,25 @@ func TestCagra(t *testing.T) {
 	}
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
+	extend_dataset.ToDevice(&resource)
+	extend_return_dataset.ToDevice(&resource)
 
 	err = BuildIndex(resource, IndexParams, &dataset, index)
 	if err != nil {
 		// println(err.Error())
 		panic(err)
 	}
+	resource.Sync()
+	ExtendParams, err := CreateExtendParams()
+	if err != nil {
+		panic(err)
+	}
+	err = ExtendIndex(resource, ExtendParams, &extend_dataset, &extend_return_dataset, index)
+	if err != nil {
+		// println(err.Error())
+		panic(err)
+	}
+
 	resource.Sync()
 
 	queries.ToDevice(&resource)
@@ -88,6 +122,17 @@ func TestCagra(t *testing.T) {
 	distances.ToHost(&resource)
 
 	resource.Sync()
+
+	println("extend return dataset: ------------------------")
+
+	extend_return_dataset.ToHost(&resource)
+	arr_extend_return_dataset, _ := extend_return_dataset.GetArray()
+	for i := range arr_extend_return_dataset {
+		println(arr_extend_return_dataset[i][0])
+		// if arr_extend_return_dataset[i][0] != float32(i) {
+		// 	t.Error("wrong neighbor, expected", i, "got", arr_extend_return_dataset[i][0])
+		// }
+	}
 
 	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
 	arr, _ := neighbors.GetArray()
