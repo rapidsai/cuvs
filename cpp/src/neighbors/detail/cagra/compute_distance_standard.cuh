@@ -21,6 +21,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/logger-macros.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/util/device_loads_stores.cuh>
 
 #include <raft/util/vectorized.cuh>
 
@@ -80,40 +81,8 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
                                      cuvs::distance::DistanceType metric,
                                      bool valid) const -> DISTANCE_T
   {
-    switch (metric) {
-      case cuvs::distance::DistanceType::L2Expanded:
-        return compute_similarity<cuvs::distance::DistanceType::L2Expanded>(
-          smem_workspace, dataset_index, valid);
-      case cuvs::distance::DistanceType::InnerProduct:
-        return compute_similarity<cuvs::distance::DistanceType::InnerProduct>(
-          smem_workspace, dataset_index, valid);
-      default: return 0;
-    }
-  }
-
- private:
-  template <typename T, cuvs::distance::DistanceType METRIC>
-  RAFT_DEVICE_INLINE_FUNCTION constexpr static auto dist_op(T a, T b)
-    -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::L2Expanded, T>
-  {
-    T diff = a - b;
-    return diff * diff;
-  }
-
-  template <typename T, cuvs::distance::DistanceType METRIC>
-  RAFT_DEVICE_INLINE_FUNCTION constexpr static auto dist_op(T a, T b)
-    -> std::enable_if_t<METRIC == cuvs::distance::DistanceType::InnerProduct, T>
-  {
-    return -a * b;
-  }
-
-  template <cuvs::distance::DistanceType METRIC>
-  RAFT_DEVICE_INLINE_FUNCTION auto compute_similarity(ws_handle smem_workspace,
-                                                      const INDEX_T dataset_i,
-                                                      const bool valid) const -> DISTANCE_T
-  {
     auto query_ptr         = smem_query_buffer(smem_workspace);
-    const auto dataset_ptr = ptr + dataset_i * ld;
+    const auto dataset_ptr = ptr + dataset_index * ld;
     const unsigned lane_id = threadIdx.x % TeamSize;
 
     DISTANCE_T norm2 = 0;
@@ -134,14 +103,22 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
           if (k >= dim) break;
 #pragma unroll
           for (uint32_t v = 0; v < vlen; v++) {
-            const uint32_t kv = k + v;
             // Note this loop can go above the dataset_dim for padded arrays. This is not a problem
             // because:
             // - Above the last element (dataset_dim-1), the query array is filled with zeros.
             // - The data buffer has to be also padded with zeros.
-            DISTANCE_T d = query_ptr[device::swizzling(kv)];
-            norm2 += dist_op<DISTANCE_T, METRIC>(
-              d, cuvs::spatial::knn::detail::utils::mapping<float>{}(dl_buff[e].val.data[v]));
+            DISTANCE_T d;
+            raft::lds(d, query_ptr + device::swizzling(k + v));
+            constexpr cuvs::spatial::knn::detail::utils::mapping<float> mapping{};
+            switch (metric) {
+              case cuvs::distance::DistanceType::L2Expanded:
+                d -= mapping(dl_buff[e].val.data[v]);
+                norm2 += d * d;
+                break;
+              case cuvs::distance::DistanceType::InnerProduct:
+                norm2 -= d * mapping(dl_buff[e].val.data[v]);
+                break;
+            }
           }
         }
       }
@@ -153,6 +130,7 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return norm2;
   }
 
+ private:
   RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_query_buffer(ws_handle smem_workspace) const
     -> QUERY_T*
   {

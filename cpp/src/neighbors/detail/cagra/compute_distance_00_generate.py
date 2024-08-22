@@ -48,11 +48,9 @@ namespace cuvs::neighbors::cagra::detail {{
 }}  // namespace cuvs::neighbors::cagra::detail
 """
 
+#mxdim_team = [(128, 8), (256, 16), (512, 32)]
 mxdim_team = [(64, 8), (128, 16), (256, 32)]
-# block = [(64, 16), (128, 8), (256, 4), (512, 2), (1024, 1)]
-# itopk_candidates = [64, 128, 256]
-# itopk_size = [64, 128, 256, 512]
-# mxelem = [64, 128, 256]
+#mxdim_team = [(32, 8), (64, 16), (128, 32)]
 
 pq_bits = [8]
 pq_lens = [2, 4]

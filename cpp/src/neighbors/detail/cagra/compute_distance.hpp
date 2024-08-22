@@ -45,7 +45,7 @@ struct dataset_descriptor_base_t {
    * This covers all standard and VPQ descriptors; we need this to copy the descriptor from global
    * memory. Increase this if new fields are needed (but try to keep the descriptors small really).
    */
-  static constexpr size_t kMaxStructSize = 128;
+  static constexpr size_t kMaxStructSize = 64;
 
   template <size_t ActualSize, size_t MaximumSize = kMaxStructSize>
   static inline constexpr void assert_struct_size()
