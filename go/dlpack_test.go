@@ -8,7 +8,7 @@ import (
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-func TestCagra(t *testing.T) {
+func TestDlPack(t *testing.T) {
 
 	resource, _ := cuvs.NewResource(nil)
 
@@ -44,9 +44,14 @@ func TestCagra(t *testing.T) {
 		panic(err)
 	}
 
+	println(dataset.GetShape()[1])
+
 	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
 	dataset.ToHost(&resource)
-	arr, _ := dataset.GetArray()
+	arr, err := dataset.GetArray()
+	if err != nil {
+		panic(err)
+	}
 	println(arr)
 	for i := range arr {
 		for j := range arr[i] {

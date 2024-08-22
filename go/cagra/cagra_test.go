@@ -37,7 +37,7 @@ func TestCagra(t *testing.T) {
 		panic(err)
 	}
 
-	index, _ := CreateIndex(IndexParams, &dataset)
+	index, _ := CreateIndex()
 	defer index.Close()
 	// use the first 4 points from the dataset as queries : will test that we get them back
 	// as their own nearest neighbor

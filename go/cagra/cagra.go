@@ -23,7 +23,7 @@ type CagraIndex struct {
 	trained bool
 }
 
-func CreateIndex(params *IndexParams, dataset *cuvs.Tensor[float32]) (*CagraIndex, error) {
+func CreateIndex() (*CagraIndex, error) {
 
 	index := (C.cuvsCagraIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsCagraIndex{}))))
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexCreate(&index)))
@@ -40,6 +40,17 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 		return err
 	}
 	index.trained = true
+	return nil
+}
+
+func ExtendIndex[T any](Resources cuvs.Resource, params *ExtendParams, additional_dataset *cuvs.Tensor[T], index *CagraIndex) error {
+	if !index.trained {
+		return errors.New("index needs to be built before calling extend")
+	}
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraExtend(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(additional_dataset.C_tensor)), index.index)))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

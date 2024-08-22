@@ -17,6 +17,8 @@ package cuvs
 import "C"
 import (
 	"errors"
+	"strconv"
+
 	// "github.com/rapidsai/cuvs/go"
 	// "rapidsai/cuvs/ivf_flat"
 	"unsafe"
@@ -24,14 +26,15 @@ import (
 
 type Tensor[T any] struct {
 	C_tensor *C.DLManagedTensor
+	shape    []int64
 }
 
 // func NewTensor[T any](from_cai bool, shape []int, data []T, use_int64 bool) (Tensor, error) {
 func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 
-	shape := make([]int, 2)
-	shape[0] = len(data)
-	shape[1] = len(data[0])
+	shape := make([]int64, 2)
+	shape[0] = int64(len(data))
+	shape[1] = int64(len(data[0]))
 
 	data_flat := make([]T, len(data)*len(data[0]))
 	for i := range data {
@@ -43,6 +46,8 @@ func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 	if len(shape) < 2 {
 		return Tensor[T]{}, errors.New("shape must be atleast 2")
 	}
+
+	println("shape: ", shape[1])
 
 	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
 
@@ -85,29 +90,36 @@ func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 
 	dlm.dl_tensor.dtype = dtype
 	dlm.dl_tensor.ndim = C.int(len(shape))
-	dlm.dl_tensor.shape = (*C.int64_t)(unsafe.Pointer(&shape[0]))
+	dlm.dl_tensor.shape = (*C.long)(unsafe.Pointer(&shape[0]))
 	dlm.dl_tensor.strides = nil
 	dlm.dl_tensor.byte_offset = 0
 
 	dlm.manager_ctx = nil
 	dlm.deleter = nil
 
-	return Tensor[T]{C_tensor: dlm}, nil
+	return Tensor[T]{C_tensor: dlm, shape: shape}, nil
 
 }
 
 func (t *Tensor[T]) GetBytes() int {
 	bytes := 1
 
-	for dim := 0; dim < int(t.C_tensor.dl_tensor.ndim); dim++ {
-		offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.C_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.C_tensor.dl_tensor.shape))
+	// for dim := 0; dim < int(t.C_tensor.dl_tensor.ndim); dim++ {
+	// 	offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.C_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.C_tensor.dl_tensor.shape))
 
-		// Convert the pointer to the correct type and dereference it to get the value
-		dimSize := *(*C.long)(offset)
+	// 	// Convert the pointer to the correct type and dereference it to get the value
+	// 	dimSize := *(*C.long)(offset)
 
-		bytes *= int(dimSize)
+	// 	bytes *= int(dimSize)
+	// }
+
+	for dim := range t.shape {
+		bytes *= int(t.shape[dim])
 	}
-	bytes *= int(t.C_tensor.dl_tensor.dtype.bits / 8)
+
+	bytes *= int(t.C_tensor.dl_tensor.dtype.bits) / 8
+
+	println("bytes: " + strconv.Itoa(bytes))
 
 	return bytes
 }
@@ -176,6 +188,11 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 
 }
 
+func (t *Tensor[T]) GetShape() []int64 {
+	// return unsafe.Slice((*int64)(unsafe.Pointer(t.C_tensor.dl_tensor.shape)), 2)
+	return t.shape
+}
+
 func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 
 	if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
@@ -193,10 +210,10 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 		}
 	}
 
-	old_shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
+	old_shape := unsafe.Slice((*int64)(unsafe.Pointer(t.C_tensor.dl_tensor.shape)), 2)
 
 	if old_shape[1] != new_shape[1] {
-		return &Tensor[T]{}, errors.New("new shape must be same as old shape")
+		return &Tensor[T]{}, errors.New("new shape must be same as old shape, old shapee: " + strconv.Itoa(int(old_shape[1])) + ", new shape: " + strconv.Itoa(int(new_shape[1])))
 	}
 
 	if len(new_shape) < 2 {
@@ -243,6 +260,8 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 	println("host data location:")
 	println(t.C_tensor.dl_tensor.data)
 
+	println("new alloc:" + strconv.Itoa(int(bytes+newDataSize)))
+
 	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &NewDeviceDataPointer, C.size_t(bytes+newDataSize))))
 	if err != nil {
 		//	panic(err)
@@ -282,8 +301,10 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 
 	shape := make([]int64, 2)
 	shape[0] = int64(*t.C_tensor.dl_tensor.shape) + int64(len(newData))
-	println(old_shape[1])
+
 	shape[1] = new_shape[1]
+
+	t.shape = shape
 
 	t.C_tensor.dl_tensor.data = NewDeviceDataPointer
 	t.C_tensor.dl_tensor.shape = (*C.int64_t)(unsafe.Pointer(&shape[0]))
@@ -293,6 +314,8 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 
 func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	bytes := t.GetBytes()
+
+	println("to host bytes: " + strconv.Itoa(bytes))
 
 	addr := (C.malloc(C.size_t(bytes)))
 
@@ -329,15 +352,15 @@ func (t *Tensor[T]) GetArray() ([][]T, error) {
 		return nil, errors.New("Tensor must be on CPU")
 	}
 
-	shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
+	// shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
 
-	data_flat := unsafe.Slice((*T)(t.C_tensor.dl_tensor.data), shape[0]*shape[1])
-
-	data := make([][]T, shape[0])
+	data_flat := unsafe.Slice((*T)(t.C_tensor.dl_tensor.data), t.shape[0]*t.shape[1])
+	println("got flat data")
+	data := make([][]T, t.shape[0])
 	for i := range data {
-		data[i] = make([]T, shape[1])
+		data[i] = make([]T, t.shape[1])
 		for j := range data[i] {
-			data[i][j] = data_flat[i*int(shape[1])+j]
+			data[i][j] = data_flat[i*int(t.shape[1])+j]
 		}
 	}
 
