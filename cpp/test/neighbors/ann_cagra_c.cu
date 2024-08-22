@@ -100,6 +100,18 @@ TEST(CagraC, BuildSearch)
   additional_dataset_tensor.dl_tensor.shape              = additional_dataset_shape;
   additional_dataset_tensor.dl_tensor.strides            = nullptr;
 
+  rmm::device_uvector<float> extend_return_d((additional_num_rows + main_num_rows) * 2, stream);
+  DLManagedTensor additional_dataset_return_tensor;
+  additional_dataset_return_tensor.dl_tensor.data               = extend_return_d.data();
+  additional_dataset_return_tensor.dl_tensor.device.device_type = kDLCUDA;
+  additional_dataset_return_tensor.dl_tensor.ndim               = 2;
+  additional_dataset_return_tensor.dl_tensor.dtype.code         = kDLFloat;
+  additional_dataset_return_tensor.dl_tensor.dtype.bits         = 32;
+  additional_dataset_return_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t additional_return_dataset_shape[2]         = {additional_num_rows + main_num_rows, 2};
+  additional_dataset_return_tensor.dl_tensor.shape   = additional_return_dataset_shape;
+  additional_dataset_return_tensor.dl_tensor.strides = nullptr;
+
   // create index
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
@@ -112,7 +124,10 @@ TEST(CagraC, BuildSearch)
   cuvsCagraExtendParams_t extend_params;
   cuvsCagraExtendParamsCreate(&extend_params);
   extend_params->max_chunk_size = 100;
-  cuvsCagraExtend(res, extend_params, &additional_dataset_tensor, index);
+  cuvsCagraExtend(
+    res, extend_params, &additional_dataset_tensor, &additional_dataset_return_tensor, index);
+
+  extend_return_d.resize(main_num_rows * 2, stream);
 
   // create queries DLTensor
   rmm::device_uvector<float> queries_d(4 * 2, stream);

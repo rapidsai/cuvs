@@ -385,6 +385,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
 cuvsError_t cuvsCagraExtend(cuvsResources_t res,
                             cuvsCagraExtendParams_t params,
                             DLManagedTensor* additional_dataset,
+                            DLManagedTensor* return_dataset,
                             cuvsCagraIndex_t index);
 
 /**
