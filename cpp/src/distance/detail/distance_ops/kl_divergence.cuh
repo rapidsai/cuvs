@@ -59,31 +59,33 @@ struct kl_divergence_op {
   {
     // TODO: make sure that these branches get hoisted out of main loop.. Could
     // be quite expensive otherwise.
+    AccT x_ = raft::to_float(x);
+    AccT y_ = raft::to_float(y);
     if (x_equal_y) {
       if (is_row_major) {
-        const bool x_zero = (x == 0);
-        const bool y_zero = (y == 0);
-        acc += x * (raft::log(x + x_zero) - (!y_zero) * raft::log(y + y_zero));
+        const bool x_zero = (x_ == 0);
+        const bool y_zero = (y_ == 0);
+        acc += x_ * (raft::log(x_ + x_zero) - (!y_zero) * raft::log(y_ + y_zero));
       } else {
-        const bool y_zero = (y == 0);
-        const bool x_zero = (x == 0);
-        acc += y * (raft::log(y + y_zero) - (!x_zero) * raft::log(x + x_zero));
+        const bool y_zero = (y_ == 0);
+        const bool x_zero = (x_ == 0);
+        acc += y_ * (raft::log(y_ + y_zero) - (!x_zero) * raft::log(x_ + x_zero));
       }
     } else {
       if (is_row_major) {
-        const bool x_zero = (x == 0);
-        acc += x * (raft::log(x + x_zero) - y);
+        const bool x_zero = (x_ == 0);
+        acc += x_ * (raft::log(x_ + x_zero) - y_);
       } else {
-        const bool y_zero = (y == 0);
-        acc += y * (raft::log(y + y_zero) - x);
+        const bool y_zero = (y_ == 0);
+        acc += y_ * (raft::log(y_ + y_zero) - x_);
       }
     }
   };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {
