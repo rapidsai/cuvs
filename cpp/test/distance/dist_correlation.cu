@@ -20,13 +20,15 @@
 namespace cuvs {
 namespace distance {
 
-template <typename DataType>
+template <typename DataType, typename OutputType = DataType>
 class DistanceCorrelation
-  : public DistanceTest<cuvs::distance::DistanceType::CorrelationExpanded, DataType> {};
+  : public DistanceTest<cuvs::distance::DistanceType::CorrelationExpanded, DataType, OutputType> {};
 
-template <typename DataType>
+template <typename DataType, typename OutputType = DataType>
 class DistanceCorrelationXequalY
-  : public DistanceTestSameBuffer<cuvs::distance::DistanceType::CorrelationExpanded, DataType> {};
+  : public DistanceTestSameBuffer<cuvs::distance::DistanceType::CorrelationExpanded,
+                                  DataType,
+                                  OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 1024, 1024, 32, true, 1234ULL},
@@ -47,6 +49,26 @@ TEST_P(DistanceCorrelationF, Result)
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationF, ::testing::ValuesIn(inputsf));
+
+const std::vector<DistanceInputs<half, float>> inputsh = {
+  {0.001f, 1024, 1024, 32, true, 1234ULL},
+  {0.001f, 1024, 32, 1024, true, 1234ULL},
+  {0.001f, 32, 1024, 1024, true, 1234ULL},
+  {0.003f, 1024, 1024, 1024, true, 1234ULL},
+  {0.001f, 1024, 1024, 32, false, 1234ULL},
+  {0.001f, 1024, 32, 1024, false, 1234ULL},
+  {0.001f, 32, 1024, 1024, false, 1234ULL},
+  {0.003f, 1024, 1024, 1024, false, 1234ULL},
+};
+typedef DistanceCorrelation<half, float> DistanceCorrelationH;
+TEST_P(DistanceCorrelationH, Result)
+{
+  int m = params.isRowMajor ? params.m : params.n;
+  int n = params.isRowMajor ? params.n : params.m;
+  ASSERT_TRUE(cuvs::devArrMatch(
+    dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
+}
+INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationH, ::testing::ValuesIn(inputsh));
 
 typedef DistanceCorrelationXequalY<float> DistanceCorrelationXequalYF;
 TEST_P(DistanceCorrelationXequalYF, Result)
@@ -86,6 +108,25 @@ TEST_P(DistanceCorrelationD, Result)
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<double>(params.tolerance), stream));
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationD, ::testing::ValuesIn(inputsd));
+
+typedef DistanceCorrelationXequalY<half, float> DistanceCorrelationXequalYH;
+TEST_P(DistanceCorrelationXequalYH, Result)
+{
+  int m = params.m;
+  ASSERT_TRUE(cuvs::devArrMatch(dist_ref[0].data(),
+                                dist[0].data(),
+                                m,
+                                m,
+                                cuvs::CompareApprox<float>(params.tolerance),
+                                stream));
+  ASSERT_TRUE(cuvs::devArrMatch(dist_ref[1].data(),
+                                dist[1].data(),
+                                m / 2,
+                                m,
+                                cuvs::CompareApprox<float>(params.tolerance),
+                                stream));
+}
+INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceCorrelationXequalYH, ::testing::ValuesIn(inputsh));
 
 class BigMatrixCorrelation
   : public BigMatrixDistanceTest<cuvs::distance::DistanceType::CorrelationExpanded> {};

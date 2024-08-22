@@ -41,7 +41,9 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
   if (midx >= m) return;
   IdxT grid_size = IdxT(blockDim.y) * IdxT(gridDim.y);
   for (IdxT nidx = threadIdx.y + blockIdx.y * blockDim.y; nidx < n; nidx += grid_size) {
-    EvalT acc = EvalT(0);
+    EvalT acc   = EvalT(0);
+    EvalT normX = EvalT(0);
+    EvalT normY = EvalT(0);
     for (IdxT i = 0; i < k; ++i) {
       IdxT xidx = i + midx * k;
       IdxT yidx = i + nidx * k;
@@ -50,6 +52,11 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
       switch (metric) {
         case cuvs::distance::DistanceType::InnerProduct: {
           acc += xv * yv;
+        } break;
+        case cuvs::distance::DistanceType::CosineExpanded: {
+          acc += xv * yv;
+          normX += xv * xv;
+          normY += yv * yv;
         } break;
         case cuvs::distance::DistanceType::L2SqrtExpanded:
         case cuvs::distance::DistanceType::L2SqrtUnexpanded:
@@ -66,6 +73,9 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
       case cuvs::distance::DistanceType::L2SqrtUnexpanded: {
         acc = raft::sqrt(acc);
       } break;
+      case cuvs::distance::DistanceType::CosineExpanded: {
+        acc = 1 - acc / (raft::sqrt(normX) * raft::sqrt(normY));
+      }
       default: break;
     }
     dist[midx * n + nidx] = acc;
@@ -118,7 +128,7 @@ void naive_knn(raft::resources const& handle,
                                                 static_cast<int>(k),
                                                 dist_topk + offset * k,
                                                 indices_topk + offset * k,
-                                                type != cuvs::distance::DistanceType::InnerProduct,
+                                                cuvs::distance::is_min_close(type),
                                                 mr);
   }
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
