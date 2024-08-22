@@ -346,7 +346,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
     return false;
   }
 
-  using descriptor_type             = cagra_q_dataset_descriptor_t<TeamSize,
+  using descriptor_type = cagra_q_dataset_descriptor_t<TeamSize,
                                                        DatasetBlockDim,
                                                        PqBits,
                                                        PqLen,
@@ -354,14 +354,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                                                        DataT,
                                                        IndexT,
                                                        DistanceT>;
-  static constexpr auto init_kernel = vpq_dataset_descriptor_init_kernel<TeamSize,
-                                                                         DatasetBlockDim,
-                                                                         PqBits,
-                                                                         PqLen,
-                                                                         CodebookT,
-                                                                         DataT,
-                                                                         IndexT,
-                                                                         DistanceT>;
+  static const void* init_kernel;
 
   template <typename DatasetT>
   static auto init(const cagra::search_params& params,
@@ -380,16 +373,18 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                             IndexT(dataset.n_rows()),
                             dataset.dim()};
     host_type result{dd_host, stream, DatasetBlockDim};
-    init_kernel<<<1, 1, 0, stream>>>(result.dev_ptr,
-                                     dd_host.encoded_dataset_ptr,
-                                     dd_host.encoded_dataset_dim,
-                                     dd_host.n_subspace,
-                                     dd_host.vq_code_book_ptr,
-                                     dd_host.vq_scale,
-                                     dd_host.pq_code_book_ptr,
-                                     dd_host.pq_scale,
-                                     dd_host.size,
-                                     dd_host.dim);
+    void* args[] =  // NOLINT
+      {&result.dev_ptr,
+       &dd_host.encoded_dataset_ptr,
+       &dd_host.encoded_dataset_dim,
+       &dd_host.n_subspace,
+       &dd_host.vq_code_book_ptr,
+       &dd_host.vq_scale,
+       &dd_host.pq_code_book_ptr,
+       &dd_host.pq_scale,
+       &dd_host.size,
+       &dd_host.dim};
+    RAFT_CUDA_TRY(cudaLaunchKernel(init_kernel, 1, 1, args, 0, stream));
     return result;
   }
 

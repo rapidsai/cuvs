@@ -28,6 +28,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template struct standard_dataset_descriptor_t<16, 128, half, uint64_t, float>;
+template <>
+const void* standard_descriptor_spec<16, 128, half, uint64_t, float>::init_kernel =
+  reinterpret_cast<const void*>(
+    &standard_dataset_descriptor_init_kernel<16, 128, half, uint64_t, float>);
 template struct standard_descriptor_spec<16, 128, half, uint64_t, float>;
 
 }  // namespace cuvs::neighbors::cagra::detail

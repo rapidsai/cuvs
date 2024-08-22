@@ -45,7 +45,7 @@ struct dataset_descriptor_base_t {
    * This covers all standard and VPQ descriptors; we need this to copy the descriptor from global
    * memory. Increase this if new fields are needed (but try to keep the descriptors small really).
    */
-  static constexpr size_t kMaxStructSize = 72;
+  static constexpr size_t kMaxStructSize = 128;
 
   template <size_t ActualSize, size_t MaximumSize = kMaxStructSize>
   static inline constexpr void assert_struct_size()
@@ -216,7 +216,7 @@ struct instance_selector<Spec, Specs...> {
     auto s0 = spec_match<Spec, DataT, IndexT, DistanceT, DatasetT>(params, dataset);
     auto ss = instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
       params, dataset);
-    return std::get<double>(s0) >= std::get<double>(ss) ? s0 : ss;
+    return std::get<1>(s0) >= std::get<1>(ss) ? s0 : ss;
   }
 
   template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>

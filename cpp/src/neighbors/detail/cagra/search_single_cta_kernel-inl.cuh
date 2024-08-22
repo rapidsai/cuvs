@@ -918,7 +918,8 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
                                                          small_hash_reset_interval,
                                                          sample_filter,
                                                          metric);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  // RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 }
 }  // namespace single_cta_search
 }  // namespace cuvs::neighbors::cagra::detail

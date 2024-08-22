@@ -45,12 +45,12 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
   using typename base_type::ws_handle;
 
   const DATA_T* ptr;
-  size_t ld;
+  uint32_t ld;
 
   _RAFT_HOST_DEVICE standard_dataset_descriptor_t(const DATA_T* ptr,
                                                   INDEX_T size,
                                                   uint32_t dim,
-                                                  size_t ld)
+                                                  uint32_t ld)
     : base_type(size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)), ptr(ptr), ld(ld)
   {
     base_type::template assert_struct_size<sizeof(*this)>();
@@ -175,7 +175,7 @@ __launch_bounds__(1, 1) __global__ void standard_dataset_descriptor_init_kernel(
   const DataT* ptr,
   IndexT size,
   uint32_t dim,
-  size_t ld)
+  uint32_t ld)
 {
   new (out) standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>(
     ptr, size, dim, ld);
@@ -201,8 +201,7 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
 
   using descriptor_type =
     standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
-  static constexpr auto init_kernel =
-    standard_dataset_descriptor_init_kernel<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+  static const void* init_kernel;
 
   template <typename DatasetT>
   static auto init(const cagra::search_params& params,
@@ -212,8 +211,9 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
     descriptor_type dd_host{
       dataset.view().data_handle(), IndexT(dataset.n_rows()), dataset.dim(), dataset.stride()};
     host_type result{dd_host, stream, DatasetBlockDim};
-    init_kernel<<<1, 1, 0, stream>>>(
-      result.dev_ptr, dd_host.ptr, dd_host.size, dd_host.dim, dd_host.ld);
+    void* args[] =  // NOLINT
+      {&result.dev_ptr, &dd_host.ptr, &dd_host.size, &dd_host.dim, &dd_host.ld};
+    RAFT_CUDA_TRY(cudaLaunchKernel(init_kernel, 1, 1, args, 0, stream));
     return result;
   }
 

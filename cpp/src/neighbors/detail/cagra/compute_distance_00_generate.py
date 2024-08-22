@@ -90,10 +90,13 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
         # CAGRA
         path = f"compute_distance_standard_{type_path}_dim{mxdim}_t{team}.cu"
         includes = '#include "compute_distance_standard.cuh"'
-        spec = f"standard_descriptor_spec<{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}>"
-        desc = f"standard_dataset_descriptor_t<{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}>"
+        params = f"{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}"
+        spec = f"standard_descriptor_spec<{params}>"
+        desc = f"standard_dataset_descriptor_t<{params}>"
         content = f"""
 template struct {desc};
+template <>
+const void* {spec}::init_kernel = reinterpret_cast<const void*>(&standard_dataset_descriptor_init_kernel<{params}>);
 template struct {spec};
 """
         descs.append(desc)
@@ -108,10 +111,13 @@ template struct {spec};
                 for pq_bit in pq_bits:
                     path = f"compute_distance_vpq_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
                     includes = '#include "compute_distance_vpq.cuh"'
-                    spec = f"vpq_descriptor_spec<{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}>"
-                    desc = f"cagra_q_dataset_descriptor_t<{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}>"
+                    params = f"{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}"
+                    spec = f"vpq_descriptor_spec<{params}>"
+                    desc = f"cagra_q_dataset_descriptor_t<{params}>"
                     content = f"""
 template struct {desc};
+template <>
+const void* {spec}::init_kernel = reinterpret_cast<const void*>(&vpq_dataset_descriptor_init_kernel<{params}>);
 template struct {spec};
 """
                     descs.append(desc)
@@ -132,6 +138,9 @@ with open("compute_distance-ext.cuh", "w") as f:
 {newline.join(map(lambda s: "extern template struct " + s + ";", descs))}
 {newline.join(map(lambda s: "extern template struct " + s + ";", specs))}
 
+extern template struct
+  instance_selector<{("," + newline + "                    ").join(specs)}>;
+
 using descriptor_instances =
   instance_selector<{("," + newline + "                    ").join(specs)}>;
 
@@ -147,6 +156,15 @@ auto dataset_descriptor_init(const cagra::search_params& params,
   }}
   return init(params, dataset, stream);
 }}
+'''
+    f.write(template.format(includes=includes, content=contents))
+
+
+with open("compute_distance.cu", "w") as f:
+    includes = '#include "compute_distance-ext.cuh"'
+    newline = "\n"
+    contents = f'''
+template struct instance_selector<{("," + newline + "                    ").join(specs)}>;
 '''
     f.write(template.format(includes=includes, content=contents))
 
