@@ -38,10 +38,15 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   using QUERY_T     = half;
   using base_type::dim;
   using base_type::smem_ws_size_in_bytes;
+  using typename base_type::compute_distance_type;
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
   using typename base_type::ws_handle;
+  constexpr static inline auto kTeamSize        = TeamSize;
+  constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
+  constexpr static inline auto kPqBits          = PQ_BITS;
+  constexpr static inline auto kPqLen           = PQ_LEN;
 
   static_assert(std::is_same_v<CODE_BOOK_T, half>, "Only CODE_BOOK_T = `half` is supported now");
 
@@ -54,14 +59,15 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN * utils::size_of<CODE_BOOK_T>();
 
-  _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(const std::uint8_t* encoded_dataset_ptr,
+  _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(compute_distance_type* compute_distance,
+                                                 const std::uint8_t* encoded_dataset_ptr,
                                                  std::uint32_t encoded_dataset_dim,
                                                  std::uint32_t n_subspace,
                                                  const CODE_BOOK_T* vq_code_book_ptr,
                                                  const CODE_BOOK_T* pq_code_book_ptr,
                                                  std::size_t size,
                                                  std::uint32_t dim)
-    : base_type(size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)),
+    : base_type(compute_distance, size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)),
       encoded_dataset_ptr(encoded_dataset_ptr),
       encoded_dataset_dim(encoded_dataset_dim),
       n_subspace(n_subspace),
@@ -73,7 +79,16 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
 
   _RAFT_DEVICE [[nodiscard]] auto set_smem_ws(void* smem_ptr) const -> ws_handle
   {
-    auto codebook_buf = reinterpret_cast<half2*>(smem_ptr);
+    using word_type             = uint32_t;
+    constexpr auto kStructWords = base_type::kMaxStructSize / sizeof(word_type);
+    auto* dst                   = reinterpret_cast<word_type*>(smem_ptr);
+    auto* src                   = reinterpret_cast<const word_type*>(this);
+    for (unsigned i = threadIdx.x; i < kStructWords; i += blockDim.x) {
+      dst[i] = src[i];
+    }
+
+    auto codebook_buf =
+      reinterpret_cast<half2*>(reinterpret_cast<uint8_t*>(smem_ptr) + base_type::kMaxStructSize);
 
     // Copy PQ table
     for (unsigned i = threadIdx.x * 2; i < (1 << PQ_BITS) * PQ_LEN; i += blockDim.x * 2) {
@@ -112,135 +127,19 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     }
   }
 
-  _RAFT_DEVICE auto compute_distance(
-    ws_handle smem_workspace,
-    INDEX_T dataset_index,
-    cuvs::distance::DistanceType /* only L2 metric is implemented */,
-    bool valid) const -> DISTANCE_T
-  {
-    auto* __restrict__ codebook_ptr = smem_pq_code_book_ptr(smem_workspace);
-    auto* __restrict__ query_ptr    = smem_query_buffer(smem_workspace);
-    auto* __restrict__ node_ptr =
-      encoded_dataset_ptr + (static_cast<std::uint64_t>(encoded_dataset_dim) * dataset_index);
-    float norm = 0;
-    if (valid) {
-      const unsigned lane_id = threadIdx.x % TeamSize;
-      const uint32_t vq_code = *reinterpret_cast<const std::uint32_t*>(node_ptr);
-      if constexpr (PQ_BITS == 8) {
-        for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += DatasetBlockDim) {
-          constexpr unsigned vlen = 4;  // **** DO NOT CHANGE ****
-          constexpr unsigned nelem =
-            raft::div_rounding_up_unsafe<unsigned>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
-          // Loading PQ codes
-          uint32_t pq_codes[nelem];
-#pragma unroll
-          for (std::uint32_t e = 0; e < nelem; e++) {
-            const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
-            if (k >= n_subspace) break;
-            // Loading 4 x 8-bit PQ-codes using 32-bit load ops (from device memory)
-            pq_codes[e] = *(reinterpret_cast<const std::uint32_t*>(node_ptr + 4 + k));
-          }
-          //
-          if constexpr (PQ_LEN % 2 == 0) {
-            // **** Use half2 for distance computation ****
-            half2 norm2{0, 0};
-#pragma unroll
-            for (std::uint32_t e = 0; e < nelem; e++) {
-              const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
-              if (k >= n_subspace) break;
-              // Loading VQ code-book
-              raft::TxN_t<half2, vlen / 2> vq_vals[PQ_LEN];
-#pragma unroll
-              for (std::uint32_t m = 0; m < PQ_LEN; m += 1) {
-                const uint32_t d = (vlen * m) + (PQ_LEN * k);
-                if (d >= dim) break;
-                vq_vals[m].load(
-                  reinterpret_cast<const half2*>(vq_code_book_ptr + d + (dim * vq_code)), 0);
-              }
-              // Compute distance
-              std::uint32_t pq_code = pq_codes[e];
-#pragma unroll
-              for (std::uint32_t v = 0; v < vlen; v++) {
-                if (PQ_LEN * (v + k) >= dim) break;
-#pragma unroll
-                for (std::uint32_t m = 0; m < PQ_LEN; m += 2) {
-                  const std::uint32_t d1 = m + (PQ_LEN * v);
-                  const std::uint32_t d  = d1 + (PQ_LEN * k);
-                  // Loading query vector in smem
-                  half2 diff2 = (reinterpret_cast<const half2*>(
-                    query_ptr))[device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d / 2)];
-                  // Loading PQ code book in smem
-                  diff2 -= *(reinterpret_cast<half2*>(codebook_ptr + (1 << PQ_BITS) * 2 * (m / 2) +
-                                                      (2 * (pq_code & 0xff))));
-                  diff2 -= vq_vals[d1 / vlen].val.data[(d1 % vlen) / 2];
-                  norm2 += diff2 * diff2;
-                }
-                pq_code >>= 8;
-              }
-            }
-            norm += static_cast<float>(norm2.x + norm2.y);
-          } else {
-            // **** Use float for distance computation ****
-#pragma unroll
-            for (std::uint32_t e = 0; e < nelem; e++) {
-              const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
-              if (k >= n_subspace) break;
-              // Loading VQ code-book
-              raft::TxN_t<CODE_BOOK_T, vlen> vq_vals[PQ_LEN];
-#pragma unroll
-              for (std::uint32_t m = 0; m < PQ_LEN; m++) {
-                const std::uint32_t d = (vlen * m) + (PQ_LEN * k);
-                if (d >= dim) break;
-                // Loading 4 x 8/16-bit VQ-values using 32/64-bit load ops (from L2$ or device
-                // memory)
-                vq_vals[m].load(
-                  reinterpret_cast<const half2*>(vq_code_book_ptr + d + (dim * vq_code)), 0);
-              }
-              // Compute distance
-              std::uint32_t pq_code = pq_codes[e];
-#pragma unroll
-              for (std::uint32_t v = 0; v < vlen; v++) {
-                if (PQ_LEN * (v + k) >= dim) break;
-                raft::TxN_t<CODE_BOOK_T, PQ_LEN> pq_vals;
-                pq_vals.load(
-                  reinterpret_cast<const half2*>(codebook_ptr + PQ_LEN * (pq_code & 0xff)),
-                  0);  // (from L1$ or smem)
-#pragma unroll
-                for (std::uint32_t m = 0; m < PQ_LEN; m++) {
-                  const std::uint32_t d1 = m + (PQ_LEN * v);
-                  const std::uint32_t d  = d1 + (PQ_LEN * k);
-                  // if (d >= dataset_dim) break;
-                  DISTANCE_T diff = query_ptr[d];  // (from smem)
-                  diff -= static_cast<float>(pq_vals.data[m]);
-                  diff -= static_cast<float>(vq_vals[d1 / vlen].val.data[d1 % vlen]);
-                  norm += diff * diff;
-                }
-                pq_code >>= 8;
-              }
-            }
-          }
-        }
-      }
-    }
-#pragma unroll
-    for (uint32_t offset = TeamSize / 2; offset > 0; offset >>= 1) {
-      norm += __shfl_xor_sync(0xffffffff, norm, offset);
-    }
-    return norm;
-  }
-
  private:
   RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_pq_code_book_ptr(ws_handle smem_workspace) const
     -> CODE_BOOK_T*
   {
-    return reinterpret_cast<CODE_BOOK_T*>(smem_workspace);
+    return reinterpret_cast<CODE_BOOK_T*>(reinterpret_cast<uint8_t*>(smem_workspace) +
+                                          base_type::kMaxStructSize);
   }
 
   RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_query_buffer(ws_handle smem_workspace) const
     -> QUERY_T*
   {
     return reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_workspace) +
-                                      kSMemCodeBookSizeInBytes);
+                                      base_type::kMaxStructSize + kSMemCodeBookSizeInBytes);
   }
 
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
@@ -249,10 +148,146 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
       1. Codebook (kSMemCodeBookSizeInBytes bytes)
       2. Queries (smem_query_buffer_length elems)
     */
-    return kSMemCodeBookSizeInBytes +
+    return base_type::kMaxStructSize + kSMemCodeBookSizeInBytes +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 };
+
+template <typename DescriptorT>
+_RAFT_DEVICE __noinline__ auto compute_distance_vpq(
+  typename DescriptorT::ws_handle smem_workspace,
+  typename DescriptorT::INDEX_T dataset_index,
+  cuvs::distance::DistanceType /* only L2 metric is implemented */,
+  bool valid) -> typename DescriptorT::DISTANCE_T
+{
+  using DATA_T                   = typename DescriptorT::DATA_T;
+  using DISTANCE_T               = typename DescriptorT::DISTANCE_T;
+  using INDEX_T                  = typename DescriptorT::INDEX_T;
+  using LOAD_T                   = typename DescriptorT::LOAD_T;
+  using QUERY_T                  = typename DescriptorT::QUERY_T;
+  using CODE_BOOK_T              = typename DescriptorT::CODE_BOOK_T;
+  using ws_handle                = typename DescriptorT::ws_handle;
+  constexpr auto TeamSize        = DescriptorT::kTeamSize;
+  constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
+  constexpr auto PQ_BITS         = DescriptorT::kPqBits;
+  constexpr auto PQ_LEN          = DescriptorT::kPqLen;
+  constexpr auto kMaxStructSize  = DescriptorT::base_type::kMaxStructSize;
+
+  auto* __restrict__ desc =
+    const_cast<const DescriptorT*>(reinterpret_cast<DescriptorT*>(smem_workspace));
+  auto* __restrict__ codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(
+    reinterpret_cast<const uint8_t*>(smem_workspace) + kMaxStructSize);
+  auto* __restrict__ query_ptr = reinterpret_cast<const QUERY_T*>(
+    reinterpret_cast<const uint8_t*>(codebook_ptr) + DescriptorT::kSMemCodeBookSizeInBytes);
+  auto* __restrict__ node_ptr =
+    desc->encoded_dataset_ptr +
+    (static_cast<std::uint64_t>(desc->encoded_dataset_dim) * dataset_index);
+  const auto dim = desc->dim;
+  float norm     = 0;
+  if (valid) {
+    const unsigned lane_id = threadIdx.x % TeamSize;
+    const uint32_t vq_code = *reinterpret_cast<const std::uint32_t*>(node_ptr);
+    if constexpr (PQ_BITS == 8) {
+      for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += DatasetBlockDim) {
+        constexpr unsigned vlen = 4;  // **** DO NOT CHANGE ****
+        constexpr unsigned nelem =
+          raft::div_rounding_up_unsafe<unsigned>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
+        // Loading PQ codes
+        uint32_t pq_codes[nelem];
+#pragma unroll
+        for (std::uint32_t e = 0; e < nelem; e++) {
+          const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
+          if (k >= desc->n_subspace) break;
+          // Loading 4 x 8-bit PQ-codes using 32-bit load ops (from device memory)
+          pq_codes[e] = *(reinterpret_cast<const std::uint32_t*>(node_ptr + 4 + k));
+        }
+        //
+        if constexpr (PQ_LEN % 2 == 0) {
+          // **** Use half2 for distance computation ****
+          half2 norm2{0, 0};
+#pragma unroll
+          for (std::uint32_t e = 0; e < nelem; e++) {
+            const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
+            if (k >= desc->n_subspace) break;
+            // Loading VQ code-book
+            raft::TxN_t<half2, vlen / 2> vq_vals[PQ_LEN];
+#pragma unroll
+            for (std::uint32_t m = 0; m < PQ_LEN; m += 1) {
+              const uint32_t d = (vlen * m) + (PQ_LEN * k);
+              if (d >= dim) break;
+              vq_vals[m].load(
+                reinterpret_cast<const half2*>(desc->vq_code_book_ptr + d + (dim * vq_code)), 0);
+            }
+            // Compute distance
+            std::uint32_t pq_code = pq_codes[e];
+#pragma unroll
+            for (std::uint32_t v = 0; v < vlen; v++) {
+              if (PQ_LEN * (v + k) >= dim) break;
+#pragma unroll
+              for (std::uint32_t m = 0; m < PQ_LEN; m += 2) {
+                const std::uint32_t d1 = m + (PQ_LEN * v);
+                const std::uint32_t d  = d1 + (PQ_LEN * k);
+                // Loading query vector in smem
+                half2 diff2 = (reinterpret_cast<const half2*>(
+                  query_ptr))[device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d / 2)];
+                // Loading PQ code book in smem
+                diff2 -= *(reinterpret_cast<const half2*>(
+                  codebook_ptr + (1 << PQ_BITS) * 2 * (m / 2) + (2 * (pq_code & 0xff))));
+                diff2 -= vq_vals[d1 / vlen].val.data[(d1 % vlen) / 2];
+                norm2 += diff2 * diff2;
+              }
+              pq_code >>= 8;
+            }
+          }
+          norm += static_cast<float>(norm2.x + norm2.y);
+        } else {
+          // **** Use float for distance computation ****
+#pragma unroll
+          for (std::uint32_t e = 0; e < nelem; e++) {
+            const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
+            if (k >= desc->n_subspace) break;
+            // Loading VQ code-book
+            raft::TxN_t<CODE_BOOK_T, vlen> vq_vals[PQ_LEN];
+#pragma unroll
+            for (std::uint32_t m = 0; m < PQ_LEN; m++) {
+              const std::uint32_t d = (vlen * m) + (PQ_LEN * k);
+              if (d >= dim) break;
+              // Loading 4 x 8/16-bit VQ-values using 32/64-bit load ops (from L2$ or device
+              // memory)
+              vq_vals[m].load(
+                reinterpret_cast<const half2*>(desc->vq_code_book_ptr + d + (dim * vq_code)), 0);
+            }
+            // Compute distance
+            std::uint32_t pq_code = pq_codes[e];
+#pragma unroll
+            for (std::uint32_t v = 0; v < vlen; v++) {
+              if (PQ_LEN * (v + k) >= dim) break;
+              raft::TxN_t<CODE_BOOK_T, PQ_LEN> pq_vals;
+              pq_vals.load(reinterpret_cast<const half2*>(codebook_ptr + PQ_LEN * (pq_code & 0xff)),
+                           0);  // (from L1$ or smem)
+#pragma unroll
+              for (std::uint32_t m = 0; m < PQ_LEN; m++) {
+                const std::uint32_t d1 = m + (PQ_LEN * v);
+                const std::uint32_t d  = d1 + (PQ_LEN * k);
+                // if (d >= dataset_dim) break;
+                DISTANCE_T diff = query_ptr[d];  // (from smem)
+                diff -= static_cast<float>(pq_vals.data[m]);
+                diff -= static_cast<float>(vq_vals[d1 / vlen].val.data[d1 % vlen]);
+                norm += diff * diff;
+              }
+              pq_code >>= 8;
+            }
+          }
+        }
+      }
+    }
+  }
+#pragma unroll
+  for (uint32_t offset = TeamSize / 2; offset > 0; offset >>= 1) {
+    norm += __shfl_xor_sync(0xffffffff, norm, offset);
+  }
+  return norm;
+}
 
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
@@ -272,20 +307,22 @@ __launch_bounds__(1, 1) __global__
                                           std::size_t size,
                                           std::uint32_t dim)
 {
-  new (out) cagra_q_dataset_descriptor_t<TeamSize,
-                                         DatasetBlockDim,
-                                         PqBits,
-                                         PqLen,
-                                         CodeBookT,
-                                         DataT,
-                                         IndexT,
-                                         DistanceT>(encoded_dataset_ptr,
-                                                    encoded_dataset_dim,
-                                                    n_subspace,
-                                                    vq_code_book_ptr,
-                                                    pq_code_book_ptr,
-                                                    size,
-                                                    dim);
+  using desc_type = cagra_q_dataset_descriptor_t<TeamSize,
+                                                 DatasetBlockDim,
+                                                 PqBits,
+                                                 PqLen,
+                                                 CodeBookT,
+                                                 DataT,
+                                                 IndexT,
+                                                 DistanceT>;
+  new (out) desc_type(&compute_distance_vpq<desc_type>,
+                      encoded_dataset_ptr,
+                      encoded_dataset_dim,
+                      n_subspace,
+                      vq_code_book_ptr,
+                      pq_code_book_ptr,
+                      size,
+                      dim);
 }
 
 template <uint32_t TeamSize,
@@ -332,7 +369,8 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                    const DatasetT& dataset,
                    rmm::cuda_stream_view stream) -> host_type
   {
-    descriptor_type dd_host{dataset.data.data_handle(),
+    descriptor_type dd_host{nullptr,
+                            dataset.data.data_handle(),
                             dataset.encoded_row_length(),
                             dataset.pq_dim(),
                             dataset.vq_code_book.data_handle(),

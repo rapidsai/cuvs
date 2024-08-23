@@ -28,6 +28,14 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, uint8_t, uint32_t, float>;
+template _RAFT_DEVICE auto
+compute_distance_vpq<cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, uint8_t, uint32_t, float>>(
+  cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, uint8_t, uint32_t, float>::ws_handle
+    smem_workspace,
+  cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, uint8_t, uint32_t, float>::INDEX_T dataset_index,
+  cuvs::distance::DistanceType metric,
+  bool valid)
+  -> cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, uint8_t, uint32_t, float>::DISTANCE_T;
 template <>
 const void* vpq_descriptor_spec<8, 64, 8, 2, half, uint8_t, uint32_t, float>::init_kernel =
   reinterpret_cast<const void*>(

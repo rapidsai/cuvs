@@ -45,7 +45,7 @@ struct dataset_descriptor_base_t {
    * This covers all standard and VPQ descriptors; we need this to copy the descriptor from global
    * memory. Increase this if new fields are needed (but try to keep the descriptors small really).
    */
-  static constexpr size_t kMaxStructSize = 64;
+  static constexpr size_t kMaxStructSize = 128;
 
   template <size_t ActualSize, size_t MaximumSize = kMaxStructSize>
   static inline constexpr void assert_struct_size()
@@ -58,6 +58,11 @@ struct dataset_descriptor_base_t {
   struct distance_workspace;
   using ws_handle = distance_workspace*;
 
+  using compute_distance_type = DISTANCE_T(ws_handle, INDEX_T, cuvs::distance::DistanceType, bool);
+
+  /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
+   * given by the dataset_index. */
+  compute_distance_type* compute_distance;
   /** Number of records in the database. */
   INDEX_T size;
   /** Dimensionality of the data/queries. */
@@ -67,11 +72,16 @@ struct dataset_descriptor_base_t {
   /** Total dynamic shared memory required by the descriptor.  */
   uint32_t smem_ws_size_in_bytes;
 
-  _RAFT_HOST_DEVICE dataset_descriptor_base_t(INDEX_T size,
+  _RAFT_HOST_DEVICE dataset_descriptor_base_t(compute_distance_type* compute_distance,
+                                              INDEX_T size,
                                               uint32_t dim,
                                               uint32_t team_size,
                                               uint32_t smem_ws_size_in_bytes)
-    : size(size), dim(dim), team_size(team_size), smem_ws_size_in_bytes(smem_ws_size_in_bytes)
+    : compute_distance(compute_distance),
+      size(size),
+      dim(dim),
+      team_size(team_size),
+      smem_ws_size_in_bytes(smem_ws_size_in_bytes)
   {
   }
 
@@ -93,13 +103,6 @@ struct dataset_descriptor_base_t {
 
   /** Copy the query to the shared memory. */
   _RAFT_DEVICE virtual void copy_query(ws_handle smem_workspace, const DATA_T* query_ptr) const = 0;
-
-  /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
-   * given by the dataset_index. */
-  _RAFT_DEVICE virtual auto compute_distance(ws_handle smem_workspace,
-                                             INDEX_T dataset_index,
-                                             cuvs::distance::DistanceType metric,
-                                             bool valid) const -> DISTANCE_T = 0;
 };
 
 template <typename DataT, typename IndexT, typename DistanceT>
