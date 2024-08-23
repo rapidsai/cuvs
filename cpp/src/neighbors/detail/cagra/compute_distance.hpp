@@ -36,33 +36,23 @@ namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT, typename IndexT, typename DistanceT>
 struct dataset_descriptor_base_t {
+  using base_type  = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
 
-  /**
-   * Maximum expected size of the descriptor struct.
-   * This covers all standard and VPQ descriptors; we need this to copy the descriptor from global
-   * memory. Increase this if new fields are needed (but try to keep the descriptors small really).
-   */
-  static constexpr size_t kMaxStructSize = 128;
+  using setup_workspace_type  = const base_type*(const base_type*, void*, const DATA_T*, uint32_t);
+  using compute_distance_type = DISTANCE_T(const base_type*,
+                                           INDEX_T,
+                                           cuvs::distance::DistanceType,
+                                           bool);
 
-  template <size_t ActualSize, size_t MaximumSize = kMaxStructSize>
-  static inline constexpr void assert_struct_size()
-  {
-    static_assert(ActualSize <= MaximumSize,
-                  "The maximum descriptor size is tracked in the dataset_descriptor_base_t. "
-                  "Update this constant if implementing a new, larger descriptor.");
-  }
-
-  struct distance_workspace;
-  using ws_handle = distance_workspace*;
-
-  using compute_distance_type = DISTANCE_T(ws_handle, INDEX_T, cuvs::distance::DistanceType, bool);
-
+  /** Copy the descriptor and the query into shared memory and do any other work, such as
+   * initializing the codebook. */
+  setup_workspace_type* setup_workspace_impl;
   /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
    * given by the dataset_index. */
-  compute_distance_type* compute_distance;
+  compute_distance_type* compute_distance_impl;
   /** Number of records in the database. */
   INDEX_T size;
   /** Dimensionality of the data/queries. */
@@ -72,12 +62,14 @@ struct dataset_descriptor_base_t {
   /** Total dynamic shared memory required by the descriptor.  */
   uint32_t smem_ws_size_in_bytes;
 
-  _RAFT_HOST_DEVICE dataset_descriptor_base_t(compute_distance_type* compute_distance,
-                                              INDEX_T size,
-                                              uint32_t dim,
-                                              uint32_t team_size,
-                                              uint32_t smem_ws_size_in_bytes)
-    : compute_distance(compute_distance),
+  RAFT_INLINE_FUNCTION dataset_descriptor_base_t(setup_workspace_type* setup_workspace_impl,
+                                                 compute_distance_type* compute_distance_impl,
+                                                 INDEX_T size,
+                                                 uint32_t dim,
+                                                 uint32_t team_size,
+                                                 uint32_t smem_ws_size_in_bytes)
+    : setup_workspace_impl(setup_workspace_impl),
+      compute_distance_impl(compute_distance_impl),
       size(size),
       dim(dim),
       team_size(team_size),
@@ -85,24 +77,19 @@ struct dataset_descriptor_base_t {
   {
   }
 
-  RAFT_DEVICE_INLINE_FUNCTION void copy_descriptor_per_block(
-    dataset_descriptor_base_t* target) const
+  RAFT_DEVICE_INLINE_FUNCTION auto setup_workspace(void* smem_ptr,
+                                                   const DATA_T* queries_ptr,
+                                                   uint32_t query_id) const -> const base_type*
   {
-    using word_type             = uint32_t;
-    constexpr auto kStructWords = kMaxStructSize / sizeof(word_type);
-    auto* dst                   = reinterpret_cast<word_type*>(target);
-    auto* src                   = reinterpret_cast<const word_type*>(this);
-    for (unsigned i = threadIdx.x; i < kStructWords; i += blockDim.x) {
-      dst[i] = src[i];
-    }
-    __syncthreads();
+    return setup_workspace_impl(this, smem_ptr, queries_ptr, query_id);
   }
 
-  /** Setup the shared memory workspace (e.g. assign pointers or prepare a lookup table). */
-  _RAFT_DEVICE [[nodiscard]] virtual auto set_smem_ws(void* smem_ptr) const -> ws_handle = 0;
-
-  /** Copy the query to the shared memory. */
-  _RAFT_DEVICE virtual void copy_query(ws_handle smem_workspace, const DATA_T* query_ptr) const = 0;
+  RAFT_DEVICE_INLINE_FUNCTION auto compute_distance(INDEX_T dataset_index,
+                                                    cuvs::distance::DistanceType metric,
+                                                    bool valid) const -> DISTANCE_T
+  {
+    return compute_distance_impl(this, dataset_index, metric, valid);
+  }
 };
 
 template <typename DataT, typename IndexT, typename DistanceT>
@@ -122,7 +109,7 @@ struct dataset_descriptor_host {
       team_size{dd_host.team_size},
       dataset_block_dim{dataset_block_dim}
   {
-    RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, dev_descriptor_t::kMaxStructSize, stream_));
+    RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, sizeof(DescriptorImpl), stream_));
   }
 
   ~dataset_descriptor_host() noexcept

@@ -31,7 +31,8 @@ template <uint32_t TeamSize,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
+struct alignas(device::LOAD_128BIT_T) cagra_q_dataset_descriptor_t
+  : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodeBookT;
   using LOAD_T      = device::LOAD_128BIT_T;
@@ -42,7 +43,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
-  using typename base_type::ws_handle;
+  using typename base_type::setup_workspace_type;
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
@@ -59,7 +60,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN * utils::size_of<CODE_BOOK_T>();
 
-  _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(compute_distance_type* compute_distance,
+  _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
+                                                 compute_distance_type* compute_distance_impl,
                                                  const std::uint8_t* encoded_dataset_ptr,
                                                  std::uint32_t encoded_dataset_dim,
                                                  std::uint32_t n_subspace,
@@ -67,34 +69,72 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
                                                  const CODE_BOOK_T* pq_code_book_ptr,
                                                  std::size_t size,
                                                  std::uint32_t dim)
-    : base_type(compute_distance, size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)),
+    : base_type(setup_workspace_impl,
+                compute_distance_impl,
+                size,
+                dim,
+                TeamSize,
+                get_smem_ws_size_in_bytes(dim)),
       encoded_dataset_ptr(encoded_dataset_ptr),
       encoded_dataset_dim(encoded_dataset_dim),
       n_subspace(n_subspace),
       vq_code_book_ptr(vq_code_book_ptr),
       pq_code_book_ptr(pq_code_book_ptr)
   {
-    base_type::template assert_struct_size<sizeof(*this)>();
   }
 
-  _RAFT_DEVICE [[nodiscard]] auto set_smem_ws(void* smem_ptr) const -> ws_handle
+ private:
+  RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
-    using word_type             = uint32_t;
-    constexpr auto kStructWords = base_type::kMaxStructSize / sizeof(word_type);
+    /* SMEM workspace layout:
+      1. The descriptor itself
+      2. Codebook (kSMemCodeBookSizeInBytes bytes)
+      3. Queries (smem_query_buffer_length elems)
+    */
+    return sizeof(cagra_q_dataset_descriptor_t) + kSMemCodeBookSizeInBytes +
+           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
+  }
+};
+
+template <typename DescriptorT>
+_RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const typename DescriptorT::base_type* that_,
+                                                   void* smem_ptr,
+                                                   const typename DescriptorT::DATA_T* queries_ptr,
+                                                   uint32_t query_id) -> const
+  typename DescriptorT::base_type*
+{
+  using descriptor_type          = DescriptorT;
+  using base_type                = typename DescriptorT::base_type;
+  using DATA_T                   = typename DescriptorT::DATA_T;
+  using DISTANCE_T               = typename DescriptorT::DISTANCE_T;
+  using INDEX_T                  = typename DescriptorT::INDEX_T;
+  using LOAD_T                   = typename DescriptorT::LOAD_T;
+  using QUERY_T                  = typename DescriptorT::QUERY_T;
+  using CODE_BOOK_T              = typename DescriptorT::CODE_BOOK_T;
+  constexpr auto TeamSize        = DescriptorT::kTeamSize;
+  constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
+  constexpr auto PQ_BITS         = DescriptorT::kPqBits;
+  constexpr auto PQ_LEN          = DescriptorT::kPqLen;
+  using word_type                = uint32_t;
+
+  auto* that = reinterpret_cast<const DescriptorT*>(that_);
+
+  if (((void*)that) != smem_ptr) {
+    constexpr auto kStructWords = sizeof(DescriptorT) / sizeof(word_type);
     auto* dst                   = reinterpret_cast<word_type*>(smem_ptr);
-    auto* src                   = reinterpret_cast<const word_type*>(this);
+    auto* src                   = reinterpret_cast<const word_type*>(that);
     for (unsigned i = threadIdx.x; i < kStructWords; i += blockDim.x) {
       dst[i] = src[i];
     }
 
     auto codebook_buf =
-      reinterpret_cast<half2*>(reinterpret_cast<uint8_t*>(smem_ptr) + base_type::kMaxStructSize);
+      reinterpret_cast<half2*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT));
 
     // Copy PQ table
     for (unsigned i = threadIdx.x * 2; i < (1 << PQ_BITS) * PQ_LEN; i += blockDim.x * 2) {
       half2 buf2;
-      buf2.x = pq_code_book_ptr[i];
-      buf2.y = pq_code_book_ptr[i + 1];
+      buf2.x = that->pq_code_book_ptr[i];
+      buf2.y = that->pq_code_book_ptr[i + 1];
 
       // Change the order of PQ code book array to reduce the
       // frequency of bank conflicts.
@@ -105,57 +145,34 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
         (j / num_banks_per_subspace) + (j % num_banks_per_subspace) * (1 << PQ_BITS);
       codebook_buf[smem_index] = buf2;
     }
-    return reinterpret_cast<ws_handle>(smem_ptr);
   }
 
-  _RAFT_DEVICE void copy_query(ws_handle smem_workspace, const DATA_T* query_ptr) const
-  {
-    constexpr cuvs::spatial::knn::detail::utils::mapping<half> mapping{};
-    auto smem_query_ptr = smem_query_buffer(smem_workspace);
-    for (unsigned i = threadIdx.x * 2; i < dim; i += blockDim.x * 2) {
-      half2 buf2{0, 0};
-      if (i < dim) { buf2.x = mapping(query_ptr[i]); }
-      if (i + 1 < dim) { buf2.y = mapping(query_ptr[i + 1]); }
-      if constexpr ((PQ_BITS == 8) && (PQ_LEN % 2 == 0)) {
-        // Use swizzling in the condition to reduce bank conflicts in shared
-        // memory, which are likely to occur when pq_code_book_dim is large.
-        ((half2*)smem_query_ptr)[device::swizzling<std::uint32_t, DatasetBlockDim / 2>(i / 2)] =
-          buf2;
-      } else {
-        (reinterpret_cast<half2*>(smem_query_ptr + i))[0] = buf2;
-      }
+  uint32_t dim = that->dim;
+  queries_ptr += dim * query_id;
+
+  constexpr cuvs::spatial::knn::detail::utils::mapping<half> mapping{};
+  auto smem_query_ptr =
+    reinterpret_cast<const QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
+                                     DescriptorT::kSMemCodeBookSizeInBytes);
+  for (unsigned i = threadIdx.x * 2; i < dim; i += blockDim.x * 2) {
+    half2 buf2{0, 0};
+    if (i < dim) { buf2.x = mapping(queries_ptr[i]); }
+    if (i + 1 < dim) { buf2.y = mapping(queries_ptr[i + 1]); }
+    if constexpr ((PQ_BITS == 8) && (PQ_LEN % 2 == 0)) {
+      // Use swizzling in the condition to reduce bank conflicts in shared
+      // memory, which are likely to occur when pq_code_book_dim is large.
+      ((half2*)smem_query_ptr)[device::swizzling<std::uint32_t, DatasetBlockDim / 2>(i / 2)] = buf2;
+    } else {
+      (reinterpret_cast<half2*>(smem_query_ptr + i))[0] = buf2;
     }
   }
 
- private:
-  RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_pq_code_book_ptr(ws_handle smem_workspace) const
-    -> CODE_BOOK_T*
-  {
-    return reinterpret_cast<CODE_BOOK_T*>(reinterpret_cast<uint8_t*>(smem_workspace) +
-                                          base_type::kMaxStructSize);
-  }
-
-  RAFT_DEVICE_INLINE_FUNCTION constexpr auto smem_query_buffer(ws_handle smem_workspace) const
-    -> QUERY_T*
-  {
-    return reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_workspace) +
-                                      base_type::kMaxStructSize + kSMemCodeBookSizeInBytes);
-  }
-
-  RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
-  {
-    /* SMEM workspace layout:
-      1. Codebook (kSMemCodeBookSizeInBytes bytes)
-      2. Queries (smem_query_buffer_length elems)
-    */
-    return base_type::kMaxStructSize + kSMemCodeBookSizeInBytes +
-           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
-  }
-};
+  return const_cast<const base_type*>(reinterpret_cast<base_type*>(smem_ptr));
+}
 
 template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
-  typename DescriptorT::ws_handle smem_workspace,
+  const typename DescriptorT::base_type* desc_,
   typename DescriptorT::INDEX_T dataset_index,
   cuvs::distance::DistanceType /* only L2 metric is implemented */,
   bool valid) -> typename DescriptorT::DISTANCE_T
@@ -166,18 +183,14 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   using LOAD_T                   = typename DescriptorT::LOAD_T;
   using QUERY_T                  = typename DescriptorT::QUERY_T;
   using CODE_BOOK_T              = typename DescriptorT::CODE_BOOK_T;
-  using ws_handle                = typename DescriptorT::ws_handle;
   constexpr auto TeamSize        = DescriptorT::kTeamSize;
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
-  constexpr auto kMaxStructSize  = DescriptorT::base_type::kMaxStructSize;
 
-  auto* __restrict__ desc =
-    const_cast<const DescriptorT*>(reinterpret_cast<DescriptorT*>(smem_workspace));
-  auto* __restrict__ codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(
-    reinterpret_cast<const uint8_t*>(smem_workspace) + kMaxStructSize);
-  auto* __restrict__ query_ptr = reinterpret_cast<const QUERY_T*>(
+  auto* __restrict__ desc         = reinterpret_cast<const DescriptorT*>(desc_);
+  auto* __restrict__ codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(desc + 1);
+  auto* __restrict__ query_ptr    = reinterpret_cast<const QUERY_T*>(
     reinterpret_cast<const uint8_t*>(codebook_ptr) + DescriptorT::kSMemCodeBookSizeInBytes);
   auto* __restrict__ node_ptr =
     desc->encoded_dataset_ptr +
@@ -315,7 +328,8 @@ __launch_bounds__(1, 1) __global__
                                                  DataT,
                                                  IndexT,
                                                  DistanceT>;
-  new (out) desc_type(&compute_distance_vpq<desc_type>,
+  new (out) desc_type(&setup_workspace_vpq<desc_type>,
+                      &compute_distance_vpq<desc_type>,
                       encoded_dataset_ptr,
                       encoded_dataset_dim,
                       n_subspace,
@@ -370,6 +384,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                    rmm::cuda_stream_view stream) -> host_type
   {
     descriptor_type dd_host{nullptr,
+                            nullptr,
                             dataset.data.data_handle(),
                             dataset.encoded_row_length(),
                             dataset.pq_dim(),

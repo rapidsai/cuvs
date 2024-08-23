@@ -93,12 +93,6 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
         desc = f"standard_dataset_descriptor_t<{params}>"
         content = f"""
 template struct {desc};
-template
-_RAFT_DEVICE auto compute_distance_standard<{desc}>(
-  {desc}::ws_handle,
-  {desc}::INDEX_T,
-  cuvs::distance::DistanceType,
-  bool valid) -> {desc}::DISTANCE_T;
 template <>
 const void* {spec}::init_kernel = reinterpret_cast<const void*>(&standard_dataset_descriptor_init_kernel<{params}>);
 template struct {spec};
@@ -120,12 +114,6 @@ template struct {spec};
                     desc = f"cagra_q_dataset_descriptor_t<{params}>"
                     content = f"""
 template struct {desc};
-template
-_RAFT_DEVICE auto compute_distance_vpq<{desc}>(
-  {desc}::ws_handle smem_workspace,
-  {desc}::INDEX_T dataset_index,
-  cuvs::distance::DistanceType metric,
-  bool valid) -> {desc}::DISTANCE_T;
 template <>
 const void* {spec}::init_kernel = reinterpret_cast<const void*>(&vpq_dataset_descriptor_init_kernel<{params}>);
 template struct {spec};

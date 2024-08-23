@@ -195,7 +195,8 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
   assert(result_buffer_size_32 <= MAX_ELEMENTS);
 
   // Set smem working buffer for the distance calculation
-  auto distance_workspace = dataset_desc->set_smem_ws(smem);
+  dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
+  __syncthreads();
 
   auto result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes);
@@ -212,8 +213,6 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
         result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
     }
 #endif
-  const DATA_T* const query_ptr = queries_ptr + query_id * dataset_desc->dim;
-  dataset_desc->copy_query(distance_workspace, query_ptr);
 
   if (threadIdx.x == 0) { terminate_flag[0] = 0; }
   INDEX_T* const local_visited_hashmap_ptr =
@@ -229,7 +228,6 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 
   device::compute_distance_to_random_nodes(result_indices_buffer,
                                            result_distances_buffer,
-                                           distance_workspace,
                                            *dataset_desc,
                                            result_buffer_size,
                                            num_distilation,
@@ -272,7 +270,6 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
     _CLK_START();
     device::compute_distance_to_child_nodes(result_indices_buffer + itopk_size,
                                             result_distances_buffer + itopk_size,
-                                            distance_workspace,
                                             *dataset_desc,
                                             knn_graph,
                                             graph_degree,

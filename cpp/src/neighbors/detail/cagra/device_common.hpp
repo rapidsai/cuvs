@@ -75,7 +75,6 @@ template <typename IndexT,
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   IndexT* result_indices_ptr,       // [num_pickup]
   DistanceT* result_distances_ptr,  // [num_pickup]
-  typename DATASET_DESCRIPTOR_T::ws_handle workspace,
   const DATASET_DESCRIPTOR_T& dataset_desc,
   size_t num_pickup,
   unsigned num_distilation,
@@ -112,7 +111,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         }
       }
 
-      auto norm2 = dataset_desc.compute_distance(workspace, seed_index, metric, valid_i);
+      auto norm2 = dataset_desc.compute_distance(seed_index, metric, valid_i);
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;
@@ -137,8 +136,6 @@ template <typename IndexT, typename DistanceT, typename DATASET_DESCRIPTOR_T>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   IndexT* result_child_indices_ptr,
   DistanceT* result_child_distances_ptr,
-  // query
-  typename DATASET_DESCRIPTOR_T::ws_handle workspace,
   // [dataset_dim, dataset_size]
   const DATASET_DESCRIPTOR_T& dataset_desc,
   // [knn_k, dataset_size]
@@ -185,8 +182,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     IndexT child_id    = invalid_index;
     if (valid_i) { child_id = result_child_indices_ptr[i]; }
 
-    auto norm2 =
-      dataset_desc.compute_distance(workspace, child_id, metric, child_id != invalid_index);
+    auto norm2 = dataset_desc.compute_distance(child_id, metric, child_id != invalid_index);
 
     // Store the distance
     const unsigned lane_id = threadIdx.x % team_size;

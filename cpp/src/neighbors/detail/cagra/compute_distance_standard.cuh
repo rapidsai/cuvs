@@ -34,7 +34,8 @@ template <uint32_t TeamSize,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
+struct alignas(device::LOAD_128BIT_T) standard_dataset_descriptor_t
+  : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using LOAD_T    = device::LOAD_128BIT_T;
   using QUERY_T   = float;
@@ -44,63 +45,78 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
   using typename base_type::DATA_T;
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
-  using typename base_type::ws_handle;
+  using typename base_type::setup_workspace_type;
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
 
   const DATA_T* ptr;
   uint32_t ld;
 
-  _RAFT_HOST_DEVICE standard_dataset_descriptor_t(compute_distance_type* compute_distance,
+  _RAFT_HOST_DEVICE standard_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
+                                                  compute_distance_type* compute_distance_impl,
                                                   const DATA_T* ptr,
                                                   INDEX_T size,
                                                   uint32_t dim,
                                                   uint32_t ld)
-    : base_type(compute_distance, size, dim, TeamSize, get_smem_ws_size_in_bytes(dim)),
+    : base_type(setup_workspace_impl,
+                compute_distance_impl,
+                size,
+                dim,
+                TeamSize,
+                get_smem_ws_size_in_bytes(dim)),
       ptr(ptr),
       ld(ld)
   {
-    base_type::template assert_struct_size<sizeof(*this)>();
-  }
-
-  _RAFT_DEVICE [[nodiscard]] auto set_smem_ws(void* smem_ptr) const -> ws_handle
-  {
-    using word_type             = uint32_t;
-    constexpr auto kStructWords = base_type::kMaxStructSize / sizeof(word_type);
-    auto* dst                   = reinterpret_cast<word_type*>(smem_ptr);
-    auto* src                   = reinterpret_cast<const word_type*>(this);
-    for (unsigned i = threadIdx.x; i < kStructWords; i += blockDim.x) {
-      dst[i] = src[i];
-    }
-    return reinterpret_cast<ws_handle>(smem_ptr);
-  }
-
-  _RAFT_DEVICE void copy_query(ws_handle smem_workspace, const DATA_T* query_ptr) const
-  {
-    auto buf     = reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_workspace) +
-                                          base_type::kMaxStructSize);
-    auto buf_len = raft::round_up_safe<uint32_t>(dim, DatasetBlockDim);
-    for (unsigned i = threadIdx.x; i < buf_len; i += blockDim.x) {
-      unsigned j = device::swizzling(i);
-      if (i < dim) {
-        buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(query_ptr[i]);
-      } else {
-        buf[j] = 0.0;
-      }
-    }
   }
 
  private:
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
-    return base_type::kMaxStructSize +
+    return sizeof(standard_dataset_descriptor_t) +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 };
 
 template <typename DescriptorT>
+_RAFT_DEVICE __noinline__ auto setup_workspace_standard(
+  const typename DescriptorT::base_type* that,
+  void* smem_ptr,
+  const typename DescriptorT::DATA_T* queries_ptr,
+  uint32_t query_id) -> const typename DescriptorT::base_type*
+{
+  using descriptor_type          = DescriptorT;
+  using base_type                = typename DescriptorT::base_type;
+  using QUERY_T                  = typename descriptor_type::QUERY_T;
+  constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
+  using word_type                = uint32_t;
+  if (((void*)that) != smem_ptr) {
+    constexpr auto kStructWords = sizeof(DescriptorT) / sizeof(word_type);
+    auto* dst                   = reinterpret_cast<word_type*>(smem_ptr);
+    auto* src                   = reinterpret_cast<const word_type*>(that);
+    for (unsigned i = threadIdx.x; i < kStructWords; i += blockDim.x) {
+      dst[i] = src[i];
+    }
+  }
+
+  uint32_t dim = that->dim;
+  auto buf = reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT));
+  auto buf_len = raft::round_up_safe<uint32_t>(dim, DatasetBlockDim);
+  queries_ptr += dim * query_id;
+  for (unsigned i = threadIdx.x; i < buf_len; i += blockDim.x) {
+    unsigned j = device::swizzling(i);
+    if (i < dim) {
+      buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(queries_ptr[i]);
+    } else {
+      buf[j] = 0.0;
+    }
+  }
+
+  return const_cast<const base_type*>(reinterpret_cast<base_type*>(smem_ptr));
+}
+
+template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_standard(
-  typename DescriptorT::ws_handle smem_workspace,
+  const typename DescriptorT::base_type* desc_,
   typename DescriptorT::INDEX_T dataset_index,
   cuvs::distance::DistanceType metric,
   bool valid) -> typename DescriptorT::DISTANCE_T
@@ -110,35 +126,14 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   using INDEX_T                   = typename DescriptorT::INDEX_T;
   using LOAD_T                    = typename DescriptorT::LOAD_T;
   using QUERY_T                   = typename DescriptorT::QUERY_T;
-  using ws_handle                 = typename DescriptorT::ws_handle;
   constexpr auto kTeamSize        = DescriptorT::kTeamSize;
   constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
-  constexpr auto kMaxStructSize   = DescriptorT::base_type::kMaxStructSize;
 
-  auto* __restrict__ desc =
-    const_cast<const DescriptorT*>(reinterpret_cast<DescriptorT*>(smem_workspace));
-  auto* __restrict__ query_ptr = reinterpret_cast<const QUERY_T*>(
-    reinterpret_cast<const uint8_t*>(smem_workspace) + kMaxStructSize);
-  const auto dataset_ptr = desc->ptr + (static_cast<std::uint64_t>(desc->ld) * dataset_index);
-  const unsigned lane_id = threadIdx.x % kTeamSize;
-  auto dim               = desc->dim;
-  // if (threadIdx.x == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
-  //   printf(
-  //     "computing distance\n  desc = %p, query = %p, dataset_ptr = %p\n  ptr = %p, dim = %u, ld =
-  //     "
-  //     "%u\n",
-  //     desc,
-  //     query_ptr,
-  //     dataset_ptr,
-  //     desc->ptr,
-  //     desc->dim,
-  //     desc->ld);
-  //   printf("  kTeamSize = %u, kDatasetBlockDim = %u, kMaxStructSize = %u\n",
-  //          kTeamSize,
-  //          kDatasetBlockDim,
-  //          uint32_t(kMaxStructSize));
-  // }
-  // return 0;
+  auto* __restrict__ desc      = reinterpret_cast<const DescriptorT*>(desc_);
+  auto* __restrict__ query_ptr = reinterpret_cast<const QUERY_T*>(desc + 1);
+  const auto dataset_ptr       = desc->ptr + (static_cast<std::uint64_t>(desc->ld) * dataset_index);
+  const unsigned lane_id       = threadIdx.x % kTeamSize;
+  auto dim                     = desc->dim;
 
   DISTANCE_T norm2 = 0;
   if (valid) {
@@ -185,9 +180,6 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   return norm2;
 }
 
-// template <typename DescriptorT>
-// __device__ typename DescriptorT::compute_distance_type* compute_distance_standard_ptr;
-
 template <uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
@@ -202,10 +194,12 @@ __launch_bounds__(1, 1) __global__ void standard_dataset_descriptor_init_kernel(
 {
   using desc_type =
     standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
-  new (out) desc_type(&compute_distance_standard<desc_type>, ptr, size, dim, ld);
-  // printf("compute-distance: %p, dataset: %p\n",
-  //        out->compute_distance,
-  //        reinterpret_cast<desc_type*>(out)->ptr);
+  new (out) desc_type(&setup_workspace_standard<desc_type>,
+                      &compute_distance_standard<desc_type>,
+                      ptr,
+                      size,
+                      dim,
+                      ld);
 }
 
 template <uint32_t TeamSize,
@@ -236,6 +230,7 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
                    rmm::cuda_stream_view stream) -> host_type
   {
     descriptor_type dd_host{nullptr,
+                            nullptr,
                             dataset.view().data_handle(),
                             IndexT(dataset.n_rows()),
                             dataset.dim(),

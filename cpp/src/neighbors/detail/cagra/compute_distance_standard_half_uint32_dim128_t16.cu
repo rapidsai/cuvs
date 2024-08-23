@@ -28,12 +28,6 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template struct standard_dataset_descriptor_t<16, 128, half, uint32_t, float>;
-template _RAFT_DEVICE auto
-compute_distance_standard<standard_dataset_descriptor_t<16, 128, half, uint32_t, float>>(
-  standard_dataset_descriptor_t<16, 128, half, uint32_t, float>::ws_handle,
-  standard_dataset_descriptor_t<16, 128, half, uint32_t, float>::INDEX_T,
-  cuvs::distance::DistanceType,
-  bool valid) -> standard_dataset_descriptor_t<16, 128, half, uint32_t, float>::DISTANCE_T;
 template <>
 const void* standard_descriptor_spec<16, 128, half, uint32_t, float>::init_kernel =
   reinterpret_cast<const void*>(

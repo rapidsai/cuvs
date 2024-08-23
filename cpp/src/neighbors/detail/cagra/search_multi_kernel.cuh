@@ -118,10 +118,7 @@ RAFT_KERNEL random_pickup_kernel(
   const uint32_t query_id      = blockIdx.y;
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
-  auto distance_workspace = dataset_desc->set_smem_ws(smem);
-  // Load a query
-  dataset_desc->copy_query(distance_workspace, queries_ptr + query_id * dataset_desc->dim);
-
+  dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
   __syncthreads();
 
   INDEX_T best_index_team_local;
@@ -136,7 +133,7 @@ RAFT_KERNEL random_pickup_kernel(
         device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_desc->size;
     }
 
-    DISTANCE_T norm2 = dataset_desc->compute_distance(distance_workspace, seed_index, metric, true);
+    DISTANCE_T norm2 = dataset_desc->compute_distance(seed_index, metric, true);
     if (norm2 < best_norm2_team_local) {
       best_norm2_team_local = norm2;
       best_index_team_local = seed_index;
@@ -330,9 +327,8 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const auto query_id       = blockIdx.y;
 
   extern __shared__ uint8_t smem[];
-  auto distance_workspace = dataset_desc->set_smem_ws(smem);
   // Load a query
-  dataset_desc->copy_query(distance_workspace, query_ptr + query_id * dataset_desc->dim);
+  dataset_desc = dataset_desc->setup_workspace(smem, query_ptr, query_id);
 
   __syncthreads();
   if (global_team_id >= search_width * graph_degree) { return; }
@@ -358,8 +354,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const auto compute_distance_flag = hashmap::insert<INDEX_T>(
     team_size, visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
 
-  DISTANCE_T norm2 =
-    dataset_desc->compute_distance(distance_workspace, child_id, metric, compute_distance_flag);
+  DISTANCE_T norm2 = dataset_desc->compute_distance(child_id, metric, compute_distance_flag);
 
   if (compute_distance_flag) {
     if (threadIdx.x % team_size == 0) {
