@@ -30,226 +30,226 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-extern template struct standard_dataset_descriptor_t<8, 64, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 128, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 256, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 2, half, float, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 64, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 128, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 256, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 2, half, half, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 64, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 128, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 256, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 64, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 128, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 256, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 64, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 128, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 256, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 2, half, float, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<8, 64, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<8, 64, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<16, 128, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<16, 128, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_dataset_descriptor_t<32, 256, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 2, half, half, uint64_t, float>;
-extern template struct cagra_q_dataset_descriptor_t<32, 256, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_descriptor_spec<8, 64, float, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 2, half, float, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_descriptor_spec<16, 128, float, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 2, half, float, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_descriptor_spec<32, 256, float, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 2, half, float, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 4, half, float, uint32_t, float>;
-extern template struct standard_descriptor_spec<8, 64, half, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 2, half, half, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_descriptor_spec<16, 128, half, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 2, half, half, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_descriptor_spec<32, 256, half, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 2, half, half, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 4, half, half, uint32_t, float>;
-extern template struct standard_descriptor_spec<8, 64, int8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_descriptor_spec<16, 128, int8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_descriptor_spec<32, 256, int8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 2, half, int8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 4, half, int8_t, uint32_t, float>;
-extern template struct standard_descriptor_spec<8, 64, uint8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_descriptor_spec<16, 128, uint8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_descriptor_spec<32, 256, uint8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 2, half, uint8_t, uint32_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 4, half, uint8_t, uint32_t, float>;
-extern template struct standard_descriptor_spec<8, 64, float, uint64_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 2, half, float, uint64_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_descriptor_spec<16, 128, float, uint64_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 2, half, float, uint64_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_descriptor_spec<32, 256, float, uint64_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 2, half, float, uint64_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 4, half, float, uint64_t, float>;
-extern template struct standard_descriptor_spec<8, 64, half, uint64_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 2, half, half, uint64_t, float>;
-extern template struct vpq_descriptor_spec<8, 64, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_descriptor_spec<16, 128, half, uint64_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 2, half, half, uint64_t, float>;
-extern template struct vpq_descriptor_spec<16, 128, 8, 4, half, half, uint64_t, float>;
-extern template struct standard_descriptor_spec<32, 256, half, uint64_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 2, half, half, uint64_t, float>;
-extern template struct vpq_descriptor_spec<32, 256, 8, 4, half, half, uint64_t, float>;
+extern template struct standard_dataset_descriptor_t<8, 128, float, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, float, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, float, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<16, 256, float, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, float, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, float, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<32, 512, float, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, float, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, float, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<8, 128, half, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, half, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, half, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<16, 256, half, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, half, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, half, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<32, 512, half, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, half, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, half, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<8, 128, int8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, int8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, int8_t, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<16, 256, int8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, int8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, int8_t, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<32, 512, int8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, int8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, int8_t, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<8, 128, uint8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, uint8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, uint8_t, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<16, 256, uint8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, uint8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, uint8_t, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<32, 512, uint8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, uint8_t, uint32_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, uint8_t, uint32_t, float>;
+extern template struct standard_dataset_descriptor_t<8, 128, float, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, float, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, float, uint64_t, float>;
+extern template struct standard_dataset_descriptor_t<16, 256, float, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, float, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, float, uint64_t, float>;
+extern template struct standard_dataset_descriptor_t<32, 512, float, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, float, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, float, uint64_t, float>;
+extern template struct standard_dataset_descriptor_t<8, 128, half, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 2, half, half, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<8, 128, 8, 4, half, half, uint64_t, float>;
+extern template struct standard_dataset_descriptor_t<16, 256, half, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 2, half, half, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<16, 256, 8, 4, half, half, uint64_t, float>;
+extern template struct standard_dataset_descriptor_t<32, 512, half, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 2, half, half, uint64_t, float>;
+extern template struct cagra_q_dataset_descriptor_t<32, 512, 8, 4, half, half, uint64_t, float>;
+extern template struct standard_descriptor_spec<8, 128, float, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 2, half, float, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 4, half, float, uint32_t, float>;
+extern template struct standard_descriptor_spec<16, 256, float, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 2, half, float, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 4, half, float, uint32_t, float>;
+extern template struct standard_descriptor_spec<32, 512, float, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 2, half, float, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 4, half, float, uint32_t, float>;
+extern template struct standard_descriptor_spec<8, 128, half, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 2, half, half, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 4, half, half, uint32_t, float>;
+extern template struct standard_descriptor_spec<16, 256, half, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 2, half, half, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 4, half, half, uint32_t, float>;
+extern template struct standard_descriptor_spec<32, 512, half, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 2, half, half, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 4, half, half, uint32_t, float>;
+extern template struct standard_descriptor_spec<8, 128, int8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 2, half, int8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 4, half, int8_t, uint32_t, float>;
+extern template struct standard_descriptor_spec<16, 256, int8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 2, half, int8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 4, half, int8_t, uint32_t, float>;
+extern template struct standard_descriptor_spec<32, 512, int8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 2, half, int8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 4, half, int8_t, uint32_t, float>;
+extern template struct standard_descriptor_spec<8, 128, uint8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 2, half, uint8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 4, half, uint8_t, uint32_t, float>;
+extern template struct standard_descriptor_spec<16, 256, uint8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 2, half, uint8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 4, half, uint8_t, uint32_t, float>;
+extern template struct standard_descriptor_spec<32, 512, uint8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 2, half, uint8_t, uint32_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 4, half, uint8_t, uint32_t, float>;
+extern template struct standard_descriptor_spec<8, 128, float, uint64_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 2, half, float, uint64_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 4, half, float, uint64_t, float>;
+extern template struct standard_descriptor_spec<16, 256, float, uint64_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 2, half, float, uint64_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 4, half, float, uint64_t, float>;
+extern template struct standard_descriptor_spec<32, 512, float, uint64_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 2, half, float, uint64_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 4, half, float, uint64_t, float>;
+extern template struct standard_descriptor_spec<8, 128, half, uint64_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 2, half, half, uint64_t, float>;
+extern template struct vpq_descriptor_spec<8, 128, 8, 4, half, half, uint64_t, float>;
+extern template struct standard_descriptor_spec<16, 256, half, uint64_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 2, half, half, uint64_t, float>;
+extern template struct vpq_descriptor_spec<16, 256, 8, 4, half, half, uint64_t, float>;
+extern template struct standard_descriptor_spec<32, 512, half, uint64_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 2, half, half, uint64_t, float>;
+extern template struct vpq_descriptor_spec<32, 512, 8, 4, half, half, uint64_t, float>;
 
 extern template struct instance_selector<
-  standard_descriptor_spec<8, 64, float, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 2, half, float, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 4, half, float, uint32_t, float>,
-  standard_descriptor_spec<16, 128, float, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 2, half, float, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 4, half, float, uint32_t, float>,
-  standard_descriptor_spec<32, 256, float, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 2, half, float, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 4, half, float, uint32_t, float>,
-  standard_descriptor_spec<8, 64, half, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 2, half, half, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 4, half, half, uint32_t, float>,
-  standard_descriptor_spec<16, 128, half, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 2, half, half, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 4, half, half, uint32_t, float>,
-  standard_descriptor_spec<32, 256, half, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 2, half, half, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 4, half, half, uint32_t, float>,
-  standard_descriptor_spec<8, 64, int8_t, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 2, half, int8_t, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 4, half, int8_t, uint32_t, float>,
-  standard_descriptor_spec<16, 128, int8_t, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 2, half, int8_t, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 4, half, int8_t, uint32_t, float>,
-  standard_descriptor_spec<32, 256, int8_t, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 2, half, int8_t, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 4, half, int8_t, uint32_t, float>,
-  standard_descriptor_spec<8, 64, uint8_t, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 2, half, uint8_t, uint32_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 4, half, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<16, 128, uint8_t, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 2, half, uint8_t, uint32_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 4, half, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<32, 256, uint8_t, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 2, half, uint8_t, uint32_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 4, half, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<8, 64, float, uint64_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 2, half, float, uint64_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 4, half, float, uint64_t, float>,
-  standard_descriptor_spec<16, 128, float, uint64_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 2, half, float, uint64_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 4, half, float, uint64_t, float>,
-  standard_descriptor_spec<32, 256, float, uint64_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 2, half, float, uint64_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 4, half, float, uint64_t, float>,
-  standard_descriptor_spec<8, 64, half, uint64_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 2, half, half, uint64_t, float>,
-  vpq_descriptor_spec<8, 64, 8, 4, half, half, uint64_t, float>,
-  standard_descriptor_spec<16, 128, half, uint64_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 2, half, half, uint64_t, float>,
-  vpq_descriptor_spec<16, 128, 8, 4, half, half, uint64_t, float>,
-  standard_descriptor_spec<32, 256, half, uint64_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 2, half, half, uint64_t, float>,
-  vpq_descriptor_spec<32, 256, 8, 4, half, half, uint64_t, float>>;
+  standard_descriptor_spec<8, 128, float, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 2, half, float, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 4, half, float, uint32_t, float>,
+  standard_descriptor_spec<16, 256, float, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 2, half, float, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 4, half, float, uint32_t, float>,
+  standard_descriptor_spec<32, 512, float, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 2, half, float, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 4, half, float, uint32_t, float>,
+  standard_descriptor_spec<8, 128, half, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 2, half, half, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 4, half, half, uint32_t, float>,
+  standard_descriptor_spec<16, 256, half, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 2, half, half, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 4, half, half, uint32_t, float>,
+  standard_descriptor_spec<32, 512, half, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 2, half, half, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 4, half, half, uint32_t, float>,
+  standard_descriptor_spec<8, 128, int8_t, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 2, half, int8_t, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 4, half, int8_t, uint32_t, float>,
+  standard_descriptor_spec<16, 256, int8_t, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 2, half, int8_t, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 4, half, int8_t, uint32_t, float>,
+  standard_descriptor_spec<32, 512, int8_t, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 2, half, int8_t, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 4, half, int8_t, uint32_t, float>,
+  standard_descriptor_spec<8, 128, uint8_t, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 2, half, uint8_t, uint32_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 4, half, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<16, 256, uint8_t, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 2, half, uint8_t, uint32_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 4, half, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<32, 512, uint8_t, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 2, half, uint8_t, uint32_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 4, half, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<8, 128, float, uint64_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 2, half, float, uint64_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 4, half, float, uint64_t, float>,
+  standard_descriptor_spec<16, 256, float, uint64_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 2, half, float, uint64_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 4, half, float, uint64_t, float>,
+  standard_descriptor_spec<32, 512, float, uint64_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 2, half, float, uint64_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 4, half, float, uint64_t, float>,
+  standard_descriptor_spec<8, 128, half, uint64_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 2, half, half, uint64_t, float>,
+  vpq_descriptor_spec<8, 128, 8, 4, half, half, uint64_t, float>,
+  standard_descriptor_spec<16, 256, half, uint64_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 2, half, half, uint64_t, float>,
+  vpq_descriptor_spec<16, 256, 8, 4, half, half, uint64_t, float>,
+  standard_descriptor_spec<32, 512, half, uint64_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 2, half, half, uint64_t, float>,
+  vpq_descriptor_spec<32, 512, 8, 4, half, half, uint64_t, float>>;
 
 using descriptor_instances =
-  instance_selector<standard_descriptor_spec<8, 64, float, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 2, half, float, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 4, half, float, uint32_t, float>,
-                    standard_descriptor_spec<16, 128, float, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 2, half, float, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 4, half, float, uint32_t, float>,
-                    standard_descriptor_spec<32, 256, float, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 2, half, float, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 4, half, float, uint32_t, float>,
-                    standard_descriptor_spec<8, 64, half, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 2, half, half, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 4, half, half, uint32_t, float>,
-                    standard_descriptor_spec<16, 128, half, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 2, half, half, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 4, half, half, uint32_t, float>,
-                    standard_descriptor_spec<32, 256, half, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 2, half, half, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 4, half, half, uint32_t, float>,
-                    standard_descriptor_spec<8, 64, int8_t, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 2, half, int8_t, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 4, half, int8_t, uint32_t, float>,
-                    standard_descriptor_spec<16, 128, int8_t, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 2, half, int8_t, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 4, half, int8_t, uint32_t, float>,
-                    standard_descriptor_spec<32, 256, int8_t, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 2, half, int8_t, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 4, half, int8_t, uint32_t, float>,
-                    standard_descriptor_spec<8, 64, uint8_t, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 2, half, uint8_t, uint32_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 4, half, uint8_t, uint32_t, float>,
-                    standard_descriptor_spec<16, 128, uint8_t, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 2, half, uint8_t, uint32_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 4, half, uint8_t, uint32_t, float>,
-                    standard_descriptor_spec<32, 256, uint8_t, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 2, half, uint8_t, uint32_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 4, half, uint8_t, uint32_t, float>,
-                    standard_descriptor_spec<8, 64, float, uint64_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 2, half, float, uint64_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 4, half, float, uint64_t, float>,
-                    standard_descriptor_spec<16, 128, float, uint64_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 2, half, float, uint64_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 4, half, float, uint64_t, float>,
-                    standard_descriptor_spec<32, 256, float, uint64_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 2, half, float, uint64_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 4, half, float, uint64_t, float>,
-                    standard_descriptor_spec<8, 64, half, uint64_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 2, half, half, uint64_t, float>,
-                    vpq_descriptor_spec<8, 64, 8, 4, half, half, uint64_t, float>,
-                    standard_descriptor_spec<16, 128, half, uint64_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 2, half, half, uint64_t, float>,
-                    vpq_descriptor_spec<16, 128, 8, 4, half, half, uint64_t, float>,
-                    standard_descriptor_spec<32, 256, half, uint64_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 2, half, half, uint64_t, float>,
-                    vpq_descriptor_spec<32, 256, 8, 4, half, half, uint64_t, float>>;
+  instance_selector<standard_descriptor_spec<8, 128, float, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 2, half, float, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 4, half, float, uint32_t, float>,
+                    standard_descriptor_spec<16, 256, float, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 2, half, float, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 4, half, float, uint32_t, float>,
+                    standard_descriptor_spec<32, 512, float, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 2, half, float, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 4, half, float, uint32_t, float>,
+                    standard_descriptor_spec<8, 128, half, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 2, half, half, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 4, half, half, uint32_t, float>,
+                    standard_descriptor_spec<16, 256, half, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 2, half, half, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 4, half, half, uint32_t, float>,
+                    standard_descriptor_spec<32, 512, half, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 2, half, half, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 4, half, half, uint32_t, float>,
+                    standard_descriptor_spec<8, 128, int8_t, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 2, half, int8_t, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 4, half, int8_t, uint32_t, float>,
+                    standard_descriptor_spec<16, 256, int8_t, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 2, half, int8_t, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 4, half, int8_t, uint32_t, float>,
+                    standard_descriptor_spec<32, 512, int8_t, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 2, half, int8_t, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 4, half, int8_t, uint32_t, float>,
+                    standard_descriptor_spec<8, 128, uint8_t, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 2, half, uint8_t, uint32_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 4, half, uint8_t, uint32_t, float>,
+                    standard_descriptor_spec<16, 256, uint8_t, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 2, half, uint8_t, uint32_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 4, half, uint8_t, uint32_t, float>,
+                    standard_descriptor_spec<32, 512, uint8_t, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 2, half, uint8_t, uint32_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 4, half, uint8_t, uint32_t, float>,
+                    standard_descriptor_spec<8, 128, float, uint64_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 2, half, float, uint64_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 4, half, float, uint64_t, float>,
+                    standard_descriptor_spec<16, 256, float, uint64_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 2, half, float, uint64_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 4, half, float, uint64_t, float>,
+                    standard_descriptor_spec<32, 512, float, uint64_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 2, half, float, uint64_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 4, half, float, uint64_t, float>,
+                    standard_descriptor_spec<8, 128, half, uint64_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 2, half, half, uint64_t, float>,
+                    vpq_descriptor_spec<8, 128, 8, 4, half, half, uint64_t, float>,
+                    standard_descriptor_spec<16, 256, half, uint64_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 2, half, half, uint64_t, float>,
+                    vpq_descriptor_spec<16, 256, 8, 4, half, half, uint64_t, float>,
+                    standard_descriptor_spec<32, 512, half, uint64_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 2, half, half, uint64_t, float>,
+                    vpq_descriptor_spec<32, 512, 8, 4, half, half, uint64_t, float>>;
 
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,

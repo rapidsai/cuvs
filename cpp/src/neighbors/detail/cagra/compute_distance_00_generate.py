@@ -48,8 +48,8 @@ namespace cuvs::neighbors::cagra::detail {{
 }}  // namespace cuvs::neighbors::cagra::detail
 """
 
-#mxdim_team = [(128, 8), (256, 16), (512, 32)]
-mxdim_team = [(64, 8), (128, 16), (256, 32)]
+mxdim_team = [(128, 8), (256, 16), (512, 32)]
+#mxdim_team = [(64, 8), (128, 16), (256, 32)]
 #mxdim_team = [(32, 8), (64, 16), (128, 32)]
 
 pq_bits = [8]
