@@ -173,9 +173,9 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const typename DescriptorT::b
 template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   const typename DescriptorT::base_type* desc_,
-  typename DescriptorT::INDEX_T dataset_index,
-  cuvs::distance::DistanceType /* only L2 metric is implemented */,
-  bool valid) -> typename DescriptorT::DISTANCE_T
+  const typename DescriptorT::INDEX_T dataset_index,
+  const cuvs::distance::DistanceType /* only L2 metric is implemented */,
+  const bool valid) -> typename DescriptorT::DISTANCE_T
 {
   using DATA_T                   = typename DescriptorT::DATA_T;
   using DISTANCE_T               = typename DescriptorT::DISTANCE_T;
@@ -188,11 +188,11 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
 
-  auto* __restrict__ desc         = reinterpret_cast<const DescriptorT*>(desc_);
-  auto* __restrict__ codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(desc + 1);
-  auto* __restrict__ query_ptr    = reinterpret_cast<const QUERY_T*>(
+  const auto* __restrict__ desc         = reinterpret_cast<const DescriptorT*>(desc_);
+  const auto* __restrict__ codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(desc + 1);
+  const auto* __restrict__ query_ptr    = reinterpret_cast<const QUERY_T*>(
     reinterpret_cast<const uint8_t*>(codebook_ptr) + DescriptorT::kSMemCodeBookSizeInBytes);
-  auto* __restrict__ node_ptr =
+  const auto* __restrict__ node_ptr =
     desc->encoded_dataset_ptr +
     (static_cast<std::uint64_t>(desc->encoded_dataset_dim) * dataset_index);
   const auto dim = desc->dim;
@@ -207,7 +207,7 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
           raft::div_rounding_up_unsafe<unsigned>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
         // Loading PQ codes
         uint32_t pq_codes[nelem];
-#pragma unroll
+#pragma unroll 1
         for (std::uint32_t e = 0; e < nelem; e++) {
           const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
           if (k >= desc->n_subspace) break;

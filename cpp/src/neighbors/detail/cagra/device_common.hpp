@@ -22,6 +22,7 @@
 
 // TODO: This shouldn't be invoking anything in detail APIs outside of cuvs/neighbors
 #include <raft/core/detail/macros.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <cuda_fp16.h>
 
@@ -73,19 +74,19 @@ template <typename IndexT,
           typename DistanceT,
           typename DATASET_DESCRIPTOR_T>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
-  IndexT* result_indices_ptr,       // [num_pickup]
-  DistanceT* result_distances_ptr,  // [num_pickup]
-  const DATASET_DESCRIPTOR_T& dataset_desc,
-  size_t num_pickup,
-  unsigned num_distilation,
-  uint64_t rand_xor_mask,
-  const IndexT* seed_ptr,  // [num_seeds]
-  uint32_t num_seeds,
-  IndexT* visited_hash_ptr,
-  uint32_t hash_bitlen,
-  cuvs::distance::DistanceType metric,
-  uint32_t block_id   = 0,
-  uint32_t num_blocks = 1)
+  IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
+  DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
+  const DATASET_DESCRIPTOR_T& __restrict__ dataset_desc,
+  const size_t num_pickup,
+  const unsigned num_distilation,
+  const uint64_t rand_xor_mask,
+  const IndexT* __restrict__ seed_ptr,  // [num_seeds]
+  const uint32_t num_seeds,
+  IndexT* __restrict__ visited_hash_ptr,
+  const uint32_t hash_bitlen,
+  const cuvs::distance::DistanceType metric,
+  const uint32_t block_id   = 0,
+  const uint32_t num_blocks = 1)
 {
   const auto team_size = dataset_desc.team_size;
   uint32_t max_i       = num_pickup;
@@ -97,7 +98,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
     const bool valid_i = (i < num_pickup);
 
     IndexT best_index_team_local;
-    DistanceT best_norm2_team_local = utils::get_max_value<DistanceT>();
+    DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
       IndexT seed_index;
@@ -125,8 +126,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         result_distances_ptr[i] = best_norm2_team_local;
         result_indices_ptr[i]   = best_index_team_local;
       } else {
-        result_distances_ptr[i] = utils::get_max_value<DistanceT>();
-        result_indices_ptr[i]   = utils::get_max_value<IndexT>();
+        result_distances_ptr[i] = raft::upper_bound<DistanceT>();
+        result_indices_ptr[i]   = raft::upper_bound<IndexT>();
       }
     }
   }
@@ -134,23 +135,23 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 
 template <typename IndexT, typename DistanceT, typename DATASET_DESCRIPTOR_T>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
-  IndexT* result_child_indices_ptr,
-  DistanceT* result_child_distances_ptr,
+  IndexT* __restrict__ result_child_indices_ptr,
+  DistanceT* __restrict__ result_child_distances_ptr,
   // [dataset_dim, dataset_size]
-  const DATASET_DESCRIPTOR_T& dataset_desc,
+  const DATASET_DESCRIPTOR_T& __restrict__ dataset_desc,
   // [knn_k, dataset_size]
-  const IndexT* knn_graph,
-  uint32_t knn_k,
+  const IndexT* __restrict__ knn_graph,
+  const uint32_t knn_k,
   // hashmap
-  IndexT* visited_hashmap_ptr,
-  uint32_t hash_bitlen,
-  const IndexT* parent_indices,
-  const IndexT* internal_topk_list,
-  uint32_t search_width,
-  cuvs::distance::DistanceType metric)
+  IndexT* __restrict__ visited_hashmap_ptr,
+  const uint32_t hash_bitlen,
+  const IndexT* __restrict__ parent_indices,
+  const IndexT* __restrict__ internal_topk_list,
+  const uint32_t search_width,
+  const cuvs::distance::DistanceType metric)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
-  const IndexT invalid_index        = utils::get_max_value<IndexT>();
+  constexpr IndexT invalid_index    = raft::upper_bound<IndexT>();
 
   // Read child indices of parents from knn graph and check if the distance
   // computaiton is necessary.
@@ -190,7 +191,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
       if (child_id != invalid_index) {
         result_child_distances_ptr[i] = norm2;
       } else {
-        result_child_distances_ptr[i] = utils::get_max_value<DistanceT>();
+        result_child_distances_ptr[i] = raft::upper_bound<DistanceT>();
       }
     }
   }

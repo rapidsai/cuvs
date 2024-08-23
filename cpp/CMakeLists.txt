@@ -273,8 +273,8 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_half_uint64.cu
 )
 
-file(GLOB_RECURSE distance_core_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
-set_source_files_properties(${distance_core_sources} PROPERTIES COMPILE_FLAGS -maxrregcount=64)
+file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
+set_source_files_properties(${compute_distance_sources} PROPERTIES COMPILE_FLAGS -maxrregcount=64)
 
 set_target_properties(
   cuvs-cagra-search

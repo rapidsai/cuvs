@@ -117,9 +117,9 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
 template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   const typename DescriptorT::base_type* desc_,
-  typename DescriptorT::INDEX_T dataset_index,
-  cuvs::distance::DistanceType metric,
-  bool valid) -> typename DescriptorT::DISTANCE_T
+  const typename DescriptorT::INDEX_T dataset_index,
+  const cuvs::distance::DistanceType metric,
+  const bool valid) -> typename DescriptorT::DISTANCE_T
 {
   using DATA_T                    = typename DescriptorT::DATA_T;
   using DISTANCE_T                = typename DescriptorT::DISTANCE_T;
@@ -129,11 +129,12 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   constexpr auto kTeamSize        = DescriptorT::kTeamSize;
   constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
 
-  auto* __restrict__ desc      = reinterpret_cast<const DescriptorT*>(desc_);
-  auto* __restrict__ query_ptr = reinterpret_cast<const QUERY_T*>(desc + 1);
-  const auto dataset_ptr       = desc->ptr + (static_cast<std::uint64_t>(desc->ld) * dataset_index);
-  const unsigned lane_id       = threadIdx.x % kTeamSize;
-  auto dim                     = desc->dim;
+  const auto* __restrict__ desc      = reinterpret_cast<const DescriptorT*>(desc_);
+  const auto* __restrict__ query_ptr = reinterpret_cast<const QUERY_T*>(desc + 1);
+  const auto* __restrict__ dataset_ptr =
+    desc->ptr + (static_cast<std::uint64_t>(desc->ld) * dataset_index);
+  const auto lane_id = threadIdx.x % kTeamSize;
+  const auto dim     = desc->dim;
 
   DISTANCE_T norm2 = 0;
   if (valid) {
