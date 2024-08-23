@@ -72,8 +72,8 @@ void pairwise_matrix_dispatch(OpT distance_op,
                               IdxT k,
                               const DataT* x,
                               const DataT* y,
-                              const DataT* x_norm,
-                              const DataT* y_norm,
+                              const OutT* x_norm,
+                              const OutT* y_norm,
                               OutT* out,
                               FinOpT fin_op,
                               cudaStream_t stream,
@@ -113,7 +113,13 @@ void pairwise_matrix_dispatch(OpT distance_op,
     void* kernel_ptr  = reinterpret_cast<void*>(sm60_wrapper.kernel_ptr);
     auto runtime_arch = arch::kernel_virtual_arch(kernel_ptr);
 
-    if (cutlass_range.contains(runtime_arch)) {
+    // TODO: the cutlass doesn't support the odd `k` on half DataT.
+    bool if_unsupported_on_half = (sizeof(DataT) == 2) && ((k % 2) != 0);
+
+    if (if_unsupported_on_half) {
+      auto any_range = arch::SM_range(arch::SM_min(), arch::SM_future());
+      pairwise_matrix_sm60_dispatch(distance_op, params, any_range, stream);
+    } else if (cutlass_range.contains(runtime_arch) && !if_unsupported_on_half) {
       // If device is SM_80 or later, use CUTLASS-based kernel.
       pairwise_matrix_sm80_dispatch(distance_op, params, cutlass_range, stream);
     } else {

@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifndef _CUVS_EXPLICIT_INSTANTIATE_ONLY
 #include "search_multi_cta_kernel-inl.cuh"
 #endif
 

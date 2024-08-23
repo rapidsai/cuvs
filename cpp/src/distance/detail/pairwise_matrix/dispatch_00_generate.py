@@ -56,8 +56,8 @@ macro = """
       IdxT k,                                                                          \\
       const DataT* x,                                                                  \\
       const DataT* y,                                                                  \\
-      const DataT* x_norm,                                                             \\
-      const DataT* y_norm,                                                             \\
+      const OutT* x_norm,                                                              \\
+      const OutT* y_norm,                                                              \\
       OutT* out,                                                                       \\
       FinOpT fin_op,                                                                   \\
       cudaStream_t stream,                                                             \\
@@ -75,6 +75,12 @@ data_type_instances = [
         DataT="double",
         AccT="double",
         OutT="double",
+        IdxT="int",
+    ),
+    dict(
+        DataT="half",
+        AccT="float",
+        OutT="float",
         IdxT="int",
     ),
 ]
