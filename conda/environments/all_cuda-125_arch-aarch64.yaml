@@ -35,7 +35,7 @@ dependencies:
 - make
 - nccl>=2.9.9
 - ninja
-- numpy>=1.23,<2.0a0
+- numpy>=1.23,<3.0a0
 - numpydoc
 - openblas
 - pre-commit
