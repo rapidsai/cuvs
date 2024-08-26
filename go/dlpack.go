@@ -47,7 +47,7 @@ func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 		return Tensor[T]{}, errors.New("shape must be atleast 2")
 	}
 
-	println("shape: ", shape[1])
+	// println("shape: ", shape[1])
 
 	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
 
@@ -119,7 +119,7 @@ func (t *Tensor[T]) GetBytes() int {
 
 	bytes *= int(t.C_tensor.dl_tensor.dtype.bits) / 8
 
-	println("bytes: " + strconv.Itoa(bytes))
+	// println("bytes: " + strconv.Itoa(bytes))
 
 	return bytes
 }
@@ -162,11 +162,11 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	}
 	// CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(bytes)))
 
-	println("device data pointer (after allocation):")
-	println(DeviceDataPointer)
-	println(&DeviceDataPointer)
-	println("bytes:")
-	println(bytes)
+	// println("device data pointer (after allocation):")
+	// println(DeviceDataPointer)
+	// println(&DeviceDataPointer)
+	// println("bytes:")
+	// println(bytes)
 	// bytes = 0
 
 	err = CheckCuda(
@@ -182,7 +182,7 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	}
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
 	t.C_tensor.dl_tensor.data = DeviceDataPointer
-	println("normal transfer done")
+	// println("normal transfer done")
 
 	return t, nil
 
@@ -253,14 +253,14 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 	var NewDeviceDataPointer unsafe.Pointer
 	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
 	// var deviceData *C.void = nil
-	println("host data location:")
-	println(t.C_tensor.dl_tensor.data)
-	println("device data pointer:")
-	println(NewDeviceDataPointer)
-	println("host data location:")
-	println(t.C_tensor.dl_tensor.data)
+	// println("host data location:")
+	// println(t.C_tensor.dl_tensor.data)
+	// println("device data pointer:")
+	// println(NewDeviceDataPointer)
+	// println("host data location:")
+	// println(t.C_tensor.dl_tensor.data)
 
-	println("new alloc:" + strconv.Itoa(int(bytes+newDataSize)))
+	// println("new alloc:" + strconv.Itoa(int(bytes+newDataSize)))
 
 	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &NewDeviceDataPointer, C.size_t(bytes+newDataSize))))
 	if err != nil {
@@ -315,7 +315,7 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	bytes := t.GetBytes()
 
-	println("to host bytes: " + strconv.Itoa(bytes))
+	// println("to host bytes: " + strconv.Itoa(bytes))
 
 	addr := (C.malloc(C.size_t(bytes)))
 
@@ -355,7 +355,7 @@ func (t *Tensor[T]) GetArray() ([][]T, error) {
 	// shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
 
 	data_flat := unsafe.Slice((*T)(t.C_tensor.dl_tensor.data), t.shape[0]*t.shape[1])
-	println("got flat data")
+	// println("got flat data")
 	data := make([][]T, t.shape[0])
 	for i := range data {
 		data[i] = make([]T, t.shape[1])
