@@ -42,7 +42,6 @@ namespace cuvs::neighbors::cagra::detail::single_cta_search {
     size_t small_hash_reset_interval,                                         \
     uint32_t num_seeds,                                                       \
     SampleFilterT sample_filter,                                              \
-    cuvs::distance::DistanceType metric,                                      \
     cudaStream_t stream);
 
 }  // namespace cuvs::neighbors::cagra::detail::single_cta_search

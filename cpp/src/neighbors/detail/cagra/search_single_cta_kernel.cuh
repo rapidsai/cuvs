@@ -41,7 +41,6 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
                     size_t small_hash_reset_interval,
                     uint32_t num_seeds,
                     SampleFilterT sample_filter,
-                    cuvs::distance::DistanceType metric,
                     cudaStream_t stream);
 
 }

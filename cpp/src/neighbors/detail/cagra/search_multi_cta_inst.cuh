@@ -41,7 +41,6 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
     uint32_t num_cta_per_query,                                               \
     uint32_t num_seeds,                                                       \
     SampleFilterT sample_filter,                                              \
-    cuvs::distance::DistanceType metric,                                      \
     cudaStream_t stream);
 
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search

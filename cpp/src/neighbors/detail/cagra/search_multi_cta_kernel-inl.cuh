@@ -154,8 +154,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
-  SAMPLE_FILTER_T sample_filter,
-  const cuvs::distance::DistanceType metric)
+  SAMPLE_FILTER_T sample_filter)
 {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -236,7 +235,6 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
                                            num_seeds,
                                            local_visited_hashmap_ptr,
                                            hash_bitlen,
-                                           metric,
                                            block_id,
                                            num_blocks);
   __syncthreads();
@@ -277,8 +275,7 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
                                             hash_bitlen,
                                             parent_indices_buffer,
                                             result_indices_buffer,
-                                            search_width,
-                                            metric);
+                                            search_width);
     _CLK_REC(clk_compute_distance);
     __syncthreads();
 
@@ -434,7 +431,6 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
                     uint32_t num_cta_per_query,
                     uint32_t num_seeds,
                     SampleFilterT sample_filter,
-                    cuvs::distance::DistanceType metric,
                     cudaStream_t stream)
 {
   auto kernel =
@@ -473,8 +469,7 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
                                                        ps.min_iterations,
                                                        ps.max_iterations,
                                                        num_executed_iterations,
-                                                       sample_filter,
-                                                       metric);
+                                                       sample_filter);
 }
 
 }  // namespace multi_cta_search

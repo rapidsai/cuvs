@@ -97,9 +97,8 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
          int64_t graph_degree,
-         uint32_t topk,
-         cuvs::distance::DistanceType metric)
-    : base_type(res, params, dataset_desc, dim, graph_degree, topk, metric)
+         uint32_t topk)
+    : base_type(res, params, dataset_desc, dim, graph_degree, topk)
   {
     set_params(res);
   }
@@ -238,7 +237,6 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
                    small_hash_reset_interval,
                    num_seeds,
                    sample_filter,
-                   this->metric,
                    stream);
   }
 };

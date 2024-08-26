@@ -69,6 +69,8 @@ search_types = dict(
     half_uint64=("half", "uint64_t", "float"),
 )
 
+metric_prefix = 'cuvs::distance::DistanceType::'
+
 specs = []
 descs = []
 cmake_list = []
@@ -86,43 +88,45 @@ for f in glob.glob("compute_distance_vpq_*.cu"):
 for type_path, (data_t, idx_t, distance_t) in search_types.items():
     for (mxdim, team) in mxdim_team:
         # CAGRA
-        path = f"compute_distance_standard_{type_path}_dim{mxdim}_t{team}.cu"
-        includes = '#include "compute_distance_standard.cuh"'
-        params = f"{team}, {mxdim}, {data_t}, {idx_t}, {distance_t}"
-        spec = f"standard_descriptor_spec<{params}>"
-        desc = f"standard_dataset_descriptor_t<{params}>"
-        content = f"""
+        for metric in ['L2Expanded', 'InnerProduct']:
+            path = f"compute_distance_standard_{metric}_{type_path}_dim{mxdim}_t{team}.cu"
+            includes = '#include "compute_distance_standard.cuh"'
+            params = f"{metric_prefix}{metric}, {team}, {mxdim}, {data_t}, {idx_t}, {distance_t}"
+            spec = f"standard_descriptor_spec<{params}>"
+            desc = f"standard_dataset_descriptor_t<{params}>"
+            content = f"""
 template struct {desc};
 template <>
 const void* {spec}::init_kernel = reinterpret_cast<const void*>(&standard_dataset_descriptor_init_kernel<{params}>);
 template struct {spec};
 """
-        descs.append(desc)
-        specs.append(spec)
-        with open(path, "w") as f:
-            f.write(template.format(includes=includes, content=content))
-            cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
+            descs.append(desc)
+            specs.append(spec)
+            with open(path, "w") as f:
+                f.write(template.format(includes=includes, content=content))
+                cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
         # CAGRA-Q
         for code_book_t in code_book_types:
             for pq_len in pq_lens:
                 for pq_bit in pq_bits:
-                    path = f"compute_distance_vpq_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
-                    includes = '#include "compute_distance_vpq.cuh"'
-                    params = f"{team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}"
-                    spec = f"vpq_descriptor_spec<{params}>"
-                    desc = f"cagra_q_dataset_descriptor_t<{params}>"
-                    content = f"""
+                    for metric in ['L2Expanded']:
+                        path = f"compute_distance_vpq_{metric}_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
+                        includes = '#include "compute_distance_vpq.cuh"'
+                        params = f"{metric_prefix}{metric}, {team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}"
+                        spec = f"vpq_descriptor_spec<{params}>"
+                        desc = f"cagra_q_dataset_descriptor_t<{params}>"
+                        content = f"""
 template struct {desc};
 template <>
 const void* {spec}::init_kernel = reinterpret_cast<const void*>(&vpq_dataset_descriptor_init_kernel<{params}>);
 template struct {spec};
 """
-                    descs.append(desc)
-                    specs.append(spec)
-                    with open(path, "w") as f:
-                        f.write(template.format(includes=includes, content=content))
-                        cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
+                        descs.append(desc)
+                        specs.append(spec)
+                        with open(path, "w") as f:
+                            f.write(template.format(includes=includes, content=content))
+                            cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
 with open("compute_distance-ext.cuh", "w") as f:
     includes = '''
@@ -145,14 +149,15 @@ using descriptor_instances =
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,
                              const DatasetT& dataset,
+                             cuvs::distance::DistanceType metric,
                              rmm::cuda_stream_view stream)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {{
-  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset);
+  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric);
   if (init == nullptr || priority < 0) {{
     RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
   }}
-  return init(params, dataset, stream);
+  return init(params, dataset, metric, stream);
 }}
 '''
     f.write(template.format(includes=includes, content=contents))

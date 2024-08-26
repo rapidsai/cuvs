@@ -105,8 +105,7 @@ RAFT_KERNEL random_pickup_kernel(
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldr]
   const std::uint32_t ldr,                                                // (*) ldr >= num_pickup
   typename DATASET_DESCRIPTOR_T::INDEX_T* const visited_hashmap_ptr,  // [num_queries, 1 << bitlen]
-  const std::uint32_t hash_bitlen,
-  const cuvs::distance::DistanceType metric)
+  const std::uint32_t hash_bitlen)
 {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -133,7 +132,7 @@ RAFT_KERNEL random_pickup_kernel(
         device::xorshift64((global_team_index ^ rand_xor_mask) * (i + 1)) % dataset_desc->size;
     }
 
-    DISTANCE_T norm2 = dataset_desc->compute_distance(seed_index, metric, true);
+    DISTANCE_T norm2 = dataset_desc->compute_distance(seed_index, true);
     if (norm2 < best_norm2_team_local) {
       best_norm2_team_local = norm2;
       best_index_team_local = seed_index;
@@ -168,7 +167,6 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
                    std::size_t ldr,                  // (*) ldr >= num_pickup
                    IndexT* visited_hashmap_ptr,      // [num_queries, 1 << bitlen]
                    std::uint32_t hash_bitlen,
-                   cuvs::distance::DistanceType metric,
                    cudaStream_t cuda_stream)
 {
   const auto block_size                = 256u;
@@ -188,8 +186,7 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
     result_distances_ptr,
     ldr,
     visited_hashmap_ptr,
-    hash_bitlen,
-    metric);
+    hash_bitlen);
 }
 
 template <class INDEX_T>
@@ -314,8 +311,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   typename DATASET_DESCRIPTOR_T::INDEX_T* const result_indices_ptr,       // [num_queries, ldd]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, ldd]
   const std::uint32_t ldd,  // (*) ldd >= search_width * graph_degree
-  SAMPLE_FILTER_T sample_filter,
-  const cuvs::distance::DistanceType metric)
+  SAMPLE_FILTER_T sample_filter)
 {
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
@@ -354,7 +350,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const auto compute_distance_flag = hashmap::insert<INDEX_T>(
     team_size, visited_hashmap_ptr + (ldb * blockIdx.y), hash_bitlen, child_id);
 
-  DISTANCE_T norm2 = dataset_desc->compute_distance(child_id, metric, compute_distance_flag);
+  DISTANCE_T norm2 = dataset_desc->compute_distance(child_id, compute_distance_flag);
 
   if (compute_distance_flag) {
     if (threadIdx.x % team_size == 0) {
@@ -398,7 +394,6 @@ void compute_distance_to_child_nodes(
   DistanceT* result_distances_ptr,  // [num_queries, ldd]
   std::uint32_t ldd,                // (*) ldd >= search_width * graph_degree
   SAMPLE_FILTER_T sample_filter,
-  cuvs::distance::DistanceType metric,
   cudaStream_t cuda_stream)
 {
   const auto block_size      = 128;
@@ -423,8 +418,7 @@ void compute_distance_to_child_nodes(
                                                           result_indices_ptr,
                                                           result_distances_ptr,
                                                           ldd,
-                                                          sample_filter,
-                                                          metric);
+                                                          sample_filter);
 }
 
 template <class INDEX_T>
@@ -632,9 +626,8 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
          int64_t graph_degree,
-         uint32_t topk,
-         cuvs::distance::DistanceType metric)
-    : base_type(res, params, dataset_desc, dim, graph_degree, topk, metric),
+         uint32_t topk)
+    : base_type(res, params, dataset_desc, dim, graph_degree, topk),
       result_indices(0, raft::resource::get_cuda_stream(res)),
       result_distances(0, raft::resource::get_cuda_stream(res)),
       parent_node_list(0, raft::resource::get_cuda_stream(res)),
@@ -807,7 +800,6 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
                                             result_buffer_allocation_size,
                                             hashmap.data(),
                                             hash_bitlen,
-                                            this->metric,
                                             stream);
 
     unsigned iter = 0;
@@ -877,7 +869,6 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
         result_distances.data() + itopk_size,
         result_buffer_allocation_size,
         sample_filter,
-        this->metric,
         stream);
 
       iter++;

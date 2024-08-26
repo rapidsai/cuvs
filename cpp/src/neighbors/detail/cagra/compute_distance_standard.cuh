@@ -28,8 +28,25 @@
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
+namespace {
+template <typename T, cuvs::distance::DistanceType Metric>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(T a, T b)
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::L2Expanded, T>
+{
+  T diff = a - b;
+  return diff * diff;
+}
 
-template <uint32_t TeamSize,
+template <typename T, cuvs::distance::DistanceType Metric>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(T a, T b)
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct, T>
+{
+  return -a * b;
+}
+}  // namespace
+
+template <cuvs::distance::DistanceType Metric,
+          uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
@@ -46,6 +63,7 @@ struct alignas(device::LOAD_128BIT_T) standard_dataset_descriptor_t
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
   using typename base_type::setup_workspace_type;
+  constexpr static inline auto kMetric          = Metric;
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
 
@@ -118,7 +136,6 @@ template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   const typename DescriptorT::base_type* desc_,
   const typename DescriptorT::INDEX_T dataset_index,
-  const cuvs::distance::DistanceType metric,
   const bool valid) -> typename DescriptorT::DISTANCE_T
 {
   using DATA_T                    = typename DescriptorT::DATA_T;
@@ -160,16 +177,8 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
           // - The data buffer has to be also padded with zeros.
           DISTANCE_T d;
           raft::lds(d, query_ptr + device::swizzling(k + v));
-          constexpr cuvs::spatial::knn::detail::utils::mapping<float> mapping{};
-          switch (metric) {
-            case cuvs::distance::DistanceType::L2Expanded:
-              d -= mapping(dl_buff[e].val.data[v]);
-              norm2 += d * d;
-              break;
-            case cuvs::distance::DistanceType::InnerProduct:
-              norm2 -= d * mapping(dl_buff[e].val.data[v]);
-              break;
-          }
+          norm2 += dist_op<DISTANCE_T, DescriptorT::kMetric>(
+            d, cuvs::spatial::knn::detail::utils::mapping<DISTANCE_T>{}(dl_buff[e].val.data[v]));
         }
       }
     }
@@ -181,7 +190,8 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   return norm2;
 }
 
-template <uint32_t TeamSize,
+template <cuvs::distance::DistanceType Metric,
+          uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
@@ -194,7 +204,7 @@ __launch_bounds__(1, 1) __global__ void standard_dataset_descriptor_init_kernel(
   uint32_t ld)
 {
   using desc_type =
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   new (out) desc_type(&setup_workspace_standard<desc_type>,
                       &compute_distance_standard<desc_type>,
                       ptr,
@@ -203,7 +213,8 @@ __launch_bounds__(1, 1) __global__ void standard_dataset_descriptor_init_kernel(
                       ld);
 }
 
-template <uint32_t TeamSize,
+template <cuvs::distance::DistanceType Metric,
+          uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           typename DataT,
           typename IndexT,
@@ -222,12 +233,13 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
   }
 
   using descriptor_type =
-    standard_dataset_descriptor_t<TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
+    standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   static const void* init_kernel;
 
   template <typename DatasetT>
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
+                   cuvs::distance::DistanceType metric,
                    rmm::cuda_stream_view stream) -> host_type
   {
     descriptor_type dd_host{nullptr,
@@ -244,10 +256,13 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
   }
 
   template <typename DatasetT>
-  static auto priority(const cagra::search_params& params, const DatasetT& dataset) -> double
+  static auto priority(const cagra::search_params& params,
+                       const DatasetT& dataset,
+                       cuvs::distance::DistanceType metric) -> double
   {
     // If explicit team_size is specified and doesn't match the instance, discard it
     if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
+    if (Metric != metric) { return -1.0; }
     // Otherwise, favor the closest dataset dimensionality.
     return 1.0 / (0.1 + std::abs(double(dataset.dim()) - double(DatasetBlockDim)));
   }

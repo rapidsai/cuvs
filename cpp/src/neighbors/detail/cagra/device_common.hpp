@@ -84,7 +84,6 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const uint32_t num_seeds,
   IndexT* __restrict__ visited_hash_ptr,
   const uint32_t hash_bitlen,
-  const cuvs::distance::DistanceType metric,
   const uint32_t block_id   = 0,
   const uint32_t num_blocks = 1)
 {
@@ -112,7 +111,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         }
       }
 
-      auto norm2 = dataset_desc.compute_distance(seed_index, metric, valid_i);
+      auto norm2 = dataset_desc.compute_distance(seed_index, valid_i);
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;
@@ -147,8 +146,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const uint32_t hash_bitlen,
   const IndexT* __restrict__ parent_indices,
   const IndexT* __restrict__ internal_topk_list,
-  const uint32_t search_width,
-  const cuvs::distance::DistanceType metric)
+  const uint32_t search_width)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
   constexpr IndexT invalid_index    = raft::upper_bound<IndexT>();
@@ -183,7 +181,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     IndexT child_id    = invalid_index;
     if (valid_i) { child_id = result_child_indices_ptr[i]; }
 
-    auto norm2 = dataset_desc.compute_distance(child_id, metric, child_id != invalid_index);
+    auto norm2 = dataset_desc.compute_distance(child_id, child_id != invalid_index);
 
     // Store the distance
     const unsigned lane_id = threadIdx.x % team_size;

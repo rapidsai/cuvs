@@ -103,9 +103,8 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
          int64_t graph_degree,
-         uint32_t topk,
-         cuvs::distance::DistanceType metric)
-    : base_type(res, params, dataset_desc, dim, graph_degree, topk, metric),
+         uint32_t topk)
+    : base_type(res, params, dataset_desc, dim, graph_degree, topk),
       intermediate_indices(0, raft::resource::get_cuda_stream(res)),
       intermediate_distances(0, raft::resource::get_cuda_stream(res)),
       topk_workspace(0, raft::resource::get_cuda_stream(res))
@@ -228,7 +227,6 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
                    num_cta_per_query,
                    num_seeds,
                    sample_filter,
-                   this->metric,
                    stream);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 

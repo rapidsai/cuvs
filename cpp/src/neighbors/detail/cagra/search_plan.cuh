@@ -38,13 +38,8 @@ struct search_plan_impl_base : public search_params {
   int64_t dim;
   int64_t graph_degree;
   uint32_t topk;
-  cuvs::distance::DistanceType metric;
-  search_plan_impl_base(search_params params,
-                        int64_t dim,
-                        int64_t graph_degree,
-                        uint32_t topk,
-                        cuvs::distance::DistanceType metric)
-    : search_params(params), dim(dim), graph_degree(graph_degree), topk(topk), metric(metric)
+  search_plan_impl_base(search_params params, int64_t dim, int64_t graph_degree, uint32_t topk)
+    : search_params(params), dim(dim), graph_degree(graph_degree), topk(topk)
   {
     if (algo == search_algo::AUTO) {
       const size_t num_sm = raft::getMultiProcessorCount();
@@ -90,9 +85,8 @@ struct search_plan_impl : public search_plan_impl_base {
                    const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                    int64_t dim,
                    int64_t graph_degree,
-                   uint32_t topk,
-                   cuvs::distance::DistanceType metric)
-    : search_plan_impl_base(params, dim, graph_degree, topk, metric),
+                   uint32_t topk)
+    : search_plan_impl_base(params, dim, graph_degree, topk),
       hashmap(0, raft::resource::get_cuda_stream(res)),
       num_executed_iterations(0, raft::resource::get_cuda_stream(res)),
       dev_seed(0, raft::resource::get_cuda_stream(res)),

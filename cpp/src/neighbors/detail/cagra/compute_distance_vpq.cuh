@@ -23,7 +23,8 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <uint32_t TeamSize,
+template <cuvs::distance::DistanceType Metric,
+          uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PQ_BITS,
           uint32_t PQ_LEN,
@@ -44,6 +45,7 @@ struct alignas(device::LOAD_128BIT_T) cagra_q_dataset_descriptor_t
   using typename base_type::DISTANCE_T;
   using typename base_type::INDEX_T;
   using typename base_type::setup_workspace_type;
+  constexpr static inline auto kMetric          = Metric;
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
@@ -174,7 +176,6 @@ template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   const typename DescriptorT::base_type* desc_,
   const typename DescriptorT::INDEX_T dataset_index,
-  const cuvs::distance::DistanceType /* only L2 metric is implemented */,
   const bool valid) -> typename DescriptorT::DISTANCE_T
 {
   using DATA_T                   = typename DescriptorT::DATA_T;
@@ -302,7 +303,8 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   return norm;
 }
 
-template <uint32_t TeamSize,
+template <cuvs::distance::DistanceType Metric,
+          uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PqBits,
           uint32_t PqLen,
@@ -320,7 +322,8 @@ __launch_bounds__(1, 1) __global__
                                           std::size_t size,
                                           std::uint32_t dim)
 {
-  using desc_type = cagra_q_dataset_descriptor_t<TeamSize,
+  using desc_type = cagra_q_dataset_descriptor_t<Metric,
+                                                 TeamSize,
                                                  DatasetBlockDim,
                                                  PqBits,
                                                  PqLen,
@@ -339,7 +342,8 @@ __launch_bounds__(1, 1) __global__
                       dim);
 }
 
-template <uint32_t TeamSize,
+template <cuvs::distance::DistanceType Metric,
+          uint32_t TeamSize,
           uint32_t DatasetBlockDim,
           uint32_t PqBits,
           uint32_t PqLen,
@@ -368,7 +372,8 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
     return false;
   }
 
-  using descriptor_type = cagra_q_dataset_descriptor_t<TeamSize,
+  using descriptor_type = cagra_q_dataset_descriptor_t<Metric,
+                                                       TeamSize,
                                                        DatasetBlockDim,
                                                        PqBits,
                                                        PqLen,
@@ -381,6 +386,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   template <typename DatasetT>
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
+                   cuvs::distance::DistanceType metric,
                    rmm::cuda_stream_view stream) -> host_type
   {
     descriptor_type dd_host{nullptr,
@@ -407,10 +413,13 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   }
 
   template <typename DatasetT>
-  static auto priority(const cagra::search_params& params, const DatasetT& dataset) -> double
+  static auto priority(const cagra::search_params& params,
+                       const DatasetT& dataset,
+                       cuvs::distance::DistanceType metric) -> double
   {
     // If explicit team_size is specified and doesn't match the instance, discard it
     if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
+    if (cuvs::distance::DistanceType::L2Expanded != metric) { return -1.0; }
     // Match codebook params
     if (dataset.pq_bits() != PqBits) { return -1.0; }
     if (dataset.pq_len() != PqLen) { return -1.0; }
