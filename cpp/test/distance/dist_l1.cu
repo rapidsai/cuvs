@@ -20,8 +20,9 @@
 namespace cuvs {
 namespace distance {
 
-template <typename DataType>
-class DistanceUnexpL1 : public DistanceTest<cuvs::distance::DistanceType::L1, DataType> {};
+template <typename DataType, typename OutputType = DataType>
+class DistanceUnexpL1
+  : public DistanceTest<cuvs::distance::DistanceType::L1, DataType, OutputType> {};
 
 const std::vector<DistanceInputs<float>> inputsf = {
   {0.001f, 1024, 1024, 32, true, 1234ULL},
@@ -62,6 +63,26 @@ TEST_P(DistanceUnexpL1D, Result)
     dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<double>(params.tolerance), stream));
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceUnexpL1D, ::testing::ValuesIn(inputsd));
+
+const std::vector<DistanceInputs<half, float>> inputsh = {
+  {0.001f, 1024, 1024, 32, true, 1234ULL},
+  {0.001f, 1024, 32, 1024, true, 1234ULL},
+  {0.001f, 32, 1024, 1024, true, 1234ULL},
+  {0.003f, 1024, 1024, 1024, true, 1234ULL},
+  {0.001f, 1024, 1024, 32, false, 1234ULL},
+  {0.001f, 1024, 32, 1024, false, 1234ULL},
+  {0.001f, 32, 1024, 1024, false, 1234ULL},
+  {0.003f, 1024, 1024, 1024, false, 1234ULL},
+};
+typedef DistanceUnexpL1<half, float> DistanceUnexpL1H;
+TEST_P(DistanceUnexpL1H, Result)
+{
+  int m = params.isRowMajor ? params.m : params.n;
+  int n = params.isRowMajor ? params.n : params.m;
+  ASSERT_TRUE(cuvs::devArrMatch(
+    dist_ref.data(), dist.data(), m, n, cuvs::CompareApprox<float>(params.tolerance), stream));
+}
+INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceUnexpL1H, ::testing::ValuesIn(inputsh));
 
 class BigMatrixUnexpL1 : public BigMatrixDistanceTest<cuvs::distance::DistanceType::L1> {};
 TEST_F(BigMatrixUnexpL1, Result) {}
