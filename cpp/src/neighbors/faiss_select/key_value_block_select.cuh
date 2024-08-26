@@ -14,7 +14,7 @@
 // because this will change the max k that can be processed. One solution might be to break
 // up k into multiple batches for larger k.
 
-namespace cuvs::neighbors::detail::faiss_select {
+namespace cuvs::neighbors::ball_cover::detail::faiss_select {
 
 // `Dir` true, produce largest values.
 // `Dir` false, produce smallest values.
@@ -226,4 +226,4 @@ struct KeyValueBlockSelect {
   int kMinus1;
 };
 
-}  // namespace cuvs::neighbors::detail::faiss_select
+}  // namespace cuvs::neighbors::ball_cover::detail::faiss_select

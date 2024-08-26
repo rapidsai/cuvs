@@ -13,7 +13,7 @@
 #include <raft/core/kvp.hpp>
 #include <raft/util/cuda_utils.cuh>
 
-namespace cuvs::neighbors::detail::faiss_select {
+namespace cuvs::neighbors::ball_cover::detail::faiss_select {
 
 // Specialization for block-wide monotonic merges producing a merge sort
 // since what we really want is a constexpr loop expansion
@@ -566,4 +566,4 @@ struct WarpSelect<K, V, Dir, Comp, 1, NumThreadQ, ThreadsPerBlock> {
   V threadV;
 };
 
-}  // namespace cuvs::neighbors::detail::faiss_select
+}  // namespace cuvs::neighbors::ball_cover::detail::faiss_select

@@ -23,7 +23,7 @@
 
 #include <cstdint>  // uint32_t
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors::ball_cover::detail {
 
 template <typename value_idx,
           typename value_t,
@@ -99,11 +99,11 @@ void rbc_eps_pass(
   value_idx* adj_ja,
   value_idx* vd) RAFT_EXPLICIT;
 
-};  // namespace cuvs::neighbors::detail
+};  // namespace cuvs::neighbors::ball_cover::detail
 
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(                                \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdims, Mdist_func)                            \
-  extern template void cuvs::neighbors::detail::                                               \
+  extern template void cuvs::neighbors::ball_cover::detail::                                   \
     rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdims>(                \
       raft::resources const& handle,                                                           \
       const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
@@ -121,7 +121,7 @@ void rbc_eps_pass(
 
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(                                \
   Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdims, Mdist_func)                            \
-  extern template void cuvs::neighbors::detail::                                               \
+  extern template void cuvs::neighbors::ball_cover::detail::                                   \
     rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdims>(                \
       raft::resources const& handle,                                                           \
       const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
@@ -137,64 +137,128 @@ void rbc_eps_pass(
       float weight,                                                                            \
       Mvalue_int* dists_counter)
 
-#define instantiate_cuvs_neighbors_detail_rbc_eps_pass(                                      \
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                                 \
-  extern template void                                                                       \
-  cuvs::neighbors::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(      \
-    raft::resources const& handle,                                                           \
-    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
-      index,                                                                                 \
-    const Mvalue_t* query,                                                                   \
-    const Mvalue_int n_query_rows,                                                           \
-    Mvalue_t eps,                                                                            \
-    const Mvalue_t* R_dists,                                                                 \
-    Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
-    bool* adj,                                                                               \
-    Mvalue_idx* vd);                                                                         \
-                                                                                             \
-  extern template void                                                                       \
-  cuvs::neighbors::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(      \
-    raft::resources const& handle,                                                           \
-    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
-      index,                                                                                 \
-    const Mvalue_t* query,                                                                   \
-    const Mvalue_int n_query_rows,                                                           \
-    Mvalue_t eps,                                                                            \
-    Mvalue_int* max_k,                                                                       \
-    const Mvalue_t* R_dists,                                                                 \
-    Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
-    Mvalue_idx* adj_ia,                                                                      \
-    Mvalue_idx* adj_ja,                                                                      \
-    Mvalue_idx* vd);
+#define instantiate_cuvs_neighbors_detail_rbc_eps_pass(                                        \
+  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                                   \
+  extern template void cuvs::neighbors::ball_cover::detail::                                   \
+    rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(                               \
+      raft::resources const& handle,                                                           \
+      const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
+        index,                                                                                 \
+      const Mvalue_t* query,                                                                   \
+      const Mvalue_int n_query_rows,                                                           \
+      Mvalue_t eps,                                                                            \
+      const Mvalue_t* R_dists,                                                                 \
+      Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
+      bool* adj,                                                                               \
+      Mvalue_idx* vd);                                                                         \
+                                                                                               \
+  extern template void cuvs::neighbors::ball_cover::detail::                                   \
+    rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(                               \
+      raft::resources const& handle,                                                           \
+      const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
+        index,                                                                                 \
+      const Mvalue_t* query,                                                                   \
+      const Mvalue_int n_query_rows,                                                           \
+      Mvalue_t eps,                                                                            \
+      Mvalue_int* max_k,                                                                       \
+      const Mvalue_t* R_dists,                                                                 \
+      Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
+      Mvalue_idx* adj_ia,                                                                      \
+      Mvalue_idx* adj_ja,                                                                      \
+      Mvalue_idx* vd);
 
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::int64_t, std::int64_t, 2, cuvs::neighbors::detail::HaversineFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  2,
+  cuvs::neighbors::ball_cover::detail::HaversineFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::int64_t, std::int64_t, 3, cuvs::neighbors::detail::HaversineFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  3,
+  cuvs::neighbors::ball_cover::detail::HaversineFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::int64_t, std::int64_t, 2, cuvs::neighbors::detail::EuclideanFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  2,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::int64_t, std::int64_t, 3, cuvs::neighbors::detail::EuclideanFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  3,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::int64_t, std::int64_t, 2, cuvs::neighbors::detail::DistFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  2,
+  cuvs::neighbors::ball_cover::detail::DistFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t, float, std::int64_t, std::int64_t, 3, cuvs::neighbors::detail::DistFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  3,
+  cuvs::neighbors::ball_cover::detail::DistFunc);
 
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::int64_t, std::int64_t, 2, cuvs::neighbors::detail::HaversineFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  2,
+  cuvs::neighbors::ball_cover::detail::HaversineFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::int64_t, std::int64_t, 3, cuvs::neighbors::detail::HaversineFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  3,
+  cuvs::neighbors::ball_cover::detail::HaversineFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::int64_t, std::int64_t, 2, cuvs::neighbors::detail::EuclideanFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  2,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::int64_t, std::int64_t, 3, cuvs::neighbors::detail::EuclideanFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  3,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::int64_t, std::int64_t, 2, cuvs::neighbors::detail::DistFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  2,
+  cuvs::neighbors::ball_cover::detail::DistFunc);
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(
-  std::int64_t, float, std::int64_t, std::int64_t, 3, cuvs::neighbors::detail::DistFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  3,
+  cuvs::neighbors::ball_cover::detail::DistFunc);
 
 instantiate_cuvs_neighbors_detail_rbc_eps_pass(
-  std::int64_t, float, std::int64_t, std::int64_t, cuvs::neighbors::detail::EuclideanSqFunc);
+  std::int64_t,
+  float,
+  std::int64_t,
+  std::int64_t,
+  cuvs::neighbors::ball_cover::detail::EuclideanSqFunc);
 
 #undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two
 #undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one

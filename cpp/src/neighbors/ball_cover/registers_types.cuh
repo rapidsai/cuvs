@@ -20,7 +20,7 @@
 
 #include <cstdint>  // uint32_t
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors::ball_cover::detail {
 
 template <typename value_t, typename value_int = std::uint32_t>
 struct DistFunc {
@@ -38,7 +38,7 @@ struct HaversineFunc : public DistFunc<value_t, value_int> {
                                                          const value_t* b,
                                                          const value_int n_dims) override
   {
-    return cuvs::neighbors::detail::compute_haversine(a[0], b[0], a[1], b[1]);
+    return cuvs::neighbors::detail::compute_haversine<value_t, value_t>(a[0], b[0], a[1], b[1]);
   }
 };
 
@@ -73,4 +73,4 @@ struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
   }
 };
 
-};  // namespace cuvs::neighbors::detail
+};  // namespace cuvs::neighbors::ball_cover::detail

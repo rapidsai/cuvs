@@ -24,7 +24,7 @@
 
 #include <cstdint>
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors::ball_cover::detail {
 
 struct NNComp {
   template <typename one, typename two>
@@ -66,4 +66,4 @@ __device__ inline bool _get_val(std::uint32_t* arr, std::uint32_t h)
   return (arr[idx] & (1 << bit)) > 0;
 }
 
-};  // namespace cuvs::neighbors::detail
+};  // namespace cuvs::neighbors::ball_cover::detail

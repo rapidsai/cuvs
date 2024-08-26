@@ -11,7 +11,7 @@
 #include "StaticUtils.h"
 #include <raft/util/cuda_utils.cuh>
 
-namespace cuvs::neighbors::detail::faiss_select {
+namespace cuvs::neighbors::ball_cover::detail::faiss_select {
 
 //
 // This file contains functions to:
@@ -516,4 +516,4 @@ inline __device__ void warpSortAnyRegisters(K k[N], V v[N])
   BitonicSortStep<K, V, N, Dir, Comp>::sort(k, v);
 }
 
-}  // namespace cuvs::neighbors::detail::faiss_select
+}  // namespace cuvs::neighbors::ball_cover::detail::faiss_select

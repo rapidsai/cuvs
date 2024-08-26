@@ -15,10 +15,8 @@
  */
 #pragma once
 
-#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
+#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
 #include "registers-inl.cuh"
 #endif
 
-#ifdef RAFT_COMPILED
 #include "registers-ext.cuh"
-#endif

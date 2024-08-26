@@ -34,7 +34,7 @@
 
 #include <cstdint>
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors::ball_cover::detail {
 
 /**
  * To find exact neighbors, we perform a post-processing stage
@@ -181,7 +181,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
     local_x_ptr[j] = x_ptr[j];
   }
 
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using namespace cuvs::neighbors::ball_cover::detail::faiss_select;
   KeyValueBlockSelect<value_t, value_idx, false, Comparator<value_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<value_t>::max(),
     std::numeric_limits<value_t>::max(),
@@ -345,7 +345,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
   }
 
   // Each warp works on 1 R
-  using namespace cuvs::neighbors::detail::faiss_select;
+  using namespace cuvs::neighbors::ball_cover::detail::faiss_select;
   KeyValueBlockSelect<value_t, value_idx, false, Comparator<value_t>, warp_q, thread_q, tpb> heap(
     std::numeric_limits<value_t>::max(),
     std::numeric_limits<value_t>::max(),
@@ -1627,4 +1627,4 @@ void rbc_eps_pass(
   raft::resource::sync_stream(handle);
 }
 
-};  // namespace cuvs::neighbors::detail
+};  // namespace cuvs::neighbors::ball_cover::detail

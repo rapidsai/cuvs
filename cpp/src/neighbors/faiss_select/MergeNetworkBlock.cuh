@@ -12,7 +12,7 @@
 
 #include <cuda.h>
 
-namespace cuvs::neighbors::detail::faiss_select {
+namespace cuvs::neighbors::ball_cover::detail::faiss_select {
 
 // Merge pairs of lists smaller than blockDim.x (NumThreads)
 template <int NumThreads,
@@ -274,4 +274,4 @@ inline __device__ void blockMerge(K* listK, V* listV)
   BlockMerge<NumThreads, K, V, N, L, Dir, Comp, kSmallerThanBlock, FullMerge>::merge(listK, listV);
 }
 
-}  // namespace cuvs::neighbors::detail::faiss_select
+}  // namespace cuvs::neighbors::ball_cover::detail::faiss_select

@@ -50,7 +50,7 @@
 
 #include <cstdint>
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::neighbors::ball_cover::detail {
 
 /**
  * Given a set of points in row-major order which are to be
@@ -208,7 +208,8 @@ void k_closest_landmarks(
     bfknn,
     raft::make_device_matrix_view(query_pts, n_query_pts, inputs.extent(1)),
     raft::make_device_matrix_view(R_knn_inds, n_query_pts, k),
-    raft::make_device_matrix_view(R_knn_dists, n_query_pts, k));
+    raft::make_device_matrix_view(R_knn_dists, n_query_pts, k),
+    std::nullopt);
 }
 
 /**
@@ -715,4 +716,4 @@ void rbc_eps_nn_query(
                            vd);
 }
 
-};  // namespace cuvs::neighbors::detail
+};  // namespace cuvs::neighbors::ball_cover::detail

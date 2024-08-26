@@ -63,12 +63,12 @@ void build_index(raft::resources const& handle,
                  cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index)
 {
   if (index.metric == cuvs::distance::DistanceType::Haversine) {
-    cuvs::neighbors::detail::rbc_build_index(
-      handle, index, cuvs::neighbors::detail::HaversineFunc<value_t, int_t>());
+    cuvs::neighbors::ball_cover::detail::rbc_build_index(
+      handle, index, cuvs::neighbors::ball_cover::detail::HaversineFunc<value_t, int_t>());
   } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
              index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
-    cuvs::neighbors::detail::rbc_build_index(
-      handle, index, cuvs::neighbors::detail::EuclideanFunc<value_t, int_t>());
+    cuvs::neighbors::ball_cover::detail::rbc_build_index(
+      handle, index, cuvs::neighbors::ball_cover::detail::EuclideanFunc<value_t, int_t>());
   } else {
     RAFT_FAIL("Metric not support");
   }
@@ -117,24 +117,24 @@ void all_knn_query(raft::resources const& handle,
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
   if (index.metric == cuvs::distance::DistanceType::Haversine) {
-    cuvs::neighbors::detail::rbc_all_knn_query(
+    cuvs::neighbors::ball_cover::detail::rbc_all_knn_query(
       handle,
       index,
       k,
       inds,
       dists,
-      cuvs::neighbors::detail::HaversineFunc<value_t, int_t>(),
+      cuvs::neighbors::ball_cover::detail::HaversineFunc<value_t, int_t>(),
       perform_post_filtering,
       weight);
   } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
              index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
-    cuvs::neighbors::detail::rbc_all_knn_query(
+    cuvs::neighbors::ball_cover::detail::rbc_all_knn_query(
       handle,
       index,
       k,
       inds,
       dists,
-      cuvs::neighbors::detail::EuclideanFunc<value_t, int_t>(),
+      cuvs::neighbors::ball_cover::detail::EuclideanFunc<value_t, int_t>(),
       perform_post_filtering,
       weight);
   } else {
@@ -266,28 +266,30 @@ void knn_query(raft::resources const& handle,
 {
   ASSERT(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
   if (index.metric == cuvs::distance::DistanceType::Haversine) {
-    cuvs::neighbors::detail::rbc_knn_query(handle,
-                                           index,
-                                           k,
-                                           query,
-                                           n_query_pts,
-                                           inds,
-                                           dists,
-                                           cuvs::neighbors::detail::HaversineFunc<value_t, int_t>(),
-                                           perform_post_filtering,
-                                           weight);
+    cuvs::neighbors::ball_cover::detail::rbc_knn_query(
+      handle,
+      index,
+      k,
+      query,
+      n_query_pts,
+      inds,
+      dists,
+      cuvs::neighbors::ball_cover::detail::HaversineFunc<value_t, int_t>(),
+      perform_post_filtering,
+      weight);
   } else if (index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
              index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
-    cuvs::neighbors::detail::rbc_knn_query(handle,
-                                           index,
-                                           k,
-                                           query,
-                                           n_query_pts,
-                                           inds,
-                                           dists,
-                                           cuvs::neighbors::detail::EuclideanFunc<value_t, int_t>(),
-                                           perform_post_filtering,
-                                           weight);
+    cuvs::neighbors::ball_cover::detail::rbc_knn_query(
+      handle,
+      index,
+      k,
+      query,
+      n_query_pts,
+      inds,
+      dists,
+      cuvs::neighbors::ball_cover::detail::EuclideanFunc<value_t, int_t>(),
+      perform_post_filtering,
+      weight);
   } else {
     RAFT_FAIL("Metric not supported");
   }
@@ -323,7 +325,7 @@ void eps_nn(raft::resources const& handle,
   ASSERT(index.is_index_trained(), "index must be previously trained");
 
   // run query
-  cuvs::neighbors::detail::rbc_eps_nn_query(
+  cuvs::neighbors::ball_cover::detail::rbc_eps_nn_query(
     handle,
     index,
     eps,
@@ -331,7 +333,7 @@ void eps_nn(raft::resources const& handle,
     query.extent(0),
     adj.data_handle(),
     vd.data_handle(),
-    cuvs::neighbors::detail::EuclideanSqFunc<value_t, int_t>());
+    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int_t>());
 }
 
 /**
@@ -380,7 +382,7 @@ void eps_nn(raft::resources const& handle,
   if (max_k.has_value()) { max_k_ptr = max_k.value().data_handle(); }
 
   // run query
-  cuvs::neighbors::detail::rbc_eps_nn_query(
+  cuvs::neighbors::ball_cover::detail::rbc_eps_nn_query(
     handle,
     index,
     eps,
@@ -390,7 +392,7 @@ void eps_nn(raft::resources const& handle,
     adj_ia.data_handle(),
     adj_ja.data_handle(),
     vd.data_handle(),
-    cuvs::neighbors::detail::EuclideanSqFunc<value_t, int_t>());
+    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int_t>());
 }
 
 /**
