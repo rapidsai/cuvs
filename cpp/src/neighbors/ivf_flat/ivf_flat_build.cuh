@@ -335,6 +335,37 @@ void extend(raft::resources const& handle,
   if (!index->center_norms().has_value()) {
     index->allocate_center_norms(handle);
     if (index->center_norms().has_value()) {
+      if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::rowNorm(index->center_norms()->data_handle(),
+                              index->centers().data_handle(),
+                              dim,
+                              n_lists,
+                              raft::linalg::L2Norm,
+                              true,
+                              stream,
+                              raft::sqrt_op{});
+      } else {
+        raft::linalg::rowNorm(index->center_norms()->data_handle(),
+                              index->centers().data_handle(),
+                              dim,
+                              n_lists,
+                              raft::linalg::L2Norm,
+                              true,
+                              stream);
+      }
+      RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
+    }
+  } else if (index->center_norms().has_value() && index->adaptive_centers()) {
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      raft::linalg::rowNorm(index->center_norms()->data_handle(),
+                            index->centers().data_handle(),
+                            dim,
+                            n_lists,
+                            raft::linalg::L2Norm,
+                            true,
+                            stream,
+                            raft::sqrt_op{});
+    } else {
       raft::linalg::rowNorm(index->center_norms()->data_handle(),
                             index->centers().data_handle(),
                             dim,
@@ -342,16 +373,7 @@ void extend(raft::resources const& handle,
                             raft::linalg::L2Norm,
                             true,
                             stream);
-      RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
     }
-  } else if (index->center_norms().has_value() && index->adaptive_centers()) {
-    raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                          index->centers().data_handle(),
-                          dim,
-                          n_lists,
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
     RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
   }
 }
@@ -384,7 +406,8 @@ inline auto build(raft::resources const& handle,
                 "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
+               "Cosine metric requires more than one dim");
   index<T, IdxT> index(handle, params, dim);
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
@@ -414,7 +437,7 @@ inline auto build(raft::resources const& handle,
       index.centers().data_handle(), index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(index.metric());
+    kmeans_params.metric  = index.metric();
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
