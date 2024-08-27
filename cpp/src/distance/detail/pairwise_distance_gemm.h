@@ -19,10 +19,14 @@
 #include "./pairwise_distance_epilogue.h"
 
 #include <cutlass/cutlass.h>
+#include <cutlass/epilogue/threadblock/default_epilogue_direct_store.h>
+#include <cutlass/gemm/device/gemm_universal.h>
 #include <cutlass/gemm/kernel/default_gemm_universal.h>
 #include <cutlass/gemm/kernel/gemm_with_fused_epilogue.h>
 #include <cutlass/layout/matrix.h>
 #include <cutlass/layout/tensor.h>
+
+#include <cuda_fp16.h>
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -217,6 +221,103 @@ struct PairwiseDistanceGemm<double,
                                                          ThreadblockSwizzle,
                                                          Stages,
                                                          Operator>::GemmKernel;
+
+  // Replace epilogue
+  using Epilogue = typename cuvs::epilogue::threadblock::PairwiseDistanceEpilogue<
+    typename GemmBase::Epilogue::Shape,
+    typename GemmBase::Epilogue::WarpMmaOperator,
+    GemmBase::Epilogue::kPartitionsK,
+    ElementC_,
+    typename EpilogueOutputOp::ElementT,
+    ElementC_,
+    EpilogueOutputOp,
+    NormXLayout,
+    GemmBase::Epilogue::kElementsPerAccess>::Epilogue;
+
+  // Compose the GEMM kernel
+  using GemmKernel = cutlass::gemm::kernel::
+    GemmWithFusedEpilogue<typename GemmBase::Mma, Epilogue, ThreadblockSwizzle>;
+};
+
+template <
+  /// Layout type for A matrix operand
+  int kAlignmentA,
+  /// Layout type for B matrix operand
+  int kAlignmentB,
+  /// Element type for C and D matrix operands
+  typename ElementC_,
+  /// Element type for internal accumulation
+  typename ElementAccumulator,
+  /// Epilogue output operator      - must satisfy concept of 'EpilogueWithBroadcastOp'
+  typename EpilogueOutputOp,
+  /// Number of stages used in the pipelined mainloop
+  int Stages,
+  /// data layout row/column major of inputs
+  bool isRowMajor>
+struct PairwiseDistanceGemm<half,
+                            kAlignmentA,
+                            half,
+                            kAlignmentB,
+                            ElementC_,
+                            ElementAccumulator,
+                            EpilogueOutputOp,
+                            Stages,
+                            isRowMajor> {
+  // using Transform = cutlass::ComplexTransform::kNone;
+  // Threadblock-level tile size (concept: GemmShape)
+  using ThreadblockShape =
+    cutlass::gemm::GemmShape<128, 128, 32>;  // <- threadblock tile M = 64, N = 64, K = 16
+  /// Warp-level tile size (concept: GemmShape)
+  // This code section describes tile size a warp will compute
+  using WarpShape = cutlass::gemm::GemmShape<64, 64, 32>;  // <- warp tile M = 32, N = 32, K = 16
+  /// Warp-level tile size (concept: GemmShape)
+  // This code section describes the size of MMA op
+  using InstructionShape = cutlass::gemm::GemmShape<16, 8, 16>;
+
+  // Operation performed by GEMM
+  using Operator = cutlass::arch::OpMultiplyAdd;
+  // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
+  // SM
+  using OperatorClass = cutlass::arch::OpClassTensorOp;
+
+  // This code section describes CUDA SM architecture number
+  using ArchTag = cutlass::arch::Sm80;
+
+  // This code section describes how threadblocks are scheduled on GPU
+  /// Threadblock-level swizzling operator
+  using ThreadblockSwizzle = cutlass::gemm::threadblock::GemmBatchedIdentityThreadblockSwizzle;
+
+  /// data layout for final output matrix.
+  // we keep this same layout even for column major inputs
+  using LayoutOutput = cutlass::layout::RowMajor;
+
+  typedef typename std::conditional<isRowMajor,
+                                    cutlass::layout::RowMajor,
+                                    cutlass::layout::ColumnMajor>::type NormXLayout;
+
+  typedef typename std::
+    conditional<isRowMajor, cutlass::layout::RowMajor, cutlass::layout::ColumnMajor>::type LayoutA_;
+
+  typedef typename std::
+    conditional<isRowMajor, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>::type LayoutB_;
+
+  using GemmBase = typename cutlass::gemm::device::GemmUniversal<cutlass::half_t,
+                                                                 LayoutA_,
+                                                                 cutlass::half_t,
+                                                                 LayoutB_,
+                                                                 ElementC_,
+                                                                 LayoutOutput,
+                                                                 ElementAccumulator,
+                                                                 OperatorClass,
+                                                                 ArchTag,
+                                                                 ThreadblockShape,
+                                                                 WarpShape,
+                                                                 InstructionShape,
+                                                                 EpilogueOutputOp,
+                                                                 ThreadblockSwizzle,
+                                                                 3,
+                                                                 2,
+                                                                 2>::GemmKernel;
 
   // Replace epilogue
   using Epilogue = typename cuvs::epilogue::threadblock::PairwiseDistanceEpilogue<
