@@ -121,7 +121,8 @@ void compute_bfknn(const raft::resources& handle,
                                        bfindex,
                                        raft::make_device_matrix_view(X2, n_query_rows, d),
                                        raft::make_device_matrix_view(inds, n_query_rows, k),
-                                       raft::make_device_matrix_view(dists, n_query_rows, k));
+                                       raft::make_device_matrix_view(dists, n_query_rows, k),
+                                       std::nullopt);
 }
 
 struct ToRadians {
