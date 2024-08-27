@@ -19,6 +19,7 @@
 #include "compute_distance.hpp"
 
 #include <cuvs/distance/distance.hpp>
+#include <raft/util/device_loads_stores.cuh>
 #include <raft/util/integer_utils.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
@@ -174,13 +175,10 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const typename DescriptorT::b
 
 template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
-  const typename DescriptorT::base_type* desc_,
-  const typename DescriptorT::INDEX_T dataset_index,
-  const bool valid) -> typename DescriptorT::DISTANCE_T
+  const typename DescriptorT::base_type* desc_, const typename DescriptorT::INDEX_T dataset_index)
+  -> typename DescriptorT::DISTANCE_T
 {
-  using DATA_T                   = typename DescriptorT::DATA_T;
   using DISTANCE_T               = typename DescriptorT::DISTANCE_T;
-  using INDEX_T                  = typename DescriptorT::INDEX_T;
   using LOAD_T                   = typename DescriptorT::LOAD_T;
   using QUERY_T                  = typename DescriptorT::QUERY_T;
   using CODE_BOOK_T              = typename DescriptorT::CODE_BOOK_T;
@@ -189,116 +187,115 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
 
-  const auto* __restrict__ desc         = reinterpret_cast<const DescriptorT*>(desc_);
-  const auto* __restrict__ codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(desc + 1);
-  const auto* __restrict__ query_ptr    = reinterpret_cast<const QUERY_T*>(
-    reinterpret_cast<const uint8_t*>(codebook_ptr) + DescriptorT::kSMemCodeBookSizeInBytes);
+  const auto* __restrict__ desc            = reinterpret_cast<const DescriptorT*>(desc_);
+  const auto* __restrict__ pq_codebook_ptr = reinterpret_cast<const CODE_BOOK_T*>(desc + 1);
+  const auto* __restrict__ query_ptr       = reinterpret_cast<const QUERY_T*>(
+    reinterpret_cast<const uint8_t*>(pq_codebook_ptr) + DescriptorT::kSMemCodeBookSizeInBytes);
   const auto* __restrict__ node_ptr =
     desc->encoded_dataset_ptr +
     (static_cast<std::uint64_t>(desc->encoded_dataset_dim) * dataset_index);
-  const auto dim = desc->dim;
-  float norm     = 0;
-  if (valid) {
-    const unsigned lane_id = threadIdx.x % TeamSize;
-    const uint32_t vq_code = *reinterpret_cast<const std::uint32_t*>(node_ptr);
-    if constexpr (PQ_BITS == 8) {
-      for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += DatasetBlockDim) {
-        constexpr unsigned vlen = 4;  // **** DO NOT CHANGE ****
-        constexpr unsigned nelem =
-          raft::div_rounding_up_unsafe<unsigned>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
-        // Loading PQ codes
-        uint32_t pq_codes[nelem];
+  const auto* __restrict__ vq_codebook_ptr = desc->vq_code_book_ptr;
+  const auto dim                           = desc->dim;
+  const auto n_subspace                    = desc->n_subspace;
+  const unsigned lane_id                   = threadIdx.x % TeamSize;
+  // const uint32_t& vq_code                  = *reinterpret_cast<const std::uint32_t*>(node_ptr);
+  uint32_t vq_code;
+  raft::ldg(vq_code, reinterpret_cast<const std::uint32_t*>(node_ptr));
+  static_assert(PQ_BITS == 8, "Only pq_bits == 8 is supported at the moment.");
+  DISTANCE_T norm = 0;
+  for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += DatasetBlockDim) {
+    constexpr unsigned vlen = 4;  // **** DO NOT CHANGE ****
+    constexpr unsigned nelem =
+      raft::div_rounding_up_unsafe<unsigned>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
+    // Loading PQ codes
+    uint32_t pq_codes[nelem];
+#pragma unroll
+    for (std::uint32_t e = 0; e < nelem; e++) {
+      const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
+      if (k >= n_subspace) break;
+      // Loading 4 x 8-bit PQ-codes using 32-bit load ops (from device memory)
+      raft::ldg(pq_codes[e], reinterpret_cast<const std::uint32_t*>(node_ptr + 4 + k));
+    }
+    //
+    if constexpr (PQ_LEN % 2 == 0) {
+      // **** Use half2 for distance computation ****
 #pragma unroll 1
-        for (std::uint32_t e = 0; e < nelem; e++) {
-          const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
-          if (k >= desc->n_subspace) break;
-          // Loading 4 x 8-bit PQ-codes using 32-bit load ops (from device memory)
-          pq_codes[e] = *(reinterpret_cast<const std::uint32_t*>(node_ptr + 4 + k));
+      for (std::uint32_t e = 0; e < nelem; e++) {
+        const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
+        if (k >= n_subspace) break;
+        // Loading VQ code-book
+        raft::TxN_t<half2, vlen / 2> vq_vals[PQ_LEN];
+#pragma unroll
+        for (std::uint32_t m = 0; m < PQ_LEN; m += 1) {
+          const uint32_t d = (vlen * m) + (PQ_LEN * k);
+          if (d >= dim) break;
+          vq_vals[m].load(reinterpret_cast<const half2*>(vq_codebook_ptr + d + (dim * vq_code)), 0);
         }
-        //
-        if constexpr (PQ_LEN % 2 == 0) {
-          // **** Use half2 for distance computation ****
-          half2 norm2{0, 0};
+        // Compute distance
+        std::uint32_t pq_code = pq_codes[e];
 #pragma unroll
-          for (std::uint32_t e = 0; e < nelem; e++) {
-            const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
-            if (k >= desc->n_subspace) break;
-            // Loading VQ code-book
-            raft::TxN_t<half2, vlen / 2> vq_vals[PQ_LEN];
+        for (std::uint32_t v = 0; v < vlen; v++) {
+          if (PQ_LEN * (v + k) >= dim) break;
 #pragma unroll
-            for (std::uint32_t m = 0; m < PQ_LEN; m += 1) {
-              const uint32_t d = (vlen * m) + (PQ_LEN * k);
-              if (d >= dim) break;
-              vq_vals[m].load(
-                reinterpret_cast<const half2*>(desc->vq_code_book_ptr + d + (dim * vq_code)), 0);
-            }
-            // Compute distance
-            std::uint32_t pq_code = pq_codes[e];
-#pragma unroll
-            for (std::uint32_t v = 0; v < vlen; v++) {
-              if (PQ_LEN * (v + k) >= dim) break;
-#pragma unroll
-              for (std::uint32_t m = 0; m < PQ_LEN; m += 2) {
-                const std::uint32_t d1 = m + (PQ_LEN * v);
-                const std::uint32_t d  = d1 + (PQ_LEN * k);
-                // Loading query vector in smem
-                half2 diff2 = (reinterpret_cast<const half2*>(
-                  query_ptr))[device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d / 2)];
-                // Loading PQ code book in smem
-                diff2 -= *(reinterpret_cast<const half2*>(
-                  codebook_ptr + (1 << PQ_BITS) * 2 * (m / 2) + (2 * (pq_code & 0xff))));
-                diff2 -= vq_vals[d1 / vlen].val.data[(d1 % vlen) / 2];
-                norm2 += diff2 * diff2;
-              }
-              pq_code >>= 8;
-            }
+          for (std::uint32_t m = 0; m < PQ_LEN; m += 2) {
+            const std::uint32_t d1 = m + (PQ_LEN * v);
+            const std::uint32_t d  = d1 + (PQ_LEN * k);
+            half2 q2, c2;
+            // Loading query vector from smem
+            raft::lds(reinterpret_cast<uint32_t&>(q2),
+                      reinterpret_cast<const uint32_t*>(query_ptr) +
+                        device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d / 2));
+            // Loading PQ code book from smem
+            raft::lds(reinterpret_cast<uint32_t&>(c2),
+                      reinterpret_cast<const uint32_t*>(
+                        pq_codebook_ptr + (1 << PQ_BITS) * 2 * (m / 2) + (2 * (pq_code & 0xff))));
+            // L2 distance
+            auto dist = q2 - c2 - vq_vals[d1 / vlen].val.data[(d1 % vlen) / 2];
+            dist      = dist * dist;
+            norm += static_cast<DISTANCE_T>(dist.x + dist.y);
           }
-          norm += static_cast<float>(norm2.x + norm2.y);
-        } else {
-          // **** Use float for distance computation ****
+          pq_code >>= 8;
+        }
+      }
+    } else {
+      // **** Use float for distance computation ****
 #pragma unroll
-          for (std::uint32_t e = 0; e < nelem; e++) {
-            const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
-            if (k >= desc->n_subspace) break;
-            // Loading VQ code-book
-            raft::TxN_t<CODE_BOOK_T, vlen> vq_vals[PQ_LEN];
+      for (std::uint32_t e = 0; e < nelem; e++) {
+        const std::uint32_t k = (lane_id + (TeamSize * e)) * vlen + elem_offset / PQ_LEN;
+        if (k >= n_subspace) break;
+        // Loading VQ code-book
+        raft::TxN_t<CODE_BOOK_T, vlen> vq_vals[PQ_LEN];
 #pragma unroll
-            for (std::uint32_t m = 0; m < PQ_LEN; m++) {
-              const std::uint32_t d = (vlen * m) + (PQ_LEN * k);
-              if (d >= dim) break;
-              // Loading 4 x 8/16-bit VQ-values using 32/64-bit load ops (from L2$ or device
-              // memory)
-              vq_vals[m].load(
-                reinterpret_cast<const half2*>(desc->vq_code_book_ptr + d + (dim * vq_code)), 0);
-            }
-            // Compute distance
-            std::uint32_t pq_code = pq_codes[e];
+        for (std::uint32_t m = 0; m < PQ_LEN; m++) {
+          const std::uint32_t d = (vlen * m) + (PQ_LEN * k);
+          if (d >= dim) break;
+          // Loading 4 x 8/16-bit VQ-values using 32/64-bit load ops (from L2$ or device
+          // memory)
+          vq_vals[m].load(reinterpret_cast<const half2*>(vq_codebook_ptr + d + (dim * vq_code)), 0);
+        }
+        // Compute distance
+        std::uint32_t pq_code = pq_codes[e];
 #pragma unroll
-            for (std::uint32_t v = 0; v < vlen; v++) {
-              if (PQ_LEN * (v + k) >= dim) break;
-              raft::TxN_t<CODE_BOOK_T, PQ_LEN> pq_vals;
-              pq_vals.load(reinterpret_cast<const half2*>(codebook_ptr + PQ_LEN * (pq_code & 0xff)),
-                           0);  // (from L1$ or smem)
+        for (std::uint32_t v = 0; v < vlen; v++) {
+          if (PQ_LEN * (v + k) >= dim) break;
+          raft::TxN_t<CODE_BOOK_T, PQ_LEN> pq_vals;
+          pq_vals.load(reinterpret_cast<const half2*>(pq_codebook_ptr + PQ_LEN * (pq_code & 0xff)),
+                       0);  // (from L1$ or smem)
 #pragma unroll
-              for (std::uint32_t m = 0; m < PQ_LEN; m++) {
-                const std::uint32_t d1 = m + (PQ_LEN * v);
-                const std::uint32_t d  = d1 + (PQ_LEN * k);
-                // if (d >= dataset_dim) break;
-                DISTANCE_T diff = query_ptr[d];  // (from smem)
-                diff -= static_cast<float>(pq_vals.data[m]);
-                diff -= static_cast<float>(vq_vals[d1 / vlen].val.data[d1 % vlen]);
-                norm += diff * diff;
-              }
-              pq_code >>= 8;
-            }
+          for (std::uint32_t m = 0; m < PQ_LEN; m++) {
+            const std::uint32_t d1 = m + (PQ_LEN * v);
+            const std::uint32_t d  = d1 + (PQ_LEN * k);
+            // if (d >= dataset_dim) break;
+            DISTANCE_T diff;
+            raft::lds(diff, query_ptr + d);
+            diff -= static_cast<DISTANCE_T>(pq_vals.data[m]);
+            diff -= static_cast<DISTANCE_T>(vq_vals[d1 / vlen].val.data[d1 % vlen]);
+            norm += diff * diff;
           }
+          pq_code >>= 8;
         }
       }
     }
-  }
-#pragma unroll
-  for (uint32_t offset = TeamSize / 2; offset > 0; offset >>= 1) {
-    norm += __shfl_xor_sync(0xffffffff, norm, offset);
   }
   return norm;
 }

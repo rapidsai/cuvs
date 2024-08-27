@@ -58,11 +58,11 @@ namespace single_cta_search {
 // #define _CLK_BREAKDOWN
 
 template <unsigned TOPK_BY_BITONIC_SORT, class INDEX_T>
-__device__ void pickup_next_parents(std::uint32_t* const terminate_flag,
-                                    INDEX_T* const next_parent_indices,
-                                    INDEX_T* const internal_topk_indices,
-                                    const std::size_t internal_topk_size,
-                                    const std::uint32_t search_width)
+RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parents(std::uint32_t* const terminate_flag,
+                                                     INDEX_T* const next_parent_indices,
+                                                     INDEX_T* const internal_topk_indices,
+                                                     const std::size_t internal_topk_size,
+                                                     const std::uint32_t search_width)
 {
   constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
   // if (threadIdx.x >= 32) return;
@@ -100,11 +100,12 @@ __device__ void pickup_next_parents(std::uint32_t* const terminate_flag,
 }
 
 template <unsigned MAX_CANDIDATES, class IdxT = void>
-__device__ inline void topk_by_bitonic_sort_1st(float* candidate_distances,  // [num_candidates]
-                                                IdxT* candidate_indices,     // [num_candidates]
-                                                const std::uint32_t num_candidates,
-                                                const std::uint32_t num_itopk,
-                                                unsigned MULTI_WARPS = 0)
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_1st(
+  float* candidate_distances,  // [num_candidates]
+  IdxT* candidate_indices,     // [num_candidates]
+  const std::uint32_t num_candidates,
+  const std::uint32_t num_itopk,
+  unsigned MULTI_WARPS = 0)
 {
   const unsigned lane_id = threadIdx.x % 32;
   const unsigned warp_id = threadIdx.x / 32;
@@ -203,15 +204,16 @@ __device__ inline void topk_by_bitonic_sort_1st(float* candidate_distances,  // 
 }
 
 template <unsigned MAX_ITOPK, class IdxT = void>
-__device__ inline void topk_by_bitonic_sort_2nd(float* itopk_distances,  // [num_itopk]
-                                                IdxT* itopk_indices,     // [num_itopk]
-                                                const std::uint32_t num_itopk,
-                                                float* candidate_distances,  // [num_candidates]
-                                                IdxT* candidate_indices,     // [num_candidates]
-                                                const std::uint32_t num_candidates,
-                                                std::uint32_t* work_buf,
-                                                const bool first,
-                                                unsigned MULTI_WARPS = 0)
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_2nd(
+  float* itopk_distances,  // [num_itopk]
+  IdxT* itopk_indices,     // [num_itopk]
+  const std::uint32_t num_itopk,
+  float* candidate_distances,  // [num_candidates]
+  IdxT* candidate_indices,     // [num_candidates]
+  const std::uint32_t num_candidates,
+  std::uint32_t* work_buf,
+  const bool first,
+  unsigned MULTI_WARPS = 0)
 {
   const unsigned lane_id = threadIdx.x % 32;
   const unsigned warp_id = threadIdx.x / 32;
@@ -411,16 +413,17 @@ __device__ inline void topk_by_bitonic_sort_2nd(float* itopk_distances,  // [num
 template <unsigned MAX_ITOPK,
           unsigned MAX_CANDIDATES,
           class IdxT>
-__device__ void topk_by_bitonic_sort(float* itopk_distances,  // [num_itopk]
-                                     IdxT* itopk_indices,     // [num_itopk]
-                                     const std::uint32_t num_itopk,
-                                     float* candidate_distances,  // [num_candidates]
-                                     IdxT* candidate_indices,     // [num_candidates]
-                                     const std::uint32_t num_candidates,
-                                     std::uint32_t* work_buf,
-                                     const bool first,
-                                     const unsigned MULTI_WARPS_1,
-                                     const unsigned MULTI_WARPS_2)
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(
+  float* itopk_distances,  // [num_itopk]
+  IdxT* itopk_indices,     // [num_itopk]
+  const std::uint32_t num_itopk,
+  float* candidate_distances,  // [num_candidates]
+  IdxT* candidate_indices,     // [num_candidates]
+  const std::uint32_t num_candidates,
+  std::uint32_t* work_buf,
+  const bool first,
+  const unsigned MULTI_WARPS_1,
+  const unsigned MULTI_WARPS_2)
 {
   // The results in candidate_distances/indices are sorted by bitonic sort.
   topk_by_bitonic_sort_1st<MAX_CANDIDATES, IdxT>(
@@ -440,11 +443,11 @@ __device__ void topk_by_bitonic_sort(float* itopk_distances,  // [num_itopk]
 }
 
 template <class INDEX_T>
-__device__ inline void hashmap_restore(INDEX_T* const hashmap_ptr,
-                                       const size_t hashmap_bitlen,
-                                       const INDEX_T* itopk_indices,
-                                       const uint32_t itopk_size,
-                                       const uint32_t first_tid = 0)
+RAFT_DEVICE_INLINE_FUNCTION void hashmap_restore(INDEX_T* const hashmap_ptr,
+                                                 const size_t hashmap_bitlen,
+                                                 const INDEX_T* itopk_indices,
+                                                 const uint32_t itopk_size,
+                                                 const uint32_t first_tid = 0)
 {
   constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
   if (threadIdx.x < first_tid) return;

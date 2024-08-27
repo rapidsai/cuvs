@@ -134,13 +134,11 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
 
 template <typename DescriptorT>
 _RAFT_DEVICE __noinline__ auto compute_distance_standard(
-  const typename DescriptorT::base_type* desc_,
-  const typename DescriptorT::INDEX_T dataset_index,
-  const bool valid) -> typename DescriptorT::DISTANCE_T
+  const typename DescriptorT::base_type* desc_, const typename DescriptorT::INDEX_T dataset_index)
+  -> typename DescriptorT::DISTANCE_T
 {
   using DATA_T                    = typename DescriptorT::DATA_T;
   using DISTANCE_T                = typename DescriptorT::DISTANCE_T;
-  using INDEX_T                   = typename DescriptorT::INDEX_T;
   using LOAD_T                    = typename DescriptorT::LOAD_T;
   using QUERY_T                   = typename DescriptorT::QUERY_T;
   constexpr auto kTeamSize        = DescriptorT::kTeamSize;
@@ -153,41 +151,35 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   const auto lane_id = threadIdx.x % kTeamSize;
   const auto dim     = desc->dim;
 
-  DISTANCE_T norm2 = 0;
-  if (valid) {
-    for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += kDatasetBlockDim) {
-      constexpr unsigned vlen      = device::get_vlen<LOAD_T, DATA_T>();
-      constexpr unsigned reg_nelem = raft::ceildiv<unsigned>(kDatasetBlockDim, kTeamSize * vlen);
-      raft::TxN_t<DATA_T, vlen> dl_buff[reg_nelem];
+  DISTANCE_T r = 0;
+  for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += kDatasetBlockDim) {
+    constexpr unsigned vlen      = device::get_vlen<LOAD_T, DATA_T>();
+    constexpr unsigned reg_nelem = raft::ceildiv<unsigned>(kDatasetBlockDim, kTeamSize * vlen);
+    raft::TxN_t<DATA_T, vlen> dl_buff[reg_nelem];
 #pragma unroll
-      for (uint32_t e = 0; e < reg_nelem; e++) {
-        const uint32_t k = (lane_id + (kTeamSize * e)) * vlen + elem_offset;
-        if (k >= dim) break;
-        dl_buff[e].load(dataset_ptr, k);
-      }
+    for (uint32_t e = 0; e < reg_nelem; e++) {
+      const uint32_t k = (lane_id + (kTeamSize * e)) * vlen + elem_offset;
+      if (k >= dim) break;
+      dl_buff[e].load(dataset_ptr, k);
+    }
 #pragma unroll
-      for (uint32_t e = 0; e < reg_nelem; e++) {
-        const uint32_t k = (lane_id + (kTeamSize * e)) * vlen + elem_offset;
-        if (k >= dim) break;
+    for (uint32_t e = 0; e < reg_nelem; e++) {
+      const uint32_t k = (lane_id + (kTeamSize * e)) * vlen + elem_offset;
+      if (k >= dim) break;
 #pragma unroll
-        for (uint32_t v = 0; v < vlen; v++) {
-          // Note this loop can go above the dataset_dim for padded arrays. This is not a problem
-          // because:
-          // - Above the last element (dataset_dim-1), the query array is filled with zeros.
-          // - The data buffer has to be also padded with zeros.
-          DISTANCE_T d;
-          raft::lds(d, query_ptr + device::swizzling(k + v));
-          norm2 += dist_op<DISTANCE_T, DescriptorT::kMetric>(
-            d, cuvs::spatial::knn::detail::utils::mapping<DISTANCE_T>{}(dl_buff[e].val.data[v]));
-        }
+      for (uint32_t v = 0; v < vlen; v++) {
+        // Note this loop can go above the dataset_dim for padded arrays. This is not a problem
+        // because:
+        // - Above the last element (dataset_dim-1), the query array is filled with zeros.
+        // - The data buffer has to be also padded with zeros.
+        DISTANCE_T d;
+        raft::lds(d, query_ptr + device::swizzling(k + v));
+        r += dist_op<DISTANCE_T, DescriptorT::kMetric>(
+          d, cuvs::spatial::knn::detail::utils::mapping<DISTANCE_T>{}(dl_buff[e].val.data[v]));
       }
     }
   }
-#pragma unroll
-  for (uint32_t offset = kTeamSize / 2; offset > 0; offset >>= 1) {
-    norm2 += __shfl_xor_sync(0xffffffff, norm2, offset);
-  }
-  return norm2;
+  return r;
 }
 
 template <cuvs::distance::DistanceType Metric,

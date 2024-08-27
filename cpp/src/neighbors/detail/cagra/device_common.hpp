@@ -23,6 +23,7 @@
 // TODO: This shouldn't be invoking anything in detail APIs outside of cuvs/neighbors
 #include <raft/core/detail/macros.hpp>
 #include <raft/util/cudart_utils.hpp>
+#include <raft/util/warp_primitives.cuh>
 
 #include <cuda_fp16.h>
 
@@ -192,6 +193,29 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
         result_child_distances_ptr[i] = raft::upper_bound<DistanceT>();
       }
     }
+  }
+}
+
+template <uint32_t TeamSize, typename T>
+RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x) -> T
+{
+#pragma unroll
+  for (uint32_t stride = TeamSize >> 1; stride > 0; stride >>= 1) {
+    x += raft::shfl_xor(x, stride, TeamSize);
+  }
+  return x;
+}
+
+template <typename T>
+RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size) -> T
+{
+  switch (team_size) {
+    case 1: return team_sum<1>(x);
+    case 2: return team_sum<2>(x);
+    case 4: return team_sum<4>(x);
+    case 8: return team_sum<8>(x);
+    case 16: return team_sum<16>(x);
+    default: return team_sum<32>(x);
   }
 }
 

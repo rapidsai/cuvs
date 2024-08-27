@@ -42,7 +42,7 @@ struct dataset_descriptor_base_t {
   using DISTANCE_T = DistanceT;
 
   using setup_workspace_type  = const base_type*(const base_type*, void*, const DATA_T*, uint32_t);
-  using compute_distance_type = DISTANCE_T(const base_type*, INDEX_T, bool);
+  using compute_distance_type = DISTANCE_T(const base_type*, INDEX_T);
 
   /** Copy the descriptor and the query into shared memory and do any other work, such as
    * initializing the codebook. */
@@ -84,7 +84,8 @@ struct dataset_descriptor_base_t {
   RAFT_DEVICE_INLINE_FUNCTION auto compute_distance(INDEX_T dataset_index, bool valid) const
     -> DISTANCE_T
   {
-    return compute_distance_impl(this, dataset_index, valid);
+    auto per_thread_distances = valid ? compute_distance_impl(this, dataset_index) : 0;
+    return device::team_sum(per_thread_distances, this->team_size);
   }
 };
 
