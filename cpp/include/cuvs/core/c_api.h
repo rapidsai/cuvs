@@ -140,7 +140,6 @@ cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
  * available memory
  * @return cuvsError_t
  */
-
 cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                             int max_pool_size_percent,
                                             int managed);
@@ -149,7 +148,6 @@ cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
  * @return cuvsError_t
  */
 cuvsError_t cuvsRMMMemoryResourceReset();
-
 
 /** @} */
 
