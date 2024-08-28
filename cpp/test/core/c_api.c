@@ -55,6 +55,7 @@ int main()
   if (free_error_pool == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Reset pool memory resource
+
   cuvsError_t reset_error = cuvsRMMMemoryResourceReset();
   if (reset_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 

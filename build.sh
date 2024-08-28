@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust go docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -26,6 +26,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
                       around the C++ code.
    python           - build the cuvs Python package
    rust             - build the cuvs Rust bindings
+   go               - build the cuvs Go bindings
    docs             - build the documentation
    tests            - build the tests
    bench-ann        - build end-to-end ann benchmarks
@@ -424,6 +425,13 @@ if (( ${NUMARGS} == 0 )) || hasArg rust; then
     cd ${REPODIR}/rust
     cargo build --examples --lib
     cargo test
+fi
+
+# Build the cuvs Go bindings
+if (( ${NUMARGS} == 0 )) || hasArg go; then
+    cd ${REPODIR}/go
+    go build ./...
+    go test ./...
 fi
 
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"

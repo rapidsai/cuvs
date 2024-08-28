@@ -26,7 +26,6 @@
 #include <rmm/mr/device/owning_wrapper.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
-
 #include <thread>
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
@@ -69,6 +68,8 @@ extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
   });
 }
 
+thread_local std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>> pool_mr;
+
 extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -87,6 +88,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   });
 }
 
+
 thread_local std::shared_ptr<
   rmm::mr::owning_wrapper<rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>,
                           rmm::mr::device_memory_resource>>
@@ -104,6 +106,7 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
       throw std::runtime_error("Current memory resource is not a cuda_memory_resource");
     }
 
+
     auto initial_size = rmm::percent_of_free_device_memory(initial_pool_size_percent);
     auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
 
@@ -119,9 +122,11 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
     pool_mr =
       rmm::mr::make_owning_wrapper<rmm::mr::pool_memory_resource>(mr, initial_size, max_size);
 
+
     rmm::mr::set_current_device_resource(pool_mr.get());
   });
 }
+
 
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
