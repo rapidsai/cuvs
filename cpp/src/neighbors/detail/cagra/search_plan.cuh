@@ -137,6 +137,12 @@ struct search_plan_impl_base : public search_params {
 
   void set_dataset_block_and_team_size(int64_t dim)
   {
+    switch (team_size) {
+      case 8: dataset_block_dim = 128; return;
+      case 16: dataset_block_dim = 256; return;
+      case 32: dataset_block_dim = 512; return;
+      default: break;
+    }
     constexpr int64_t max_dataset_block_dim = 512;
     dataset_block_dim                       = 128;
     while (dataset_block_dim < dim && dataset_block_dim < max_dataset_block_dim) {
