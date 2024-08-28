@@ -168,15 +168,14 @@ struct index : cuvs::neighbors::index {
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.hpp>
+ *  #include <cuvs/distance/distance.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
  *  auto metric = cuvs::distance::DistanceType::L2Expanded;
- *  cuvs::neighbors::ball_cover::index index(handle, X, metric);
- *
+ *  ball_cover::index index(handle, X, metric);
  *  ball_cover::build_index(handle, index);
  * @endcode
  *
@@ -206,16 +205,16 @@ void build(raft::resources const& handle, index<int64_t, float, int64_t, int64_t
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.hpp>
+ *  #include <cuvs/distance/distance.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
  *  auto metric = cuvs::distance::DistanceType::L2Expanded;
  *
  *  // Construct a ball cover index
- *  cuvs::neighbors::ball_cover::index index(handle, X, metric);
+ *  ball_cover::index index(handle, X, metric);
  *
  *  // Perform all neighbors knn query
  *  ball_cover::all_knn_query(handle, index, inds, dists, k);
@@ -315,16 +314,16 @@ void eps_nn(raft::resources const& handle,
  * @code{.cpp}
  *
  *  #include <raft/core/resources.hpp>
- *  #include <raft/neighbors/ball_cover.cuh>
- *  #include <raft/distance/distance_types.hpp>
- *  using namespace raft::neighbors;
+ *  #include <cuvs/neighbors/ball_cover.hpp>
+ *  #include <cuvs/distance/distance.hpp>
+ *  using namespace cuvs::neighbors;
  *
  *  raft::resources handle;
  *  ...
  *  auto metric = cuvs::distance::DistanceType::L2Expanded;
  *
  *  // Build a ball cover index
- *  cuvs::neighbors::ball_cover::index index(handle, X, metric);
+ *  ball_cover::index index(handle, X, metric);
  *  ball_cover::build_index(handle, index);
  *
  *  // Perform all neighbors knn query
