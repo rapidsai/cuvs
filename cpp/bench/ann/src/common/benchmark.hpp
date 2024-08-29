@@ -461,7 +461,8 @@ void register_search(std::shared_ptr<const dataset<T>> dataset,
 }
 
 template <typename T>
-void dispatch_benchmark(const configuration& conf,
+void dispatch_benchmark(std::string cmdline,
+                        const configuration& conf,
                         bool force_overwrite,
                         bool build_mode,
                         bool search_mode,
@@ -471,6 +472,10 @@ void dispatch_benchmark(const configuration& conf,
                         Mode metric_objective,
                         const std::vector<int>& threads)
 {
+  ::benchmark::AddCustomContext("command_line", cmdline);
+  for (auto [key, value] : host_info()) {
+    ::benchmark::AddCustomContext(key, value);
+  }
   if (cudart.found()) {
     for (auto [key, value] : cuda_info()) {
       ::benchmark::AddCustomContext(key, value);
@@ -586,6 +591,11 @@ inline auto run_main(int argc, char** argv) -> int
     printf_usage();
     return -1;
   }
+  // Save command line for reproducibility.
+  std::string cmdline(argv[0]);
+  for (int i = 1; i < argc; i++) {
+    cmdline += " " + std::string(argv[i]);
+  }
 
   char* conf_path = argv[--argc];
   std::ifstream conf_stream(conf_path);
@@ -667,7 +677,8 @@ inline auto run_main(int argc, char** argv) -> int
   std::string dtype = conf.get_dataset_conf().dtype;
 
   if (dtype == "float") {
-    dispatch_benchmark<float>(conf,
+    dispatch_benchmark<float>(cmdline,
+                              conf,
                               force_overwrite,
                               build_mode,
                               search_mode,
@@ -677,7 +688,8 @@ inline auto run_main(int argc, char** argv) -> int
                               metric_objective,
                               threads);
     // } else if (dtype == "half") {
-    //   dispatch_benchmark<half>(conf,
+    //   dispatch_benchmark<half>(cmdline
+    //                            conf,
     //                            force_overwrite,
     //                            build_mode,
     //                            search_mode,
@@ -687,7 +699,8 @@ inline auto run_main(int argc, char** argv) -> int
     //                            metric_objective,
     //                            threads);
   } else if (dtype == "uint8") {
-    dispatch_benchmark<std::uint8_t>(conf,
+    dispatch_benchmark<std::uint8_t>(cmdline,
+                                     conf,
                                      force_overwrite,
                                      build_mode,
                                      search_mode,
@@ -697,7 +710,8 @@ inline auto run_main(int argc, char** argv) -> int
                                      metric_objective,
                                      threads);
   } else if (dtype == "int8") {
-    dispatch_benchmark<std::int8_t>(conf,
+    dispatch_benchmark<std::int8_t>(cmdline,
+                                    conf,
                                     force_overwrite,
                                     build_mode,
                                     search_mode,

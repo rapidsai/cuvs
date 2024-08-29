@@ -238,9 +238,10 @@ template <
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
+  const bool guarantee_connectivity = false)
 {
-  detail::optimize(res, knn_graph, new_graph);
+  detail::optimize(res, knn_graph, new_graph, guarantee_connectivity);
 }
 
 template <typename T,

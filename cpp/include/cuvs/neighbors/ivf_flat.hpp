@@ -61,6 +61,15 @@ struct index_params : cuvs::neighbors::index_params {
    * flag to `true` if you prefer to use as little GPU memory for the database as possible.
    */
   bool conservative_memory_allocation = false;
+  /**
+   * Whether to add the dataset content to the index, i.e.:
+   *
+   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
+   * `build`.
+   *  - `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but
+   * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
+   */
+  bool add_data_on_build = true;
 };
 /**
  * @}
@@ -295,6 +304,12 @@ struct index : cuvs::neighbors::index {
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -317,6 +332,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -342,6 +363,12 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -364,6 +391,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -389,6 +422,12 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -411,6 +450,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -436,11 +481,24 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   auto index = ivf_flat::build(handle, dataset, index_params);
  * @endcode
@@ -459,11 +517,24 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
  *   ivf_flat::build(handle, dataset, index_params, index);
@@ -483,11 +554,24 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   auto index = ivf_flat::build(handle, dataset, index_params);
  * @endcode
@@ -506,11 +590,24 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
  *   ivf_flat::build(handle, dataset, index_params, index);
@@ -530,11 +627,24 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   auto index = ivf_flat::build(handle, dataset, index_params);
  * @endcode
@@ -553,11 +663,24 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
+ * Note, if index_params.add_data_on_build is set to true, the user can set a
+ * stream pool in the input raft::resource with at least one stream to enable kernel and copy
+ * overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   ivf_flat::index_params index_params;
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping. This is only applicable if index_params.add_data_on_build is set to true
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // create and fill the index from a [N, D] dataset
  *   ivf_flat::index<decltype(dataset::value_type), decltype(dataset::index_type)> index;
  *   ivf_flat::build(handle, dataset, index_params, index);
@@ -701,6 +824,7 @@ auto extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors raft::device_matrix_view to a row-major matrix [n_rows, index.dim()]
  * @param[in] new_indices optional raft::device_vector_view to a vector of indices [n_rows].
+ *
  *    If the original index is empty (`orig_index.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx pointer to index, to be overwritten in-place
@@ -777,6 +901,9 @@ void extend(raft::resources const& handle,
 /**
  * @brief Build a new index containing the data of the original plus new extra vectors.
  *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
  * Implementation note:
  *    The new data is clustered according to existing kmeans clusters, then the cluster
  *    centers are adjusted to match the newly labeled data.
@@ -789,6 +916,9 @@ void extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
@@ -812,6 +942,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index in-place with the new data.
  *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -820,6 +953,9 @@ auto extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_flat::extend(handle, dataset, no_opt, &index_empty);
@@ -841,6 +977,9 @@ void extend(raft::resources const& handle,
 /**
  * @brief Build a new index containing the data of the original plus new extra vectors.
  *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
  * Implementation note:
  *    The new data is clustered according to existing kmeans clusters, then the cluster
  *    centers are adjusted to match the newly labeled data.
@@ -853,6 +992,9 @@ void extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
@@ -876,6 +1018,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index in-place with the new data.
  *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -884,6 +1029,9 @@ auto extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_flat::extend(handle, dataset, no_opt, &index_empty);
@@ -905,6 +1053,9 @@ void extend(raft::resources const& handle,
 /**
  * @brief Build a new index containing the data of the original plus new extra vectors.
  *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
  * Implementation note:
  *    The new data is clustered according to existing kmeans clusters, then the cluster
  *    centers are adjusted to match the newly labeled data.
@@ -917,6 +1068,9 @@ void extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_flat::build(handle, dataset, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   auto index = ivf_flat::extend(handle, new_vectors, no_op, index_empty);
@@ -940,6 +1094,9 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index in-place with the new data.
  *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -948,6 +1105,9 @@ auto extend(raft::resources const& handle,
  *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
  *   // train the index from a [N, D] dataset
  *   auto index_empty = ivf_flat::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
  *   // fill the index with the data
  *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
  *   ivf_flat::extend(handle, dataset, no_opt, &index_empty);
@@ -1870,6 +2030,89 @@ void reset_index(const raft::resources& res, index<int8_t, int64_t>* index);
  */
 void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index);
 
+/**
+ * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+ * modified externally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // initialize an empty index
+ *   ivf_pq::index<int64_t> index(res, index_params, D);
+ *   ivf_pq::helpers::reset_index(res, &index);
+ *   // resize the first IVF list to hold 5 records
+ *   auto spec = list_spec<uint32_t, int64_t>{
+ *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   uint32_t new_size = 5;
+ *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
+ *   // recompute the internal state of the index
+ *   ivf_pq::helpers::recompute_internal_state(res, index);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] index pointer to IVF-PQ index
+ */
+void recompute_internal_state(const raft::resources& res, index<float, int64_t>* index);
+
+/**
+ * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+ * modified externally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // initialize an empty index
+ *   ivf_pq::index<int64_t> index(res, index_params, D);
+ *   ivf_pq::helpers::reset_index(res, &index);
+ *   // resize the first IVF list to hold 5 records
+ *   auto spec = list_spec<uint32_t, int64_t>{
+ *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   uint32_t new_size = 5;
+ *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
+ *   // recompute the internal state of the index
+ *   ivf_pq::helpers::recompute_internal_state(res, index);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] index pointer to IVF-PQ index
+ */
+void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>* index);
+
+/**
+ * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
+ * modified externally.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   // use default index parameters
+ *   ivf_pq::index_params index_params;
+ *   // initialize an empty index
+ *   ivf_pq::index<int64_t> index(res, index_params, D);
+ *   ivf_pq::helpers::reset_index(res, &index);
+ *   // resize the first IVF list to hold 5 records
+ *   auto spec = list_spec<uint32_t, int64_t>{
+ *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   uint32_t new_size = 5;
+ *   ivf::resize_list(res, list, spec, new_size, 0);
+ *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
+ *   // recompute the internal state of the index
+ *   ivf_pq::helpers::recompute_internal_state(res, index);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[inout] index pointer to IVF-Flat index
+ */
+void recompute_internal_state(const raft::resources& res, index<uint8_t, int64_t>* index);
 /**
  * @}
  */

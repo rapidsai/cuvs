@@ -31,6 +31,7 @@
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/add.cuh>
@@ -195,13 +196,25 @@ void extend(raft::resources const& handle,
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size                    = std::min<size_t>(n_rows, kReasonableMaxBatchSize);
 
+  // Determine if a stream pool exist and make sure there is at least one stream in it so we
+  // could use the stream for kernel/copy overlapping by enabling prefetch.
+  auto copy_stream = raft::resource::get_cuda_stream(handle);  // Using the main stream by default
+  bool enable_prefetch = false;
+  if (handle.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
+    if (raft::resource::get_stream_pool_size(handle) >= 1) {
+      enable_prefetch = true;
+      copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
+    }
+  }
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(new_vectors,
                                             n_rows,
                                             index->dim(),
                                             max_batch_size,
-                                            stream,
-                                            raft::resource::get_workspace_resource(handle));
+                                            copy_stream,
+                                            raft::resource::get_workspace_resource(handle),
+                                            enable_prefetch);
+  vec_batches.prefetch_next_batch();
 
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
@@ -214,6 +227,10 @@ void extend(raft::resources const& handle,
                                             orig_centroids_view,
                                             batch_labels_view,
                                             utils::mapping<float>{});
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
   }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
@@ -277,6 +294,8 @@ void extend(raft::resources const& handle,
 
   utils::batch_load_iterator<IdxT> vec_indices(
     new_indices, n_rows, 1, max_batch_size, stream, raft::resource::get_workspace_resource(handle));
+  vec_batches.reset();
+  vec_batches.prefetch_next_batch();
   utils::batch_load_iterator<IdxT> idx_batch = vec_indices.begin();
   size_t next_report_offset                  = 0;
   size_t d_report_offset                     = n_rows * 5 / 100;
@@ -297,6 +316,10 @@ void extend(raft::resources const& handle,
                                            dim,
                                            index->veclen(),
                                            batch.offset());
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     if (batch.offset() > next_report_offset) {
@@ -312,6 +335,37 @@ void extend(raft::resources const& handle,
   if (!index->center_norms().has_value()) {
     index->allocate_center_norms(handle);
     if (index->center_norms().has_value()) {
+      if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::rowNorm(index->center_norms()->data_handle(),
+                              index->centers().data_handle(),
+                              dim,
+                              n_lists,
+                              raft::linalg::L2Norm,
+                              true,
+                              stream,
+                              raft::sqrt_op{});
+      } else {
+        raft::linalg::rowNorm(index->center_norms()->data_handle(),
+                              index->centers().data_handle(),
+                              dim,
+                              n_lists,
+                              raft::linalg::L2Norm,
+                              true,
+                              stream);
+      }
+      RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
+    }
+  } else if (index->center_norms().has_value() && index->adaptive_centers()) {
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      raft::linalg::rowNorm(index->center_norms()->data_handle(),
+                            index->centers().data_handle(),
+                            dim,
+                            n_lists,
+                            raft::linalg::L2Norm,
+                            true,
+                            stream,
+                            raft::sqrt_op{});
+    } else {
       raft::linalg::rowNorm(index->center_norms()->data_handle(),
                             index->centers().data_handle(),
                             dim,
@@ -319,16 +373,7 @@ void extend(raft::resources const& handle,
                             raft::linalg::L2Norm,
                             true,
                             stream);
-      RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
     }
-  } else if (index->center_norms().has_value() && index->adaptive_centers()) {
-    raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                          index->centers().data_handle(),
-                          dim,
-                          n_lists,
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
     RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
   }
 }
@@ -361,7 +406,8 @@ inline auto build(raft::resources const& handle,
                 "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
+               "Cosine metric requires more than one dim");
   index<T, IdxT> index(handle, params, dim);
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
@@ -391,7 +437,7 @@ inline auto build(raft::resources const& handle,
       index.centers().data_handle(), index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(index.metric());
+    kmeans_params.metric  = index.metric();
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
