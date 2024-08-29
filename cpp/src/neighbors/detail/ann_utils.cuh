@@ -19,6 +19,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/common/nvtx.hpp>
 #include <raft/core/logger-ext.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -561,8 +562,9 @@ struct batch_load_iterator {
                       size_type row_width,
                       size_type batch_size,
                       rmm::cuda_stream_view stream,
-                      rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
-                      bool prefetch                     = false)
+                      raft::resource::device_async_resource_ref mr =
+                        raft::resource::get_current_device_resource_ref(),
+                      bool prefetch = false)
     : cur_batch_(new batch(source, n_rows, row_width, batch_size, stream, mr, prefetch)),
       cur_pos_(0),
       cur_prefetch_pos_(0)

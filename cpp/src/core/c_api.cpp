@@ -19,6 +19,7 @@
 #include <cuvs/core/exceptions.hpp>
 #include <memory>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
@@ -69,8 +70,8 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    auto mr      = rmm::mr::get_current_device_resource();
-    *ptr         = mr->allocate(bytes, raft::resource::get_cuda_stream(*res_ptr));
+    auto mr      = raft::resource::get_current_device_resource_ref();
+    *ptr         = mr.allocate_async(bytes, raft::resource::get_cuda_stream(*res_ptr));
   });
 }
 
@@ -78,8 +79,8 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    auto mr      = rmm::mr::get_current_device_resource();
-    mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
+    auto mr      = raft::resource::get_current_device_resource_ref();
+    mr.deallocate_async(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
   });
 }
 
@@ -90,7 +91,7 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
 {
   return cuvs::core::translate_exceptions([=] {
     // Upstream memory resource needs to be a cuda_memory_resource
-    auto cuda_mr         = rmm::mr::get_current_device_resource();
+    auto cuda_mr         = raft::resource::get_current_device_resource();
     auto* cuda_mr_casted = dynamic_cast<rmm::mr::cuda_memory_resource*>(cuda_mr);
     if (cuda_mr_casted == nullptr) {
       throw std::runtime_error("Current memory resource is not a cuda_memory_resource");
@@ -99,14 +100,14 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
     auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
     pool_mr = std::make_unique<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>>(
       cuda_mr_casted, initial_size, max_size);
-    rmm::mr::set_current_device_resource(pool_mr.get());
+    raft::resource::set_current_device_resource(pool_mr.get());
   });
 }
 
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
   return cuvs::core::translate_exceptions([=] {
-    rmm::mr::set_current_device_resource(nullptr);
+    raft::resource::set_current_device_resource(nullptr);
     pool_mr.reset();
   });
 }

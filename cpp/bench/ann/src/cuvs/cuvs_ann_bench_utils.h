@@ -26,6 +26,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
@@ -79,10 +80,10 @@ class shared_raft_resources {
   using mr_type      = rmm::mr::failure_callback_resource_adaptor<pool_mr_type>;
 
   shared_raft_resources()
-  try : orig_resource_{rmm::mr::get_current_device_resource()},
+  try : orig_resource_{raft::resource::get_current_device_resource()},
     pool_resource_(orig_resource_, 1024 * 1024 * 1024ull),
     resource_(&pool_resource_, rmm_oom_callback, nullptr) {
-    rmm::mr::set_current_device_resource(&resource_);
+    raft::resource::set_current_device_resource(&resource_);
   } catch (const std::exception& e) {
     auto cuda_status = cudaGetLastError();
     size_t free      = 0;
@@ -102,7 +103,7 @@ class shared_raft_resources {
   shared_raft_resources(const shared_raft_resources& res)                      = delete;
   auto operator=(const shared_raft_resources& other) -> shared_raft_resources& = delete;
 
-  ~shared_raft_resources() noexcept { rmm::mr::set_current_device_resource(orig_resource_); }
+  ~shared_raft_resources() noexcept { raft::resource::set_current_device_resource(orig_resource_); }
 
  private:
   rmm::mr::device_memory_resource* orig_resource_;

@@ -149,7 +149,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     switch (mem_type) {
       case (AllocatorType::kHostPinned): return &mr_pinned_;
       case (AllocatorType::kHostHugePage): return &mr_huge_page_;
-      default: return rmm::mr::get_current_device_resource();
+      default: return raft::resource::get_current_device_resource_ref();
     }
   }
 };

@@ -17,11 +17,11 @@
 #include <cstdint>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
+#include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/random/make_blobs.cuh>
 
 #include <cuvs/neighbors/cagra.hpp>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
 
 #include "common.cuh"
@@ -66,8 +66,8 @@ int main()
 
   // Set pool memory resource with 1 GiB initial pool size. All allocations use the same pool.
   rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  rmm::mr::set_current_device_resource(&pool_mr);
+    raft::resource::get_current_device_resource_ref(), 1024 * 1024 * 1024ull);
+  raft::resource::set_current_device_resource(&pool_mr);
 
   // Alternatively, one could define a pool allocator for temporary arrays (used within RAFT
   // algorithms). In that case only the internal arrays would use the pool, any other allocation
