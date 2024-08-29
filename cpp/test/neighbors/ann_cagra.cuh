@@ -50,6 +50,18 @@
 namespace cuvs::neighbors::cagra {
 namespace {
 
+struct test_cagra_sample_filter {
+  static constexpr unsigned offset = 300;
+  inline _RAFT_HOST_DEVICE auto operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample inside the current inverted list
+    const uint32_t sample_ix) const
+  {
+    return sample_ix >= offset;
+  }
+};
+
 /** Xorshift rondem number generator.
  *
  * See https://en.wikipedia.org/wiki/Xorshift#xorshift for reference.
@@ -635,6 +647,202 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                  ps.k,
                                  ps.metric,
                                  1.0e-4));
+    }
+  }
+
+  void SetUp() override
+  {
+    database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
+    search_queries.resize(ps.n_queries * ps.dim, stream_);
+    raft::random::RngState r(1234ULL);
+    InitDataset(handle_, database.data(), ps.n_rows, ps.dim, ps.metric, r);
+    InitDataset(handle_, search_queries.data(), ps.n_queries, ps.dim, ps.metric, r);
+    raft::resource::sync_stream(handle_);
+  }
+
+  void TearDown() override
+  {
+    raft::resource::sync_stream(handle_);
+    database.resize(0, stream_);
+    search_queries.resize(0, stream_);
+  }
+
+ private:
+  raft::resources handle_;
+  rmm::cuda_stream_view stream_;
+  AnnCagraInputs ps;
+  rmm::device_uvector<DataT> database;
+  rmm::device_uvector<DataT> search_queries;
+};
+
+template <typename DistanceT, typename DataT, typename IdxT>
+class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
+ public:
+  AnnCagraFilterTest()
+    : stream_(raft::resource::get_cuda_stream(handle_)),
+      ps(::testing::TestWithParam<AnnCagraInputs>::GetParam()),
+      database(0, stream_),
+      search_queries(0, stream_)
+  {
+  }
+
+ protected:
+  void testCagra()
+  {
+    if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
+        ps.build_algo == graph_build_algo::NN_DESCENT)
+      GTEST_SKIP();
+
+    size_t queries_size = ps.n_queries * ps.k;
+    std::vector<IdxT> indices_Cagra(queries_size);
+    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<DistanceT> distances_Cagra(queries_size);
+    std::vector<DistanceT> distances_naive(queries_size);
+
+    {
+      rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
+      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+      auto* database_filtered_ptr = database.data() + test_cagra_sample_filter::offset * ps.dim;
+      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(
+        handle_,
+        distances_naive_dev.data(),
+        indices_naive_dev.data(),
+        search_queries.data(),
+        database_filtered_ptr,
+        ps.n_queries,
+        ps.n_rows - test_cagra_sample_filter::offset,
+        ps.dim,
+        ps.k,
+        ps.metric);
+      raft::linalg::addScalar(indices_naive_dev.data(),
+                              indices_naive_dev.data(),
+                              IdxT(test_cagra_sample_filter::offset),
+                              queries_size,
+                              stream_);
+      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
+      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
+      raft::resource::sync_stream(handle_);
+    }
+
+    {
+      rmm::device_uvector<DistanceT> distances_dev(queries_size, stream_);
+      rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+
+      {
+        cagra::index_params index_params;
+        index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
+                                          // not used for knn_graph building.
+
+        switch (ps.build_algo) {
+          case graph_build_algo::IVF_PQ:
+            index_params.graph_build_params =
+              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            if (ps.ivf_pq_search_refine_ratio) {
+              std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+                index_params.graph_build_params)
+                .refinement_rate = *ps.ivf_pq_search_refine_ratio;
+            }
+            break;
+          case graph_build_algo::NN_DESCENT: {
+            index_params.graph_build_params =
+              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
+        };
+
+        index_params.compression = ps.compression;
+        cagra::search_params search_params;
+        search_params.algo        = ps.algo;
+        search_params.max_queries = ps.max_queries;
+        search_params.team_size   = ps.team_size;
+
+        // TODO: setting search_params.itopk_size here breaks the filter tests, but is required for
+        // k>1024 skip these tests until fixed
+        if (ps.k >= 1024) { GTEST_SKIP(); }
+        // search_params.itopk_size   = ps.itopk_size;
+
+        auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
+          (const DataT*)database.data(), ps.n_rows, ps.dim);
+
+        cagra::index<DataT, IdxT> index(handle_);
+        if (ps.host_dataset) {
+          auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
+          raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
+          auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
+            (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+          index = cagra::build(handle_, index_params, database_host_view);
+        } else {
+          index = cagra::build(handle_, index_params, database_view);
+        }
+
+        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
+
+        auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
+          search_queries.data(), ps.n_queries, ps.dim);
+        auto indices_out_view =
+          raft::make_device_matrix_view<IdxT, int64_t>(indices_dev.data(), ps.n_queries, ps.k);
+        auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
+          distances_dev.data(), ps.n_queries, ps.k);
+        auto removed_indices =
+          raft::make_device_vector<int64_t, int64_t>(handle_, test_cagra_sample_filter::offset);
+        thrust::sequence(
+          raft::resource::get_thrust_policy(handle_),
+          thrust::device_pointer_cast(removed_indices.data_handle()),
+          thrust::device_pointer_cast(removed_indices.data_handle() + removed_indices.extent(0)));
+        raft::resource::sync_stream(handle_);
+        cuvs::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+          handle_, removed_indices.view(), ps.n_rows);
+        cagra::search(handle_,
+                      search_params,
+                      index,
+                      search_queries_view,
+                      indices_out_view,
+                      dists_out_view,
+                      std::make_optional(
+                        cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view())));
+        raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
+        raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
+        raft::resource::sync_stream(handle_);
+      }
+
+      // Test search results for nodes marked as filtered
+      bool unacceptable_node = false;
+      for (int q = 0; q < ps.n_queries; q++) {
+        for (int i = 0; i < ps.k; i++) {
+          const auto n      = indices_Cagra[q * ps.k + i];
+          unacceptable_node = unacceptable_node | !test_cagra_sample_filter()(q, n);
+        }
+      }
+      EXPECT_FALSE(unacceptable_node);
+
+      double min_recall = ps.min_recall;
+      // TODO(mfoerster): re-enable uniquenes test
+      EXPECT_TRUE(eval_neighbours(indices_naive,
+                                  indices_Cagra,
+                                  distances_naive,
+                                  distances_Cagra,
+                                  ps.n_queries,
+                                  ps.k,
+                                  0.003,
+                                  min_recall,
+                                  false));
+      if (!ps.compression.has_value()) {
+        // Don't evaluate distances for CAGRA-Q for now as the error can be somewhat large
+        EXPECT_TRUE(eval_distances(handle_,
+                                   database.data(),
+                                   search_queries.data(),
+                                   indices_dev.data(),
+                                   distances_dev.data(),
+                                   ps.n_rows,
+                                   ps.dim,
+                                   ps.n_queries,
+                                   ps.k,
+                                   ps.metric,
+                                   1.0e-4));
+      }
     }
   }
 
