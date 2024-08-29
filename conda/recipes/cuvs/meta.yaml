@@ -69,6 +69,8 @@ requirements:
     - libcuvs {{ version }}
     - python x.x
     - rmm ={{ minor_version }}
+    - cuda-python
+    - numpy >=1.23,<3.0a0
 
 tests:
   requirements:
