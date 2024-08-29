@@ -1,0 +1,295 @@
+dataset:
+  base_file: bigann-1B/base.1B.u8bin
+  distance: euclidean
+  groundtruth_neighbors_file: bigann-100M/groundtruth.neighbors.ibin
+  name: bigann-100M
+  query_file: bigann-1B/query.public.10K.u8bin
+  subset_size: 100000000
+index:
+- algo: raft_ivf_pq
+  build_param:
+    niter: 25
+    nlist: 5000
+    pq_dim: 64
+    ratio: 10
+  file: bigann-100M/raft_ivf_pq/dimpq64-cluster5K
+  name: raft_ivf_pq.dimpq64-cluster5K
+  search_params:
+  - internalDistanceDtype: float
+    nprobe: 20
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 30
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 40
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 50
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 100
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 200
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 500
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 1000
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 20
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 30
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 40
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 50
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 100
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 200
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 500
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 1000
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 20
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 1000
+    smemLutDtype: half
+- algo: raft_ivf_pq
+  build_param:
+    niter: 25
+    nlist: 10000
+    pq_dim: 64
+    ratio: 10
+  file: bigann-100M/raft_ivf_pq/dimpq64-cluster5K
+  name: raft_ivf_pq.dimpq64-cluster10K
+  search_params:
+  - internalDistanceDtype: float
+    nprobe: 20
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 30
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 40
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 50
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 100
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 200
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 500
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 1000
+    smemLutDtype: float
+  - internalDistanceDtype: float
+    nprobe: 20
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 30
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 40
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 50
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 100
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 200
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 500
+    smemLutDtype: fp8
+  - internalDistanceDtype: float
+    nprobe: 1000
+    smemLutDtype: fp8
+  - internalDistanceDtype: half
+    nprobe: 20
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 30
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 40
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 50
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 100
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 200
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 500
+    smemLutDtype: half
+  - internalDistanceDtype: half
+    nprobe: 1000
+    smemLutDtype: half
+- algo: hnswlib
+  build_param:
+    M: 12
+    efConstruction: 500
+    numThreads: 32
+  file: bigann-100M/hnswlib/M12
+  name: hnswlib.M12
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: hnswlib
+  build_param:
+    M: 16
+    efConstruction: 500
+    numThreads: 32
+  file: bigann-100M/hnswlib/M16
+  name: hnswlib.M16
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: hnswlib
+  build_param:
+    M: 24
+    efConstruction: 500
+    numThreads: 32
+  file: bigann-100M/hnswlib/M24
+  name: hnswlib.M24
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: hnswlib
+  build_param:
+    M: 36
+    efConstruction: 500
+    numThreads: 32
+  file: bigann-100M/hnswlib/M36
+  name: hnswlib.M36
+  search_params:
+  - ef: 10
+  - ef: 20
+  - ef: 40
+  - ef: 60
+  - ef: 80
+  - ef: 120
+  - ef: 200
+  - ef: 400
+  - ef: 600
+  - ef: 800
+- algo: raft_ivf_flat
+  build_param:
+    niter: 25
+    nlist: 100000
+    ratio: 5
+  file: bigann-100M/raft_ivf_flat/nlist100K
+  name: raft_ivf_flat.nlist100K
+  search_params:
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 20
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 30
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 40
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 50
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 100
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 200
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 500
+  - max_batch: 10000
+    max_k: 10
+    nprobe: 1000
+- algo: raft_cagra
+  build_param:
+    graph_degree: 32
+  file: bigann-100M/raft_cagra/dim32
+  name: raft_cagra.dim32
+  search_params:
+  - itopk: 32
+  - itopk: 64
+  - itopk: 128
+- algo: raft_cagra
+  build_param:
+    graph_degree: 64
+  file: bigann-100M/raft_cagra/dim64
+  name: raft_cagra.dim64
+  search_params:
+  - itopk: 32
+  - itopk: 64
+  - itopk: 128
+search_basic_param:
+  batch_size: 10000
+  k: 10

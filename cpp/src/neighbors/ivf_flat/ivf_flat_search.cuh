@@ -79,6 +79,8 @@ void search_impl(raft::resources const& handle,
   // also we might need additional storage for select_k
   rmm::device_uvector<uint32_t> indices_tmp_dev(0, stream, search_mr);
   rmm::device_uvector<uint32_t> neighbors_uint32_buf(0, stream, search_mr);
+  auto distance_buffer_dev_view = raft::make_device_matrix_view<AccT, int64_t>(
+    distance_buffer_dev.data(), n_queries, index.n_lists());
 
   size_t float_query_size;
   if constexpr (std::is_integral_v<T>) {
@@ -122,6 +124,19 @@ void search_impl(raft::resources const& handle,
       RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
       break;
     }
+    case cuvs::distance::DistanceType::CosineExpanded: {
+      raft::linalg::rowNorm(query_norm_dev.data(),
+                            converted_queries_ptr,
+                            static_cast<IdxT>(index.dim()),
+                            static_cast<IdxT>(n_queries),
+                            raft::linalg::L2Norm,
+                            true,
+                            stream,
+                            raft::sqrt_op{});
+      alpha = -1.0f;
+      beta  = 0.0f;
+      break;
+    }
     default: {
       alpha = 1.0f;
       beta  = 0.0f;
@@ -144,12 +159,25 @@ void search_impl(raft::resources const& handle,
                      index.n_lists(),
                      stream);
 
+  if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    auto n_lists                      = index.n_lists();
+    const auto* q_norm_ptr            = query_norm_dev.data();
+    const auto* index_center_norm_ptr = index.center_norms()->data_handle();
+    raft::linalg::map_offset(
+      handle,
+      distance_buffer_dev_view,
+      [=] __device__(const uint32_t idx, const float dist) {
+        const auto query   = idx / n_lists;
+        const auto cluster = idx % n_lists;
+        return dist / (q_norm_ptr[query] * index_center_norm_ptr[cluster]);
+      },
+      raft::make_const_mdspan(distance_buffer_dev_view));
+  }
   RAFT_LOG_TRACE_VEC(distance_buffer_dev.data(), std::min<uint32_t>(20, index.n_lists()));
 
   cuvs::selection::select_k(
     handle,
-    raft::make_device_matrix_view<const AccT, int64_t>(
-      distance_buffer_dev.data(), n_queries, index.n_lists()),
+    raft::make_const_mdspan(distance_buffer_dev_view),
     std::nullopt,
     raft::make_device_matrix_view<AccT, int64_t>(coarse_distances_dev.data(), n_queries, n_probes),
     raft::make_device_matrix_view<uint32_t, int64_t>(
