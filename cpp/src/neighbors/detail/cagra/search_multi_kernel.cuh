@@ -111,9 +111,9 @@ RAFT_KERNEL random_pickup_kernel(
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
-  const auto team_size         = dataset_desc->team_size;
+  const auto team_size_bits    = dataset_desc->team_size_bitshift();
   const auto ldb               = hashmap::get_size(hash_bitlen);
-  const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) / team_size;
+  const auto global_team_index = (blockIdx.x * blockDim.x + threadIdx.x) >> team_size_bits;
   const uint32_t query_id      = blockIdx.y;
   if (global_team_index >= num_pickup) { return; }
   extern __shared__ uint8_t smem[];
@@ -140,7 +140,7 @@ RAFT_KERNEL random_pickup_kernel(
   }
 
   const auto store_gmem_index = global_team_index + (ldr * query_id);
-  if (threadIdx.x % team_size == 0) {
+  if ((threadIdx.x & ((1u << team_size_bits) - 1u)) == 0) {
     if (hashmap::insert(
           visited_hashmap_ptr + (ldb * query_id), hash_bitlen, best_index_team_local)) {
       result_distances_ptr[store_gmem_index] = best_norm2_team_local;
@@ -316,10 +316,11 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
-  const auto team_size      = dataset_desc->team_size;
+  const auto team_size_bits = dataset_desc->team_size_bitshift();
+  const auto team_size      = 1u << team_size_bits;
   const uint32_t ldb        = hashmap::get_size(hash_bitlen);
   const auto tid            = threadIdx.x + blockDim.x * blockIdx.x;
-  const auto global_team_id = tid / team_size;
+  const auto global_team_id = tid >> team_size_bits;
   const auto query_id       = blockIdx.y;
 
   extern __shared__ uint8_t smem[];
@@ -353,12 +354,12 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   DISTANCE_T norm2 = dataset_desc->compute_distance(child_id, compute_distance_flag);
 
   if (compute_distance_flag) {
-    if (threadIdx.x % team_size == 0) {
+    if ((threadIdx.x & (team_size - 1)) == 0) {
       result_indices_ptr[ldd * blockIdx.y + global_team_id]   = child_id;
       result_distances_ptr[ldd * blockIdx.y + global_team_id] = norm2;
     }
   } else {
-    if (threadIdx.x % team_size == 0) {
+    if ((threadIdx.x & (team_size - 1)) == 0) {
       result_distances_ptr[ldd * blockIdx.y + global_team_id] = utils::get_max_value<DISTANCE_T>();
     }
   }

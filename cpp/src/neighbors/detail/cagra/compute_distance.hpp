@@ -28,6 +28,7 @@
 // TODO: This shouldn't be invoking spatial/knn
 #include "../ann_utils.cuh"
 
+#include <raft/util/device_loads_stores.cuh>
 #include <raft/util/vectorized.cuh>
 
 #include <type_traits>
@@ -67,6 +68,30 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
     }
   };
 
+  struct smem_and_team_size_t {
+    uint32_t value;
+    RAFT_INLINE_FUNCTION constexpr smem_and_team_size_t(uint32_t smem_size_bytes,
+                                                        uint32_t team_size_bitshift)
+      : value{(team_size_bitshift << 24) | smem_size_bytes}
+    {
+    }
+    /** Total dynamic shared memory required by the descriptor.  */
+    RAFT_INLINE_FUNCTION constexpr auto smem_ws_size_in_bytes() const noexcept -> uint32_t
+    {
+      return value & 0xffffffu;
+    }
+    RAFT_INLINE_FUNCTION constexpr auto team_size_bitshift() const noexcept -> uint32_t
+    {
+      return (value >> 24) & 0xffu;
+    }
+    /** How many threads are involved in computing a single distance. */
+    RAFT_INLINE_FUNCTION constexpr auto team_size() const noexcept -> uint32_t
+    {
+      return 1u << team_size_bitshift();
+    }
+  };
+  static_assert(sizeof(smem_and_team_size_t) == sizeof(uint32_t));
+
   using setup_workspace_type  = const base_type*(const base_type*, void*, const DATA_T*, uint32_t);
   using compute_distance_type = DISTANCE_T(const args_t, const INDEX_T);
 
@@ -79,10 +104,7 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
    * given by the dataset_index. */
   compute_distance_type* compute_distance_impl;
   void* extra_ptr3;
-  /** How many threads are involved in computing a single distance. */
-  uint32_t team_size;
-  /** Total dynamic shared memory required by the descriptor.  */
-  uint32_t smem_ws_size_in_bytes;
+  smem_and_team_size_t smem_and_team_size;
 
   /** Number of records in the database. */
   INDEX_T size;
@@ -91,15 +113,37 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
                                                  compute_distance_type* compute_distance_impl,
                                                  INDEX_T size,
                                                  uint32_t dim,
-                                                 uint32_t team_size,
+                                                 uint32_t team_size_bitshift,
                                                  uint32_t smem_ws_size_in_bytes)
     : setup_workspace_impl(setup_workspace_impl),
       compute_distance_impl(compute_distance_impl),
       size(size),
-      team_size(team_size),
-      smem_ws_size_in_bytes(smem_ws_size_in_bytes),
+      smem_and_team_size(smem_ws_size_in_bytes, team_size_bitshift),
       args{nullptr, nullptr, 0, dim, 0, 0}
   {
+  }
+
+  /** Total dynamic shared memory required by the descriptor.  */
+  RAFT_INLINE_FUNCTION constexpr auto smem_ws_size_in_bytes() const noexcept -> uint32_t
+  {
+    return smem_and_team_size.smem_ws_size_in_bytes();
+  }
+  RAFT_INLINE_FUNCTION constexpr auto team_size_bitshift() const noexcept -> uint32_t
+  {
+    return smem_and_team_size.team_size_bitshift();
+  }
+  RAFT_DEVICE_INLINE_FUNCTION constexpr auto team_size_bitshift_from_smem() const noexcept
+    -> uint32_t
+  {
+    uint32_t sts;
+    raft::lds(sts, reinterpret_cast<const uint32_t*>(&smem_and_team_size));
+    return reinterpret_cast<smem_and_team_size_t&>(sts).team_size_bitshift();
+  }
+
+  /** How many threads are involved in computing a single distance. */
+  RAFT_INLINE_FUNCTION constexpr auto team_size() const noexcept -> uint32_t
+  {
+    return smem_and_team_size.team_size();
   }
 
   RAFT_DEVICE_INLINE_FUNCTION auto setup_workspace(void* smem_ptr,
@@ -113,7 +157,7 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
     -> DISTANCE_T
   {
     auto per_thread_distances = valid ? compute_distance_impl(args.load(), dataset_index) : 0;
-    return device::team_sum(per_thread_distances, this->team_size);
+    return device::team_sum(per_thread_distances, team_size_bitshift_from_smem());
   }
 };
 
@@ -130,8 +174,8 @@ struct dataset_descriptor_host {
                           rmm::cuda_stream_view stream,
                           uint32_t dataset_block_dim)
     : stream_{stream},
-      smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes},
-      team_size{dd_host.team_size},
+      smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
+      team_size{dd_host.team_size()},
       dataset_block_dim{dataset_block_dim}
   {
     RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, sizeof(DescriptorImpl), stream_));

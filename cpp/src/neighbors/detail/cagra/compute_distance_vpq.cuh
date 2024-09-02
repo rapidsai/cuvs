@@ -21,6 +21,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/integer_utils.hpp>
+#include <raft/util/pow2_utils.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -124,7 +125,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
                 compute_distance_impl,
                 size,
                 dim,
-                TeamSize,
+                raft::Pow2<TeamSize>::Log2,
                 get_smem_ws_size_in_bytes(dim))
   {
     cagra_q_dataset_descriptor_t::encoded_dataset_ptr(args) = encoded_dataset_ptr;

@@ -22,7 +22,7 @@
 #include <raft/core/logger-macros.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/util/device_loads_stores.cuh>
-
+#include <raft/util/pow2_utils.cuh>
 #include <raft/util/vectorized.cuh>
 
 #include <type_traits>
@@ -113,7 +113,7 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
                 compute_distance_impl,
                 size,
                 dim,
-                TeamSize,
+                raft::Pow2<TeamSize>::Log2,
                 get_smem_ws_size_in_bytes(dim))
   {
     standard_dataset_descriptor_t::ptr(args) = ptr;

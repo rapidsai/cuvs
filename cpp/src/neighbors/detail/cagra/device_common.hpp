@@ -71,6 +71,29 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr T swizzling(T x)
   }
 }
 
+template <uint32_t TeamSize, typename T>
+RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x) -> T
+{
+#pragma unroll
+  for (uint32_t stride = TeamSize >> 1; stride > 0; stride >>= 1) {
+    x += raft::shfl_xor(x, stride, TeamSize);
+  }
+  return x;
+}
+
+template <typename T>
+RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size_bitshift) -> T
+{
+  switch (team_size_bitshift) {
+    case 5: x += raft::shfl_xor(x, 16);
+    case 4: x += raft::shfl_xor(x, 8);
+    case 3: x += raft::shfl_xor(x, 4);
+    case 2: x += raft::shfl_xor(x, 2);
+    case 1: x += raft::shfl_xor(x, 1);
+    default: return x;
+  }
+}
+
 template <typename IndexT,
           typename DistanceT,
           typename DATASET_DESCRIPTOR_T>
@@ -88,10 +111,12 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const uint32_t block_id   = 0,
   const uint32_t num_blocks = 1)
 {
-  const auto team_size = dataset_desc.team_size;
-  const auto max_i     = raft::round_up_safe<uint32_t>(num_pickup, warp_size / team_size);
+  const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
+  const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
+  const auto compute_distance = dataset_desc.compute_distance_impl;
+  const auto args             = dataset_desc.args.load();
 
-  for (uint32_t i = threadIdx.x / team_size; i < max_i; i += blockDim.x / team_size) {
+  for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
 
     IndexT best_index_team_local;
@@ -109,7 +134,11 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         }
       }
 
-      auto norm2 = dataset_desc.compute_distance(seed_index, valid_i);
+      // This is the `dataset_desc.compute_distance` manually inlined to move the fetching of
+      // dataset_desc from smem out of the loop.
+      // const auto norm2 = dataset_desc.compute_distance(seed_index, valid_i);
+      const auto norm2 =
+        device::team_sum(valid_i ? compute_distance(args, seed_index) : 0, team_size_bits);
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;
@@ -117,7 +146,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
       }
     }
 
-    const unsigned lane_id = threadIdx.x % team_size;
+    const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
     if (valid_i && lane_id == 0) {
       if (hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
         result_distances_ptr[i] = best_norm2_team_local;
@@ -168,18 +197,25 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   __syncthreads();
 
   // Compute the distance to child nodes
-  const auto team_size = dataset_desc.team_size;
-  const auto max_i     = raft::round_up_safe(knn_k * search_width, warp_size / team_size);
-  for (uint32_t tid = threadIdx.x; tid < max_i * team_size; tid += blockDim.x) {
-    const auto i       = tid / team_size;
+  const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
+  const auto max_i          = raft::round_up_safe(knn_k * search_width, warp_size >> team_size_bits)
+                     << team_size_bits;
+  const auto compute_distance = dataset_desc.compute_distance_impl;
+  const auto args             = dataset_desc.args.load();
+  for (uint32_t tid = threadIdx.x; tid < max_i; tid += blockDim.x) {
+    const auto i       = tid >> team_size_bits;
     const bool valid_i = (i < (knn_k * search_width));
     IndexT child_id    = invalid_index;
     if (valid_i) { child_id = result_child_indices_ptr[i]; }
 
-    auto norm2 = dataset_desc.compute_distance(child_id, child_id != invalid_index);
+    // This is the `dataset_desc.compute_distance` manually inlined to move the fetching of
+    // dataset_desc from smem out of the loop.
+    // const auto norm2 = dataset_desc.compute_distance(child_id, child_id != invalid_index);
+    const auto norm2 = device::team_sum(
+      (child_id != invalid_index) ? compute_distance(args, child_id) : 0, team_size_bits);
 
     // Store the distance
-    const unsigned lane_id = threadIdx.x % team_size;
+    const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
     if (valid_i && lane_id == 0) {
       if (child_id != invalid_index) {
         result_child_distances_ptr[i] = norm2;
@@ -187,29 +223,6 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
         result_child_distances_ptr[i] = raft::upper_bound<DistanceT>();
       }
     }
-  }
-}
-
-template <uint32_t TeamSize, typename T>
-RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x) -> T
-{
-#pragma unroll
-  for (uint32_t stride = TeamSize >> 1; stride > 0; stride >>= 1) {
-    x += raft::shfl_xor(x, stride, TeamSize);
-  }
-  return x;
-}
-
-template <typename T>
-RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size) -> T
-{
-  switch (team_size) {
-    case 32: x += raft::shfl_xor(x, 16);
-    case 16: x += raft::shfl_xor(x, 8);
-    case 8: x += raft::shfl_xor(x, 4);
-    case 4: x += raft::shfl_xor(x, 2);
-    case 2: x += raft::shfl_xor(x, 1);
-    default: return x;
   }
 }
 

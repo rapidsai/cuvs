@@ -529,7 +529,7 @@ RAFT_KERNEL search_kernel(
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
 
   auto result_indices_buffer =
-    reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes);
+    reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes());
   auto result_distances_buffer =
     reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
   auto visited_hash_buffer =
