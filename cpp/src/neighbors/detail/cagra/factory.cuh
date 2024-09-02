@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "compute_distance-ext.cuh"
 #include "search_multi_cta.cuh"
 #include "search_multi_kernel.cuh"
 #include "search_plan.cuh"
@@ -67,4 +68,89 @@ class factory {
     }
   }
 };
+
+struct dataset_descriptor_key {
+  uint64_t data_ptr;
+  uint64_t n_rows;
+  uint32_t dim;
+  uint32_t extra_val;
+  uint32_t team_size;
+  uint32_t metric;
+};
+
+template <typename DatasetT>
+auto make_key(const cagra::search_params& params,
+              const DatasetT& dataset,
+              cuvs::distance::DistanceType metric)
+  -> std::enable_if_t<is_strided_dataset_v<DatasetT>, dataset_descriptor_key>
+{
+  return dataset_descriptor_key{reinterpret_cast<uint64_t>(dataset.view().data_handle()),
+                                uint64_t(dataset.n_rows()),
+                                dataset.dim(),
+                                dataset.stride(),
+                                uint32_t(params.team_size),
+                                uint32_t(metric)};
+}
+
+template <typename DatasetT>
+auto make_key(const cagra::search_params& params,
+              const DatasetT& dataset,
+              cuvs::distance::DistanceType metric)
+  -> std::enable_if_t<is_vpq_dataset_v<DatasetT>, dataset_descriptor_key>
+{
+  return dataset_descriptor_key{
+    reinterpret_cast<uint64_t>(dataset.data.data_handle()),
+    uint64_t(dataset.n_rows()),
+    dataset.dim(),
+    uint32_t(reinterpret_cast<uint64_t>(dataset.pq_code_book.data_handle()) >> 6),
+    uint32_t(params.team_size),
+    uint32_t(metric)};
+}
+
+inline auto operator==(const dataset_descriptor_key& a, const dataset_descriptor_key& b) -> bool
+{
+  return a.data_ptr == b.data_ptr && a.n_rows == b.n_rows && a.dim == b.dim &&
+         a.extra_val == b.extra_val && a.team_size == b.team_size && a.metric == b.metric;
+}
+
+struct dataset_descriptor_key_hash {
+  inline auto operator()(const dataset_descriptor_key& x) const noexcept -> std::size_t
+  {
+    return size_t{x.data_ptr} + size_t{x.n_rows} * size_t{x.dim} * size_t{x.extra_val} +
+           (size_t{x.team_size} ^ size_t{x.metric});
+  }
+};
+
+template <typename DataT, typename IndexT, typename DistanceT>
+struct dataset_descriptor_cache {
+  /** Number of descriptors to cache. */
+  static constexpr size_t kDefaultSize = 100;
+  raft::cache::lru<dataset_descriptor_key,
+                   dataset_descriptor_key_hash,
+                   std::equal_to<>,
+                   std::shared_ptr<dataset_descriptor_host<DataT, IndexT, DistanceT>>>
+    value{kDefaultSize};
+};
+
+template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+auto dataset_descriptor_init_with_cache(const raft::resources& res,
+                                        const cagra::search_params& params,
+                                        const DatasetT& dataset,
+                                        cuvs::distance::DistanceType metric)
+  -> const dataset_descriptor_host<DataT, IndexT, DistanceT>&
+{
+  using desc_t = dataset_descriptor_host<DataT, IndexT, DistanceT>;
+  auto key     = make_key(params, dataset, metric);
+  auto& cache =
+    raft::resource::get_custom_resource<dataset_descriptor_cache<DataT, IndexT, DistanceT>>(res)
+      ->value;
+  std::shared_ptr<desc_t> desc{nullptr};
+  if (!cache.get(key, &desc)) {
+    desc = std::make_shared<desc_t>(std::move(dataset_descriptor_init<DataT, IndexT, DistanceT>(
+      params, dataset, metric, raft::resource::get_cuda_stream(res))));
+    cache.set(key, desc);
+  }
+  return *desc;
+}
+
 };  // namespace cuvs::neighbors::cagra::detail
