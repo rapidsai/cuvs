@@ -77,9 +77,9 @@ template <typename IndexT,
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   IndexT* __restrict__ result_indices_ptr,       // [num_pickup]
   DistanceT* __restrict__ result_distances_ptr,  // [num_pickup]
-  const DATASET_DESCRIPTOR_T& __restrict__ dataset_desc,
-  const size_t num_pickup,
-  const unsigned num_distilation,
+  const DATASET_DESCRIPTOR_T& dataset_desc,
+  const uint32_t num_pickup,
+  const uint32_t num_distilation,
   const uint64_t rand_xor_mask,
   const IndexT* __restrict__ seed_ptr,  // [num_seeds]
   const uint32_t num_seeds,
@@ -89,10 +89,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const uint32_t num_blocks = 1)
 {
   const auto team_size = dataset_desc.team_size;
-  uint32_t max_i       = num_pickup;
-  if (max_i % (warp_size / team_size)) {
-    max_i += (warp_size / team_size) - (max_i % (warp_size / team_size));
-  }
+  const auto max_i     = raft::round_up_safe<uint32_t>(num_pickup, warp_size / team_size);
 
   for (uint32_t i = threadIdx.x / team_size; i < max_i; i += blockDim.x / team_size) {
     const bool valid_i = (i < num_pickup);
@@ -138,7 +135,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   IndexT* __restrict__ result_child_indices_ptr,
   DistanceT* __restrict__ result_child_distances_ptr,
   // [dataset_dim, dataset_size]
-  const DATASET_DESCRIPTOR_T& __restrict__ dataset_desc,
+  const DATASET_DESCRIPTOR_T& dataset_desc,
   // [knn_k, dataset_size]
   const IndexT* __restrict__ knn_graph,
   const uint32_t knn_k,
@@ -171,11 +168,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   __syncthreads();
 
   // Compute the distance to child nodes
-  uint32_t max_i       = knn_k * search_width;
   const auto team_size = dataset_desc.team_size;
-  if (max_i % (warp_size / team_size)) {
-    max_i += (warp_size / team_size) - (max_i % (warp_size / team_size));
-  }
+  const auto max_i     = raft::round_up_safe(knn_k * search_width, warp_size / team_size);
   for (uint32_t tid = threadIdx.x; tid < max_i * team_size; tid += blockDim.x) {
     const auto i       = tid / team_size;
     const bool valid_i = (i < (knn_k * search_width));
@@ -217,6 +211,40 @@ RAFT_DEVICE_INLINE_FUNCTION auto team_sum(T x, uint32_t team_size) -> T
     case 2: x += raft::shfl_xor(x, 1);
     default: return x;
   }
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(float& x, uint32_t addr)
+{
+  asm volatile("ld.shared.f32 {%0}, [%1];" : "=f"(x) : "r"(addr));
+}
+RAFT_DEVICE_INLINE_FUNCTION void lds(half& x, uint32_t addr)
+{
+  asm volatile("ld.shared.u16 {%0}, [%1];" : "=h"(reinterpret_cast<uint16_t&>(x)) : "r"(addr));
+}
+RAFT_DEVICE_INLINE_FUNCTION void lds(half2& x, uint32_t addr)
+{
+  asm volatile("ld.shared.u32 {%0}, [%1];" : "=r"(reinterpret_cast<uint32_t&>(x)) : "r"(addr));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, uint32_t addr)
+{
+  asm volatile("ld.shared.v4.u32 {%0, %1, %2, %3}, [%4];"
+               : "=r"(x.x), "=r"(x.y), "=r"(x.z), "=r"(x.w)
+               : "r"(addr));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, const uint4* addr)
+{
+  lds(x, uint32_t(__cvta_generic_to_shared(addr)));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const half2& x)
+{
+  asm volatile("st.shared.v2.u16 [%0], {%1, %2};"
+               :
+               : "r"(addr),
+                 "h"(reinterpret_cast<const uint16_t&>(x.x)),
+                 "h"(reinterpret_cast<const uint16_t&>(x.y)));
 }
 
 }  // namespace device

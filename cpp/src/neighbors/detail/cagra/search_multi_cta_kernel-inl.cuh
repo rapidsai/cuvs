@@ -133,7 +133,7 @@ __device__ inline void topk_by_bitonic_sort(float* distances,  // [num_elements]
 // multiple CTAs per single query
 //
 template <std::uint32_t MAX_ELEMENTS, class DATASET_DESCRIPTOR_T, class SAMPLE_FILTER_T>
-__launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
+RAFT_KERNEL search_kernel(
   typename DATASET_DESCRIPTOR_T::INDEX_T* const
     result_indices_ptr,  // [num_queries, num_cta_per_query, itopk_size]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const
@@ -195,7 +195,6 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
-  __syncthreads();
 
   auto result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes);

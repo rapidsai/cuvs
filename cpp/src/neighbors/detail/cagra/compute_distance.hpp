@@ -35,14 +35,42 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename DataT, typename IndexT, typename DistanceT>
-struct dataset_descriptor_base_t {
+struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   using base_type  = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  using LOAD_T     = device::LOAD_128BIT_T;
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
 
+  struct alignas(LOAD_T) args_t {
+    void* extra_ptr1;
+    void* extra_ptr2;
+    /** Pointer to the workspace in the shared memory (filled in every copy by a thread block). */
+    uint32_t smem_ws_ptr;
+    /** Dimensionality of the data/queries. */
+    uint32_t dim;
+    uint32_t extra_word1;
+    uint32_t extra_word2;
+
+    RAFT_DEVICE_INLINE_FUNCTION auto load() const -> args_t
+    {
+      constexpr int kCount = sizeof(*this) / sizeof(LOAD_T);
+      using blob_type      = LOAD_T[kCount];
+      args_t r;
+      auto& src = reinterpret_cast<const blob_type&>(*this);
+      auto& dst = reinterpret_cast<blob_type&>(r);
+#pragma unroll
+      for (int i = 0; i < kCount; i++) {
+        device::lds(dst[i], src + i);
+      }
+      return r;
+    }
+  };
+
   using setup_workspace_type  = const base_type*(const base_type*, void*, const DATA_T*, uint32_t);
-  using compute_distance_type = DISTANCE_T(const base_type*, INDEX_T);
+  using compute_distance_type = DISTANCE_T(const args_t, const INDEX_T);
+
+  args_t args;
 
   /** Copy the descriptor and the query into shared memory and do any other work, such as
    * initializing the codebook. */
@@ -50,14 +78,14 @@ struct dataset_descriptor_base_t {
   /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
    * given by the dataset_index. */
   compute_distance_type* compute_distance_impl;
-  /** Number of records in the database. */
-  INDEX_T size;
-  /** Dimensionality of the data/queries. */
-  uint32_t dim;
+  void* extra_ptr3;
   /** How many threads are involved in computing a single distance. */
   uint32_t team_size;
   /** Total dynamic shared memory required by the descriptor.  */
   uint32_t smem_ws_size_in_bytes;
+
+  /** Number of records in the database. */
+  INDEX_T size;
 
   RAFT_INLINE_FUNCTION dataset_descriptor_base_t(setup_workspace_type* setup_workspace_impl,
                                                  compute_distance_type* compute_distance_impl,
@@ -68,9 +96,9 @@ struct dataset_descriptor_base_t {
     : setup_workspace_impl(setup_workspace_impl),
       compute_distance_impl(compute_distance_impl),
       size(size),
-      dim(dim),
       team_size(team_size),
-      smem_ws_size_in_bytes(smem_ws_size_in_bytes)
+      smem_ws_size_in_bytes(smem_ws_size_in_bytes),
+      args{nullptr, nullptr, 0, dim, 0, 0}
   {
   }
 
@@ -84,7 +112,7 @@ struct dataset_descriptor_base_t {
   RAFT_DEVICE_INLINE_FUNCTION auto compute_distance(INDEX_T dataset_index, bool valid) const
     -> DISTANCE_T
   {
-    auto per_thread_distances = valid ? compute_distance_impl(this, dataset_index) : 0;
+    auto per_thread_distances = valid ? compute_distance_impl(args.load(), dataset_index) : 0;
     return device::team_sum(per_thread_distances, this->team_size);
   }
 };

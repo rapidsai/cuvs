@@ -463,7 +463,7 @@ template <unsigned MAX_ITOPK,
           unsigned TOPK_BY_BITONIC_SORT,
           class DATASET_DESCRIPTOR_T,
           class SAMPLE_FILTER_T>
-__launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
+RAFT_KERNEL search_kernel(
   typename DATASET_DESCRIPTOR_T::INDEX_T* const result_indices_ptr,       // [num_queries, top_k]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, top_k]
   const std::uint32_t top_k,
@@ -527,7 +527,6 @@ __launch_bounds__(1024, 1) RAFT_KERNEL search_kernel(
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
-  __syncthreads();
 
   auto result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes);
