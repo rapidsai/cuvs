@@ -23,40 +23,12 @@
  *
  */
 
-#include "compute_distance_vpq.cuh"
+#include "compute_distance_vpq-impl.cuh"
 
 namespace cuvs::neighbors::cagra::detail {
 
-template struct cagra_q_dataset_descriptor_t<cuvs::distance::DistanceType::L2Expanded,
-                                             32,
-                                             512,
-                                             8,
-                                             2,
-                                             half,
-                                             float,
-                                             uint32_t,
-                                             float>;
-template <>
-const void* vpq_descriptor_spec<cuvs::distance::DistanceType::L2Expanded,
-                                32,
-                                512,
-                                8,
-                                2,
-                                half,
-                                float,
-                                uint32_t,
-                                float>::init_kernel =
-  reinterpret_cast<const void*>(
-    &vpq_dataset_descriptor_init_kernel<cuvs::distance::DistanceType::L2Expanded,
-                                        32,
-                                        512,
-                                        8,
-                                        2,
-                                        half,
-                                        float,
-                                        uint32_t,
-                                        float>);
-template struct vpq_descriptor_spec<cuvs::distance::DistanceType::L2Expanded,
+using namespace cuvs::distance;
+template struct vpq_descriptor_spec<DistanceType::L2Expanded,
                                     32,
                                     512,
                                     8,

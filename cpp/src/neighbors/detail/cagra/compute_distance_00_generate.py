@@ -43,6 +43,7 @@ template = """/*
 
 namespace cuvs::neighbors::cagra::detail {{
 
+using namespace cuvs::distance;
 {content}
 
 }}  // namespace cuvs::neighbors::cagra::detail
@@ -69,7 +70,7 @@ search_types = dict(
     half_uint64=("half", "uint64_t", "float"),
 )
 
-metric_prefix = 'cuvs::distance::DistanceType::'
+metric_prefix = 'DistanceType::'
 
 specs = []
 descs = []
@@ -90,17 +91,10 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
         # CAGRA
         for metric in ['L2Expanded', 'InnerProduct']:
             path = f"compute_distance_standard_{metric}_{type_path}_dim{mxdim}_t{team}.cu"
-            includes = '#include "compute_distance_standard.cuh"'
+            includes = '#include "compute_distance_standard-impl.cuh"'
             params = f"{metric_prefix}{metric}, {team}, {mxdim}, {data_t}, {idx_t}, {distance_t}"
             spec = f"standard_descriptor_spec<{params}>"
-            desc = f"standard_dataset_descriptor_t<{params}>"
-            content = f"""
-template struct {desc};
-template <>
-const void* {spec}::init_kernel = reinterpret_cast<const void*>(&standard_dataset_descriptor_init_kernel<{params}>);
-template struct {spec};
-"""
-            descs.append(desc)
+            content = f"""template struct {spec};"""
             specs.append(spec)
             with open(path, "w") as f:
                 f.write(template.format(includes=includes, content=content))
@@ -112,17 +106,10 @@ template struct {spec};
                 for pq_bit in pq_bits:
                     for metric in ['L2Expanded']:
                         path = f"compute_distance_vpq_{metric}_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
-                        includes = '#include "compute_distance_vpq.cuh"'
+                        includes = '#include "compute_distance_vpq-impl.cuh"'
                         params = f"{metric_prefix}{metric}, {team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}"
                         spec = f"vpq_descriptor_spec<{params}>"
-                        desc = f"cagra_q_dataset_descriptor_t<{params}>"
-                        content = f"""
-template struct {desc};
-template <>
-const void* {spec}::init_kernel = reinterpret_cast<const void*>(&vpq_dataset_descriptor_init_kernel<{params}>);
-template struct {spec};
-"""
-                        descs.append(desc)
+                        content = f"""template struct {spec};"""
                         specs.append(spec)
                         with open(path, "w") as f:
                             f.write(template.format(includes=includes, content=content))
@@ -132,12 +119,11 @@ with open("compute_distance-ext.cuh", "w") as f:
     includes = '''
 #pragma once
 
-#include "compute_distance_standard.cuh"
-#include "compute_distance_vpq.cuh"
+#include "compute_distance_standard.hpp"
+#include "compute_distance_vpq.hpp"
 '''
     newline = "\n"
     contents = f'''
-{newline.join(map(lambda s: "extern template struct " + s + ";", descs))}
 {newline.join(map(lambda s: "extern template struct " + s + ";", specs))}
 
 extern template struct

@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "compute_distance.hpp"
+#include "compute_distance_standard.hpp"
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -262,57 +262,30 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
-  using base_type = instance_spec<DataT, IndexT, DistanceT>;
-  using typename base_type::data_type;
-  using typename base_type::distance_type;
-  using typename base_type::host_type;
-  using typename base_type::index_type;
-
-  template <typename DatasetT>
-  constexpr static inline bool accepts_dataset()
-  {
-    return is_strided_dataset_v<DatasetT>;
-  }
-
-  using descriptor_type =
+dataset_descriptor_host<DataT, IndexT, DistanceT>
+standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>::init_(
+  const cagra::search_params& params,
+  const DataT* ptr,
+  IndexT size,
+  uint32_t dim,
+  uint32_t ld,
+  rmm::cuda_stream_view stream)
+{
+  using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
-  static const void* init_kernel;
+  using base_type = typename desc_type::base_type;
+  desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld};
+  host_type result{dd_host, stream, DatasetBlockDim};
 
-  template <typename DatasetT>
-  static auto init(const cagra::search_params& params,
-                   const DatasetT& dataset,
-                   cuvs::distance::DistanceType metric,
-                   rmm::cuda_stream_view stream) -> host_type
-  {
-    descriptor_type dd_host{nullptr,
-                            nullptr,
-                            dataset.view().data_handle(),
-                            IndexT(dataset.n_rows()),
-                            dataset.dim(),
-                            dataset.stride()};
-    host_type result{dd_host, stream, DatasetBlockDim};
-    void* args[] =  // NOLINT
-      {&result.dev_ptr,
-       &descriptor_type::ptr(dd_host.args),
-       &dd_host.size,
-       &dd_host.args.dim,
-       &descriptor_type::ld(dd_host.args)};
-    RAFT_CUDA_TRY(cudaLaunchKernel(init_kernel, 1, 1, args, 0, stream));
-    return result;
-  }
-
-  template <typename DatasetT>
-  static auto priority(const cagra::search_params& params,
-                       const DatasetT& dataset,
-                       cuvs::distance::DistanceType metric) -> double
-  {
-    // If explicit team_size is specified and doesn't match the instance, discard it
-    if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
-    if (Metric != metric) { return -1.0; }
-    // Otherwise, favor the closest dataset dimensionality.
-    return 1.0 / (0.1 + std::abs(double(dataset.dim()) - double(DatasetBlockDim)));
-  }
-};
+  standard_dataset_descriptor_init_kernel<Metric,
+                                          TeamSize,
+                                          DatasetBlockDim,
+                                          DataT,
+                                          IndexT,
+                                          DistanceT>
+    <<<1, 1, 0, stream>>>(result.dev_ptr, ptr, size, dim, desc_type::ld(dd_host.args));
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  return result;
+}
 
 }  // namespace cuvs::neighbors::cagra::detail

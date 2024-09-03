@@ -23,31 +23,12 @@
  *
  */
 
-#include "compute_distance_standard.cuh"
+#include "compute_distance_standard-impl.cuh"
 
 namespace cuvs::neighbors::cagra::detail {
 
-template struct standard_dataset_descriptor_t<cuvs::distance::DistanceType::L2Expanded,
-                                              16,
-                                              256,
-                                              int8_t,
-                                              uint32_t,
-                                              float>;
-template <>
-const void* standard_descriptor_spec<cuvs::distance::DistanceType::L2Expanded,
-                                     16,
-                                     256,
-                                     int8_t,
-                                     uint32_t,
-                                     float>::init_kernel =
-  reinterpret_cast<const void*>(
-    &standard_dataset_descriptor_init_kernel<cuvs::distance::DistanceType::L2Expanded,
-                                             16,
-                                             256,
-                                             int8_t,
-                                             uint32_t,
-                                             float>);
-template struct standard_descriptor_spec<cuvs::distance::DistanceType::L2Expanded,
+using namespace cuvs::distance;
+template struct standard_descriptor_spec<DistanceType::L2Expanded,
                                          16,
                                          256,
                                          int8_t,
