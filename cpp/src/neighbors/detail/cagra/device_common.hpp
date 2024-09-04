@@ -333,25 +333,21 @@ RAFT_DEVICE_INLINE_FUNCTION void ldg_ca(half (&x)[4], const half* addr)
 
 RAFT_DEVICE_INLINE_FUNCTION void ldg_ca(half2& x, const half* addr)
 {
-  asm volatile("ld.global.ca.v2.u16 {%0, %1}, [%2];"
-               : "=h"(reinterpret_cast<uint16_t&>(x.x)), "=h"(reinterpret_cast<uint16_t&>(x.y))
-               : "l"(reinterpret_cast<const uint16_t*>(addr)));
+  asm volatile("ld.global.ca.u32 %0, [%1];"
+               : "=r"(reinterpret_cast<uint32_t&>(x))
+               : "l"(reinterpret_cast<const uint32_t*>(addr)));
 }
 RAFT_DEVICE_INLINE_FUNCTION void ldg_ca(half2 (&x)[1], const half* addr)
 {
-  asm volatile("ld.global.ca.v2.u16 {%0, %1}, [%2];"
-               : "=h"(reinterpret_cast<uint16_t&>(x[0].x)),
-                 "=h"(reinterpret_cast<uint16_t&>(x[0].y))
-               : "l"(reinterpret_cast<const uint16_t*>(addr)));
+  asm volatile("ld.global.ca.u32 %0, [%1];"
+               : "=r"(*reinterpret_cast<uint32_t*>(x))
+               : "l"(reinterpret_cast<const uint32_t*>(addr)));
 }
 RAFT_DEVICE_INLINE_FUNCTION void ldg_ca(half2 (&x)[2], const half* addr)
 {
-  asm volatile("ld.global.ca.v4.u16 {%0, %1, %2, %3}, [%4];"
-               : "=h"(reinterpret_cast<uint16_t&>(x[0].x)),
-                 "=h"(reinterpret_cast<uint16_t&>(x[0].y)),
-                 "=h"(reinterpret_cast<uint16_t&>(x[1].x)),
-                 "=h"(reinterpret_cast<uint16_t&>(x[1].y))
-               : "l"(reinterpret_cast<const uint16_t*>(addr)));
+  asm volatile("ld.global.ca.v2.u32 {%0, %1}, [%2];"
+               : "=r"(*reinterpret_cast<uint32_t*>(x)), "=r"(*reinterpret_cast<uint32_t*>(x + 1))
+               : "l"(reinterpret_cast<const uint32_t*>(addr)));
 }
 
 }  // namespace device

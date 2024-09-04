@@ -278,7 +278,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
         // Loading VQ code-book
         half2 vq_vals[PQ_LEN][vlen / 2];
 #pragma unroll
-        for (std::uint32_t m = 0; m < PQ_LEN; m += 1) {
+        for (std::uint32_t m = 0; m < PQ_LEN; m++) {
           const uint32_t d = (vlen * m) + (PQ_LEN * k);
           if (d >= dim) break;
           device::ldg_ca(vq_vals[m], vq_code_book_ptr + d);
@@ -289,20 +289,20 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
         for (std::uint32_t v = 0; v < vlen; v++) {
           if (PQ_LEN * (v + k) >= dim) break;
 #pragma unroll
-          for (std::uint32_t m = 0; m < PQ_LEN; m += 2) {
-            const std::uint32_t d1 = m + (PQ_LEN * v);
-            const std::uint32_t d  = d1 + (PQ_LEN * k);
+          for (std::uint32_t m = 0; m < PQ_LEN / 2; m++) {
+            const std::uint32_t d1 = m + (PQ_LEN / 2) * v;
+            const std::uint32_t d  = d1 + (PQ_LEN / 2) * k;
             half2 q2, c2;
             // Loading query vector from smem
             device::lds(q2,
                         query_ptr + sizeof(uint32_t) *
-                                      device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d / 2));
+                                      device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d));
             // Loading PQ code book from smem
             device::lds(c2,
-                        pq_codebook_ptr + sizeof(CODE_BOOK_T) * ((1 << PQ_BITS) * 2 * (m / 2) +
-                                                                 (2 * (pq_codes[e] & 0xff))));
+                        pq_codebook_ptr +
+                          sizeof(CODE_BOOK_T) * ((1 << PQ_BITS) * 2 * m + (2 * (pq_code & 0xff))));
             // L2 distance
-            auto dist = q2 - c2 - vq_vals[d1 / vlen][(d1 % vlen) / 2];
+            auto dist = q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
             dist      = dist * dist;
             norm += static_cast<DISTANCE_T>(dist.x + dist.y);
           }
@@ -339,7 +339,8 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
             DISTANCE_T diff;
             device::lds(diff, query_ptr + sizeof(QUERY_T) * d);
             diff -= static_cast<DISTANCE_T>(pq_vals[m]);
-            diff -= static_cast<DISTANCE_T>(vq_vals[d1 / vlen][d1 % vlen]);
+            diff -=
+              static_cast<DISTANCE_T>(reinterpret_cast<CODE_BOOK_T(&)[PQ_LEN * vlen]>(vq_vals)[d1]);
             norm += diff * diff;
           }
           pq_code >>= 8;
