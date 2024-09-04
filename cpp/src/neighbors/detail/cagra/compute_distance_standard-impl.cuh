@@ -18,12 +18,8 @@
 #include "compute_distance_standard.hpp"
 
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/common.hpp>
-#include <raft/core/logger-macros.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/util/device_loads_stores.cuh>
 #include <raft/util/pow2_utils.cuh>
-#include <raft/util/vectorized.cuh>
 
 #include <type_traits>
 
@@ -187,17 +183,19 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
   constexpr auto kTeamSize        = DescriptorT::kTeamSize;
   constexpr auto kDatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto vlen             = device::get_vlen<LOAD_T, DATA_T>();
-  constexpr auto reg_nelem        = raft::ceildiv<uint32_t>(kDatasetBlockDim, kTeamSize * vlen);
+  constexpr auto reg_nelem =
+    raft::div_rounding_up_unsafe<uint32_t>(kDatasetBlockDim, kTeamSize * vlen);
 
   DISTANCE_T r = 0;
   for (uint32_t elem_offset = (threadIdx.x % kTeamSize) * vlen; elem_offset < dim;
        elem_offset += kDatasetBlockDim) {
-    raft::TxN_t<DATA_T, vlen> dl_buff[reg_nelem];
+    DATA_T data[reg_nelem][vlen];
 #pragma unroll
     for (uint32_t e = 0; e < reg_nelem; e++) {
       const uint32_t k = e * (kTeamSize * vlen) + elem_offset;
       if (k >= dim) break;
-      dl_buff[e].load(dataset_ptr, k);
+      device::ldg_cg(reinterpret_cast<LOAD_T&>(data[e]),
+                     reinterpret_cast<const LOAD_T*>(dataset_ptr + k));
     }
 #pragma unroll
     for (uint32_t e = 0; e < reg_nelem; e++) {
@@ -212,7 +210,7 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
         DISTANCE_T d;
         device::lds(d, query_smem_ptr + sizeof(QUERY_T) * device::swizzling(k + v));
         r += dist_op<DISTANCE_T, DescriptorT::kMetric>(
-          d, cuvs::spatial::knn::detail::utils::mapping<DISTANCE_T>{}(dl_buff[e].val.data[v]));
+          d, cuvs::spatial::knn::detail::utils::mapping<DISTANCE_T>{}(data[e][v]));
       }
     }
   }
@@ -236,12 +234,12 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT>
-__launch_bounds__(1, 1) __global__ void standard_dataset_descriptor_init_kernel(
-  dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
-  const DataT* ptr,
-  IndexT size,
-  uint32_t dim,
-  uint32_t ld)
+RAFT_KERNEL __launch_bounds__(1, 1)
+  standard_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
+                                          const DataT* ptr,
+                                          IndexT size,
+                                          uint32_t dim,
+                                          uint32_t ld)
 {
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
