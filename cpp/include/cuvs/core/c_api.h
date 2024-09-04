@@ -127,6 +127,27 @@ cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t bytes);
  */
 cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
 
+/**
+ * @brief Switches the working memory resource to use the RMM pool memory resource, which will
+ * bypass unnecessary synchronizations by allocating a chunk of device memory up front and carving
+ * that up for temporary memory allocations within algorithms. Be aware that this function will
+ * change the memory resource for the whole process and the new memory resource will be used until
+ * explicitly changed.
+ *
+ * @param[in] initial_pool_size_percent The initial pool size as a percentage of the total
+ * available memory
+ * @param[in] max_pool_size_percent The maximum pool size as a percentage of the total
+ * available memory
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
+                                            int max_pool_size_percent);
+/**
+ * @brief Resets the memory resource to use the default memory resource (cuda_memory_resource)
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMMemoryResourceReset();
+
 /** @} */
 
 #ifdef __cplusplus
