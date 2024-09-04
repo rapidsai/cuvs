@@ -100,7 +100,7 @@ void naive_knn(raft::resources const& handle,
                uint32_t k,
                cuvs::distance::DistanceType type)
 {
-  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource_ref();
+  rmm::device_async_resource_ref mr = raft::resource::get_current_device_resource_ref();
 
   auto stream = raft::resource::get_cuda_stream(handle);
   dim3 block_dim(16, 32, 1);

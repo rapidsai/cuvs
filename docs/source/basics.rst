@@ -23,8 +23,8 @@ Here's an example of configuring RMM to use a pool allocator in C++ (derived fro
     // With the pool initially half of available device memory
     auto initial_size = rmm::percent_of_free_device_memory(50);
     rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource> pool_mr{&cuda_mr, initial_size};
-    rmm::mr::set_current_device_resource(&pool_mr); // Updates the current device resource pointer to `pool_mr`
-    auto mr = rmm::mr::get_current_device_resource_ref(); // Reference to `pool_mr`
+    raft::resource::set_current_device_resource(&pool_mr); // Updates the current device resource pointer to `pool_mr`
+    auto mr = raft::resource::get_current_device_resource_ref(); // Reference to `pool_mr`
 
 Python
 ^^^^^^
