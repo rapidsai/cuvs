@@ -271,7 +271,7 @@ void copy_with_padding(
   raft::resources const& res,
   raft::device_matrix<T, int64_t, raft::row_major>& dst,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> src,
-  raft::resource::device_async_resource_ref mr = raft::resource::get_current_device_resource_ref())
+  rmm::device_async_resource_ref mr = raft::resource::get_current_device_resource_ref())
 {
   size_t padded_dim = raft::round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
 

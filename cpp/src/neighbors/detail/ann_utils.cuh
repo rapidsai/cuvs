@@ -557,14 +557,14 @@ struct batch_load_iterator {
    * @param mr a custom memory resource for the intermediate buffer, if applicable.
    * @param prefetch enable prefetch feature in order to achieve kernel/copy overlapping.
    */
-  batch_load_iterator(const T* source,
-                      size_type n_rows,
-                      size_type row_width,
-                      size_type batch_size,
-                      rmm::cuda_stream_view stream,
-                      raft::resource::device_async_resource_ref mr =
-                        raft::resource::get_current_device_resource_ref(),
-                      bool prefetch = false)
+  batch_load_iterator(
+    const T* source,
+    size_type n_rows,
+    size_type row_width,
+    size_type batch_size,
+    rmm::cuda_stream_view stream,
+    rmm::device_async_resource_ref mr = raft::resource::get_current_device_resource_ref(),
+    bool prefetch                     = false)
     : cur_batch_(new batch(source, n_rows, row_width, batch_size, stream, mr, prefetch)),
       cur_pos_(0),
       cur_prefetch_pos_(0)
