@@ -28,7 +28,7 @@
 #include <iostream>
 #include <random>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 // parameter structure definition
@@ -232,4 +232,4 @@ TEST_P(silhouetteScoreTestClass, Result)
 INSTANTIATE_TEST_CASE_P(silhouetteScore, silhouetteScoreTestClass, ::testing::ValuesIn(inputs));
 
 }  // end namespace stats
-}  // end namespace raft
+}  // end namespace cuvs

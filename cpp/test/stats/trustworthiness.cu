@@ -26,7 +26,7 @@
 #include <iostream>
 #include <vector>
 
-namespace raft {
+namespace cuvs {
 namespace stats {
 
 class TrustworthinessScoreTest : public ::testing::Test {
@@ -352,4 +352,4 @@ class TrustworthinessScoreTest : public ::testing::Test {
 typedef TrustworthinessScoreTest TrustworthinessScoreTestF;
 TEST_F(TrustworthinessScoreTestF, Result) { ASSERT_TRUE(0.9375 < score && score < 0.9379); }
 };  // namespace stats
-};  // namespace raft
+};  // namespace cuvs
