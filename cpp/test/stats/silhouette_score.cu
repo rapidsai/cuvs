@@ -46,9 +46,9 @@ template <typename LabelT, typename DataT>
 class silhouetteScoreTest : public ::testing::TestWithParam<silhouetteScoreParam> {
  protected:
   silhouetteScoreTest()
-    : d_X(0, resource::get_cuda_stream(handle)),
-      sampleSilScore(0, resource::get_cuda_stream(handle)),
-      d_labels(0, resource::get_cuda_stream(handle))
+    : d_X(0, raft::resource::get_cuda_stream(handle)),
+      sampleSilScore(0, raft::resource::get_cuda_stream(handle)),
+      d_labels(0, raft::resource::get_cuda_stream(handle))
   {
   }
 
@@ -66,7 +66,7 @@ class silhouetteScoreTest : public ::testing::TestWithParam<silhouetteScoreParam
     std::generate(h_labels.begin(), h_labels.end(), [&]() { return intGenerator(dre); });
 
     // allocating and initializing memory to the GPU
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
     d_X.resize(nElements, stream);
     d_labels.resize(nElements, stream);
     RAFT_CUDA_TRY(cudaMemsetAsync(d_X.data(), 0, d_X.size() * sizeof(DataT), stream));

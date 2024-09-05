@@ -32,7 +32,8 @@ namespace stats {
 class TrustworthinessScoreTest : public ::testing::Test {
  public:
   TrustworthinessScoreTest()
-    : d_X(0, resource::get_cuda_stream(handle)), d_X_embedded(0, resource::get_cuda_stream(handle))
+    : d_X(0, raft::resource::get_cuda_stream(handle)),
+      d_X_embedded(0, raft::resource::get_cuda_stream(handle))
   {
   }
 
@@ -316,7 +317,7 @@ class TrustworthinessScoreTest : public ::testing::Test {
       -0.02323332, 0.04292452,  0.39291084,  -0.94897962, -0.63863206, -0.16546988, 0.23698957,
       -0.30633628};
 
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
 
     d_X.resize(X.size(), stream);
     d_X_embedded.resize(X_embedded.size(), stream);
