@@ -36,8 +36,7 @@ namespace stats {
  * @param[out] silhouette_score_per_sample: optional array populated with the silhouette score
  * for every sample (length: nRows)
  * @param[in]  n_unique_labels: number of unique labels in the labels array
- * @param[in]  metric: the numerical value that maps to the type of distance metric to be used in
- * the calculations
+ * @param[in]  metric: Distance metric to use. Euclidean (L2) is used by default
  * @return: The silhouette score.
  */
 float silhouette_score(

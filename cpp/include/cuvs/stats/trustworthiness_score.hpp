@@ -32,6 +32,7 @@ namespace stats {
  * @param[in] X: Data in original dimension
  * @param[in] X_embedded: Data in target dimension (embedding)
  * @param[in] n_neighbors Number of neighbors considered by trustworthiness score
+ * @param[in] metric Distance metric to use. Euclidean (L2) is used by default
  * @param[in] batch_size Batch size
  * @return Trustworthiness score
  * @note The constness of the data in X_embedded is currently casted away and the data is slightly
