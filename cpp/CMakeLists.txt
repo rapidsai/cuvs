@@ -554,8 +554,7 @@ target_compile_options(
 )
 # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
 #
-# TODO(achirkin): disabled during experiments with CUDA_SEPARABLE_COMPILATION (otherwise did't link)
-# target_link_options(cuvs PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
+target_link_options(cuvs PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
 # ##################################################################################################
 # * cuvs_c -------------------------------------------------------------------------------
