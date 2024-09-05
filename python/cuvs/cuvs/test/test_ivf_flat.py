@@ -92,6 +92,7 @@ def run_ivf_flat_build_search_test(
     skl_metric = {
         "sqeuclidean": "sqeuclidean",
         "inner_product": "cosine",
+        "cosine": "cosine",
         "euclidean": "euclidean",
     }[metric]
     nn_skl = NearestNeighbors(
@@ -107,7 +108,7 @@ def run_ivf_flat_build_search_test(
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32])
 @pytest.mark.parametrize(
-    "metric", ["sqeuclidean", "inner_product", "euclidean"]
+    "metric", ["sqeuclidean", "inner_product", "euclidean", "cosine"]
 )
 def test_ivf_flat(inplace, dtype, metric):
     run_ivf_flat_build_search_test(
