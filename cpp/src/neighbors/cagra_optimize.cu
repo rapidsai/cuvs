@@ -21,21 +21,25 @@ namespace cuvs::neighbors::cagra {
 
 void optimize(raft::resources const& handle,
               raft::device_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
-              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph)
+              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph,
+              bool guarantee_graph_connectivity)
 {
   cuvs::neighbors::cagra::optimize<
     uint32_t,
     raft::host_device_accessor<std::experimental::default_accessor<uint32_t>,
-                               raft::memory_type::device>>(handle, knn_graph, new_graph);
+                               raft::memory_type::device>>(
+    handle, knn_graph, new_graph, guarantee_graph_connectivity);
 }
 void optimize(raft::resources const& handle,
               raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
-              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph)
+              raft::host_matrix_view<uint32_t, int64_t, raft::row_major> new_graph,
+              bool guarantee_graph_connectivity)
 {
   cuvs::neighbors::cagra::optimize<
     uint32_t,
     raft::host_device_accessor<std::experimental::default_accessor<uint32_t>,
-                               raft::memory_type::host>>(handle, knn_graph, new_graph);
+                               raft::memory_type::host>>(
+    handle, knn_graph, new_graph, guarantee_graph_connectivity);
 }
 
 }  // namespace cuvs::neighbors::cagra
