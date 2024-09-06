@@ -47,6 +47,6 @@ inline void chooseTileSize(size_t numQueries,
   tileRows = std::min(preferredTileRows, numQueries);
 
   // tileCols is the remainder size
-  tileCols = std::min(targetUsage / preferredTileRows, numCentroids);
+  tileCols = std::min(targetUsage / tileRows, numCentroids);
 }
 }  // namespace cuvs::neighbors::detail::faiss_select

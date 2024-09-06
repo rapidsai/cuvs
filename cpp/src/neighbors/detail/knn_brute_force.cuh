@@ -81,12 +81,14 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            const uint32_t* filter_bitmap             = nullptr)
 {
   // Figure out the number of rows/cols to tile for
-  size_t tile_rows   = 0;
-  size_t tile_cols   = 0;
-  auto stream        = raft::resource::get_cuda_stream(handle);
-  auto device_memory = raft::resource::get_workspace_resource(handle);
-  auto total_mem     = rmm::available_device_memory().second;
+  size_t tile_rows = 0;
+  size_t tile_cols = 0;
+  auto stream      = raft::resource::get_cuda_stream(handle);
 
+  // total memory is not relevant in the heuristic for data below 512 MB
+  auto total_mem = (sizeof(DistanceT) * tile_rows * tile_cols < 1 << 29)
+                     ? (1ul << 36)
+                     : rmm::available_device_memory().second;
   cuvs::neighbors::detail::faiss_select::chooseTileSize(
     m, n, d, sizeof(DistanceT), total_mem, tile_rows, tile_cols);
 
@@ -356,8 +358,11 @@ void brute_force_knn_impl(
 
   ASSERT(input.size() == sizes.size(), "input and sizes vectors should be the same size");
 
-  std::vector<IdxType>* id_ranges;
-  if (translations == nullptr) {
+  std::vector<IdxType>* id_ranges = nullptr;
+  if (translations != nullptr) {
+    // use the given translations
+    id_ranges = translations;
+  } else if (input.size() > 1) {
     // If we don't have explicit translations
     // for offsets of the indices, build them
     // from the local partitions
@@ -367,16 +372,13 @@ void brute_force_knn_impl(
       id_ranges->push_back(total_n);
       total_n += sizes[i];
     }
-  } else {
-    // otherwise, use the given translations
-    id_ranges = translations;
   }
 
-  int device;
-  RAFT_CUDA_TRY(cudaGetDevice(&device));
-
-  rmm::device_uvector<IdxType> trans(id_ranges->size(), userStream);
-  raft::update_device(trans.data(), id_ranges->data(), id_ranges->size(), userStream);
+  rmm::device_uvector<IdxType> trans(0, userStream);
+  if (id_ranges != nullptr) {
+    trans.resize(id_ranges->size(), userStream);
+    raft::update_device(trans.data(), id_ranges->data(), id_ranges->size(), userStream);
+  }
 
   rmm::device_uvector<DistType> all_D(0, userStream);
   rmm::device_uvector<IdxType> all_I(0, userStream);
@@ -514,7 +516,7 @@ void brute_force_knn_impl(
     knn_merge_parts(out_D, out_I, res_D, res_I, n, input.size(), k, userStream, trans.data());
   }
 
-  if (translations == nullptr) delete id_ranges;
+  if (id_ranges != nullptr && translations == nullptr) delete id_ranges;
 };
 
 template <typename T,
