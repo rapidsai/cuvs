@@ -19,7 +19,7 @@
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
 
-#include <cuvs/neighbors/ann_mg.hpp>
+#include <cuvs/neighbors/mg.hpp>
 
 namespace cuvs::neighbors::mg {
 
@@ -118,10 +118,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       {
         auto index = cuvs::neighbors::mg::build(handle_, clique, index_params, index_dataset);
         cuvs::neighbors::mg::extend(handle_, clique, index, index_dataset, std::nullopt);
-        cuvs::neighbors::mg::serialize(handle_, clique, index, "./cpp/build/ann_mg_ivf_flat_index");
+        cuvs::neighbors::mg::serialize(handle_, clique, index, "./cpp/build/mg_ivf_flat_index");
       }
       auto new_index = cuvs::neighbors::mg::deserialize_flat<DataT, int64_t>(
-        handle_, clique, "./cpp/build/ann_mg_ivf_flat_index");
+        handle_, clique, "./cpp/build/mg_ivf_flat_index");
 
       cuvs::neighbors::mg::sharded_merge_mode merge_mode;
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
@@ -184,10 +184,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       {
         auto index = cuvs::neighbors::mg::build(handle_, clique, index_params, index_dataset);
         cuvs::neighbors::mg::extend(handle_, clique, index, index_dataset, std::nullopt);
-        cuvs::neighbors::mg::serialize(handle_, clique, index, "./cpp/build/ann_mg_ivf_pq_index");
+        cuvs::neighbors::mg::serialize(handle_, clique, index, "./cpp/build/mg_ivf_pq_index");
       }
       auto new_index = cuvs::neighbors::mg::deserialize_pq<DataT, int64_t>(
-        handle_, clique, "./cpp/build/ann_mg_ivf_pq_index");
+        handle_, clique, "./cpp/build/mg_ivf_pq_index");
 
       cuvs::neighbors::mg::sharded_merge_mode merge_mode;
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
@@ -245,10 +245,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       {
         auto index = cuvs::neighbors::mg::build(handle_, clique, index_params, index_dataset);
-        cuvs::neighbors::mg::serialize(handle_, clique, index, "./cpp/build/ann_mg_cagra_index");
+        cuvs::neighbors::mg::serialize(handle_, clique, index, "./cpp/build/mg_cagra_index");
       }
       auto new_index = cuvs::neighbors::mg::deserialize_cagra<DataT, uint32_t>(
-        handle_, clique, "./cpp/build/ann_mg_cagra_index");
+        handle_, clique, "./cpp/build/mg_cagra_index");
 
       cuvs::neighbors::mg::sharded_merge_mode merge_mode;
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)

@@ -17,7 +17,7 @@
 
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_cagra_wrapper.h"
-#include <cuvs/neighbors/ann_mg.hpp>
+#include <cuvs/neighbors/mg.hpp>
 
 namespace cuvs::bench {
 
@@ -25,7 +25,7 @@ enum class AllocatorType;
 enum class CagraBuildAlgo;
 
 template <typename T, typename IdxT>
-class cuvs_ann_mg_cagra : public algo<T>, public algo_gpu {
+class cuvs_mg_cagra : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
@@ -43,7 +43,7 @@ class cuvs_ann_mg_cagra : public algo<T>, public algo_gpu {
     cuvs::neighbors::mg::sharded_merge_mode merge_mode;
   };
 
-  cuvs_ann_mg_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
+  cuvs_mg_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
     : algo<T>(metric, dim), index_params_(param)
   {
     index_params_.cagra_params.metric         = parse_metric_type(metric);
@@ -94,13 +94,12 @@ class cuvs_ann_mg_cagra : public algo<T>, public algo_gpu {
   build_param index_params_;
   cuvs::neighbors::cagra::search_params search_params_;
   cuvs::neighbors::mg::sharded_merge_mode merge_mode_;
-  std::shared_ptr<
-    cuvs::neighbors::mg::ann_mg_index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>
+  std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>
     index_;
 };
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
+void cuvs_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_extents = raft::make_extents<IdxT>(nrow, dim_);
 
@@ -129,106 +128,51 @@ void cuvs_ann_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, nrow, dim_);
   const auto& handle = clique_->set_current_device_to_root_rank();
   auto idx           = cuvs::neighbors::mg::build(handle, *clique_, params, dataset_view);
-  index_             = std::make_shared<
-    cuvs::neighbors::mg::ann_mg_index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
-    std::move(idx));
+  index_ =
+    std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
+      std::move(idx));
 }
 
 inline auto allocator_to_string(AllocatorType mem_type) -> std::string;
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_mg_cagra<T, IdxT>::set_search_param(const search_param_base& param)
 {
   auto sp        = dynamic_cast<const search_param&>(param);
   search_params_ = sp.p;
   merge_mode_    = sp.merge_mode;
   refine_ratio_  = sp.refine_ratio;
-
-  /*
-  if (sp.graph_mem != graph_mem_) {
-    // Move graph to correct memory space
-    graph_mem_ = sp.graph_mem;
-    RAFT_LOG_DEBUG("moving graph to new memory space: %s", allocator_to_string(graph_mem_).c_str());
-    // We create a new graph and copy to it from existing graph
-    auto mr        = get_mr(graph_mem_);
-    auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(
-      handle_, mr, raft::make_extents<int64_t>(index_->graph().extent(0), index_->graph_degree()));
-
-    raft::copy(new_graph.data_handle(),
-               index_->graph().data_handle(),
-               index_->graph().size(),
-               raft::resource::get_cuda_stream(handle_));
-
-    index_->update_graph(handle_, make_const_mdspan(new_graph.view()));
-    // update_graph() only stores a view in the index. We need to keep the graph object alive.
-    *graph_ = std::move(new_graph);
-  }
-
-  if (sp.dataset_mem != dataset_mem_ || need_dataset_update_) {
-    dataset_mem_ = sp.dataset_mem;
-
-    // First free up existing memory
-    *dataset_ = raft::make_device_matrix<T, int64_t>(handle_, 0, 0);
-    index_->update_dataset(handle_, make_const_mdspan(dataset_->view()));
-
-    // Allocate space using the correct memory resource.
-    RAFT_LOG_DEBUG("moving dataset to new memory space: %s",
-                   allocator_to_string(dataset_mem_).c_str());
-
-    auto mr = get_mr(dataset_mem_);
-    cuvs::neighbors::mg::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
-
-    auto dataset_view = raft::make_device_strided_matrix_view<const T, int64_t>(
-      dataset_->data_handle(), dataset_->extent(0), this->dim_, dataset_->extent(1));
-    index_->update_dataset(handle_, dataset_view);
-
-    need_dataset_update_ = false;
-  }
-  */
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
+void cuvs_mg_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 {
-  /*
-  using ds_idx_type = decltype(index_->data().n_rows());
-  bool is_vpq =
-    dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
-    dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
-  // It can happen that we are re-using a previous algo object which already has
-  // the dataset set. Check if we need update.
-  if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
-      input_dataset_v_->data_handle() != dataset) {
-    *input_dataset_v_ = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
-    need_dataset_update_ = !is_vpq;  // ignore update if this is a VPQ dataset.
-  }
-  */
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::save(const std::string& file) const
+void cuvs_mg_cagra<T, IdxT>::save(const std::string& file) const
 {
   const auto& handle = clique_->set_current_device_to_root_rank();
   cuvs::neighbors::mg::serialize(handle, *clique_, *index_, file);
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::load(const std::string& file)
+void cuvs_mg_cagra<T, IdxT>::load(const std::string& file)
 {
   const auto& handle = clique_->set_current_device_to_root_rank();
-  index_             = std::make_shared<
-    cuvs::neighbors::mg::ann_mg_index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
-    std::move(cuvs::neighbors::mg::deserialize_cagra<T, IdxT>(handle, *clique_, file)));
+  index_ =
+    std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
+      std::move(cuvs::neighbors::mg::deserialize_cagra<T, IdxT>(handle, *clique_, file)));
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<algo<T>> cuvs_ann_mg_cagra<T, IdxT>::copy()
+std::unique_ptr<algo<T>> cuvs_mg_cagra<T, IdxT>::copy()
 {
-  return std::make_unique<cuvs_ann_mg_cagra<T, IdxT>>(*this);  // use copy constructor
+  return std::make_unique<cuvs_mg_cagra<T, IdxT>>(*this);  // use copy constructor
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::search_base(
+void cuvs_mg_cagra<T, IdxT>::search_base(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   static_assert(std::is_integral_v<algo_base::index_type>);
@@ -253,7 +197,7 @@ void cuvs_ann_mg_cagra<T, IdxT>::search_base(
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_cagra<T, IdxT>::search(
+void cuvs_mg_cagra<T, IdxT>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);

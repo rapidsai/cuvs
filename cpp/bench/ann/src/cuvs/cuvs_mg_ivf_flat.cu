@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cuvs_ann_mg_ivf_pq_wrapper.h"
+#include "cuvs_mg_ivf_flat_wrapper.h"
 
 namespace cuvs::bench {
-template class cuvs_ann_mg_ivf_pq<float, int64_t>;
-// template class cuvs_ann_mg_ivf_pq<half, int64_t>;
-template class cuvs_ann_mg_ivf_pq<uint8_t, int64_t>;
-template class cuvs_ann_mg_ivf_pq<int8_t, int64_t>;
+template class cuvs_mg_ivf_flat<float, int64_t>;
+// template class cuvs_mg_ivf_flat<half, int64_t>;
+template class cuvs_mg_ivf_flat<uint8_t, int64_t>;
+template class cuvs_mg_ivf_flat<int8_t, int64_t>;
 }  // namespace cuvs::bench

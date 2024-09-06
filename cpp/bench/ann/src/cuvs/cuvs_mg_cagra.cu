@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cuvs_ann_mg_cagra_wrapper.h"
+#include "cuvs_mg_cagra_wrapper.h"
 
 namespace cuvs::bench {
-template class cuvs_ann_mg_cagra<float, uint32_t>;
-// template class cuvs_ann_mg_cagra<half, uint32_t>;
-template class cuvs_ann_mg_cagra<uint8_t, uint32_t>;
-template class cuvs_ann_mg_cagra<int8_t, uint32_t>;
+template class cuvs_mg_cagra<float, uint32_t>;
+// template class cuvs_mg_cagra<half, uint32_t>;
+template class cuvs_mg_cagra<uint8_t, uint32_t>;
+template class cuvs_mg_cagra<int8_t, uint32_t>;
 }  // namespace cuvs::bench

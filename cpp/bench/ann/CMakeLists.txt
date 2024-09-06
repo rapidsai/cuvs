@@ -32,7 +32,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
-option(CUVS_ANN_BENCH_USE_CUVS_ANN_MG "Include cuVS ann mg algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -56,7 +56,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
   set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
-  set(CUVS_ANN_BENCH_USE_CUVS_ANN_MG OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_MG OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -68,7 +68,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
-   OR CUVS_ANN_BENCH_USE_CUVS_ANN_MG
+   OR CUVS_ANN_BENCH_USE_CUVS_MG
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -250,15 +250,15 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
   )
 endif()
 
-if(CUVS_ANN_BENCH_USE_CUVS_ANN_MG)
+if(CUVS_ANN_BENCH_USE_CUVS_MG)
   ConfigureAnnBench(
     NAME
-    CUVS_ANN_MG
+    CUVS_MG
     PATH
     src/cuvs/cuvs_benchmark.cu
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:src/cuvs/cuvs_ann_mg_ivf_flat.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:src/cuvs/cuvs_ann_mg_ivf_pq.cu>
-    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_ANN_MG}>:src/cuvs/cuvs_ann_mg_cagra.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_ivf_flat.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_ivf_pq.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_cagra.cu>
     LINKS
     cuvs
   )

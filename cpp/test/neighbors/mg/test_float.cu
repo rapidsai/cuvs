@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../ann_mg.cuh"
+#include "../mg.cuh"
 
 namespace cuvs::neighbors::mg {
 

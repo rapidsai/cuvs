@@ -202,17 +202,17 @@ endif()
 
 if(BUILD_MG_ALGOS)
   set(CUVS_MG_ALGOS
-      src/neighbors/ann_mg/ann_mg_flat_float_int64_t.cu
-      src/neighbors/ann_mg/ann_mg_flat_int8_t_int64_t.cu
-      src/neighbors/ann_mg/ann_mg_flat_uint8_t_int64_t.cu
-      src/neighbors/ann_mg/ann_mg_pq_float_int64_t.cu
-      src/neighbors/ann_mg/ann_mg_pq_int8_t_int64_t.cu
-      src/neighbors/ann_mg/ann_mg_pq_uint8_t_int64_t.cu
-      src/neighbors/ann_mg/ann_mg_cagra_float_uint32_t.cu
-      src/neighbors/ann_mg/ann_mg_cagra_int8_t_uint32_t.cu
-      src/neighbors/ann_mg/ann_mg_cagra_uint8_t_uint32_t.cu
-      src/neighbors/ann_mg/nccl_clique.cu
-      src/neighbors/ann_mg/omp_checks.cu
+      src/neighbors/mg/mg_flat_float_int64_t.cu
+      src/neighbors/mg/mg_flat_int8_t_int64_t.cu
+      src/neighbors/mg/mg_flat_uint8_t_int64_t.cu
+      src/neighbors/mg/mg_pq_float_int64_t.cu
+      src/neighbors/mg/mg_pq_int8_t_int64_t.cu
+      src/neighbors/mg/mg_pq_uint8_t_int64_t.cu
+      src/neighbors/mg/mg_cagra_float_uint32_t.cu
+      src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
+      src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
+      src/neighbors/mg/nccl_clique.cu
+      src/neighbors/mg/omp_checks.cu
   )
 endif()
 

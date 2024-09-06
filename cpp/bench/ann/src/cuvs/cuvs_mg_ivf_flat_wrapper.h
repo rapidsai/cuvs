@@ -17,24 +17,24 @@
 #pragma once
 
 #include "cuvs_ann_bench_utils.h"
-#include "cuvs_ivf_pq_wrapper.h"
-#include <cuvs/neighbors/ann_mg.hpp>
+#include "cuvs_ivf_flat_wrapper.h"
+#include <cuvs/neighbors/mg.hpp>
 
 namespace cuvs::bench {
 
 template <typename T, typename IdxT>
-class cuvs_ann_mg_ivf_pq : public algo<T>, public algo_gpu {
+class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
 
-  using build_param = cuvs::neighbors::ivf_pq::mg_index_params;
+  using build_param = cuvs::neighbors::ivf_flat::mg_index_params;
 
-  struct search_param : public cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param {
+  struct search_param : public cuvs::bench::cuvs_ivf_flat<T, IdxT>::search_param {
     cuvs::neighbors::mg::sharded_merge_mode merge_mode;
   };
 
-  cuvs_ann_mg_ivf_pq(Metric metric, int dim, const build_param& param)
+  cuvs_mg_ivf_flat(Metric metric, int dim, const build_param& param)
     : algo<T>(metric, dim), index_params_(param)
   {
     index_params_.metric = parse_metric_type(metric);
@@ -73,57 +73,56 @@ class cuvs_ann_mg_ivf_pq : public algo<T>, public algo_gpu {
  private:
   std::shared_ptr<cuvs::neighbors::mg::nccl_clique> clique_;
   build_param index_params_;
-  cuvs::neighbors::ivf_pq::search_params search_params_;
+  cuvs::neighbors::ivf_flat::search_params search_params_;
   cuvs::neighbors::mg::sharded_merge_mode merge_mode_;
-  std::shared_ptr<cuvs::neighbors::mg::ann_mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>
+  std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>
     index_;
 };
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_ivf_pq<T, IdxT>::build(const T* dataset, size_t nrow)
+void cuvs_mg_ivf_flat<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, IdxT(nrow), IdxT(dim_));
   const auto& handle = clique_->set_current_device_to_root_rank();
   auto idx           = cuvs::neighbors::mg::build(handle, *clique_, index_params_, dataset_view);
   index_             = std::make_shared<
-    cuvs::neighbors::mg::ann_mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
-    std::move(idx));
+    cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>(std::move(idx));
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_mg_ivf_flat<T, IdxT>::set_search_param(const search_param_base& param)
 {
   auto sp        = dynamic_cast<const search_param&>(param);
-  search_params_ = sp.pq_param;
+  search_params_ = sp.ivf_flat_params;
   merge_mode_    = sp.merge_mode;
   assert(search_params_.n_probes <= index_params_.n_lists);
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_ivf_pq<T, IdxT>::save(const std::string& file) const
+void cuvs_mg_ivf_flat<T, IdxT>::save(const std::string& file) const
 {
   const auto& handle = clique_->set_current_device_to_root_rank();
   cuvs::neighbors::mg::serialize(handle, *clique_, *index_, file);
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_ivf_pq<T, IdxT>::load(const std::string& file)
+void cuvs_mg_ivf_flat<T, IdxT>::load(const std::string& file)
 {
   const auto& handle = clique_->set_current_device_to_root_rank();
   index_             = std::make_shared<
-    cuvs::neighbors::mg::ann_mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
-    std::move(cuvs::neighbors::mg::deserialize_pq<T, IdxT>(handle, *clique_, file)));
+    cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>(
+    std::move(cuvs::neighbors::mg::deserialize_flat<T, IdxT>(handle, *clique_, file)));
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<algo<T>> cuvs_ann_mg_ivf_pq<T, IdxT>::copy()
+std::unique_ptr<algo<T>> cuvs_mg_ivf_flat<T, IdxT>::copy()
 {
-  return std::make_unique<cuvs_ann_mg_ivf_pq<T, IdxT>>(*this);  // use copy constructor
+  return std::make_unique<cuvs_mg_ivf_flat<T, IdxT>>(*this);  // use copy constructor
 }
 
 template <typename T, typename IdxT>
-void cuvs_ann_mg_ivf_pq<T, IdxT>::search(
+void cuvs_mg_ivf_flat<T, IdxT>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   auto queries_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(

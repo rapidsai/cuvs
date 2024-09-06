@@ -7,14 +7,14 @@ The SNMG (single-node multi-GPUs) ANN API provides a set of functions to deploy 
    :language: c++
    :class: highlight
 
-``#include <cuvs/neighbors/ann_mg.hpp>``
+``#include <cuvs/neighbors/mg.hpp>``
 
 namespace *cuvs::neighbors::mg*
 
 NCCL clique utility
 -------------------
 
-.. doxygengroup:: ann_mg_cpp_nccl_clique
+.. doxygengroup:: mg_cpp_nccl_clique
     :project: cuvs
     :members:
     :content-only:
@@ -22,7 +22,7 @@ NCCL clique utility
 Index build parameters
 ----------------------
 
-.. doxygengroup:: ann_mg_cpp_index_params
+.. doxygengroup:: mg_cpp_index_params
     :project: cuvs
     :members:
     :content-only:
@@ -30,7 +30,7 @@ Index build parameters
 Index build
 -----------
 
-.. doxygengroup:: ann_mg_cpp_index_build
+.. doxygengroup:: mg_cpp_index_build
     :project: cuvs
     :members:
     :content-only:
@@ -38,7 +38,7 @@ Index build
 Index extend
 ------------
 
-.. doxygengroup:: ann_mg_cpp_index_extend
+.. doxygengroup:: mg_cpp_index_extend
     :project: cuvs
     :members:
     :content-only:
@@ -46,7 +46,7 @@ Index extend
 Index search
 ------------
 
-.. doxygengroup:: ann_mg_cpp_index_search
+.. doxygengroup:: mg_cpp_index_search
     :project: cuvs
     :members:
     :content-only:
@@ -54,7 +54,7 @@ Index search
 Index serialize
 ---------------
 
-.. doxygengroup:: ann_mg_cpp_serialize
+.. doxygengroup:: mg_cpp_serialize
     :project: cuvs
     :members:
     :content-only:
@@ -62,15 +62,15 @@ Index serialize
 Index deserialize
 -----------------
 
-.. doxygengroup:: ann_mg_cpp_deserialize
+.. doxygengroup:: mg_cpp_deserialize
     :project: cuvs
     :members:
     :content-only:
 
 Distribute pre-built local index
---------------------------------------
+--------------------------------
 
-.. doxygengroup:: ann_mg_cpp_distribute
+.. doxygengroup:: mg_cpp_distribute
     :project: cuvs
     :members:
     :content-only:

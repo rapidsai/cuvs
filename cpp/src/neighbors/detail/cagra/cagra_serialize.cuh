@@ -32,8 +32,9 @@
 #include <fstream>
 #include <type_traits>
 
-static const std::string RAFT_NAME = "raft";
 namespace cuvs::neighbors::cagra::detail {
+
+static const std::string RAFT_NAME = "raft";
 
 constexpr int serialization_version = 4;
 

@@ -165,7 +165,7 @@ if(BUILD_TESTS)
   endif()
 
   if(BUILD_MG_ALGOS)
-    ConfigureTest(NAME NEIGHBORS_ANN_MG_TEST PATH neighbors/ann_mg/test_float.cu GPUS 1 PERCENT 100)
+    ConfigureTest(NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100)
   endif()
 
   ConfigureTest(

@@ -21,9 +21,7 @@
 #include <raft/core/device_resources.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
-#include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/iface.hpp>
 
 #ifndef NO_NCCL_FORWARD_DECLARATION
 class ncclComm_t {};
@@ -31,11 +29,11 @@ class ncclComm_t {};
 
 #define DEFAULT_SEARCH_BATCH_SIZE 1 << 20
 
-/// \defgroup ann_mg_cpp_index_params ANN MG index build parameters
+/// \defgroup mg_cpp_index_params ANN MG index build parameters
 
 namespace cuvs::neighbors::mg {
 /** Distribution mode */
-/// \ingroup ann_mg_cpp_index_params
+/// \ingroup mg_cpp_index_params
 enum distribution_mode {
   /** Index is replicated on each device, favors throughput */
   REPLICATED,
@@ -44,7 +42,7 @@ enum distribution_mode {
 };
 
 /** Merge mode when using a sharded index */
-/// \ingroup ann_mg_cpp_index_params
+/// \ingroup mg_cpp_index_params
 enum sharded_merge_mode {
   /** Search batches are merged on the root rank */
   MERGE_ON_ROOT_RANK,
@@ -54,7 +52,7 @@ enum sharded_merge_mode {
 }  // namespace cuvs::neighbors::mg
 
 namespace cuvs::neighbors::ivf_flat {
-/// \ingroup ann_mg_cpp_index_params
+/// \ingroup mg_cpp_index_params
 /**
  * IVF-Flat MG build parameters struct
  *
@@ -75,7 +73,7 @@ struct mg_index_params : public cuvs::neighbors::ivf_flat::index_params {
 }  // namespace cuvs::neighbors::ivf_flat
 
 namespace cuvs::neighbors::ivf_pq {
-/// \ingroup ann_mg_cpp_index_params
+/// \ingroup mg_cpp_index_params
 /**
  * IVF-PQ MG build parameters struct
  *
@@ -96,7 +94,7 @@ struct mg_index_params : public cuvs::neighbors::ivf_pq::index_params {
 }  // namespace cuvs::neighbors::ivf_pq
 
 namespace cuvs::neighbors::cagra {
-/// \ingroup ann_mg_cpp_index_params
+/// \ingroup mg_cpp_index_params
 /**
  * CAGRA MG build parameters struct
  *
@@ -119,9 +117,9 @@ struct mg_index_params : public cuvs::neighbors::cagra::index_params {
 namespace cuvs::neighbors::mg {
 using pool_mr = rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>;
 
-/// \defgroup ann_mg_cpp_nccl_clique NCCL clique utility
+/// \defgroup mg_cpp_nccl_clique NCCL clique utility
 
-/// \ingroup ann_mg_cpp_nccl_clique
+/// \ingroup mg_cpp_nccl_clique
 struct nccl_clique {
   /**
    * Instantiates a NCCL clique with all available GPUs
@@ -165,47 +163,17 @@ struct nccl_clique {
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
-class ann_interface {
+class index {
  public:
-  template <typename Accessor>
-  void build(raft::resources const& handle,
-             const cuvs::neighbors::index_params* index_params,
-             raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
+  index(distribution_mode mode, int num_ranks_);
+  index(const raft::resources& handle,
+        const cuvs::neighbors::mg::nccl_clique& clique,
+        const std::string& filename);
 
-  template <typename Accessor1, typename Accessor2>
-  void extend(
-    raft::resources const& handle,
-    raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
-    std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
-      new_indices);
-
-  void search(raft::resources const& handle,
-              const cuvs::neighbors::search_params* search_params,
-              raft::host_matrix_view<const T, int64_t, row_major> h_queries,
-              raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
-              raft::device_matrix_view<float, int64_t, row_major> d_distances) const;
-
-  void serialize(raft::resources const& handle, std::ostream& os) const;
-  void deserialize(raft::resources const& handle, std::istream& is);
-  void deserialize(raft::resources const& handle, const std::string& filename);
-  const IdxT size() const;
-
- private:
-  std::optional<AnnIndexType> index_;
-};
-
-template <typename AnnIndexType, typename T, typename IdxT>
-class ann_mg_index {
- public:
-  ann_mg_index(distribution_mode mode, int num_ranks_);
-  ann_mg_index(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
-               const std::string& filename);
-
-  ann_mg_index(const ann_mg_index&)                    = delete;
-  ann_mg_index(ann_mg_index&&)                         = default;
-  auto operator=(const ann_mg_index&) -> ann_mg_index& = delete;
-  auto operator=(ann_mg_index&&) -> ann_mg_index&      = default;
+  index(const index&)                    = delete;
+  index(index&&)                         = default;
+  auto operator=(const index&) -> index& = delete;
+  auto operator=(index&&) -> index&      = default;
 
   void deserialize_and_distribute(const raft::resources& handle,
                                   const cuvs::neighbors::mg::nccl_clique& clique,
@@ -260,12 +228,12 @@ class ann_mg_index {
 
   distribution_mode mode_;
   int num_ranks_;
-  std::vector<ann_interface<AnnIndexType, T, IdxT>> ann_interfaces_;
+  std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
 };
 
-/// \defgroup ann_mg_cpp_index_build ANN MG index build
+/// \defgroup mg_cpp_index_build ANN MG index build
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -287,9 +255,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const ivf_flat::mg_index_params& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
-  -> ann_mg_index<ivf_flat::index<float, int64_t>, float, int64_t>;
+  -> index<ivf_flat::index<float, int64_t>, float, int64_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -311,9 +279,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const ivf_flat::mg_index_params& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
-  -> ann_mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>;
+  -> index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -335,9 +303,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const ivf_flat::mg_index_params& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
-  -> ann_mg_index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>;
+  -> index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -359,9 +327,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const ivf_pq::mg_index_params& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
-  -> ann_mg_index<ivf_pq::index<int64_t>, float, int64_t>;
+  -> index<ivf_pq::index<int64_t>, float, int64_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -383,9 +351,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const ivf_pq::mg_index_params& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
-  -> ann_mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>;
+  -> index<ivf_pq::index<int64_t>, int8_t, int64_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -407,9 +375,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const ivf_pq::mg_index_params& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
-  -> ann_mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
+  -> index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -431,9 +399,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const cagra::mg_index_params& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
-  -> ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>;
+  -> index<cagra::index<float, uint32_t>, float, uint32_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -455,9 +423,9 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const cagra::mg_index_params& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
-  -> ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
+  -> index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
 
-/// \ingroup ann_mg_cpp_index_build
+/// \ingroup mg_cpp_index_build
 /**
  *
  * Usage example:
@@ -479,11 +447,11 @@ auto build(const raft::resources& handle,
            const cuvs::neighbors::mg::nccl_clique& clique,
            const cagra::mg_index_params& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
-  -> ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
+  -> index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
 
-/// \defgroup ann_mg_cpp_index_extend ANN MG index extend
+/// \defgroup mg_cpp_index_extend ANN MG index extend
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -505,11 +473,11 @@ auto build(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
+            index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -531,11 +499,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
+            index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -557,11 +525,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
+            index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -583,11 +551,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+            index<ivf_pq::index<int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -609,11 +577,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+            index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -635,11 +603,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+            index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -661,11 +629,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -687,11 +655,11 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+            index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
-/// \ingroup ann_mg_cpp_index_extend
+/// \ingroup mg_cpp_index_extend
 /**
  *
  * Usage example:
@@ -713,13 +681,13 @@ void extend(const raft::resources& handle,
  */
 void extend(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+            index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
-/// \defgroup ann_mg_cpp_index_search ANN MG index search
+/// \defgroup mg_cpp_index_search ANN MG index search
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -746,7 +714,7 @@ void extend(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
+            const index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
             const ivf_flat::search_params& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
@@ -754,7 +722,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -781,7 +749,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
+            const index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
             const ivf_flat::search_params& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
@@ -789,7 +757,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -816,7 +784,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
+            const index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
             const ivf_flat::search_params& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
@@ -824,7 +792,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -851,7 +819,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+            const index<ivf_pq::index<int64_t>, float, int64_t>& index,
             const ivf_pq::search_params& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
@@ -859,7 +827,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -886,7 +854,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+            const index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             const ivf_pq::search_params& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
@@ -894,7 +862,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -921,7 +889,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+            const index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             const ivf_pq::search_params& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
@@ -929,7 +897,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -956,7 +924,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            const index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             const cagra::search_params& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
@@ -964,7 +932,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -991,7 +959,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+            const index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
             const cagra::search_params& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
@@ -999,7 +967,7 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \ingroup ann_mg_cpp_index_search
+/// \ingroup mg_cpp_index_search
 /**
  *
  * Usage example:
@@ -1026,7 +994,7 @@ void search(const raft::resources& handle,
  */
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
-            const ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+            const index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
             const cagra::search_params& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
@@ -1034,9 +1002,9 @@ void search(const raft::resources& handle,
             cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE,
             int64_t n_rows_per_batch                           = DEFAULT_SEARCH_BATCH_SIZE);
 
-/// \defgroup ann_mg_cpp_serialize ANN MG index serialization
+/// \defgroup mg_cpp_serialize ANN MG index serialization
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1057,10 +1025,10 @@ void search(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
+               const index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1081,10 +1049,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
+               const index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1105,10 +1073,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
+               const index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1129,10 +1097,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+               const index<ivf_pq::index<int64_t>, float, int64_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1153,10 +1121,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+               const index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1177,10 +1145,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+               const index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1201,10 +1169,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+               const index<cagra::index<float, uint32_t>, float, uint32_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1225,10 +1193,10 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+               const index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
                const std::string& filename);
 
-/// \ingroup ann_mg_cpp_serialize
+/// \ingroup mg_cpp_serialize
 /**
  *
  * Usage example:
@@ -1249,12 +1217,12 @@ void serialize(const raft::resources& handle,
  */
 void serialize(const raft::resources& handle,
                const cuvs::neighbors::mg::nccl_clique& clique,
-               const ann_mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+               const index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
                const std::string& filename);
 
-/// \defgroup ann_mg_cpp_deserialize ANN MG index deserialization
+/// \defgroup mg_cpp_deserialize ANN MG index deserialization
 
-/// \ingroup ann_mg_cpp_deserialize
+/// \ingroup mg_cpp_deserialize
 /**
  *
  * Usage example:
@@ -1277,10 +1245,9 @@ void serialize(const raft::resources& handle,
 template <typename T, typename IdxT>
 auto deserialize_flat(const raft::resources& handle,
                       const cuvs::neighbors::mg::nccl_clique& clique,
-                      const std::string& filename)
-  -> ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>;
+                      const std::string& filename) -> index<ivf_flat::index<T, IdxT>, T, IdxT>;
 
-/// \ingroup ann_mg_cpp_deserialize
+/// \ingroup mg_cpp_deserialize
 /**
  *
  * Usage example:
@@ -1302,9 +1269,9 @@ auto deserialize_flat(const raft::resources& handle,
 template <typename T, typename IdxT>
 auto deserialize_pq(const raft::resources& handle,
                     const cuvs::neighbors::mg::nccl_clique& clique,
-                    const std::string& filename) -> ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>;
+                    const std::string& filename) -> index<ivf_pq::index<IdxT>, T, IdxT>;
 
-/// \ingroup ann_mg_cpp_deserialize
+/// \ingroup mg_cpp_deserialize
 /**
  *
  * Usage example:
@@ -1327,11 +1294,11 @@ auto deserialize_pq(const raft::resources& handle,
 template <typename T, typename IdxT>
 auto deserialize_cagra(const raft::resources& handle,
                        const cuvs::neighbors::mg::nccl_clique& clique,
-                       const std::string& filename) -> ann_mg_index<cagra::index<T, IdxT>, T, IdxT>;
+                       const std::string& filename) -> index<cagra::index<T, IdxT>, T, IdxT>;
 
-/// \defgroup ann_mg_cpp_distribute ANN MG local index distribution
+/// \defgroup mg_cpp_distribute ANN MG local index distribution
 
-/// \ingroup ann_mg_cpp_distribute
+/// \ingroup mg_cpp_distribute
 /**
  *
  * Usage example:
@@ -1354,10 +1321,9 @@ auto deserialize_cagra(const raft::resources& handle,
 template <typename T, typename IdxT>
 auto distribute_flat(const raft::resources& handle,
                      const cuvs::neighbors::mg::nccl_clique& clique,
-                     const std::string& filename)
-  -> ann_mg_index<ivf_flat::index<T, IdxT>, T, IdxT>;
+                     const std::string& filename) -> index<ivf_flat::index<T, IdxT>, T, IdxT>;
 
-/// \ingroup ann_mg_cpp_distribute
+/// \ingroup mg_cpp_distribute
 /**
  *
  * Usage example:
@@ -1379,9 +1345,9 @@ auto distribute_flat(const raft::resources& handle,
 template <typename T, typename IdxT>
 auto distribute_pq(const raft::resources& handle,
                    const cuvs::neighbors::mg::nccl_clique& clique,
-                   const std::string& filename) -> ann_mg_index<ivf_pq::index<IdxT>, T, IdxT>;
+                   const std::string& filename) -> index<ivf_pq::index<IdxT>, T, IdxT>;
 
-/// \ingroup ann_mg_cpp_distribute
+/// \ingroup mg_cpp_distribute
 /**
  *
  * Usage example:
@@ -1404,7 +1370,7 @@ auto distribute_pq(const raft::resources& handle,
 template <typename T, typename IdxT>
 auto distribute_cagra(const raft::resources& handle,
                       const cuvs::neighbors::mg::nccl_clique& clique,
-                      const std::string& filename) -> ann_mg_index<cagra::index<T, IdxT>, T, IdxT>;
+                      const std::string& filename) -> index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::mg
 
