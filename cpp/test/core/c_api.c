@@ -42,7 +42,7 @@ int main()
   if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Enable pool memory resource
-  error = cuvsRMMPoolMemoryResourceEnable(10, 100, 0);
+  error = cuvsRMMPoolMemoryResourceEnable(10, 100, false);
   if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Allocate memory again
@@ -58,7 +58,7 @@ int main()
   if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Enable pool memory resource (managed)
-  error = cuvsRMMPoolMemoryResourceEnable(10, 100, 1);
+  error = cuvsRMMPoolMemoryResourceEnable(10, 100, true);
   if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   // Allocate memory again

@@ -93,7 +93,7 @@ thread_local std::shared_ptr<
 
 extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
                                                        int max_pool_size_percent,
-                                                       int managed)
+                                                       bool managed)
 {
   return cuvs::core::translate_exceptions([=] {
     // Upstream memory resource needs to be a cuda_memory_resource
