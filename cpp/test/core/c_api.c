@@ -58,6 +58,15 @@ int main()
   cuvsError_t reset_error = cuvsRMMMemoryResourceReset();
   if (reset_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
+  // Alloc memory on host (pinned)
+  void* ptr3;
+  cuvsError_t alloc_error_pinned = cuvsRMMHostAlloc(&ptr3, 1024);
+  if (alloc_error_pinned == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Free memory
+  cuvsError_t free_error_pinned = cuvsRMMHostFree(ptr3, 1024);
+  if (free_error_pinned == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
   // Destroy resources
   cuvsError_t destroy_error = cuvsResourcesDestroy(res);
   if (destroy_error == CUVS_ERROR) { exit(EXIT_FAILURE); }

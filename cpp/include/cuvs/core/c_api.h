@@ -148,6 +148,22 @@ cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
  */
 cuvsError_t cuvsRMMMemoryResourceReset();
 
+/**
+ * @brief Allocates pinned memory on the host using RMM
+ * @param[out] ptr Pointer to allocated host memory
+ * @param[in] bytes Size in bytes to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
+
+/**
+ * @brief Deallocates pinned memory on the host using RMM
+ * @param[in] ptr Pointer to allocated host memory to free
+ * @param[in] bytes Size in bytes to deallocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
+
 /** @} */
 
 #ifdef __cplusplus
