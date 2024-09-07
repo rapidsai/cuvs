@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/pairwise_distance.h>
 #include <cuvs/neighbors/cagra.h>
@@ -14,6 +30,8 @@
 float PointA[N_ROWS][DIM] = {1.0,2.0,3.0,4.0};
 float PointB[N_ROWS][DIM] = {2.0,3.0,4.0,5.0};
 
+cuvsResources_t res;
+
 void outputVector(float * Vec) {
   printf("Vector is ");
   for (int i = 0; i < DIM; ++i){
@@ -22,21 +40,14 @@ void outputVector(float * Vec) {
   printf("\n");
 }
 
-cuvsResources_t res;
-
-int initResources(void){
-  // Create a cuvsResources_t object
-  cuvsResourcesCreate(&res);
-  return 0;
-}
-
-int freeResources(void){
-  cuvsResourcesDestroy(res);
-  return 0;
-}
-
-/* Started by AICoder, pid:96cd0bcb6ad27b1149870b5f20ef16170f62a328 */
-void initializeTensor(float* x_d, int64_t x_shape[2], DLManagedTensor* x_tensor) {
+/**
+ * @brief Initialize Tensor.
+ *
+ * @param[in] x_d Pointer to a vector
+ * @param[in] x_shape[] Two-dimensional array, which stores the number of rows and columns of vectors.
+ * @param[out] x_tensor Stores the initialized DLManagedTensor.
+ */
+void tensor_initialize(float* x_d, int64_t x_shape[2], DLManagedTensor* x_tensor) {
   x_tensor->dl_tensor.data = x_d;
   x_tensor->dl_tensor.device.device_type = kDLCUDA;
   x_tensor->dl_tensor.ndim = 2;
@@ -46,9 +57,16 @@ void initializeTensor(float* x_d, int64_t x_shape[2], DLManagedTensor* x_tensor)
   x_tensor->dl_tensor.shape = x_shape;
   x_tensor->dl_tensor.strides = NULL;
 }
-/* Ended by AICoder, pid:96cd0bcb6ad27b1149870b5f20ef16170f62a328 */
 
-int calcL2Distance(int64_t n_cols,float x[], float y[], float *ret) {
+/**
+ * @brief Calculate the euclidean distance between two arrays.
+ *
+ * @param[in] n_cols array length，also the dimension of the vector
+ * @param[in] x[] Pointer to a vector
+ * @param[in] y[] Pointer to another vector
+ * @param[out] ret will store the result about the euclidean distance
+ */
+void l2_distance_calc(int64_t n_cols,float x[], float y[], float *ret) {
   float *x_d, *y_d;
   float *distance_d;
   cuvsRMMAlloc(res, (void**) &x_d, sizeof(float) * N_ROWS * n_cols);
@@ -61,15 +79,15 @@ int calcL2Distance(int64_t n_cols,float x[], float y[], float *ret) {
 
   DLManagedTensor x_tensor;
   int64_t x_shape[2] = {N_ROWS, n_cols};
-  initializeTensor(x_d, x_shape, &x_tensor);
+  tensor_initialize(x_d, x_shape, &x_tensor);
 
   DLManagedTensor y_tensor;
   int64_t y_shape[2] = {N_ROWS, n_cols};
-  initializeTensor(y_d, y_shape, &y_tensor);
+  tensor_initialize(y_d, y_shape, &y_tensor);
   
   DLManagedTensor dist_tensor;
   int64_t distances_shape[2] = {N_ROWS, N_ROWS};
-  initializeTensor(distance_d, distances_shape, &dist_tensor);
+  tensor_initialize(distance_d, distances_shape, &dist_tensor);
 
   // metric_arg default value is 2.0,used for Minkowski distance
   cuvsPairwiseDistance(res, &x_tensor, &y_tensor, &dist_tensor, L2SqrtUnexpanded, 2.0);
@@ -80,21 +98,21 @@ int calcL2Distance(int64_t n_cols,float x[], float y[], float *ret) {
   cuvsRMMFree(res, x_d, sizeof(float) * N_ROWS * n_cols);
   cuvsRMMFree(res, y_d, sizeof(float) * N_ROWS * n_cols);
 
-  return 0;
 }
 
 int euclidean_distance_calculation_example() {
-  float ret;
+  // Create a cuvsResources_t object
+  cuvsResourcesCreate(&res);
 
   outputVector((float *)PointA);
   outputVector((float *)PointB);
-
-  initResources();
   
-  calcL2Distance(DIM, (float *)PointA, (float *)PointB, &ret);
+  float ret;
+  
+  l2_distance_calc(DIM, (float *)PointA, (float *)PointB, &ret);
   printf("L2 distance is %f.\n", ret);
   
-  freeResources();
+  cuvsResourcesDestroy(res);
 
   return 0;
 }
