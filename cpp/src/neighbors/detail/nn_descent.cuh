@@ -99,9 +99,9 @@ class ResultItem<int> {
 
  public:
   __host__ __device__ ResultItem()
-    : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()){};
+    : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()) {};
   __host__ __device__ ResultItem(const Index_t id_with_flag, const DistData_t dist)
-    : id_(id_with_flag), dist_(dist){};
+    : id_(id_with_flag), dist_(dist) {};
   __host__ __device__ bool is_new() const { return id_ >= 0; }
   __host__ __device__ Index_t& id_with_flag() { return id_; }
   __host__ __device__ Index_t id() const
@@ -487,13 +487,12 @@ RAFT_KERNEL preprocess_data_kernel(
     int idx = step * raft::warp_size() + threadIdx.x;
     if (idx < dim) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
+        // output_data[list_id * dim + idx] =
+        //   (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
         output_data[list_id * dim + idx] = (float)input_data[(size_t)blockIdx.x * dim + idx];
-      } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
+      } else {
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
-      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-        output_data[list_id * dim + idx] =
-          (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
       }
     }
   }
@@ -831,12 +830,10 @@ __launch_bounds__(BLOCK_SIZE, 4)
         i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
-      } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
+      } else {
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
-      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-        s_distances[i] = 1.0 - s_distances[i];
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -912,12 +909,10 @@ __launch_bounds__(BLOCK_SIZE, 4)
         i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
-      } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
+      } else {
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
-      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-        s_distances[i] = 1.0 - s_distances[i];
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -1353,6 +1348,14 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
                       update_counter_);
   raft::resource::sync_stream(res);
   graph_.sort_lists();
+
+  std::cout << "NN Descent distances: " << std::endl;
+  for (size_t i = 0; i < nrow_; i++) {
+    for (size_t j = 0; j < graph_.node_degree; j++) {
+      std::cout << graph_.h_dists.data_handle()[i * graph_.node_degree + j] << " ";
+    }
+    std::cout << std::endl;
+  }
 
   // Reuse graph_.h_dists as the buffer for shrink the lists in graph
   static_assert(sizeof(decltype(*(graph_.h_dists.data_handle()))) >= sizeof(Index_t));

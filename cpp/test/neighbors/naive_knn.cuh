@@ -41,9 +41,7 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
   if (midx >= m) return;
   IdxT grid_size = IdxT(blockDim.y) * IdxT(gridDim.y);
   for (IdxT nidx = threadIdx.y + blockIdx.y * blockDim.y; nidx < n; nidx += grid_size) {
-    EvalT acc   = EvalT(0);
-    EvalT xnorm = 0;
-    EvalT ynorm = 0;
+    EvalT acc = EvalT(0);
     for (IdxT i = 0; i < k; ++i) {
       IdxT xidx = i + midx * k;
       IdxT yidx = i + nidx * k;
@@ -52,11 +50,6 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
       switch (metric) {
         case cuvs::distance::DistanceType::InnerProduct: {
           acc += xv * yv;
-        } break;
-        case cuvs::distance::DistanceType::CosineExpanded: {
-          acc += xv * yv;
-          xnorm += xv * xv;
-          ynorm += yv * yv;
         } break;
         case cuvs::distance::DistanceType::L2SqrtExpanded:
         case cuvs::distance::DistanceType::L2SqrtUnexpanded:
@@ -72,10 +65,6 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
       case cuvs::distance::DistanceType::L2SqrtExpanded:
       case cuvs::distance::DistanceType::L2SqrtUnexpanded: {
         acc = raft::sqrt(acc);
-      } break;
-      case cuvs::distance::DistanceType::CosineExpanded: {
-        acc /= raft::sqrt(xnorm) * raft::sqrt(ynorm);
-        acc = 1.0 - acc;
       } break;
       default: break;
     }
