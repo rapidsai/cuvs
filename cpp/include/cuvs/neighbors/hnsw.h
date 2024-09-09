@@ -109,6 +109,8 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
  * `kDLDataType.bits = 32`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS,
+ *       as the format is not compatible with the original hnswlib.
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -161,7 +163,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 
 /**
  * Load hnswlib index from file which was serialized from a HNSW index.
- * NOTE: The loaded hnswlib index is immutable.
+ * NOTE: The loaded hnswlib index is immutable, and only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  * Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}

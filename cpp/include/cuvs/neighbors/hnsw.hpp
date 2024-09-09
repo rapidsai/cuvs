@@ -82,7 +82,9 @@ struct index : cuvs::neighbors::index {
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
  * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
- * before reading it as an hnswlib index, then deleting the temporary file.
+ * before reading it as an hnswlib index, then deleting the temporary file. The returned index
+ * is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not
+ * compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] cagra_index cagra index
@@ -106,7 +108,9 @@ std::unique_ptr<index<float>> from_cagra(
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
  * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
- * before reading it as an hnswlib index, then deleting the temporary file.
+ * before reading it as an hnswlib index, then deleting the temporary file.  The returned index
+ * is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not
+ * compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] cagra_index cagra index
@@ -130,7 +134,9 @@ std::unique_ptr<index<uint8_t>> from_cagra(
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
  * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
- * before reading it as an hnswlib index, then deleting the temporary file.
+ * before reading it as an hnswlib index, then deleting the temporary file.  The returned index
+ * is immutable and can only be searched by the hnswlib wrapper in cuVS, as the format is not
+ * compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] cagra_index cagra index
@@ -153,6 +159,8 @@ std::unique_ptr<index<int8_t>> from_cagra(
 
 /**
  * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS,
+ *       as the format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -194,6 +202,8 @@ void search(raft::resources const& res,
 
 /**
  * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS,
+ *       as the format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -235,6 +245,8 @@ void search(raft::resources const& res,
 
 /**
  * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS,
+ *       as the format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -276,7 +288,8 @@ void search(raft::resources const& res,
 
 /**
  * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
- * NOTE: The loaded hnswlib index is immutable.
+ * NOTE: The loaded hnswlib index is immutable, and only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the file containing the serialized CAGRA index
@@ -311,7 +324,8 @@ void deserialize(raft::resources const& res,
 
 /**
  * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
- * NOTE: The loaded hnswlib index is immutable.
+ * NOTE: The loaded hnswlib index is immutable, and only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the file containing the serialized CAGRA index
@@ -346,7 +360,8 @@ void deserialize(raft::resources const& res,
 
 /**
  * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
- * NOTE: The loaded hnswlib index is immutable.
+ * NOTE: The loaded hnswlib index is immutable, and only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] filename path to the file containing the serialized CAGRA index

@@ -421,6 +421,8 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
 
 /**
  * Save the CAGRA index to file in hnswlib format.
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
