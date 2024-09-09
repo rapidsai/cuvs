@@ -130,15 +130,8 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_BRUTE_FORCE_TEST
-    PATH
-    neighbors/ann_brute_force/test_float.cu
-    neighbors/ann_brute_force/test_half.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_ANN_BRUTE_FORCE_TEST PATH neighbors/ann_brute_force/test_float.cu
+    neighbors/ann_brute_force/test_half.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -195,6 +188,9 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
+  )
+  ConfigureTest(
+    NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )
 endif()
 
