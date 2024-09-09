@@ -23,13 +23,13 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifdef _CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 template <unsigned TEAM_SIZE,
-          unsigned MAX_DATASET_DIM,
+          unsigned DATASET_BLOCK_DIM,
           typename DATASET_DESCRIPTOR_T,
           typename SAMPLE_FILTER_T>
-void select_and_run(  // raft::resources const& res,
+void select_and_run(
   DATASET_DESCRIPTOR_T dataset_desc,
   raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, raft::row_major>
     graph,
@@ -39,26 +39,21 @@ void select_and_run(  // raft::resources const& res,
   const uint32_t num_queries,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* dev_seed_ptr,  // [num_queries, num_seeds]
   uint32_t* const num_executed_iterations,                     // [num_queries,]
+  const search_params& ps,
   uint32_t topk,
   uint32_t num_itopk_candidates,
-  uint32_t block_size,
+  uint32_t block_size,  //
   uint32_t smem_size,
   int64_t hash_bitlen,
   typename DATASET_DESCRIPTOR_T::INDEX_T* hashmap_ptr,
   size_t small_hash_bitlen,
   size_t small_hash_reset_interval,
-  uint32_t num_random_samplings,
-  uint64_t rand_xor_mask,
   uint32_t num_seeds,
-  size_t itopk_size,
-  size_t search_width,
-  size_t min_iterations,
-  size_t max_iterations,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
   cudaStream_t stream) RAFT_EXPLICIT;
 
-#endif  // RAFT_EXPLICIT_INSTANTIATE_ONLY
+#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_single_cta_select_and_run(                                                  \
   TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                     \
@@ -76,6 +71,7 @@ void select_and_run(  // raft::resources const& res,
     const uint32_t num_queries,                                                                 \
     const INDEX_T* dev_seed_ptr,                                                                \
     uint32_t* const num_executed_iterations,                                                    \
+    const search_params& ps,                                                                    \
     uint32_t topk,                                                                              \
     uint32_t num_itopk_candidates,                                                              \
     uint32_t block_size,                                                                        \
@@ -84,13 +80,7 @@ void select_and_run(  // raft::resources const& res,
     INDEX_T* hashmap_ptr,                                                                       \
     size_t small_hash_bitlen,                                                                   \
     size_t small_hash_reset_interval,                                                           \
-    uint32_t num_random_samplings,                                                              \
-    uint64_t rand_xor_mask,                                                                     \
     uint32_t num_seeds,                                                                         \
-    size_t itopk_size,                                                                          \
-    size_t search_width,                                                                        \
-    size_t min_iterations,                                                                      \
-    size_t max_iterations,                                                                      \
     SAMPLE_FILTER_T sample_filter,                                                              \
     cuvs::distance::DistanceType metric,                                                        \
     cudaStream_t stream);
@@ -162,6 +152,7 @@ instantiate_single_cta_select_and_run(
     const uint32_t num_queries,                                                                 \
     const INDEX_T* dev_seed_ptr,                                                                \
     uint32_t* const num_executed_iterations,                                                    \
+    const search_params& ps,                                                                    \
     uint32_t topk,                                                                              \
     uint32_t num_itopk_candidates,                                                              \
     uint32_t block_size,                                                                        \
@@ -170,13 +161,7 @@ instantiate_single_cta_select_and_run(
     INDEX_T* hashmap_ptr,                                                                       \
     size_t small_hash_bitlen,                                                                   \
     size_t small_hash_reset_interval,                                                           \
-    uint32_t num_random_samplings,                                                              \
-    uint64_t rand_xor_mask,                                                                     \
     uint32_t num_seeds,                                                                         \
-    size_t itopk_size,                                                                          \
-    size_t search_width,                                                                        \
-    size_t min_iterations,                                                                      \
-    size_t max_iterations,                                                                      \
     SAMPLE_FILTER_T sample_filter,                                                              \
     cuvs::distance::DistanceType metric,                                                        \
     cudaStream_t stream);

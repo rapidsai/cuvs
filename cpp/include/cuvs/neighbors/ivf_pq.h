@@ -116,6 +116,15 @@ struct cuvsIvfPqIndexParams {
    * flag to `true` if you prefer to use as little GPU memory for the database as possible.
    */
   bool conservative_memory_allocation;
+
+  /**
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and
+   * PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training
+   * points to train each codebook.
+   */
+  uint32_t max_train_points_per_pq_code;
 };
 
 typedef struct cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t;
@@ -391,6 +400,26 @@ cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res, const char* filename, cuvs
  * @}
  */
 
+/**
+ * @defgroup ivf_pq_c_index_extend IVF-PQ index extend
+ * @{
+ */
+/**
+ * @brief Extend the index with the new data.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] new_vectors DLManagedTensor* the new vectors to add to the index
+ * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors
+ * @param[inout] index IVF-PQ index to be extended
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                            DLManagedTensor* new_vectors,
+                            DLManagedTensor* new_indices,
+                            cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

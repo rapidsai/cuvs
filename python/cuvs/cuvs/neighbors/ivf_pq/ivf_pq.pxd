@@ -50,6 +50,7 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         codebook_gen codebook_kind
         bool force_random_rotation
         bool conservative_memory_allocation
+        uint32_t max_train_points_per_pq_code
 
     ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
 
@@ -99,3 +100,8 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
     cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res,
                                      const char * filename,
                                      cuvsIvfPqIndex_t index) except +
+
+    cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                                DLManagedTensor* new_vectors,
+                                DLManagedTensor* new_indices,
+                                cuvsIvfPqIndex_t index)

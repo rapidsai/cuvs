@@ -19,6 +19,4 @@
 #include "distance-inl.cuh"
 #endif
 
-#ifdef RAFT_COMPILED
 #include "distance-ext.cuh"
-#endif

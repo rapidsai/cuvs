@@ -27,6 +27,7 @@
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/common.h>
 
 namespace {
 
@@ -53,7 +54,8 @@ void _search(cuvsResources_t res,
              cuvsBruteForceIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
-             DLManagedTensor* distances_tensor)
+             DLManagedTensor* distances_tensor,
+             cuvsFilter prefilter)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::brute_force::index<T>*>(index.addr);
@@ -61,12 +63,29 @@ void _search(cuvsResources_t res,
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<int64_t, int64_t, raft::row_major>;
   using distances_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
-  auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
-  auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
-  auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
+  using prefilter_mds_type    = raft::device_vector_view<const uint32_t, int64_t>;
+  using prefilter_opt_type    = cuvs::core::bitmap_view<const uint32_t, int64_t>;
+
+  auto queries_mds   = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
+  auto neighbors_mds = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
+  auto distances_mds = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
+
+  std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> filter_opt;
+
+  if (prefilter.type == NO_FILTER) {
+    filter_opt = std::nullopt;
+  } else {
+    auto prefilter_ptr  = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
+    auto prefilter_mds  = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
+    auto prefilter_view = prefilter_opt_type((const uint32_t*)prefilter_mds.data_handle(),
+                                             queries_mds.extent(0),
+                                             index_ptr->dataset().extent(0));
+
+    filter_opt = std::make_optional<prefilter_opt_type>(prefilter_view);
+  }
 
   cuvs::neighbors::brute_force::search(
-    *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds, std::nullopt);
+    *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds, filter_opt);
 }
 
 }  // namespace
@@ -120,7 +139,8 @@ extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
                                             cuvsBruteForceIndex_t index_c_ptr,
                                             DLManagedTensor* queries_tensor,
                                             DLManagedTensor* neighbors_tensor,
-                                            DLManagedTensor* distances_tensor)
+                                            DLManagedTensor* distances_tensor,
+                                            cuvsFilter prefilter)
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -143,7 +163,7 @@ extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
-      _search<float>(res, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<float>(res, index, queries_tensor, neighbors_tensor, distances_tensor, prefilter);
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,

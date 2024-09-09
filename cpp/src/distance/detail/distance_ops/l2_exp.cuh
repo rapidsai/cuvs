@@ -19,6 +19,8 @@
 #include <raft/core/math.hpp>
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
+#include <cuda_fp16.h>
+
 namespace cuvs::distance::detail::ops {
 
 /**
@@ -52,8 +54,8 @@ struct l2_exp_cutlass_op {
      * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product (accVal)
      * can sometimes have round-off errors, which will cause (aNorm == bNorm) ~ accVal instead.
      */
-    outVal = outVal * !((outVal * outVal < get_clamp_precision<DataT>()) * (aNorm == bNorm));
-    return sqrt ? raft::sqrt(outVal * (outVal > 0)) : outVal;
+    outVal = outVal * AccT(!((outVal * outVal < get_clamp_precision<AccT>()) * (aNorm == bNorm)));
+    return sqrt ? raft::sqrt(outVal * static_cast<AccT>(outVal > AccT(0))) : outVal;
   }
 
   __device__ AccT operator()(DataT aData) const noexcept { return aData; }
@@ -88,15 +90,22 @@ struct l2_exp_distance_op {
   template <typename Policy>
   static constexpr size_t shared_mem_size()
   {
-    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(DataT));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const { acc += x * y; };
+  DI void core(AccT& acc, DataT& x, DataT& y) const
+  {
+    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+      acc += __half2float(x) * __half2float(y);
+    } else {
+      acc += x * y;
+    }
+  };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {
@@ -104,8 +113,8 @@ struct l2_exp_distance_op {
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
       for (int j = 0; j < Policy::AccColsPerTh; ++j) {
-        DataT accVal = acc[i][j];
-        DataT val    = regxn[i] + regyn[j] - (DataT)2.0 * accVal;
+        AccT accVal = acc[i][j];
+        AccT val    = regxn[i] + regyn[j] - (AccT)2.0 * accVal;
 
         /**
          * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product
@@ -113,7 +122,8 @@ struct l2_exp_distance_op {
          * instead.
          */
         acc[i][j] =
-          val * (val > 0) * !((val * val < get_clamp_precision<DataT>()) * (regxn[i] == regyn[j]));
+          val * static_cast<AccT>((val > AccT(0))) *
+          static_cast<AccT>(!((val * val < get_clamp_precision<AccT>()) * (regxn[i] == regyn[j])));
       }
     }
     if (sqrt) {

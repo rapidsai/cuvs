@@ -20,16 +20,21 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
-#include <raft/core/detail/popc.cuh>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/random/rmat_rectangular_generator.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/random/rng_state.hpp>
+#include <raft/util/popc.cuh>
 
 #include <gtest/gtest.h>
 
+#include <cuda_fp16.h>
+#include <thrust/device_vector.h>
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/reduce.h>
+#include <thrust/transform.h>
 
 #include <algorithm>
 #include <cmath>
@@ -93,6 +98,10 @@ RAFT_KERNEL normalize_kernel(
   }
 }
 
+struct float_to_half {
+  __host__ __device__ __half operator()(const float x) const { return __float2half(x); }
+};
+
 template <typename OutT, typename InT>
 void normalize(OutT* theta,
                const InT* in_vals,
@@ -136,7 +145,8 @@ void set_bitmap(const index_t* src,
     <<<blocks, block_size, 0, stream>>>(src, dst, bitmap, n_edges, n_cols);
   RAFT_CUDA_TRY(cudaGetLastError());
 }
-template <typename value_t, typename index_t, typename bitmap_t = uint32_t>
+
+template <typename value_t, typename dist_t, typename index_t, typename bitmap_t = uint32_t>
 class PrefilteredBruteForceTest
   : public ::testing::TestWithParam<PrefilteredBruteForceInputs<index_t>> {
  public:
@@ -156,22 +166,22 @@ class PrefilteredBruteForceTest
  protected:
   index_t create_sparse_matrix_with_rmat(index_t m,
                                          index_t n,
-                                         value_t sparsity,
+                                         float sparsity,
                                          rmm::device_uvector<bitmap_t>& filter_d)
   {
     index_t r_scale   = (index_t)std::log2(m);
     index_t c_scale   = (index_t)std::log2(n);
-    index_t n_edges   = (index_t)(m * n * 1.0 * sparsity);
+    index_t n_edges   = (index_t)(m * n * 1.0f * sparsity);
     index_t max_scale = std::max(r_scale, c_scale);
 
     rmm::device_uvector<index_t> out_src{(unsigned long)n_edges, stream};
     rmm::device_uvector<index_t> out_dst{(unsigned long)n_edges, stream};
-    rmm::device_uvector<value_t> theta{(unsigned long)(4 * max_scale), stream};
+    rmm::device_uvector<float> theta{(unsigned long)(4 * max_scale), stream};
 
     raft::random::RngState state{2024ULL, raft::random::GeneratorType::GenPC};
 
-    raft::random::uniform<value_t>(handle, state, theta.data(), theta.size(), 0.0f, 1.0f);
-    normalize<value_t, value_t>(
+    raft::random::uniform<float>(handle, state, theta.data(), theta.size(), 0.0f, 1.0f);
+    normalize<float, float>(
       theta.data(), theta.data(), max_scale, r_scale, c_scale, r_scale != c_scale, true, stream);
     raft::random::rmat_rectangular_gen((index_t*)nullptr,
                                        out_src.data(),
@@ -192,12 +202,12 @@ class PrefilteredBruteForceTest
       auto nnz_view = raft::make_device_scalar_view<index_t>(nnz.data());
       auto filter_view =
         raft::make_device_vector_view<const uint32_t, index_t>(filter_d.data(), filter_d.size());
+      index_t size_h = m * n;
+      auto size_view = raft::make_host_scalar_view<index_t>(&size_h);
 
       set_bitmap(src, dst, bitmap, n_edges, n, stream);
 
-      // TODO(rhdong): Need to switch to the public API,
-      // with the issue: https://github.com/rapidsai/cuvs/issues/158
-      raft::detail::popc(handle, filter_view, m * n, nnz_view);
+      raft::popc(handle, filter_view, size_view, nnz_view);
       raft::copy(&nnz_h, nnz.data(), 1, stream);
 
       raft::resource::sync_stream(handle, stream);
@@ -235,15 +245,15 @@ class PrefilteredBruteForceTest
     }
   }
 
-  void cpu_sddmm(const std::vector<value_t>& A,
-                 const std::vector<value_t>& B,
-                 std::vector<value_t>& vals,
+  void cpu_sddmm(const std::vector<dist_t>& A,
+                 const std::vector<dist_t>& B,
+                 std::vector<dist_t>& vals,
                  const std::vector<index_t>& cols,
                  const std::vector<index_t>& row_ptrs,
                  bool is_row_major_A,
                  bool is_row_major_B,
-                 value_t alpha = 1.0,
-                 value_t beta  = 0.0)
+                 dist_t alpha = 1.0,
+                 dist_t beta  = 0.0)
   {
     if (params.n_queries * params.dim != static_cast<index_t>(A.size()) ||
         params.dim * params.n_dataset != static_cast<index_t>(B.size())) {
@@ -256,24 +266,35 @@ class PrefilteredBruteForceTest
 
     for (index_t i = 0; i < params.n_queries; ++i) {
       for (index_t j = row_ptrs[i]; j < row_ptrs[i + 1]; ++j) {
-        value_t sum     = 0;
-        value_t norms_A = 0;
-        value_t norms_B = 0;
+        dist_t sum     = 0;
+        dist_t norms_A = 0;
+        dist_t norms_B = 0;
+
         for (index_t l = 0; l < params.dim; ++l) {
           index_t a_index = trans_a ? i * params.dim + l : l * params.n_queries + i;
           index_t b_index = trans_b ? l * params.n_dataset + cols[j] : cols[j] * params.dim + l;
-          sum += A[a_index] * B[b_index];
+          dist_t A_v;
+          dist_t B_v;
+          if constexpr (sizeof(value_t) == 2) {
+            A_v = __half2float(__float2half(A[a_index]));
+            B_v = __half2float(__float2half(B[b_index]));
+          } else {
+            A_v = A[a_index];
+            B_v = B[b_index];
+          }
 
-          norms_A += A[a_index] * A[a_index];
-          norms_B += B[b_index] * B[b_index];
+          sum += A_v * B_v;
+
+          norms_A += A_v * A_v;
+          norms_B += B_v * B_v;
         }
         vals[j] = alpha * sum + beta * vals[j];
         if (params.metric == cuvs::distance::DistanceType::L2Expanded) {
-          vals[j] = value_t(-2.0) * vals[j] + norms_A + norms_B;
+          vals[j] = dist_t(-2.0) * vals[j] + norms_A + norms_B;
         } else if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-          vals[j] = std::sqrt(value_t(-2.0) * vals[j] + norms_A + norms_B);
+          vals[j] = std::sqrt(dist_t(-2.0) * vals[j] + norms_A + norms_B);
         } else if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-          vals[j] = value_t(1.0) - vals[j] / std::sqrt(norms_A * norms_B);
+          vals[j] = dist_t(1.0) - vals[j] / std::sqrt(norms_A * norms_B);
         }
       }
     }
@@ -281,32 +302,31 @@ class PrefilteredBruteForceTest
 
   void cpu_select_k(const std::vector<index_t>& indptr_h,
                     const std::vector<index_t>& indices_h,
-                    const std::vector<value_t>& values_h,
+                    const std::vector<dist_t>& values_h,
                     std::optional<std::vector<index_t>>& in_idx_h,
                     index_t n_queries,
                     index_t n_dataset,
                     index_t top_k,
-                    std::vector<value_t>& out_values_h,
+                    std::vector<dist_t>& out_values_h,
                     std::vector<index_t>& out_indices_h,
                     bool select_min = true)
   {
-    auto comp = [select_min](const std::pair<value_t, index_t>& a,
-                             const std::pair<value_t, index_t>& b) {
+    auto comp = [select_min](const std::pair<dist_t, index_t>& a,
+                             const std::pair<dist_t, index_t>& b) {
       return select_min ? a.first < b.first : a.first >= b.first;
     };
 
     for (index_t row = 0; row < n_queries; ++row) {
-      std::priority_queue<std::pair<value_t, index_t>,
-                          std::vector<std::pair<value_t, index_t>>,
+      std::priority_queue<std::pair<dist_t, index_t>,
+                          std::vector<std::pair<dist_t, index_t>>,
                           decltype(comp)>
         pq(comp);
-
       for (index_t idx = indptr_h[row]; idx < indptr_h[row + 1]; ++idx) {
         pq.push({values_h[idx], (in_idx_h.has_value()) ? (*in_idx_h)[idx] : indices_h[idx]});
         if (pq.size() > size_t(top_k)) { pq.pop(); }
       }
 
-      std::vector<std::pair<value_t, index_t>> row_pairs;
+      std::vector<std::pair<dist_t, index_t>> row_pairs;
       while (!pq.empty()) {
         row_pairs.push_back(pq.top());
         pq.pop();
@@ -346,40 +366,80 @@ class PrefilteredBruteForceTest
     index_t dataset_size = params.n_dataset * params.dim;
     index_t queries_size = params.n_queries * params.dim;
 
-    std::vector<value_t> dataset_h(dataset_size);
-    std::vector<value_t> queries_h(queries_size);
+    std::vector<dist_t> dataset_h(dataset_size);
+    std::vector<dist_t> queries_h(queries_size);
 
     dataset_d.resize(dataset_size, stream);
     queries_d.resize(queries_size, stream);
 
     auto blobs_in_val =
-      raft::make_device_matrix<value_t, index_t>(handle, 1, dataset_size + queries_size);
+      raft::make_device_matrix<dist_t, index_t>(handle, 1, dataset_size + queries_size);
     auto labels = raft::make_device_vector<index_t, index_t>(handle, 1);
 
-    raft::random::make_blobs<value_t, index_t>(blobs_in_val.data_handle(),
-                                               labels.data_handle(),
-                                               1,
-                                               dataset_size + queries_size,
-                                               1,
-                                               stream,
-                                               false,
-                                               nullptr,
-                                               nullptr,
-                                               value_t(1.0),
-                                               false,
-                                               value_t(-1.0f),
-                                               value_t(1.0f),
-                                               uint64_t(2024));
+    if constexpr (!std::is_same_v<value_t, half>) {
+      raft::random::make_blobs<value_t, index_t>(blobs_in_val.data_handle(),
+                                                 labels.data_handle(),
+                                                 1,
+                                                 dataset_size + queries_size,
+                                                 1,
+                                                 stream,
+                                                 false,
+                                                 nullptr,
+                                                 nullptr,
+                                                 value_t(1.0),
+                                                 false,
+                                                 value_t(-1.0f),
+                                                 value_t(1.0f),
+                                                 uint64_t(2024));
+    } else {
+      raft::random::make_blobs<dist_t, index_t>(blobs_in_val.data_handle(),
+                                                labels.data_handle(),
+                                                1,
+                                                dataset_size + queries_size,
+                                                1,
+                                                stream,
+                                                false,
+                                                nullptr,
+                                                nullptr,
+                                                dist_t(1.0),
+                                                false,
+                                                dist_t(-1.0f),
+                                                dist_t(1.0f),
+                                                uint64_t(2024));
+    }
 
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
-    raft::copy(dataset_d.data(), blobs_in_val.data_handle(), dataset_size, stream);
+
+    if constexpr (std::is_same_v<value_t, half>) {
+      thrust::device_ptr<dist_t> d_output_ptr =
+        thrust::device_pointer_cast(blobs_in_val.data_handle());
+      thrust::device_ptr<value_t> d_value_ptr = thrust::device_pointer_cast(dataset_d.data());
+      thrust::transform(thrust::cuda::par.on(stream),
+                        d_output_ptr,
+                        d_output_ptr + dataset_size,
+                        d_value_ptr,
+                        float_to_half());
+    } else {
+      raft::copy(dataset_d.data(), blobs_in_val.data_handle(), dataset_size, stream);
+    }
 
     raft::copy(queries_h.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
-    raft::copy(queries_d.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
+    if constexpr (std::is_same_v<value_t, half>) {
+      thrust::device_ptr<dist_t> d_output_ptr =
+        thrust::device_pointer_cast(blobs_in_val.data_handle() + dataset_size);
+      thrust::device_ptr<value_t> d_value_ptr = thrust::device_pointer_cast(queries_d.data());
+      thrust::transform(thrust::cuda::par.on(stream),
+                        d_output_ptr,
+                        d_output_ptr + queries_size,
+                        d_value_ptr,
+                        float_to_half());
+    } else {
+      raft::copy(queries_d.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
+    }
 
     raft::resource::sync_stream(handle);
 
-    std::vector<value_t> values_h(nnz);
+    std::vector<dist_t> values_h(nnz);
     std::vector<index_t> indices_h(nnz);
     std::vector<index_t> indptr_h(params.n_queries + 1);
 
@@ -389,9 +449,9 @@ class PrefilteredBruteForceTest
 
     bool select_min = cuvs::distance::is_min_close(params.metric);
 
-    std::vector<value_t> out_val_h(params.n_queries * params.top_k,
-                                   select_min ? std::numeric_limits<value_t>::infinity()
-                                              : std::numeric_limits<value_t>::lowest());
+    std::vector<dist_t> out_val_h(
+      params.n_queries * params.top_k,
+      select_min ? std::numeric_limits<dist_t>::infinity() : std::numeric_limits<dist_t>::lowest());
     std::vector<index_t> out_idx_h(params.n_queries * params.top_k, static_cast<index_t>(0));
 
     out_val_d.resize(params.n_queries * params.top_k, stream);
@@ -403,7 +463,6 @@ class PrefilteredBruteForceTest
     raft::resource::sync_stream(handle);
 
     std::optional<std::vector<index_t>> optional_indices_h = std::nullopt;
-
     cpu_select_k(indptr_h,
                  indices_h,
                  values_h,
@@ -414,9 +473,10 @@ class PrefilteredBruteForceTest
                  out_val_h,
                  out_idx_h,
                  select_min);
-
     out_val_expected_d.resize(params.n_queries * params.top_k, stream);
     out_idx_expected_d.resize(params.n_queries * params.top_k, stream);
+
+    // dump_vector(out_val_h.data(), out_val_h.size(), "out_val_h");
 
     raft::update_device(out_val_expected_d.data(), out_val_h.data(), out_val_h.size(), stream);
     raft::update_device(out_idx_expected_d.data(), out_idx_h.data(), out_idx_h.size(), stream);
@@ -437,12 +497,17 @@ class PrefilteredBruteForceTest
     auto filter = cuvs::core::bitmap_view<const bitmap_t, index_t>(
       (const bitmap_t*)filter_d.data(), params.n_queries, params.n_dataset);
 
-    auto out_val = raft::make_device_matrix_view<value_t, index_t, raft::row_major>(
+    auto out_val = raft::make_device_matrix_view<dist_t, index_t, raft::row_major>(
       out_val_d.data(), params.n_queries, params.top_k);
     auto out_idx = raft::make_device_matrix_view<index_t, index_t, raft::row_major>(
       out_idx_d.data(), params.n_queries, params.top_k);
 
     brute_force::search(handle, dataset, queries, out_idx, out_val, std::make_optional(filter));
+    std::vector<dist_t> out_val_h(params.n_queries * params.top_k,
+                                  std::numeric_limits<dist_t>::infinity());
+
+    raft::update_host(out_val_h.data(), out_val_d.data(), out_val_h.size(), stream);
+    raft::resource::sync_stream(handle);
 
     ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(out_idx_expected_d.data(),
                                                     out_idx.data_handle(),
@@ -467,49 +532,61 @@ class PrefilteredBruteForceTest
   rmm::device_uvector<value_t> queries_d;
   rmm::device_uvector<bitmap_t> filter_d;
 
-  rmm::device_uvector<value_t> out_val_d;
-  rmm::device_uvector<value_t> out_val_expected_d;
+  rmm::device_uvector<dist_t> out_val_d;
+  rmm::device_uvector<dist_t> out_val_expected_d;
 
   rmm::device_uvector<index_t> out_idx_d;
   rmm::device_uvector<index_t> out_idx_expected_d;
 };
 
-using PrefilteredBruteForceTest_float_int64 = PrefilteredBruteForceTest<float, int64_t>;
+using PrefilteredBruteForceTest_float_int64 = PrefilteredBruteForceTest<float, float, int64_t>;
 TEST_P(PrefilteredBruteForceTest_float_int64, Result) { Run(); }
+
+using PrefilteredBruteForceTest_half_int64 = PrefilteredBruteForceTest<half, float, int64_t>;
+TEST_P(PrefilteredBruteForceTest_half_int64, Result) { Run(); }
 
 template <typename index_t>
 const std::vector<PrefilteredBruteForceInputs<index_t>> selectk_inputs = {
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2Expanded},
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::InnerProduct},
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::L2SqrtExpanded},
+  {8, 131072, 255, 255, 0.01, cuvs::distance::DistanceType::CosineExpanded},
   {2, 131072, 255, 255, 0.4, cuvs::distance::DistanceType::L2Expanded},
+
   {8, 131072, 512, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
   {16, 131072, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+  {2, 8192, 255, 16, 0.01, cuvs::distance::DistanceType::InnerProduct},
   {2, 8192, 255, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
   {16, 8192, 512, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
+
   {128, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 1, 0, 0.1, cuvs::distance::DistanceType::L2Expanded},
   {1024, 8192, 3, 0, 0.1, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 5, 0, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
   {1024, 8192, 8, 0, 0.1, cuvs::distance::DistanceType::CosineExpanded},
 
-  {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},
+  {1024, 8192, 1, 1, 0.1, cuvs::distance::DistanceType::L2Expanded},  //--
   {1024, 8192, 3, 1, 0.1, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 5, 1, 0.1, cuvs::distance::DistanceType::L2SqrtExpanded},
   {1024, 8192, 8, 1, 0.1, cuvs::distance::DistanceType::CosineExpanded},
-
   {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2Expanded},
+
   {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
   {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
   {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::InnerProduct},
+
   {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::L2SqrtExpanded},
   {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::L2SqrtExpanded},
   {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
   {1024, 8192, 2050, 16, 0.4, cuvs::distance::DistanceType::CosineExpanded},
   {1024, 8192, 2051, 16, 0.5, cuvs::distance::DistanceType::CosineExpanded},
-  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
 
+  {1024, 8192, 2052, 16, 0.2, cuvs::distance::DistanceType::CosineExpanded},
   {1024, 8192, 1, 16, 0.5, cuvs::distance::DistanceType::L2Expanded},
   {1024, 8192, 2, 16, 0.2, cuvs::distance::DistanceType::L2Expanded},
+
   {1024, 8192, 3, 16, 0.4, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 4, 16, 0.5, cuvs::distance::DistanceType::InnerProduct},
   {1024, 8192, 5, 16, 0.2, cuvs::distance::DistanceType::L2SqrtExpanded},
@@ -519,6 +596,10 @@ const std::vector<PrefilteredBruteForceInputs<index_t>> selectk_inputs = {
 
 INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceTest,
                         PrefilteredBruteForceTest_float_int64,
+                        ::testing::ValuesIn(selectk_inputs<int64_t>));
+
+INSTANTIATE_TEST_CASE_P(PrefilteredBruteForceTest,
+                        PrefilteredBruteForceTest_half_int64,
                         ::testing::ValuesIn(selectk_inputs<int64_t>));
 
 }  // namespace cuvs::neighbors::brute_force
