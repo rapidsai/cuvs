@@ -424,6 +424,8 @@ add_library(
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
+  src/stats/silhouette_score.cu
+  src/stats/trustworthiness_score.cu
 )
 
 target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
