@@ -94,7 +94,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       else
         d_mode = distribution_mode::SHARDED;
 
-      ivf_flat::mg_index_params index_params;
+      mg::index_params<ivf_flat::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
       index_params.adaptive_centers         = ps.adaptive_centers;
@@ -103,7 +103,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
       index_params.mode                     = d_mode;
 
-      ivf_flat::search_params search_params;
+      mg::search_params<ivf_flat::search_params> search_params;
       search_params.n_probes = ps.nprobe;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -123,11 +123,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto new_index = cuvs::neighbors::mg::deserialize_flat<DataT, int64_t>(
         handle_, clique, "./cpp/build/mg_ivf_flat_index");
 
-      cuvs::neighbors::mg::sharded_merge_mode merge_mode;
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
-        merge_mode = MERGE_ON_ROOT_RANK;
+        search_params.merge_mode = MERGE_ON_ROOT_RANK;
       else
-        merge_mode = TREE_MERGE;
+        search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   new_index,
@@ -135,7 +134,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
-                                  merge_mode,
                                   n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
@@ -161,7 +159,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       else
         d_mode = distribution_mode::SHARDED;
 
-      ivf_pq::mg_index_params index_params;
+      mg::index_params<ivf_pq::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
       index_params.add_data_on_build        = false;
@@ -169,7 +167,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
       index_params.mode                     = d_mode;
 
-      ivf_pq::search_params search_params;
+      mg::search_params<ivf_pq::search_params> search_params;
       search_params.n_probes = ps.nprobe;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -189,11 +187,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto new_index = cuvs::neighbors::mg::deserialize_pq<DataT, int64_t>(
         handle_, clique, "./cpp/build/mg_ivf_pq_index");
 
-      cuvs::neighbors::mg::sharded_merge_mode merge_mode;
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
-        merge_mode = MERGE_ON_ROOT_RANK;
+        search_params.merge_mode = MERGE_ON_ROOT_RANK;
       else
-        merge_mode = TREE_MERGE;
+        search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   new_index,
@@ -201,7 +198,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
-                                  merge_mode,
                                   n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
@@ -227,12 +223,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       else
         d_mode = distribution_mode::SHARDED;
 
-      cagra::mg_index_params index_params;
+      mg::index_params<cagra::index_params> index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
       index_params.mode = d_mode;
 
-      cagra::search_params search_params;
+      mg::search_params<cagra::search_params> search_params;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -250,11 +246,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto new_index = cuvs::neighbors::mg::deserialize_cagra<DataT, uint32_t>(
         handle_, clique, "./cpp/build/mg_cagra_index");
 
-      cuvs::neighbors::mg::sharded_merge_mode merge_mode;
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
-        merge_mode = MERGE_ON_ROOT_RANK;
+        search_params.merge_mode = MERGE_ON_ROOT_RANK;
       else
-        merge_mode = TREE_MERGE;
+        search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   new_index,
@@ -262,7 +257,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
-                                  merge_mode,
                                   n_rows_per_search_batch);
       resource::sync_stream(handle_);
 
@@ -288,7 +282,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.kmeans_trainset_fraction = 1.0;
       index_params.metric_arg               = 0;
 
-      ivf_flat::search_params search_params;
+      mg::search_params<ivf_flat::search_params> search_params;
       search_params.n_probes = ps.nprobe;
 
       RAFT_CUDA_TRY(cudaSetDevice(0));
@@ -309,7 +303,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto distributed_index = cuvs::neighbors::mg::distribute_flat<DataT, int64_t>(
         handle_, clique, "./cpp/build/local_ivf_flat_index");
-      cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
+      search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   distributed_index,
@@ -317,7 +311,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
-                                  merge_mode,
                                   n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
@@ -343,7 +336,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.kmeans_trainset_fraction = 1.0;
       index_params.metric_arg               = 0;
 
-      ivf_pq::search_params search_params;
+      mg::search_params<ivf_pq::search_params> search_params;
       search_params.n_probes = ps.nprobe;
 
       RAFT_CUDA_TRY(cudaSetDevice(0));
@@ -364,7 +357,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto distributed_index = cuvs::neighbors::mg::distribute_pq<DataT, int64_t>(
         handle_, clique, "./cpp/build/local_ivf_pq_index");
-      cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
+      search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   distributed_index,
@@ -372,7 +365,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
-                                  merge_mode,
                                   n_rows_per_search_batch);
 
       resource::sync_stream(handle_);
@@ -395,7 +387,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
 
-      cagra::search_params search_params;
+      mg::search_params<cagra::search_params> search_params;
 
       RAFT_CUDA_TRY(cudaSetDevice(0));
 
@@ -416,7 +408,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distributed_index = cuvs::neighbors::mg::distribute_cagra<DataT, uint32_t>(
         handle_, clique, "./cpp/build/local_cagra_index");
 
-      cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
+      search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   clique,
                                   distributed_index,
@@ -424,7 +416,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   queries,
                                   neighbors,
                                   distances,
-                                  merge_mode,
                                   n_rows_per_search_batch);
 
       resource::sync_stream(handle_);

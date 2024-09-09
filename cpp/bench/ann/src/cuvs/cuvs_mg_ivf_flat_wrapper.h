@@ -21,6 +21,7 @@
 #include <cuvs/neighbors/mg.hpp>
 
 namespace cuvs::bench {
+using namespace cuvs::neighbors;
 
 template <typename T, typename IdxT>
 class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
@@ -28,7 +29,7 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
 
-  using build_param = cuvs::neighbors::ivf_flat::mg_index_params;
+  using build_param = cuvs::neighbors::mg::index_params<ivf_flat::index_params>;
 
   struct search_param : public cuvs::bench::cuvs_ivf_flat<T, IdxT>::search_param {
     cuvs::neighbors::mg::sharded_merge_mode merge_mode;
@@ -73,8 +74,7 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
  private:
   std::shared_ptr<cuvs::neighbors::mg::nccl_clique> clique_;
   build_param index_params_;
-  cuvs::neighbors::ivf_flat::search_params search_params_;
-  cuvs::neighbors::mg::sharded_merge_mode merge_mode_;
+  cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params_;
   std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>
     index_;
 };
@@ -93,9 +93,12 @@ void cuvs_mg_ivf_flat<T, IdxT>::build(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_mg_ivf_flat<T, IdxT>::set_search_param(const search_param_base& param)
 {
-  auto sp        = dynamic_cast<const search_param&>(param);
-  search_params_ = sp.ivf_flat_params;
-  merge_mode_    = sp.merge_mode;
+  auto sp = dynamic_cast<const search_param&>(param);
+  // search_params_ = sp.ivf_flat_params;
+  ivf_flat::search_params* search_params_ptr_ =
+    static_cast<ivf_flat::search_params*>(&search_params_);
+  *search_params_ptr_       = sp.ivf_flat_params;
+  search_params_.merge_mode = sp.merge_mode;
   assert(search_params_.n_probes <= index_params_.n_lists);
 }
 
@@ -140,7 +143,7 @@ void cuvs_mg_ivf_flat<T, IdxT>::search(
                               queries_view,
                               neighbors_view,
                               distances_view,
-                              merge_mode_);
+                              search_params_.merge_mode);
 }
 
 }  // namespace cuvs::bench

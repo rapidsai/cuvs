@@ -31,7 +31,7 @@ namespace cuvs::neighbors::mg {
   index<ivf_flat::index<T, IdxT>, T, IdxT> build(                                                \
     const raft::resources& handle,                                                               \
     const cuvs::neighbors::mg::nccl_clique& clique,                                              \
-    const ivf_flat::mg_index_params& index_params,                                               \
+    const mg::index_params<ivf_flat::index_params>& index_params,                                \
     raft::host_matrix_view<const T, int64_t, row_major> index_dataset)                           \
   {                                                                                              \
     return std::move(                                                                            \
@@ -50,22 +50,14 @@ namespace cuvs::neighbors::mg {
   void search(const raft::resources& handle,                                                     \
               const cuvs::neighbors::mg::nccl_clique& clique,                                    \
               const index<ivf_flat::index<T, IdxT>, T, IdxT>& index,                             \
-              const ivf_flat::search_params& search_params,                                      \
+              const mg::search_params<ivf_flat::search_params>& search_params,                   \
               raft::host_matrix_view<const T, int64_t, row_major> queries,                       \
               raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,                        \
               raft::host_matrix_view<float, int64_t, row_major> distances,                       \
-              cuvs::neighbors::mg::sharded_merge_mode merge_mode,                                \
               int64_t n_rows_per_batch)                                                          \
   {                                                                                              \
-    cuvs::neighbors::mg::detail::search(handle,                                                  \
-                                        clique,                                                  \
-                                        index,                                                   \
-                                        search_params,                                           \
-                                        queries,                                                 \
-                                        neighbors,                                               \
-                                        distances,                                               \
-                                        merge_mode,                                              \
-                                        n_rows_per_batch);                                       \
+    cuvs::neighbors::mg::detail::search(                                                         \
+      handle, clique, index, search_params, queries, neighbors, distances, n_rows_per_batch);    \
   }                                                                                              \
                                                                                                  \
   void serialize(const raft::resources& handle,                                                  \

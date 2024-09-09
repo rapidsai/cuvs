@@ -23,7 +23,7 @@
 
 #include "../../utils/nccl_helpers.cuh"
 #define NO_NCCL_FORWARD_DECLARATION
-#include <cuvs/neighbors/ann_mg.hpp>
+#include <cuvs/neighbors/mg.hpp>
 #undef NO_NCCL_FORWARD_DECLARATION
 #include <cuvs/neighbors/common.hpp>
 
@@ -188,7 +188,6 @@ void index<AnnIndexType, T, IdxT>::search(
   raft::host_matrix_view<const T, int64_t, row_major> queries,
   raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
   raft::host_matrix_view<float, int64_t, row_major> distances,
-  cuvs::neighbors::mg::sharded_merge_mode merge_mode,
   int64_t n_rows_per_batch) const
 {
   int64_t n_rows      = queries.extent(0);
@@ -242,6 +241,23 @@ void index<AnnIndexType, T, IdxT>::search(
       resource::sync_stream(dev_res);
     }
   } else if (mode_ == SHARDED) {
+    cuvs::neighbors::mg::sharded_merge_mode merge_mode;
+    if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+      const cuvs::neighbors::mg::search_params<ivf_flat::search_params>* mg_search_params =
+        static_cast<const cuvs::neighbors::mg::search_params<ivf_flat::search_params>*>(
+          search_params);
+      merge_mode = mg_search_params->merge_mode;
+    } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+      const cuvs::neighbors::mg::search_params<ivf_pq::search_params>* mg_search_params =
+        static_cast<const cuvs::neighbors::mg::search_params<ivf_pq::search_params>*>(
+          search_params);
+      merge_mode = mg_search_params->merge_mode;
+    } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+      const cuvs::neighbors::mg::search_params<cagra::search_params>* mg_search_params =
+        static_cast<const cuvs::neighbors::mg::search_params<cagra::search_params>*>(search_params);
+      merge_mode = mg_search_params->merge_mode;
+    }
+
     if (merge_mode == MERGE_ON_ROOT_RANK) {
       RAFT_LOG_INFO("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
                     n_batches,
@@ -551,7 +567,7 @@ template <typename T, typename IdxT>
 index<ivf_flat::index<T, IdxT>, T, IdxT> build(
   const raft::resources& handle,
   const cuvs::neighbors::mg::nccl_clique& clique,
-  const ivf_flat::mg_index_params& index_params,
+  const mg::index_params<ivf_flat::index_params>& index_params,
   raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   index<ivf_flat::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);
@@ -564,7 +580,7 @@ template <typename T, typename IdxT>
 index<ivf_pq::index<IdxT>, T, IdxT> build(
   const raft::resources& handle,
   const cuvs::neighbors::mg::nccl_clique& clique,
-  const ivf_pq::mg_index_params& index_params,
+  const mg::index_params<ivf_pq::index_params>& index_params,
   raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   index<ivf_pq::index<IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);
@@ -577,7 +593,7 @@ template <typename T, typename IdxT>
 index<cagra::index<T, IdxT>, T, IdxT> build(
   const raft::resources& handle,
   const cuvs::neighbors::mg::nccl_clique& clique,
-  const cagra::mg_index_params& index_params,
+  const mg::index_params<cagra::index_params> index_params,
   raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
   index<cagra::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);
@@ -610,11 +626,10 @@ template <typename T, typename IdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const index<ivf_flat::index<T, IdxT>, T, IdxT>& index,
-            const ivf_flat::search_params& search_params,
+            const mg::search_params<ivf_flat::search_params>& search_params,
             raft::host_matrix_view<const T, int64_t, row_major> queries,
             raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            cuvs::neighbors::mg::sharded_merge_mode merge_mode,
             int64_t n_rows_per_batch)
 {
   index.search(clique,
@@ -622,7 +637,6 @@ void search(const raft::resources& handle,
                queries,
                neighbors,
                distances,
-               merge_mode,
                n_rows_per_batch);
 }
 
@@ -630,11 +644,10 @@ template <typename T, typename IdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const index<ivf_pq::index<IdxT>, T, IdxT>& index,
-            const ivf_pq::search_params& search_params,
+            const mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const T, int64_t, row_major> queries,
             raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            cuvs::neighbors::mg::sharded_merge_mode merge_mode,
             int64_t n_rows_per_batch)
 {
   index.search(clique,
@@ -642,7 +655,6 @@ void search(const raft::resources& handle,
                queries,
                neighbors,
                distances,
-               merge_mode,
                n_rows_per_batch);
 }
 
@@ -650,11 +662,10 @@ template <typename T, typename IdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::mg::nccl_clique& clique,
             const index<cagra::index<T, IdxT>, T, IdxT>& index,
-            const cagra::search_params& search_params,
+            const mg::search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const T, int64_t, row_major> queries,
             raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances,
-            cuvs::neighbors::mg::sharded_merge_mode merge_mode,
             int64_t n_rows_per_batch)
 {
   index.search(clique,
@@ -662,7 +673,6 @@ void search(const raft::resources& handle,
                queries,
                neighbors,
                distances,
-               merge_mode,
                n_rows_per_batch);
 }
 

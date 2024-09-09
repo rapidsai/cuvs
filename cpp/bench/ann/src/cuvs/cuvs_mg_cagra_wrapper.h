@@ -20,6 +20,7 @@
 #include <cuvs/neighbors/mg.hpp>
 
 namespace cuvs::bench {
+using namespace cuvs::neighbors;
 
 enum class AllocatorType;
 enum class CagraBuildAlgo;
@@ -31,7 +32,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   using algo<T>::dim_;
 
   struct build_param {
-    cuvs::neighbors::cagra::mg_index_params cagra_params;
+    cuvs::neighbors::mg::index_params<cagra::index_params> cagra_params;
     CagraBuildAlgo algo;
     std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
@@ -92,8 +93,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::mg::nccl_clique> clique_;
   float refine_ratio_;
   build_param index_params_;
-  cuvs::neighbors::cagra::search_params search_params_;
-  cuvs::neighbors::mg::sharded_merge_mode merge_mode_;
+  cuvs::neighbors::mg::search_params<cagra::search_params> search_params_;
   std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>
     index_;
 };
@@ -138,10 +138,12 @@ inline auto allocator_to_string(AllocatorType mem_type) -> std::string;
 template <typename T, typename IdxT>
 void cuvs_mg_cagra<T, IdxT>::set_search_param(const search_param_base& param)
 {
-  auto sp        = dynamic_cast<const search_param&>(param);
-  search_params_ = sp.p;
-  merge_mode_    = sp.merge_mode;
-  refine_ratio_  = sp.refine_ratio;
+  auto sp = dynamic_cast<const search_param&>(param);
+  // search_params_ = static_cast<mg::search_params<cagra::search_params>>(sp.p);
+  cagra::search_params* search_params_ptr_ = static_cast<cagra::search_params*>(&search_params_);
+  *search_params_ptr_                      = sp.p;
+  search_params_.merge_mode                = sp.merge_mode;
+  refine_ratio_                            = sp.refine_ratio;
 }
 
 template <typename T, typename IdxT>
@@ -193,7 +195,7 @@ void cuvs_mg_cagra<T, IdxT>::search_base(
                               queries_view,
                               neighbors_view,
                               distances_view,
-                              merge_mode_);
+                              search_params_.merge_mode);
 }
 
 template <typename T, typename IdxT>
