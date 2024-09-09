@@ -44,7 +44,7 @@ index<AnnIndexType, T, IdxT>::index(const raft::resources& handle,
                                     const cuvs::neighbors::mg::nccl_clique& clique,
                                     const std::string& filename)
 {
-  deserialize_mg_index(handle, clique, filename);
+  deserialize(handle, clique, filename);
 }
 
 // local index deserialization and distribution
@@ -59,16 +59,15 @@ void index<AnnIndexType, T, IdxT>::deserialize_and_distribute(
     const raft::device_resources& dev_res = clique.device_resources_[rank];
     RAFT_CUDA_TRY(cudaSetDevice(dev_id));
     auto& ann_if = ann_interfaces_.emplace_back();
-    ann_if.deserialize(dev_res, filename);
+    cuvs::neighbors::deserialize(dev_res, ann_if, filename);
   }
 }
 
 // MG index deserialization
 template <typename AnnIndexType, typename T, typename IdxT>
-void index<AnnIndexType, T, IdxT>::deserialize_mg_index(
-  const raft::resources& handle,
-  const cuvs::neighbors::mg::nccl_clique& clique,
-  const std::string& filename)
+void index<AnnIndexType, T, IdxT>::deserialize(const raft::resources& handle,
+                                               const cuvs::neighbors::mg::nccl_clique& clique,
+                                               const std::string& filename)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
@@ -81,7 +80,7 @@ void index<AnnIndexType, T, IdxT>::deserialize_mg_index(
     const raft::device_resources& dev_res = clique.device_resources_[rank];
     RAFT_CUDA_TRY(cudaSetDevice(dev_id));
     auto& ann_if = ann_interfaces_.emplace_back();
-    ann_if.deserialize(dev_res, is);
+    cuvs::neighbors::deserialize(dev_res, ann_if, is);
   }
 
   is.close();
@@ -104,7 +103,7 @@ void index<AnnIndexType, T, IdxT>::build(
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
       auto& ann_if = ann_interfaces_[rank];
-      ann_if.build(dev_res, index_params, index_dataset);
+      cuvs::neighbors::build(dev_res, ann_if, index_params, index_dataset);
       resource::sync_stream(dev_res);
     }
   } else if (mode_ == SHARDED) {
@@ -126,7 +125,7 @@ void index<AnnIndexType, T, IdxT>::build(
       auto partition                  = raft::make_host_matrix_view<const T, int64_t, row_major>(
         partition_ptr, n_rows_of_current_shard, n_cols);
       auto& ann_if = ann_interfaces_[rank];
-      ann_if.build(dev_res, index_params, partition);
+      cuvs::neighbors::build(dev_res, ann_if, index_params, partition);
       resource::sync_stream(dev_res);
     }
   }
@@ -148,7 +147,7 @@ void index<AnnIndexType, T, IdxT>::extend(
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
       auto& ann_if = ann_interfaces_[rank];
-      ann_if.extend(dev_res, new_vectors, new_indices);
+      cuvs::neighbors::extend(dev_res, ann_if, new_vectors, new_indices);
       resource::sync_stream(dev_res);
     }
   } else if (mode_ == SHARDED) {
@@ -175,7 +174,7 @@ void index<AnnIndexType, T, IdxT>::extend(
           new_indices_ptr, n_rows_of_current_shard);
       }
       auto& ann_if = ann_interfaces_[rank];
-      ann_if.extend(dev_res, new_vectors_part, new_indices_part);
+      cuvs::neighbors::extend(dev_res, ann_if, new_vectors_part, new_indices_part);
       resource::sync_stream(dev_res);
     }
   }
@@ -226,8 +225,8 @@ void index<AnnIndexType, T, IdxT>::search(
         dev_res, n_rows_of_current_batch, n_neighbors);
 
       auto& ann_if = ann_interfaces_[rank];
-      ann_if.search(
-        dev_res, search_params, query_partition, d_neighbors.view(), d_distances.view());
+      cuvs::neighbors::search(
+        dev_res, ann_if, search_params, query_partition, d_neighbors.view(), d_distances.view());
 
       raft::copy(neighbors.data_handle() + output_offset,
                  d_neighbors.data_handle(),
@@ -337,7 +336,8 @@ void index<AnnIndexType, T, IdxT>::sharded_search_with_direct_merge(
           in_neighbors.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
         auto d_distances = raft::make_device_matrix_view<float, int64_t, row_major>(
           in_distances.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
-        ann_if.search(dev_res, search_params, query_partition, d_neighbors, d_distances);
+        cuvs::neighbors::search(
+          dev_res, ann_if, search_params, query_partition, d_neighbors, d_distances);
 
         // wait for other ranks
         comms.group_start();
@@ -361,8 +361,8 @@ void index<AnnIndexType, T, IdxT>::sharded_search_with_direct_merge(
           dev_res, n_rows_of_current_batch, n_neighbors);
         auto d_distances = raft::make_device_matrix<float, int64_t, row_major>(
           dev_res, n_rows_of_current_batch, n_neighbors);
-        ann_if.search(
-          dev_res, search_params, query_partition, d_neighbors.view(), d_distances.view());
+        cuvs::neighbors::search(
+          dev_res, ann_if, search_params, query_partition, d_neighbors.view(), d_distances.view());
 
         // send results to root rank
         comms.group_start();
@@ -454,7 +454,8 @@ void index<AnnIndexType, T, IdxT>::sharded_search_with_tree_merge(
         tmp_neighbors.data_handle(), n_rows_of_current_batch, n_neighbors);
       auto distances_view = raft::make_device_matrix_view<float, int64_t, row_major>(
         tmp_distances.data_handle(), n_rows_of_current_batch, n_neighbors);
-      ann_if.search(dev_res, search_params, query_partition, neighbors_view, distances_view);
+      cuvs::neighbors::search(
+        dev_res, ann_if, search_params, query_partition, neighbors_view, distances_view);
 
       int64_t translation_offset = 0;
       for (int r = 0; r < rank; r++) {
@@ -551,7 +552,7 @@ void index<AnnIndexType, T, IdxT>::serialize(raft::resources const& handle,
     const raft::device_resources& dev_res = clique.device_resources_[rank];
     RAFT_CUDA_TRY(cudaSetDevice(dev_id));
     auto& ann_if = ann_interfaces_[rank];
-    ann_if.serialize(dev_res, of);
+    cuvs::neighbors::serialize(dev_res, ann_if, of);
   }
 
   of.close();

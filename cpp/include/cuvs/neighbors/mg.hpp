@@ -129,9 +129,9 @@ class index {
                                   const cuvs::neighbors::mg::nccl_clique& clique,
                                   const std::string& filename);
 
-  void deserialize_mg_index(const raft::resources& handle,
-                            const cuvs::neighbors::mg::nccl_clique& clique,
-                            const std::string& filename);
+  void deserialize(const raft::resources& handle,
+                   const cuvs::neighbors::mg::nccl_clique& clique,
+                   const std::string& filename);
 
   void build(const cuvs::neighbors::mg::nccl_clique& clique,
              const cuvs::neighbors::index_params* index_params,
