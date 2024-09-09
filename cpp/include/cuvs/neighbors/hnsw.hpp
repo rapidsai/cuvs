@@ -34,7 +34,7 @@
 namespace cuvs::neighbors::hnsw {
 
 /**
- * @defgroup hnsw Build CAGRA index and search with hnswlib
+ * @defgroup hnsw_cpp_search_params Build CAGRA index and search with hnswlib
  * @{
  */
 
@@ -43,6 +43,13 @@ struct search_params : cuvs::neighbors::search_params {
   int num_threads = 0;  // number of host threads to use for concurrent searches. Value of 0
                         // automatically maximizes parallelism
 };
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_index hnswlib index wrapper
+ * @{
+ */
 
 template <typename T>
 struct index : cuvs::neighbors::index {
@@ -78,6 +85,13 @@ struct index : cuvs::neighbors::index {
   int dim_;
   cuvs::distance::DistanceType metric_;
 };
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_index_load Load CAGRA index as hnswlib index
+ * @{
+ */
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -156,6 +170,13 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  */
 std::unique_ptr<index<int8_t>> from_cagra(
   raft::resources const& res, const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index);
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_index_search Search hnswlib index
+ * @{
+ */
 
 /**
  * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
@@ -285,6 +306,13 @@ void search(raft::resources const& res,
             raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_index_deserialize Deserialize CAGRA index as hnswlib index
+ * @{
+ */
 
 /**
  * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
