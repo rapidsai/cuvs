@@ -85,11 +85,8 @@ void tiled_brute_force_knn(const raft::resources& handle,
   size_t tile_cols = 0;
   auto stream      = raft::resource::get_cuda_stream(handle);
 
-  // total memory is not relevant in the heuristic for data below 512 MB
-  auto total_mem =
-    (sizeof(DistanceT) * m * n < 1 << 29) ? (1ul << 36) : rmm::available_device_memory().second;
   cuvs::neighbors::detail::faiss_select::chooseTileSize(
-    m, n, d, sizeof(DistanceT), total_mem, tile_rows, tile_cols);
+    m, n, d, sizeof(DistanceT), tile_rows, tile_cols);
 
   // for unittesting, its convenient to be able to put a max size on the tiles
   // so we can test the tiling logic without having to use huge inputs.
