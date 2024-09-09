@@ -51,7 +51,7 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
   build_params.max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
 
   auto dataset = dataset_tensor->dl_tensor;
-  auto dim     = dataset.shape[0];
+  auto dim     = dataset.shape[1];
 
   auto index = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr, build_params, dim);
 
