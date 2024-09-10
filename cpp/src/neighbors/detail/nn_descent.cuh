@@ -1349,14 +1349,6 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
   raft::resource::sync_stream(res);
   graph_.sort_lists();
 
-  std::cout << "NN Descent distances: " << std::endl;
-  for (size_t i = 0; i < nrow_; i++) {
-    for (size_t j = 0; j < graph_.node_degree; j++) {
-      std::cout << graph_.h_dists.data_handle()[i * graph_.node_degree + j] << " ";
-    }
-    std::cout << std::endl;
-  }
-
   // Reuse graph_.h_dists as the buffer for shrink the lists in graph
   static_assert(sizeof(decltype(*(graph_.h_dists.data_handle()))) >= sizeof(Index_t));
   Index_t* graph_shrink_buffer = (Index_t*)graph_.h_dists.data_handle();

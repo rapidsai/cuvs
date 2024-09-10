@@ -124,7 +124,7 @@ def run_cagra_build_search_test(
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 @pytest.mark.parametrize("metric", ["euclidean", "inner_product"])
 def test_cagra_dataset_dtype_host_device(
-    dtype, array_type, inplace, build_algo
+    dtype, array_type, inplace, build_algo, metric
 ):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
@@ -133,6 +133,7 @@ def test_cagra_dataset_dtype_host_device(
         inplace=inplace,
         array_type=array_type,
         build_algo=build_algo,
+        metric=metric,
     )
 
 
