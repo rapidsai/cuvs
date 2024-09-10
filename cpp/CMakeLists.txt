@@ -552,6 +552,7 @@ if(BUILD_C_LIBRARY)
     src/neighbors/ivf_flat_c.cpp
     src/neighbors/ivf_pq_c.cpp
     src/neighbors/cagra_c.cpp
+    src/neighbors/hnsw_c.cpp
     src/neighbors/refine/refine_c.cpp
     src/distance/pairwise_distance_c.cpp
   )

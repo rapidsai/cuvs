@@ -131,6 +131,14 @@ void _serialize(cuvsResources_t res,
 }
 
 template <typename T>
+void _serialize_to_hnswlib(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
+  cuvs::neighbors::cagra::serialize_to_hnswlib(*res_ptr, std::string(filename), *index_ptr);
+}
+
+template <typename T>
 void* _deserialize(cuvsResources_t res, const char* filename)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
@@ -321,6 +329,23 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
       _serialize<int8_t>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       _serialize<uint8_t>(res, filename, index, include_dataset);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
+                                                   const char* filename,
+                                                   cuvsCagraIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize_to_hnswlib<float>(res, filename, index);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize_to_hnswlib<int8_t>(res, filename, index);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize_to_hnswlib<uint8_t>(res, filename, index);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }

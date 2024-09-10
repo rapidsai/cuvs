@@ -21,6 +21,19 @@ files:
       - test_py_cuvs
       - cupy
       - rust
+  bench_ann:
+    output: conda
+    matrix:
+      cuda: ["11.8", "12.5"]
+      arch: [x86_64, aarch64]
+    includes:
+      - rapids_build
+      - build_py_cuvs
+      - cuda
+      - cuda_version
+      - develop
+      - bench
+      - bench_python
   test_cpp:
     output: none
     includes:
@@ -90,6 +103,20 @@ files:
       - test_python_common
       - test_py_cuvs
       - cupy
+  py_build_cuvs_bench:
+    output: pyproject
+    pyproject_dir: python/cuvs_bench
+    extras:
+      table: build-system
+    includes:
+      - rapids_build_setuptools
+  py_run_cuvs_bench:
+    output: pyproject
+    pyproject_dir: python/cuvs_bench
+    extras:
+      table: project
+    includes:
+      - bench_python
 channels:
   - rapidsai
   - rapidsai-nightly
@@ -153,6 +180,14 @@ dependencies:
             packages: [nvcc_linux-64=11.2]
           - matrix: {cuda: "11.2", arch: aarch64}
             packages: [nvcc_linux-aarch64=11.2]
+
+  rapids_build_setuptools:
+    common:
+      - output_types: [requirements, pyproject]
+        packages:
+          - &rapids_build_backend rapids-build-backend>=0.3.0,<0.4.0.dev0
+          - setuptools
+          - wheel
 
   build_py_cuvs:
     common:
@@ -405,8 +440,12 @@ dependencies:
             packages:
               - python=3.11
           - matrix:
+              py: "3.12"
             packages:
-              - python>=3.10,<3.12
+              - python=3.12
+          - matrix:
+            packages:
+              - python>=3.10,<3.13
   run_py_cuvs:
     common:
       - output_types: [conda, pyproject]
@@ -456,3 +495,23 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - scikit-learn
+  bench:
+    common:
+      - output_types: [conda, pyproject, requirements]
+        packages:
+          - hnswlib=0.6.2
+          - nlohmann_json>=3.11.2
+          - glog>=0.6.0
+          - h5py>=3.8.0
+          - benchmark>=1.8.2
+          - openblas
+          - *rmm_unsuffixed
+  bench_python:
+    common:
+      - output_types: [conda]
+        packages:
+          - matplotlib
+          - pandas
+          - pyyaml
+          - pandas
+          - click
