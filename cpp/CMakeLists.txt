@@ -216,30 +216,43 @@ add_library(
   src/cluster/kmeans_transform_float.cu
   src/cluster/single_linkage_float.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_correlation_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_cosine_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l1_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l_inf_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_russel_rao_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_rbf.cu
   src/distance/detail/fused_distance_nn.cu
@@ -268,14 +281,6 @@ add_library(
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim512_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim1024_t32_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim1024_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim128_t8_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim128_t8_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim256_t16_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim256_t16_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim512_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim512_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim1024_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint32_dim1024_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_int8_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_int8_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_int8_uint32_dim256_t16_8pq_2subd_half.cu
@@ -300,14 +305,6 @@ add_library(
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint64_dim512_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint64_dim1024_t32_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint64_dim1024_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim128_t8_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim128_t8_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim256_t16_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim256_t16_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim512_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim512_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim1024_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_multi_cta_half_uint64_dim1024_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint32_dim256_t16_8pq_2subd_half.cu
@@ -316,14 +313,6 @@ add_library(
   src/neighbors/detail/cagra/q_search_single_cta_float_uint32_dim512_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint32_dim1024_t32_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint32_dim1024_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim128_t8_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim128_t8_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim256_t16_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim256_t16_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim512_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim512_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim1024_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint32_dim1024_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_int8_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_int8_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_int8_uint32_dim256_t16_8pq_2subd_half.cu
@@ -348,22 +337,10 @@ add_library(
   src/neighbors/detail/cagra/q_search_single_cta_float_uint64_dim512_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint64_dim1024_t32_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_single_cta_float_uint64_dim1024_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim128_t8_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim128_t8_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim256_t16_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim256_t16_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim512_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim512_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim1024_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/q_search_single_cta_half_uint64_dim1024_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim512_t32.cu
   src/neighbors/detail/cagra/search_multi_cta_float_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint32_dim1024_t32.cu
   src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/search_multi_cta_int8_uint32_dim512_t32.cu
@@ -376,18 +353,10 @@ add_library(
   src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_multi_cta_float_uint64_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64_dim128_t8.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64_dim256_t16.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64_dim512_t32.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64_dim1024_t32.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint32_dim128_t8.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint32_dim256_t16.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint32_dim1024_t32.cu
   src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_int8_uint32_dim512_t32.cu
@@ -400,10 +369,6 @@ add_library(
   src/neighbors/detail/cagra/search_single_cta_float_uint64_dim256_t16.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint64_dim1024_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64_dim128_t8.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64_dim256_t16.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64_dim512_t32.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64_dim1024_t32.cu
   $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
@@ -459,7 +424,11 @@ add_library(
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
+  src/stats/silhouette_score.cu
+  src/stats/trustworthiness_score.cu
 )
+
+target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
 
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
@@ -683,13 +652,13 @@ rapids_export(
 # * build test executable ----------------------------------------------------
 
 if(BUILD_TESTS OR BUILD_C_TESTS)
-  include(internal/CMakeLists.txt)
-  include(test/CMakeLists.txt)
+  add_subdirectory(internal)
+  add_subdirectory(test)
 endif()
 
 # ##################################################################################################
 # * build ann benchmark executable -----------------------------------------------
 
 if(BUILD_ANN_BENCH)
-  include(bench/ann/CMakeLists.txt)
+  add_subdirectory(bench/ann/)
 endif()

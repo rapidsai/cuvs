@@ -38,7 +38,7 @@ dependencies:
 - make
 - nccl>=2.9.9
 - ninja
-- numpy>=1.23,<2.0a0
+- numpy>=1.23,<3.0a0
 - numpydoc
 - nvcc_linux-64=11.8
 - openblas
@@ -51,7 +51,7 @@ dependencies:
 - recommonmark
 - rmm==24.10.*,>=0.0.0a0
 - rust
-- scikit-build-core>=0.7.0
+- scikit-build-core>=0.10.0
 - scikit-learn
 - sphinx-copybutton
 - sphinx-markdown-tables

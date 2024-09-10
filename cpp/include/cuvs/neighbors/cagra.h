@@ -347,7 +347,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
  *        1. `queries`:
- *          a. kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *          a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *          b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
  *          c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
@@ -430,6 +430,8 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
 
 /**
  * Save the CAGRA index to file in hnswlib format.
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *

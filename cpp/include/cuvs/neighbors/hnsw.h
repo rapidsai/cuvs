@@ -33,7 +33,7 @@ extern "C" {
 
 struct cuvsHnswSearchParams {
   int32_t ef;
-  int32_t num_threads;
+  int32_t numThreads;
 };
 
 typedef struct cuvsHnswSearchParams* cuvsHnswSearchParams_t;
@@ -106,11 +106,13 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
  *        queries.dl_tensor.dtype.code`
  *        Supported types for input are:
  *        1. `queries`:
- *          a. kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *          a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *          b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
  *          c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 64`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS,
+ *       as the format is not compatible with the original hnswlib.
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -163,7 +165,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 
 /**
  * Load hnswlib index from file which was serialized from a HNSW index.
- *
+ * NOTE: The loaded hnswlib index is immutable, and only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  * Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}
@@ -188,8 +191,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file that stores the index
- * @param[in] dim dimensions of the training dataset
- * @param[in] metric distance metric to search. Supported metrics ("L2Expanded")
+ * @param[in] dim the dimension of the vectors in the index
+ * @param[in] metric the distance metric used to build the index
  * @param[out] index HNSW index loaded disk
  */
 cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,

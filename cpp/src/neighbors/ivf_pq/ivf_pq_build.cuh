@@ -20,7 +20,6 @@
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
 #include "ivf_pq_codepacking.cuh"
-#include "ivf_pq_list.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -34,6 +33,7 @@
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/add.cuh>
@@ -44,6 +44,7 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
+#include <raft/matrix/sample_rows.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/stats/histogram.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -68,51 +69,6 @@ using raft::RAFT_NAME;                       // TODO: this is required for RAFT_
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
-
-template <uint32_t BlockDim, typename T, typename S>
-__launch_bounds__(BlockDim) static __global__ void copy_warped_kernel(
-  T* out, uint32_t ld_out, const S* in, uint32_t ld_in, uint32_t n_cols, size_t n_rows)
-{
-  using warp    = raft::Pow2<raft::WarpSize>;
-  size_t row_ix = warp::div(size_t(threadIdx.x) + size_t(BlockDim) * size_t(blockIdx.x));
-  uint32_t i    = warp::mod(threadIdx.x);
-  if (row_ix >= n_rows) return;
-  out += row_ix * ld_out;
-  in += row_ix * ld_in;
-  auto f = utils::mapping<T>{};
-  for (uint32_t col_ix = i; col_ix < n_cols; col_ix += warp::Value) {
-    auto x = f(in[col_ix]);
-    __syncwarp();
-    out[col_ix] = x;
-  }
-}
-
-/**
- * raft::copy the data one warp-per-row:
- *
- *  1. load the data per-warp
- *  2. apply the `utils::mapping<T>{}`
- *  3. sync within warp
- *  4. store the data.
- *
- * Assuming sizeof(T) >= sizeof(S) and the data is properly aligned (see the usage in `build`), this
- * allows to re-structure the data within rows in-place.
- */
-template <typename T, typename S>
-void copy_warped(T* out,
-                 uint32_t ld_out,
-                 const S* in,
-                 uint32_t ld_in,
-                 uint32_t n_cols,
-                 size_t n_rows,
-                 rmm::cuda_stream_view stream)
-{
-  constexpr uint32_t kBlockDim = 128;
-  dim3 threads(kBlockDim, 1, 1);
-  dim3 blocks(raft::div_rounding_up_safe<size_t>(n_rows, kBlockDim / raft::WarpSize), 1, 1);
-  copy_warped_kernel<kBlockDim, T, S>
-    <<<blocks, threads, 0, stream>>>(out, ld_out, in, ld_in, n_cols, n_rows);
-}
 
 /**
  * @brief Compute residual vectors from the source dataset given by selected indices.
@@ -358,14 +314,19 @@ void train_per_subset(raft::resources const& handle,
                       size_t n_rows,
                       const float* trainset,   // [n_rows, dim]
                       const uint32_t* labels,  // [n_rows]
-                      uint32_t kmeans_n_iters)
+                      uint32_t kmeans_n_iters,
+                      uint32_t max_train_points_per_pq_code)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
 
   rmm::device_uvector<float> pq_centers_tmp(index.pq_centers().size(), stream, device_memory);
-  rmm::device_uvector<float> sub_trainset(n_rows * size_t(index.pq_len()), stream, device_memory);
-  rmm::device_uvector<uint32_t> sub_labels(n_rows, stream, device_memory);
+  // Subsampling the train set for codebook generation based on max_train_points_per_pq_code.
+  size_t big_enough = max_train_points_per_pq_code * size_t(index.pq_book_size());
+  auto pq_n_rows    = uint32_t(std::min(big_enough, n_rows));
+  rmm::device_uvector<float> sub_trainset(
+    pq_n_rows * size_t(index.pq_len()), stream, device_memory);
+  rmm::device_uvector<uint32_t> sub_labels(pq_n_rows, stream, device_memory);
 
   rmm::device_uvector<uint32_t> pq_cluster_sizes(index.pq_book_size(), stream, device_memory);
 
@@ -376,7 +337,7 @@ void train_per_subset(raft::resources const& handle,
     // Get the rotated cluster centers for each training vector.
     // This will be subtracted from the input vectors afterwards.
     utils::copy_selected<float, float, size_t, uint32_t>(
-      n_rows,
+      pq_n_rows,
       index.pq_len(),
       index.centers_rot().data_handle() + index.pq_len() * j,
       labels,
@@ -392,7 +353,7 @@ void train_per_subset(raft::resources const& handle,
                        true,
                        false,
                        index.pq_len(),
-                       n_rows,
+                       pq_n_rows,
                        index.dim(),
                        &alpha,
                        index.rotation_matrix().data_handle() + index.dim() * index.pq_len() * j,
@@ -406,13 +367,13 @@ void train_per_subset(raft::resources const& handle,
 
     // train PQ codebook for this subspace
     auto sub_trainset_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      sub_trainset.data(), n_rows, index.pq_len());
+      sub_trainset.data(), pq_n_rows, index.pq_len());
     auto centers_tmp_view = raft::make_device_matrix_view<float, internal_extents_t>(
       pq_centers_tmp.data() + index.pq_book_size() * index.pq_len() * j,
       index.pq_book_size(),
       index.pq_len());
     auto sub_labels_view =
-      raft::make_device_vector_view<uint32_t, internal_extents_t>(sub_labels.data(), n_rows);
+      raft::make_device_vector_view<uint32_t, internal_extents_t>(sub_labels.data(), pq_n_rows);
     auto cluster_sizes_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
       pq_cluster_sizes.data(), index.pq_book_size());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
@@ -435,7 +396,8 @@ void train_per_cluster(raft::resources const& handle,
                        size_t n_rows,
                        const float* trainset,   // [n_rows, dim]
                        const uint32_t* labels,  // [n_rows]
-                       uint32_t kmeans_n_iters)
+                       uint32_t kmeans_n_iters,
+                       uint32_t max_train_points_per_pq_code)
 {
   auto stream        = raft::resource::get_cuda_stream(handle);
   auto device_memory = raft::resource::get_workspace_resource(handle);
@@ -485,9 +447,11 @@ void train_per_cluster(raft::resources const& handle,
                      indices + cluster_offsets[l],
                      device_memory);
 
-    // limit the cluster size to bound the training time.
+    // limit the cluster size to bound the training time based on max_train_points_per_pq_code
+    // If pq_book_size is less than pq_dim, use max_train_points_per_pq_code per pq_dim instead
     // [sic] we interpret the data as pq_len-dimensional
-    size_t big_enough     = 256ul * std::max<size_t>(index.pq_book_size(), index.pq_dim());
+    size_t big_enough =
+      max_train_points_per_pq_code * std::max<size_t>(index.pq_book_size(), index.pq_dim());
     size_t available_rows = size_t(cluster_size) * size_t(index.pq_dim());
     auto pq_n_rows        = uint32_t(std::min(big_enough, available_rows));
     // train PQ codebook for this cluster
@@ -1573,9 +1537,19 @@ void extend(raft::resources const& handle,
     }
   }
 
+  // Determine if a stream pool exist and make sure there is at least one stream in it so we
+  // could use the stream for kernel/copy overlapping by enabling prefetch.
+  auto copy_stream = raft::resource::get_cuda_stream(handle);  // Using the main stream by default
+  bool enable_prefetch = false;
+  if (handle.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
+    if (raft::resource::get_stream_pool_size(handle) >= 1) {
+      enable_prefetch = true;
+      copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
+    }
+  }
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(
-    new_vectors, n_rows, index->dim(), max_batch_size, stream, batches_mr);
+    new_vectors, n_rows, index->dim(), max_batch_size, copy_stream, device_memory, enable_prefetch);
   // Release the placeholder memory, because we don't intend to allocate any more long-living
   // temporary buffers before we allocate the index data.
   // This memory could potentially speed up UVM accesses, if any.
@@ -1593,6 +1567,7 @@ void extend(raft::resources const& handle,
                                     n_clusters,
                                     cudaMemcpyDefault,
                                     stream));
+    vec_batches.prefetch_next_batch();
     for (const auto& batch : vec_batches) {
       auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
         batch.data(), batch.size(), index->dim());
@@ -1608,6 +1583,10 @@ void extend(raft::resources const& handle,
                                               centers_view,
                                               batch_labels_view,
                                               utils::mapping<float>{});
+      vec_batches.prefetch_next_batch();
+      // User needs to make sure kernel finishes its work before we overwrite batch in the next
+      // iteration if different streams are used for kernel and copy.
+      raft::resource::sync_stream(handle);
     }
   }
 
@@ -1649,6 +1628,8 @@ void extend(raft::resources const& handle,
   // Fill the extended index with the new data (possibly, in batches)
   utils::batch_load_iterator<IdxT> idx_batches(
     new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
+  vec_batches.reset();
+  vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
     process_and_fill_codes(handle,
@@ -1660,6 +1641,10 @@ void extend(raft::resources const& handle,
                            new_data_labels.data() + vec_batch.offset(),
                            IdxT(vec_batch.size()),
                            batches_mr);
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
   }
 }
 
@@ -1709,6 +1694,7 @@ auto build(raft::resources const& handle,
   utils::memzero(index.inds_ptrs().data_handle(), index.inds_ptrs().size(), stream);
 
   {
+    raft::random::RngState random_state{137};
     auto trainset_ratio = std::max<size_t>(
       1,
       size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
@@ -1728,9 +1714,11 @@ auto build(raft::resources const& handle,
 
     // Besides just sampling, we transform the input dataset into floats to make it easier
     // to use gemm operations from cublas.
-    rmm::device_uvector<float> trainset(0, stream, big_memory_resource);
+    auto trainset = raft::make_device_mdarray<float>(
+      handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
     try {
-      trainset.resize(n_rows_train * index.dim(), stream);
+      trainset = raft::make_device_mdarray<float>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
     } catch (raft::logic_error& e) {
       RAFT_LOG_ERROR(
         "Insufficient memory for kmeans training set allocation. Please decrease "
@@ -1739,54 +1727,19 @@ auto build(raft::resources const& handle,
     }
     // TODO: a proper sampling
     if constexpr (std::is_same_v<T, float>) {
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset.data(),
-                                      sizeof(T) * index.dim(),
-                                      dataset.data_handle(),
-                                      sizeof(T) * index.dim() * trainset_ratio,
-                                      sizeof(T) * index.dim(),
-                                      n_rows_train,
-                                      cudaMemcpyDefault,
-                                      stream));
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
-      size_t dim = index.dim();
-      cudaPointerAttributes dataset_attr;
-      RAFT_CUDA_TRY(cudaPointerGetAttributes(&dataset_attr, dataset.data_handle()));
-      if (dataset_attr.devicePointer != nullptr) {
-        // data is available on device: just run the kernel to raft::copy and map the data
-        auto p = reinterpret_cast<T*>(dataset_attr.devicePointer);
-        auto trainset_view =
-          raft::make_device_vector_view<float, IdxT>(trainset.data(), dim * n_rows_train);
-        raft::linalg::map_offset(
-          handle, trainset_view, [p, trainset_ratio, dim] __device__(size_t i) {
-            auto col = i % dim;
-            return utils::mapping<float>{}(p[(i - col) * size_t(trainset_ratio) + col]);
-          });
-      } else {
-        // data is not available: first raft::copy, then map inplace
-        auto trainset_tmp = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(trainset.data()) +
-                                                 (sizeof(float) - sizeof(T)) * index.dim());
-        // We raft::copy the data in strides, one row at a time, and place the smaller rows of type
-        // T at the end of float rows.
-        RAFT_CUDA_TRY(cudaMemcpy2DAsync(trainset_tmp,
-                                        sizeof(float) * index.dim(),
-                                        dataset.data_handle(),
-                                        sizeof(T) * index.dim() * trainset_ratio,
-                                        sizeof(T) * index.dim(),
-                                        n_rows_train,
-                                        cudaMemcpyDefault,
-                                        stream));
-        // Transform the input `{T -> float}`, one row per warp.
-        // The threads in each warp raft::copy the data synchronously; this and the layout of the
-        // data (content is aligned to the end of the rows) together allow doing the transform
-        // in-place.
-        copy_warped(trainset.data(),
-                    index.dim(),
-                    trainset_tmp,
-                    index.dim() * sizeof(float) / sizeof(T),
-                    index.dim(),
-                    n_rows_train,
-                    stream);
-      }
+      // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
+      auto trainset_tmp = raft::make_device_mdarray<T>(
+        handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
+
+      raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());
+
+      raft::linalg::unaryOp(trainset.data_handle(),
+                            trainset_tmp.data_handle(),
+                            trainset.size(),
+                            utils::mapping<float>{},
+                            raft::resource::get_cuda_stream(handle));
     }
 
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
@@ -1796,9 +1749,8 @@ auto build(raft::resources const& handle,
     auto cluster_centers = cluster_centers_buf.data();
 
     // Train balanced hierarchical kmeans clustering
-    auto trainset_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      trainset.data(), n_rows_train, index.dim());
-    auto centers_view = raft::make_device_matrix_view<float, internal_extents_t>(
+    auto trainset_const_view = raft::make_const_mdspan(trainset.view());
+    auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
@@ -1827,12 +1779,22 @@ auto build(raft::resources const& handle,
     // Train PQ codebooks
     switch (index.codebook_kind()) {
       case codebook_gen::PER_SUBSPACE:
-        train_per_subset(
-          handle, index, n_rows_train, trainset.data(), labels.data(), params.kmeans_n_iters);
+        train_per_subset(handle,
+                         index,
+                         n_rows_train,
+                         trainset.data_handle(),
+                         labels.data(),
+                         params.kmeans_n_iters,
+                         params.max_train_points_per_pq_code);
         break;
       case codebook_gen::PER_CLUSTER:
-        train_per_cluster(
-          handle, index, n_rows_train, trainset.data(), labels.data(), params.kmeans_n_iters);
+        train_per_cluster(handle,
+                          index,
+                          n_rows_train,
+                          trainset.data_handle(),
+                          labels.data(),
+                          params.kmeans_n_iters,
+                          params.max_train_points_per_pq_code);
         break;
       default: RAFT_FAIL("Unreachable code");
     }

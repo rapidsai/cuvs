@@ -70,6 +70,9 @@ function(ConfigureTest)
     ${TEST_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                          "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
+
+  target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
+
   if(_CUVS_TEST_NOCUDA)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
   endif()
@@ -91,22 +94,22 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
-    NAME NEIGHBORS_TEST PATH test/neighbors/brute_force.cu
-    test/neighbors/brute_force_prefiltered.cu test/neighbors/refine.cu GPUS 1 PERCENT 100
+    NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
+    neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
-    NAME CLUSTER_TEST PATH test/cluster/kmeans.cu test/cluster/kmeans_balanced.cu
-    test/cluster/kmeans_find_k.cu test/cluster/linkage.cu GPUS 1 PERCENT 100
+    NAME CLUSTER_TEST PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
+    cluster/linkage.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
     NAME
     NEIGHBORS_ANN_IVF_FLAT_TEST
     PATH
-    test/neighbors/ann_ivf_flat/test_float_int64_t.cu
-    test/neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
-    test/neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
+    neighbors/ann_ivf_flat/test_float_int64_t.cu
+    neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
+    neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
     GPUS
     1
     PERCENT
@@ -117,9 +120,9 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_IVF_PQ_TEST
     PATH
-    test/neighbors/ann_ivf_pq/test_float_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
-    test/neighbors/ann_ivf_pq/test_uint8_t_int64_t.cu
+    neighbors/ann_ivf_pq/test_float_int64_t.cu
+    neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
+    neighbors/ann_ivf_pq/test_uint8_t_int64_t.cu
     GPUS
     1
     PERCENT
@@ -127,12 +130,17 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
+    NAME NEIGHBORS_ANN_BRUTE_FORCE_TEST PATH neighbors/ann_brute_force/test_float.cu
+    neighbors/ann_brute_force/test_half.cu GPUS 1 PERCENT 100
+  )
+
+  ConfigureTest(
     NAME
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
-    test/neighbors/ann_cagra/test_float_uint32_t.cu
-    test/neighbors/ann_cagra/test_int8_t_uint32_t.cu
-    test/neighbors/ann_cagra/test_uint8_t_uint32_t.cu
+    neighbors/ann_cagra/test_float_uint32_t.cu
+    neighbors/ann_cagra/test_int8_t_uint32_t.cu
+    neighbors/ann_cagra/test_uint8_t_uint32_t.cu
     GPUS
     1
     PERCENT
@@ -143,9 +151,9 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_NN_DESCENT_TEST
     PATH
-    test/neighbors/ann_nn_descent/test_float_uint32_t.cu
-    test/neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
-    test/neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
+    neighbors/ann_nn_descent/test_float_uint32_t.cu
+    neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
+    neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
     GPUS
     1
     PERCENT
@@ -153,61 +161,60 @@ if(BUILD_TESTS)
   )
 
   if(BUILD_CAGRA_HNSWLIB)
-    ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH test/neighbors/hnsw.cu GPUS 1 PERCENT 100)
+    ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
   endif()
 
   ConfigureTest(
     NAME
     DISTANCE_TEST
     PATH
-    test/distance/dist_canberra.cu
-    test/distance/dist_correlation.cu
-    test/distance/dist_cos.cu
-    test/distance/dist_hamming.cu
-    test/distance/dist_hellinger.cu
-    test/distance/dist_inner_product.cu
-    test/distance/dist_jensen_shannon.cu
-    test/distance/dist_kl_divergence.cu
-    test/distance/dist_l1.cu
-    test/distance/dist_l2_exp.cu
-    test/distance/dist_l2_sqrt_exp.cu
-    test/distance/dist_l_inf.cu
-    test/distance/dist_lp_unexp.cu
-    test/distance/dist_russell_rao.cu
-    test/distance/masked_nn.cu
-    test/sparse/neighbors/cross_component_nn.cu
+    distance/dist_canberra.cu
+    distance/dist_correlation.cu
+    distance/dist_cos.cu
+    distance/dist_hamming.cu
+    distance/dist_hellinger.cu
+    distance/dist_inner_product.cu
+    distance/dist_jensen_shannon.cu
+    distance/dist_kl_divergence.cu
+    distance/dist_l1.cu
+    distance/dist_l2_exp.cu
+    distance/dist_l2_sqrt_exp.cu
+    distance/dist_l_inf.cu
+    distance/dist_lp_unexp.cu
+    distance/dist_russell_rao.cu
+    distance/masked_nn.cu
+    sparse/neighbors/cross_component_nn.cu
     GPUS
     1
     PERCENT
     100
   )
+  ConfigureTest(
+    NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
+  )
 endif()
 
 if(BUILD_C_TESTS)
-  ConfigureTest(NAME INTEROP_TEST PATH test/core/interop.cu C_LIB)
+  ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu C_LIB)
   ConfigureTest(
-    NAME DISTANCE_C_TEST PATH test/distance/run_pairwise_distance_c.c
-    test/distance/pairwise_distance_c.cu C_LIB
-  )
-
-  ConfigureTest(
-    NAME BRUTEFORCE_C_TEST PATH test/neighbors/run_brute_force_c.c test/neighbors/brute_force_c.cu
+    NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_FLAT_C_TEST PATH test/neighbors/run_ivf_flat_c.c test/neighbors/ann_ivf_flat_c.cu
-    C_LIB
+    NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_PQ_C_TEST PATH test/neighbors/run_ivf_pq_c.c test/neighbors/ann_ivf_pq_c.cu C_LIB
+    NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu C_LIB
   )
 
-  ConfigureTest(NAME CAGRA_C_TEST PATH test/neighbors/ann_cagra_c.cu C_LIB)
+  ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu C_LIB)
 
-  if (BUILD_CAGRA_HNSWLIB)
-    ConfigureTest(NAME HNSW_C_TEST PATH test/neighbors/ann_hnsw_c.cu C_LIB)
+  ConfigureTest(NAME CAGRA_C_TEST PATH neighbors/ann_cagra_c.cu C_LIB)
+
+  if(BUILD_CAGRA_HNSWLIB)
+    ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
   endif()
 endif()
 
@@ -219,9 +226,9 @@ rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gt
 if(BUILD_C_TESTS)
   enable_language(C)
 
-  add_executable(cuvs_c_test test/core/c_api.c)
+  add_executable(cuvs_c_test core/c_api.c)
   target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
 
-  add_executable(cuvs_c_neighbors_test test/neighbors/c_api.c)
+  add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
   target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
 endif()

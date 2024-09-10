@@ -382,7 +382,8 @@ template <
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
+  const bool guarantee_connectivity = false)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -400,7 +401,8 @@ void optimize(
       knn_graph.extent(0),
       knn_graph.extent(1));
 
-  cagra::detail::graph::optimize(res, knn_graph_internal, new_graph_internal);
+  cagra::detail::graph::optimize(
+    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
 }
 
 template <typename T,
@@ -476,7 +478,7 @@ index<T, IdxT> build(
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
 
   RAFT_LOG_INFO("optimizing graph");
-  optimize<IdxT>(res, knn_graph->view(), cagra_graph.view());
+  optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
 
   // free intermediate graph before trying to create the index
   knn_graph.reset();
@@ -497,15 +499,22 @@ index<T, IdxT> build(
 
     return idx;
   }
-  try {
-    return index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
-  } catch (std::bad_alloc& e) {
-    RAFT_LOG_DEBUG("Insufficient GPU memory to construct CAGRA index with dataset on GPU");
-    // We just add the graph. User is expected to update dataset separately (e.g allocating in
-    // managed memory).
-  } catch (raft::logic_error& e) {
-    // The memory error can also manifest as logic_error.
-    RAFT_LOG_DEBUG("Insufficient GPU memory to construct CAGRA index with dataset on GPU");
+  if (params.attach_dataset_on_build) {
+    try {
+      return index<T, IdxT>(
+        res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
+        "be added to the index");
+      // We just add the graph. User is expected to update dataset separately (e.g allocating in
+      // managed memory).
+    } catch (raft::logic_error& e) {
+      // The memory error can also manifest as logic_error.
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
+        "be added to the index");
+    }
   }
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));

@@ -72,8 +72,8 @@ struct PairwiseDistances : public BaseClass {
 
  private:
   typedef Policy P;
-  const DataT* xn;
-  const DataT* yn;
+  const OutT* xn;
+  const OutT* yn;
   const DataT* const yBase;
   OutT* dOutput;
   char* smem;
@@ -99,8 +99,8 @@ struct PairwiseDistances : public BaseClass {
                        IdxT _lda,
                        IdxT _ldb,
                        IdxT _ldd,
-                       const DataT* _xn,
-                       const DataT* _yn,
+                       const OutT* _xn,
+                       const OutT* _yn,
                        OutT* _dOutput,
                        char* _smem,
                        OpT _distance_op,
@@ -154,7 +154,7 @@ struct PairwiseDistances : public BaseClass {
 
         // Epilog:
         if (distance_op.use_norms) {
-          DataT regxn[P::AccRowsPerTh], regyn[P::AccColsPerTh];
+          OutT regxn[P::AccRowsPerTh], regyn[P::AccColsPerTh];
           load_norms(tile_idx_m, tile_idx_n, regxn, regyn);
           // Overlap ldg with epilog computation
           ldgNextGridStride(tile_idx_m, tile_idx_n);
@@ -200,7 +200,7 @@ struct PairwiseDistances : public BaseClass {
     for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
       for (int j = 0; j < P::AccColsPerTh; ++j) {
-        acc[i][j] = BaseClass::Zero;
+        acc[i][j] = BaseClass::Zero();
       }
     }
   }
@@ -242,23 +242,23 @@ struct PairwiseDistances : public BaseClass {
 
   DI void load_norms(IdxT tile_idx_m,
                      IdxT tile_idx_n,
-                     DataT (&regxn)[P::AccRowsPerTh],
-                     DataT (&regyn)[P::AccColsPerTh])
+                     OutT (&regxn)[P::AccRowsPerTh],
+                     OutT (&regyn)[P::AccColsPerTh])
   {
-    DataT* sxNorm = (DataT*)(&smem[P::SmemSize]);
-    DataT* syNorm = (&sxNorm[P::Mblk]);
+    OutT* sxNorm = (OutT*)(&smem[P::SmemSize]);
+    OutT* syNorm = (&sxNorm[P::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer
     if (tile_idx_n == blockIdx.x * P::Nblk) {
       for (int i = threadIdx.x; i < P::Mblk; i += P::Nthreads) {
         auto idx  = tile_idx_m + i;
-        sxNorm[i] = idx < this->m ? xn[idx] : 0;
+        sxNorm[i] = idx < this->m ? xn[idx] : OutT(0);
       }
     }
 
     for (int i = threadIdx.x; i < P::Nblk; i += P::Nthreads) {
       auto idx  = tile_idx_n + i;
-      syNorm[i] = idx < this->n ? yn[idx] : 0;
+      syNorm[i] = idx < this->n ? yn[idx] : OutT(0);
     }
     __syncthreads();
 
@@ -285,7 +285,7 @@ struct PairwiseDistances : public BaseClass {
         auto colId = startx + j * P::AccThCols;
         if (rowId < this->m && colId < this->n) {
           // Promote to 64 bit index for final write, as output array can be > 2^31
-          dOutput[std::size_t(rowId) * this->n + colId] = fin_op(acc[i][j], 0);
+          dOutput[std::size_t(rowId) * this->n + colId] = fin_op(acc[i][j], AccT(0));
         }
       }
     }
