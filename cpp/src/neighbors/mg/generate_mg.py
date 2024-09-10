@@ -54,11 +54,15 @@ footer = """
 flat_macro = """
 #define CUVS_INST_MG_FLAT(T, IdxT)                                                                                          \\
   index<ivf_flat::index<T, IdxT>, T, IdxT> build(const raft::resources& handle,                                             \\
-                                                        const cuvs::neighbors::mg::nccl_clique& clique,                     \\
-                                                        const mg::index_params<ivf_flat::index_params>& index_params,       \\
-                                                        raft::host_matrix_view<const T, int64_t, row_major> index_dataset)  \\
+                                                 const cuvs::neighbors::mg::nccl_clique& clique,                            \\
+                                                 const mg::index_params<ivf_flat::index_params>& index_params,              \\
+                                                 raft::host_matrix_view<const T, int64_t, row_major> index_dataset)         \\
   {                                                                                                                         \\
-    return std::move(cuvs::neighbors::mg::detail::build<T, IdxT>(handle, clique, index_params, index_dataset));             \\
+    index<ivf_flat::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);                                   \\
+    cuvs::neighbors::mg::detail::build(clique, index,                                                                       \\
+                                       static_cast<const cuvs::neighbors::index_params*>(&index_params),                    \\
+                                       index_dataset);                                                                      \\
+    return index;                                                                                                           \\
   }                                                                                                                         \\
                                                                                                                             \\
   void extend(const raft::resources& handle,                                                                                \\
@@ -67,7 +71,7 @@ flat_macro = """
               raft::host_matrix_view<const T, int64_t, row_major> new_vectors,                                              \\
               std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)                                       \\
   {                                                                                                                         \\
-    cuvs::neighbors::mg::detail::extend(handle, clique, index, new_vectors, new_indices);                                   \\
+    cuvs::neighbors::mg::detail::extend(clique, index, new_vectors, new_indices);                                           \\
   }                                                                                                                         \\
                                                                                                                             \\
   void search(const raft::resources& handle,                                                                                \\
@@ -79,8 +83,9 @@ flat_macro = """
               raft::host_matrix_view<float, int64_t, row_major> distances,                                                  \\
               int64_t n_rows_per_batch)                                                                                     \\
   {                                                                                                                         \\
-    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                      \\
-                                        neighbors, distances, n_rows_per_batch);                                            \\
+    cuvs::neighbors::mg::detail::search(clique, index,                                                                      \\
+                                        static_cast<const cuvs::neighbors::search_params*>(&search_params),                 \\
+                                        queries, neighbors, distances, n_rows_per_batch);                                   \\
   }                                                                                                                         \\
                                                                                                                             \\
   void serialize(const raft::resources& handle,                                                                             \\
@@ -93,29 +98,36 @@ flat_macro = """
                                                                                                                             \\
   template<>                                                                                                                \\
   index<ivf_flat::index<T, IdxT>, T, IdxT> deserialize_flat<T, IdxT>(const raft::resources& handle,                         \\
-                                                                            const cuvs::neighbors::mg::nccl_clique& clique, \\
-                                                                            const std::string& filename)                    \\
+                                                                     const cuvs::neighbors::mg::nccl_clique& clique,        \\
+                                                                     const std::string& filename)                           \\
   {                                                                                                                         \\
-    return std::move(cuvs::neighbors::mg::detail::deserialize_flat<T, IdxT>(handle, clique, filename));                     \\
+    auto idx = index<ivf_flat::index<T, IdxT>, T, IdxT>(handle, clique, filename);                                          \\
+    return idx;                                                                                                             \\
   }                                                                                                                         \\
                                                                                                                             \\
   template<>                                                                                                                \\
   index<ivf_flat::index<T, IdxT>, T, IdxT> distribute_flat<T, IdxT>(const raft::resources& handle,                          \\
-                                                                           const cuvs::neighbors::mg::nccl_clique& clique,  \\
-                                                                           const std::string& filename)                     \\
+                                                                    const cuvs::neighbors::mg::nccl_clique& clique,         \\
+                                                                    const std::string& filename)                            \\
   {                                                                                                                         \\
-    return std::move(cuvs::neighbors::mg::detail::distribute_flat<T, IdxT>(handle, clique, filename));                      \\
+    auto idx = index<ivf_flat::index<T, IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                                     \\
+    cuvs::neighbors::mg::detail::deserialize_and_distribute(handle, clique, idx, filename);                                 \\
+    return idx;                                                                                                             \\
   }
 """
 
 pq_macro = """
 #define CUVS_INST_MG_PQ(T, IdxT)                                                                                          \\
   index<ivf_pq::index<IdxT>, T, IdxT> build(const raft::resources& handle,                                                \\
-                                                   const cuvs::neighbors::mg::nccl_clique& clique,                        \\
-                                                   const mg::index_params<ivf_pq::index_params>& index_params,            \\
-                                                   raft::host_matrix_view<const T, int64_t, row_major> index_dataset)     \\
+                                            const cuvs::neighbors::mg::nccl_clique& clique,                               \\
+                                            const mg::index_params<ivf_pq::index_params>& index_params,                   \\
+                                            raft::host_matrix_view<const T, int64_t, row_major> index_dataset)            \\
   {                                                                                                                       \\
-    return std::move(cuvs::neighbors::mg::detail::build<T, IdxT>(handle, clique, index_params, index_dataset));           \\
+    index<ivf_pq::index<IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);                                      \\
+    cuvs::neighbors::mg::detail::build(clique, index,                                                                     \\
+                                       static_cast<const cuvs::neighbors::index_params*>(&index_params),                  \\
+                                       index_dataset);                                                                    \\
+    return index;                                                                                                         \\
   }                                                                                                                       \\
                                                                                                                           \\
   void extend(const raft::resources& handle,                                                                              \\
@@ -124,7 +136,7 @@ pq_macro = """
               raft::host_matrix_view<const T, int64_t, row_major> new_vectors,                                            \\
               std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)                                     \\
   {                                                                                                                       \\
-    cuvs::neighbors::mg::detail::extend(handle, clique, index, new_vectors, new_indices);                                 \\
+    cuvs::neighbors::mg::detail::extend(clique, index, new_vectors, new_indices);                                         \\
   }                                                                                                                       \\
                                                                                                                           \\
   void search(const raft::resources& handle,                                                                              \\
@@ -136,8 +148,9 @@ pq_macro = """
               raft::host_matrix_view<float, int64_t, row_major> distances,                                                \\
               int64_t n_rows_per_batch)                                                                                   \\
   {                                                                                                                       \\
-    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
-                                        neighbors, distances, n_rows_per_batch);                                          \\
+    cuvs::neighbors::mg::detail::search(clique, index,                                                                    \\
+                                        static_cast<const cuvs::neighbors::search_params*>(&search_params),               \\
+                                        queries, neighbors, distances, n_rows_per_batch);                                 \\
   }                                                                                                                       \\
                                                                                                                           \\
   void serialize(const raft::resources& handle,                                                                           \\
@@ -150,29 +163,36 @@ pq_macro = """
                                                                                                                           \\
   template<>                                                                                                              \\
   index<ivf_pq::index<IdxT>, T, IdxT> deserialize_pq<T, IdxT>(const raft::resources& handle,                              \\
-                                                                     const cuvs::neighbors::mg::nccl_clique& clique,      \\
-                                                                     const std::string& filename)                         \\
+                                                              const cuvs::neighbors::mg::nccl_clique& clique,             \\
+                                                              const std::string& filename)                                \\
   {                                                                                                                       \\
-    return std::move(cuvs::neighbors::mg::detail::deserialize_pq<T, IdxT>(handle, clique, filename));                     \\
+    auto idx = index<ivf_pq::index<IdxT>, T, IdxT>(handle, clique, filename);                                             \\
+    return idx;                                                                                                           \\
   }                                                                                                                       \\
                                                                                                                           \\
   template<>                                                                                                              \\
   index<ivf_pq::index<IdxT>, T, IdxT> distribute_pq<T, IdxT>(const raft::resources& handle,                               \\
-                                                                    const cuvs::neighbors::mg::nccl_clique& clique,       \\
-                                                                    const std::string& filename)                          \\
+                                                             const cuvs::neighbors::mg::nccl_clique& clique,              \\
+                                                             const std::string& filename)                                 \\
   {                                                                                                                       \\
-    return std::move(cuvs::neighbors::mg::detail::distribute_pq<T, IdxT>(handle, clique, filename));                      \\
-  } 
+    auto idx = index<ivf_pq::index<IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                                        \\
+    cuvs::neighbors::mg::detail::deserialize_and_distribute(handle, clique, idx, filename);                               \\
+    return idx;                                                                                                           \\
+  }
 """
 
 cagra_macro = """
 #define CUVS_INST_MG_CAGRA(T, IdxT)                                                                                       \\
   index<cagra::index<T, IdxT>, T, IdxT> build(const raft::resources& handle,                                              \\
-                                                     const cuvs::neighbors::mg::nccl_clique& clique,                      \\
-                                                     const mg::index_params<cagra::index_params>& index_params,           \\
-                                                     raft::host_matrix_view<const T, int64_t, row_major> index_dataset)   \\
+                                              const cuvs::neighbors::mg::nccl_clique& clique,                             \\
+                                              const mg::index_params<cagra::index_params>& index_params,                  \\
+                                              raft::host_matrix_view<const T, int64_t, row_major> index_dataset)          \\
   {                                                                                                                       \\
-    return std::move(cuvs::neighbors::mg::detail::build<T, IdxT>(handle, clique, index_params, index_dataset));           \\
+    index<cagra::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);                                    \\
+    cuvs::neighbors::mg::detail::build(clique, index,                                                                     \\
+                                       static_cast<const cuvs::neighbors::index_params*>(&index_params),                  \\
+                                       index_dataset);                                                                    \\
+    return index;                                                                                                         \\
   }                                                                                                                       \\
                                                                                                                           \\
   void search(const raft::resources& handle,                                                                              \\
@@ -184,8 +204,9 @@ cagra_macro = """
               raft::host_matrix_view<float, int64_t, row_major> distances,                                                \\
               int64_t n_rows_per_batch)                                                                                   \\
   {                                                                                                                       \\
-    cuvs::neighbors::mg::detail::search(handle, clique, index, search_params, queries,                                    \\
-                                        neighbors, distances, n_rows_per_batch);                                          \\
+    cuvs::neighbors::mg::detail::search(clique, index,                                                                    \\
+                                        static_cast<const cuvs::neighbors::search_params*>(&search_params),               \\
+                                        queries, neighbors, distances, n_rows_per_batch);                                 \\
   }                                                                                                                       \\
                                                                                                                           \\
   void serialize(const raft::resources& handle,                                                                           \\
@@ -198,19 +219,22 @@ cagra_macro = """
                                                                                                                           \\
   template<>                                                                                                              \\
   index<cagra::index<T, IdxT>, T, IdxT> deserialize_cagra<T, IdxT>(const raft::resources& handle,                         \\
-                                                                          const cuvs::neighbors::mg::nccl_clique& clique, \\
-                                                                          const std::string& filename)                    \\
+                                                                   const cuvs::neighbors::mg::nccl_clique& clique,        \\
+                                                                   const std::string& filename)                           \\
   {                                                                                                                       \\
-    return std::move(cuvs::neighbors::mg::detail::deserialize_cagra<T, IdxT>(handle, clique, filename));                  \\
+    auto idx = index<cagra::index<T, IdxT>, T, IdxT>(handle, clique, filename);                                           \\
+    return idx;                                                                                                           \\
   }                                                                                                                       \\
                                                                                                                           \\
   template<>                                                                                                              \\
   index<cagra::index<T, IdxT>, T, IdxT> distribute_cagra<T, IdxT>(const raft::resources& handle,                          \\
-                                                                         const cuvs::neighbors::mg::nccl_clique& clique,  \\
-                                                                         const std::string& filename)                     \\
+                                                                  const cuvs::neighbors::mg::nccl_clique& clique,         \\
+                                                                  const std::string& filename)                            \\
   {                                                                                                                       \\
-    return std::move(cuvs::neighbors::mg::detail::distribute_cagra<T, IdxT>(handle, clique, filename));                   \\
-  } 
+    auto idx = index<cagra::index<T, IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                                      \\
+    cuvs::neighbors::mg::detail::deserialize_and_distribute(handle, clique, idx, filename);                               \\
+    return idx;                                                                                                           \\
+  }
 """
 
 macros_1 = dict(

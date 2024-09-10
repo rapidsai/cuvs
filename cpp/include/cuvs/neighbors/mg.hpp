@@ -113,8 +113,7 @@ struct nccl_clique {
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
-class index {
- public:
+struct index {
   index(distribution_mode mode, int num_ranks_);
   index(const raft::resources& handle,
         const cuvs::neighbors::mg::nccl_clique& clique,
@@ -124,56 +123,6 @@ class index {
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
-
-  void deserialize_and_distribute(const raft::resources& handle,
-                                  const cuvs::neighbors::mg::nccl_clique& clique,
-                                  const std::string& filename);
-
-  void deserialize(const raft::resources& handle,
-                   const cuvs::neighbors::mg::nccl_clique& clique,
-                   const std::string& filename);
-
-  void build(const cuvs::neighbors::mg::nccl_clique& clique,
-             const cuvs::neighbors::index_params* index_params,
-             raft::host_matrix_view<const T, int64_t, row_major> index_dataset);
-
-  void extend(const cuvs::neighbors::mg::nccl_clique& clique,
-              raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
-              std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices);
-
-  void search(const cuvs::neighbors::mg::nccl_clique& clique,
-              const cuvs::neighbors::search_params* search_params,
-              raft::host_matrix_view<const T, int64_t, row_major> queries,
-              raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
-              raft::host_matrix_view<float, int64_t, row_major> distances,
-              int64_t n_rows_per_batch) const;
-
-  void serialize(raft::resources const& handle,
-                 const cuvs::neighbors::mg::nccl_clique& clique,
-                 const std::string& filename) const;
-
- private:
-  void sharded_search_with_direct_merge(const cuvs::neighbors::mg::nccl_clique& clique,
-                                        const cuvs::neighbors::search_params* search_params,
-                                        raft::host_matrix_view<const T, int64_t, row_major> queries,
-                                        raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
-                                        raft::host_matrix_view<float, int64_t, row_major> distances,
-                                        int64_t n_rows_per_batch,
-                                        int64_t n_rows,
-                                        int64_t n_cols,
-                                        int64_t n_neighbors,
-                                        int64_t n_batches) const;
-
-  void sharded_search_with_tree_merge(const cuvs::neighbors::mg::nccl_clique& clique,
-                                      const cuvs::neighbors::search_params* search_params,
-                                      raft::host_matrix_view<const T, int64_t, row_major> queries,
-                                      raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
-                                      raft::host_matrix_view<float, int64_t, row_major> distances,
-                                      int64_t n_rows_per_batch,
-                                      int64_t n_rows,
-                                      int64_t n_cols,
-                                      int64_t n_neighbors,
-                                      int64_t n_batches) const;
 
   distribution_mode mode_;
   int num_ranks_;
