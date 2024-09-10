@@ -12,7 +12,7 @@ files:
       - cuda
       - cuda_version
       - depends_on_pylibraft
-      - depends_on_rmm
+      - depends_on_librmm
       - develop
       - checks
       - build_wheels
@@ -34,7 +34,7 @@ files:
       - cuda
       - cuda_version
       - depends_on_pylibraft
-      - depends_on_rmm
+      - depends_on_librmm
       - develop
       - bench
       - bench_python
@@ -89,8 +89,6 @@ files:
     includes:
       - rapids_build
       - build_py_cuvs
-      - depends_on_pylibraft
-      - depends_on_rmm
   py_run_py_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -100,7 +98,6 @@ files:
       - cuda_wheels
       - run_py_cuvs
       - depends_on_pylibraft
-      - depends_on_rmm
   py_test_py_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -480,11 +477,11 @@ dependencies:
           - pyyaml
           - pandas
           - click
-  depends_on_rmm:
+  depends_on_librmm:
     common:
       - output_types: conda
         packages:
-          - &rmm_unsuffixed rmm==24.10.*,>=0.0.0a0
+          - &librmm_unsuffixed librmm==24.10.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -497,13 +494,13 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - rmm-cu12==24.10.*,>=0.0.0a0
+              - librmm-cu12==24.10.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - rmm-cu11==24.10.*,>=0.0.0a0
-          - {matrix: null, packages: [*rmm_unsuffixed]}
+              - librmm-cu11==24.10.*,>=0.0.0a0
+          - {matrix: null, packages: [*librmm_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda
