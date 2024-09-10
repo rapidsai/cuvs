@@ -63,6 +63,7 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
+        - librmm ={{ minor_version }}
         - libraft-headers-only ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
@@ -128,6 +129,7 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
+        - librmm ={{ minor_version }}
         - libraft-headers-only ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
@@ -193,6 +195,7 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
+        - librmm ={{ minor_version }}
         - libraft-headers-only ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
@@ -263,6 +266,7 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
+        - librmm ={{ minor_version }}
         - libraft-headers-only ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
