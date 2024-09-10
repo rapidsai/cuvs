@@ -84,7 +84,6 @@ outputs:
         - libcusparse-dev
         {% endif %}
       run:
-        - libraft-headers-only ={{ minor_version }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
         {% if cuda_major != "11" %}
         - cuda-cudart
@@ -150,7 +149,6 @@ outputs:
         - libcusparse-dev
         {% endif %}
       run:
-        - libraft-headers-only ={{ minor_version }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
         {% if cuda_major != "11" %}
         - cuda-cudart
@@ -228,7 +226,6 @@ outputs:
         - libcusolver
         - libcusparse
         {% endif %}
-        - libraft-headers-only ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
@@ -298,7 +295,6 @@ outputs:
         - libcusolver
         - libcusparse
         {% endif %}
-        - libraft-headers-only ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
