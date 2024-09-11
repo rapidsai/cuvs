@@ -32,6 +32,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
+- librmm==24.10.*,>=0.0.0a0
 - make
 - nccl>=2.9.9
 - ninja
@@ -45,7 +46,6 @@ dependencies:
 - pytest==7.*
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
 - recommonmark
-- rmm==24.10.*,>=0.0.0a0
 - rust
 - scikit-build-core>=0.10.0
 - scikit-learn
