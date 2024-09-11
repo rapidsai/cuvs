@@ -58,7 +58,7 @@ cdef class SearchParams:
                  ef=200,
                  num_threads=0):
         self.params.ef = ef
-        self.params.num_threads = num_threads
+        self.params.numThreads = num_threads
 
     def __repr__(self):
         attr_str = [attr + "=" + str(getattr(self, attr))
@@ -72,7 +72,7 @@ cdef class SearchParams:
 
     @property
     def num_threads(self):
-        return self.params.num_threads
+        return self.params.numThreads
 
 
 cdef class Index:
@@ -106,6 +106,9 @@ cdef class Index:
 def save(filename, cagra.Index index, resources=None):
     """
     Saves the CAGRA index to a file as an hnswlib index.
+    The saved index is immutable and can only be searched by the hnswlib
+    wrapper in cuVS, as the format is not compatible with the original
+    hnswlib.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change.
@@ -142,11 +145,13 @@ def save(filename, cagra.Index index, resources=None):
 def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
     """
     Loads base-layer-only hnswlib index from file, which was originally
-    saved as a built CAGRA index.
+    saved as a built CAGRA index. The loaded index is immutable and can only
+    be searched by the hnswlib wrapper in cuVS, as the format is not
+    compatible with the original hnswlib.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change, therefore loading an index saved with a previous
-    version of raft is not guaranteed to work.
+    version of cuVS is not guaranteed to work.
 
     Parameters
     ----------
@@ -224,7 +229,9 @@ def from_cagra(cagra.Index index, resources=None):
 
     NOTE: This method uses the filesystem to write the CAGRA index in
           `/tmp/<random_number>.bin` before reading it as an hnswlib index,
-          then deleting the temporary file.
+          then deleting the temporary file. The returned index is immutable
+          and can only be searched by the hnswlib wrapper in cuVS, as the
+          format is not compatible with the original hnswlib.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change.

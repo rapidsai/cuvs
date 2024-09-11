@@ -25,7 +25,7 @@ from cuvs.distance_type cimport cuvsDistanceType
 cdef extern from "cuvs/neighbors/hnsw.h" nogil:
     ctypedef struct cuvsHnswSearchParams:
         int32_t ef
-        int32_t num_threads
+        int32_t numThreads
 
     ctypedef cuvsHnswSearchParams* cuvsHnswSearchParams_t
 
