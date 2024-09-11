@@ -21,6 +21,7 @@
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
 
 #include <cub/cub.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::ivf::detail {
 
@@ -219,6 +220,9 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
                            bool account_for_max_close,
                            rmm::cuda_stream_view stream)
 {
+  std::cout << "inside ivf_common post_process_distances" << std::endl;
+  std::cout << "scaling factor" << scaling_factor << std::endl;
+  raft::print_device_vector("input_distances", in, 100, std::cout);
   constexpr bool needs_cast = !std::is_same<ScoreInT, ScoreOutT>::value;
   const bool needs_copy     = ((void*)in) != ((void*)out);
   size_t len                = size_t(n_queries) * size_t(topk);
@@ -254,7 +258,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
         raft::linalg::unaryOp(out, in, len, raft::sqrt_op{}, stream);
       }
     } break;
-    case distance::DistanceType::CosineExpanded:
+    // case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
       float factor = (account_for_max_close ? -1.0 : 1.0) * scaling_factor * scaling_factor;
       if (factor != 1.0) {
@@ -269,16 +273,16 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
       }
     } break;
     case distance::DistanceType::CosineExpanded: {
-      if (needs_cast) {
+      // if (needs_cast) {
         raft::linalg::unaryOp(
           out,
           in,
           len,
           raft::compose_op(raft::add_const_op<ScoreOutT>{1.0}, raft::cast_op<ScoreOutT>{}),
           stream);
-      } else {
-        raft::linalg::unaryOp(out, in, len, raft::add_const_op<ScoreInT>{1.0}, stream);
-      }
+      // } else {
+      //   raft::linalg::unaryOp(out, in, len, raft::add_const_op<ScoreInT>{1.0}, stream);
+      // }
     } break;
     default: RAFT_FAIL("Unexpected metric.");
   }

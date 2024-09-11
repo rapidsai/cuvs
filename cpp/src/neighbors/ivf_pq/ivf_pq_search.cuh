@@ -40,6 +40,7 @@
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cache.hpp>
@@ -466,6 +467,7 @@ void ivfpq_search_worker(raft::resources const& handle,
                          distances_buf.data(),
                          neighbors_ptr);
 
+  raft::print_device_vector("distances_buf", distances_buf.data(), 100, std::cout);
   // Select topk vectors for each query
   rmm::device_uvector<ScoreT> topk_dists(n_queries * topK, stream, mr);
 
@@ -486,7 +488,10 @@ void ivfpq_search_worker(raft::resources const& handle,
     cuvs::selection::SelectAlgo::kAuto,
     num_samples_vector);
 
+  raft::print_device_vector("topk_dists.data()", topk_dists.data(), 100, std::cout);
+
   // Postprocessing
+  std::cout << "index.metric" << index.metric() << std::endl;
   ivf::detail::postprocess_distances(
     distances, topk_dists.data(), index.metric(), n_queries, topK, scaling_factor, true, stream);
   ivf::detail::postprocess_neighbors(neighbors,
@@ -729,6 +734,14 @@ inline void search(raft::resources const& handle,
                        rot_queries.data(),
                        index.rot_dim(),
                        stream);
+
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      raft::linalg::row_normalize(
+        handle,
+        raft::make_device_matrix_view<const float>(rot_queries.data(), n_queries, index.rot_dim()),
+        raft::make_device_matrix_view<float>(rot_queries.data(), n_queries, index.rot_dim()),
+        raft::linalg::NormType::L2Norm);
+    }
 
     for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
       uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);

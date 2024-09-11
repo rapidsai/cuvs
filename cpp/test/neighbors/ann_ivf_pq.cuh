@@ -25,6 +25,7 @@
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_pool.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
@@ -641,6 +642,9 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
+
+    raft::print_host_vector("indices_ivf_pq.data()", indices_ivf_pq.data(), 100, std::cout);
+    raft::print_host_vector("distances_ivf_pq.data()", distances_ivf_pq.data(), 100, std::cout);
 
     // A very conservative lower bound on recall
     double min_recall =

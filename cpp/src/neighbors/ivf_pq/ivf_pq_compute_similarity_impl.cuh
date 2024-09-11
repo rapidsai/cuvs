@@ -285,6 +285,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       const uint8_t* const* pq_dataset,
                                       const uint32_t* cluster_labels,
                                       const uint32_t* _chunk_indices,
+                                      const float* dataset_norms,
                                       const float* queries,
                                       const uint32_t* index_list,
                                       float* query_kths,
@@ -420,6 +421,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               diff -= pq_c;
               score += diff * diff;
             } break;
+            case distance::DistanceType::CosineExpanded:
             case distance::DistanceType::InnerProduct: {
               // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
               float q;
@@ -433,28 +435,10 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               }
               score -= q * pq_c;
             } break;
-            case distance::DistanceType::CosineExpanded: {
-              // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
-              float q, c, quantized;
-              if constexpr (PrecompBaseDiff) {
-                float2 pvals = reinterpret_cast<float2*>(lut_end)[j];
-                q            = pvals.x;
-                c            = pvals.y;
-              } else {
-                q = query[j];
-                c = cluster_center[j];
-              }
-              quantized = c + pq_c;
-              score -= q * quantized;
-              q_norm += q * q;
-              c_norm += quantized * quantized;
-            } break;
             default: __builtin_unreachable();
           }
         } while (++j < j_end);
         lut_scores[i] = LutT(score);
-        if (metric == distance::DistanceType::CosineExpanded)
-          lut_scores[i] = LutT(score / sqrt(q_norm * c_norm));
       }
     }
 
