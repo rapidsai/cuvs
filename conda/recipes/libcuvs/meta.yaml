@@ -64,7 +64,7 @@ outputs:
         - {{ stdlib("c") }}
       host:
         - librmm ={{ minor_version }}
-        - libraft-headers-only ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
@@ -130,7 +130,7 @@ outputs:
         - {{ stdlib("c") }}
       host:
         - librmm ={{ minor_version }}
-        - libraft-headers-only ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
@@ -196,7 +196,7 @@ outputs:
         - {{ stdlib("c") }}
       host:
         - librmm ={{ minor_version }}
-        - libraft-headers-only ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         - openblas # required by some CPU algos in benchmarks
@@ -267,7 +267,7 @@ outputs:
         - {{ stdlib("c") }}
       host:
         - librmm ={{ minor_version }}
-        - libraft-headers-only ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
