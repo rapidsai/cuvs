@@ -255,6 +255,7 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
                         raft::linalg::L2Norm,
                         true,
                         stream);
+  if (index->metric == cuvs::distance::DistanceType::CosineExpanded)
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
                                   sizeof(float) * index->dim_ext(),
                                   center_norms.data(),
@@ -1159,6 +1160,7 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
   raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   codebook_gen codebook_kind,
+  const float* src_norms,
   std::optional<raft::device_vector_view<float, uint32_t, raft::row_major>> dataset_norms)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
@@ -1181,8 +1183,8 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
       pq_indices[out_ix] = std::get<const IdxT*>(src_offset_or_indices)[row_ix];
     }
     if (dataset_norms.has_value()) {
-      auto norms = dataset_norms.value()(cluster_ix);
-      norms[out_ix] = std::get<IdxT>(src_offset_or_indices) + row_ix;
+      auto norms = (dataset_norms.value())(cluster_ix);
+      norms[out_ix] = src_norms[row_ix];
     }
   }
 
@@ -1298,6 +1300,7 @@ void process_and_fill_codes(raft::resources const& handle,
                             const T* new_vectors,
                             std::variant<IdxT, const IdxT*> src_offset_or_indices,
                             const uint32_t* new_labels,
+                            const float* new_norms,
                             IdxT n_rows,
                             rmm::device_async_resource_ref mr)
 {
@@ -1335,7 +1338,9 @@ void process_and_fill_codes(raft::resources const& handle,
     index.inds_ptrs(),
     index.data_ptrs(),
     index.pq_centers(),
-    index.codebook_kind());
+    index.codebook_kind(),
+    new_norms,
+    index.dataset_norms());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -1577,6 +1582,10 @@ void extend(raft::resources const& handle,
       copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
     }
   }
+
+  if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    auto dataset_norms = raft::make_device_vector<float>(handle, n_rows);
+  }
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(
     new_vectors, n_rows, index->dim(), max_batch_size, copy_stream, device_memory, enable_prefetch);
@@ -1607,9 +1616,9 @@ void extend(raft::resources const& handle,
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
+        std::optional<raft::device_vector_view<const float, internal_extents_t>> X_norm = std::nullopt;
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt;
-        raft::linalg::rowNorm(dataset_norms,
+        raft::linalg::rowNorm(dataset_norms.data_handle() + batch.offset(),
                               batch_data_view.data_handle(),
                               index->dim(),
                               batch.size(),
@@ -1668,6 +1677,8 @@ void extend(raft::resources const& handle,
   // Fill the extended index with the new data (possibly, in batches)
   utils::batch_load_iterator<IdxT> idx_batches(
     new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
+  utils::batch_load_iterator<float> norms_batches(
+    dataset_norms.data_handle(), n_rows, 1, max_batch_size, stream, batches_mr);
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
@@ -1679,6 +1690,7 @@ void extend(raft::resources const& handle,
                              ? std::variant<IdxT, const IdxT*>(idx_batch.data())
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
                            new_data_labels.data() + vec_batch.offset(),
+                           dataset_norms.data() + vec_batch.offset(),
                            IdxT(vec_batch.size()),
                            batches_mr);
 

@@ -23,9 +23,11 @@
 #include "ivf_pq_compute_similarity.cuh"
 #include "ivf_pq_fp_8bit.cuh"
 
+#include <cuda_runtime_api.h>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/selection/select_k.hpp>
+#include <driver_types.h>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger-ext.hpp>
@@ -164,25 +166,27 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-    auto centroidsNorm =
+    // TODO: store dataset norms in a different manner for the cosine metric to avoid the copy here
+    auto center_norms =
       raft::make_device_mdarray<float, uint32_t>(handle, mr, raft::make_extents<uint32_t>(n_lists));
-    raft::linalg::rowNorm<float, uint32_t>(centroidsNorm.data_handle(),
-                                           cluster_centers,
-                                           dim,
-                                           n_lists,
-                                           raft::linalg::L2Norm,
-                                           true,
-                                           stream);
 
-    auto op = [] __device__(float a, float b) { return a / raft::sqrt(b); };
+    cudaMemcpy2DAsync(center_norms.data_handle(),
+                      sizeof(float),
+                      cluster_centers,
+                      sizeof(float) * dim_ext,
+                      sizeof(float),
+                      n_lists,
+                      cudaMemcpyDefault,
+                      stream);
+
     raft::linalg::matrixVectorOp(qc_distances.data(),
                                  qc_distances.data(),
-                                 centroidsNorm.data_handle(),
+                                 center_norms.data_handle(),
                                  n_lists,
                                  n_queries,
                                  true,
                                  true,
-                                 op,
+                                 raft::div_op{},
                                  stream);
   }
 
