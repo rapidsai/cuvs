@@ -190,6 +190,89 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
   return score;
 }
 
+/* Manually unrolled loop over a chunk of pq_dataset that fits into one VecT. */
+template <typename OutT,
+          typename LutT,
+          typename VecT,
+          bool CheckBounds,
+          uint32_t PqBits,
+          uint32_t BitsLeft = 0,
+          uint32_t Ix       = 0>
+__device__ __forceinline__ void ivfpq_compute_chunk(OutT& score /* NOLINT */,
+                                                    OutT& norm,
+                                                    typename VecT::math_t& pq_code,
+                                                    const VecT& pq_codes,
+                                                    const LutT*& lut_head,
+                                                    const LutT*& lut_end,
+                                                    const LutT*& lut_norms_head,
+                                                    const LutT*& lut_norms_end)
+{
+  if constexpr (CheckBounds) {
+    if (lut_head >= lut_end) { return; }
+  }
+  constexpr uint32_t kTotalBits = 8 * sizeof(typename VecT::math_t);
+  constexpr uint32_t kPqShift   = 1u << PqBits;
+  constexpr uint32_t kPqMask    = kPqShift - 1u;
+  if constexpr (BitsLeft >= PqBits) {
+    uint8_t code = pq_code & kPqMask;
+    pq_code >>= PqBits;
+    score += OutT(lut_head[code]);
+    norm += OutT(lut_norms_end[code]);
+    lut_head += kPqShift;
+    return ivfpq_compute_chunk<OutT, LutT, VecT, CheckBounds, PqBits, BitsLeft - PqBits, Ix>(
+      score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
+  } else if constexpr (Ix < VecT::Ratio) {
+    uint8_t code                = pq_code;
+    pq_code                     = pq_codes.val.data[Ix];
+    constexpr uint32_t kRemBits = PqBits - BitsLeft;
+    constexpr uint32_t kRemMask = (1u << kRemBits) - 1u;
+    code |= (pq_code & kRemMask) << BitsLeft;
+    pq_code >>= kRemBits;
+    score += OutT(lut_head[code]);
+    lut_head += kPqShift;
+    return ivfpq_compute_chunk<OutT,
+                               LutT,
+                               VecT,
+                               CheckBounds,
+                               PqBits,
+                               kTotalBits - kRemBits,
+                               Ix + 1>(
+      score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
+  }
+}
+
+/* Compute the similarity for one vector in the pq_dataset */
+template <typename OutT, typename LutT, typename VecT, uint32_t PqBits>
+__device__ auto ivfpq_compute_score(uint32_t pq_dim,
+                                    const typename VecT::io_t* pq_head,
+                                    const LutT* lut_scores,
+                                    const LutT* lut_norms) -> OutT
+{
+  constexpr uint32_t kChunkSize = sizeof(VecT) * 8u / PqBits;
+  auto lut_head                 = lut_scores;
+  auto lut_end                  = lut_scores + (pq_dim << PqBits);
+  auto lut_norms_head           = lut_norms;
+  auto lut_norms_end            = lut_scores + (pq_dim << PqBits);
+  VecT pq_codes;
+  OutT score{0};
+  OutT norm{0};
+  for (; pq_dim >= kChunkSize; pq_dim -= kChunkSize) {
+    *pq_codes.vectorized_data() = *pq_head;
+    pq_head += kIndexGroupSize;
+    typename VecT::math_t pq_code = 0;
+    ivfpq_compute_chunk<OutT, LutT, VecT, false, PqBits>(
+      score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
+    // Early stop when it makes sense (otherwise early_stop_limit is kDummy/infinity).
+  }
+  if (pq_dim > 0) {
+    *pq_codes.vectorized_data()   = *pq_head;
+    typename VecT::math_t pq_code = 0;
+    ivfpq_compute_chunk<OutT, LutT, VecT, true, PqBits>(
+      score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
+  }
+  return score / norm;
+}
+
 /**
  * The main kernel that computes similarity scores across multiple queries and probes.
  * When `Capacity > 0`, it also selects top K candidates for each query and probe
@@ -291,6 +374,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       float* query_kths,
                                       IvfSampleFilterT sample_filter,
                                       LutT* lut_scores,
+                                      LutT* lut_norms,
                                       OutT* _out_scores,
                                       uint32_t* _out_indices)
 {
@@ -303,7 +387,8 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     * topk::block_sort: some amount of shared memory, but overlaps with the rest:
         block_sort only needs shared memory for `.done()` operation, which can come very last.
   */
-  extern __shared__ __align__(256) uint8_t smem_buf[];  // NOLINT
+  extern __shared__ __align__(256) uint8_t smem_buf[];        // NOLINT
+  extern __shared__ __align__(256) uint8_t norms_smem_buf[];  // NOLINT
   constexpr bool kManageLocalTopK = Capacity > 0;
 
   constexpr uint32_t PqShift = 1u << PqBits;  // NOLINT
@@ -323,6 +408,21 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     lut_end = reinterpret_cast<uint8_t*>(lut_scores + lut_size);
   } else {
     lut_end = smem_buf;
+  }
+
+  uint8_t* lut_norms_end = nullptr;
+  if (metric == distance::DistanceType::CosineExpanded) {
+    if constexpr (EnableSMemLut) {
+      lut_norms = reinterpret_cast<LutT*>(norms_smem_buf);
+    } else {
+      lut_norms += lut_size * blockIdx.x;
+    }
+
+    if constexpr (EnableSMemLut) {
+      lut_norms_end = reinterpret_cast<uint8_t*>(lut_norms + lut_size);
+    } else {
+      lut_norms_end = norms_smem_buf;
+    }
   }
 
   for (int ib = blockIdx.x; ib < n_queries * n_probes; ib += gridDim.x) {
@@ -403,9 +503,8 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
         const uint32_t j_end = pq_len + j;
         auto cur_pq_center   = pq_center + (i & PqMask) +
                              (codebook_kind == codebook_gen::PER_SUBSPACE ? j * PqShift : 0u);
-        float score  = 0.0;
-        float q_norm = 1.0;
-        float c_norm = 1.0;
+        float score = 0.0;
+        float norm  = 0.0;
         do {
           float pq_c = *cur_pq_center;
           cur_pq_center += PqShift;
@@ -421,7 +520,22 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               diff -= pq_c;
               score += diff * diff;
             } break;
-            case distance::DistanceType::CosineExpanded:
+            case distance::DistanceType::CosineExpanded: {
+              // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
+              float q;
+              float c;
+              if constexpr (PrecompBaseDiff) {
+                float2 pvals = reinterpret_cast<float2*>(lut_end)[j];
+                q            = pvals.x;
+                c            = pvals.y;
+              } else {
+                q = query[j];
+                c = cluster_center[j];
+              }
+              float quantized = c + pq_c;
+              score -= q * quantized;
+              norm += quantized * quantized;
+            } break;
             case distance::DistanceType::InnerProduct: {
               // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
               float q;
@@ -439,6 +553,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
           }
         } while (++j < j_end);
         lut_scores[i] = LutT(score);
+        if (metric == distance::DistanceType::CosineExpanded) { lut_norms[i] = LutT(norm); }
       }
     }
 
@@ -494,11 +609,16 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
       bool valid = i < n_samples;
       // Check bounds and that the sample is acceptable for the query
       if (valid && sample_filter(queries_offset + query_ix, label, i)) {
-        score = ivfpq_compute_score<OutT, LutT, vec_t, PqBits>(
-          pq_dim,
-          reinterpret_cast<const vec_t::io_t*>(pq_thread_data),
-          lut_scores,
-          early_stop_limit);
+        if (metric != distance::DistanceType::CosineExpanded) {
+          score = ivfpq_compute_score<OutT, LutT, vec_t, PqBits>(
+            pq_dim, reinterpret_cast<const vec_t::io_t*>(pq_thread_data), lut_scores, lut_norms);
+        } else {
+          score = ivfpq_compute_score<OutT, LutT, vec_t, PqBits>(
+            pq_dim,
+            reinterpret_cast<const vec_t::io_t*>(pq_thread_data),
+            lut_scores,
+            early_stop_limit);
+        }
       }
       if constexpr (kManageLocalTopK) {
         block_topk.add(score, sample_offset + i);
