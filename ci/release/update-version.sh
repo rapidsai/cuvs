@@ -45,6 +45,7 @@ DEPENDENCIES=(
   dask-cuda
   cuvs
   pylibraft
+  librmm
   rmm
   rapids-dask-dependency
 )
