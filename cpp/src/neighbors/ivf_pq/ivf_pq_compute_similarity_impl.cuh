@@ -242,7 +242,8 @@ __device__ __forceinline__ void ivfpq_compute_chunk(OutT& score /* NOLINT */,
                                CheckBounds,
                                PqBits,
                                kTotalBits - kRemBits,
-                               Ix + 1>(score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
+                               Ix + 1>(
+      score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
   }
 }
 
@@ -392,8 +393,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     * topk::block_sort: some amount of shared memory, but overlaps with the rest:
         block_sort only needs shared memory for `.done()` operation, which can come very last.
   */
-  extern __shared__ __align__(256) uint8_t smem_buf[];        // NOLINT
-  extern __shared__ __align__(256) uint8_t norms_smem_buf[];  // NOLINT
+  extern __shared__ __align__(256) uint8_t smem_buf[];  // NOLINT
   constexpr bool kManageLocalTopK = Capacity > 0;
 
   constexpr uint32_t PqShift = 1u << PqBits;  // NOLINT
@@ -404,32 +404,25 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
 
   if constexpr (EnableSMemLut) {
     lut_scores = reinterpret_cast<LutT*>(smem_buf);
-    printf("using shared_mem\n");
+    // printf("using shared_mem\n");
   } else {
     lut_scores += lut_size * blockIdx.x;
     // printf("not using shared_mem\n");
   }
 
+  bool compute_norms = (metric == distance::DistanceType::CosineExpanded);
   uint8_t* lut_end = nullptr;
   if constexpr (EnableSMemLut) {
-    lut_end = reinterpret_cast<uint8_t*>(lut_scores + lut_size);
+    lut_end = reinterpret_cast<uint8_t*>(lut_scores + lut_size * (1 + compute_norms));
   } else {
     lut_end = smem_buf;
   }
 
-  uint8_t* lut_norms_end = nullptr;
-  if (metric == distance::DistanceType::CosineExpanded) {
-    if constexpr (EnableSMemLut) {
-      lut_norms = reinterpret_cast<LutT*>(norms_smem_buf);
-    } else {
-      lut_norms += lut_size * blockIdx.x;
-    }
-
-    if constexpr (EnableSMemLut) {
-      lut_norms_end = reinterpret_cast<uint8_t*>(lut_norms + lut_size);
-    } else {
-      lut_norms_end = norms_smem_buf;
-    }
+  if constexpr (EnableSMemLut) {
+    // do not allocate lut_size smem if norms need not be computed
+    lut_norms = reinterpret_cast<LutT*>(lut_scores + lut_size * compute_norms);
+  } else {
+    lut_norms += lut_size * blockIdx.x;
   }
 
   for (int ib = blockIdx.x; ib < n_queries * n_probes; ib += gridDim.x) {
@@ -839,7 +832,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                uint32_t topk) -> selected<OutT, LutT, IvfSampleFilterT>
 {
   // Shared memory for storing the lookup table
-  // size_t lut_mem = sizeof(LutT) * (pq_dim << pq_bits);
+  size_t lut_mem = sizeof(LutT) * (pq_dim << pq_bits) * 2;
   // Shared memory for storing pre-computed pieces to speedup the lookup table construction
   // (e.g. the distance between a cluster center and the query for L2).
   size_t bdf_mem = sizeof(float) * precomp_data_count;
@@ -942,12 +935,12 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
   auto conf_no_smem_lut = get_compute_similarity_kernel<OutT, LutT, true, false, IvfSampleFilterT>;
   auto topk_or_zero     = manage_local_topk ? topk : 0u;
   std::array candidates{
-    // std::make_tuple(conf_fast(pq_bits, topk_or_zero),
-    //                 total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, bdf_mem},
-    //                 true),
-    // std::make_tuple(conf_no_basediff(pq_bits, topk_or_zero),
-    //                 total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, 0},
-    //                 true),
+    std::make_tuple(conf_fast(pq_bits, topk_or_zero),
+                    total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, bdf_mem},
+                    true),
+    std::make_tuple(conf_no_basediff(pq_bits, topk_or_zero),
+                    total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, 0},
+                    true),
     std::make_tuple(conf_no_smem_lut(pq_bits, topk_or_zero),
                     total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, 0, bdf_mem},
                     false)};
