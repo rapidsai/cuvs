@@ -1,7 +1,7 @@
 # Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 # Usage:
-#   conda build . -c conda-forge -c nvidia -c rapidsai
+#   conda build . -c rapidsai -c conda-forge -c nvidia
 {% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
 {% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
 {% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
@@ -63,7 +63,8 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
-        - libraft ={{ minor_version }}
+        - librmm ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
@@ -84,7 +85,6 @@ outputs:
         - libcusparse-dev
         {% endif %}
       run:
-        - libraft ={{ minor_version }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
         {% if cuda_major != "11" %}
         - cuda-cudart
@@ -129,7 +129,8 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
-        - libraft ={{ minor_version }}
+        - librmm ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
@@ -150,7 +151,6 @@ outputs:
         - libcusparse-dev
         {% endif %}
       run:
-        - libraft ={{ minor_version }}
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
         {% if cuda_major != "11" %}
         - cuda-cudart
@@ -195,7 +195,8 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
-        - libraft ={{ minor_version }}
+        - librmm ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         - openblas # required by some CPU algos in benchmarks
@@ -228,7 +229,6 @@ outputs:
         - libcusolver
         - libcusparse
         {% endif %}
-        - libraft ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
@@ -248,6 +248,9 @@ outputs:
         - {{ compiler('cuda') }}
         - cuda-cudart-dev
         - libcublas-dev
+        - libcurand-dev
+        - libcusolver-dev
+        - libcusparse-dev
         {% endif %}
     requirements:
       build:
@@ -263,17 +266,27 @@ outputs:
         - ninja
         - {{ stdlib("c") }}
       host:
-        - libraft ={{ minor_version }}
+        - librmm ={{ minor_version }}
+        - libraft-headers ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
         - libcublas {{ cuda11_libcublas_host_version }}
         - libcublas-dev {{ cuda11_libcublas_host_version }}
+        - libcurand {{ cuda11_libcurand_host_version }}
+        - libcurand-dev {{ cuda11_libcurand_host_version }}
+        - libcusolver {{ cuda11_libcusolver_host_version }}
+        - libcusolver-dev {{ cuda11_libcusolver_host_version }}
+        - libcusparse {{ cuda11_libcusparse_host_version }}
+        - libcusparse-dev {{ cuda11_libcusparse_host_version }}
         {% else %}
         - cuda-cudart-dev
         - cuda-profiler-api
         - libcublas-dev
+        - libcurand-dev
+        - libcusolver-dev
+        - libcusparse-dev
         {% endif %}
       run:
         - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
@@ -282,8 +295,10 @@ outputs:
         {% else %}
         - cuda-cudart
         - libcublas
+        - libcurand
+        - libcusolver
+        - libcusparse
         {% endif %}
-        - libraft ={{ minor_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
