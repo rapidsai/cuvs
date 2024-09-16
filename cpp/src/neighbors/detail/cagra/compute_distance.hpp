@@ -32,6 +32,15 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace device {
 
+constexpr inline auto get_DBD(uint32_t team_size)
+{
+  switch (team_size) {
+    case 32: return 512;
+    case 16: return 256;
+    default: return 128;
+  }
+}
+
 // using LOAD_256BIT_T = ulonglong4;
 using LOAD_128BIT_T = uint4;
 using LOAD_64BIT_T  = uint64_t;
@@ -122,6 +131,85 @@ _RAFT_DEVICE void compute_distance_to_random_nodes(
   }
 }
 
+template <class DATASET_DESCRIPTOR_T, class DISTANCE_T, class INDEX_T>
+_RAFT_DEVICE void compute_distance_to_random_nodes(
+  unsigned team_size,
+  INDEX_T* const result_indices_ptr,       // [num_pickup]
+  DISTANCE_T* const result_distances_ptr,  // [num_pickup]
+  const typename DATASET_DESCRIPTOR_T::QUERY_T* const query_buffer,
+  const DATASET_DESCRIPTOR_T& dataset_desc,
+  const std::size_t num_pickup,
+  const unsigned num_distilation,
+  const uint64_t rand_xor_mask,
+  const INDEX_T* const seed_ptr,  // [num_seeds]
+  const uint32_t num_seeds,
+  INDEX_T* const visited_hash_ptr,
+  const uint32_t hash_bitlen,
+  const cuvs::distance::DistanceType metric,
+  const uint32_t block_id   = 0,
+  const uint32_t num_blocks = 1)
+{
+  switch (team_size) {
+    case 32:
+      return compute_distance_to_random_nodes<32,
+                                              get_DBD(32),
+                                              DATASET_DESCRIPTOR_T,
+                                              DISTANCE_T,
+                                              INDEX_T>(result_indices_ptr,
+                                                       result_distances_ptr,
+                                                       query_buffer,
+                                                       dataset_desc,
+                                                       num_pickup,
+                                                       num_distilation,
+                                                       rand_xor_mask,
+                                                       seed_ptr,
+                                                       num_seeds,
+                                                       visited_hash_ptr,
+                                                       hash_bitlen,
+                                                       metric,
+                                                       block_id,
+                                                       num_blocks);
+    case 16:
+      return compute_distance_to_random_nodes<16,
+                                              get_DBD(16),
+                                              DATASET_DESCRIPTOR_T,
+                                              DISTANCE_T,
+                                              INDEX_T>(result_indices_ptr,
+                                                       result_distances_ptr,
+                                                       query_buffer,
+                                                       dataset_desc,
+                                                       num_pickup,
+                                                       num_distilation,
+                                                       rand_xor_mask,
+                                                       seed_ptr,
+                                                       num_seeds,
+                                                       visited_hash_ptr,
+                                                       hash_bitlen,
+                                                       metric,
+                                                       block_id,
+                                                       num_blocks);
+    default:
+      return compute_distance_to_random_nodes<8,
+                                              get_DBD(8),
+                                              DATASET_DESCRIPTOR_T,
+                                              DISTANCE_T,
+                                              INDEX_T>(result_indices_ptr,
+                                                       result_distances_ptr,
+                                                       query_buffer,
+                                                       dataset_desc,
+                                                       num_pickup,
+                                                       num_distilation,
+                                                       rand_xor_mask,
+                                                       seed_ptr,
+                                                       num_seeds,
+                                                       visited_hash_ptr,
+                                                       hash_bitlen,
+                                                       metric,
+                                                       block_id,
+                                                       num_blocks);
+  }
+}
+
 template <unsigned TEAM_SIZE,
           unsigned DATASET_BLOCK_DIM,
           unsigned MAX_N_FRAGS,
@@ -206,6 +294,84 @@ _RAFT_DEVICE void compute_distance_to_child_nodes(
   }
 }
 
+template <unsigned MAX_N_FRAGS, class DATASET_DESCRIPTOR_T, class DISTANCE_T, class INDEX_T>
+_RAFT_DEVICE void compute_distance_to_child_nodes(
+  unsigned team_size,
+  INDEX_T* const result_child_indices_ptr,
+  DISTANCE_T* const result_child_distances_ptr,
+  // query
+  const typename DATASET_DESCRIPTOR_T::QUERY_T* const query_buffer,
+  // [dataset_dim, dataset_size]
+  const DATASET_DESCRIPTOR_T& dataset_desc,
+  // [knn_k, dataset_size]
+  const INDEX_T* const knn_graph,
+  const std::uint32_t knn_k,
+  // hashmap
+  INDEX_T* const visited_hashmap_ptr,
+  const std::uint32_t hash_bitlen,
+  const INDEX_T* const parent_indices,
+  const INDEX_T* const internal_topk_list,
+  const std::uint32_t search_width,
+  const cuvs::distance::DistanceType metric)
+{
+  switch (team_size) {
+    case 32:
+      return compute_distance_to_child_nodes<32,
+                                             get_DBD(32),
+                                             MAX_N_FRAGS,
+                                             DATASET_DESCRIPTOR_T,
+                                             DISTANCE_T,
+                                             INDEX_T>(result_child_indices_ptr,
+                                                      result_child_distances_ptr,
+                                                      query_buffer,
+                                                      dataset_desc,
+                                                      knn_graph,
+                                                      knn_k,
+                                                      visited_hashmap_ptr,
+                                                      hash_bitlen,
+                                                      parent_indices,
+                                                      internal_topk_list,
+                                                      search_width,
+                                                      metric);
+    case 16:
+      return compute_distance_to_child_nodes<16,
+                                             get_DBD(16),
+                                             MAX_N_FRAGS,
+                                             DATASET_DESCRIPTOR_T,
+                                             DISTANCE_T,
+                                             INDEX_T>(result_child_indices_ptr,
+                                                      result_child_distances_ptr,
+                                                      query_buffer,
+                                                      dataset_desc,
+                                                      knn_graph,
+                                                      knn_k,
+                                                      visited_hashmap_ptr,
+                                                      hash_bitlen,
+                                                      parent_indices,
+                                                      internal_topk_list,
+                                                      search_width,
+                                                      metric);
+    default:
+      return compute_distance_to_child_nodes<8,
+                                             get_DBD(8),
+                                             MAX_N_FRAGS,
+                                             DATASET_DESCRIPTOR_T,
+                                             DISTANCE_T,
+                                             INDEX_T>(result_child_indices_ptr,
+                                                      result_child_distances_ptr,
+                                                      query_buffer,
+                                                      dataset_desc,
+                                                      knn_graph,
+                                                      knn_k,
+                                                      visited_hashmap_ptr,
+                                                      hash_bitlen,
+                                                      parent_indices,
+                                                      internal_topk_list,
+                                                      search_width,
+                                                      metric);
+  }
+}
+
 }  // namespace device
 
 template <class QUERY_T_, class DISTANCE_T_, class INDEX_T_>
@@ -243,7 +409,6 @@ struct standard_dataset_descriptor_t
   static const std::uint32_t smem_buffer_size_in_byte = 0;
   __device__ void set_smem_ptr(void* const){};
 
-  template <uint32_t DATASET_BLOCK_DIM>
   __device__ void copy_query(const DATA_T* const dmem_query_ptr,
                              QUERY_T* const smem_query_ptr,
                              const std::uint32_t query_smem_buffer_length)

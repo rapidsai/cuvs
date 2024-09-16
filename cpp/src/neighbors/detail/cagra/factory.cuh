@@ -45,6 +45,8 @@ class factory {
     const cuvs::distance::DistanceType metric)
   {
     search_plan_impl_base plan(params, dim, graph_degree, topk, metric);
+    if (plan.team_size != 0) { plan.dataset_block_dim = device::get_DBD(plan.team_size); }
+
     switch (plan.dataset_block_dim) {
       case 128:
         switch (plan.team_size) {
@@ -76,14 +78,12 @@ class factory {
   {
     if (plan.algo == search_algo::SINGLE_CTA) {
       return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>(
-        new single_cta_search::
-          search<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
-            res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
+        new single_cta_search::search<DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
+          res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
     } else if (plan.algo == search_algo::MULTI_CTA) {
       return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>(
-        new multi_cta_search::
-          search<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
-            res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
+        new multi_cta_search::search<DATASET_DESCRIPTOR_T, CagraSampleFilterT>(
+          res, plan, plan.dim, plan.graph_degree, plan.topk, plan.metric));
     } else {
       return std::unique_ptr<search_plan_impl<DATASET_DESCRIPTOR_T, CagraSampleFilterT>>(
         new multi_kernel_search::

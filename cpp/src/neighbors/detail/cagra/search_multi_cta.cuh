@@ -51,10 +51,7 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace multi_cta_search {
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          typename DATASET_DESCRIPTOR_T,
-          typename SAMPLE_FILTER_T>
+template <typename DATASET_DESCRIPTOR_T, typename SAMPLE_FILTER_T>
 
 struct search : public search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
@@ -130,7 +127,7 @@ struct search : public search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
     RAFT_EXPECTS(result_buffer_size_32 <= 256, "Result buffer size cannot exceed 256");
 
     const auto query_smem_buffer_length =
-      raft::ceildiv<uint32_t>(dim, DATASET_BLOCK_DIM) * DATASET_BLOCK_DIM;
+      raft::round_up_safe<uint32_t>(dim, device::get_DBD(team_size));
 
     smem_size = sizeof(float) * query_smem_buffer_length +
                 (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * result_buffer_size_32 +
@@ -221,27 +218,27 @@ struct search : public search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
   {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-    select_and_run<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>(
-      dataset_desc,
-      graph,
-      intermediate_indices.data(),
-      intermediate_distances.data(),
-      queries_ptr,
-      num_queries,
-      dev_seed_ptr,
-      num_executed_iterations,
-      *this,
-      topk,
-      thread_block_size,
-      result_buffer_size,
-      smem_size,
-      hash_bitlen,
-      hashmap.data(),
-      num_cta_per_query,
-      num_seeds,
-      sample_filter,
-      this->metric,
-      stream);
+    select_and_run<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>(dataset_desc,
+                                                          graph,
+                                                          intermediate_indices.data(),
+                                                          intermediate_distances.data(),
+                                                          queries_ptr,
+                                                          num_queries,
+                                                          dev_seed_ptr,
+                                                          num_executed_iterations,
+                                                          *this,
+                                                          topk,
+                                                          thread_block_size,
+                                                          result_buffer_size,
+                                                          smem_size,
+                                                          hash_bitlen,
+                                                          hashmap.data(),
+                                                          num_cta_per_query,
+                                                          num_seeds,
+                                                          sample_filter,
+                                                          this->metric,
+                                                          stream,
+                                                          team_size);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     // Select the top-k results from the intermediate results

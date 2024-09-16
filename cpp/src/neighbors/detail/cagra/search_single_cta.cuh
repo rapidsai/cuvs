@@ -49,10 +49,7 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          typename DATASET_DESCRIPTOR_T,
-          typename SAMPLE_FILTER_T>
+template <typename DATASET_DESCRIPTOR_T, typename SAMPLE_FILTER_T>
 struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
@@ -129,7 +126,7 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
     //
     const std::uint32_t topk_ws_size = 3;
     const auto query_smem_buffer_length =
-      raft::ceildiv<uint32_t>(dim, DATASET_BLOCK_DIM) * DATASET_BLOCK_DIM;
+      raft::round_up_safe<uint32_t>(dim, device::get_DBD(team_size));
     const std::uint32_t base_smem_size =
       sizeof(float) * query_smem_buffer_length +
       (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * result_buffer_size_32 +
@@ -224,28 +221,28 @@ struct search : search_plan_impl<DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T> {
                   SAMPLE_FILTER_T sample_filter)
   {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
-    select_and_run<TEAM_SIZE, DATASET_BLOCK_DIM, DATASET_DESCRIPTOR_T>(
-      dataset_desc,
-      graph,
-      result_indices_ptr,
-      result_distances_ptr,
-      queries_ptr,
-      num_queries,
-      dev_seed_ptr,
-      num_executed_iterations,
-      *this,
-      topk,
-      num_itopk_candidates,
-      static_cast<uint32_t>(thread_block_size),
-      smem_size,
-      hash_bitlen,
-      hashmap.data(),
-      small_hash_bitlen,
-      small_hash_reset_interval,
-      num_seeds,
-      sample_filter,
-      this->metric,
-      stream);
+    select_and_run<DATASET_DESCRIPTOR_T>(dataset_desc,
+                                         graph,
+                                         result_indices_ptr,
+                                         result_distances_ptr,
+                                         queries_ptr,
+                                         num_queries,
+                                         dev_seed_ptr,
+                                         num_executed_iterations,
+                                         *this,
+                                         topk,
+                                         num_itopk_candidates,
+                                         static_cast<uint32_t>(thread_block_size),
+                                         smem_size,
+                                         hash_bitlen,
+                                         hashmap.data(),
+                                         small_hash_bitlen,
+                                         small_hash_reset_interval,
+                                         num_seeds,
+                                         sample_filter,
+                                         this->metric,
+                                         stream,
+                                         team_size);
   }
 };
 

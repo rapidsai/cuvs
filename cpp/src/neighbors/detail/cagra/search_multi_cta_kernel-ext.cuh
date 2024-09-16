@@ -26,10 +26,7 @@ namespace multi_cta_search {
 
 #ifdef _CUVS_EXPLICIT_INSTANTIATE_ONLY
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          typename DATASET_DESCRIPTOR_T,
-          typename SAMPLE_FILTER_T>
+template <typename DATASET_DESCRIPTOR_T, typename SAMPLE_FILTER_T>
 void select_and_run(
   DATASET_DESCRIPTOR_T dataset_desc,
   raft::device_matrix_view<const typename DATASET_DESCRIPTOR_T::INDEX_T, int64_t, raft::row_major>
@@ -52,14 +49,12 @@ void select_and_run(
   uint32_t num_seeds,
   SAMPLE_FILTER_T sample_filter,
   cuvs::distance::DistanceType metric,
-  cudaStream_t stream) RAFT_EXPLICIT;
+  cudaStream_t stream,
+  uint32_t team_size) RAFT_EXPLICIT;
 #endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
-#define instantiate_kernel_selection(                                                           \
-  TEAM_SIZE, MAX_DATASET_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)                     \
+#define instantiate_kernel_selection(DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)              \
   extern template void select_and_run<                                                          \
-    TEAM_SIZE,                                                                                  \
-    MAX_DATASET_DIM,                                                                            \
     cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<DATA_T, INDEX_T, DISTANCE_T>, \
     SAMPLE_FILTER_T>(                                                                           \
     cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<DATA_T, INDEX_T, DISTANCE_T>  \
@@ -82,56 +77,32 @@ void select_and_run(
     uint32_t num_seeds,                                                                         \
     SAMPLE_FILTER_T sample_filter,                                                              \
     cuvs::distance::DistanceType metric,                                                        \
-    cudaStream_t stream);
+    cudaStream_t stream,                                                                        \
+    uint32_t team_size);
 
-instantiate_kernel_selection(
-  32, 1024, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  8, 128, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  16, 256, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 512, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 1024, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  8, 128, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  16, 256, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 512, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 1024, int8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  8, 128, int8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  16, 256, int8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 512, int8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 1024, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  8, 128, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  16, 256, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_kernel_selection(
-  32, 512, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
+instantiate_kernel_selection(float,
+                             uint32_t,
+                             float,
+                             cuvs::neighbors::filtering::none_cagra_sample_filter);
+instantiate_kernel_selection(half,
+                             uint32_t,
+                             float,
+                             cuvs::neighbors::filtering::none_cagra_sample_filter);
+instantiate_kernel_selection(int8_t,
+                             uint32_t,
+                             float,
+                             cuvs::neighbors::filtering::none_cagra_sample_filter);
+instantiate_kernel_selection(uint8_t,
+                             uint32_t,
+                             float,
+                             cuvs::neighbors::filtering::none_cagra_sample_filter);
 
 #undef instantiate_kernel_selection
 
-#define instantiate_q_kernel_selection(TEAM_SIZE,                                               \
-                                       MAX_DATASET_DIM,                                         \
-                                       CODE_BOOK_T,                                             \
-                                       PQ_BITS,                                                 \
-                                       PQ_CODE_BOOK_DIM,                                        \
-                                       DATA_T,                                                  \
-                                       INDEX_T,                                                 \
-                                       DISTANCE_T,                                              \
-                                       SAMPLE_FILTER_T)                                         \
+#define instantiate_q_kernel_selection(                                                         \
+  CODE_BOOK_T, PQ_BITS, PQ_CODE_BOOK_DIM, DATA_T, INDEX_T, DISTANCE_T, SAMPLE_FILTER_T)         \
   extern template void                                                                          \
-  select_and_run<TEAM_SIZE,                                                                     \
-                 MAX_DATASET_DIM,                                                               \
-                 cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<DATA_T,           \
+  select_and_run<cuvs::neighbors::cagra::detail::cagra_q_dataset_descriptor_t<DATA_T,           \
                                                                               CODE_BOOK_T,      \
                                                                               PQ_BITS,          \
                                                                               PQ_CODE_BOOK_DIM, \
@@ -162,243 +133,25 @@ instantiate_kernel_selection(
     uint32_t num_seeds,                                                                         \
     SAMPLE_FILTER_T sample_filter,                                                              \
     cuvs::distance::DistanceType metric,                                                        \
-    cudaStream_t stream);
+    cudaStream_t stream,                                                                        \
+    uint32_t team_size);
 
 instantiate_q_kernel_selection(
-  8, 128, half, 8, 2, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 2, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  16, 256, half, 8, 2, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 4, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  32, 512, half, 8, 2, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               2,
-                               half,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 2, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  8, 128, half, 8, 4, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 4, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  16, 256, half, 8, 4, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 2, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  32, 512, half, 8, 4, half, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               4,
-                               half,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-
+  half, 8, 4, uint8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  8, 128, half, 8, 2, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(16,
-                               256,
-                               half,
-                               8,
-                               2,
-                               float,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               512,
-                               half,
-                               8,
-                               2,
-                               float,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               2,
-                               float,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 2, int8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 instantiate_q_kernel_selection(
-  8, 128, half, 8, 4, float, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(16,
-                               256,
-                               half,
-                               8,
-                               4,
-                               float,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               512,
-                               half,
-                               8,
-                               4,
-                               float,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               4,
-                               float,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-
-instantiate_q_kernel_selection(8,
-                               128,
-                               half,
-                               8,
-                               2,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(16,
-                               256,
-                               half,
-                               8,
-                               2,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               512,
-                               half,
-                               8,
-                               2,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               2,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(8,
-                               128,
-                               half,
-                               8,
-                               4,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(16,
-                               256,
-                               half,
-                               8,
-                               4,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               512,
-                               half,
-                               8,
-                               4,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               4,
-                               uint8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-
-instantiate_q_kernel_selection(8,
-                               128,
-                               half,
-                               8,
-                               2,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(16,
-                               256,
-                               half,
-                               8,
-                               2,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               512,
-                               half,
-                               8,
-                               2,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               2,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(8,
-                               128,
-                               half,
-                               8,
-                               4,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(16,
-                               256,
-                               half,
-                               8,
-                               4,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               512,
-                               half,
-                               8,
-                               4,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
-instantiate_q_kernel_selection(32,
-                               1024,
-                               half,
-                               8,
-                               4,
-                               int8_t,
-                               uint32_t,
-                               float,
-                               cuvs::neighbors::filtering::none_cagra_sample_filter);
+  half, 8, 4, int8_t, uint32_t, float, cuvs::neighbors::filtering::none_cagra_sample_filter);
 
 #undef instantiate_q_kernel_selection
 }  // namespace multi_cta_search
