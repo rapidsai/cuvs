@@ -223,7 +223,7 @@ cdef class Index:
     @property
     def dim(self):
         cdef int32_t dim
-        check_cuvs(cuvsCagraIndexDim(self.index, &dim))
+        check_cuvs(cuvsCagraIndexGetDims(self.index, &dim))
         return dim
 
     def __repr__(self):

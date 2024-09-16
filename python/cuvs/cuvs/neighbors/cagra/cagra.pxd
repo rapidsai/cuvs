@@ -101,7 +101,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
 
-    cuvsError_t cuvsCagraIndexDim(cuvsCagraIndex_t index, int32_t* dim)
+    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int32_t* dim)
 
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams* params,

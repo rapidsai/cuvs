@@ -176,7 +176,7 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexDim(cuvsCagraIndex_t index, int* dim)
+extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);

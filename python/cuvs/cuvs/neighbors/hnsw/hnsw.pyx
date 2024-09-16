@@ -49,7 +49,8 @@ cdef class SearchParams:
         Maximum number of candidate list size used during search.
     num_threads: int, default = 0
         Number of CPU threads used to increase search parallelism.
-        When set to 0, the number of threads is automatically determined.
+        When set to 0, the number of threads is automatically determined
+        using OpenMP's `omp_get_max_threads()`.
     """
 
     cdef cuvsHnswSearchParams params
@@ -162,10 +163,10 @@ def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
     dtype : np.dtype of the saved index
         Valid values for dtype: [np.float32, np.byte, np.ubyte]
     metric : string denoting the metric type, default="sqeuclidean"
-        Valid values for metric: ["sqeuclidean"], where
+        Valid values for metric: ["sqeuclidean", "inner_product"], where
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,
-            - inner product distance is defined as
+            - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
     {resources_docstring}
 
@@ -225,13 +226,16 @@ def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
 @auto_sync_resources
 def from_cagra(cagra.Index index, resources=None):
     """
-    Returns an hnswlib base-layer-only index from a CAGRA index.
+    Returns an hnsw base-layer-only index from a CAGRA index.
 
     NOTE: This method uses the filesystem to write the CAGRA index in
-          `/tmp/<random_number>.bin` before reading it as an hnswlib index,
+          `/tmp/<random_number>.bin` before reading it as an hnsw index,
           then deleting the temporary file. The returned index is immutable
-          and can only be searched by the hnswlib wrapper in cuVS, as the
-          format is not compatible with the original hnswlib.
+          and can only be searched by the hnsw wrapper in cuVS, as the
+          format is not compatible with the original hnswlib library.
+          By `base_layer_only`, we mean that the hnsw index is created
+          without the additional layers that are used for the hierarchical
+          search in hnswlib. Instead, the base layer is used for the search.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change.
