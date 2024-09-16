@@ -23,15 +23,15 @@ namespace cuvs::neighbors::reachability {
 void mutual_reachability_graph(const raft::resources& handle,
                                raft::device_matrix_view<const float, int64_t, raft::row_major> X,
                                int min_samples,
-                               raft::device_vector_view<int> indptr,
+                               raft::device_vector_view<int64_t> indptr,
                                raft::device_vector_view<float> core_dists,
-                               raft::sparse::COO<float, int>& out,
+                               raft::sparse::COO<float, int64_t>& out,
                                cuvs::distance::DistanceType metric,
                                float alpha)
 {
   // TODO: assert core_dists/indptr have right shape
   // TODO: add test
-  cuvs::neighbors::detail::reachability::mutual_reachability_graph<int, float>(
+  cuvs::neighbors::detail::reachability::mutual_reachability_graph<int64_t, float>(
     handle,
     X.data_handle(),
     X.extent(0),
