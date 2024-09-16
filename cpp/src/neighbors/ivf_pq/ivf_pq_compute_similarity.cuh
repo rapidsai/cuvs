@@ -60,6 +60,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       float* query_kths,
                                       IvfSampleFilterT sample_filter,
                                       LutT* lut_scores,
+                                      LutT* lut_norms,
                                       OutT* _out_scores,
                                       uint32_t* _out_indices);
 
@@ -99,6 +100,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                             float* query_kths,
                             IvfSampleFilterT sample_filter,
                             LutT* lut_scores,
+                            LutT* lut_norms,
                             OutT* _out_scores,
                             uint32_t* _out_indices);
 
@@ -169,6 +171,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
     float* query_kths,                                                                      \
     IvfSampleFilterT sample_filter,                                                         \
     LutT* lut_scores,                                                                       \
+    LutT* lut_norms,                                                                        \
     OutT* _out_scores,                                                                      \
     uint32_t* _out_indices);
 

@@ -63,6 +63,7 @@
     float* query_kths,                                                                      \
     IvfSampleFilterT sample_filter,                                                         \
     LutT* lut_scores,                                                                       \
+    LutT* lut_norms,                                                                        \
     OutT* _out_scores,                                                                      \
     uint32_t* _out_indices);
 

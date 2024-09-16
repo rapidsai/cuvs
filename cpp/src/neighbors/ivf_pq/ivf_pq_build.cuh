@@ -28,7 +28,6 @@
 
 // TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
 #include "../../cluster/kmeans_balanced.cuh"
-#include "raft/linalg/norm_types.hpp"
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger-ext.hpp>
@@ -255,7 +254,6 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
                         raft::linalg::L2Norm,
                         true,
                         stream);
-  if (index->metric == cuvs::distance::DistanceType::CosineExpanded)
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
                                   sizeof(float) * index->dim_ext(),
                                   center_norms.data(),
@@ -1064,7 +1062,6 @@ struct encode_vectors {
   uint32_t cluster_ix;
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers;
   raft::device_mdspan<const float, raft::extent_3d<IdxT>, raft::row_major> in_vectors;
-  raft::device_vector_view<const float, uint32_t> cluster_center;
 
   __device__ inline encode_vectors(
     raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
@@ -1125,29 +1122,6 @@ struct encode_vectors {
     }
     return code;
   }
-
-  __device__ inline auto operator()(uint8_t code, uint32_t j) -> float
-  {
-    float res                   = 0;
-    const uint32_t pq_book_size = pq_centers.extent(2);
-    const uint32_t pq_len       = pq_centers.extent(1);
-    uint32_t partition_ix;
-    switch (codebook_kind) {
-      case codebook_gen::PER_CLUSTER: {
-        partition_ix = cluster_ix;
-      } break;
-      case codebook_gen::PER_SUBSPACE: {
-        partition_ix = j;
-      } break;
-      default: __builtin_unreachable();
-    }
-    for (uint32_t k = 0; k < pq_len; k++) {
-      // NB: the L2 quantifiers on residuals are always trained on L2 metric.
-      res = res + cluster_center[threadIdx.x * pq_len + k] +
-            pq_centers(partition_ix, k, uint32_t(code));
-    }
-    return res;
-  }
 };
 
 template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
@@ -1159,9 +1133,7 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
   raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs,
   raft::device_vector_view<uint8_t*, uint32_t, raft::row_major> data_ptrs,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-  codebook_gen codebook_kind,
-  const float* src_norms,
-  std::optional<raft::device_vector_view<float, uint32_t, raft::row_major>> dataset_norms)
+  codebook_gen codebook_kind)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
@@ -1181,10 +1153,6 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
       pq_indices[out_ix] = std::get<IdxT>(src_offset_or_indices) + row_ix;
     } else {
       pq_indices[out_ix] = std::get<const IdxT*>(src_offset_or_indices)[row_ix];
-    }
-    if (dataset_norms.has_value()) {
-      auto norms = (dataset_norms.value())(cluster_ix);
-      norms[out_ix] = src_norms[row_ix];
     }
   }
 
@@ -1300,7 +1268,6 @@ void process_and_fill_codes(raft::resources const& handle,
                             const T* new_vectors,
                             std::variant<IdxT, const IdxT*> src_offset_or_indices,
                             const uint32_t* new_labels,
-                            const float* new_norms,
                             IdxT n_rows,
                             rmm::device_async_resource_ref mr)
 {
@@ -1338,9 +1305,7 @@ void process_and_fill_codes(raft::resources const& handle,
     index.inds_ptrs(),
     index.data_ptrs(),
     index.pq_centers(),
-    index.codebook_kind(),
-    new_norms,
-    index.dataset_norms());
+    index.codebook_kind());
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
@@ -1582,10 +1547,6 @@ void extend(raft::resources const& handle,
       copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
     }
   }
-
-  if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-    auto dataset_norms = raft::make_device_vector<float>(handle, n_rows);
-  }
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(
     new_vectors, n_rows, index->dim(), max_batch_size, copy_stream, device_memory, enable_prefetch);
@@ -1616,16 +1577,6 @@ void extend(raft::resources const& handle,
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
-        std::optional<raft::device_vector_view<const float, internal_extents_t>> X_norm = std::nullopt;
-      if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::rowNorm(dataset_norms.data_handle() + batch.offset(),
-                              batch_data_view.data_handle(),
-                              index->dim(),
-                              batch.size(),
-                              raft::linalg::NormType::L2Norm,
-                              true,
-                              stream);
-      }
       cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
                                               batch_data_view,
@@ -1677,8 +1628,6 @@ void extend(raft::resources const& handle,
   // Fill the extended index with the new data (possibly, in batches)
   utils::batch_load_iterator<IdxT> idx_batches(
     new_indices, n_rows, 1, max_batch_size, stream, batches_mr);
-  utils::batch_load_iterator<float> norms_batches(
-    dataset_norms.data_handle(), n_rows, 1, max_batch_size, stream, batches_mr);
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
@@ -1690,10 +1639,8 @@ void extend(raft::resources const& handle,
                              ? std::variant<IdxT, const IdxT*>(idx_batch.data())
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
                            new_data_labels.data() + vec_batch.offset(),
-                           dataset_norms.data() + vec_batch.offset(),
                            IdxT(vec_batch.size()),
                            batches_mr);
-
     vec_batches.prefetch_next_batch();
     // User needs to make sure kernel finishes its work before we overwrite batch in the next
     // iteration if different streams are used for kernel and copy.
@@ -1732,7 +1679,7 @@ auto build(raft::resources const& handle,
                 "Unsupported data type");
 
   std::cout << "using ivf_pq::index_params nrows " << (int)dataset.extent(0) << ", dim "
-            << (int)dataset.extent(1) << ", n_lists " << (int)params.n_lists << ", pq_dim "
+            << (int)dataset.extent(1) << ", n_lits " << (int)params.n_lists << ", pq_dim "
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
@@ -1857,8 +1804,6 @@ auto build(raft::resources const& handle,
   if (params.add_data_on_build) {
     detail::extend<T, IdxT>(handle, &index, dataset.data_handle(), nullptr, n_rows);
   }
-
-  if (index.metric() == distance::DistanceType::CosineExpanded) { compute_c_pq_c_norms(); }
   return index;
 }
 

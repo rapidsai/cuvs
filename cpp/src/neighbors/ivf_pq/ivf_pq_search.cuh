@@ -178,6 +178,8 @@ void select_clusters(raft::resources const& handle,
                       n_lists,
                       cudaMemcpyDefault,
                       stream);
+    
+    raft::linalg::map_offset(handle, center_norms.view(), raft::sqrt_op{});
 
     raft::linalg::matrixVectorOp(qc_distances.data(),
                                  qc_distances.data(),
@@ -436,6 +438,10 @@ void ivfpq_search_worker(raft::resources const& handle,
   }
 
   rmm::device_uvector<LutT> device_lut(search_instance.device_lut_size, stream, mr);
+  rmm::device_uvector<LutT> device_lut_norms(0, stream, mr);
+  if (index.metric() == distance::DistanceType::CosineExpanded) {
+    device_lut_norms.resize(search_instance.device_lut_size, stream);
+  }
   std::optional<raft::device_vector<float>> query_kths_buf{std::nullopt};
   float* query_kths = nullptr;
   if (manage_local_topk) {
@@ -468,9 +474,12 @@ void ivfpq_search_worker(raft::resources const& handle,
                          query_kths,
                          sample_filter,
                          device_lut.data(),
+                         device_lut_norms.data(),
                          distances_buf.data(),
                          neighbors_ptr);
-
+  std::cout << "metric" << index.metric() << std::endl;
+  // raft::print_device_vector("device_lut", device_lut.data(), device_lut.size(), std::cout);
+  // raft::print_device_vector("device_lut_norms", device_lut_norms.data(), device_lut_norms.size(), std::cout);
   raft::print_device_vector("distances_buf", distances_buf.data(), 100, std::cout);
   // Select topk vectors for each query
   rmm::device_uvector<ScoreT> topk_dists(n_queries * topK, stream, mr);
@@ -507,6 +516,7 @@ void ivfpq_search_worker(raft::resources const& handle,
                                      n_probes,
                                      topK,
                                      stream);
+  raft::print_device_vector("final dists", distances, 100, std::cout);
 }
 
 /**

@@ -530,8 +530,6 @@ struct list {
   raft::device_mdarray<index_type, raft::extent_1d<size_type>, raft::row_major> indices;
   /** The actual size of the content. */
   std::atomic<size_type> size;
-  /** Dataset norms. */
-  raft::device_mdarray<float, list_extents, raft::row_major> norms;
 
   /** Allocate a new list capable of holding at least `n_rows` data records and indices. */
   list(raft::resources const& res, const spec_type& spec, size_type n_rows);

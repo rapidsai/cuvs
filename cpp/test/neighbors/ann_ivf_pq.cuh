@@ -199,6 +199,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     indices_ref.resize(queries_size);
     raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
+    raft::print_host_vector("distances_ref", distances_ref.data(), 100, std::cout);
   }
 
   auto build_only()
@@ -586,6 +587,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     indices_ref.resize(queries_size);
     raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
+    raft::print_host_vector("distances_ref", distances_ref.data(), 100, std::cout);
   }
 
   auto build_only()

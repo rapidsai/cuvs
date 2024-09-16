@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "cuvs/distance/distance.hpp"
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
@@ -93,8 +92,6 @@ index<IdxT>::index(raft::resources const& handle,
 {
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
-  if (metric == cuvs::distance::DistanceType::CosineExpanded)
-    dataset_norms_ = raft::make_device_vector<float*, uint32_t>(handle, n_lists);
 }
 
 template <typename IdxT>
@@ -290,29 +287,6 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ce
   const noexcept
 {
   return centers_rot_.view();
-}
-
-template <typename IdxT>
-std::optional<raft::device_vector_view<float*, uint32_t, raft::row_major>>
-index<IdxT>::data_norms_ptrs() noexcept
-{
-  std::optional<raft::device_vector_view<float*, uint32_t, raft::row_major>> ret;
-  if (dataset_norms_.has_value()) ret = dataset_norms_->view();
-  return ret;
-}
-
-template <typename IdxT>
-std::optional<raft::device_vector_view<const float* const, uint32_t, raft::row_major>>
-index<IdxT>::data_norms_ptrs() const noexcept
-{
-  std::optional<raft::device_vector_view<const float* const, uint32_t, raft::row_major>> ret;
-  if (dataset_norms_.has_value()) {
-    auto norms_ptrs_view =
-      raft::make_mdspan<const float* const, uint32_t, raft::row_major, false, true>(
-        dataset_norms_->data_handle(), dataset_norms_->extents());
-    ret = norms_ptrs_view;
-  }
-  return ret;
 }
 
 template <typename IdxT>

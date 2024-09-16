@@ -446,10 +446,6 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept;
 
-  /** Pointers to the inverted lists (clusters) true norms [n_lists] */
-  std::optional<raft::device_vector_view<float*, uint32_t, raft::row_major>> data_norms_ptrs() noexcept;
-  std::optional<raft::device_vector_view<const float* const, uint32_t, raft::row_major>> data_norms_ptrs() const noexcept;
-
   /** fetch size of a particular IVF list in bytes using the list extents.
    * Usage example:
    * @code{.cpp}
@@ -483,13 +479,12 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
-  std::optional<raft::device_vector<float, uint32_t>> center_norms_;
+  // std::optional<raft::device_vector<float, uint32_t>> center_norms_;
 
   // Computed members for accelerating search.
   raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
   raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
   raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
-  std::optional<raft::device_vector<float*, uint32_t, raft::row_major>> dataset_norms_{std::nullopt};
 
   /** Throw an error if the index content is inconsistent. */
   void check_consistency();

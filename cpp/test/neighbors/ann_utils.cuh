@@ -270,6 +270,11 @@ auto eval_neighbours(const std::vector<T>& expected_idx,
     calc_recall(expected_idx, actual_idx, expected_dist, actual_dist, rows, cols, eps);
   double error_margin = (actual_recall - min_recall) / std::max(1.0 - min_recall, eps);
 
+  raft::print_host_vector("expected_dist", expected_dist.data(), 100, std::cout);
+  raft::print_host_vector("actual_dist", actual_dist.data(), 100, std::cout);
+  raft::print_host_vector("expected_idx", expected_idx.data(), 100, std::cout);
+  raft::print_host_vector("actual_idx", actual_idx.data(), 100, std::cout);
+
   RAFT_LOG_INFO("Recall = %f (%zu/%zu), the error is %2.1f%% %s the threshold (eps = %f).",
                 actual_recall,
                 match_count,

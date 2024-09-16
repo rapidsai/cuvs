@@ -217,8 +217,10 @@ __device__ __forceinline__ void ivfpq_compute_chunk(OutT& score /* NOLINT */,
     uint8_t code = pq_code & kPqMask;
     pq_code >>= PqBits;
     score += OutT(lut_head[code]);
-    norm += OutT(lut_norms_end[code]);
+    norm += OutT(lut_norms_head[code]);
+    // printf("if score %f norm %f\n", float(score), float(norm));
     lut_head += kPqShift;
+    lut_norms_head += kPqShift;
     return ivfpq_compute_chunk<OutT, LutT, VecT, CheckBounds, PqBits, BitsLeft - PqBits, Ix>(
       score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
   } else if constexpr (Ix < VecT::Ratio) {
@@ -228,16 +230,19 @@ __device__ __forceinline__ void ivfpq_compute_chunk(OutT& score /* NOLINT */,
     constexpr uint32_t kRemMask = (1u << kRemBits) - 1u;
     code |= (pq_code & kRemMask) << BitsLeft;
     pq_code >>= kRemBits;
+    // printf("else code %d\n", int(code));
     score += OutT(lut_head[code]);
+    norm += OutT(lut_norms_head[code]);
+    // printf("else score %f norm %f\n", float(score), float(norm));
     lut_head += kPqShift;
+    lut_norms_head += kPqShift;
     return ivfpq_compute_chunk<OutT,
                                LutT,
                                VecT,
                                CheckBounds,
                                PqBits,
                                kTotalBits - kRemBits,
-                               Ix + 1>(
-      score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
+                               Ix + 1>(score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
   }
 }
 
@@ -252,7 +257,7 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
   auto lut_head                 = lut_scores;
   auto lut_end                  = lut_scores + (pq_dim << PqBits);
   auto lut_norms_head           = lut_norms;
-  auto lut_norms_end            = lut_scores + (pq_dim << PqBits);
+  auto lut_norms_end            = lut_norms + (pq_dim << PqBits);
   VecT pq_codes;
   OutT score{0};
   OutT norm{0};
@@ -270,7 +275,8 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
     ivfpq_compute_chunk<OutT, LutT, VecT, true, PqBits>(
       score, norm, pq_code, pq_codes, lut_head, lut_end, lut_norms_head, lut_norms_end);
   }
-  return score / norm;
+  // printf("score %f norm %f\n", float(score), float(norm));
+  return score / OutT(sqrtf(norm));
 }
 
 /**
@@ -368,7 +374,6 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       const uint8_t* const* pq_dataset,
                                       const uint32_t* cluster_labels,
                                       const uint32_t* _chunk_indices,
-                                      const float* dataset_norms,
                                       const float* queries,
                                       const uint32_t* index_list,
                                       float* query_kths,
@@ -399,8 +404,10 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
 
   if constexpr (EnableSMemLut) {
     lut_scores = reinterpret_cast<LutT*>(smem_buf);
+    printf("using shared_mem\n");
   } else {
     lut_scores += lut_size * blockIdx.x;
+    // printf("not using shared_mem\n");
   }
 
   uint8_t* lut_end = nullptr;
@@ -554,6 +561,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
         } while (++j < j_end);
         lut_scores[i] = LutT(score);
         if (metric == distance::DistanceType::CosineExpanded) { lut_norms[i] = LutT(norm); }
+        // printf("score %f norm %f", float(LutT(score)), float(LutT(norm)));
       }
     }
 
@@ -609,7 +617,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
       bool valid = i < n_samples;
       // Check bounds and that the sample is acceptable for the query
       if (valid && sample_filter(queries_offset + query_ix, label, i)) {
-        if (metric != distance::DistanceType::CosineExpanded) {
+        if (metric == distance::DistanceType::CosineExpanded) {
           score = ivfpq_compute_score<OutT, LutT, vec_t, PqBits>(
             pq_dim, reinterpret_cast<const vec_t::io_t*>(pq_thread_data), lut_scores, lut_norms);
         } else {
@@ -773,6 +781,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                             float* query_kths,
                             IvfSampleFilterT sample_filter,
                             LutT* lut_scores,
+                            LutT* lut_norms,
                             OutT* _out_scores,
                             uint32_t* _out_indices)
 {
@@ -795,6 +804,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                                                              query_kths,
                                                              sample_filter,
                                                              lut_scores,
+                                                             lut_norms,
                                                              _out_scores,
                                                              _out_indices);
   RAFT_CHECK_CUDA(stream);
@@ -829,7 +839,7 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                uint32_t topk) -> selected<OutT, LutT, IvfSampleFilterT>
 {
   // Shared memory for storing the lookup table
-  size_t lut_mem = sizeof(LutT) * (pq_dim << pq_bits);
+  // size_t lut_mem = sizeof(LutT) * (pq_dim << pq_bits);
   // Shared memory for storing pre-computed pieces to speedup the lookup table construction
   // (e.g. the distance between a cluster center and the query for L2).
   size_t bdf_mem = sizeof(float) * precomp_data_count;
@@ -932,12 +942,12 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
   auto conf_no_smem_lut = get_compute_similarity_kernel<OutT, LutT, true, false, IvfSampleFilterT>;
   auto topk_or_zero     = manage_local_topk ? topk : 0u;
   std::array candidates{
-    std::make_tuple(conf_fast(pq_bits, topk_or_zero),
-                    total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, bdf_mem},
-                    true),
-    std::make_tuple(conf_no_basediff(pq_bits, topk_or_zero),
-                    total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, 0},
-                    true),
+    // std::make_tuple(conf_fast(pq_bits, topk_or_zero),
+    //                 total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, bdf_mem},
+    //                 true),
+    // std::make_tuple(conf_no_basediff(pq_bits, topk_or_zero),
+    //                 total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, lut_mem, 0},
+    //                 true),
     std::make_tuple(conf_no_smem_lut(pq_bits, topk_or_zero),
                     total_shared_mem_t{ltk_add_mem, ltk_reduce_mem, 0, bdf_mem},
                     false)};
