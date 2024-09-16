@@ -224,7 +224,7 @@ inline void memzero(T* ptr, IdxT n_elems, rmm::cuda_stream_view stream)
 }
 
 template <typename T, typename IdxT>
-RAFT_KERNEL outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c)
+static __global__ void outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c)
 {
   IdxT gid = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
   IdxT i   = gid / len_b;
@@ -234,12 +234,12 @@ RAFT_KERNEL outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* 
 }
 
 template <typename T, typename IdxT>
-RAFT_KERNEL block_copy_kernel(const IdxT* in_offsets,
-                              const IdxT* out_offsets,
-                              IdxT n_blocks,
-                              const T* in_data,
-                              T* out_data,
-                              IdxT n_mult)
+static __global__ void block_copy_kernel(const IdxT* in_offsets,
+                                         const IdxT* out_offsets,
+                                         IdxT n_blocks,
+                                         const T* in_data,
+                                         T* out_data,
+                                         IdxT n_mult)
 {
   IdxT i = static_cast<IdxT>(blockDim.x) * static_cast<IdxT>(blockIdx.x) + threadIdx.x;
   // find the source offset using the binary search.
@@ -317,7 +317,7 @@ void outer_add(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c, rmm::cuda_s
 }
 
 template <typename T, typename S, typename IdxT, typename LabelT>
-RAFT_KERNEL copy_selected_kernel(
+static __global__ void copy_selected_kernel(
   IdxT n_rows, IdxT n_cols, const S* src, const LabelT* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
 {
   IdxT gid   = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
