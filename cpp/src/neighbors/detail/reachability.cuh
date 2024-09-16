@@ -89,27 +89,8 @@ void compute_knn(const raft::resources& handle,
                  int k,
                  cuvs::distance::DistanceType metric)
 {
-  auto stream      = raft::resource::get_cuda_stream(handle);
-  auto exec_policy = raft::resource::get_thrust_policy(handle);
-  std::vector<value_t*> inputs;
-  inputs.push_back(const_cast<value_t*>(X));
-
-  std::vector<int> sizes;
-  sizes.push_back(m);
-
-  // the tiled_brute_force_knn code only works with int64 indices, convert
-  rmm::device_uvector<int64_t> int64_indices(k * n_search_items, stream);
-
   // perform knn
-  tiled_brute_force_knn(
-    handle, X, search_items, m, n_search_items, n, k, dists, int64_indices.data(), metric);
-
-  // convert from current knn's 64-bit to 32-bit.
-  thrust::transform(exec_policy,
-                    int64_indices.data(),
-                    int64_indices.data() + int64_indices.size(),
-                    inds,
-                    [] __device__(int64_t in) -> value_idx { return in; });
+  tiled_brute_force_knn(handle, X, search_items, m, n_search_items, n, k, dists, inds, metric);
 }
 
 /*
@@ -177,10 +158,6 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
                                 value_t* core_dists,
                                 value_t alpha)
 {
-  // TODO: we are dealing with int32 indices (for compatibility with cuml)
-  // but the tiled_brute_force_knn code only works with int64. convert
-  rmm::device_uvector<int64_t> int64_indices(k * m, raft::resource::get_cuda_stream(handle));
-
   // Create a functor to postprocess distances into mutual reachability space
   // Note that we can't use a lambda for this here, since we get errors like:
   // `A type local to a function cannot be used in the template argument of the
@@ -198,7 +175,7 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
       n,
       k,
       out_dists,
-      int64_indices.data(),
+      out_inds,
       cuvs::distance::DistanceType::L2SqrtExpanded,
       2.0,
       0,
@@ -207,13 +184,6 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
       nullptr,
       nullptr,
       epilogue);
-
-  // convert from current knn's 64-bit to 32-bit.
-  thrust::transform(raft::resource::get_thrust_policy(handle),
-                    int64_indices.data(),
-                    int64_indices.data() + int64_indices.size(),
-                    out_inds,
-                    [] __device__(int64_t in) -> value_idx { return in; });
 }
 
 template <typename value_idx, typename value_t>
