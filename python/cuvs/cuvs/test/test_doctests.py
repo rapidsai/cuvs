@@ -100,7 +100,7 @@ DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.distance))
 
 def _test_name_from_docstring(docstring):
     filename = Path(docstring.filename).name.split(".")[0]
-    return f"{filename}:{docstring.name}"
+    return f"{filename}:{docstring.name}"  # noqa: E231
 
 
 @pytest.mark.parametrize(
@@ -121,5 +121,5 @@ def test_docstring(docstring):
         results = runner.summarize()
     assert not results.failed, (
         f"{results.failed} of {results.attempted} doctests failed for "
-        f"{docstring.name}:\n{doctest_stdout.getvalue()}"
+        f"{docstring.name}:\n{doctest_stdout.getvalue()}"  # noqa: E231
     )
