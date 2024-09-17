@@ -24,6 +24,21 @@ from typing import Optional, Dict, Any, Tuple
 from .runners import cuvs_bench_cpp
 
 
+def rmm_present() -> bool:
+    """
+    Check if RMM (RAPIDS Memory Manager) is present.
+    Returns
+    -------
+    bool
+        True if RMM is present, False otherwise.
+    """
+    try:
+        import rmm  # noqa: F401
+        return True
+    except ImportError:
+        return False
+    
+
 def load_yaml_file(file_path: str) -> dict:
     """
     Load a YAML file and return its contents as a dictionary.
@@ -188,101 +203,31 @@ def prepare_executables(algos_conf: dict, algos_yaml: dict, gpu_present: bool, c
             executable = find_executable(algos_yaml, algo, group, count, batch_size)
             if executable not in executables_to_run:
                 executables_to_run[executable] = {"index": []}
-            indexes = prepare_indexes(group_conf, algo, group, conf_file, dataset_path, dataset, count, batch_size)
+            indexes = prepare_indexes(group_conf, algo, group, conf_file, algos_conf, dataset_path, dataset, count, batch_size)
             executables_to_run[executable]["index"].extend(indexes)
     return executables_to_run
 
 
-def prepare_indexes(group_conf: dict, algo: str, group: str, conf_file: dict, dataset_path: str, dataset: str, count: int, batch_size: int) -> list:
+def validate_algorithm(algos_conf: dict, algo: str, gpu_present: bool) -> bool:
     """
-    Prepare the index configurations for the given algorithm and group.
+    Validate the algorithm based on the available hardware (GPU presence).
     Parameters
     ----------
-    group_conf : dict
-        The configuration for the algorithm group.
+    algos_conf : dict
+        The configuration dictionary for the algorithms.
     algo : str
         The name of the algorithm.
-    group : str
-        The name of the group.
-    conf_file : dict
-        The main configuration file.
-    dataset_path : str
-        The path to the dataset directory.
-    dataset : str
-        The name of the dataset.
-    count : int
-        The number of nearest neighbors to search for.
-    batch_size : int
-        The size of each batch for processing.
-    Returns
-    -------
-    list
-        A list of index configurations.
-    """
-    indexes = []
-    build_params = group_conf.get("build", {})
-    search_params = group_conf.get("search", {})
-    all_build_params = itertools.product(*build_params.values())
-    search_param_names, search_param_lists = zip(*search_params.items()) if search_params else ([], [])
-    for params in all_build_params:
-        index = {"algo": algo, "build_param": dict(zip(build_params.keys(), params))}
-        index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
-        index_filename = index_name if len(index_name) < 128 else str(hash(index_name))
-        index["name"] = index_name
-        index["file"] = os.path.join(dataset_path, dataset, "index", index_filename)
-        index["search_params"] = validate_search_params(
-            itertools.product(*search_param_lists), search_param_names, algo, group_conf, conf_file, count, batch_size
-        )
-        if index["search_params"]:
-            indexes.append(index)
-    return indexes
-
-
-def validate_search_params(all_search_params, search_param_names, algo, group_conf, conf_file, count, batch_size) -> list:
-    """
-    Validate and prepare the search parameters for the given algorithm and group.
-    Parameters
-    ----------
-    all_search_params : itertools.product
-        The Cartesian product of search parameter values.
-    search_param_names : list
-        The names of the search parameters.
-    algo : str
-        The name of the algorithm.
-    group_conf : dict
-        The configuration for the algorithm group.
-    conf_file : dict
-        The main configuration file.
-    count : int
-        The number of nearest neighbors to search for.
-    batch_size : int
-        The size of each batch for processing.
-    Returns
-    -------
-    list
-        A list of validated search parameters.
-    """
-    search_params_list = []
-    for search_params in all_search_params:
-        search_dict = dict(zip(search_param_names, search_params))
-        if validate_constraints(group_conf, algo, "search", search_dict, conf_file["dataset"].get("dims"), count, batch_size):
-            search_params_list.append(search_dict)
-    return search_params_list
-
-
-def rmm_present() -> bool:
-    """
-    Check if RMM (RAPIDS Memory Manager) is present.
+    gpu_present : bool
+        Whether a GPU is present.
     Returns
     -------
     bool
-        True if RMM is present, False otherwise.
+        True if the algorithm is valid for the current hardware configuration, False otherwise.
     """
-    try:
-        import rmm  # noqa: F401
-        return True
-    except ImportError:
-        return False
+    algos_conf_keys = set(algos_conf.keys())
+    if gpu_present:
+        return algo in algos_conf_keys
+    return algo in algos_conf_keys and algos_conf[algo]["requires_gpu"] is False
 
 
 def find_executable(algos_conf: dict, algo: str, group: str, k: int, batch_size: int) -> Tuple[str, str, Tuple[str, str]]:
@@ -348,26 +293,81 @@ def get_build_path(executable: str) -> Optional[str]:
     return None
 
 
-def validate_algorithm(algos_conf: dict, algo: str, gpu_present: bool) -> bool:
+def prepare_indexes(group_conf: dict, algo: str, group: str, conf_file: dict, algos_conf: dict, dataset_path: str, dataset: str, count: int, batch_size: int) -> list:
     """
-    Validate the algorithm based on the available hardware (GPU presence).
+    Prepare the index configurations for the given algorithm and group.
     Parameters
     ----------
-    algos_conf : dict
-        The configuration dictionary for the algorithms.
+    group_conf : dict
+        The configuration for the algorithm group.
     algo : str
         The name of the algorithm.
-    gpu_present : bool
-        Whether a GPU is present.
+    group : str
+        The name of the group.
+    conf_file : dict
+        The main configuration file.
+    dataset_path : str
+        The path to the dataset directory.
+    dataset : str
+        The name of the dataset.
+    count : int
+        The number of nearest neighbors to search for.
+    batch_size : int
+        The size of each batch for processing.
     Returns
     -------
-    bool
-        True if the algorithm is valid for the current hardware configuration, False otherwise.
+    list
+        A list of index configurations.
     """
-    algos_conf_keys = set(algos_conf.keys())
-    if gpu_present:
-        return algo in algos_conf_keys
-    return algo in algos_conf_keys and algos_conf[algo]["requires_gpu"] is False
+    indexes = []
+    build_params = group_conf.get("build", {})
+    search_params = group_conf.get("search", {})
+    all_build_params = itertools.product(*build_params.values())
+    search_param_names, search_param_lists = zip(*search_params.items()) if search_params else ([], [])
+    for params in all_build_params:
+        index = {"algo": algo, "build_param": dict(zip(build_params.keys(), params))}
+        index_name = f"{algo}_{group}" if group != "base" else f"{algo}"
+        index_filename = index_name if len(index_name) < 128 else str(hash(index_name))
+        index["name"] = index_name
+        index["file"] = os.path.join(dataset_path, dataset, "index", index_filename)
+        index["search_params"] = validate_search_params(
+            itertools.product(*search_param_lists), search_param_names, index["build_param"], algo, group_conf, algos_conf, conf_file, count, batch_size
+        )
+        if index["search_params"]:
+            indexes.append(index)
+    return indexes
+
+
+def validate_search_params(all_search_params, search_param_names, build_params, algo, group_conf, algos_conf, conf_file, count, batch_size) -> list:
+    """
+    Validate and prepare the search parameters for the given algorithm and group.
+    Parameters
+    ----------
+    all_search_params : itertools.product
+        The Cartesian product of search parameter values.
+    search_param_names : list
+        The names of the search parameters.
+    algo : str
+        The name of the algorithm.
+    group_conf : dict
+        The configuration for the algorithm group.
+    conf_file : dict
+        The main configuration file.
+    count : int
+        The number of nearest neighbors to search for.
+    batch_size : int
+        The size of each batch for processing.
+    Returns
+    -------
+    list
+        A list of validated search parameters.
+    """
+    search_params_list = []
+    for search_params in all_search_params:
+        search_dict = dict(zip(search_param_names, search_params))
+        if validate_constraints(algos_conf, algo, "search", search_dict, build_params, conf_file["dataset"].get("dims"), count, batch_size):
+            search_params_list.append(search_dict)
+    return search_params_list
 
 
 def validate_constraints(
@@ -375,6 +375,7 @@ def validate_constraints(
     algo: str,
     constraint_type: str,
     param: Dict[str, Any],
+    build_param: dict,
     dims: Any,
     k: Optional[int],
     batch_size: Optional[int]
@@ -411,9 +412,13 @@ def validate_constraints(
         module, func = ".".join(importable.split(".")[:-1]), importable.split(".")[-1]
         validator = import_module(module)
         constraints_func = getattr(validator, func)
-        if constraint_type == "build" and "dims" not in conf_file["dataset"]:
-            raise ValueError("`dims` needed for build constraints but not specified in datasets.yaml")
-        return constraints_func(param, dims)
+        if constraint_type == "build":
+            if "dims" not in conf_file["dataset"]:
+                raise ValueError("`dims` needed for build constraints but not specified in datasets.yaml")
+            else:    
+                return constraints_func(param, dims)
+        else:
+            return constraints_func(param, build_param, k, batch_size)
     return True
 
 

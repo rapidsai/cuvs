@@ -196,8 +196,8 @@ template <typename DataT,
           bool isRowMajor   = true>
 __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
                                                               const DataT* y,
-                                                              const DataT* _xn,
-                                                              const DataT* _yn,
+                                                              const OutT* _xn,
+                                                              const OutT* _yn,
                                                               const IdxT m,
                                                               const IdxT n,
                                                               const IdxT k,
@@ -342,8 +342,8 @@ __launch_bounds__(Policy::Nthreads, 2) RAFT_KERNEL fusedL2kNN(const DataT* x,
   auto epilog_lambda =
     [&distance_op, numOfNN, m, n, ldd, out_dists, out_inds, keyMax, identity] __device__(
       AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-      DataT * regxn,
-      DataT * regyn,
+      OutT * regxn,
+      OutT * regyn,
       IdxT gridStrideX,
       IdxT gridStrideY) {
       // Use ::template to disambiguate (See:
@@ -536,8 +536,8 @@ void fusedL2UnexpKnnImpl(const DataT* x,
                          void* workspace,
                          size_t& worksize)
 {
-  typedef typename raft::linalg::Policy2x8<DataT, 1>::Policy RowPolicy;
-  typedef typename raft::linalg::Policy4x4<DataT, VecLen>::ColPolicy ColPolicy;
+  typedef typename raft::linalg::Policy2x8<AccT, 1>::Policy RowPolicy;
+  typedef typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy ColPolicy;
 
   typedef typename std::conditional<true, RowPolicy, ColPolicy>::type KPolicy;
 
@@ -705,8 +705,8 @@ template <typename DataT,
           bool isRowMajor>
 void fusedL2ExpKnnImpl(const DataT* x,
                        const DataT* y,
-                       const DataT* xn,
-                       const DataT* yn,
+                       const AccT* xn,
+                       const AccT* yn,
                        IdxT m,
                        IdxT n,
                        IdxT k,
@@ -721,8 +721,8 @@ void fusedL2ExpKnnImpl(const DataT* x,
                        void* workspace,
                        size_t& worksize)
 {
-  typedef typename raft::linalg::Policy2x8<DataT, 1>::Policy RowPolicy;
-  typedef typename raft::linalg::Policy4x4<DataT, VecLen>::ColPolicy ColPolicy;
+  typedef typename raft::linalg::Policy2x8<AccT, 1>::Policy RowPolicy;
+  typedef typename raft::linalg::Policy4x4<AccT, VecLen>::ColPolicy ColPolicy;
 
   typedef typename std::conditional<true, RowPolicy, ColPolicy>::type KPolicy;
 
@@ -777,7 +777,7 @@ void fusedL2ExpKnnImpl(const DataT* x,
     int32_t* mutexes = nullptr;
     if (grid.x > 1) {
       const auto numMutexes   = raft::ceildiv<int>(m, KPolicy::Mblk);
-      const auto normsSize    = (x != y) ? (m + n) * sizeof(DataT) : n * sizeof(DataT);
+      const auto normsSize    = (x != y) ? (m + n) * sizeof(AccT) : n * sizeof(AccT);
       const auto requiredSize = sizeof(int32_t) * numMutexes + normsSize;
       if (worksize < requiredSize) {
         worksize = requiredSize;
@@ -790,8 +790,8 @@ void fusedL2ExpKnnImpl(const DataT* x,
 
     // calculate norms if they haven't been passed in
     if (!xn) {
-      DataT* xn_ = (DataT*)workspace;
-      workspace  = xn_ + m;
+      AccT* xn_ = (AccT*)workspace;
+      workspace = xn_ + m;
       raft::linalg::rowNorm(
         xn_, x, k, m, raft::linalg::L2Norm, isRowMajor, stream, raft::identity_op{});
       xn = xn_;
@@ -800,7 +800,7 @@ void fusedL2ExpKnnImpl(const DataT* x,
       if (x == y) {
         yn = xn;
       } else {
-        DataT* yn_ = (DataT*)(workspace);
+        AccT* yn_ = (AccT*)(workspace);
         raft::linalg::rowNorm(
           yn_, y, k, n, raft::linalg::L2Norm, isRowMajor, stream, raft::identity_op{});
         yn = yn_;
@@ -843,8 +843,8 @@ void fusedL2ExpKnn(IdxT m,
                    IdxT ldd,
                    const DataT* x,
                    const DataT* y,
-                   const DataT* xn,
-                   const DataT* yn,
+                   const AccT* xn,
+                   const AccT* yn,
                    bool sqrt,
                    OutT* out_dists,
                    IdxT* out_inds,
@@ -930,10 +930,13 @@ void fusedL2ExpKnn(IdxT m,
  * @param[in] rowMajorQuery are the query array in row-major layout?
  * @param[in] stream stream to order kernel launch
  */
-template <typename value_idx, typename value_t, bool usePrevTopKs = false>
+template <typename value_idx,
+          typename value_t,
+          bool usePrevTopKs   = false,
+          typename distance_t = float>
 void fusedL2Knn(size_t D,
                 value_idx* out_inds,
-                value_t* out_dists,
+                distance_t* out_dists,
                 const value_t* index,
                 const value_t* query,
                 size_t n_index_rows,
@@ -943,8 +946,8 @@ void fusedL2Knn(size_t D,
                 bool rowMajorQuery,
                 cudaStream_t stream,
                 cuvs::distance::DistanceType metric,
-                const value_t* index_norms = NULL,
-                const value_t* query_norms = NULL)
+                const distance_t* index_norms = NULL,
+                const distance_t* query_norms = NULL)
 {
   // Validate the input data
   ASSERT(k > 0, "l2Knn: k must be > 0");
@@ -975,83 +978,87 @@ void fusedL2Knn(size_t D,
       tempWorksize =
         cuvs::distance::getWorkspaceSize<cuvs::distance::DistanceType::L2Expanded,
                                          value_t,
-                                         value_t,
-                                         value_t,
+                                         distance_t,
+                                         distance_t,
                                          value_idx>(query, index, n_query_rows, n_index_rows, D);
       worksize = tempWorksize;
       workspace.resize(worksize, stream);
-      fusedL2ExpKnn<value_t, value_t, value_t, value_idx, usePrevTopKs, true>(n_query_rows,
-                                                                              n_index_rows,
-                                                                              D,
-                                                                              lda,
-                                                                              ldb,
-                                                                              ldd,
-                                                                              query,
-                                                                              index,
-                                                                              query_norms,
-                                                                              index_norms,
-                                                                              sqrt,
-                                                                              out_dists,
-                                                                              out_inds,
-                                                                              k,
-                                                                              stream,
-                                                                              workspace.data(),
-                                                                              worksize);
+      fusedL2ExpKnn<value_t, distance_t, distance_t, value_idx, usePrevTopKs, true>(
+        n_query_rows,
+        n_index_rows,
+        D,
+        lda,
+        ldb,
+        ldd,
+        query,
+        index,
+        query_norms,
+        index_norms,
+        sqrt,
+        out_dists,
+        out_inds,
+        k,
+        stream,
+        workspace.data(),
+        worksize);
       if (worksize > tempWorksize) {
         workspace.resize(worksize, stream);
-        fusedL2ExpKnn<value_t, value_t, value_t, value_idx, usePrevTopKs, true>(n_query_rows,
-                                                                                n_index_rows,
-                                                                                D,
-                                                                                lda,
-                                                                                ldb,
-                                                                                ldd,
-                                                                                query,
-                                                                                index,
-                                                                                query_norms,
-                                                                                index_norms,
-                                                                                sqrt,
-                                                                                out_dists,
-                                                                                out_inds,
-                                                                                k,
-                                                                                stream,
-                                                                                workspace.data(),
-                                                                                worksize);
+        fusedL2ExpKnn<value_t, distance_t, distance_t, value_idx, usePrevTopKs, true>(
+          n_query_rows,
+          n_index_rows,
+          D,
+          lda,
+          ldb,
+          ldd,
+          query,
+          index,
+          query_norms,
+          index_norms,
+          sqrt,
+          out_dists,
+          out_inds,
+          k,
+          stream,
+          workspace.data(),
+          worksize);
       }
       break;
     case cuvs::distance::DistanceType::L2Unexpanded:
     case cuvs::distance::DistanceType::L2SqrtUnexpanded:
-      fusedL2UnexpKnn<value_t, value_t, value_t, value_idx, usePrevTopKs, true>(n_query_rows,
-                                                                                n_index_rows,
-                                                                                D,
-                                                                                lda,
-                                                                                ldb,
-                                                                                ldd,
-                                                                                query,
-                                                                                index,
-                                                                                sqrt,
-                                                                                out_dists,
-                                                                                out_inds,
-                                                                                k,
-                                                                                stream,
-                                                                                workspace.data(),
-                                                                                worksize);
+      fusedL2UnexpKnn<value_t, distance_t, distance_t, value_idx, usePrevTopKs, true>(
+        n_query_rows,
+        n_index_rows,
+        D,
+        lda,
+        ldb,
+        ldd,
+        query,
+        index,
+        sqrt,
+        out_dists,
+        out_inds,
+        k,
+        stream,
+        workspace.data(),
+        worksize);
       if (worksize) {
         workspace.resize(worksize, stream);
-        fusedL2UnexpKnn<value_t, value_t, value_t, value_idx, usePrevTopKs, true>(n_query_rows,
-                                                                                  n_index_rows,
-                                                                                  D,
-                                                                                  lda,
-                                                                                  ldb,
-                                                                                  ldd,
-                                                                                  query,
-                                                                                  index,
-                                                                                  sqrt,
-                                                                                  out_dists,
-                                                                                  out_inds,
-                                                                                  k,
-                                                                                  stream,
-                                                                                  workspace.data(),
-                                                                                  worksize);
+        fusedL2UnexpKnn<value_t, distance_t, distance_t, value_idx, usePrevTopKs, true>(
+          n_query_rows,
+          n_index_rows,
+          D,
+          lda,
+          ldb,
+          ldd,
+          query,
+          index,
+          sqrt,
+          out_dists,
+          out_inds,
+          k,
+          stream,
+          workspace.data(),
+          worksize);
       }
       break;
     default: printf("only L2 distance metric is supported\n"); break;

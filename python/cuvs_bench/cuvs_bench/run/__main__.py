@@ -27,7 +27,6 @@ from . import run_benchmark
 @click.option(
     "--subset-size",
     type=click.IntRange(min=1),
-    prompt='Enter the subset size',
     help="The number of subset rows of the dataset to build the index"
 )
 @click.option(
@@ -49,12 +48,12 @@ from . import run_benchmark
 )
 @click.option(
     "--dataset-configuration",
-    prompt='Enter the path to YAML configuration file for datasets',
+    default=None,
+    show_default=True,
     help="Path to YAML configuration file for datasets"
 )
 @click.option(
     "--configuration",
-    prompt='Enter the path to YAML configuration file or directory for algorithms',
     help="Path to YAML configuration file or directory for algorithms. "
          "Any run groups found in the specified file/directory will "
          "automatically override groups of the same name present in the "
@@ -88,7 +87,7 @@ from . import run_benchmark
 )
 @click.option(
     "--algorithms",
-    default=None,
+    default="cuvs_cagra",
     show_default=True,
     prompt='Enter the comma separated list of named algorithms to run',
     help="Run only comma separated list of named algorithms. If parameters `groups` and `algo-groups` are both undefined, "
@@ -103,7 +102,6 @@ from . import run_benchmark
 )
 @click.option(
     "--algo-groups",
-    prompt='Enter the comma separated <algorithm>.<group> to run',
     help='Add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large".',
 )
 @click.option(
@@ -125,7 +123,6 @@ from . import run_benchmark
     "--search-threads",
     default=None,
     show_default=True,
-    prompt='Enter the number of threads to use for throughput benchmark',
     help="Specify the number threads to use for throughput benchmark. Single value or a pair of min and max separated by ':'. "
          "Example: --search-threads=1:4. Power of 2 values between 'min' and 'max' will be used. "
          "If only 'min' is specified, then a single test is run with 'min' threads. By default min=1, max=<num hyper threads>."

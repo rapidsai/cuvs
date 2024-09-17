@@ -50,4 +50,10 @@ Index search
     :members:
     :content-only:
 
+Index serialize
+------------
 
+.. doxygengroup:: cagra_c_index_serialize
+    :project: cuvs
+    :members:
+    :content-only:
