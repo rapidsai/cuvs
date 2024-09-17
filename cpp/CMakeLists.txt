@@ -55,7 +55,7 @@ option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
 option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
-option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" ON)
+option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
