@@ -27,7 +27,7 @@ const IdxT iface<AnnIndexType, T, IdxT>::size() const
 }
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
-void build(raft::resources const& handle,
+void build(const raft::device_resources& handle,
            cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset)
@@ -51,7 +51,7 @@ void build(raft::resources const& handle,
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
 void extend(
-  raft::resources const& handle,
+  const raft::device_resources& handle,
   cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
   raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
@@ -72,7 +72,7 @@ void extend(
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(raft::resources const& handle,
+void search(const raft::device_resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> h_queries,
@@ -115,7 +115,7 @@ void search(raft::resources const& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(raft::resources const& handle,
+void serialize(const raft::device_resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os)
 {
@@ -129,7 +129,7 @@ void serialize(raft::resources const& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(raft::resources const& handle,
+void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is)
 {
@@ -149,7 +149,7 @@ void deserialize(raft::resources const& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(raft::resources const& handle,
+void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename)
 {

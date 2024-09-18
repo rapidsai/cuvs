@@ -23,10 +23,6 @@
 
 #include <cuvs/neighbors/iface.hpp>
 
-#ifndef NO_NCCL_FORWARD_DECLARATION
-class ncclComm_t {};
-#endif
-
 #define DEFAULT_SEARCH_BATCH_SIZE 1 << 20
 
 /// \defgroup mg_cpp_index_params ANN MG index build parameters
@@ -65,59 +61,13 @@ struct search_params : public Upstream {
 }  // namespace cuvs::neighbors::mg
 
 namespace cuvs::neighbors::mg {
-using pool_mr = rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>;
-
-/// \defgroup mg_cpp_nccl_clique NCCL clique utility
-
-/// \ingroup mg_cpp_nccl_clique
-struct nccl_clique {
-  /**
-   * Instantiates a NCCL clique with all available GPUs
-   *
-   * @param[in] percent_of_free_memory percentage of device memory to pre-allocate as memory pool
-   *
-   */
-  nccl_clique(int percent_of_free_memory = 80);
-
-  /**
-   * Instantiates a NCCL clique
-   *
-   * Usage example:
-   * @code{.cpp}
-   * int n_devices;
-   * cudaGetDeviceCount(&n_devices);
-   * std::vector<int> device_ids(n_devices);
-   * std::iota(device_ids.begin(), device_ids.end(), 0);
-   * cuvs::neighbors::mg::nccl_clique& clique(device_ids); // first device is the root rank
-   * @endcode
-   *
-   * @param[in] device_ids list of device IDs to be used to initiate the clique
-   * @param[in] percent_of_free_memory percentage of device memory to pre-allocate as memory pool
-   *
-   */
-  nccl_clique(const std::vector<int>& device_ids, int percent_of_free_memory = 80);
-
-  void nccl_clique_init();
-  const raft::device_resources& set_current_device_to_root_rank() const;
-  ~nccl_clique();
-
-  int root_rank_;
-  int num_ranks_;
-  int percent_of_free_memory_;
-  std::vector<int> device_ids_;
-  std::vector<ncclComm_t> nccl_comms_;
-  std::vector<std::unique_ptr<pool_mr>> per_device_pools_;
-  std::vector<raft::device_resources> device_resources_;
-};
 
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct index {
   index(distribution_mode mode, int num_ranks_);
-  index(const raft::resources& handle,
-        const cuvs::neighbors::mg::nccl_clique& clique,
-        const std::string& filename);
+  index(const raft::device_resources& handle, const std::string& filename);
 
   index(const index&)                    = delete;
   index(index&&)                         = default;
@@ -137,20 +87,17 @@ struct index {
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed IVF-Flat MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<ivf_flat::index_params>& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
   -> index<ivf_flat::index<float, int64_t>, float, int64_t>;
@@ -161,20 +108,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed IVF-Flat MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<ivf_flat::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>;
@@ -185,20 +129,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed IVF-Flat MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<ivf_flat::index_params>& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
   -> index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>;
@@ -209,20 +150,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
   -> index<ivf_pq::index<int64_t>, float, int64_t>;
@@ -233,20 +171,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> index<ivf_pq::index<int64_t>, int8_t, int64_t>;
@@ -257,20 +192,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
   -> index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
@@ -281,20 +213,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed CAGRA MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
   -> index<cagra::index<float, uint32_t>, float, uint32_t>;
@@ -305,20 +234,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed CAGRA MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
@@ -329,20 +255,17 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
  * @return the constructed CAGRA MG index
  */
-auto build(const raft::resources& handle,
-           const cuvs::neighbors::mg::nccl_clique& clique,
+auto build(const raft::device_resources& handle,
            const mg::index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
   -> index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
@@ -355,22 +278,19 @@ auto build(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -381,22 +301,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -407,22 +324,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -433,22 +347,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<ivf_pq::index<int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -459,22 +370,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -485,22 +393,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -511,22 +416,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
@@ -537,22 +439,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
@@ -563,22 +462,19 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, clique, index, new_vectors, std::nullopt);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
@@ -591,16 +487,14 @@ void extend(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -609,8 +503,7 @@ void extend(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
             const mg::search_params<ivf_flat::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
@@ -624,16 +517,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -642,8 +533,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
             const mg::search_params<ivf_flat::search_params>& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
@@ -657,16 +547,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -675,8 +563,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
             const mg::search_params<ivf_flat::search_params>& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
@@ -690,16 +577,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -708,8 +593,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<ivf_pq::index<int64_t>, float, int64_t>& index,
             const mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
@@ -723,16 +607,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -741,8 +623,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             const mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
@@ -756,16 +637,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -774,8 +653,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             const mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
@@ -789,16 +667,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<cagra::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -807,8 +683,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             const mg::search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
@@ -822,16 +697,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<cagra::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -840,8 +713,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
             const mg::search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
@@ -855,16 +727,14 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   cuvs::neighbors::mg::search_params<cagra::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, clique, index, search_params, queries, neighbors,
+ * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -873,8 +743,7 @@ void search(const raft::resources& handle,
  * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::resources& handle,
-            const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
             const mg::search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
@@ -890,21 +759,18 @@ void search(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<ivf_flat::index<float, int64_t>, float, int64_t>& index,
                const std::string& filename);
 
@@ -914,21 +780,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<ivf_flat::index<int8_t, int64_t>, int8_t, int64_t>& index,
                const std::string& filename);
 
@@ -938,21 +801,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<ivf_flat::index<uint8_t, int64_t>, uint8_t, int64_t>& index,
                const std::string& filename);
 
@@ -962,21 +822,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<ivf_pq::index<int64_t>, float, int64_t>& index,
                const std::string& filename);
 
@@ -986,21 +843,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
                const std::string& filename);
 
@@ -1010,21 +864,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
                const std::string& filename);
 
@@ -1034,21 +885,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<cagra::index<float, uint32_t>, float, uint32_t>& index,
                const std::string& filename);
 
@@ -1058,21 +906,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
                const std::string& filename);
 
@@ -1082,21 +927,18 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::resources& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
                const std::string& filename);
 
@@ -1108,24 +950,21 @@ void serialize(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
- *   auto new_index = cuvs::neighbors::mg::deserialize_flat<float, int64_t>(handle, clique,
- * filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ *   auto new_index = cuvs::neighbors::mg::deserialize_flat<float, int64_t>(handle, filename);
+ *
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] filename path to the file to be deserialized
  *
  */
 template <typename T, typename IdxT>
-auto deserialize_flat(const raft::resources& handle,
-                      const cuvs::neighbors::mg::nccl_clique& clique,
-                      const std::string& filename) -> index<ivf_flat::index<T, IdxT>, T, IdxT>;
+auto deserialize_flat(const raft::device_resources& handle, const std::string& filename)
+  -> index<ivf_flat::index<T, IdxT>, T, IdxT>;
 
 /// \ingroup mg_cpp_deserialize
 /**
@@ -1133,23 +972,20 @@ auto deserialize_flat(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
- *   auto new_index = cuvs::neighbors::mg::deserialize_pq<float, int64_t>(handle, clique, filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ *   auto new_index = cuvs::neighbors::mg::deserialize_pq<float, int64_t>(handle, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] filename path to the file to be deserialized
  *
  */
 template <typename T, typename IdxT>
-auto deserialize_pq(const raft::resources& handle,
-                    const cuvs::neighbors::mg::nccl_clique& clique,
-                    const std::string& filename) -> index<ivf_pq::index<IdxT>, T, IdxT>;
+auto deserialize_pq(const raft::device_resources& handle, const std::string& filename)
+  -> index<ivf_pq::index<IdxT>, T, IdxT>;
 
 /// \ingroup mg_cpp_deserialize
 /**
@@ -1157,24 +993,21 @@ auto deserialize_pq(const raft::resources& handle,
  * Usage example:
  * @code{.cpp}
  *   raft::handle_t handle;
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
  *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, clique, index_params, index_dataset);
+ * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, clique, index, filename);
- *   auto new_index = cuvs::neighbors::mg::deserialize_cagra<float, uint32_t>(handle, clique,
- * filename);
+ *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ *   auto new_index = cuvs::neighbors::mg::deserialize_cagra<float, uint32_t>(handle, filename);
+ *
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] filename path to the file to be deserialized
  *
  */
 template <typename T, typename IdxT>
-auto deserialize_cagra(const raft::resources& handle,
-                       const cuvs::neighbors::mg::nccl_clique& clique,
-                       const std::string& filename) -> index<cagra::index<T, IdxT>, T, IdxT>;
+auto deserialize_cagra(const raft::device_resources& handle, const std::string& filename)
+  -> index<cagra::index<T, IdxT>, T, IdxT>;
 
 /// \defgroup mg_cpp_distribute ANN MG local index distribution
 
@@ -1188,20 +1021,17 @@ auto deserialize_cagra(const raft::resources& handle,
  *   auto index = cuvs::neighbors::ivf_flat::build(handle, index_params, index_dataset);
  *   const std::string filename = "local_index.cuvs";
  *   cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
- *   auto new_index = cuvs::neighbors::mg::distribute_flat<float, int64_t>(handle, clique,
- * filename);
+ *   auto new_index = cuvs::neighbors::mg::distribute_flat<float, int64_t>(handle, filename);
+ *
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] filename path to the file to be deserialized : a local index
  *
  */
 template <typename T, typename IdxT>
-auto distribute_flat(const raft::resources& handle,
-                     const cuvs::neighbors::mg::nccl_clique& clique,
-                     const std::string& filename) -> index<ivf_flat::index<T, IdxT>, T, IdxT>;
+auto distribute_flat(const raft::device_resources& handle, const std::string& filename)
+  -> index<ivf_flat::index<T, IdxT>, T, IdxT>;
 
 /// \ingroup mg_cpp_distribute
 /**
@@ -1213,19 +1043,16 @@ auto distribute_flat(const raft::resources& handle,
  *   auto index = cuvs::neighbors::ivf_pq::build(handle, index_params, index_dataset);
  *   const std::string filename = "local_index.cuvs";
  *   cuvs::neighbors::ivf_pq::serialize(handle, filename, index);
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
- *   auto new_index = cuvs::neighbors::mg::distribute_pq<float, int64_t>(handle, clique, filename);
+ *   auto new_index = cuvs::neighbors::mg::distribute_pq<float, int64_t>(handle, filename);
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] filename path to the file to be deserialized : a local index
  *
  */
 template <typename T, typename IdxT>
-auto distribute_pq(const raft::resources& handle,
-                   const cuvs::neighbors::mg::nccl_clique& clique,
-                   const std::string& filename) -> index<ivf_pq::index<IdxT>, T, IdxT>;
+auto distribute_pq(const raft::device_resources& handle, const std::string& filename)
+  -> index<ivf_pq::index<IdxT>, T, IdxT>;
 
 /// \ingroup mg_cpp_distribute
 /**
@@ -1237,20 +1064,17 @@ auto distribute_pq(const raft::resources& handle,
  *   auto index = cuvs::neighbors::cagra::build(handle, index_params, index_dataset);
  *   const std::string filename = "local_index.cuvs";
  *   cuvs::neighbors::cagra::serialize(handle, filename, index);
- *   cuvs::neighbors::mg::nccl_clique& clique; // default NCCL clique
- *   auto new_index = cuvs::neighbors::mg::distribute_cagra<float, uint32_t>(handle, clique,
- * filename);
+ *   auto new_index = cuvs::neighbors::mg::distribute_cagra<float, uint32_t>(handle, filename);
+ *
  * @endcode
  *
  * @param[in] handle
- * @param[in] clique configure the NCCL clique
  * @param[in] filename path to the file to be deserialized : a local index
  *
  */
 template <typename T, typename IdxT>
-auto distribute_cagra(const raft::resources& handle,
-                      const cuvs::neighbors::mg::nccl_clique& clique,
-                      const std::string& filename) -> index<cagra::index<T, IdxT>, T, IdxT>;
+auto distribute_cagra(const raft::device_resources& handle, const std::string& filename)
+  -> index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::mg
 

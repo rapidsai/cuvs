@@ -39,7 +39,8 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
     : algo<T>(metric, dim), index_params_(param)
   {
     index_params_.metric = parse_metric_type(metric);
-    clique_              = std::make_shared<cuvs::neighbors::mg::nccl_clique>();
+    // init nccl clique outside as to not affect benchmark
+    const raft::comms::nccl_clique& clique = handle_.get_nccl_clique_handle();
   }
 
   void build(const T* dataset, size_t nrow) final;
@@ -60,8 +61,7 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
-    const auto& handle = clique_->set_current_device_to_root_rank();
-    auto stream        = raft::resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle_);
     return stream;
   }
 
@@ -72,7 +72,7 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  std::shared_ptr<cuvs::neighbors::mg::nccl_clique> clique_;
+  raft::device_resources handle_;
   build_param index_params_;
   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params_;
   std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>
@@ -84,9 +84,8 @@ void cuvs_mg_ivf_flat<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, IdxT(nrow), IdxT(dim_));
-  const auto& handle = clique_->set_current_device_to_root_rank();
-  auto idx           = cuvs::neighbors::mg::build(handle, *clique_, index_params_, dataset_view);
-  index_             = std::make_shared<
+  auto idx = cuvs::neighbors::mg::build(handle_, index_params_, dataset_view);
+  index_   = std::make_shared<
     cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>(std::move(idx));
 }
 
@@ -105,17 +104,15 @@ void cuvs_mg_ivf_flat<T, IdxT>::set_search_param(const search_param_base& param)
 template <typename T, typename IdxT>
 void cuvs_mg_ivf_flat<T, IdxT>::save(const std::string& file) const
 {
-  const auto& handle = clique_->set_current_device_to_root_rank();
-  cuvs::neighbors::mg::serialize(handle, *clique_, *index_, file);
+  cuvs::neighbors::mg::serialize(handle_, *index_, file);
 }
 
 template <typename T, typename IdxT>
 void cuvs_mg_ivf_flat<T, IdxT>::load(const std::string& file)
 {
-  const auto& handle = clique_->set_current_device_to_root_rank();
-  index_             = std::make_shared<
+  index_ = std::make_shared<
     cuvs::neighbors::mg::index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>(
-    std::move(cuvs::neighbors::mg::deserialize_flat<T, IdxT>(handle, *clique_, file)));
+    std::move(cuvs::neighbors::mg::deserialize_flat<T, IdxT>(handle_, file)));
 }
 
 template <typename T, typename IdxT>
@@ -135,9 +132,7 @@ void cuvs_mg_ivf_flat<T, IdxT>::search(
   auto distances_view = raft::make_host_matrix_view<float, int64_t, raft::row_major>(
     distances, IdxT(batch_size), IdxT(k));
 
-  const auto& handle = clique_->set_current_device_to_root_rank();
-  cuvs::neighbors::mg::search(handle,
-                              *clique_,
+  cuvs::neighbors::mg::search(handle_,
                               *index_,
                               search_params_,
                               queries_view,

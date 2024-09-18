@@ -21,11 +21,8 @@
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
-#include "../../utils/nccl_helpers.cuh"
-#define NO_NCCL_FORWARD_DECLARATION
-#include <cuvs/neighbors/mg.hpp>
-#undef NO_NCCL_FORWARD_DECLARATION
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/mg.hpp>
 
 namespace cuvs::neighbors::mg {
 void check_omp_threads(const int requirements);
@@ -37,11 +34,11 @@ using namespace raft;
 
 // local index deserialization and distribution
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize_and_distribute(const raft::resources& handle,
-                                const cuvs::neighbors::mg::nccl_clique& clique,
+void deserialize_and_distribute(const raft::device_resources& handle,
                                 index<AnnIndexType, T, IdxT>& index,
                                 const std::string& filename)
 {
+  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     int dev_id                            = clique.device_ids_[rank];
     const raft::device_resources& dev_res = clique.device_resources_[rank];
@@ -53,16 +50,23 @@ void deserialize_and_distribute(const raft::resources& handle,
 
 // MG index deserialization
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::resources& handle,
-                 const cuvs::neighbors::mg::nccl_clique& clique,
+void deserialize(const raft::device_resources& handle,
                  index<AnnIndexType, T, IdxT>& index,
                  const std::string& filename)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+
   index.mode_      = (cuvs::neighbors::mg::distribution_mode)deserialize_scalar<int>(handle, is);
   index.num_ranks_ = deserialize_scalar<int>(handle, is);
+
+  if (index.num_ranks_ != clique.num_ranks_) {
+    RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
+              index.num_ranks_,
+              clique.num_ranks_);
+  }
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     int dev_id                            = clique.device_ids_[rank];
@@ -76,11 +80,13 @@ void deserialize(const raft::resources& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void build(const cuvs::neighbors::mg::nccl_clique& clique,
+void build(const raft::device_resources& handle,
            index<AnnIndexType, T, IdxT>& index,
            const cuvs::neighbors::index_params* index_params,
            raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
+  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+
   if (index.mode_ == REPLICATED) {
     int64_t n_rows = index_dataset.extent(0);
     RAFT_LOG_INFO("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
@@ -121,11 +127,13 @@ void build(const cuvs::neighbors::mg::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void extend(const cuvs::neighbors::mg::nccl_clique& clique,
+void extend(const raft::device_resources& handle,
             index<AnnIndexType, T, IdxT>& index,
             raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)
 {
+  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+
   int64_t n_rows = new_vectors.extent(0);
   if (index.mode_ == REPLICATED) {
     RAFT_LOG_INFO("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
@@ -170,7 +178,7 @@ void extend(const cuvs::neighbors::mg::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void sharded_search_with_direct_merge(const cuvs::neighbors::mg::nccl_clique& clique,
+void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
                                       const index<AnnIndexType, T, IdxT>& index,
                                       const cuvs::neighbors::search_params* search_params,
                                       raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -297,7 +305,7 @@ void sharded_search_with_direct_merge(const cuvs::neighbors::mg::nccl_clique& cl
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void sharded_search_with_tree_merge(const cuvs::neighbors::mg::nccl_clique& clique,
+void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
                                     const index<AnnIndexType, T, IdxT>& index,
                                     const cuvs::neighbors::search_params* search_params,
                                     raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -421,7 +429,7 @@ void sharded_search_with_tree_merge(const cuvs::neighbors::mg::nccl_clique& cliq
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(const cuvs::neighbors::mg::nccl_clique& clique,
+void search(const raft::device_resources& handle,
             const index<AnnIndexType, T, IdxT>& index,
             const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -429,6 +437,8 @@ void search(const cuvs::neighbors::mg::nccl_clique& clique,
             raft::host_matrix_view<float, int64_t, row_major> distances,
             int64_t n_rows_per_batch)
 {
+  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
@@ -531,16 +541,18 @@ void search(const cuvs::neighbors::mg::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(raft::resources const& handle,
-               const cuvs::neighbors::mg::nccl_clique& clique,
+void serialize(const raft::device_resources& handle,
                const index<AnnIndexType, T, IdxT>& index,
                const std::string& filename)
 {
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+
   serialize_scalar(handle, of, (int)index.mode_);
   serialize_scalar(handle, of, index.num_ranks_);
+
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     int dev_id                            = clique.device_ids_[rank];
     const raft::device_resources& dev_res = clique.device_resources_[rank];
@@ -566,10 +578,9 @@ index<AnnIndexType, T, IdxT>::index(distribution_mode mode, int num_ranks_)
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-index<AnnIndexType, T, IdxT>::index(const raft::resources& handle,
-                                    const cuvs::neighbors::mg::nccl_clique& clique,
+index<AnnIndexType, T, IdxT>::index(const raft::device_resources& handle,
                                     const std::string& filename)
 {
-  cuvs::neighbors::mg::detail::deserialize(handle, clique, *this, filename);
+  cuvs::neighbors::mg::detail::deserialize(handle, *this, filename);
 }
 }  // namespace cuvs::neighbors::mg
