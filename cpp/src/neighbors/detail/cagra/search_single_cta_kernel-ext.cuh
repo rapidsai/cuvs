@@ -23,7 +23,7 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-#ifdef _CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 template <unsigned TEAM_SIZE,
           unsigned DATASET_BLOCK_DIM,

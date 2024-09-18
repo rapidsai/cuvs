@@ -19,7 +19,6 @@
 #include "compute_distance_vpq.cuh"
 #include "factory.cuh"
 #include "search_plan.cuh"
-#include "search_single_cta_inst.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -30,10 +29,6 @@
 #include <cuvs/distance/distance.hpp>
 
 #include <cuvs/neighbors/cagra.hpp>
-
-// TODO: Fix these when ivf methods are moved over
-#include "../../ivf_common.cuh"
-#include "../../ivf_pq/ivf_pq_search.cuh"
 #include <cuvs/neighbors/common.hpp>
 
 // TODO: This shouldn't be calling spatial/knn apis
