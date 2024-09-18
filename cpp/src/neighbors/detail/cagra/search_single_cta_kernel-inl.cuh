@@ -520,24 +520,24 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   // | <internal_topk_size> | <search_width * graph_degree> | upto 32 |
   // +----------------------+------------------------------+---------+
   // |<---             result_buffer_size              --->|
-  std::uint32_t result_buffer_size    = internal_topk + (search_width * graph_degree);
-  std::uint32_t result_buffer_size_32 = result_buffer_size;
-  if (result_buffer_size % 32) { result_buffer_size_32 += 32 - (result_buffer_size % 32); }
-  const auto small_hash_size = hashmap::get_size(small_hash_bitlen);
+  const auto result_buffer_size    = internal_topk + (search_width * graph_degree);
+  const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
+  const auto small_hash_size       = hashmap::get_size(small_hash_bitlen);
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
 
-  auto result_indices_buffer =
+  auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes());
-  auto result_distances_buffer =
+  auto* __restrict__ result_distances_buffer =
     reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
-  auto visited_hash_buffer =
+  auto* __restrict__ visited_hash_buffer =
     reinterpret_cast<INDEX_T*>(result_distances_buffer + result_buffer_size_32);
-  auto parent_list_buffer = reinterpret_cast<INDEX_T*>(visited_hash_buffer + small_hash_size);
-  auto topk_ws            = reinterpret_cast<std::uint32_t*>(parent_list_buffer + search_width);
-  auto terminate_flag     = reinterpret_cast<std::uint32_t*>(topk_ws + 3);
-  auto smem_work_ptr      = reinterpret_cast<std::uint32_t*>(terminate_flag + 1);
+  auto* __restrict__ parent_list_buffer =
+    reinterpret_cast<INDEX_T*>(visited_hash_buffer + small_hash_size);
+  auto* __restrict__ topk_ws = reinterpret_cast<std::uint32_t*>(parent_list_buffer + search_width);
+  auto* terminate_flag       = reinterpret_cast<std::uint32_t*>(topk_ws + 3);
+  auto* __restrict__ smem_work_ptr = reinterpret_cast<std::uint32_t*>(terminate_flag + 1);
 
   // A flag for filtering.
   auto filter_flag = terminate_flag;
@@ -655,7 +655,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
         nullptr,
         topk_ws,
         true,
-        reinterpret_cast<std::uint32_t*>(smem_work_ptr));
+        smem_work_ptr);
       _CLK_REC(clk_topk);
 
       // reset small-hash table
