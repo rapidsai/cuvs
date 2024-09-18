@@ -419,6 +419,11 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
         python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs
 fi
 
+# Build and (optionally) install the cuvs_bench Python package
+if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
+    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench -vvv
+fi
+
 # Build the cuvs Rust bindings
 if (( ${NUMARGS} == 0 )) || hasArg rust; then
     cd ${REPODIR}/rust

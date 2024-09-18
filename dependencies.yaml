@@ -38,6 +38,7 @@ files:
       - develop
       - bench
       - bench_python
+      - rapids_build_setuptools
   test_cpp:
     output: none
     includes:
