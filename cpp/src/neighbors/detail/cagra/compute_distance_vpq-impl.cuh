@@ -209,21 +209,12 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
   uint32_t dim = r->args.dim;
   queries_ptr += dim * query_id;
 
-  constexpr cuvs::spatial::knn::detail::utils::mapping<half> mapping{};
+  constexpr cuvs::spatial::knn::detail::utils::mapping<QUERY_T> mapping{};
   auto smem_query_ptr =
-    reinterpret_cast<const QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
-                                     DescriptorT::kSMemCodeBookSizeInBytes);
-  for (unsigned i = threadIdx.x * 2; i < dim; i += blockDim.x * 2) {
-    half2 buf2{0, 0};
-    if (i < dim) { buf2.x = mapping(queries_ptr[i]); }
-    if (i + 1 < dim) { buf2.y = mapping(queries_ptr[i + 1]); }
-    if constexpr ((PQ_BITS == 8) && (PQ_LEN % 2 == 0)) {
-      // Use swizzling in the condition to reduce bank conflicts in shared
-      // memory, which are likely to occur when pq_code_book_dim is large.
-      ((half2*)smem_query_ptr)[device::swizzling<std::uint32_t, DatasetBlockDim / 2>(i / 2)] = buf2;
-    } else {
-      (reinterpret_cast<half2*>(smem_query_ptr + i))[0] = buf2;
-    }
+    reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
+                               DescriptorT::kSMemCodeBookSizeInBytes);
+  for (unsigned i = threadIdx.x; i < dim; i += blockDim.x) {
+    smem_query_ptr[i] = mapping(queries_ptr[i]);
   }
 
   return const_cast<const DescriptorT*>(r);
@@ -247,23 +238,23 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
 
   const uint32_t query_ptr = pq_codebook_ptr + DescriptorT::kSMemCodeBookSizeInBytes;
-  {
-    uint32_t vq_code;
-    device::ldg_cg(vq_code, reinterpret_cast<const std::uint32_t*>(dataset_ptr));
-    vq_code_book_ptr += dim * vq_code;
-  }
   static_assert(PQ_BITS == 8, "Only pq_bits == 8 is supported at the moment.");
   constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
   constexpr uint32_t nelem =
     raft::div_rounding_up_unsafe<uint32_t>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
+
+  constexpr auto kTeamMask   = DescriptorT::kTeamSize - 1;
+  constexpr auto kTeamStride = vlen * PQ_LEN;
+  constexpr auto kTeamVLen   = TeamSize * vlen;
+
   DISTANCE_T norm = 0;
-  for (uint32_t elem_offset = (threadIdx.x % TeamSize) * (vlen * PQ_LEN); elem_offset < dim;
+  for (uint32_t elem_offset = (threadIdx.x & kTeamMask) * kTeamStride; elem_offset < dim;
        elem_offset += DatasetBlockDim) {
     // Loading PQ codes
     uint32_t pq_codes[nelem];
 #pragma unroll
     for (std::uint32_t e = 0; e < nelem; e++) {
-      const std::uint32_t k = e * (TeamSize * vlen) + elem_offset / PQ_LEN;
+      const std::uint32_t k = e * kTeamVLen + elem_offset / PQ_LEN;
       if (k >= n_subspace) break;
       // Loading 4 x 8-bit PQ-codes using 32-bit load ops (from device memory)
       device::ldg_cg(pq_codes[e], reinterpret_cast<const std::uint32_t*>(dataset_ptr + 4 + k));
@@ -273,7 +264,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
       // **** Use half2 for distance computation ****
 #pragma unroll
       for (std::uint32_t e = 0; e < nelem; e++) {
-        const std::uint32_t k = e * (TeamSize * vlen) + elem_offset / PQ_LEN;
+        const std::uint32_t k = e * kTeamVLen + elem_offset / PQ_LEN;
         if (k >= n_subspace) break;
         // Loading VQ code-book
         half2 vq_vals[PQ_LEN][vlen / 2];
@@ -294,9 +285,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
             const std::uint32_t d  = d1 + (PQ_LEN / 2) * k;
             half2 q2, c2;
             // Loading query vector from smem
-            device::lds(q2,
-                        query_ptr + sizeof(uint32_t) *
-                                      device::swizzling<std::uint32_t, DatasetBlockDim / 2>(d));
+            device::lds(q2, query_ptr + sizeof(half2) * d);
             // Loading PQ code book from smem
             device::lds(c2,
                         pq_codebook_ptr +
@@ -313,7 +302,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
       // **** Use float for distance computation ****
 #pragma unroll
       for (std::uint32_t e = 0; e < nelem; e++) {
-        const std::uint32_t k = e * (TeamSize * vlen) + elem_offset / PQ_LEN;
+        const std::uint32_t k = e * kTeamVLen + elem_offset / PQ_LEN;
         if (k >= n_subspace) break;
         // Loading VQ code-book
         CODE_BOOK_T vq_vals[PQ_LEN][vlen];
@@ -356,10 +345,14 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   const typename DescriptorT::args_t args, const typename DescriptorT::INDEX_T dataset_index) ->
   typename DescriptorT::DISTANCE_T
 {
-  return compute_distance_vpq_worker<DescriptorT>(
+  const auto* dataset_ptr =
     DescriptorT::encoded_dataset_ptr(args) +
-      (static_cast<std::uint64_t>(DescriptorT::encoded_dataset_dim(args)) * dataset_index),
-    DescriptorT::vq_code_book_ptr(args),
+    (static_cast<std::uint64_t>(DescriptorT::encoded_dataset_dim(args)) * dataset_index);
+  uint32_t vq_code;
+  device::ldg_cg(vq_code, reinterpret_cast<const std::uint32_t*>(dataset_ptr));
+  return compute_distance_vpq_worker<DescriptorT>(
+    dataset_ptr,
+    DescriptorT::vq_code_book_ptr(args) + args.dim * vq_code,
     args.dim,
     args.smem_ws_ptr,
     DescriptorT::n_subspace(args));
