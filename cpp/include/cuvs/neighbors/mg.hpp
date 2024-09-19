@@ -40,8 +40,10 @@ enum distribution_mode {
   SHARDED
 };
 
+/// \defgroup mg_cpp_search_params ANN MG search parameters
+
 /** Merge mode when using a sharded index */
-/// \ingroup mg_cpp_index_params
+/// \ingroup mg_cpp_search_params
 enum sharded_merge_mode {
   /** Search batches are merged on the root rank */
   MERGE_ON_ROOT_RANK,
@@ -49,12 +51,16 @@ enum sharded_merge_mode {
   TREE_MERGE
 };
 
+/** Build parameters */
+/// \ingroup mg_cpp_index_params
 template <typename Upstream>
 struct index_params : public Upstream {
   /** Distribution mode */
   cuvs::neighbors::mg::distribution_mode mode = SHARDED;
 };
 
+/** Search parameters */
+/// \ingroup mg_cpp_search_params
 template <typename Upstream>
 struct search_params : public Upstream {
   /** Sharded search mode */
@@ -89,12 +95,13 @@ struct index {
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -110,12 +117,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -131,12 +139,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -152,12 +161,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -173,12 +183,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -194,12 +205,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -215,12 +227,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -236,12 +249,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -257,12 +271,13 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_build
 /**
+ * @brief Builds a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
  * @endcode
  *
  * @param[in] handle
@@ -280,13 +295,14 @@ auto build(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -303,13 +319,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -326,13 +343,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -349,13 +367,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -372,13 +391,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -395,13 +415,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -418,13 +439,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -441,13 +463,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -464,13 +487,14 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_extend
 /**
+ * @brief Extends a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::extend(handle, index, new_vectors, std::nullopt);
  * @endcode
  *
  * @param[in] handle
@@ -489,14 +513,15 @@ void extend(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -519,14 +544,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -549,14 +575,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -579,14 +606,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -609,14 +637,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -639,14 +668,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -669,14 +699,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<cagra::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -699,14 +730,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<cagra::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -729,14 +761,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_index_search
 /**
+ * @brief Searches a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   cuvs::neighbors::mg::search_params<cagra::search_params> search_params; // default search
- * parameters cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg::search(handle, index, search_params, queries, neighbors,
  * distances);
  * @endcode
  *
@@ -761,14 +794,15 @@ void search(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -782,14 +816,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -803,14 +838,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -824,14 +860,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -845,14 +882,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -866,14 +904,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -887,14 +926,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -908,14 +948,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -929,14 +970,15 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_serialize
 /**
+ * @brief Serializes a multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
  * @endcode
  *
  * @param[in] handle
@@ -952,15 +994,16 @@ void serialize(const raft::device_resources& handle,
 
 /// \ingroup mg_cpp_deserialize
 /**
+ * @brief Deserializes an IVF-Flat multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
- *   auto new_index = cuvs::neighbors::mg::deserialize_flat<float, int64_t>(handle, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
+ * auto new_index = cuvs::neighbors::mg::deserialize_flat<float, int64_t>(handle, filename);
  *
  * @endcode
  *
@@ -974,15 +1017,16 @@ auto deserialize_flat(const raft::device_resources& handle, const std::string& f
 
 /// \ingroup mg_cpp_deserialize
 /**
+ * @brief Deserializes an IVF-PQ multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
- *   auto new_index = cuvs::neighbors::mg::deserialize_pq<float, int64_t>(handle, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
+ * auto new_index = cuvs::neighbors::mg::deserialize_pq<float, int64_t>(handle, filename);
  * @endcode
  *
  * @param[in] handle
@@ -995,15 +1039,16 @@ auto deserialize_pq(const raft::device_resources& handle, const std::string& fil
 
 /// \ingroup mg_cpp_deserialize
 /**
+ * @brief Deserializes a CAGRA multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::mg::index_params<cagra::index_params> index_params; // default build
- * parameters auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
- *   const std::string filename = "mg_index.cuvs";
- *   cuvs::neighbors::mg::serialize(handle, index, filename);
- *   auto new_index = cuvs::neighbors::mg::deserialize_cagra<float, uint32_t>(handle, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::mg::build(handle, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::mg::serialize(handle, index, filename);
+ * auto new_index = cuvs::neighbors::mg::deserialize_cagra<float, uint32_t>(handle, filename);
  *
  * @endcode
  *
@@ -1019,15 +1064,17 @@ auto deserialize_cagra(const raft::device_resources& handle, const std::string& 
 
 /// \ingroup mg_cpp_distribute
 /**
+ * @brief Replicates a locally built and serialized IVF-Flat index to all GPUs to form a distributed
+ * multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::ivf_flat::index_params index_params; // default build parameters
- *   auto index = cuvs::neighbors::ivf_flat::build(handle, index_params, index_dataset);
- *   const std::string filename = "local_index.cuvs";
- *   cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
- *   auto new_index = cuvs::neighbors::mg::distribute_flat<float, int64_t>(handle, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::ivf_flat::index_params index_params;
+ * auto index = cuvs::neighbors::ivf_flat::build(handle, index_params, index_dataset);
+ * const std::string filename = "local_index.cuvs";
+ * cuvs::neighbors::ivf_flat::serialize(handle, filename, index);
+ * auto new_index = cuvs::neighbors::mg::distribute_flat<float, int64_t>(handle, filename);
  *
  * @endcode
  *
@@ -1041,15 +1088,17 @@ auto distribute_flat(const raft::device_resources& handle, const std::string& fi
 
 /// \ingroup mg_cpp_distribute
 /**
+ * @brief Replicates a locally built and serialized IVF-PQ index to all GPUs to form a distributed
+ * multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::ivf_pq::index_params index_params; // default build parameters
- *   auto index = cuvs::neighbors::ivf_pq::build(handle, index_params, index_dataset);
- *   const std::string filename = "local_index.cuvs";
- *   cuvs::neighbors::ivf_pq::serialize(handle, filename, index);
- *   auto new_index = cuvs::neighbors::mg::distribute_pq<float, int64_t>(handle, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::ivf_pq::index_params index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(handle, index_params, index_dataset);
+ * const std::string filename = "local_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(handle, filename, index);
+ * auto new_index = cuvs::neighbors::mg::distribute_pq<float, int64_t>(handle, filename);
  * @endcode
  *
  * @param[in] handle
@@ -1062,15 +1111,17 @@ auto distribute_pq(const raft::device_resources& handle, const std::string& file
 
 /// \ingroup mg_cpp_distribute
 /**
+ * @brief Replicates a locally built and serialized CAGRA index to all GPUs to form a distributed
+ * multi-GPU index
  *
  * Usage example:
  * @code{.cpp}
- *   raft::handle_t handle;
- *   cuvs::neighbors::cagra::index_params index_params; // default build parameters
- *   auto index = cuvs::neighbors::cagra::build(handle, index_params, index_dataset);
- *   const std::string filename = "local_index.cuvs";
- *   cuvs::neighbors::cagra::serialize(handle, filename, index);
- *   auto new_index = cuvs::neighbors::mg::distribute_cagra<float, uint32_t>(handle, filename);
+ * raft::handle_t handle;
+ * cuvs::neighbors::cagra::index_params index_params;
+ * auto index = cuvs::neighbors::cagra::build(handle, index_params, index_dataset);
+ * const std::string filename = "local_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(handle, filename, index);
+ * auto new_index = cuvs::neighbors::mg::distribute_cagra<float, uint32_t>(handle, filename);
  *
  * @endcode
  *

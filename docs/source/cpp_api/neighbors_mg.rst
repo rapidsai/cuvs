@@ -1,5 +1,5 @@
-SNMG ANN
-========
+Distributed ANN
+===============
 
 The SNMG (single-node multi-GPUs) ANN API provides a set of functions to deploy ANN indexes on multiple GPUs.
 
@@ -11,18 +11,18 @@ The SNMG (single-node multi-GPUs) ANN API provides a set of functions to deploy 
 
 namespace *cuvs::neighbors::mg*
 
-NCCL clique utility
--------------------
-
-.. doxygengroup:: mg_cpp_nccl_clique
-    :project: cuvs
-    :members:
-    :content-only:
-
 Index build parameters
 ----------------------
 
 .. doxygengroup:: mg_cpp_index_params
+    :project: cuvs
+    :members:
+    :content-only:
+
+Search parameters
+----------------------
+
+.. doxygengroup:: mg_cpp_search_params
     :project: cuvs
     :members:
     :content-only:
