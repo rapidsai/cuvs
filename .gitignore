@@ -28,6 +28,11 @@ bench/ann/data
 temporary_*.json
 rust/target/
 rust/Cargo.lock
+rmm_log.txt
+
+## example notebooks
+notebooks/simplewiki-2020-11-01-nq-distilbert-base-v1.pt
+notebooks/data/
 
 ## scikit-build
 _skbuild

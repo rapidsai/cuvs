@@ -53,8 +53,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
-option(BUILD_C_LIBRARY "Build raft C API library" OFF)
-option(BUILD_C_TESTS "Build raft C API tests" OFF)
+option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
+option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
 option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
@@ -440,6 +440,8 @@ add_library(
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
+  src/stats/silhouette_score.cu
+  src/stats/trustworthiness_score.cu
   ${CUVS_MG_ALGOS}
 )
 
@@ -575,6 +577,7 @@ if(BUILD_C_LIBRARY)
     src/neighbors/ivf_flat_c.cpp
     src/neighbors/ivf_pq_c.cpp
     src/neighbors/cagra_c.cpp
+    src/neighbors/hnsw_c.cpp
     src/neighbors/refine/refine_c.cpp
     src/distance/pairwise_distance_c.cpp
   )

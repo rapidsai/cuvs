@@ -193,6 +193,9 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+  ConfigureTest(
+    NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
+  )
 endif()
 
 if(BUILD_C_TESTS)
@@ -213,6 +216,10 @@ if(BUILD_C_TESTS)
   ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu C_LIB)
 
   ConfigureTest(NAME CAGRA_C_TEST PATH neighbors/ann_cagra_c.cu C_LIB)
+
+  if(BUILD_CAGRA_HNSWLIB)
+    ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
+  endif()
 endif()
 
 # ##################################################################################################
