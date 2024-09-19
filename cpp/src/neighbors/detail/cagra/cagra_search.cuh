@@ -26,9 +26,11 @@
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/unary_op.cuh>
 
 #include <cuvs/distance/distance.hpp>
 
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
 // TODO: Fix these when ivf methods are moved over
@@ -264,6 +266,60 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  if constexpr (!std::is_same_v<CagraSampleFilterT,
+                                cuvs::neighbors::filtering::none_cagra_sample_filter> &&
+                (std::is_same_v<T, float> || std::is_same_v<T, half>)) {
+    auto n_queries = queries.extent(0);
+    auto n_dataset = index.size();
+
+    auto bitset_filter_view = sample_filter.bitset_view_;
+    auto dataset_view       = index.contiguous_dataset();
+
+    auto sparsity                    = bitset_filter_view.sparsity(res);
+    constexpr double threshold_to_bf = 0.9;
+
+    // TODO: Support host dataset in `brute_force::build`
+    if (sparsity >= threshold_to_bf &&
+        std::holds_alternative<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
+          dataset_view)) {
+      std::cout << " Cagra goes to BF!" << std::endl;
+      using bitmap_view_t = cuvs::core::bitmap_view<const uint32_t, int64_t>;
+
+      auto stream = raft::resource::get_cuda_stream(res);
+      auto bitmap_n_elements =
+        bitmap_view_t::eval_n_elements(bitset_filter_view.size() * n_queries);
+
+      rmm::device_uvector<uint32_t> raw_bitmap(bitmap_n_elements, stream);
+      rmm::device_uvector<int64_t> raw_neighbors(neighbors.size(), stream);
+
+      bitset_filter_view.repeat(res, n_queries, raw_bitmap.data());
+
+      auto brute_force_filter = bitmap_view_t(raw_bitmap.data(), n_queries, n_dataset);
+
+      auto brute_force_neighbors = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
+        raw_neighbors.data(), neighbors.extent(0), neighbors.extent(1));
+      auto brute_force_dataset =
+        std::get_if<raft::device_matrix_view<const T, int64_t, raft::row_major>>(&dataset_view);
+
+      if (brute_force_dataset) {
+        auto brute_force_idx =
+          cuvs::neighbors::brute_force::build(res, *brute_force_dataset, index.metric());
+        cuvs::neighbors::brute_force::search(res,
+                                             brute_force_idx,
+                                             queries,
+                                             brute_force_neighbors,
+                                             distances,
+                                             std::make_optional(brute_force_filter));
+        raft::linalg::unaryOp(neighbors.data_handle(),
+                              brute_force_neighbors.data_handle(),
+                              neighbors.size(),
+                              raft::cast_op<InternalIdxT>(),
+                              raft::resource::get_cuda_stream(res));
+        return;
+      }
+    }
+  }
+
   const auto& graph   = index.graph();
   auto graph_internal = raft::make_device_matrix_view<const InternalIdxT, int64_t, raft::row_major>(
     reinterpret_cast<const InternalIdxT*>(graph.data_handle()), graph.extent(0), graph.extent(1));
