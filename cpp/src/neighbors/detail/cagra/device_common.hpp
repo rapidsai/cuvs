@@ -58,16 +58,18 @@ _RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
   return u * 0x2545F4914F6CDD1DULL;
 }
 
-template <class T, unsigned X_MAX = 1024>
-RAFT_DEVICE_INLINE_FUNCTION constexpr T swizzling(T x)
+template <uint32_t Dim = 1024, uint32_t Stride = 128, typename T>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto swizzling(T x) -> T
 {
   // Address swizzling reduces bank conflicts in shared memory, but increases
   // the amount of operation instead.
   // return x;
-  if constexpr (X_MAX <= 1024) {
-    return (x) ^ ((x) >> 5);
+  if constexpr (Stride <= 32) {
+    return x;
+  } else if constexpr (Dim <= 1024) {
+    return x ^ (x >> 5);
   } else {
-    return (x) ^ (((x) >> 5) & 0x1f);
+    return x ^ ((x >> 5) & 0x1f);
   }
 }
 
@@ -245,6 +247,16 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(half (&x)[4], uint32_t addr)
                  "=h"(*reinterpret_cast<uint16_t*>(x + 2)),
                  "=h"(*reinterpret_cast<uint16_t*>(x + 3))
                : "r"(addr));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, uint32_t addr)
+{
+  asm volatile("ld.shared.u32 {%0}, [%1];" : "=r"(x) : "r"(addr));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, const uint32_t* addr)
+{
+  lds(x, uint32_t(__cvta_generic_to_shared(addr)));
 }
 
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, uint32_t addr)

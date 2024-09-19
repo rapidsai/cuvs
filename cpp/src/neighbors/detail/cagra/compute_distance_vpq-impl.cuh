@@ -161,9 +161,9 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
   using DATA_T                   = typename DescriptorT::DATA_T;
   using DISTANCE_T               = typename DescriptorT::DISTANCE_T;
   using INDEX_T                  = typename DescriptorT::INDEX_T;
-  using LOAD_T                   = typename DescriptorT::LOAD_T;
   using QUERY_T                  = typename DescriptorT::QUERY_T;
   using CODE_BOOK_T              = typename DescriptorT::CODE_BOOK_T;
+  using word_type                = uint32_t;
   constexpr auto TeamSize        = DescriptorT::kTeamSize;
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
@@ -172,8 +172,8 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
   auto* r = reinterpret_cast<DescriptorT*>(smem_ptr);
 
   if (r != that) {
-    constexpr uint32_t kCount = sizeof(DescriptorT) / sizeof(LOAD_T);
-    using blob_type           = LOAD_T[kCount];
+    constexpr uint32_t kCount = sizeof(DescriptorT) / sizeof(uint32_t);
+    using blob_type           = uint32_t[kCount];
     auto& src                 = reinterpret_cast<const blob_type&>(*that);
     auto& dst                 = reinterpret_cast<blob_type&>(*r);
     for (uint32_t i = threadIdx.x; i < kCount; i += blockDim.x) {
@@ -183,7 +183,7 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
     auto codebook_buf = uint32_t(__cvta_generic_to_shared(r + 1));
     const auto smem_ptr_offset =
       reinterpret_cast<uint8_t*>(&(r->args.smem_ws_ptr)) - reinterpret_cast<uint8_t*>(r);
-    if (threadIdx.x == uint32_t(smem_ptr_offset / sizeof(LOAD_T))) {
+    if (threadIdx.x == uint32_t(smem_ptr_offset / sizeof(uint32_t))) {
       r->args.smem_ws_ptr = codebook_buf;
     }
     __syncthreads();
@@ -213,8 +213,25 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
   auto smem_query_ptr =
     reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
                                DescriptorT::kSMemCodeBookSizeInBytes);
-  for (unsigned i = threadIdx.x; i < dim; i += blockDim.x) {
-    smem_query_ptr[i] = mapping(queries_ptr[i]);
+  // for (unsigned i = threadIdx.x; i < dim; i += blockDim.x) {
+  //   smem_query_ptr[i] = mapping(queries_ptr[i]);
+  // }
+  for (unsigned i = threadIdx.x * 2; i < dim; i += blockDim.x * 2) {
+    half2 buf2{0, 0};
+    if (i < dim) { buf2.x = mapping(queries_ptr[i]); }
+    if (i + 1 < dim) { buf2.y = mapping(queries_ptr[i + 1]); }
+    if constexpr ((PQ_BITS == 8) && (PQ_LEN % 2 == 0)) {
+      // Use swizzling in the condition to reduce bank conflicts in shared
+      // memory, which are likely to occur when pq_code_book_dim is large.
+      constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
+      // The actual stride should be as commented out below, but it seems the performance is better
+      // this way (with swizzling disabled for a larger range of inputs)
+      // constexpr auto kStride  =  TeamSize * vlen * PQ_LEN / 2;
+      constexpr auto kStride = TeamSize * vlen;
+      ((half2*)smem_query_ptr)[device::swizzling<DatasetBlockDim / 2, kStride>(i / 2)] = buf2;
+    } else {
+      (reinterpret_cast<half2*>(smem_query_ptr + i))[0] = buf2;
+    }
   }
 
   return const_cast<const DescriptorT*>(r);
@@ -282,7 +299,8 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
 #pragma unroll
           for (std::uint32_t m = 0; m < PQ_LEN / 2; m++) {
             const std::uint32_t d1 = m + (PQ_LEN / 2) * v;
-            const std::uint32_t d  = d1 + (PQ_LEN / 2) * k;
+            const std::uint32_t d =
+              device::swizzling<DatasetBlockDim / 2, kTeamVLen>(d1 + (PQ_LEN / 2) * k);
             half2 q2, c2;
             // Loading query vector from smem
             device::lds(q2, query_ptr + sizeof(half2) * d);
