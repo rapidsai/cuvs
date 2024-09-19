@@ -1,0 +1,62 @@
+{
+  "context": {
+    "date": "2024-09-19T15:46:40-07:00",
+    "host_name": "ipp1-3302",
+    "executable": "/raid/tarangj/miniconda3/envs/new-cuvs-bench/bin/ann/FAISS_GPU_IVF_PQ_ANN_BENCH",
+    "num_cpus": 96,
+    "mhz_per_cpu": 2300,
+    "cpu_scaling_enabled": true,
+    "caches": [
+      {
+        "type": "Data",
+        "level": 1,
+        "size": 32768,
+        "num_sharing": 1
+      },
+      {
+        "type": "Instruction",
+        "level": 1,
+        "size": 32768,
+        "num_sharing": 1
+      },
+      {
+        "type": "Unified",
+        "level": 2,
+        "size": 524288,
+        "num_sharing": 1
+      },
+      {
+        "type": "Unified",
+        "level": 3,
+        "size": 16777216,
+        "num_sharing": 3
+      }
+    ],
+    "load_avg": [1.69,1.89,6.98],
+    "library_build_type": "release",
+    "command_line": "/raid/tarangj/miniconda3/envs/new-cuvs-bench/bin/ann/FAISS_GPU_IVF_PQ_ANN_BENCH --search --data_prefix=/home/nfs/tarangj/cuvs2/cuvs/python/cuvs_bench/cuvs_bench/run/datasets/ --benchmark_counters_tabular=true --override_kv=k:10 --override_kv=n_queries:10000 --benchmark_min_warmup_time=1 --benchmark_out_format=json --mode=latency --benchmark_out=/home/nfs/tarangj/cuvs2/cuvs/python/cuvs_bench/cuvs_bench/run/datasets/wiki_all_10M/result/search/faiss_gpu_ivf_pq,base,k10,bs10000.json --raft_log_level=3 wiki_all_10M_faiss_gpu_ivf_pq,base,k10,bs10000_08b48c7a-76d9-11ef-9ede-d85ed30db299.json",
+    "dataset": "wiki_all_10M",
+    "distance": "euclidean",
+    "gpu_driver_version": "12.2",
+    "gpu_gpuDirectRDMASupported": "1",
+    "gpu_hostNativeAtomicSupported": "0",
+    "gpu_mem_bus_width": "5120",
+    "gpu_mem_freq": "1512000000.000000",
+    "gpu_mem_global_size": "85174583296",
+    "gpu_mem_shared_size": "167936",
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "gpu_pageableMemoryAccess": "0",
+    "gpu_pageableMemoryAccessUsesHostPageTables": "0",
+    "gpu_runtime_version": "12.5",
+    "gpu_sm_count": "108",
+    "gpu_sm_freq": "1410000000.000000",
+    "host_cores_used": "48",
+    "host_cpu_freq_max": "2300000000",
+    "host_cpu_freq_min": "1500000000",
+    "host_pagesize": "4096",
+    "host_processors_sysconf": "96",
+    "host_processors_used": "96",
+    "host_total_ram_size": "540884389888",
+    "host_total_swap_size": "8589930496"
+  },
+  "benchmarks": [

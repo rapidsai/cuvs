@@ -53,9 +53,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
-option(BUILD_C_LIBRARY "Build raft C API library" OFF)
-option(BUILD_C_TESTS "Build raft C API tests" OFF)
-option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" ON)
+option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
+option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
+option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
@@ -216,30 +216,43 @@ add_library(
   src/cluster/kmeans_transform_float.cu
   src/cluster/single_linkage_float.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_correlation_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_correlation_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_cosine_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_hellinger_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_jensen_shannon_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_kl_divergence_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_kl_divergence_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_kl_divergence_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l1_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l1_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l1_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l2_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l_inf_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_l_inf_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_l_inf_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_lp_unexpanded_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_float_float_float_int.cu
+  src/distance/detail/pairwise_matrix/dispatch_russel_rao_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_rbf.cu
   src/distance/detail/fused_distance_nn.cu
@@ -411,7 +424,11 @@ add_library(
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
+  src/stats/silhouette_score.cu
+  src/stats/trustworthiness_score.cu
 )
+
+target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
 
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
@@ -534,6 +551,7 @@ if(BUILD_C_LIBRARY)
     src/neighbors/ivf_flat_c.cpp
     src/neighbors/ivf_pq_c.cpp
     src/neighbors/cagra_c.cpp
+    src/neighbors/hnsw_c.cpp
     src/neighbors/refine/refine_c.cpp
     src/distance/pairwise_distance_c.cpp
   )
