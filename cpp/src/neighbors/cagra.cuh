@@ -301,7 +301,8 @@ void search_with_filtering(raft::resources const& res,
                            raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                            raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
                            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-                           CagraSampleFilterT sample_filter = CagraSampleFilterT())
+                           CagraSampleFilterT sample_filter = CagraSampleFilterT(),
+                           double threshold_to_bf           = 1.0)
 {
   RAFT_EXPECTS(
     queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
@@ -322,8 +323,14 @@ void search_with_filtering(raft::resources const& res,
   auto distances_internal = raft::make_device_matrix_view<float, int64_t, raft::row_major>(
     distances.data_handle(), distances.extent(0), distances.extent(1));
 
-  return cagra::detail::search_main<T, internal_IdxT, CagraSampleFilterT, IdxT>(
-    res, params, idx, queries_internal, neighbors_internal, distances_internal, sample_filter);
+  return cagra::detail::search_main<T, internal_IdxT, CagraSampleFilterT, IdxT>(res,
+                                                                                params,
+                                                                                idx,
+                                                                                queries_internal,
+                                                                                neighbors_internal,
+                                                                                distances_internal,
+                                                                                sample_filter,
+                                                                                threshold_to_bf);
 }
 
 template <typename T, typename IdxT>
@@ -334,12 +341,20 @@ void search(raft::resources const& res,
             raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter_opt = std::nullopt)
+              sample_filter_opt    = std::nullopt,
+            double threshold_to_bf = 1.0)
 {
   if (sample_filter_opt.has_value()) {
     return cagra::
       search_with_filtering<T, IdxT, cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>(
-        res, params, idx, queries, neighbors, distances, sample_filter_opt.value());
+        res,
+        params,
+        idx,
+        queries,
+        neighbors,
+        distances,
+        sample_filter_opt.value(),
+        threshold_to_bf);
   } else {
     using none_filter_type = cuvs::neighbors::filtering::none_cagra_sample_filter;
     return cagra::search_with_filtering<T, IdxT, none_filter_type>(

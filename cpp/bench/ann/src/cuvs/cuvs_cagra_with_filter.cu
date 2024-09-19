@@ -240,7 +240,8 @@ class CagraWithFilterKNNBenchmark {
                                        search_queries.data(), params_.num_queries, params_.dim),
                                      indices,
                                      distances,
-                                     filter);
+                                     filter,
+                                     params_.threshold_to_bf);
       flush_l2_cache();
       raft::resource::sync_stream(handle_, stream_);
     }
@@ -262,7 +263,8 @@ class CagraWithFilterKNNBenchmark {
                                      search_queries.data(), params_.num_queries, params_.dim),
                                    indices,
                                    distances,
-                                   filter);
+                                   filter,
+                                   params_.threshold_to_bf);
     raft::resource::sync_stream(handle_, stream_);
     end        = std::chrono::high_resolution_clock::now();
     search_dur = end - start;
@@ -283,7 +285,8 @@ class CagraWithFilterKNNBenchmark {
                                        search_queries.data(), params_.num_queries, params_.dim),
                                      indices_expected,
                                      distances_expected,
-                                     filter);
+                                     filter,
+                                     0.0);
       raft::resource::sync_stream(handle_, stream_);
     }
 
@@ -385,7 +388,17 @@ static std::vector<RandomKNNInputs> getInputs()
                                            params.dim,
                                            params.k,
                                            params.sparsity + 0.0001f,
+                                           params.sparsity,  // threshold_to_bf
+                                           params.metric,
+                                           params.algo,
+                                           params.row_major}));
+      // add case for original `CAGRA`.
+      param_vec.push_back(RandomKNNInputs({params.num_queries,
+                                           params.num_db_vecs,
+                                           params.dim,
+                                           params.k,
                                            params.sparsity,
+                                           1.0f,  // threshold_to_bf
                                            params.metric,
                                            params.algo,
                                            params.row_major}));

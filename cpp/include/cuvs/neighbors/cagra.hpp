@@ -988,7 +988,8 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter = std::nullopt);
+              sample_filter        = std::nullopt,
+            double threshold_to_bf = 1.0);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1013,7 +1014,8 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter = std::nullopt);
+              sample_filter        = std::nullopt,
+            double threshold_to_bf = 1.0);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1038,7 +1040,8 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter = std::nullopt);
+              sample_filter        = std::nullopt,
+            double threshold_to_bf = 1.0);
 
 /**
  * @}

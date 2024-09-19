@@ -264,7 +264,8 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                  raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
-                 CagraSampleFilterT sample_filter = CagraSampleFilterT())
+                 CagraSampleFilterT sample_filter = CagraSampleFilterT(),
+                 double threshold_to_bf           = 1.0)
 {
   if constexpr (!std::is_same_v<CagraSampleFilterT,
                                 cuvs::neighbors::filtering::none_cagra_sample_filter> &&
@@ -275,8 +276,9 @@ void search_main(raft::resources const& res,
     auto bitset_filter_view = sample_filter.bitset_view_;
     auto dataset_view       = index.contiguous_dataset();
 
-    auto sparsity                    = bitset_filter_view.sparsity(res);
-    constexpr double threshold_to_bf = 0.9;
+    auto sparsity = bitset_filter_view.sparsity(res);
+
+    std::cout << " sparsity: " << sparsity << std::endl;
 
     // TODO: Support host dataset in `brute_force::build`
     if (sparsity >= threshold_to_bf &&

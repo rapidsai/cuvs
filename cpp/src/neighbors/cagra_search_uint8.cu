@@ -27,10 +27,11 @@ namespace cuvs::neighbors::cagra {
     raft::device_matrix_view<const T, int64_t, raft::row_major> queries,                       \
     raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,                        \
     raft::device_matrix_view<float, int64_t, raft::row_major> distances,                       \
-    std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>> sample_filter) \
+    std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>> sample_filter, \
+    double threshold_to_bf)                                                                    \
   {                                                                                            \
     cuvs::neighbors::cagra::search<T, IdxT>(                                                   \
-      handle, params, index, queries, neighbors, distances, sample_filter);                    \
+      handle, params, index, queries, neighbors, distances, sample_filter, threshold_to_bf);   \
   }
 
 CUVS_INST_CAGRA_SEARCH(uint8_t, uint32_t);
