@@ -1,3 +1,5 @@
+#include <mutex>
+
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -9,9 +11,12 @@ using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct iface {
+  iface() : mutex_(std::make_shared<std::mutex>()) {}
+
   const IdxT size() const;
 
   std::optional<AnnIndexType> index_;
+  std::shared_ptr<std::mutex> mutex_;
 };
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -32,6 +37,8 @@ void build(const raft::device_resources& handle,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset)
 {
+  interface.mutex_->lock();
+
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx = cuvs::neighbors::ivf_flat::build(
       handle, *static_cast<const ivf_flat::index_params*>(index_params), index_dataset);
@@ -47,6 +54,8 @@ void build(const raft::device_resources& handle,
     interface.index_.emplace(std::move(idx));
   }
   resource::sync_stream(handle);
+
+  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
@@ -57,6 +66,8 @@ void extend(
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices)
 {
+  interface.mutex_->lock();
+
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx =
       cuvs::neighbors::ivf_flat::extend(handle, new_vectors, new_indices, interface.index_.value());
@@ -69,6 +80,8 @@ void extend(
     RAFT_FAIL("CAGRA does not implement the extend method");
   }
   resource::sync_stream(handle);
+
+  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -79,6 +92,8 @@ void search(const raft::device_resources& handle,
             raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances)
 {
+  // interface.mutex_->lock();
+
   int64_t n_rows = h_queries.extent(0);
   int64_t n_dims = h_queries.extent(1);
   auto d_queries = raft::make_device_matrix<T, int64_t, row_major>(handle, n_rows, n_dims);
@@ -112,6 +127,8 @@ void search(const raft::device_resources& handle,
                                    d_distances);
   }
   resource::sync_stream(handle);
+
+  // interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -119,6 +136,8 @@ void serialize(const raft::device_resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os)
 {
+  interface.mutex_->lock();
+
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::serialize(handle, os, interface.index_.value());
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
@@ -126,6 +145,8 @@ void serialize(const raft::device_resources& handle,
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::serialize(handle, os, interface.index_.value(), true);
   }
+
+  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -133,6 +154,8 @@ void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is)
 {
+  interface.mutex_->lock();
+
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
@@ -146,6 +169,8 @@ void deserialize(const raft::device_resources& handle,
     cagra::deserialize(handle, is, &idx);
     interface.index_.emplace(std::move(idx));
   }
+
+  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -153,6 +178,8 @@ void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename)
 {
+  interface.mutex_->lock();
+
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
@@ -171,6 +198,8 @@ void deserialize(const raft::device_resources& handle,
   }
 
   is.close();
+
+  interface.mutex_->unlock();
 }
 
 };  // namespace cuvs::neighbors

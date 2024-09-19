@@ -18,6 +18,9 @@
 
 #ifdef CUVS_BUILD_MG_ALGOS
 
+#include <atomic>
+#include <memory>
+
 #include <raft/core/device_resources.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
@@ -77,6 +80,9 @@ struct index {
   distribution_mode mode_;
   int num_ranks_;
   std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
+
+  // for load balancing mechanism
+  std::shared_ptr<std::atomic<int64_t>> load_balancing_counter_;
 };
 
 /// \defgroup mg_cpp_index_build ANN MG index build

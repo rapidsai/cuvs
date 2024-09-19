@@ -24,6 +24,8 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/mg.hpp>
 
+#define SMALL_SEARCH_BATCH 4
+
 namespace cuvs::neighbors::mg {
 void check_omp_threads(const int requirements);
 }
@@ -429,6 +431,47 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
+void run_search_batch(const raft::comms::nccl_clique& clique,
+                      const index<AnnIndexType, T, IdxT>& index,
+                      int rank,
+                      const cuvs::neighbors::search_params* search_params,
+                      raft::host_matrix_view<const T, int64_t, row_major>& queries,
+                      raft::host_matrix_view<IdxT, int64_t, row_major>& neighbors,
+                      raft::host_matrix_view<float, int64_t, row_major>& distances,
+                      int64_t query_offset,
+                      int64_t output_offset,
+                      int64_t n_rows_of_current_batch,
+                      int64_t n_cols,
+                      int64_t n_neighbors)
+{
+  int dev_id = clique.device_ids_[rank];
+  RAFT_CUDA_TRY(cudaSetDevice(dev_id));
+  const raft::device_resources& dev_res = clique.device_resources_[rank];
+  auto& ann_if                          = index.ann_interfaces_[rank];
+
+  auto query_partition = raft::make_host_matrix_view<const T, int64_t, row_major>(
+    queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
+  auto d_neighbors = raft::make_device_matrix<IdxT, int64_t, row_major>(
+    dev_res, n_rows_of_current_batch, n_neighbors);
+  auto d_distances = raft::make_device_matrix<float, int64_t, row_major>(
+    dev_res, n_rows_of_current_batch, n_neighbors);
+
+  cuvs::neighbors::search(
+    dev_res, ann_if, search_params, query_partition, d_neighbors.view(), d_distances.view());
+
+  raft::copy(neighbors.data_handle() + output_offset,
+             d_neighbors.data_handle(),
+             n_rows_of_current_batch * n_neighbors,
+             resource::get_cuda_stream(dev_res));
+  raft::copy(distances.data_handle() + output_offset,
+             d_distances.data_handle(),
+             n_rows_of_current_batch * n_neighbors,
+             resource::get_cuda_stream(dev_res));
+
+  resource::sync_stream(dev_res);
+}
+
+template <typename AnnIndexType, typename T, typename IdxT>
 void search(const raft::device_resources& handle,
             const index<AnnIndexType, T, IdxT>& index,
             const cuvs::neighbors::search_params* search_params,
@@ -442,6 +485,27 @@ void search(const raft::device_resources& handle,
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
+
+  bool run_load_balancer = index.mode_ == REPLICATED && n_rows <= SMALL_SEARCH_BATCH;
+  if (run_load_balancer) {
+    auto& lbc    = *index.load_balancing_counter_;
+    int64_t rank = lbc++;
+    rank %= index.num_ranks_;
+
+    run_search_batch(clique,
+                     index,
+                     rank,
+                     search_params,
+                     queries,
+                     neighbors,
+                     distances,
+                     0,
+                     0,
+                     n_rows,
+                     n_cols,
+                     n_neighbors);
+    return;
+  }
 
   if (index.mode_ == REPLICATED) {
     int64_t n_rows_per_rank = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
@@ -457,37 +521,24 @@ void search(const raft::device_resources& handle,
 
 #pragma omp parallel for
     for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
-      int rank                              = batch_idx % index.num_ranks_;  // alternate GPUs
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-
+      int rank                        = batch_idx % index.num_ranks_;  // alternate GPUs
       int64_t offset                  = batch_idx * n_rows_per_batch;
       int64_t query_offset            = offset * n_cols;
       int64_t output_offset           = offset * n_neighbors;
       int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
 
-      auto query_partition = raft::make_host_matrix_view<const T, int64_t, row_major>(
-        queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
-      auto d_neighbors = raft::make_device_matrix<IdxT, int64_t, row_major>(
-        dev_res, n_rows_of_current_batch, n_neighbors);
-      auto d_distances = raft::make_device_matrix<float, int64_t, row_major>(
-        dev_res, n_rows_of_current_batch, n_neighbors);
-
-      auto& ann_if = index.ann_interfaces_[rank];
-      cuvs::neighbors::search(
-        dev_res, ann_if, search_params, query_partition, d_neighbors.view(), d_distances.view());
-
-      raft::copy(neighbors.data_handle() + output_offset,
-                 d_neighbors.data_handle(),
-                 n_rows_of_current_batch * n_neighbors,
-                 resource::get_cuda_stream(dev_res));
-      raft::copy(distances.data_handle() + output_offset,
-                 d_distances.data_handle(),
-                 n_rows_of_current_batch * n_neighbors,
-                 resource::get_cuda_stream(dev_res));
-
-      resource::sync_stream(dev_res);
+      run_search_batch(clique,
+                       index,
+                       rank,
+                       search_params,
+                       queries,
+                       neighbors,
+                       distances,
+                       query_offset,
+                       output_offset,
+                       n_rows_of_current_batch,
+                       n_cols,
+                       n_neighbors);
     }
   } else if (index.mode_ == SHARDED) {
     cuvs::neighbors::mg::sharded_merge_mode merge_mode;
@@ -573,13 +624,16 @@ using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
 index<AnnIndexType, T, IdxT>::index(distribution_mode mode, int num_ranks_)
-  : mode_(mode), num_ranks_(num_ranks_)
+  : mode_(mode),
+    num_ranks_(num_ranks_),
+    load_balancing_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
 index<AnnIndexType, T, IdxT>::index(const raft::device_resources& handle,
                                     const std::string& filename)
+  : load_balancing_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
   cuvs::neighbors::mg::detail::deserialize(handle, *this, filename);
 }
