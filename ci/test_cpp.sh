@@ -4,6 +4,7 @@
 set -euo pipefail
 
 . /opt/conda/etc/profile.d/conda.sh
+source ./ci/use_conda_packages_from_prs.sh
 
 rapids-logger "Generate C++ testing dependencies"
 rapids-dependency-file-generator \

@@ -12,6 +12,8 @@ case "${RAPIDS_CUDA_VERSION}" in
   ;;
 esac
 
+source ./ci/use_wheels_from_prs.sh
+
 # Set up skbuild options. Enable sccache in skbuild config options
 export SKBUILD_CMAKE_ARGS="-DDETECT_CONDA_ENV=OFF;-DFIND_CUVS_CPP=OFF${EXTRA_CMAKE_ARGS}"
 
