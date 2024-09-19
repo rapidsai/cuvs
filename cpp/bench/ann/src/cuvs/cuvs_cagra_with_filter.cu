@@ -174,6 +174,13 @@ class CagraWithFilterKNNBenchmark {
       item = static_cast<uint32_t>(0);
     }
 
+    if(sparsity == 0.0) {
+      for (auto& item : bitset) {
+        item = static_cast<uint32_t>(0xffffffff);
+      }
+      return total;
+    }
+
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<int64_t> dis(0, total - 1);
@@ -376,7 +383,7 @@ static std::vector<RandomKNNInputs> getInputs()
                                                  {int(1024 * 1024)},
                                                  {int(32)},
                                                  {int(64)},
-                                                 {0.1f, 0.3f, 0.5f, 0.8f, 0.9f, 0.99f},
+                                                 {0.0f, 0.1f, 0.3f, 0.5f, 0.8f, 0.9f, 0.99f},
                                                  {cuvs::distance::DistanceType::InnerProduct},
                                                  {search_algo::SINGLE_CTA},
                                                  {true});
