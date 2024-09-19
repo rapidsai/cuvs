@@ -215,6 +215,7 @@ add_library(
   src/cluster/kmeans_balanced_predict_int8.cu
   src/cluster/kmeans_transform_float.cu
   src/cluster/single_linkage_float.cu
+  src/core/bitset.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
@@ -405,9 +406,6 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
   src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_int8.cu

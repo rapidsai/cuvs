@@ -19,6 +19,7 @@
 #include "common.hpp"
 #include <cstdint>
 #include <cuvs/neighbors/common.hpp>
+#include <optional>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 
@@ -1163,13 +1164,17 @@ void extend(raft::resources const& handle,
  * dataset [n_queries, k]
  * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
  * [n_queries, k]
+ * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
+ * query.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             cuvs::neighbors::ivf_flat::index<float, int64_t>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter = std::nullopt);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1200,13 +1205,17 @@ void search(raft::resources const& handle,
  * dataset [n_queries, k]
  * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
  * [n_queries, k]
+ * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
+ * query.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             cuvs::neighbors::ivf_flat::index<int8_t, int64_t>& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter = std::nullopt);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1237,112 +1246,18 @@ void search(raft::resources const& handle,
  * dataset [n_queries, k]
  * @param[out] distances raft::device_matrix_view to the distances to the selected neighbors
  * [n_queries, k]
+ * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
+ * query.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::ivf_flat::search_params& params,
             cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter = std::nullopt);
 
-/**
- * @brief Search ANN using the constructed index with the given filter.
- *
- * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
- *
- * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
- * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
- * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`.
- * The exact size of the temporary buffer depends on multiple factors and is an implementation
- * detail. However, you can safely specify a small initial size for the memory pool, so that only a
- * few allocations happen to grow it during the first invocations of the `search`.
- *
- * @param[in] handle
- * @param[in] params configure the search
- * @param[in] idx ivf-flat constructed index
- * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
- * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
- * [n_queries, k]
- * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
- * k]
- * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
- * query.
- */
-void search_with_filtering(
-  raft::resources const& handle,
-  const search_params& params,
-  index<float, int64_t>& idx,
-  raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
-  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> sample_filter);
-
-/**
- * @brief Search ANN using the constructed index with the given filter.
- *
- * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
- *
- * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
- * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
- * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`.
- * The exact size of the temporary buffer depends on multiple factors and is an implementation
- * detail. However, you can safely specify a small initial size for the memory pool, so that only a
- * few allocations happen to grow it during the first invocations of the `search`.
- *
- * @param[in] handle
- * @param[in] params configure the search
- * @param[in] idx ivf-flat constructed index
- * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
- * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
- * [n_queries, k]
- * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
- * k]
- * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
- * query.
- */
-void search_with_filtering(
-  raft::resources const& handle,
-  const search_params& params,
-  index<int8_t, int64_t>& idx,
-  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
-  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> sample_filter);
-
-/**
- * @brief Search ANN using the constructed index with the given filter.
- *
- * See the [ivf_flat::build](#ivf_flat::build) documentation for a usage example.
- *
- * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
- * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
- * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`.
- * The exact size of the temporary buffer depends on multiple factors and is an implementation
- * detail. However, you can safely specify a small initial size for the memory pool, so that only a
- * few allocations happen to grow it during the first invocations of the `search`.
- *
- * @param[in] handle
- * @param[in] params configure the search
- * @param[in] idx ivf-flat constructed index
- * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
- * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
- * [n_queries, k]
- * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
- * k]
- * @param[in] sample_filter a device bitset filter function that greenlights samples for a given
- * query.
- */
-void search_with_filtering(
-  raft::resources const& handle,
-  const search_params& params,
-  index<uint8_t, int64_t>& idx,
-  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
-  raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
-  raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-  cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t> sample_filter);
 /**
  * @}
  */
@@ -2039,18 +1954,18 @@ void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index);
  *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   // use default index parameters
- *   ivf_pq::index_params index_params;
+ *   ivf_flat::index_params index_params;
  *   // initialize an empty index
- *   ivf_pq::index<int64_t> index(res, index_params, D);
- *   ivf_pq::helpers::reset_index(res, &index);
+ *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+ *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, int64_t>{
- *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
+ *     index->dim(), index->conservative_memory_allocation()};
  *   uint32_t new_size = 5;
  *   ivf::resize_list(res, list, spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
- *   ivf_pq::helpers::recompute_internal_state(res, index);
+ *   ivf_flat::helpers::recompute_internal_state(res, index);
  * @endcode
  *
  * @param[in] res raft resource
@@ -2067,18 +1982,18 @@ void recompute_internal_state(const raft::resources& res, index<float, int64_t>*
  *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   // use default index parameters
- *   ivf_pq::index_params index_params;
+ *   ivf_flat::index_params index_params;
  *   // initialize an empty index
- *   ivf_pq::index<int64_t> index(res, index_params, D);
- *   ivf_pq::helpers::reset_index(res, &index);
+ *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+ *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, int64_t>{
- *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
+ *     index->dim(), index->conservative_memory_allocation()};
  *   uint32_t new_size = 5;
  *   ivf::resize_list(res, list, spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
- *   ivf_pq::helpers::recompute_internal_state(res, index);
+ *   ivf_flat::helpers::recompute_internal_state(res, index);
  * @endcode
  *
  * @param[in] res raft resource
@@ -2095,18 +2010,18 @@ void recompute_internal_state(const raft::resources& res, index<int8_t, int64_t>
  *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   // use default index parameters
- *   ivf_pq::index_params index_params;
+ *   ivf_flat::index_params index_params;
  *   // initialize an empty index
- *   ivf_pq::index<int64_t> index(res, index_params, D);
- *   ivf_pq::helpers::reset_index(res, &index);
+ *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
+ *   ivf_flat::helpers::reset_index(res, &index);
  *   // resize the first IVF list to hold 5 records
- *   auto spec = list_spec<uint32_t, int64_t>{
- *     index->pq_bits(), index->pq_dim(), index->conservative_memory_allocation()};
+ *   auto spec = list_spec<uint32_t, uint8_t, int64_t>{
+ *     index->dim(), index->conservative_memory_allocation()};
  *   uint32_t new_size = 5;
  *   ivf::resize_list(res, list, spec, new_size, 0);
  *   raft::update_device(index.list_sizes(), &new_size, 1, stream);
  *   // recompute the internal state of the index
- *   ivf_pq::helpers::recompute_internal_state(res, index);
+ *   ivf_flat::helpers::recompute_internal_state(res, index);
  * @endcode
  *
  * @param[in] res raft resource

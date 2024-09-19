@@ -332,11 +332,19 @@ void search(raft::resources const& res,
             const index<T, IdxT>& idx,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances)
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter_opt = std::nullopt)
 {
-  using none_filter_type = cuvs::neighbors::filtering::none_cagra_sample_filter;
-  return cagra::search_with_filtering<T, IdxT, none_filter_type>(
-    res, params, idx, queries, neighbors, distances, none_filter_type{});
+  if (sample_filter_opt.has_value()) {
+    return cagra::
+      search_with_filtering<T, IdxT, cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>(
+        res, params, idx, queries, neighbors, distances, sample_filter_opt.value());
+  } else {
+    using none_filter_type = cuvs::neighbors::filtering::none_cagra_sample_filter;
+    return cagra::search_with_filtering<T, IdxT, none_filter_type>(
+      res, params, idx, queries, neighbors, distances, none_filter_type{});
+  }
 }
 
 template <class T, class IdxT, class Accessor>

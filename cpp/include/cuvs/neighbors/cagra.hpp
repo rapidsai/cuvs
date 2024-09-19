@@ -951,9 +951,6 @@ void extend(
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] res raft resources
  * @param[in] params configure the search
  * @param[in] idx cagra index
@@ -962,6 +959,8 @@ void extend(
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
+ * given query
  */
 
 void search(raft::resources const& res,
@@ -969,15 +968,14 @@ void search(raft::resources const& res,
             const cuvs::neighbors::cagra::index<float, uint32_t>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter = std::nullopt);
 
 /**
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -987,21 +985,22 @@ void search(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
+ * given query
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter = std::nullopt);
 
 /**
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -1011,13 +1010,18 @@ void search(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
+ * given query
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
+              sample_filter = std::nullopt);
+
 /**
  * @}
  */
