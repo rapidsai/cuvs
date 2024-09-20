@@ -55,11 +55,12 @@ namespace multi_cta_search {
 // #define _CLK_BREAKDOWN
 
 template <class INDEX_T>
-__device__ void pickup_next_parents(INDEX_T* const next_parent_indices,  // [search_width]
-                                    const uint32_t search_width,
-                                    INDEX_T* const itopk_indices,  // [num_itopk]
-                                    const size_t num_itopk,
-                                    uint32_t* const terminate_flag)
+RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parents(
+  INDEX_T* const next_parent_indices,  // [search_width]
+  const uint32_t search_width,
+  INDEX_T* const itopk_indices,  // [num_itopk]
+  const size_t num_itopk,
+  uint32_t* const terminate_flag)
 {
   constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
   const unsigned warp_id             = threadIdx.x / 32;
@@ -95,10 +96,11 @@ __device__ void pickup_next_parents(INDEX_T* const next_parent_indices,  // [sea
 }
 
 template <unsigned MAX_ELEMENTS, class INDEX_T>
-__device__ inline void topk_by_bitonic_sort(float* distances,  // [num_elements]
-                                            INDEX_T* indices,  // [num_elements]
-                                            const uint32_t num_elements,
-                                            const uint32_t num_itopk  // num_itopk <= num_elements
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(
+  float* distances,  // [num_elements]
+  INDEX_T* indices,  // [num_elements]
+  const uint32_t num_elements,
+  const uint32_t num_itopk  // num_itopk <= num_elements
 )
 {
   const unsigned warp_id = threadIdx.x / 32;
@@ -188,21 +190,21 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   // | <itopk_size>   | <search_width * graph_degree> | upto 32 |
   // +----------------+------------------------------+---------+
   // |<---          result_buffer_size           --->|
-  uint32_t result_buffer_size    = itopk_size + (search_width * graph_degree);
-  uint32_t result_buffer_size_32 = result_buffer_size;
-  if (result_buffer_size % 32) { result_buffer_size_32 += 32 - (result_buffer_size % 32); }
+  const auto result_buffer_size    = itopk_size + (search_width * graph_degree);
+  const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
   assert(result_buffer_size_32 <= MAX_ELEMENTS);
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
 
-  auto result_indices_buffer =
+  auto* __restrict__ result_indices_buffer =
     reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes());
-  auto result_distances_buffer =
+  auto* __restrict__ result_distances_buffer =
     reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
-  auto parent_indices_buffer =
+  auto* __restrict__ parent_indices_buffer =
     reinterpret_cast<INDEX_T*>(result_distances_buffer + result_buffer_size_32);
-  auto terminate_flag = reinterpret_cast<uint32_t*>(parent_indices_buffer + search_width);
+  auto* __restrict__ terminate_flag =
+    reinterpret_cast<uint32_t*>(parent_indices_buffer + search_width);
 
 #if 0
     /* debug */
