@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef _PQ_H_
-#define _PQ_H_
+#pragma once
 
 #include <stdio.h>
 #include "vamana_structs.cuh"
@@ -381,4 +380,3 @@ enqueue_all_neighbors(int num_neighbors, Point<T, accT> *query_vec,
 }
 
 } // namespace
-#endif

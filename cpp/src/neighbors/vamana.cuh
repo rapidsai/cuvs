@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@
 
 #include "detail/vamana/vamana_build.cuh"
 #include "detail/vamana/vamana_serialize.cuh"
-//#include "detail/vamana/vamana_search.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef _ANN_DISTANCE_H_
-#define _ANN_DISTANCE_H_
 
 #pragma once
 
@@ -487,5 +484,3 @@ __global__ void recompute_reverse_dists(
 
 
 } // cuvs::neighbors::vamana::detail namespace
-
-#endif
