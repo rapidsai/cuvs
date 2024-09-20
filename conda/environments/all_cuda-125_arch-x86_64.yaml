@@ -34,7 +34,7 @@ dependencies:
 - libcusparse-dev
 - librmm==24.10.*,>=0.0.0a0
 - make
-- nccl>=2.9.9
+- nccl>=2.18.1.1
 - ninja
 - numpy>=1.23,<3.0a0
 - numpydoc
