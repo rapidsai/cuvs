@@ -108,7 +108,6 @@ void serialize(raft::resources const& res,
   index_of.write((char *)&max_degree, sizeof(uint32_t));
 
   RAFT_LOG_DEBUG("Wrote file out, index size:%lu, max_degree:%u, num_sparse:%ld, num_single:%ld, total edges:%ld, avg degree:%f", index_size, max_degree, num_sparse, num_single, total_edges, (float)total_edges / (float)h_graph.extent(0));
-  RAFT_LOG_INFO("Vamana graph written to file.");
 
   index_of.close();
   if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
