@@ -63,9 +63,15 @@ __forceinline__ __device__ void sort_visited(
 }
 
 
-/*
-  GPU kernel for Graph-based ANN searching algorithm 
-*/
+/********************************************************************************************
+  GPU kernel to perform a batched GreedySearch on a graph. Since this is used for
+  Vamana construction, the entire visited list is kept and stored within the query_list.
+  Input - graph with edge lists, dataset vectors, query_list_ptr with the ids of dataset
+          vectors to be searched.
+
+  Output - the id and dist lists in query_list_ptr will be updated with the nodes visited
+           during the GreedySearch.
+**********************************************************************************************/
 template <typename T, 
           typename accT, 
           typename IdxT = uint32_t,
@@ -113,7 +119,6 @@ __global__ void GreedySearchKernel(
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
   smem_offset += dim * sizeof(T);
 
-//  Node<accT>* topk_pq = (Node<accT>*)(&dynamic_smem[dim*sizeof(T)]);
   Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]);
   smem_offset += topk * sizeof(Node<accT>);
 
@@ -126,12 +131,9 @@ __global__ void GreedySearchKernel(
   s_query.coords = s_coords;
   s_query.Dim = dim;
 
-//  static __shared__ DistPair<IdxT, accT> sharememory[CANDIDATE_QUEUE_SIZE];
   PriorityQueue<IdxT, accT> heap_queue;
 
   if (threadIdx.x == 0) {
-//    heap_queue.initialize(&((DistPair<IdxT, accT> *)sharememory)[0],
-//                          CANDIDATE_QUEUE_SIZE, &cand_q_size);
     heap_queue.initialize(candidate_queue_smem,
                           max_queue_size, &cand_q_size);
   }
@@ -141,13 +143,8 @@ __global__ void GreedySearchKernel(
   for (int i = blockIdx.x; i<num_queries; i+=gridDim.x) {
     __syncthreads();
 
-//    bool write_flag = false;
-//    int visited_node_count = 0;
-
     //resetting visited list
     query_list[i].reset();
-//    reset_filter(visited_table, visited_table_size, -1);
-//    reset_filter(query_list[i].list, query_list[i].maxSize, -1);
 
     //storing the current query vector into shared memory
     update_shared_point<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim);
@@ -169,9 +166,7 @@ __global__ void GreedySearchKernel(
    // Just start from medoid every time, rather than multiple set_ups
     query_vec = &s_query;
     query_vec->Dim = dim;
-//    Point<T, accT, Dim>* medoid = vec_ptr + medoid_id;
     const T* medoid = &vec_ptr[(size_t)medoid_id*(size_t)dim];
-//    accT medoid_dist = GetDistanceByVec<T,accT,Dim>(query_vec, medoid, metric);
     accT medoid_dist = dist<T,accT>(query_vec->coords, medoid, dim, metric);
 
     if(threadIdx.x==0) {
@@ -201,9 +196,6 @@ __syncthreads();
 
       __syncthreads();
 
-//      if (CheckVisited<accT>(visited_table, query_list[i].list, visited_cnt, cand_num, cur_distance,
-//                       visited_table_size, query_list[i].maxSize)) {
-
       if(query_list[i].check_visited(cand_num, cur_distance)) {
         continue;
       }
@@ -226,12 +218,10 @@ __syncthreads();
         done = __shfl_sync(FULL_BITMASK, done, 0);
         if (done) {
           if(query_list[i].size < topk) {
-//          if (visited_node_count < min_visiting_node) {
             pass_flag = true;
           }
 
           else if (query_list[i].size >= topk) {
-//            write_flag = true;
             break;
           }
         }
@@ -239,7 +229,6 @@ __syncthreads();
 
       //The current node is closer to the query vector than the worst candidate in top-K queue, so 
       //enquee the current node in top-k queue
-//      visited_node_count += 1;
       Node<accT> new_cand;
       new_cand.distance = cur_distance;
       new_cand.nodeid = cand_num;
@@ -261,19 +250,15 @@ __syncthreads();
 
 
       for (size_t j = threadIdx.x; j < degree; j += blockDim.x) {
-        //Load 32 neighbors from the graph array and store them in neighbor array (shared memory)
-//          neighbor_array[j] = graph[(size_t)(cand_num) * (size_t)(DEGREE) + (size_t)(j)];
+        //Load neighbors from the graph array and store them in neighbor array (shared memory)
           neighbor_array[j] = graph(cand_num, j);
           if(neighbor_array[j] == INFTY<IdxT>()) atomicMin(&num_neighbors, (int)j); // warp-wide min to find the number of neighbors
       }
 
-        //computing distances between the query vector and 32 neighbor vectors then sequentially enqueue in priority queue.
+        //computing distances between the query vector and neighbor vectors then enqueue in priority queue.
       enqueue_all_neighbors<T, accT, IdxT>(num_neighbors, query_vec, vec_ptr,
                                               neighbor_array, heap_queue, dim, metric);
                                               
-//      Compute_Insert_Multi<T, accT, IdxT>(num_neighbors, query_vec, vec_ptr,
-//                                              neighbor_array, 0,
-//                                              heap_queue, dim);
       __syncthreads();
 
     } // End cand_q_size != 0 loop
@@ -297,13 +282,6 @@ __syncthreads();
     if(self_found) query_list[i].size--;
 
     SEARCH_SELECT_SORT(topk);
-
-   /* 
-    if(threadIdx.x==0 && i==0) {
-      query_list[i].print_visited();
-    }
-    */
-    
   }
 
   return;

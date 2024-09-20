@@ -87,20 +87,6 @@ class PriorityQueue {
       }
 
     }
-/*
-    __forceinline__ __device__ void MultiHeapifyReverseAt(int idx){
-      int i = idx;
-      int swapDest = 0;
-      while(i > 0){
-        swapDest = ((i-1)/2);
-        if(vals[swapDest].dist <= vals[i].dist) return;
-        
-        swap(&vals[i], &vals[swapDest]);
-        i = swapDest;
-      }
-
-    }
-    */
 
     __device__ void reset() {
       *q_size = 0;
@@ -131,28 +117,6 @@ class PriorityQueue {
         gmem[i] = vals[i].idx;
       }
     }
-
-
-    // FOR DEBUGGING: Print heap out
-    /*
-    __device__ void printHeap() {
-      int levelSize=0;
-      int offset=0;
-      for(int level=0; offset<=4; level++) {
-        levelSize = pow(2,level);
-        for(int i=0; i<levelSize; i++) {
-          if(vals[offset+i].idx == INFTY<IdxT>()) {printf("0 (INFTY)   ");}
-          else {
-            printf("%d (%0.3f)   ", vals[offset+i].idx, vals[offset+i].dist);
-          }
-          //printf("%llu   ", vals[offset+i].dist);
-        }
-        offset += levelSize;
-        printf("\n");
-      } 
-    }
-    */
-
 
     // Replace the root of the heap with new pair
     __device__ void insert(accT newDist, IdxT newIdx) {

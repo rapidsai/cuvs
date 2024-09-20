@@ -56,38 +56,6 @@ struct AnnVamanaInputs {
   bool host_dataset;
 };
 
-/*
-inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
-{
-  const auto metric_str = [](const cuvs::distance::DistanceType dist) -> std::string {
-    switch (dist) {
-      case InnerProduct: return "InnerProduct";
-      case L2Expanded: return "L2";
-      default: break;
-    }
-    return "Unknown";
-  };
-
-  std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
-  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
-  os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
-     << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
-     << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
-     << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
-     << ", build_algo=" << build_algo.at((int)p.build_algo);
-  if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
-    os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
-  }
-  if (p.compression.has_value()) {
-    auto vpq = p.compression.value();
-    os << ", pq_bits=" << vpq.pq_bits << ", pq_dim=" << vpq.pq_dim
-       << ", vq_n_centers=" << vpq.vq_n_centers;
-  }
-  os << '}' << std::endl;
-  return os;
-}
-*/
-
 template<typename DataT, typename IdxT>
 inline void CheckGraph(vamana::index<DataT, IdxT>* index_, AnnVamanaInputs inputs, cudaStream_t stream) {
 

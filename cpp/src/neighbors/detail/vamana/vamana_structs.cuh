@@ -486,7 +486,6 @@ __global__ void recompute_reverse_dists(
  */
 
 
-
 } // cuvs::neighbors::vamana::detail namespace
 
 #endif
