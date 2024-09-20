@@ -160,6 +160,19 @@ if(BUILD_TESTS)
     100
   )
 
+ ConfigureTest(
+    NAME
+    NEIGHBORS_ANN_VAMANA_TEST
+    PATH
+    neighbors/ann_vamana/test_float_uint32_t.cu
+    neighbors/ann_vamana/test_int8_t_uint32_t.cu
+    neighbors/ann_vamana/test_uint8_t_uint32_t.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
   endif()
