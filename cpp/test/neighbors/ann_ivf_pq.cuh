@@ -888,6 +888,26 @@ inline auto enum_variety_l2sqrt() -> test_cases_t
   });
 }
 
+inline auto enum_variety_cosine() -> test_cases_t
+{
+  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
+    ivf_pq_inputs y(x);
+    if (y.min_recall.has_value()) {
+      if (y.search_params.lut_dtype == CUDA_R_8U) {
+        // InnerProduct score is signed,
+        // thus we're forced to used signed 8-bit representation,
+        // thus we have one bit less precision
+        y.min_recall = y.min_recall.value() * 0.90;
+      } else {
+        // In other cases it seems to perform a little bit better, still worse than L2
+        y.min_recall = y.min_recall.value() * 0.94;
+      }
+    }
+    y.index_params.metric = distance::DistanceType::CosineExpanded;
+    return y;
+  });
+}
+
 /**
  * Try different number of n_probes, some of which may trigger the non-fused version of the search
  * kernel.

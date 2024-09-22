@@ -41,6 +41,8 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
@@ -1569,17 +1571,22 @@ void extend(raft::resources const& handle,
                                     stream));
     vec_batches.prefetch_next_batch();
     for (const auto& batch : vec_batches) {
-      auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
-        batch.data(), batch.size(), index->dim());
+      // auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
+      //   batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
         new_data_labels.data() + batch.offset(), batch.size());
+      auto float_vec_batch = raft::make_device_matrix<float, internal_extents_t>(handle, batch.size(), index->dim());
+      raft::linalg::map_offset(handle, raft::make_device_vector_view<const T, internal_extents_t>(batch.data(), batch.size() * index->dim()), raft::make_device_vector_view<float, internal_extents_t>(float_vec_batch.data_handle(), float_vec_batch.size()), [=]__device__(internal_extents_t idx, T i) {return utils::mapping<float>{}(i);});
+      if(index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::row_normalize(handle, raft::make_const_mdspan(float_vec_batch.view()), float_vec_batch.view(), raft::linalg::NormType::L2Norm);
+      }
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
-      kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
+      kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
       cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
-                                              batch_data_view,
+                                              raft::make_const_mdspan(float_vec_batch.view()),
                                               centers_view,
                                               batch_labels_view,
                                               utils::mapping<float>{});
@@ -1632,9 +1639,14 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
+    auto float_vec_batch = raft::make_device_matrix<float, internal_extents_t>(handle, vec_batch.size(), index->dim());
+      raft::linalg::map_offset(handle, raft::make_device_vector_view<const T, internal_extents_t>(vec_batch.data(), vec_batch.size() * index->dim()), raft::make_device_vector_view<float, internal_extents_t>(float_vec_batch.data_handle(), float_vec_batch.size()), [=]__device__(internal_extents_t idx, T i) {return utils::mapping<float>{}(i);});
+      if(index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::row_normalize(handle, raft::make_const_mdspan(float_vec_batch.view()), float_vec_batch.view(), raft::linalg::NormType::L2Norm);
+      }
     process_and_fill_codes(handle,
                            *index,
-                           vec_batch.data(),
+                           float_vec_batch.data_handle(),
                            new_indices != nullptr
                              ? std::variant<IdxT, const IdxT*>(idx_batch.data())
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
@@ -1750,11 +1762,12 @@ auto build(raft::resources const& handle,
 
     // Train balanced hierarchical kmeans clustering
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
+    raft::linalg::row_normalize(handle, trainset_const_view, trainset.view(), raft::linalg::NormType::L2Norm);
     auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
 

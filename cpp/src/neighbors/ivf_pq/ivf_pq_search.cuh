@@ -38,6 +38,8 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
+#include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/normalize.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cache.hpp>
 #include <raft/util/cuda_utils.cuh>
@@ -110,6 +112,7 @@ void select_clusters(raft::resources const& handle,
   switch (metric) {
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
@@ -121,6 +124,10 @@ void select_clusters(raft::resources const& handle,
       uint32_t row = ix / dim_ext;
       return col < dim ? utils::mapping<float>{}(queries[col + dim * row]) : norm_factor;
     });
+  
+  auto float_queries_matrix_view = raft::make_device_matrix_view<float, uint32_t>(float_queries, n_queries, dim_ext);
+  
+  raft::linalg::row_normalize(handle, raft::make_const_mdspan(float_queries_matrix_view), float_queries_matrix_view, raft::linalg::NormType::L2Norm);
 
   float alpha;
   float beta;
@@ -133,6 +140,7 @@ void select_clusters(raft::resources const& handle,
       gemm_k = dim + 1;
       RAFT_EXPECTS(gemm_k <= dim_ext, "unexpected gemm_k or dim_ext");
     } break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: {
       alpha = -1.0;
       beta  = 0.0;
@@ -363,6 +371,7 @@ void ivfpq_search_worker(raft::resources const& handle,
       // stores basediff (query[i] - center[i])
       precomp_data_count = index.rot_dim();
     } break;
+    case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
       // stores two components (query[i] * center[i], query[i] * center[i])
       precomp_data_count = index.rot_dim() * 2;
@@ -666,7 +675,7 @@ inline void search(raft::resources const& handle,
     uint32_t queries_batch = min(max_queries, n_queries - offset_q);
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> batch_scope(
       "ivf_pq::search-batch(queries: %u - %u)", offset_q, offset_q + queries_batch);
-
+    
     select_clusters(handle,
                     clusters_to_probe.data(),
                     float_queries.data(),
