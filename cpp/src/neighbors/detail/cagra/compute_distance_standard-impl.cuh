@@ -63,23 +63,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
   constexpr static inline auto kTeamSize        = TeamSize;
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
 
-  // const DATA_T* ptr;
-  // uint32_t ld;
-
-  // RAFT_INLINE_FUNCTION constexpr auto ptr() noexcept -> const DATA_T*&
-  // {
-  //   return (const DATA_T*&)(extra_ptr1);
-  // }
-
-  // RAFT_INLINE_FUNCTION constexpr auto ptr() const noexcept -> const DATA_T* const&
-  // {
-  //   return (const DATA_T* const&)(extra_ptr1);
-  // }
-
-  // RAFT_INLINE_FUNCTION constexpr auto ld() noexcept -> uint32_t& { return extra_word1; }
-  // RAFT_INLINE_FUNCTION constexpr auto ld() const noexcept -> const uint32_t& { return
-  // extra_word1; }
-
   static constexpr RAFT_INLINE_FUNCTION auto ptr(const args_t& args) noexcept
     -> const DATA_T* const&
   {

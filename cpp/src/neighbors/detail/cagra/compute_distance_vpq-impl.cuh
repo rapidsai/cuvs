@@ -56,11 +56,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
 
   static_assert(std::is_same_v<CODE_BOOK_T, half>, "Only CODE_BOOK_T = `half` is supported now");
 
-  // alignas(LOAD_T) const std::uint8_t* encoded_dataset_ptr;
-  // const CODE_BOOK_T* vq_code_book_ptr;
-  // const CODE_BOOK_T* pq_code_book_ptr;
-  // std::uint32_t encoded_dataset_dim;
-
   RAFT_INLINE_FUNCTION static constexpr auto encoded_dataset_ptr(args_t& args) noexcept
     -> const uint8_t*&
   {
