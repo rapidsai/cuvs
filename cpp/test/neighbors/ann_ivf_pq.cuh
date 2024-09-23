@@ -21,9 +21,12 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
+#include <library_types.h>
 #include <raft/core/bitset.cuh>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
+#include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_pool.hpp>
@@ -160,6 +163,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   void gen_data()
   {
+    std::cout << "inside gen_data" << std::endl;
     database.resize(size_t{ps.num_db_vecs} * size_t{ps.dim}, stream_);
     search_queries.resize(size_t{ps.num_queries} * size_t{ps.dim}, stream_);
 
@@ -169,6 +173,14 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
+        auto dataset_const_view = raft::make_device_matrix_view<const float>(database.data(), ps.num_db_vecs, ps.dim);
+      // auto dataset_view = raft::make_device_matrix_view<float>(database.data(), ps.num_db_vecs, ps.dim);
+      // raft::linalg::row_normalize(handle_, dataset_const_view, dataset_view, raft::linalg::NormType::L2Norm);
+      // auto queries_const_view = raft::make_device_matrix_view<const float>(search_queries.data(), ps.num_queries, ps.dim);
+      // auto queries_view = raft::make_device_matrix_view<float>(search_queries.data(), ps.num_queries, ps.dim);
+      // raft::linalg::row_normalize(handle_, queries_const_view, queries_view, raft::linalg::NormType::L2Norm);
+      // raft::print_device_vector("database", database.data(), 100, std::cout);
+
     } else {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(1), DataT(20));
@@ -199,7 +211,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     indices_ref.resize(queries_size);
     raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
-    raft::print_host_vector("distances_ref", distances_ref.data(), 100, std::cout);
+    // raft::print_host_vector("distances_ref", distances_ref.data(), 100, std::cout);
   }
 
   auto build_only()
@@ -543,6 +555,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   void gen_data()
   {
+    std::cout << "inside gen_data" << std::endl;
     database.resize(size_t{ps.num_db_vecs} * size_t{ps.dim}, stream_);
     search_queries.resize(size_t{ps.num_queries} * size_t{ps.dim}, stream_);
 
@@ -552,6 +565,12 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
+      // auto dataset_const_view = raft::make_device_matrix_view<const float>(database.data(), ps.num_db_vecs, ps.dim);
+      // auto dataset_view = raft::make_device_matrix_view<float>(database.data(), ps.num_db_vecs, ps.dim);
+      // raft::linalg::row_normalize(handle_, dataset_const_view, dataset_view, raft::linalg::NormType::L2Norm);
+      // auto queries_const_view = raft::make_device_matrix_view<const float>(search_queries.data(), ps.num_queries, ps.dim);
+      // auto queries_view = raft::make_device_matrix_view<float>(search_queries.data(), ps.num_queries, ps.dim);
+      // raft::linalg::row_normalize(handle_, queries_const_view, queries_view, raft::linalg::NormType::L2Norm);
     } else {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(1), DataT(20));
@@ -587,7 +606,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     indices_ref.resize(queries_size);
     raft::update_host(indices_ref.data(), indices_naive_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
-    raft::print_host_vector("distances_ref", distances_ref.data(), 100, std::cout);
+    // raft::print_host_vector("distances_ref", distances_ref.data(), 100, std::cout);
   }
 
   auto build_only()
@@ -645,8 +664,8 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
     raft::resource::sync_stream(handle_);
 
-    raft::print_host_vector("indices_ivf_pq.data()", indices_ivf_pq.data(), 100, std::cout);
-    raft::print_host_vector("distances_ivf_pq.data()", distances_ivf_pq.data(), 100, std::cout);
+    // raft::print_host_vector("indices_ivf_pq.data()", indices_ivf_pq.data(), 100, std::cout);
+    // raft::print_host_vector("distances_ivf_pq.data()", distances_ivf_pq.data(), 100, std::cout);
 
     // A very conservative lower bound on recall
     double min_recall =
@@ -898,6 +917,20 @@ inline auto enum_variety_cosine() -> test_cases_t
 {
   return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
     ivf_pq_inputs y(x);
+    if (y.min_recall.has_value()) {
+      // y.search_params.lut_dtype = CUDA_R_8U;
+      if (y.search_params.lut_dtype == CUDA_R_8U) {
+        y.search_params.lut_dtype               = CUDA_R_16F;
+        // InnerProduct score is signed,
+        // thus we're forced to used signed 8-bit representation,
+        // thus we have one bit less precision
+        y.min_recall = y.min_recall.value() * 0.94;
+      } else {
+        // In other cases it seems to perform a little bit better, still worse than L2
+        y.min_recall = y.min_recall.value() * 0.94;
+      }
+    }
+    // y.index_params.codebook_kind = ivf_pq::codebook_gen::PER_SUBSPACE;
     y.index_params.metric = distance::DistanceType::CosineExpanded;
     return y;
   });

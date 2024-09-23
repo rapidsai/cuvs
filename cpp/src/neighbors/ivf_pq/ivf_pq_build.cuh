@@ -30,7 +30,9 @@
 #include "../../cluster/kmeans_balanced.cuh"
 
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_mdspan.hpp>
 #include <raft/core/logger-ext.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
@@ -41,6 +43,8 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
@@ -254,6 +258,7 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
                         raft::linalg::L2Norm,
                         true,
                         stream);
+  raft::print_device_vector("center_norms during build", center_norms.data(), index->n_lists(), std::cout);
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
                                   sizeof(float) * index->dim_ext(),
                                   center_norms.data(),
@@ -1571,15 +1576,21 @@ void extend(raft::resources const& handle,
     for (const auto& batch : vec_batches) {
       auto batch_data_view = raft::make_device_matrix_view<const T, internal_extents_t>(
         batch.data(), batch.size(), index->dim());
+      // auto float_vec_batch = raft::make_device_matrix<float, internal_extents_t>(handle, batch.size(), index->dim());
+      // raft::linalg::map_offset(handle, raft::make_device_vector_view<const T, internal_extents_t>(batch.data(), batch.size() * index->dim()), raft::make_device_vector_view<float, internal_extents_t>(float_vec_batch.data_handle(), float_vec_batch.size()), [=]__device__(internal_extents_t idx, T i) {return utils::mapping<float>{}(i);});
+      // if(index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      //   raft::linalg::row_normalize(handle, raft::make_const_mdspan(float_vec_batch.view()), float_vec_batch.view(), raft::linalg::NormType::L2Norm);
+      // }
       auto batch_labels_view = raft::make_device_vector_view<uint32_t, internal_extents_t>(
         new_data_labels.data() + batch.offset(), batch.size());
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
+      // kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
       cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
-                                              batch_data_view,
+                                              raft::make_const_mdspan(batch_data_view),
                                               centers_view,
                                               batch_labels_view,
                                               utils::mapping<float>{});
@@ -1631,6 +1642,11 @@ void extend(raft::resources const& handle,
   vec_batches.reset();
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
+    // auto float_vec_batch = raft::make_device_matrix<float, internal_extents_t>(handle, vec_batch.size(), index->dim());
+    //   raft::linalg::map_offset(handle, raft::make_device_vector_view<const T, internal_extents_t>(vec_batch.data(), vec_batch.size() * index->dim()), raft::make_device_vector_view<float, internal_extents_t>(float_vec_batch.data_handle(), float_vec_batch.size()), [=]__device__(internal_extents_t idx, T i) {return utils::mapping<float>{}(i);});
+    //   if(index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    //     raft::linalg::row_normalize(handle, raft::make_const_mdspan(float_vec_batch.view()), float_vec_batch.view(), raft::linalg::NormType::L2Norm);
+    //   }
     const auto& idx_batch = *idx_batches++;
     process_and_fill_codes(handle,
                            *index,
@@ -1742,6 +1758,10 @@ auto build(raft::resources const& handle,
                             raft::resource::get_cuda_stream(handle));
     }
 
+    // if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    //   raft::linalg::row_normalize(handle, raft::make_const_mdspan(trainset.view()), trainset.view(), raft::linalg::NormType::L2Norm);
+    // }
+
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
     // dim_ext]!
     rmm::device_uvector<float> cluster_centers_buf(
@@ -1754,14 +1774,16 @@ auto build(raft::resources const& handle,
       cluster_centers, index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    // kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    kmeans_params.metric = cuvs::distance::DistanceType::InnerProduct;
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
-
+    
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
+    // raft::linalg::row_normalize(handle, centers_const_view, centers_view, raft::linalg::NormType::L2Norm);
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
     cuvs::cluster::kmeans_balanced::predict(handle,

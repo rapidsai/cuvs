@@ -129,6 +129,10 @@ void select_clusters(raft::resources const& handle,
       uint32_t row = ix / dim_ext;
       return col < dim ? utils::mapping<float>{}(queries[col + dim * row]) : norm_factor;
     });
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    auto float_queries_matrix_view = raft::make_device_matrix_view<float, uint32_t>(float_queries, n_queries, dim_ext);
+    raft::linalg::row_normalize(handle, raft::make_const_mdspan(float_queries_matrix_view), float_queries_matrix_view, raft::linalg::NormType::L2Norm);
+  }
 
   float alpha;
   float beta;
@@ -165,14 +169,16 @@ void select_clusters(raft::resources const& handle,
                      n_lists,
                      stream);
 
-  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+  if (metric == distance::DistanceType::CosineExpanded) {
     // TODO: store dataset norms in a different manner for the cosine metric to avoid the copy here
     auto center_norms =
       raft::make_device_mdarray<float, uint32_t>(handle, mr, raft::make_extents<uint32_t>(n_lists));
+    
+    raft::print_device_vector("cluster_centers", cluster_centers, dim_ext * 3, std::cout);
 
     cudaMemcpy2DAsync(center_norms.data_handle(),
                       sizeof(float),
-                      cluster_centers,
+                      cluster_centers + dim,
                       sizeof(float) * dim_ext,
                       sizeof(float),
                       n_lists,
@@ -716,6 +722,8 @@ inline void search(raft::resources const& handle,
     uint32_t queries_batch = min(max_queries, n_queries - offset_q);
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> batch_scope(
       "ivf_pq::search-batch(queries: %u - %u)", offset_q, offset_q + queries_batch);
+    
+    // raft::linalg::row_normalize(handle, raft::make_device_matrix_view<const float>(float_queries.data(), max_queries, dim_ext), raft::make_device_matrix_view<float>(float_queries.data(), max_queries, dim_ext), raft::linalg::NormType::L2Norm);
 
     select_clusters(handle,
                     clusters_to_probe.data(),

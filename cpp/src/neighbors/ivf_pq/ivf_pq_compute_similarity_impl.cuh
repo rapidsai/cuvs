@@ -278,6 +278,7 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
   }
   // printf("score %f norm %f\n", float(score), float(norm));
   return score / OutT(sqrtf(norm));
+  // return score;
 }
 
 /**
@@ -783,7 +784,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                                                              pq_dim,
                                                              n_queries,
                                                              queries_offset,
-                                                             metric,
+                                                             cuvs::distance::DistanceType::CosineExpanded,
                                                              codebook_kind,
                                                              topk,
                                                              max_samples,

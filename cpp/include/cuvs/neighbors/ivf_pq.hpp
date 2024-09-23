@@ -479,7 +479,6 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
-  // std::optional<raft::device_vector<float, uint32_t>> center_norms_;
 
   // Computed members for accelerating search.
   raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
