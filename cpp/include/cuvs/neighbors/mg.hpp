@@ -24,7 +24,7 @@
 #include <raft/core/device_resources.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
-#include <cuvs/neighbors/iface.hpp>
+#include <cuvs/neighbors/common.hpp>
 
 #define DEFAULT_SEARCH_BATCH_SIZE 1 << 20
 

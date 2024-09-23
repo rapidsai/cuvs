@@ -4,32 +4,11 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <raft/core/device_resources.hpp>
 
 namespace cuvs::neighbors {
 
 using namespace raft;
-
-template <typename AnnIndexType, typename T, typename IdxT>
-struct iface {
-  iface() : mutex_(std::make_shared<std::mutex>()) {}
-
-  const IdxT size() const;
-
-  std::optional<AnnIndexType> index_;
-  std::shared_ptr<std::mutex> mutex_;
-};
-
-template <typename AnnIndexType, typename T, typename IdxT>
-const IdxT iface<AnnIndexType, T, IdxT>::size() const
-{
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
-    return index_.value().size();
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
-    return index_.value().size();
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
-    return index_.value().size();
-  }
-}
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
 void build(const raft::device_resources& handle,

@@ -288,6 +288,15 @@ add_library(
   src/neighbors/cagra_serialize_float.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
+  src/neighbors/iface/iface_cagra_float_uint32_t.cu
+  src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
+  src/neighbors/iface/iface_cagra_uint8_t_uint32_t.cu
+  src/neighbors/iface/iface_flat_float_int64_t.cu
+  src/neighbors/iface/iface_flat_int8_t_int64_t.cu
+  src/neighbors/iface/iface_flat_uint8_t_int64_t.cu
+  src/neighbors/iface/iface_pq_float_int64_t.cu
+  src/neighbors/iface/iface_pq_int8_t_int64_t.cu
+  src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
   src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/q_search_multi_cta_float_uint32_dim128_t8_8pq_4subd_half.cu
