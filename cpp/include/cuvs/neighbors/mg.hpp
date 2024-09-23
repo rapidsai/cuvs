@@ -24,7 +24,10 @@
 #include <raft/core/device_resources.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 
 #define DEFAULT_SEARCH_BATCH_SIZE 1 << 20
 
