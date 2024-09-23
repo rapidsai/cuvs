@@ -204,9 +204,10 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     const bool valid_i  = i < num_k;
     const auto child_id = valid_i ? result_child_indices_ptr[i] : invalid_index;
 
-    // This is the `dataset_desc.compute_distance` manually inlined to move the fetching of
-    // dataset_desc from smem out of the loop.
-    // const auto norm2 = dataset_desc.compute_distance(child_id, child_id != invalid_index);
+    // We should be calling `dataset_desc.compute_distance(..)` here as follows:
+    // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
+    // Instead, we manually inline this function for performance reasons.
+    // This allows us to move the fetching of the arguments from shared memory out of the loop.
     const DistanceT child_dist = device::team_sum(
       (child_id != invalid_index) ? compute_distance(args, child_id)
                                   : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
