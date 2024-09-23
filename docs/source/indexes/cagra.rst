@@ -1,30 +1,104 @@
 CAGRA
 =====
 
-CAGRA is a graph-based index that is based loosely on the navigable small-world graph (NSG) algorithm, but which has been
+CAGRA, or (C)UDA (A)NN (GRA)ph-based, is a graph-based index that is based loosely on the popular navigable small-world graph (NSG) algorithm, but which has been
 built from the ground-up specifically for the GPU. CAGRA constructs a flat graph representation by first building a kNN graph
 of the training points and then removing redundant paths between neighbors.
 
 The CAGRA algorithm has two basic steps-
-1. Construct a kNN graph
-2. Prune redundant routes from the kNN graph.
+* 1. Construct a kNN graph
+* 2. Prune redundant routes from the kNN graph.
 
-Brute-force could be used to construct the initial kNN graph. This would yield the most accurate graph but would be very slow and
+I-force could be used to construct the initial kNN graph. This would yield the most accurate graph but would be very slow and
 we find that in practice the kNN graph does not need to be very accurate since the pruning step helps to boost the overall recall of
-the index. cuVS provides IVF-PQ and NN-Descent strategies for building the initial kNN graph and these can be selected in index
- params object during index construction.
+the index. cuVS provides IVF-PQ and NN-Descent strategies for building the initial kNN graph and these can be selected in index params object during index construction.
 
 Interoperability with HNSW
 --------------------------
 
-[ C API | C++ API | Python API | Rust API ]
+cuVS provides the capability to convert a CAGRA graph to an HNSW graph, which enables the GPU to be used only for building the index
+while the CPU can be leveraged for search.
 
+# TODO: Add code example for this conversion
+
+[ :ref:`C API <../c_api.rst>` | :ref:`C++ API <../cpp_api.rst>` | :ref:`Python API <../python_api.rst>` | :ref:`Rust API <../rust_api/index.rst>` ]
+
+Filtering considerations
+------------------------
+
+CAGRA supports filtered search which can work well for moderately small filters (such as filtering out only a small percentage of the vectors in the index (e.g. <<50%).
+
+When a filter is expected to remove 80%-99% of the vectors in the index, it is preferred to use brute-force with pre-filtering instead, as that will compute only those distances
+between the vectors not being filtered out. By default, CAGRA will pass the filter to the pre-filtered brute-force when the number of vevtors being filtered out is >90% of the vectors in the index.
 
 Configuration parameters
 ------------------------
 
+Build parameters
+~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Default
+     - Description
+   * - compression
+     - None
+     - For large datasets, the raw vectors can be compressed using product quantization so they can be placed on device. This comes at the cost of lowering recall, though a refinement reranking step can be used to make up the lost recall after search.
+   * - graph_build_algo
+     - 'IVF_PQ'
+     - The graph build algorithm to use for building
+   * - graph_build_params
+     - None
+     - Specify explicit build parameters for the corresponding graph build algorithms
+   * - graph_degree
+     - 32
+     - The degree of the final CAGRA graph. All vertices in the graph will have this degree. During search, a larger graph degree allows for more exploration of the search space and improves recall but at the expense of searching more vertices.
+   * - intermediate_graph_degree
+     - 64
+     - The degree of the initial knn graph before it is optimized into the final CAGRA graph. A larger value increases connectivity of the initial graph so that it performs better once pruned. Larger values come at the cost of increased device memory usage and increases the time of initial knn graph construction.
+   * - guarantee_connectivity
+     - False
+     - Uses a degree-constrained minimum spanning tree to guarantee the initial knn graph is connected. This can improve recall on some datasets.
+   * - attach_data_on_build
+     - True
+     - Should the dataset be attached to the index after the index is built? Setting this to `False` can improve memory usage and performance, for example if the graph is being serialized to disk or converted to HNSW right after building it.
+
+Search parameters
+~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
+
+   * - Name
+     - Default
+     - Description
+   * - itopk_size
+     - 64
+     - Number of intermediate search results retained during search. This value needs to be >=k. This is the main knob to tweak search performance.
+   * - max_iterations
+     - 0
+     - The maximum number of iterations during search. Default is to auto-select.
+   * - max_queries
+     - 0
+     - Max number of search queries to perform concurrently (batch size). Default is to auto-select.
+   * - team_size
+     - 0
+     - Number of CUDA threads for calculating each distance. Can be 4, 8, 16, or 32. Default is to auto-select.
+   * - search_width
+     - 1
+     - Number of vertices to select as the starting point for the search in each iteration.
+   * - min_iterations
+     - 0
+     - Minimum number of search iterations to perform
+
 Tuning Considerations
 ---------------------
+
+The 3 hyper-parameters that are most often tuned are `graph_degree`, `intermediate_graph_degree`, and `itopk_size`.
 
 Memory footprint
 ----------------
