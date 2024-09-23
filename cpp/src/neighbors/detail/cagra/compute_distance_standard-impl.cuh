@@ -280,7 +280,7 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
   desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld};
-  host_type result{dd_host, stream, DatasetBlockDim};
+  host_type result{dd_host, stream};
 
   standard_dataset_descriptor_init_kernel<Metric,
                                           TeamSize,
@@ -288,7 +288,7 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
                                           DataT,
                                           IndexT,
                                           DistanceT>
-    <<<1, 1, 0, stream>>>(result.dev_ptr, ptr, size, dim, desc_type::ld(dd_host.args));
+    <<<1, 1, 0, stream>>>(result.dev_ptr(), ptr, size, dim, desc_type::ld(dd_host.args));
   RAFT_CUDA_TRY(cudaPeekAtLastError());
   return result;
 }

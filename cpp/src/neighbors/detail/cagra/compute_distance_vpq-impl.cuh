@@ -448,7 +448,7 @@ vpq_descriptor_spec<Metric,
                     pq_code_book_ptr,
                     size,
                     dim};
-  host_type result{dd_host, stream, DatasetBlockDim};
+  host_type result{dd_host, stream};
   vpq_dataset_descriptor_init_kernel<Metric,
                                      TeamSize,
                                      DatasetBlockDim,
@@ -457,7 +457,7 @@ vpq_descriptor_spec<Metric,
                                      CodebookT,
                                      DataT,
                                      IndexT,
-                                     DistanceT><<<1, 1, 0, stream>>>(result.dev_ptr,
+                                     DistanceT><<<1, 1, 0, stream>>>(result.dev_ptr(),
                                                                      encoded_dataset_ptr,
                                                                      encoded_dataset_dim,
                                                                      vq_code_book_ptr,
