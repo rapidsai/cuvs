@@ -103,3 +103,46 @@ The 3 hyper-parameters that are most often tuned are `graph_degree`, `intermedia
 Memory footprint
 ----------------
 
+CAGRA builds a graph that ultimately ends up on the host while it needs to keep the original dataset around (can be on host or device).
+
+IVFPQ or NN-DESCENT can be used to build the graph (additions to the peak memory usage calculated as in the respective build algo above).
+
+Dataset on device (graph on host):
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Index memory footprint (device): :math: `n\_index\_vectors * n\_dims * sizeof(T)`
+Index memory footprint (host): :math: `graph\_degree * n\_index\_vectors * sizeof(T)``
+
+Dataset on host (graph on host):
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Index memory footprint (host): :math: `n\_index\_vectors * n\_dims * sizeof(T) + graph\_degree * n\_index\_vectors * sizeof(T)`
+
+Build peak memory usage:
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When built using NN-descent / IVF-PQ, the build process consists of two phases: (1) building an initial/(intermediate) graph and then (2) optimizing the graph. Key input parameters are n_vectors, intermediate_graph_degree, graph_degree.
+The memory usage in the first phase (building) depends on the chosen method. The biggest allocation is the graph (n_vectors*intermediate_graph_degree), but it’s stored in the host memory.
+Usually, the second phase (optimize) uses the most device memory. The peak memory usage is achieved during the pruning step (graph_core.cuh/optimize)
+Optimize: formula for peak memory usage (device): :math: `n\_vectors * (4 + (sizeof(IdxT) + 1) * intermediate\_degree)``
+
+Build with out-of-core IVF-PQ peak memory usage:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Out-of-core CAGA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimization. Note that these steps are performed sequentially, so they are not additive.
+
+IVF-PQ Build:
+
+.. math::
+   n_vectors / train_set_ratio * dim * sizeof(float)   // trainset, may be in managed mem
+   + n_vectors / train_set_ratio * sizeof(uint32_t)    // labels, may be in managed mem
+   + n_clusters * n_dim * sizeof(float)                // cluster centers
+
+IVF-PQ Search (max batch size 1024 vectors on device at a time):
+
+.. math::
+   [n_vectors * (pq_dim * pq_bits / 8 + sizeof(int64_t)) + O(n_clusters)]
+   + [batch_size * n_dim * sizeof(float)] + [batch_size * intermediate_degree * sizeof(uint32_t)] +
+   [batch_size * intermediate_degree * sizeof(float)]
+
+
