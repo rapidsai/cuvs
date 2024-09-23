@@ -5,11 +5,14 @@ A brief primer on vector databases and how they relate to vector search
 One of the primary differences between vector database indexes and traditional database indexes is that vector search often uses approximations to trade-off accuracy of the results for speed. Because of this, while many mature databases offer mechanisms to tune their indexes and achieve better performance, vector database indexes can return completely garbage results if they aren’t tuned for a reasonable level of search quality in addition to performance tuning. This is because vector database indexes are more closely related to machine learning models than they are to traditional database indexes.
 
 Of course, if the number of vectors is very small, such as less than 100 thousand vectors, it could be fast enough to use a brute-force (also known as a flat index), which exhaustively searches all possible neighbors.
+
 Objectives
+==========
 
 This primer addresses the challenge of configuring vector database indexes, but its primary goal is to get a user up and running quickly with acceptable enough results for a good choice of index type and a small and manageable tuning knob, rather than providing a comprehensive guide to tuning each and every hyper-parameter.
 
 For this reason, we focus on 4 primary data sizes:
+
 #. Tiny datasets (< 100 thousand vectors)
 #. Small datasets where GPU might not be needed (< 1 million vectors)
 #. Large datasets (> 1 million vectors), goal is fast index creation at the expense of search quality
