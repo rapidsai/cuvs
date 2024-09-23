@@ -19,12 +19,11 @@ What is cuVS?
 cuVS is a library for vector search and clustering on the GPU.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 3
    :caption: Contents:
 
-   getting_started.rst
-   indexes/indexes.rst
    build.rst
+   getting_started.rst
    integrations.rst
    api_docs.rst
    contributing.md

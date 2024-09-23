@@ -50,14 +50,21 @@ Many vector search algorithms improve scalability while reducing the number of d
 
 This leads us to two core architectural designs that we encounter in vector databases:
 
-Locally partitioned vector search indexes: most databases follow this design, and vectors are often first written to a write-ahead log for durability. After some number of vectors are written, the write-ahead logs become immutable and may be merged with other write-ahead logs before eventually being converted to a new vector search index.
+Locally partitioned vector search indexes
+-----------------------------------------
+
+>ost databases follow this design, and vectors are often first written to a write-ahead log for durability. After some number of vectors are written, the write-ahead logs become immutable and may be merged with other write-ahead logs before eventually being converted to a new vector search index.
 
 The search is generally done over each locally partitioned index and the results combined. When setting hyperparameters, only the local vector search indexes need to be considered, though the same hyperparameters are going to be used across all of the local partitions. So, for example, if you’ve ingested 100M vectors but each partition only contains about 10M vectors, the size of the index only needs to consider its local 10M vectors. Details like number of vectors in the index are important, for example, when setting the number of clusters in an IVF-based (inverted file index) method, as I’ll cover below.
 
 
-Globally partitioned vector search indexes: some special-purpose vector databases follow this design, such as Yahoo’s Vespa and Google’s Spanner. A global index is trained to partition the entire database’s vectors up front as soon as there are enough vectors to do so (usually these databases are at a large enough scale that a significant number of vectors are bootstrapped initially and so it avoids the cold start problem). Ingested vectors are first run through the global index (clustering, for example, but tree- and graph-based methods have also been used) to determine which partition they belong to and the vectors are then (sent to, and) written  directly to that partition. The individual partitions can contain a graph, tree, or a simple IVF list. These types of indexes have been able to scale to hundreds of billions to trillions of vectors, and since the partitions are themselves often implicitly based on neighborhoods, rather than being based on uniformly random distributed vectors like the locally partitioned architectures, the partitions can be grouped together or intentionally separated to support localized searches or load balancing, depending upon the needs of the system.
+Globally partitioned vector search indexes
+------------------------------------------
 
-The challenge when setting hyperparameters for these types of indexes is that the indexes need to account for the entire set of vectors, and thus the hyperparameters of the global index generally account for all of the vectors in the database, rather than any local partition.
+Some special-purpose vector databases follow this design, such as Yahoo’s Vespa and Google’s Spanner. A global index is trained to partition the entire database’s vectors up front as soon as there are enough vectors to do so (usually these databases are at a large enough scale that a significant number of vectors are bootstrapped initially and so it avoids the cold start problem). Ingested vectors are first run through the global index (clustering, for example, but tree- and graph-based methods have also been used) to determine which partition they belong to and the vectors are then (sent to, and) written  directly to that partition. The individual partitions can contain a graph, tree, or a simple IVF list. These types of indexes have been able to scale to hundreds of billions to trillions of vectors, and since the partitions are themselves often implicitly based on neighborhoods, rather than being based on uniformly random distributed vectors like the locally partitioned architectures, the partitions can be grouped together or intentionally separated to support localized searches or load balancing, depending upon the needs of the system.
+
+The challenge when setting hyper-parameters for globally partitioned indexes is that they need to account for the entire set of vectors, and thus the hyperparameters of the global index generally account for all of the vectors in the database, rather than any local partition.
+
 
 
 Of course, the two approaches outlined above can also be used together (e.g. training a global “coarse” index and then creating localized vector search indexes within each of the global indexes) but to my knowledge, no such architecture has implemented this pattern.
@@ -72,7 +79,8 @@ Since most vector databases use localized partitioning, we’ll focus on that in
 Tiny datasets (< 100 thousand vectors)
 These datasets are very small and it’s questionable whether or not the GPU would provide any value at all. If the dimensionality is also relatively small (< 1024), you could just use brute-force or HNSW on the CPU and get great performance. If the dimensionality is relatively large (1536, 2048, 4096), you should consider using HNSW. If build time performance is critical, you should consider using CAGRA to build the graph and convert it to an HNSW graph for search (this capability exists today in the standalone cuVS/RAFT libraries and will soon be added to Milvus). An IVF flat index  can also be a great candidate here, as it can improve the search performance over brute-force by partitioning the vector space and thus reducing the search space.
 
-You could even use FAISS or cuVS directly if you don’t need the additional features in a fully-fledged database.
+You could even use FAISS or cuVS standalone if you don’t need the additional features in a fully-fledged database.
+
 Small datasets where GPU might not be needed (< 1 million vectors)
 For smaller dimensionality, such as 1024 or below, you could consider using a brute-force (aka flat) index on GPU and get very good search performance with exact results. You could also use a graph-based index like HNSW on the CPU or CAGRA on the GPU. If build time is critical, you could even build a CAGRA graph on the GPU and convert it to HNSW graph on the CPU.
 
@@ -99,32 +107,31 @@ Full hyperparameter optimization may also not always be necessary- for example, 
 
 
 Summary of vector search index types
+====================================
 
+.. list-table::
+   :widths: 25 25 50
+   :header-rows: 1
 
-Name
-Trade-offs
-Best to use with…
-Brute-force (aka flat)
-Exact search but requires exhaustive distance computations
-Tiny datasets (< 100k vectors)
-IVF-Flat
-Partitions the vector space to reduce distance computations for brute-force search at the expense of recall
-Small datasets (<1M vectors) or larger datasets (>1M vectors) where fast index build time is prioritized over quality.
-IVF-PQ
-Adds product quantization to IVF-Flat to achieve scale at the expense of recall
-Large datasets (>>1M vectors) where fast index build is prioritized over quality
-HNSW
-Significantly reduces distance computations at the expense of longer build times
-Small datasets (<1M vectors) or large datasets (>1M vectors) where quality and speed of search are prioritized over index build times
-CAGRA
-Significantly reduces distance computations at the expense of longer build times (though build times improve over HNSW)
-Large datasets (>>1M vectors) where quality and speed of search are prioritized over index build times but index build times are still important.
-CAGRA build +HNSW search
-(coming soon to Milvus)
-Significantly reduces distance computations and improves build times at the expense of higher search latency / lower throughput.
-Large datasets (>>1M vectors) where index build times and quality of search is important but GPU resources are limited and latency of search is not.
-
-
-
-
-
+   * - Name
+     - Trade-offs
+     - Best to use with...
+   * - Brute-force (aka flat)
+     - Exact search but requires exhaustive distance computations
+     - Tiny datasets (< 100k vectors)
+   * - IVF-Flat
+     - Partitions the vector space to reduce distance computations for brute-force search at the expense of recall
+     - Small datasets (<1M vectors) or larger datasets (>1M vectors) where fast index build time is prioritized over quality.
+   * - IVF-PQ
+     - Adds product quantization to IVF-Flat to achieve scale at the expense of recall
+     - Large datasets (>>1M vectors) where fast index build is prioritized over quality
+   * - HNSW
+     - Significantly reduces distance computations at the expense of longer build times
+     - Small datasets (<1M vectors) or large datasets (>1M vectors) where quality and speed of search are prioritized over index build times
+   * - CAGRA
+     - Significantly reduces distance computations at the expense of longer build times (though build times improve over HNSW)
+     - Large datasets (>>1M vectors) where quality and speed of search are prioritized over index build times but index build times are still important.
+   * - CAGRA build +HNSW search
+     - (coming soon to Milvus)
+     - Significantly reduces distance computations and improves build times at the expense of higher search latency / lower throughput.
+       Large datasets (>>1M vectors) where index build times and quality of search is important but GPU resources are limited and latency of search is not.
