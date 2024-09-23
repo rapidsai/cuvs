@@ -42,6 +42,8 @@ namespace cuvs::neighbors::vamana::detail {
 
 #define FULL_BITMASK 0xFFFFFFFF
 
+static const int DEGREE_SIZES = {32, 64, 128, 256};
+
 // Templated MAX and MIN values for different datatypes
 template<typename T> __host__ __device__ T INFTY() {}
 template<> __forceinline__ __host__ __device__ int INFTY<int>() {return INT_MAX;}
@@ -163,7 +165,7 @@ __device__ SUMTYPE l2_SEQ(Point<T, SUMTYPE> *src_vec,
   SUMTYPE partial_sum = 0;
 
   for (int i = threadIdx.x; i < src_vec->Dim; i += blockDim.x) {
-    partial_sum += fmaf((src_vec[0].coords[i] - dst_vec[0].coords[i]), 
+    partial_sum = fmaf((src_vec[0].coords[i] - dst_vec[0].coords[i]), 
 		    (src_vec[0].coords[i] - dst_vec[0].coords[i]), partial_sum);
   }
 
@@ -185,10 +187,10 @@ __device__ SUMTYPE l2_ILP2(Point<T, SUMTYPE> *src_vec,
     if(i+32 < src_vec->Dim)
         temp_dst[1] = dst_vec->coords[i+32];
 
-    partial_sum[0] += fmaf((src_vec[0].coords[i] - temp_dst[0]), 
+    partial_sum[0] = fmaf((src_vec[0].coords[i] - temp_dst[0]), 
 		    (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
     if(i+32 < src_vec->Dim)
-    partial_sum[1] += fmaf((src_vec[0].coords[i+32] - temp_dst[1]), 
+    partial_sum[1] = fmaf((src_vec[0].coords[i+32] - temp_dst[1]), 
 		    (src_vec[0].coords[i+32] - temp_dst[1]), partial_sum[1]);
   }
   partial_sum[0] += partial_sum[1];
@@ -215,16 +217,16 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE> *src_vec,
     if(i+92 < src_vec->Dim)
     	temp_dst[3] = dst_vec->coords[i+96];
 
-    partial_sum[0] += fmaf((src_vec[0].coords[i] - temp_dst[0]), 
+    partial_sum[0] = fmaf((src_vec[0].coords[i] - temp_dst[0]), 
 		    (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
     if(i+32 < src_vec->Dim)
-    partial_sum[1] += fmaf((src_vec[0].coords[i+32] - temp_dst[1]), 
+    partial_sum[1] = fmaf((src_vec[0].coords[i+32] - temp_dst[1]), 
 		    (src_vec[0].coords[i+32] - temp_dst[1]), partial_sum[1]);
     if(i+64 < src_vec->Dim)
-    partial_sum[2] += fmaf((src_vec[0].coords[i+64] - temp_dst[2]), 
+    partial_sum[2] = fmaf((src_vec[0].coords[i+64] - temp_dst[2]), 
 		    (src_vec[0].coords[i+64] - temp_dst[2]), partial_sum[2]);
     if(i+92 < src_vec->Dim)
-    partial_sum[3] += fmaf((src_vec[0].coords[i+96] - temp_dst[3]), 
+    partial_sum[3] = fmaf((src_vec[0].coords[i+96] - temp_dst[3]), 
 		    (src_vec[0].coords[i+96] - temp_dst[3]), partial_sum[3]);
   }
   partial_sum[0] += partial_sum[1] + partial_sum[2] + partial_sum[3];

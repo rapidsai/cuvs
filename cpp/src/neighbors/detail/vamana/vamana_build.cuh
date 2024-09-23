@@ -438,12 +438,21 @@ index<T, IdxT> build(
   RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded, 
               "Currently only L2Expanded metric is supported");
 
+  int* deg_size = std::find(std::begin(DEGREE_SIZES), std::end(DEGREE_SIZES), graph_degree);
+  RAFT_EXPECTS(deg_size != std::end(DEGREE_SIZES), "Provided graph_degree not currently supported");
+
+  RAFT_EXPECTS(params.visited_size > graph_degree, "visited_size must be > graph_degree");
+  RAFT_EXPECTS((params.visited_size & (params.visited_size-1)) == 0, "visited_size must be a power of 2");
+
+  int dim = dataset.extent(1);
+  // TODO - Fix issue with alignment when dataset dimenion is odd
+  RAFT_EXPECTS(dim%2 == 0, "Datasets with an odd number of dimensions not currently supported");
+
   RAFT_LOG_DEBUG("Creating empty graph structure");
   auto vamana_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
 
   RAFT_LOG_DEBUG("Running Vamana batched insert algorithm");
 
-  int dim = dataset.extent(1);
 
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 

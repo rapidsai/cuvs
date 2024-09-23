@@ -114,8 +114,8 @@ raft::device_matrix<T,idxT> read_bin_dataset(raft::device_resources const &dev_r
   if(N > max_N) N = max_N;
   printf("Read in file - N:%u, dim:%u\n", N, dim);
   std::vector<T> data;
-  data.resize(N*dim);
-  datafile.read(reinterpret_cast<char*>(data.data()), N*dim*sizeof(T));
+  data.resize((size_t)N*(size_t)dim);
+  datafile.read(reinterpret_cast<char*>(data.data()), (size_t)N*(size_t)dim*sizeof(T));
   datafile.close();
 
   auto dataset = raft::make_device_matrix<T, idxT>(dev_resources, N, dim);
