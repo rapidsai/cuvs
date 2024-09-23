@@ -60,7 +60,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   // const CODE_BOOK_T* vq_code_book_ptr;
   // const CODE_BOOK_T* pq_code_book_ptr;
   // std::uint32_t encoded_dataset_dim;
-  // std::uint32_t n_subspace;
 
   RAFT_INLINE_FUNCTION static constexpr auto encoded_dataset_ptr(args_t& args) noexcept
     -> const uint8_t*&
@@ -79,10 +78,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   RAFT_INLINE_FUNCTION static constexpr auto encoded_dataset_dim(args_t& args) noexcept -> uint32_t&
   {
     return args.extra_word1;
-  }
-  RAFT_INLINE_FUNCTION static constexpr auto n_subspace(args_t& args) noexcept -> uint32_t&
-  {
-    return args.extra_word2;
   }
 
   RAFT_INLINE_FUNCTION static constexpr auto encoded_dataset_ptr(const args_t& args) noexcept
@@ -104,11 +99,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   {
     return args.extra_word1;
   }
-  RAFT_INLINE_FUNCTION static constexpr auto n_subspace(const args_t& args) noexcept
-    -> const uint32_t&
-  {
-    return args.extra_word2;
-  }
 
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN * utils::size_of<CODE_BOOK_T>();
@@ -117,7 +107,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
                                                  compute_distance_type* compute_distance_impl,
                                                  const std::uint8_t* encoded_dataset_ptr,
                                                  std::uint32_t encoded_dataset_dim,
-                                                 std::uint32_t n_subspace,
                                                  const CODE_BOOK_T* vq_code_book_ptr,
                                                  const CODE_BOOK_T* pq_code_book_ptr,
                                                  IndexT size,
@@ -133,7 +122,6 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     cagra_q_dataset_descriptor_t::vq_code_book_ptr(args)    = vq_code_book_ptr;
     this->pq_code_book_ptr()                                = pq_code_book_ptr;
     cagra_q_dataset_descriptor_t::encoded_dataset_dim(args) = encoded_dataset_dim;
-    cagra_q_dataset_descriptor_t::n_subspace(args)          = n_subspace;
     static_assert(sizeof(*this) == sizeof(base_type));
     static_assert(alignof(cagra_q_dataset_descriptor_t) == alignof(base_type));
   }
@@ -241,8 +229,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   const uint8_t* __restrict__ dataset_ptr,
   const typename DescriptorT::CODE_BOOK_T* __restrict__ vq_code_book_ptr,
   uint32_t dim,
-  uint32_t pq_codebook_ptr,
-  uint32_t n_subspace) -> typename DescriptorT::DISTANCE_T
+  uint32_t pq_codebook_ptr) -> typename DescriptorT::DISTANCE_T
 {
   using DISTANCE_T               = typename DescriptorT::DISTANCE_T;
   using LOAD_T                   = typename DescriptorT::LOAD_T;
@@ -262,8 +249,9 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   constexpr auto kTeamMask = DescriptorT::kTeamSize - 1;
   constexpr auto kTeamVLen = TeamSize * vlen;
 
-  const auto laneId = threadIdx.x & kTeamMask;
-  DISTANCE_T norm   = 0;
+  const auto n_subspace = raft::div_rounding_up_unsafe(dim, PQ_LEN);
+  const auto laneId     = threadIdx.x & kTeamMask;
+  DISTANCE_T norm       = 0;
   for (uint32_t elem_offset = 0; elem_offset * PQ_LEN < dim;
        elem_offset += DatasetBlockDim / PQ_LEN) {
     // Loading PQ codes
@@ -369,11 +357,10 @@ _RAFT_DEVICE __noinline__ auto compute_distance_vpq(
   uint32_t vq_code;
   device::ldg_cg(vq_code, reinterpret_cast<const std::uint32_t*>(dataset_ptr));
   return compute_distance_vpq_worker<DescriptorT>(
-    dataset_ptr,
+    dataset_ptr /* advance dataset pointer by the size of vq_code */,
     DescriptorT::vq_code_book_ptr(args) + args.dim * vq_code,
     args.dim,
-    args.smem_ws_ptr,
-    DescriptorT::n_subspace(args));
+    args.smem_ws_ptr);
 }
 
 template <cuvs::distance::DistanceType Metric,
@@ -389,7 +376,6 @@ RAFT_KERNEL __launch_bounds__(1, 1)
   vpq_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
                                      const std::uint8_t* encoded_dataset_ptr,
                                      uint32_t encoded_dataset_dim,
-                                     uint32_t n_subspace,
                                      const CodebookT* vq_code_book_ptr,
                                      const CodebookT* pq_code_book_ptr,
                                      IndexT size,
@@ -410,7 +396,6 @@ RAFT_KERNEL __launch_bounds__(1, 1)
     reinterpret_cast<typename base_type::compute_distance_type*>(&compute_distance_vpq<desc_type>),
     encoded_dataset_ptr,
     encoded_dataset_dim,
-    n_subspace,
     vq_code_book_ptr,
     pq_code_book_ptr,
     size,
@@ -438,7 +423,6 @@ vpq_descriptor_spec<Metric,
                     DistanceT>::init_(const cagra::search_params& params,
                                       const std::uint8_t* encoded_dataset_ptr,
                                       uint32_t encoded_dataset_dim,
-                                      uint32_t n_subspace,
                                       const CodebookT* vq_code_book_ptr,
                                       const CodebookT* pq_code_book_ptr,
                                       IndexT size,
@@ -460,7 +444,6 @@ vpq_descriptor_spec<Metric,
                     nullptr,
                     encoded_dataset_ptr,
                     encoded_dataset_dim,
-                    n_subspace,
                     vq_code_book_ptr,
                     pq_code_book_ptr,
                     size,
@@ -477,7 +460,6 @@ vpq_descriptor_spec<Metric,
                                      DistanceT><<<1, 1, 0, stream>>>(result.dev_ptr,
                                                                      encoded_dataset_ptr,
                                                                      encoded_dataset_dim,
-                                                                     n_subspace,
                                                                      vq_code_book_ptr,
                                                                      pq_code_book_ptr,
                                                                      size,
