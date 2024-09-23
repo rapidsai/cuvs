@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuvs/neighbors/common.hpp>
+#include <raft/core/bitmap.cuh>
 #include <raft/core/bitset.cuh>
 #include <raft/core/detail/macros.hpp>
 
@@ -107,4 +108,20 @@ inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
   return bitset_view_.test(sample_ix);
 }
 
+template <typename bitmap_t, typename index_t>
+bitmap_filter<bitmap_t, index_t>::bitmap_filter(
+  const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_for_filtering)
+  : bitmap_view_{bitmap_for_filtering}
+{
+}
+
+template <typename bitmap_t, typename index_t>
+inline _RAFT_HOST_DEVICE bool bitmap_filter<bitmap_t, index_t>::operator()(
+  // query index
+  const uint32_t query_ix,
+  // the index of the current sample
+  const uint32_t sample_ix) const
+{
+  return bitmap_view_.test(query_ix, sample_ix);
+}
 }  // namespace cuvs::neighbors::filtering

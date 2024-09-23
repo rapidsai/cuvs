@@ -19,18 +19,17 @@
 
 namespace cuvs::neighbors::cagra {
 
-#define CUVS_INST_CAGRA_SEARCH(T, IdxT)                                                        \
-  void search(                                                                                 \
-    raft::resources const& handle,                                                             \
-    cuvs::neighbors::cagra::search_params const& params,                                       \
-    const cuvs::neighbors::cagra::index<T, IdxT>& index,                                       \
-    raft::device_matrix_view<const T, int64_t, raft::row_major> queries,                       \
-    raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,                        \
-    raft::device_matrix_view<float, int64_t, raft::row_major> distances,                       \
-    std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>> sample_filter) \
-  {                                                                                            \
-    cuvs::neighbors::cagra::search<T, IdxT>(                                                   \
-      handle, params, index, queries, neighbors, distances, sample_filter);                    \
+#define CUVS_INST_CAGRA_SEARCH(T, IdxT)                                            \
+  void search(raft::resources const& handle,                                       \
+              cuvs::neighbors::cagra::search_params const& params,                 \
+              const cuvs::neighbors::cagra::index<T, IdxT>& index,                 \
+              raft::device_matrix_view<const T, int64_t, raft::row_major> queries, \
+              raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,  \
+              raft::device_matrix_view<float, int64_t, raft::row_major> distances, \
+              cuvs::neighbors::filtering::base_filter* sample_filter_ptr)          \
+  {                                                                                \
+    cuvs::neighbors::cagra::search<T, IdxT>(                                       \
+      handle, params, index, queries, neighbors, distances, sample_filter_ptr);    \
   }
 
 CUVS_INST_CAGRA_SEARCH(float, uint32_t);

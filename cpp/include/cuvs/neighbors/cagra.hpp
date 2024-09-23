@@ -959,8 +959,8 @@ void extend(
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (nullptr for no filtering)
  */
 
 void search(raft::resources const& res,
@@ -969,8 +969,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter = std::nullopt);
+            cuvs::neighbors::filtering::base_filter* sample_filter_ptr = nullptr);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -985,8 +984,8 @@ void search(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (nullptr for no filtering)
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -994,8 +993,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter = std::nullopt);
+            cuvs::neighbors::filtering::base_filter* sample_filter_ptr = nullptr);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1010,8 +1008,8 @@ void search(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (nullptr for no filtering)
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -1019,8 +1017,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>
-              sample_filter = std::nullopt);
+            cuvs::neighbors::filtering::base_filter* sample_filter_ptr = nullptr);
 
 /**
  * @}

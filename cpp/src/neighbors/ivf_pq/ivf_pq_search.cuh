@@ -784,18 +784,16 @@ void search_with_filtering(raft::resources const& handle,
 }
 
 template <typename T, typename IdxT>
-void search(
-  raft::resources const& handle,
-  const search_params& params,
-  const index<IdxT>& idx,
-  raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
-  raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
-  raft::device_matrix_view<float, IdxT, raft::row_major> distances,
-  std::optional<cuvs::neighbors::filtering::bitset_filter<uint32_t, IdxT>> sample_filter_opt)
+void search(raft::resources const& handle,
+            const search_params& params,
+            const index<IdxT>& idx,
+            raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
+            raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
+            raft::device_matrix_view<float, IdxT, raft::row_major> distances,
+            cuvs::neighbors::filtering::base_filter* sample_filter_ptr)
 {
-  if (sample_filter_opt.has_value()) {
-    search_with_filtering(handle, params, idx, queries, neighbors, distances, *sample_filter_opt);
-  } else {
+  if (sample_filter_ptr == nullptr ||
+      dynamic_cast<cuvs::neighbors::filtering::none_ivf_sample_filter*>(sample_filter_ptr)) {
     search_with_filtering(handle,
                           params,
                           idx,
@@ -803,6 +801,12 @@ void search(
                           neighbors,
                           distances,
                           cuvs::neighbors::filtering::none_ivf_sample_filter{});
+  } else if (auto* bitset_filter_ptr =
+               dynamic_cast<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>*>(
+                 sample_filter_ptr)) {
+    search_with_filtering(handle, params, idx, queries, neighbors, distances, *bitset_filter_ptr);
+  } else {
+    RAFT_FAIL("Unsupported sample filter type.");
   }
 }
 }  // namespace cuvs::neighbors::ivf_pq::detail

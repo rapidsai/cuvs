@@ -795,14 +795,15 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::resource::sync_stream(handle_);
         cuvs::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
           handle_, removed_indices.view(), ps.n_rows);
+        auto bitset_filter_obj =
+          cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
         cagra::search(handle_,
                       search_params,
                       index,
                       search_queries_view,
                       indices_out_view,
                       dists_out_view,
-                      std::make_optional(
-                        cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view())));
+                      &bitset_filter_obj);
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
