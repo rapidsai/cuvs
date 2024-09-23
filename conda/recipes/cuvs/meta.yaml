@@ -1,7 +1,7 @@
 # Copyright (c) 2022-2024, NVIDIA CORPORATION.
 
 # Usage:
-#   conda build . -c conda-forge -c numba -c rapidsai -c pytorch
+#   conda build . -c rapidsai -c conda-forge -c nvidia
 {% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
 {% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
 {% set py_version = environ['CONDA_PY'] %}
@@ -54,10 +54,8 @@ requirements:
     - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
     - python x.x
-    - rmm ={{ minor_version }}
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
     - scikit-build-core >=0.10.0
-    - setuptools
   run:
     - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
     {% if cuda_major == "11" %}
@@ -68,7 +66,6 @@ requirements:
     - pylibraft {{ minor_version }}
     - libcuvs {{ version }}
     - python x.x
-    - rmm ={{ minor_version }}
     - cuda-python
     - numpy >=1.23,<3.0a0
 
@@ -81,5 +78,4 @@ tests:
 about:
   home: https://rapids.ai/
   license: Apache-2.0
-  # license_file: LICENSE
   summary: cuvs python library
