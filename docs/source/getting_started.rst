@@ -2,6 +2,42 @@
 Getting Started
 ~~~~~~~~~~~~~~~
 
+- `New to vector search?`_
+
+  * :doc:`Primer on vector search <vector_databases_vs_vector_search>`
+
+  * :doc:`Index tuning guide <tuning_guide>`
+
+  * :doc:`Comparing vector search index performance <comparing_indexes>`
+
+- `Supported indexes`_
+
+  * :doc:`Vector search index guide <indexes/indexes>`
+
+- `Using cuVS APIs`_
+
+  * :doc:`C API Docs <c_api>`
+
+  * :doc:`C++ API Docs <cpp_api>`
+
+  * :doc:`Python API Docs <python_api>`
+
+  * :doc:`Rust API Docs <rust_api/index>`
+
+  * :doc:`API basics <api_basics>`
+
+  * :doc:`API interoperability <api_interoperability>`
+
+- `Where to next?`_
+
+  * `Social media`_
+
+  * `Blogs`_
+
+  * `Research`_
+
+  * `Get involved`_
+
 Welcome to cuVS, the premier library for GPU-accelerated vector search and clustering! cuVS provides several core building blocks for constructing new algorithms, as well as end-to-end vector search and clustering algorithms for use either standalone or through a growing list of :doc:`integrations <integrations>`.
 
 There are several benefits to using cuVS and GPUs for vector search, including
@@ -48,10 +84,34 @@ Please refer to the :doc:`guide on API interoperability <api_interoperability>` 
 Where to next?
 ==============
 
-cuVS is free and open source software, licesed under Apache 2.0 Once you are familiar with and/or have used cuVS, you can access the developer community most easily through :doc:`Github <https://github.com/rapidsai/cuvs>`. Please open Github issues for any bugs, questions or feature requests.
+cuVS is free and open source software, licesed under Apache 2.0 Once you are familiar with and/or have used cuVS, you can access the developer community most easily through `Github <https://github.com/rapidsai/cuvs>`_. Please open Github issues for any bugs, questions or feature requests.
 
-You can also access the RAPIDS community through :doc:`Slack <https://rapids.ai/slack-invite>`, :doc:`Stack Overflow <https://stackoverflow.com/tags/rapids>` and :doc:`X <https://twitter.com/rapidsai>`
+Social media
+------------
+
+You can access the RAPIDS community through `Slack <https://rapids.ai/slack-invite>`_ , `Stack Overflow <https://stackoverflow.com/tags/rapids>`_ and `X <https://twitter.com/rapidsai>`_
+
+Blogs
+-----
 
 We frequently publish blogs on GPU-enabled vector search, which can provide great deep dives into various important topics and breakthroughs:
 
-#.  :doc:`Accelerating Vector Search with cuVS IVF-PQ <https://developer.nvidia.com/blog/accelerating-vector-search-rapids-cuvs-ivf-pq-deep-dive-part-1/>`
+#. `Accelerated Vector Search: Approximating with cuVS IVF-Flat <https://developer.nvidia.com/blog/accelerated-vector-search-approximating-with-rapids-raft-ivf-flat/>`_
+#. `Accelerating Vector Search with cuVS IVF-PQ <https://developer.nvidia.com/blog/accelerating-vector-search-rapids-cuvs-ivf-pq-deep-dive-part-1/>`_
+
+Research
+--------
+
+For the interested reader, many of the accelerated implementations in cuVS are also based on research papers which can provide a lot more background. We also ask you to please cite the corresponding algorithms by referencing them in your own research.
+
+#. `CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search <https://arxiv.org/abs/2308.15136>`_
+#. `Top-K Algorithms on GPU: A Comprehensive Study and New Methods <https://dl.acm.org/doi/10.1145/3581784.3607062>`_
+#. `Fast K-NN Graph Construction by GPU Based NN-Descent <https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>`_
+#. `cuSLINK: Single-linkage Agglomerative Clustering on the GPU <https://arxiv.org/abs/2306.16354>`_
+#. `GPU Semiring Primitives for Sparse Neighborhood Methods <https://arxiv.org/abs/2104.06357>`_
+
+
+Get involved
+------------
+
+We always welcome patches for new features and bug fixes. Please read our `contributing guide <contributing.md>`_ for more information on contributing patches to cuVS.
