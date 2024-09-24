@@ -14,19 +14,20 @@
 # limitations under the License.
 #
 
-import os
 import json
+import os
 import subprocess
 import uuid
-
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 
 def cuvs_bench_cpp(
     conf_file: Dict,
     conf_filename: str,
     conf_filedir: str,
-    executables_to_run: Dict[Tuple[str, str, Tuple[str, str]], Dict[str, List[Dict]]],
+    executables_to_run: Dict[
+        Tuple[str, str, Tuple[str, str]], Dict[str, List[Dict]]
+    ],
     dataset_path: str,
     force: bool,
     build: bool,
@@ -36,7 +37,7 @@ def cuvs_bench_cpp(
     batch_size: int,
     search_threads: Optional[int],
     mode: str = "throughput",
-    raft_log_level: str = "info"
+    raft_log_level: str = "info",
 ) -> None:
     """
     Run the CUVS benchmarking tool with the provided configuration.
@@ -49,7 +50,8 @@ def cuvs_bench_cpp(
         The name of the configuration file.
     conf_filedir : str
         The directory of the configuration file.
-    executables_to_run : Dict[Tuple[str, str, Tuple[str, str]], Dict[str, List[Dict]]]
+    executables_to_run : Dict[Tuple[str, str, Tuple[str, str]],
+                         Dict[str, List[Dict]]]
         Dictionary of executables to run and their configurations.
     dataset_path : str
         The path to the dataset.
@@ -68,7 +70,8 @@ def cuvs_bench_cpp(
     search_threads : Optional[int]
         The number of threads to use for searching.
     mode : str, optional
-        The mode of search to perform ('latency' or 'throughput'), by default 'throughput'.
+        The mode of search to perform ('latency' or 'throughput'),
+        by default 'throughput'.
     raft_log_level : str, optional
         The logging level for the RAFT library, by default 'info'.
 
@@ -76,19 +79,29 @@ def cuvs_bench_cpp(
     -------
     None
     """
-    for executable, ann_executable_path, output_filename in executables_to_run.keys():
+    for (
+        executable,
+        ann_executable_path,
+        output_filename,
+    ) in executables_to_run.keys():
         # Need to write temporary configuration
-        temp_conf_filename = f"{conf_filename}_{output_filename[1]}_{uuid.uuid1()}.json"
+        temp_conf_filename = (
+            f"{conf_filename}_{output_filename[1]}_{uuid.uuid1()}.json"
+        )
         with open(temp_conf_filename, "w") as f:
             temp_conf = {
                 "dataset": conf_file["dataset"],
                 "search_basic_param": conf_file["search_basic_param"],
-                "index": executables_to_run[(executable, ann_executable_path, output_filename)]["index"]
+                "index": executables_to_run[
+                    (executable, ann_executable_path, output_filename)
+                ]["index"],
             }
             json_str = json.dumps(temp_conf, indent=2)
             f.write(json_str)
 
-        legacy_result_folder = os.path.join(dataset_path, conf_file["dataset"]["name"], "result")
+        legacy_result_folder = os.path.join(
+            dataset_path, conf_file["dataset"]["name"], "result"
+        )
         os.makedirs(legacy_result_folder, exist_ok=True)
 
         if build:
@@ -96,25 +109,31 @@ def cuvs_bench_cpp(
             os.makedirs(build_folder, exist_ok=True)
             build_file = f"{output_filename[0]}.json"
             temp_build_file = f"{build_file}.lock"
+            benchmark_out = os.path.join(build_folder, temp_build_file)
             cmd = [
                 ann_executable_path,
                 "--build",
                 f"--data_prefix={dataset_path}",
                 "--benchmark_out_format=json",
                 "--benchmark_counters_tabular=true",
-                f"--benchmark_out={os.path.join(build_folder, temp_build_file)}",
-                f"--raft_log_level={parse_log_level(raft_log_level)}"
+                f"--benchmark_out={os.path.join(benchmark_out)}",
+                f"--raft_log_level={parse_log_level(raft_log_level)}",
             ]
             if force:
                 cmd.append("--force")
             cmd.append(temp_conf_filename)
 
             if dry_run:
-                print(f"Benchmark command for {output_filename[0]}:\n{' '.join(cmd)}\n")
+                print(
+                    f"Benchmark command for {output_filename[0]}:\n"
+                    f"{' '.join(cmd)}\n"
+                )
             else:
                 try:
                     subprocess.run(cmd, check=True)
-                    merge_build_files(build_folder, build_file, temp_build_file)
+                    merge_build_files(
+                        build_folder, build_file, temp_build_file
+                    )
                 except Exception as e:
                     print(f"Error occurred running benchmark: {e}")
                 finally:
@@ -137,7 +156,7 @@ def cuvs_bench_cpp(
                 "--benchmark_out_format=json",
                 f"--mode={mode}",
                 f"--benchmark_out={os.path.join(search_folder, search_file)}",
-                f"--raft_log_level={parse_log_level(raft_log_level)}"
+                f"--raft_log_level={parse_log_level(raft_log_level)}",
             ]
             if force:
                 cmd.append("--force")
@@ -146,7 +165,10 @@ def cuvs_bench_cpp(
             cmd.append(temp_conf_filename)
 
             if dry_run:
-                print(f"Benchmark command for {output_filename[1]}:\n{' '.join(cmd)}\n")
+                print(
+                    f"Benchmark command for {output_filename[1]}:\n"
+                    f"{' '.join(cmd)}\n"
+                )
             else:
                 try:
                     subprocess.run(cmd, check=True)
@@ -164,6 +186,7 @@ log_levels = {
     "debug": 4,
     "trace": 5,
 }
+
 
 def parse_log_level(level_str: str) -> int:
     """
@@ -189,7 +212,9 @@ def parse_log_level(level_str: str) -> int:
     return log_levels[level_str.lower()]
 
 
-def merge_build_files(build_dir: str, build_file: str, temp_build_file: str) -> None:
+def merge_build_files(
+    build_dir: str, build_file: str, temp_build_file: str
+) -> None:
     """
     Merge temporary build files into the main build file.
 
@@ -221,7 +246,9 @@ def merge_build_files(build_dir: str, build_file: str, temp_build_file: str) -> 
             with open(build_json_path, "r") as f:
                 build_dict = json.load(f)
         except Exception as e:
-            print(f"Error loading existing build file: {build_json_path} ({e})")
+            print(
+                f"Error loading existing build file: {build_json_path} ({e})"
+            )
 
     temp_build_dict = {}
     if os.path.isfile(tmp_build_json_path):

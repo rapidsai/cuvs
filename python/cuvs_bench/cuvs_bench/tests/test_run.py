@@ -15,23 +15,23 @@
 #
 
 
-import os
-import pytest
+import itertools
+from unittest.mock import MagicMock, mock_open, patch
 
-from unittest.mock import patch, mock_open, MagicMock
+import pytest
 from benchmark import (
-    load_yaml_file,
-    get_dataset_configuration,
-    prepare_conf_file,
+    find_executable,
     gather_algorithm_configs,
+    get_dataset_configuration,
     load_algorithms_conf,
+    load_yaml_file,
+    prepare_conf_file,
     prepare_executables,
     prepare_indexes,
-    validate_search_params,
     rmm_present,
-    find_executable,
     validate_algorithm,
     validate_constraints,
+    validate_search_params,
 )
 
 
@@ -72,12 +72,10 @@ def test_gather_algorithm_configs(tmpdir):
     result = gather_algorithm_configs(str(scripts_path), None)
     assert len(result) == 2
 
-
     custom_conf_dir = tmpdir.mkdir("custom_conf")
     custom_conf_dir.join("custom_algo.yaml").write("key: value")
     result = gather_algorithm_configs(str(scripts_path), str(custom_conf_dir))
     assert len(result) == 3
-
 
     custom_conf_file = custom_conf_dir.join("custom_algo_file.yaml")
     custom_conf_file.write("key: value")
@@ -96,7 +94,6 @@ def test_load_algorithms_conf():
         result = load_algorithms_conf(algos_conf_fs, None, None)
         assert "algo1" in result
 
-
     with patch("builtins.open", mock_open(read_data=yaml_content)):
         result = load_algorithms_conf(algos_conf_fs, ["algo1"], None)
         assert "algo1" in result
@@ -104,20 +101,18 @@ def test_load_algorithms_conf():
         assert "algo1" not in result
 
 
-@patch("benchmark.find_executable", return_value=("executable", "path", "filename"))
+@patch(
+    "benchmark.find_executable",
+    return_value=("executable", "path", "filename"),
+)
 @patch("benchmark.validate_algorithm", return_value=True)
-@patch("benchmark.prepare_indexes", return_value=[{"index_key": "index_value"}])
-def test_prepare_executables(mock_prepare_indexes, mock_validate_algorithm, mock_find_executable):
-    algos_conf = {
-        "algo1": {
-            "groups": {
-                "group1": {
-                    "build": {},
-                    "search": {}
-                }
-            }
-        }
-    }
+@patch(
+    "benchmark.prepare_indexes", return_value=[{"index_key": "index_value"}]
+)
+def test_prepare_executables(
+    mock_prepare_indexes, mock_validate_algorithm, mock_find_executable
+):
+    algos_conf = {"algo1": {"groups": {"group1": {"build": {}, "search": {}}}}}
     algos_yaml = {"algo1": {}}
     gpu_present = True
     conf_file = {}
@@ -125,18 +120,33 @@ def test_prepare_executables(mock_prepare_indexes, mock_validate_algorithm, mock
     dataset = "dataset"
     count = 10
     batch_size = 128
-    result = prepare_executables(algos_conf, algos_yaml, gpu_present, conf_file, dataset_path, dataset, count, batch_size)
+    result = prepare_executables(
+        algos_conf,
+        algos_yaml,
+        gpu_present,
+        conf_file,
+        dataset_path,
+        dataset,
+        count,
+        batch_size,
+    )
     assert "executable" in result
     assert len(result["executable"]["index"]) == 1
 
 
 def test_prepare_indexes():
-    group_conf = {
-        "build": {"param1": [1, 2]},
-        "search": {"param2": [3, 4]}
-    }
+    group_conf = {"build": {"param1": [1, 2]}, "search": {"param2": [3, 4]}}
     conf_file = {"dataset": {"dims": 128}}
-    result = prepare_indexes(group_conf, "algo", "group", conf_file, "dataset_path", "dataset", 10, 128)
+    result = prepare_indexes(
+        group_conf,
+        "algo",
+        "group",
+        conf_file,
+        "dataset_path",
+        "dataset",
+        10,
+        128,
+    )
     assert len(result) == 2
     assert "param1" in result[0]["build_param"]
 
@@ -146,7 +156,15 @@ def test_validate_search_params():
     search_param_names = ["param1", "param2"]
     group_conf = {}
     conf_file = {"dataset": {"dims": 128}}
-    result = validate_search_params(all_search_params, search_param_names, "algo", group_conf, conf_file, 10, 128)
+    result = validate_search_params(
+        all_search_params,
+        search_param_names,
+        "algo",
+        group_conf,
+        conf_file,
+        10,
+        128,
+    )
     assert len(result) == 4
 
 
@@ -161,7 +179,11 @@ def test_rmm_present():
 def test_find_executable(mock_get_build_path):
     algos_conf = {"algo1": {"executable": "executable1"}}
     result = find_executable(algos_conf, "algo1", "group1", 10, 128)
-    assert result == ("executable1", "build_path", ("algo1,group1", "algo1,group1,k10,bs128"))
+    assert result == (
+        "executable1",
+        "build_path",
+        ("algo1,group1", "algo1,group1,k10,bs128"),
+    )
     mock_get_build_path.return_value = None
     with pytest.raises(FileNotFoundError):
         find_executable(algos_conf, "algo1", "group1", 10, 128)
@@ -184,22 +206,22 @@ def test_validate_constraints(mock_import_module):
     mock_import_module.return_value = mock_validator
     mock_validator.constraint_func.return_value = True
     algos_conf = {
-        "algo1": {
-            "constraints": {
-                "build": "module.constraint_func"
-            }
-        }
+        "algo1": {"constraints": {"build": "module.constraint_func"}}
     }
-    result = validate_constraints(algos_conf, "algo1", "build", {"param1": "value1"}, 128, None, None)
+    result = validate_constraints(
+        algos_conf, "algo1", "build", {"param1": "value1"}, 128, None, None
+    )
     assert result is True
-
 
     algos_conf = {"algo1": {"constraints": {}}}
-    result = validate_constraints(algos_conf, "algo1", "build", {"param1": "value1"}, 128, None, None)
+    result = validate_constraints(
+        algos_conf, "algo1", "build", {"param1": "value1"}, 128, None, None
+    )
     assert result is True
-
 
     mock_validator.constraint_func.return_value = False
     algos_conf["algo1"]["constraints"]["build"] = "module.constraint_func"
-    result = validate_constraints(algos_conf, "algo1", "build", {"param1": "value1"}, 128, None, None)
+    result = validate_constraints(
+        algos_conf, "algo1", "build", {"param1": "value1"}, 128, None, None
+    )
     assert result is False
