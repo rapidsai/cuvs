@@ -1592,7 +1592,7 @@ void extend(raft::resources const& handle,
                                               centers_view,
                                               batch_labels_view);
       } else {
-      kmeans_params.metric = index->metric();
+      kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
       cuvs::cluster::kmeans_balanced::predict(handle,
                                               kmeans_params,
                                               batch_data_view,

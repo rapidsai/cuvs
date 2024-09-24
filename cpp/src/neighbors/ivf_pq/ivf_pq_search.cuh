@@ -38,6 +38,7 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/normalize.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
@@ -744,7 +745,11 @@ inline void search(raft::resources const& handle,
                        rot_queries.data(),
                        index.rot_dim(),
                        stream);
-
+    
+    raft::print_device_vector("rot_queries", rot_queries.data(), index.rot_dim(), std::cout);
+    auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(rot_queries.data(), max_queries, index.rot_dim());
+    raft::linalg::row_normalize(handle, raft::make_const_mdspan(rot_queries_view), rot_queries_view, raft::linalg::NormType::L2Norm);
+    raft::print_device_vector("rot_queries_normalized", rot_queries.data(), index.rot_dim(), std::cout);
     for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
       uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);
       /* The distance calculation is done in the rotated/transformed space;
