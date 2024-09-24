@@ -242,7 +242,7 @@ void make_rotation_matrix(raft::resources const& handle,
   auto stream  = raft::resource::get_cuda_stream(handle);
   bool inplace = n_rows == n_cols;
   uint32_t n   = std::max(n_rows, n_cols);
-  if (force_random_rotation || !inplace) {
+  if (false) {
     rmm::device_uvector<float> buf(inplace ? 0 : n * n, stream);
     float* mat = inplace ? rotation_matrix : buf.data();
     raft::random::normal(handle, rng, mat, n * n, 0.0f, 1.0f);
