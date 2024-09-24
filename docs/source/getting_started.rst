@@ -38,18 +38,6 @@ Getting Started
 
   * `Get involved`_
 
-Welcome to cuVS, the premier library for GPU-accelerated vector search and clustering! cuVS provides several core building blocks for constructing new algorithms, as well as end-to-end vector search and clustering algorithms for use either standalone or through a growing list of :doc:`integrations <integrations>`.
-
-There are several benefits to using cuVS and GPUs for vector search, including
-
-#. Fast index build
-#. Latency critical and high throughput search
-#. Parameter tuning
-#. Cost savings
-#. Interoperability (build on GPU, deploy on CPU)
-#. Multiple language support
-#. Building blocks for composing new or accelerating existing algorithms
-
 New to vector search?
 =====================
 

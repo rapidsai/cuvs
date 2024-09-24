@@ -33,7 +33,7 @@ cuVS has several important algorithms for performing vector search on the GPU an
 
 This tutorial assumes cuVS has been installed and/or added to your build so that you are able to compile and run RAFT code. If not done already, please follow the [build and install instructions](build.md) and consider taking a look at the [example c++ template project](https://github.com/rapidsai/raft/tree/HEAD/cpp/template) for ready-to-go examples that you can immediately build and start playing with. Also take a look at RAFT's library of [reproducible vector search benchmarks](raft_ann_benchmarks.md) to run benchmarks that compare cuVS against other state-of-the-art nearest neighbors algorithms at scale.
 
-For more information about the various APIs demonstrated in this tutorial, along with comprehensive usage examples of all the APIs offered by RAFT, please refer to the [cuVS C++ API Documentation](https://docs.rapids.ai/api/cuvs/nightly/cpp_api/).
+For more information about the various APIs demonstrated in this tutorial, along with comprehensive usage examples of all the APIs offered by RAFT, please refer to the `cuVS C++ API Documentation <>https://docs.rapids.ai/api/cuvs/nightly/cpp_api/>`_.
 
 Step 1: Starting off with cuVS
 ==============================

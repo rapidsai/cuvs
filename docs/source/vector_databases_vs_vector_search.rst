@@ -1,6 +1,6 @@
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A brief primer on vector databases and how they relate to vector search
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+Primer on vector search
+~~~~~~~~~~~~~~~~~~~~~~~
 
 One of the primary differences between vector database indexes and traditional database indexes is that vector search often uses approximations to trade-off accuracy of the results for speed. Because of this, while many mature databases offer mechanisms to tune their indexes and achieve better performance, vector database indexes can return completely garbage results if they aren’t tuned for a reasonable level of search quality in addition to performance tuning. This is because vector database indexes are more closely related to machine learning models than they are to traditional database indexes.
 
@@ -65,8 +65,6 @@ Some special-purpose vector databases follow this design, such as Yahoo’s Vesp
 
 The challenge when setting hyper-parameters for globally partitioned indexes is that they need to account for the entire set of vectors, and thus the hyperparameters of the global index generally account for all of the vectors in the database, rather than any local partition.
 
-
-
 Of course, the two approaches outlined above can also be used together (e.g. training a global “coarse” index and then creating localized vector search indexes within each of the global indexes) but to my knowledge, no such architecture has implemented this pattern.
 
 A challenge with GPUs in vector databases today is that the resulting vector indexes are expected to fit into the memory of available GPUs for fast search. That is to say, there doesn’t exist today an efficient mechanism for offloading or swapping GPU indexes so they can be cached from disk or host memory, for example. We are working on mechanisms to do this, and to also utilize technologies like GPUDirect Storage and GPUDirect RDMA to improve the IO performance further.
@@ -77,21 +75,28 @@ Configuring localized vector search indexes
 Since most vector databases use localized partitioning, we’ll focus on that in this document. If global partitioning becomes more widely used, we can add more details at a later date.
 
 Tiny datasets (< 100 thousand vectors)
+--------------------------------------
+
 These datasets are very small and it’s questionable whether or not the GPU would provide any value at all. If the dimensionality is also relatively small (< 1024), you could just use brute-force or HNSW on the CPU and get great performance. If the dimensionality is relatively large (1536, 2048, 4096), you should consider using HNSW. If build time performance is critical, you should consider using CAGRA to build the graph and convert it to an HNSW graph for search (this capability exists today in the standalone cuVS/RAFT libraries and will soon be added to Milvus). An IVF flat index  can also be a great candidate here, as it can improve the search performance over brute-force by partitioning the vector space and thus reducing the search space.
 
 You could even use FAISS or cuVS standalone if you don’t need the additional features in a fully-fledged database.
 
 Small datasets where GPU might not be needed (< 1 million vectors)
+------------------------------------------------------------------
+
 For smaller dimensionality, such as 1024 or below, you could consider using a brute-force (aka flat) index on GPU and get very good search performance with exact results. You could also use a graph-based index like HNSW on the CPU or CAGRA on the GPU. If build time is critical, you could even build a CAGRA graph on the GPU and convert it to HNSW graph on the CPU.
 
 For larger dimensionality (1536, 2048, 4096), you will start to see lower build-time performance with HNSW for higher quality search settings, and so it becomes more clear that building a CAGRA graph can be useful instead.
+
 Large datasets (> 1 million vectors), goal is fast index creation at the expense of search quality
+--------------------------------------------------------------------------------------------------
 
 For fast ingest where slightly lower search quality is acceptable (85% recall and above), the IVF (inverted file index) methods can be very useful, as they can be very fast to build and still have acceptable search performance. IVF-flat index will partition the vectors into some number of clusters (specified by the user as n_lists) and at search time, some number of closest clusters (defined by n_probes) will be searched with brute-force for each query vector.
 
 IVF-PQ is similar to IVF-flat with the major difference that the vectors are compressed using a lossy product quantized compression so the index can have a much smaller footprint on the GPU. In general, it’s advised to set n_lists = sqrt(n_vectors) and set n_probes to some percentage of n_lists (e.g. 1%, 2%, 4%, 8%, 16%). Because IVF-PQ is a lossy compression, a refinement step can be performed by initially increasing the number of neighbors (by some multiple factor) and using the raw vectors to compute the exact distances, ultimately reducing the neighborhoods down to size k. Even a refinement of 2x (which would query initially for k*2) can be quite effective in making up for recall lost by the PQ compression, but it does come at the expense of having to keep the raw vectors around (keeping in mind many databases store the raw vectors anyways).
 
 Large datasets (> 1 million vectors), goal is high quality search at the expense of fast index creation
+-------------------------------------------------------------------------------------------------------
 
 By trading off index creation performance, an extremely high quality search model can be built. Generally, all of the vector search index types have hyperparameters that have a direct correlation with the search accuracy and so they can be cranked up to yield better recall. Unfortunately, this can also significantly increase the index build time and reduce the search throughput. The trick here is to find the fastest build time that can achieve the best recall with the lowest latency or highest throughput possible.
 
