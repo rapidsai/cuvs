@@ -46,6 +46,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
  public:
   AnnMGTest()
     : stream_(resource::get_cuda_stream(handle_)),
+      clique_(handle_.get_nccl_clique_handle()),
       ps(::testing::TestWithParam<AnnMGInputs>::GetParam()),
       d_index_dataset(0, stream_),
       d_queries(0, stream_),
@@ -627,6 +628,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
  private:
   raft::device_resources handle_;
   rmm::cuda_stream_view stream_;
+  raft::comms::nccl_clique clique_;
   AnnMGInputs ps;
   std::vector<DataT> h_index_dataset;
   std::vector<DataT> h_queries;

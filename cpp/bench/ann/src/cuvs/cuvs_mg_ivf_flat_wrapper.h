@@ -132,13 +132,8 @@ void cuvs_mg_ivf_flat<T, IdxT>::search(
   auto distances_view = raft::make_host_matrix_view<float, int64_t, raft::row_major>(
     distances, IdxT(batch_size), IdxT(k));
 
-  cuvs::neighbors::mg::search(handle_,
-                              *index_,
-                              search_params_,
-                              queries_view,
-                              neighbors_view,
-                              distances_view,
-                              search_params_.merge_mode);
+  cuvs::neighbors::mg::search(
+    handle_, *index_, search_params_, queries_view, neighbors_view, distances_view);
 }
 
 }  // namespace cuvs::bench

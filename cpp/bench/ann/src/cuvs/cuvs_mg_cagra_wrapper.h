@@ -185,13 +185,8 @@ void cuvs_mg_cagra<T, IdxT>::search_base(
   auto distances_view =
     raft::make_host_matrix_view<float, int64_t, raft::row_major>(distances, batch_size, k);
 
-  cuvs::neighbors::mg::search(handle_,
-                              *index_,
-                              search_params_,
-                              queries_view,
-                              neighbors_view,
-                              distances_view,
-                              search_params_.merge_mode);
+  cuvs::neighbors::mg::search(
+    handle_, *index_, search_params_, queries_view, neighbors_view, distances_view);
 }
 
 template <typename T, typename IdxT>
