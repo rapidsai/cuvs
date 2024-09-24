@@ -26,10 +26,11 @@ Useful Resources
 - `Issue tracker <https://github.com/rapidsai/cuvs/issues>`_: Report issues or request features.
 
 
+Contents
+########
 
 .. toctree::
    :maxdepth: 4
-   :caption: Contents:
 
    build.rst
    getting_started.rst
@@ -37,10 +38,3 @@ Useful Resources
    api_docs.rst
    contributing.md
 
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
