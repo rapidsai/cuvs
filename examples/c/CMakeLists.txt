@@ -13,6 +13,8 @@
 
 cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 
+set(CMAKE_CUDA_ARCHITECTURES 89)
+
 # ------------- configure rapids-cmake --------------#
 
 include(../cmake/thirdparty/fetch_rapids.cmake)
