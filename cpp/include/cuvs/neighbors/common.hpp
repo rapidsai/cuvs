@@ -436,8 +436,9 @@ struct ivf_to_sample_filter {
 };
 
 /**
- * @brief Filter an index with a bitset
+ * @brief Filter an index with a bitmap
  *
+ * @tparam bitmap_t Data type of the bitmap
  * @tparam index_t Indexing type
  */
 template <typename bitmap_t, typename index_t>
@@ -456,6 +457,7 @@ struct bitmap_filter : public base_filter {
 /**
  * @brief Filter an index with a bitset
  *
+ * @tparam bitset_t Data type of the bitset
  * @tparam index_t Indexing type
  */
 template <typename bitset_t, typename index_t>

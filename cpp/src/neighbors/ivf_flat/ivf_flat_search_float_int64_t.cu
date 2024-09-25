@@ -31,15 +31,15 @@ namespace cuvs::neighbors::ivf_flat {
 
 #define CUVS_INST_IVF_FLAT_SEARCH(T, IdxT)                                      \
   void search(raft::resources const& handle,                                    \
-              const search_params& params,                                      \
-              index<T, IdxT>& idx,                                              \
+              const cuvs::neighbors::ivf_flat::search_params& params,           \
+              cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                 \
               raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \
               raft::device_matrix_view<float, IdxT, raft::row_major> distances, \
               cuvs::neighbors::filtering::base_filter* sample_filter)           \
   {                                                                             \
     cuvs::neighbors::ivf_flat::detail::search(                                  \
-      handle, params, idx, queries, neighbors, distances, sample_filter);       \
+      handle, params, index, queries, neighbors, distances, sample_filter);     \
   }
 CUVS_INST_IVF_FLAT_SEARCH(float, int64_t);
 

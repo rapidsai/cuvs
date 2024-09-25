@@ -18,10 +18,10 @@
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
+#include <cuvs/core/bitset.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include <raft/core/bitset.cuh>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>

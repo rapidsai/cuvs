@@ -19,7 +19,6 @@
 #include "common.hpp"
 #include <cstdint>
 #include <cuvs/neighbors/common.hpp>
-#include <optional>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 

@@ -25,8 +25,6 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 
-#include <optional>
-
 namespace cuvs::neighbors::ivf_pq {
 
 /**
@@ -1219,7 +1217,7 @@ void extend(raft::resources const& handle,
  * @{
  */
 /**
- * @brief Search ANN using the constructed index and the optional filter given.
+ * @brief Search ANN using the constructed index.
  *
  * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
  *
@@ -1263,7 +1261,7 @@ void search(raft::resources const& handle,
             cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 
 /**
- * @brief Search ANN using the constructed index and the optional filter given.
+ * @brief Search ANN using the constructed index.
  *
  * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
  *
@@ -1307,7 +1305,7 @@ void search(raft::resources const& handle,
             cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 
 /**
- * @brief Search ANN using the constructed index and the optional filter given.
+ * @brief Search ANN using the constructed index.
  *
  * See the [ivf_pq::build](#ivf_pq::build) documentation for a usage example.
  *

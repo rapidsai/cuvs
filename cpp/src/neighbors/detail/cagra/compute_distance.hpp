@@ -240,7 +240,6 @@ struct dataset_descriptor_host {
       smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
       team_size{dd_host.team_size()}
   {
-    RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, sizeof(DescriptorImpl), stream_));
   }
 
   [[nodiscard]] auto dev_ptr() const -> const dev_descriptor_t* { return dev_ptr_.get(); }
