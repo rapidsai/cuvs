@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "kmeans.cuh"
+#include "kmeans_mg_impl.cuh"
 #include <raft/core/resources.hpp>
 
-namespace cuvs::cluster::kmeans {
+namespace cuvs::cluster::kmeans::mg {
 
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
@@ -27,8 +27,10 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<float, int> inertia,
          raft::host_scalar_view<int, int> n_iter)
 {
-  cuvs::cluster::kmeans::fit<float, int>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
+
+  cuvs::cluster::kmeans::mg::detail::fit<float, int>(
+    handle, params, X, sample_weight.value(), centroids, inertia, n_iter, workspace);
 }
 
 void fit(raft::resources const& handle,
@@ -39,7 +41,9 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<float, int64_t> inertia,
          raft::host_scalar_view<int64_t, int64_t> n_iter)
 {
-  cuvs::cluster::kmeans::fit<float, int64_t>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
+
+  cuvs::cluster::kmeans::mg::detail::fit<float, int64_t>(
+    handle, params, X, sample_weight.value(), centroids, inertia, n_iter, workspace);
 }
-}  // namespace cuvs::cluster::kmeans
+}  // namespace cuvs::cluster::kmeans::mg
