@@ -21,6 +21,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
+#include <library_types.h>
 #include <raft/core/bitset.cuh>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
@@ -898,6 +899,7 @@ inline auto enum_variety_cosine() -> test_cases_t
     ivf_pq_inputs y(x);
     if (y.min_recall.has_value()) {
       if (y.search_params.lut_dtype == CUDA_R_8U) {
+        y.search_params.lut_dtype = CUDA_R_16F;
         // InnerProduct score is signed,
         // thus we're forced to used signed 8-bit representation,
         // thus we have one bit less precision
