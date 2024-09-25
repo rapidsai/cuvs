@@ -275,7 +275,7 @@ if hasArg tests || (( ${NUMARGS} == 0 )); then
 fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
-    BUILD_ANN_BENCH=ON
+    BUILD_CUVS_BENCH=ON
     CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
 fi
 
@@ -351,7 +351,7 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           -DDISABLE_DEPRECATION_WARNINGS=${DISABLE_DEPRECATION_WARNINGS} \
           -DBUILD_TESTS=${BUILD_TESTS} \
           -DBUILD_C_TESTS=${BUILD_TESTS} \
-          -DBUILD_ANN_BENCH=${BUILD_ANN_BENCH} \
+          -DBUILD_CUVS_BENCH=${BUILD_CUVS_BENCH} \
           -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \
           ${CACHE_ARGS} \
