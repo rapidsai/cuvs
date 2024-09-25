@@ -531,7 +531,6 @@ target_compile_options(
                "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
 )
 # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-#
 target_link_options(cuvs PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
 # ##################################################################################################
