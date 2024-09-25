@@ -58,16 +58,18 @@ _RAFT_HOST_DEVICE inline uint64_t xorshift64(uint64_t u)
   return u * 0x2545F4914F6CDD1DULL;
 }
 
-template <class T, unsigned X_MAX = 1024>
-RAFT_DEVICE_INLINE_FUNCTION constexpr T swizzling(T x)
+template <uint32_t Dim = 1024, uint32_t Stride = 128, typename T>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto swizzling(T x) -> T
 {
   // Address swizzling reduces bank conflicts in shared memory, but increases
   // the amount of operation instead.
   // return x;
-  if constexpr (X_MAX <= 1024) {
-    return (x) ^ ((x) >> 5);
+  if constexpr (Stride <= 32) {
+    return x;
+  } else if constexpr (Dim <= 1024) {
+    return x ^ (x >> 5);
   } else {
-    return (x) ^ (((x) >> 5) & 0x1f);
+    return x ^ ((x >> 5) & 0x1f);
   }
 }
 
@@ -114,7 +116,6 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
   const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
   const auto compute_distance = dataset_desc.compute_distance_impl;
-  const auto args             = dataset_desc.args.load();
 
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
@@ -134,11 +135,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         }
       }
 
-      // This is the `dataset_desc.compute_distance` manually inlined to move the fetching of
-      // dataset_desc from smem out of the loop.
-      // const auto norm2 = dataset_desc.compute_distance(seed_index, valid_i);
-      const auto norm2 =
-        device::team_sum(valid_i ? compute_distance(args, seed_index) : 0, team_size_bits);
+      const auto norm2 = dataset_desc.compute_distance(seed_index, valid_i);
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;
@@ -197,32 +194,27 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   __syncthreads();
 
   // Compute the distance to child nodes
-  const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
-  const auto max_i          = raft::round_up_safe(knn_k * search_width, warp_size >> team_size_bits)
-                     << team_size_bits;
+  const auto team_size_bits   = dataset_desc.team_size_bitshift_from_smem();
+  const auto num_k            = knn_k * search_width;
+  const auto max_i            = raft::round_up_safe(num_k, warp_size >> team_size_bits);
   const auto compute_distance = dataset_desc.compute_distance_impl;
   const auto args             = dataset_desc.args.load();
-  for (uint32_t tid = threadIdx.x; tid < max_i; tid += blockDim.x) {
-    const auto i       = tid >> team_size_bits;
-    const bool valid_i = (i < (knn_k * search_width));
-    IndexT child_id    = invalid_index;
-    if (valid_i) { child_id = result_child_indices_ptr[i]; }
+  const bool lead_lane        = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
+  for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += blockDim.x >> team_size_bits) {
+    const bool valid_i  = i < num_k;
+    const auto child_id = valid_i ? result_child_indices_ptr[i] : invalid_index;
 
-    // This is the `dataset_desc.compute_distance` manually inlined to move the fetching of
-    // dataset_desc from smem out of the loop.
-    // const auto norm2 = dataset_desc.compute_distance(child_id, child_id != invalid_index);
-    const auto norm2 = device::team_sum(
-      (child_id != invalid_index) ? compute_distance(args, child_id) : 0, team_size_bits);
+    // We should be calling `dataset_desc.compute_distance(..)` here as follows:
+    // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
+    // Instead, we manually inline this function for performance reasons.
+    // This allows us to move the fetching of the arguments from shared memory out of the loop.
+    const DistanceT child_dist = device::team_sum(
+      (child_id != invalid_index) ? compute_distance(args, child_id)
+                                  : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
+      team_size_bits);
 
     // Store the distance
-    const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
-    if (valid_i && lane_id == 0) {
-      if (child_id != invalid_index) {
-        result_child_distances_ptr[i] = norm2;
-      } else {
-        result_child_distances_ptr[i] = raft::upper_bound<DistanceT>();
-      }
-    }
+    if (valid_i && lead_lane) { result_child_distances_ptr[i] = child_dist; }
   }
 }
 
@@ -256,6 +248,16 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(half (&x)[4], uint32_t addr)
                  "=h"(*reinterpret_cast<uint16_t*>(x + 2)),
                  "=h"(*reinterpret_cast<uint16_t*>(x + 3))
                : "r"(addr));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, uint32_t addr)
+{
+  asm volatile("ld.shared.u32 {%0}, [%1];" : "=r"(x) : "r"(addr));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, const uint32_t* addr)
+{
+  lds(x, uint32_t(__cvta_generic_to_shared(addr)));
 }
 
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, uint32_t addr)

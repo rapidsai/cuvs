@@ -69,11 +69,22 @@ class factory {
   }
 };
 
-struct dataset_descriptor_key {
+/*
+Caching of dataset/distance descriptor initialization
+  (see `dataset_descriptor_init_with_cache` below).
+ */
+namespace descriptor_cache {
+
+/**
+ * The key for caching consists of a minimal set of fields that uniquely define the descriptor.
+ * The key field names are the same as of the descriptor and the contents are not relevant for
+ * caching.
+ */
+struct key {
   uint64_t data_ptr;
   uint64_t n_rows;
   uint32_t dim;
-  uint32_t extra_val;
+  uint32_t extra_val;  // this one has different meanings for different descriptor types
   uint32_t team_size;
   uint32_t metric;
 };
@@ -82,39 +93,38 @@ template <typename DatasetT>
 auto make_key(const cagra::search_params& params,
               const DatasetT& dataset,
               cuvs::distance::DistanceType metric)
-  -> std::enable_if_t<is_strided_dataset_v<DatasetT>, dataset_descriptor_key>
+  -> std::enable_if_t<is_strided_dataset_v<DatasetT>, key>
 {
-  return dataset_descriptor_key{reinterpret_cast<uint64_t>(dataset.view().data_handle()),
-                                uint64_t(dataset.n_rows()),
-                                dataset.dim(),
-                                dataset.stride(),
-                                uint32_t(params.team_size),
-                                uint32_t(metric)};
+  return key{reinterpret_cast<uint64_t>(dataset.view().data_handle()),
+             uint64_t(dataset.n_rows()),
+             dataset.dim(),
+             dataset.stride(),
+             uint32_t(params.team_size),
+             uint32_t(metric)};
 }
 
 template <typename DatasetT>
 auto make_key(const cagra::search_params& params,
               const DatasetT& dataset,
               cuvs::distance::DistanceType metric)
-  -> std::enable_if_t<is_vpq_dataset_v<DatasetT>, dataset_descriptor_key>
+  -> std::enable_if_t<is_vpq_dataset_v<DatasetT>, key>
 {
-  return dataset_descriptor_key{
-    reinterpret_cast<uint64_t>(dataset.data.data_handle()),
-    uint64_t(dataset.n_rows()),
-    dataset.dim(),
-    uint32_t(reinterpret_cast<uint64_t>(dataset.pq_code_book.data_handle()) >> 6),
-    uint32_t(params.team_size),
-    uint32_t(metric)};
+  return key{reinterpret_cast<uint64_t>(dataset.data.data_handle()),
+             uint64_t(dataset.n_rows()),
+             dataset.dim(),
+             uint32_t(reinterpret_cast<uint64_t>(dataset.pq_code_book.data_handle()) >> 6),
+             uint32_t(params.team_size),
+             uint32_t(metric)};
 }
 
-inline auto operator==(const dataset_descriptor_key& a, const dataset_descriptor_key& b) -> bool
+inline auto operator==(const key& a, const key& b) -> bool
 {
   return a.data_ptr == b.data_ptr && a.n_rows == b.n_rows && a.dim == b.dim &&
          a.extra_val == b.extra_val && a.team_size == b.team_size && a.metric == b.metric;
 }
 
-struct dataset_descriptor_key_hash {
-  inline auto operator()(const dataset_descriptor_key& x) const noexcept -> std::size_t
+struct key_hash {
+  inline auto operator()(const key& x) const noexcept -> std::size_t
   {
     return size_t{x.data_ptr} + size_t{x.n_rows} * size_t{x.dim} * size_t{x.extra_val} +
            (size_t{x.team_size} ^ size_t{x.metric});
@@ -122,16 +132,28 @@ struct dataset_descriptor_key_hash {
 };
 
 template <typename DataT, typename IndexT, typename DistanceT>
-struct dataset_descriptor_cache {
+struct store {
   /** Number of descriptors to cache. */
   static constexpr size_t kDefaultSize = 100;
-  raft::cache::lru<dataset_descriptor_key,
-                   dataset_descriptor_key_hash,
+  raft::cache::lru<key,
+                   key_hash,
                    std::equal_to<>,
                    std::shared_ptr<dataset_descriptor_host<DataT, IndexT, DistanceT>>>
     value{kDefaultSize};
 };
 
+}  // namespace descriptor_cache
+
+/**
+ * Call `dataset_descriptor_init` with memoization.
+ * (NB: `dataset_descriptor_init` is a function in a generated header file
+ * `neighbors/detail/cagra/compute_distance-ext.cuh`).
+ *
+ * `dataset_descriptor_init`  involves calling a CUDA kernel to resolve device symbols before the
+ * main search kernel runs. This adds an extra unwanted latency.
+ * Caching the the descriptor helps to hide this latency for repeated searches.
+ *
+ */
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init_with_cache(const raft::resources& res,
                                         const cagra::search_params& params,
@@ -140,9 +162,9 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
   -> const dataset_descriptor_host<DataT, IndexT, DistanceT>&
 {
   using desc_t = dataset_descriptor_host<DataT, IndexT, DistanceT>;
-  auto key     = make_key(params, dataset, metric);
+  auto key     = descriptor_cache::make_key(params, dataset, metric);
   auto& cache =
-    raft::resource::get_custom_resource<dataset_descriptor_cache<DataT, IndexT, DistanceT>>(res)
+    raft::resource::get_custom_resource<descriptor_cache::store<DataT, IndexT, DistanceT>>(res)
       ->value;
   std::shared_ptr<desc_t> desc{nullptr};
   if (!cache.get(key, &desc)) {

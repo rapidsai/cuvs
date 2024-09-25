@@ -218,7 +218,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
                   SAMPLE_FILTER_T sample_filter)
   {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
-    select_and_run(dataset_desc.dev_ptr,
+    select_and_run(dataset_desc.dev_ptr(),
                    graph,
                    result_indices_ptr,
                    result_distances_ptr,

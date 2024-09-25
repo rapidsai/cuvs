@@ -31,10 +31,41 @@
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/vectorized.cuh>
 
+#include <functional>
+#include <memory>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
 
+/**
+ * @brief Dataset and distance description.
+ *
+ * This is the base type for the dataset/distance descriptors.
+ * The actual implementations are hidden in `compute_distance_***-impl.cuh` files, which should be
+ * included only in `compute_distance_***.cu` files to enforce separable compilation.
+ *
+ * [Note: manual dispatch]
+ * The descriptor type hierarchy declared here resembles the usual C++ inheritance: the search
+ * kernels take a pointer to the base type as an argument, but the actual implementation types are
+ * passed by the host. The kernels only ever need two functions `setup_workspace` and
+ * `compute_distance`; the choice of the implementation happens at the runtime.
+ *
+ * However, for performance reasons, we don't use the C++ virtual dispatch mechanics here.
+ * The extra pointer-chasing and register usage overheads associated with virtual tables turn out to
+ * cause a significant slowdown in the performance-critical `compute_distance`.
+ * Instead, we manually dispatch the two polymorphic functions and store them as fields in the
+ * descriptor structure.
+ *
+ * [Note: initialization/dispatch]
+ * The host doesn't know the addresses of the device symbols. That means we either need to resolve
+ * the device functions and store them in the descriptor directly on the device, or use
+ * `cudaMemcpyFromSymbolAsync` to fetch them (note, there is same problem with classes: if an object
+ * is created on the host, its pointer to the vtable would be invalid on device).
+ * We take the first approach: there's an `***_init_kernel` for each descriptor instance that is
+ * called before the search kernel; all it does is call a (placement) new with an appropriate type
+ * and arguments in a single GPU thread.
+ *
+ */
 template <typename DataT, typename IndexT, typename DistanceT>
 struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   using base_type  = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
@@ -43,6 +74,20 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   using INDEX_T    = IndexT;
   using DISTANCE_T = DistanceT;
 
+  /**
+   * @brief "polymorphic" `compute_distance` arguments.
+   *
+   * This is a tightly-packed POD arguments of `compute_distance`.
+   * **Important** this structure is passed by value to `compute_distance`; it's important it
+   * remains small.
+   *
+   * [Note: arguments layout]
+   * The descriptor implementations require different sets of arguments (with couple arguments
+   * overlapping). At the same time the `compute_distance` is defined such that it accepts the
+   * `args_t` by value. That means the layout of the struct must be identical for all descriptor
+   * implementations. We workaround this requirement by defining generic fields in this struct and
+   * assignging the meaning to them on the implementation side.
+   */
   struct alignas(LOAD_T) args_t {
     void* extra_ptr1;
     void* extra_ptr2;
@@ -53,6 +98,13 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
     uint32_t extra_word1;
     uint32_t extra_word2;
 
+    /**
+     * Load this struct from shared memory.
+     *
+     * NB: until `compute_distance` is called, the arguments struct is stored in the shared memory
+     * as a member of the descriptor struct. This helper functions saves a few instructions by
+     * forcing the compiler to assume it is indeed in the shared memory address space.
+     */
     RAFT_DEVICE_INLINE_FUNCTION auto load() const -> args_t
     {
       constexpr int kCount = sizeof(*this) / sizeof(LOAD_T);
@@ -68,6 +120,7 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
     }
   };
 
+  /** Shared memory usage and team_size packed into a single uint32_t to save on memory requests. */
   struct smem_and_team_size_t {
     uint32_t value;
     RAFT_INLINE_FUNCTION constexpr smem_and_team_size_t(uint32_t smem_size_bytes,
@@ -103,6 +156,7 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
    * given by the dataset_index. */
   compute_distance_type* compute_distance_impl;
+  /** A placeholder for an implementation-specific pointer. */
   void* extra_ptr3;
   smem_and_team_size_t smem_and_team_size;
 
@@ -161,57 +215,48 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
   }
 };
 
+/**
+ * @brief Hosting a device descriptor.
+ *
+ * The dataset descriptor is initialized on the device side and stays there.
+ * The host struct manages the lifetime of the associated device pointer and a couple parameters
+ * affecting the search kernel launch config.
+ *
+ */
 template <typename DataT, typename IndexT, typename DistanceT>
 struct dataset_descriptor_host {
   using dev_descriptor_t         = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
-  dev_descriptor_t* dev_ptr      = nullptr;
   uint32_t smem_ws_size_in_bytes = 0;
   uint32_t team_size             = 0;
-  uint32_t dataset_block_dim     = 0;
 
   template <typename DescriptorImpl>
-  dataset_descriptor_host(const DescriptorImpl& dd_host,
-                          rmm::cuda_stream_view stream,
-                          uint32_t dataset_block_dim)
-    : stream_{stream},
+  dataset_descriptor_host(const DescriptorImpl& dd_host, rmm::cuda_stream_view stream)
+    : dev_ptr_{[stream]() {
+                 dev_descriptor_t* p;
+                 RAFT_CUDA_TRY(cudaMallocAsync(&p, sizeof(DescriptorImpl), stream));
+                 return p;
+               }(),
+               [stream](dev_descriptor_t* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(p, stream)); }},
       smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
-      team_size{dd_host.team_size()},
-      dataset_block_dim{dataset_block_dim}
+      team_size{dd_host.team_size()}
   {
     RAFT_CUDA_TRY(cudaMallocAsync(&dev_ptr, sizeof(DescriptorImpl), stream_));
   }
 
-  ~dataset_descriptor_host() noexcept
-  {
-    if (dev_ptr == nullptr) { return; }
-    RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(dev_ptr, stream_));
-  }
-
-  dataset_descriptor_host(dataset_descriptor_host&& other)
-  {
-    std::swap(this->dev_ptr, other.dev_ptr);
-    std::swap(this->smem_ws_size_in_bytes, other.smem_ws_size_in_bytes);
-    std::swap(this->stream_, other.stream_);
-    std::swap(this->team_size, other.team_size);
-    std::swap(this->dataset_block_dim, other.dataset_block_dim);
-  }
-  dataset_descriptor_host& operator=(dataset_descriptor_host&& b)
-  {
-    auto& a = *this;
-    std::swap(a.dev_ptr, b.dev_ptr);
-    std::swap(a.smem_ws_size_in_bytes, b.smem_ws_size_in_bytes);
-    std::swap(a.stream_, b.stream_);
-    std::swap(a.team_size, b.team_size);
-    std::swap(a.dataset_block_dim, b.dataset_block_dim);
-    return a;
-  }
-  dataset_descriptor_host(const dataset_descriptor_host&)            = delete;
-  dataset_descriptor_host& operator=(const dataset_descriptor_host&) = delete;
+  [[nodiscard]] auto dev_ptr() const -> const dev_descriptor_t* { return dev_ptr_.get(); }
+  [[nodiscard]] auto dev_ptr() -> dev_descriptor_t* { return dev_ptr_.get(); }
 
  private:
-  rmm::cuda_stream_view stream_;
+  std::unique_ptr<dev_descriptor_t, std::function<void(dev_descriptor_t*)>> dev_ptr_;
 };
 
+/**
+ * @brief The signature for descriptor initialization.
+ *
+ * There is an init function associated with every descriptor implementation. It's responsible for
+ * initializing the device-side descriptor instance (calling the init kernel).
+ *
+ */
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 using init_desc_type =
   dataset_descriptor_host<DataT, IndexT, DistanceT> (*)(const cagra::search_params&,
@@ -219,6 +264,22 @@ using init_desc_type =
                                                         cuvs::distance::DistanceType,
                                                         rmm::cuda_stream_view);
 
+/**
+ * @brief Descriptor instance specification.
+ *
+ * This type provides a decentralized way for selecting a descriptor instance best suitable for the
+ * given dataset and distance metric.
+ * There is a spec for every descriptor (described in the interface files
+ * `compute_distance_***.hpp`).
+ *
+ * The `instance_spec` implementation must have the following static member template functions:
+ *   * constexpr bool accepts_dataset()
+ *     - tells whether the spec is compatible with the dataset type, executed at compile time.
+ *   * double priority(..)
+ *     - tells how to select a single spec out of possibly several compatible specs
+ *   * init_desc_type init
+ *     - (see `init_desc_type` above) the function to initialize the descriptor.
+ */
 template <typename DataT, typename IndexT, typename DistanceT>
 struct instance_spec {
   using data_type     = DataT;
@@ -233,6 +294,9 @@ struct instance_spec {
   }
 };
 
+/** Whether the descriptor is compatible with the dataset and arguments at the type level
+ * (compile-time check).
+ */
 template <typename InstanceSpec,
           typename DataT,
           typename IndexT,
@@ -243,6 +307,11 @@ constexpr bool spec_sound = std::is_same_v<DataT, typename InstanceSpec::data_ty
                             std::is_same_v<DistanceT, typename InstanceSpec::distance_type> &&
                             InstanceSpec::template accepts_dataset<DatasetT>();
 
+/**
+ * @brief Get the init function and the priority of the descriptor given by the InstanceSpec.
+ *
+ * @return (init function, priority)
+ */
 template <typename InstanceSpec,
           typename DataT,
           typename IndexT,
@@ -260,6 +329,21 @@ constexpr auto spec_match(const cagra::search_params& params,
   return std::make_tuple(nullptr, -1.0);
 }
 
+/**
+ * @brief Select the best matching descriptor instance from the given type-level list.
+ *
+ * This is a helper struct that goes through the given list of specs (given as template arguments),
+ * filters is (partially at compile time and partially at runtime), and selects the descriptor with
+ * the highest priority.
+ *
+ * There is a single point in the codebase, where all specs are brought together; it's in the
+ * `neighbors/detail/cagra/compute_distance-ext.cuh`, which is generated by
+ * `neighbors/detail/cagra/compute_distance_00_generate.py`.
+ * Hence, `compute_distance_00_generate.py` is the only place you need to manually change to modify
+ * or extend the list supported dataset descriptors.
+ * The logic of selecting the descriptor is fully defined in this file, whereas the priorities of
+ * specific implementations are defined next to the implementations.
+ */
 template <typename... Specs>
 struct instance_selector {
   template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>

@@ -208,15 +208,9 @@ add_library(
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint64_dim128_t8.cu
-  src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint64_dim256_t16.cu
-  src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint64_dim128_t8.cu
-  src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint64_dim256_t16.cu
-  src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_int8_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_int8_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_int8_uint32_dim512_t32.cu
@@ -226,15 +220,9 @@ add_library(
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint64_dim128_t8.cu
-  src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint64_dim256_t16.cu
-  src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_float_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim512_t32.cu
-  src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint64_dim128_t8.cu
-  src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint64_dim256_t16.cu
-  src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint64_dim512_t32.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim128_t8.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim256_t16.cu
   src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim512_t32.cu
@@ -247,24 +235,12 @@ add_library(
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim256_t16_8pq_4subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim512_t32_8pq_2subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim512_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint64_dim128_t8_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint64_dim128_t8_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint64_dim256_t16_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint64_dim256_t16_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint64_dim512_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint64_dim512_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim256_t16_8pq_2subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim256_t16_8pq_4subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim512_t32_8pq_2subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint32_dim512_t32_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint64_dim128_t8_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint64_dim128_t8_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint64_dim256_t16_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint64_dim256_t16_8pq_4subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint64_dim512_t32_8pq_2subd_half.cu
-  src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_half_uint64_dim512_t32_8pq_4subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim128_t8_8pq_2subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim128_t8_8pq_4subd_half.cu
   src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_int8_uint32_dim256_t16_8pq_2subd_half.cu
@@ -553,7 +529,6 @@ target_compile_options(
                "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
 )
 # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-#
 target_link_options(cuvs PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
 # ##################################################################################################
