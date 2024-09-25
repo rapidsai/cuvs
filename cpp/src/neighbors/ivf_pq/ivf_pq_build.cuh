@@ -1579,7 +1579,7 @@ void extend(raft::resources const& handle,
       auto centers_view = raft::make_device_matrix_view<const float, internal_extents_t>(
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
-      raft::print_device_vector("non_normalized_extend", batch.data(), index->dim(), std::cout);
+
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
         auto float_vec_batch =
           raft::make_device_matrix<float, internal_extents_t>(handle, batch.size(), index->dim());
@@ -1594,8 +1594,7 @@ void extend(raft::resources const& handle,
                                     raft::make_const_mdspan(float_vec_batch.view()),
                                     float_vec_batch.view(),
                                     raft::linalg::NormType::L2Norm);
-        raft::print_device_vector(
-          "normalized_extend", float_vec_batch.data_handle(), index->dim(), std::cout);
+
         kmeans_params.metric = distance::DistanceType::InnerProduct;
         cuvs::cluster::kmeans_balanced::predict(handle,
                                                 kmeans_params,
@@ -1798,11 +1797,8 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     if (index.metric() == distance::DistanceType::CosineExpanded) {
-    //   raft::print_device_vector(
-    //     "non_normalized_build", trainset.data_handle(), index.dim(), std::cout);
       raft::linalg::row_normalize(
         handle, trainset_const_view, trainset.view(), raft::linalg::NormType::L2Norm);
-      raft::print_device_vector("normalized_build", trainset.data_handle(), index.dim(), std::cout);
       kmeans_params.metric = distance::DistanceType::InnerProduct;
     } else {
       kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index.metric());
@@ -1810,11 +1806,6 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
     
-    raft::print_device_vector("centers", centers_view.data_handle(), index.dim(), std::cout);
-
-    // raft::linalg::row_normalize(handle, raft::make_const_mdspan(centers_view), centers_view,
-    // raft::linalg::NormType::L2Norm);
-
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
