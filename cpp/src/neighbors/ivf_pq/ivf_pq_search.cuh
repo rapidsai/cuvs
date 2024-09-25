@@ -172,35 +172,6 @@ void select_clusters(raft::resources const& handle,
                      n_lists,
                      stream);
 
-  if (false) {
-    // TODO: store dataset norms in a different manner for the cosine metric to avoid the copy here
-    auto center_norms =
-      raft::make_device_mdarray<float, uint32_t>(handle, mr, raft::make_extents<uint32_t>(n_lists));
-
-    cudaMemcpy2DAsync(center_norms.data_handle(),
-                      sizeof(float),
-                      cluster_centers + dim,
-                      sizeof(float) * dim_ext,
-                      sizeof(float),
-                      n_lists,
-                      cudaMemcpyDefault,
-                      stream);
-    raft::linalg::map_offset(
-      handle,
-      raft::make_device_vector_view<float, uint32_t>(center_norms.data_handle(), n_lists),
-      raft::sqrt_op{});
-
-    raft::linalg::matrixVectorOp(qc_distances.data(),
-                                 qc_distances.data(),
-                                 center_norms.data_handle(),
-                                 n_lists,
-                                 n_queries,
-                                 true,
-                                 true,
-                                 raft::div_checkzero_op{},
-                                 stream);
-  }
-
   // Select neighbor clusters for each query.
   rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
   cuvs::selection::select_k(
@@ -752,7 +723,6 @@ inline void search(raft::resources const& handle,
                                 raft::make_const_mdspan(rot_queries_view),
                                 rot_queries_view,
                                 raft::linalg::NormType::L2Norm);
-
     for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
       uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);
       /* The distance calculation is done in the rotated/transformed space;

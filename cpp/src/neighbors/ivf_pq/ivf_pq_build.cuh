@@ -30,6 +30,7 @@
 #include "../../cluster/kmeans_balanced.cuh"
 
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/error.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -1725,6 +1726,9 @@ auto build(raft::resources const& handle,
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
+  if (params.metric == cuvs::distance::DistanceType::CosineExpanded && params.codebook_kind == codebook_gen::PER_CLUSTER) {
+    RAFT_FAIL("CosineExpanded metric only supported for codebook_gen::PER_SUBSPACE");
+  }
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -1805,7 +1809,7 @@ auto build(raft::resources const& handle,
     }
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
-    
+
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(

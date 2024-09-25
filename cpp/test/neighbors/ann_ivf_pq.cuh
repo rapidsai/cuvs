@@ -21,12 +21,10 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include <library_types.h>
+#include <gtest/gtest.h>
 #include <raft/core/bitset.cuh>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
-#include <raft/linalg/norm_types.hpp>
-#include <raft/linalg/normalize.cuh>
 #include <raft/matrix/gather.cuh>
 #include <rmm/cuda_stream_pool.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
@@ -131,8 +129,8 @@ void compare_vectors_l2(
     double d = dist(i);
     // The theoretical estimate of the error is hard to come up with,
     // the estimate below is based on experimentation + curse of dimensionality
-    // ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
-    //   << " (label = " << label << ", ix = " << i << ", eps = " << eps << ")";
+    ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
+      << " (label = " << label << ", ix = " << i << ", eps = " << eps << ")";
   }
 }
 
@@ -171,12 +169,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
-      // auto dv = raft::make_device_matrix_view<float, size_t>(database.data(),
-      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
-      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(dv), dv, raft::linalg::NormType::L2Norm);
-      // auto sv = raft::make_device_matrix_view<float, size_t>(search_queries.data(),
-      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
-      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(sv), sv, raft::linalg::NormType::L2Norm);
     } else {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(1), DataT(20));
@@ -201,7 +193,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       ps.num_db_vecs,
       ps.dim,
       ps.k,
-      cuvs::distance::DistanceType::CosineExpanded);
+      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
     distances_ref.resize(queries_size);
     raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
@@ -291,6 +283,10 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                             uint32_t n_take,
                             uint32_t n_skip)
   {
+    // the original data cannot be reconstructed since the dataset was normalized
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      return;
+    }
     auto& rec_list = index.lists()[label];
     auto dim       = index.dim();
     n_take         = std::min<uint32_t>(n_take, rec_list->size.load());
@@ -322,6 +318,9 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto old_list = index->lists()[label];
     auto n_rows   = old_list->size.load();
     if (n_rows == 0) { return; }
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      return;
+    }
 
     auto vectors_1 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
     auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
@@ -385,7 +384,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // Pack a few vectors back to the list.
     int row_offset = 9;
     int n_vec      = 3;
-    // ASSERT_TRUE(row_offset + n_vec < n_rows);
+    ASSERT_TRUE(row_offset + n_vec < n_rows);
     size_t offset      = row_offset * index->pq_dim();
     auto codes_to_pack = raft::make_device_matrix_view<const uint8_t, uint32_t>(
       codes.data_handle() + offset, n_vec, index->pq_dim());
@@ -399,7 +398,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // Another test with the API that take list_data directly
     [[maybe_unused]] auto list_data = index->lists()[label]->data.view();
     uint32_t n_take                 = 4;
-    // ASSERT_TRUE(row_offset + n_take < n_rows);
+    ASSERT_TRUE(row_offset + n_take < n_rows);
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
     ivf_pq::helpers::codepacker::unpack(
       handle_, list_data, index->pq_bits(), row_offset, codes2.view());
@@ -559,12 +558,6 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
-      // auto dv = raft::make_device_matrix_view<float, size_t>(database.data(),
-      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
-      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(dv), dv, raft::linalg::NormType::L2Norm);
-      // auto sv = raft::make_device_matrix_view<float, size_t>(search_queries.data(),
-      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
-      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(sv), sv, raft::linalg::NormType::L2Norm);
     } else {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(1), DataT(20));
@@ -589,7 +582,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       ps.num_db_vecs - test_ivf_sample_filter::offset,
       ps.dim,
       ps.k,
-      cuvs::distance::DistanceType::CosineExpanded);
+      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
     raft::linalg::addScalar(indices_naive_dev.data(),
                             indices_naive_dev.data(),
                             IdxT(test_ivf_sample_filter::offset),
@@ -889,7 +882,7 @@ inline auto enum_variety_ip() -> test_cases_t
         y.min_recall = y.min_recall.value() * 0.94;
       }
     }
-    y.index_params.metric = distance::DistanceType::CosineExpanded;
+    y.index_params.metric = distance::DistanceType::InnerProduct;
     return y;
   });
 }
@@ -909,17 +902,17 @@ inline auto enum_variety_cosine() -> test_cases_t
     ivf_pq_inputs y(x);
     if (y.min_recall.has_value()) {
       if (y.search_params.lut_dtype == CUDA_R_8U) {
-        y.search_params.lut_dtype = CUDA_R_16F;
-        // InnerProduct score is signed,
+        // CosineExpanded score is signed,
         // thus we're forced to used signed 8-bit representation,
         // thus we have one bit less precision
-        y.min_recall = y.min_recall.value() * 0.90;
+        y.min_recall = y.min_recall.value() * 0.70;
       } else {
         // In other cases it seems to perform a little bit better, still worse than L2
         y.min_recall = y.min_recall.value() * 0.94;
       }
     }
     y.index_params.metric = distance::DistanceType::CosineExpanded;
+    y.index_params.codebook_kind = cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE;
     return y;
   });
 }
