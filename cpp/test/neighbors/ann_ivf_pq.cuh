@@ -284,9 +284,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                             uint32_t n_skip)
   {
     // the original data cannot be reconstructed since the dataset was normalized
-    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      return;
-    }
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
     auto& rec_list = index.lists()[label];
     auto dim       = index.dim();
     n_take         = std::min<uint32_t>(n_take, rec_list->size.load());
@@ -318,9 +316,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto old_list = index->lists()[label];
     auto n_rows   = old_list->size.load();
     if (n_rows == 0) { return; }
-    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      return;
-    }
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
 
     auto vectors_1 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
     auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
@@ -911,7 +907,7 @@ inline auto enum_variety_cosine() -> test_cases_t
         y.min_recall = y.min_recall.value() * 0.94;
       }
     }
-    y.index_params.metric = distance::DistanceType::CosineExpanded;
+    y.index_params.metric        = distance::DistanceType::CosineExpanded;
     y.index_params.codebook_kind = cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE;
     return y;
   });

@@ -1726,7 +1726,8 @@ auto build(raft::resources const& handle,
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-  if (params.metric == cuvs::distance::DistanceType::CosineExpanded && params.codebook_kind == codebook_gen::PER_CLUSTER) {
+  if (params.metric == cuvs::distance::DistanceType::CosineExpanded &&
+      params.codebook_kind == codebook_gen::PER_CLUSTER) {
     RAFT_FAIL("CosineExpanded metric only supported for codebook_gen::PER_SUBSPACE");
   }
 
