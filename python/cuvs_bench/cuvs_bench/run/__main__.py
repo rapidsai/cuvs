@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import Optional
 
 import click
-from run import run_benchmark
 from data_export import convert_json_to_csv_build, convert_json_to_csv_search
+from run import run_benchmark
 
 
 @click.command()
@@ -140,10 +140,14 @@ from data_export import convert_json_to_csv_build, convert_json_to_csv_search
     "the command.",
 )
 @click.option(
-    "-r",
     "--data-export",
     is_flag=True,
-    help="By default, the intermediate JSON outputs produced by cuvs_bench.run to more easily readable CSV files is done automatically, which are needed to build charts made by cuvs_bench.plot. But if some of the benchmark runs failed or were interrupted, use this option to convert those intermediate files manually.",
+    help="By default, the intermediate JSON outputs produced by "
+    "cuvs_bench.run to more easily readable CSV files is done "
+    "automatically, which are needed to build charts made by "
+    "cuvs_bench.plot. But if some of the benchmark runs failed or "
+    "were interrupted, use this option to convert those intermediate "
+    "files manually.",
 )
 @click.option(
     "--raft-log-level",
@@ -222,7 +226,6 @@ def main(
 
     convert_json_to_csv_build(dataset, dataset_path)
     convert_json_to_csv_search(dataset, dataset_path)
-
 
 
 if __name__ == "__main__":

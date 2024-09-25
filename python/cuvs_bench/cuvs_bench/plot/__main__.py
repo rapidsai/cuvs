@@ -19,13 +19,11 @@
 # 3: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/metrics.py  # noqa: E501
 # Licence: https://github.com/erikbern/ann-benchmarks/blob/main/LICENSE
 
-import argparse
-import click
 import itertools
 import os
-import sys
 from collections import OrderedDict
 
+import click
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -62,7 +60,6 @@ def positive_float(value):
     if fvalue <= 0:
         raise click.BadParameter(f"{value} is not a positive float")
     return fvalue
-
 
 
 def generate_n_colors(n):
@@ -432,142 +429,139 @@ def load_all_results(
 
 
 @click.command()
+@click.option("--dataset", default="glove-100-inner", help="Dataset to plot.")
 @click.option(
-    '--dataset',
-    default="glove-100-inner",
-    help="Dataset to plot."
+    "--dataset-path",
+    default=lambda: os.getenv(
+        "RAPIDS_DATASET_ROOT_DIR", os.path.join(os.getcwd(), "datasets/")
+    ),
+    help="Path to dataset folder.",
 )
 @click.option(
-    '--dataset-path',
-    default=lambda: os.getenv("RAPIDS_DATASET_ROOT_DIR", os.path.join(os.getcwd(), "datasets/")),
-    help="Path to dataset folder."
-)
-@click.option(
-    '--output-filepath',
+    "--output-filepath",
     default=os.getcwd(),
-    help="Directory where PNG will be saved."
+    help="Directory where PNG will be saved.",
 )
 @click.option(
-    '--algorithms',
+    "--algorithms",
     default=None,
-    help="Comma-separated list of named algorithms to plot. If `groups` and `algo-groups` are both undefined, then group `base` is plotted by default."
+    help="Comma-separated list of named algorithms to plot. If `groups` and "
+    "`algo-groups` are both undefined, then group `base` is plotted by "
+    "default.",
 )
 @click.option(
-    '--groups',
+    "--groups",
     default="base",
-    help="Comma-separated groups of parameters to plot."
+    help="Comma-separated groups of parameters to plot.",
 )
 @click.option(
-    '--algo-groups',
-    help='Comma-separated <algorithm>.<group> to plot. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large".'
+    "--algo-groups",
+    help="Comma-separated <algorithm>.<group> to plot. Example usage: "
+    '--algo-groups=raft_cagra.large,hnswlib.large".',
 )
 @click.option(
-    '-k', '--count',
+    "-k",
+    "--count",
     default=10,
     type=positive_int,
-    help="The number of nearest neighbors to search for."
+    help="The number of nearest neighbors to search for.",
 )
 @click.option(
-    '-bs', '--batch-size',
+    "-bs",
+    "--batch-size",
     default=10000,
     type=positive_int,
-    help="Number of query vectors to use in each query trial."
+    help="Number of query vectors to use in each query trial.",
 )
+@click.option("--build", is_flag=True, help="Flag to indicate build mode.")
+@click.option("--search", is_flag=True, help="Flag to indicate search mode.")
 @click.option(
-    '--build',
-    is_flag=True,
-    help="Flag to indicate build mode."
-)
-@click.option(
-    '--search',
-    is_flag=True,
-    help="Flag to indicate search mode."
-)
-@click.option(
-    '--x-scale',
+    "--x-scale",
     default="linear",
-    help="Scale to use when drawing the X-axis. Typically linear, logit, or a2."
+    help="Scale to use when drawing the X-axis. Typically linear, "
+    "logit, or a2.",
 )
 @click.option(
-    '--y-scale',
-    type=click.Choice(['linear', 'log', 'symlog', 'logit'], case_sensitive=False),
+    "--y-scale",
+    type=click.Choice(
+        ["linear", "log", "symlog", "logit"], case_sensitive=False
+    ),
     default="linear",
-    help="Scale to use when drawing the Y-axis."
+    help="Scale to use when drawing the Y-axis.",
 )
 @click.option(
-    '--x-start',
+    "--x-start",
     default=0.8,
     type=positive_float,
-    help="Recall values to start the x-axis from."
+    help="Recall values to start the x-axis from.",
 )
 @click.option(
-    '--mode',
-    type=click.Choice(['throughput', 'latency'], case_sensitive=False),
+    "--mode",
+    type=click.Choice(["throughput", "latency"], case_sensitive=False),
     default="throughput",
-    help="Search mode whose Pareto frontier is used on the Y-axis."
+    help="Search mode whose Pareto frontier is used on the Y-axis.",
 )
 @click.option(
-    '--time-unit',
-    type=click.Choice(['s', 'ms', 'us'], case_sensitive=False),
+    "--time-unit",
+    type=click.Choice(["s", "ms", "us"], case_sensitive=False),
     default="ms",
-    help="Time unit to plot when mode is latency."
+    help="Time unit to plot when mode is latency.",
 )
 @click.option(
-    '--raw',
+    "--raw",
     is_flag=True,
-    help="Show raw results (not just Pareto frontier) of the mode argument."
+    help="Show raw results (not just Pareto frontier) of the mode argument.",
 )
-def main(dataset: str,
-         dataset_path: str,
-         output_filepath: str,
-         algorithms: str,
-         groups: str,
-         algo_groups: str,
-         count: int,
-         batch_size: int,
-         build: bool,
-         search: bool,
-         x_scale: str,
-         y_scale: str,
-         x_start: float,
-         mode: str,
-         time_unit: str,
-         raw: bool) -> None:
+def main(
+    dataset: str,
+    dataset_path: str,
+    output_filepath: str,
+    algorithms: str,
+    groups: str,
+    algo_groups: str,
+    count: int,
+    batch_size: int,
+    build: bool,
+    search: bool,
+    x_scale: str,
+    y_scale: str,
+    x_start: float,
+    mode: str,
+    time_unit: str,
+    raw: bool,
+) -> None:
 
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(1)
-    args = parser.parse_args()
+    args = locals()
 
-    if args.algorithms:
-        algorithms = args.algorithms.split(",")
+    if args["algorithms"]:
+        algorithms = args["algorithms"].split(",")
     else:
         algorithms = []
-    groups = args.groups.split(",")
-    if args.algo_groups:
-        algo_groups = args.algo_groups.split(",")
+    groups = args["groups"].split(",")
+    if args["algo_groups"]:
+        algo_groups = args["algo_groups"].split(",")
     else:
         algo_groups = []
-    k = args.count
-    batch_size = args.batch_size
-    if not args.build and not args.search:
+    k = args["count"]
+    batch_size = args["batch_size"]
+    if not args["build"] and not args["search"]:
         build = True
         search = True
     else:
-        build = args.build
-        search = args.search
+        build = args["build"]
+        search = args["search"]
 
     search_output_filepath = os.path.join(
-        args.output_filepath,
-        f"search-{args.dataset}-k{k}-batch_size{batch_size}.png",
+        args["output_filepath"],
+        f"search-{args['dataset']}-k{k}-batch_size{batch_size}.png",
     )
     build_output_filepath = os.path.join(
-        args.output_filepath,
-        f"build-{args.dataset}-k{k}-batch_size{batch_size}.png",
+        args["output_filepath"],
+        f"build-{args['dataset']}-k{k}-batch_size{batch_size}.png",
     )
 
     search_results = load_all_results(
-        os.path.join(args.dataset_path, args.dataset),
+        os.path.join(args["dataset_path"], args["dataset"]),
         algorithms,
         groups,
         algo_groups,
@@ -575,28 +569,28 @@ def main(dataset: str,
         batch_size,
         "search",
         "algo",
-        args.raw,
-        args.mode,
-        args.time_unit,
+        args["raw"],
+        args["mode"],
+        args["time_unit"],
     )
     linestyles = create_linestyles(sorted(search_results.keys()))
     if search:
         create_plot_search(
             search_results,
-            args.x_scale,
-            args.y_scale,
+            args["x_scale"],
+            args["y_scale"],
             search_output_filepath,
             linestyles,
-            args.dataset,
+            args["dataset"],
             k,
             batch_size,
-            args.mode,
-            args.time_unit,
-            args.x_start,
+            args["mode"],
+            args["time_unit"],
+            args["x_start"],
         )
     if build:
         build_results = load_all_results(
-            os.path.join(args.dataset_path, args.dataset),
+            os.path.join(args["dataset_path"], args["dataset"]),
             algorithms,
             groups,
             algo_groups,
@@ -604,16 +598,16 @@ def main(dataset: str,
             batch_size,
             "build",
             "index",
-            args.raw,
-            args.mode,
-            args.time_unit,
+            args["raw"],
+            args["mode"],
+            args["time_unit"],
         )
         create_plot_build(
             build_results,
             search_results,
             linestyles,
             build_output_filepath,
-            args.dataset,
+            args["dataset"],
             k,
             batch_size,
         )

@@ -14,10 +14,8 @@
 # limitations under the License.
 #
 
-import argparse
 import json
 import os
-import sys
 import traceback
 import warnings
 
@@ -67,6 +65,7 @@ metrics = {
 def read_json_files(dataset, dataset_path, method):
     """
     Yield file paths, algo names, and loaded JSON data as pandas DataFrames.
+
     Parameters
     ----------
     dataset : str
@@ -75,10 +74,12 @@ def read_json_files(dataset, dataset_path, method):
         The base path where datasets are stored.
     method : str
         The method subdirectory to search within (e.g., "build" or "search").
+
     Yields
     ------
     tuple
-        A tuple containing the file path, algorithm name, and the DataFrame of JSON content.
+        A tuple containing the file path, algorithm name, and the
+        DataFrame of JSON content.
     """
     dir_path = os.path.join(dataset_path, dataset, "result", method)
     for file in os.listdir(dir_path):
@@ -98,10 +99,12 @@ def read_json_files(dataset, dataset_path, method):
 def clean_algo_name(algo_name):
     """
     Clean and format the algorithm name.
+
     Parameters
     ----------
     algo_name : tuple
         Tuple containing parts of the algorithm name.
+
     Returns
     -------
     str
@@ -114,6 +117,7 @@ def clean_algo_name(algo_name):
 def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
     """
     Write a DataFrame to CSV with specified columns skipped.
+
     Parameters
     ----------
     file : str
@@ -128,7 +132,13 @@ def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
         Set of columns to skip when writing to CSV (default is None).
     """
     df["name"] = df["name"].str.split("/").str[0]
-    write_data = pd.DataFrame({"algo_name": [algo_name] * len(df), "index_name": df["name"], "time": df["real_time"]})
+    write_data = pd.DataFrame(
+        {
+            "algo_name": [algo_name] * len(df),
+            "index_name": df["name"],
+            "time": df["real_time"],
+        }
+    )
     # Add extra columns if provided
     if extra_columns:
         for col in extra_columns:
@@ -143,6 +153,7 @@ def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
 def convert_json_to_csv_build(dataset, dataset_path):
     """
     Convert build JSON files to CSV format.
+
     Parameters
     ----------
     dataset : str
@@ -153,7 +164,7 @@ def convert_json_to_csv_build(dataset, dataset_path):
     for file, algo_name, df in read_json_files(dataset, dataset_path, "build"):
         try:
             algo_name = clean_algo_name(algo_name)
-            write_csv(file, algo_name, df, skip_cols=SKIP_BUILD_COLS)
+            write_csv(file, algo_name, df, skip_cols=skip_build_cols)
         except Exception as e:
             print(f"Error processing build file {file}: {e}. Skipping...")
             traceback.print_exc()
@@ -162,10 +173,12 @@ def convert_json_to_csv_build(dataset, dataset_path):
 def append_build_data(write, build_file):
     """
     Append build data to the search DataFrame.
+
     Parameters
     ----------
     write : pandas.DataFrame
-        The DataFrame containing the search data to which build data will be appended.
+        The DataFrame containing the search data to which build
+        data will be appended.
     build_file : str
         The file path to the build CSV file.
     """
@@ -173,7 +186,12 @@ def append_build_data(write, build_file):
         build_df = pd.read_csv(build_file)
         write_ncols = len(write.columns)
         # Initialize columns for build data
-        build_columns = ["build time", "build threads", "build cpu_time", "build GPU"]
+        build_columns = [
+            "build time",
+            "build threads",
+            "build cpu_time",
+            "build GPU",
+        ]
         write = write.assign(**{col: None for col in build_columns})
         # Append additional columns if available
         for col_name in build_df.columns[6:]:
@@ -185,12 +203,15 @@ def append_build_data(write, build_file):
                     write.iloc[s_index, write_ncols:] = build_row[2:].values
                     break
     else:
-        warnings.warn(f"Build CSV not found for {build_file}, build params not appended.")
+        warnings.warn(
+            f"Build CSV not found for {build_file}, build params not appended."
+        )
 
 
 def convert_json_to_csv_search(dataset, dataset_path):
     """
     Convert search JSON files to CSV format.
+
     Parameters
     ----------
     dataset : str
@@ -198,17 +219,28 @@ def convert_json_to_csv_search(dataset, dataset_path):
     dataset_path : str
         The base path where datasets are stored.
     """
-    for file, algo_name, df in read_json_files(dataset, dataset_path, "search"):
+    for file, algo_name, df in read_json_files(
+        dataset, dataset_path, "search"
+    ):
         try:
-            build_file = os.path.join(dataset_path, dataset, "result", "build", f"{','.join(algo_name)}.csv")
+            build_file = os.path.join(
+                dataset_path,
+                dataset,
+                "result",
+                "build",
+                f"{','.join(algo_name)}.csv",
+            )
             algo_name = clean_algo_name(algo_name)
-            write_data = pd.DataFrame({
-                "algo_name": [algo_name] * len(df),
-                "index_name": df["name"],
-                "recall": df["Recall"],
-                "throughput": df["items_per_second"],
-                "latency": df["Latency"]
-            })
+            df["name"] = df["name"].str.split("/").str[0]
+            write_data = pd.DataFrame(
+                {
+                    "algo_name": [algo_name] * len(df),
+                    "index_name": df["name"],
+                    "recall": df["Recall"],
+                    "throughput": df["items_per_second"],
+                    "latency": df["Latency"],
+                }
+            )
             # Append build data
             append_build_data(write_data, build_file)
             # Write search data and compute frontiers
@@ -223,6 +255,7 @@ def convert_json_to_csv_search(dataset, dataset_path):
 def create_pointset(data, xn, yn):
     """
     Create a pointset by sorting and filtering data based on metrics.
+
     Parameters
     ----------
     data : list
@@ -231,18 +264,23 @@ def create_pointset(data, xn, yn):
         X-axis metric name.
     yn : str
         Y-axis metric name.
+
     Returns
     -------
     list
         Filtered list of data points sorted by x and y metrics.
     """
-    xm, ym = METRICS[xn], METRICS[yn]
-    rev_x, rev_y = (-1 if xm["worst"] < 0 else 1), (-1 if ym["worst"] < 0 else 1)
+    xm, ym = metrics[xn], metrics[yn]
+    rev_x, rev_y = (-1 if xm["worst"] < 0 else 1), (
+        -1 if ym["worst"] < 0 else 1
+    )
     # Sort data based on x and y metrics
     data.sort(key=lambda t: (rev_y * t[4], rev_x * t[2]))
     lines = []
     last_x = xm["worst"]
-    comparator = (lambda xv, lx: xv > lx) if last_x < 0 else (lambda xv, lx: xv < lx)
+    comparator = (
+        (lambda xv, lx: xv > lx) if last_x < 0 else (lambda xv, lx: xv < lx)
+    )
     for d in data:
         if comparator(d[2], last_x):
             last_x = d[2]
@@ -253,12 +291,14 @@ def create_pointset(data, xn, yn):
 def get_frontier(df, metric):
     """
     Get the frontier of the data for a given metric.
+
     Parameters
     ----------
     df : pandas.DataFrame
         The DataFrame containing the data.
     metric : str
         The metric for which to compute the frontier.
+
     Returns
     -------
     pandas.DataFrame
@@ -271,6 +311,7 @@ def get_frontier(df, metric):
 def write_frontier(file, write_data, metric):
     """
     Write the frontier data to CSV for a given metric.
+
     Parameters
     ----------
     file : str
@@ -278,7 +319,8 @@ def write_frontier(file, write_data, metric):
     write_data : pandas.DataFrame
         The DataFrame containing the original data.
     metric : str
-        The metric for which the frontier is computed (e.g., "throughput", "latency").
+        The metric for which the frontier is computed
+        (e.g., "throughput", "latency").
     """
     frontier_data = get_frontier(write_data, metric)
     frontier_data.to_csv(file.replace(".json", f",{metric}.csv"), index=False)
