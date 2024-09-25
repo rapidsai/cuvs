@@ -172,7 +172,7 @@ void select_clusters(raft::resources const& handle,
                      n_lists,
                      stream);
 
-  if (metric == distance::DistanceType::CosineExpanded) {
+  if (false) {
     // TODO: store dataset norms in a different manner for the cosine metric to avoid the copy here
     auto center_norms =
       raft::make_device_mdarray<float, uint32_t>(handle, mr, raft::make_extents<uint32_t>(n_lists));

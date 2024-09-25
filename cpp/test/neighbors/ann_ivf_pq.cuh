@@ -172,8 +172,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
       // auto dv = raft::make_device_matrix_view<float, size_t>(database.data(),
-      // (size_t)(ps.num_db_vecs), (size_t)ps.dim); raft::linalg::row_normalize(handle_,
-      // raft::make_const_mdspan(dv), dv, raft::linalg::NormType::L2Norm);
+      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
+      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(dv), dv, raft::linalg::NormType::L2Norm);
+      // auto sv = raft::make_device_matrix_view<float, size_t>(search_queries.data(),
+      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
+      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(sv), sv, raft::linalg::NormType::L2Norm);
     } else {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(1), DataT(20));
@@ -198,7 +201,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       ps.num_db_vecs,
       ps.dim,
       ps.k,
-      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
+      cuvs::distance::DistanceType::CosineExpanded);
     distances_ref.resize(queries_size);
     raft::update_host(distances_ref.data(), distances_naive_dev.data(), queries_size, stream_);
     indices_ref.resize(queries_size);
@@ -556,6 +559,12 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
+      // auto dv = raft::make_device_matrix_view<float, size_t>(database.data(),
+      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
+      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(dv), dv, raft::linalg::NormType::L2Norm);
+      // auto sv = raft::make_device_matrix_view<float, size_t>(search_queries.data(),
+      // (size_t)(ps.num_db_vecs), (size_t)ps.dim);
+      // raft::linalg::row_normalize(handle_, raft::make_const_mdspan(sv), sv, raft::linalg::NormType::L2Norm);
     } else {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(1), DataT(20));
@@ -580,7 +589,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       ps.num_db_vecs - test_ivf_sample_filter::offset,
       ps.dim,
       ps.k,
-      static_cast<cuvs::distance::DistanceType>((int)ps.index_params.metric));
+      cuvs::distance::DistanceType::CosineExpanded);
     raft::linalg::addScalar(indices_naive_dev.data(),
                             indices_naive_dev.data(),
                             IdxT(test_ivf_sample_filter::offset),
