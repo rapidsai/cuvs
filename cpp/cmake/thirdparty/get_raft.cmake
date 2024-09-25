@@ -61,8 +61,8 @@ endfunction()
 # To use a different RAFT locally, set the CMake variable
 # CPM_raft_SOURCE=/path/to/local/raft
 find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
-        FORK                     ${RAFT_FORK}
-        PINNED_TAG               ${RAFT_PINNED_TAG}
+        FORK                     rhdong
+        PINNED_TAG               cagra-bf
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
