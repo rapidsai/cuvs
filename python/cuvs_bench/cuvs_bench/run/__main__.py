@@ -172,6 +172,7 @@ def main(
     search_mode: str,
     search_threads: Optional[str],
     dry_run: bool,
+    data_export: bool,
     raft_log_level: str,
 ) -> None:
     """
@@ -216,8 +217,9 @@ def main(
 
     """
 
-    if not
-    run_benchmark(**locals())
+    if not data_export:
+        run_benchmark(**locals())
+
     convert_json_to_csv_build(dataset, dataset_path)
     convert_json_to_csv_search(dataset, dataset_path)
 
