@@ -380,7 +380,7 @@ static std::vector<RandomKNNInputs> getInputs()
   {
     const std::vector<TestParams> params_group =
       raft::util::itertools::product<TestParams>({int(100)},
-                                                 {int(1024 * 1024)},
+                                                 {int(1024 * 1024 - 1)},
                                                  {int(32)},
                                                  {int(64)},
                                                  {0.0f, 0.1f, 0.3f, 0.5f, 0.8f, 0.9f, 0.99f},
