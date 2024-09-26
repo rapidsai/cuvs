@@ -48,7 +48,7 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<float, int> centroids,
          raft::host_scalar_view<float, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
-}
+
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const float, int64_t> X,
@@ -56,7 +56,7 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<float, int64_t> centroids,
          raft::host_scalar_view<float, int64_t> inertia,
          raft::host_scalar_view<int64_t, int64_t> n_iter);
-}
+
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const double, int> X,
@@ -64,7 +64,7 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<double, int> centroids,
          raft::host_scalar_view<double, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
-}
+
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const double, int64_t> X,
@@ -72,4 +72,4 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<double, int64_t> centroids,
          raft::host_scalar_view<double, int64_t> inertia,
          raft::host_scalar_view<int64_t, int> n_iter);
-}
+}  // namespace cuvs::cluster::kmeans::mg
