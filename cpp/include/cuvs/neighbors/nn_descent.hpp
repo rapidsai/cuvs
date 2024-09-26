@@ -58,10 +58,8 @@ struct index_params : cuvs::neighbors::index_params {
    *
    * @param graph_degree output graph degree
    */
-  index_params(size_t graph_degree = 64)
-    : graph_degree(graph_degree), intermediate_graph_degree(1.5 * graph_degree)
-  {
-  }
+  index_params(size_t graph_degree                 = 64,
+               cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
 /**
@@ -99,10 +97,13 @@ struct index : cuvs::neighbors::index {
    * @param n_rows number of rows in knn-graph
    * @param n_cols number of cols in knn-graph
    */
-  index(raft::resources const& res, int64_t n_rows, int64_t n_cols)
+  index(raft::resources const& res,
+        int64_t n_rows,
+        int64_t n_cols,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{cuvs::distance::DistanceType::L2Expanded},
+      metric_{metric},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(n_rows, n_cols)},
       graph_view_{graph_.view()}
   {
@@ -119,10 +120,11 @@ struct index : cuvs::neighbors::index {
    * @param graph_view raft::host_matrix_view<IdxT, int64_t, raft::row_major> for storing knn-graph
    */
   index(raft::resources const& res,
-        raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view)
+        raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{cuvs::distance::DistanceType::L2Expanded},
+      metric_{metric},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},
       graph_view_{graph_view}
   {
