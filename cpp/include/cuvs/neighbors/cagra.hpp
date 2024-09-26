@@ -969,7 +969,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter_ptr = nullptr);
+            cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -993,7 +993,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter_ptr = nullptr);
+            cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1017,7 +1017,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter_ptr = nullptr);
+            cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 
 /**
  * @}
