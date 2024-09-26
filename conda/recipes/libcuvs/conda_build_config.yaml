@@ -19,9 +19,6 @@ c_stdlib_version:
 cmake_version:
   - ">=3.26.4,!=3.30.0"
 
-nccl_version:
-  - ">=2.9.9"
-
 h5py_version:
   - ">=3.8.0"
 
