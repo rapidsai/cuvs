@@ -35,7 +35,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rapidsai/raft"
+Homepage = "https://github.com/rapidsai/cuvs"
 
 [tool.setuptools.package-data]
 "*" = ["*.*", "VERSION"]

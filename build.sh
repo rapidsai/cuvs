@@ -421,7 +421,7 @@ fi
 
 # Build and (optionally) install the cuvs_bench Python package
 if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
-    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench -vvv
+    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi
 
 # Build the cuvs Rust bindings

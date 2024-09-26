@@ -99,7 +99,7 @@ from run import run_benchmark
 @click.option(
     "--algo-groups",
     help="Add comma separated <algorithm>.<group> to run. Example usage: "
-    ' "--algo-groups=raft_cagra.large,hnswlib.large".',
+    ' "--algo-groups=cuvs_cagra.large,hnswlib.large".',
 )
 @click.option(
     "-f",
