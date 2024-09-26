@@ -635,9 +635,10 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
          search_params params,
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
+         int64_t dataset_size,
          int64_t graph_degree,
          uint32_t topk)
-    : base_type(res, params, dataset_desc, dim, graph_degree, topk),
+    : base_type(res, params, dataset_desc, dim, dataset_size, graph_degree, topk),
       result_indices(res),
       result_distances(res),
       parent_node_list(res),

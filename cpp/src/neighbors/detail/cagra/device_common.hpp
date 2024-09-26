@@ -109,7 +109,9 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const IndexT* __restrict__ seed_ptr,  // [num_seeds]
   const uint32_t num_seeds,
   IndexT* __restrict__ visited_hash_ptr,
-  const uint32_t hash_bitlen,
+  const uint32_t visited_hash_bitlen,
+  IndexT* __restrict__ traversed_hash_ptr,
+  const uint32_t traversed_hash_bitlen,
   const uint32_t block_id   = 0,
   const uint32_t num_blocks = 1)
 {
@@ -145,14 +147,21 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 
     const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
     if (valid_i && lane_id == 0) {
-      if (best_index_team_local != raft::upper_bound<IndexT>() &&
-          hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
-        result_distances_ptr[i] = best_norm2_team_local;
-        result_indices_ptr[i]   = best_index_team_local;
-      } else {
-        result_distances_ptr[i] = raft::upper_bound<DistanceT>();
-        result_indices_ptr[i]   = raft::upper_bound<IndexT>();
+      if (best_index_team_local != raft::upper_bound<IndexT>()) {
+        if (hashmap::insert(visited_hash_ptr, visited_hash_bitlen, best_index_team_local) == 0) {
+          // Deactivate this entry as insertion into visited hash table has failed.
+          best_norm2_team_local = raft::upper_bound<DistanceT>();
+          best_index_team_local = raft::upper_bound<IndexT>();
+        } else if ((traversed_hash_ptr != nullptr) &&
+                   hashmap::search<IndexT, 1>(
+                     traversed_hash_ptr, traversed_hash_bitlen, best_index_team_local)) {
+          // Deactivate this entry as it has been already used by otehrs.
+          best_norm2_team_local = raft::upper_bound<DistanceT>();
+          best_index_team_local = raft::upper_bound<IndexT>();
+        }
       }
+      result_distances_ptr[i] = best_norm2_team_local;
+      result_indices_ptr[i]   = best_index_team_local;
     }
   }
 }
@@ -168,7 +177,9 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const uint32_t knn_k,
   // hashmap
   IndexT* __restrict__ visited_hashmap_ptr,
-  const uint32_t hash_bitlen,
+  const uint32_t visited_hash_bitlen,
+  IndexT* __restrict__ traversed_hashmap_ptr,
+  const uint32_t traversed_hash_bitlen,
   const IndexT* __restrict__ parent_indices,
   const IndexT* __restrict__ internal_topk_list,
   const uint32_t search_width)
@@ -186,7 +197,13 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
       child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
     }
     if (child_id != invalid_index) {
-      if (hashmap::insert(visited_hashmap_ptr, hash_bitlen, child_id) == 0) {
+      if (hashmap::insert(visited_hashmap_ptr, visited_hash_bitlen, child_id) == 0) {
+        // Deactivate this entry as insertion into visited hash table has failed.
+        child_id = invalid_index;
+      } else if ((traversed_hashmap_ptr != nullptr) &&
+                 hashmap::search<IndexT, 1>(
+                   traversed_hashmap_ptr, traversed_hash_bitlen, child_id)) {
+        // Deactivate this entry as this has been already used by others.
         child_id = invalid_index;
       }
     }

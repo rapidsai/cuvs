@@ -622,7 +622,9 @@ __device__ void search_core(
                                            local_seed_ptr,
                                            num_seeds,
                                            local_visited_hashmap_ptr,
-                                           hash_bitlen);
+                                           hash_bitlen,
+                                           (INDEX_T*) nullptr,
+                                           0);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -749,6 +751,8 @@ __device__ void search_core(
                                             graph_degree,
                                             local_visited_hashmap_ptr,
                                             hash_bitlen,
+                                            (INDEX_T*) nullptr,
+                                            0,
                                             parent_list_buffer,
                                             result_indices_buffer,
                                             search_width);
