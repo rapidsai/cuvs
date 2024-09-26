@@ -1594,16 +1594,18 @@ struct alignas(kCacheLineBytes) launcher_t {
   }
 };
 
-template <typename DATASET_DESCRIPTOR_T, typename SAMPLE_FILTER_T>
+template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
 struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_base_t {
-  using index_type         = typename DATASET_DESCRIPTOR_T::INDEX_T;
-  using distance_type      = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
-  using data_type          = typename DATASET_DESCRIPTOR_T::DATA_T;
-  using kernel_config_type = search_kernel_config<true, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>;
-  using kernel_type        = typename kernel_config_type::kernel_t;
-  using job_desc_type      = job_desc_t<DATASET_DESCRIPTOR_T>;
+  using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  using index_type           = IndexT;
+  using distance_type        = DistanceT;
+  using data_type            = DataT;
+  using kernel_config_type   = search_kernel_config<true, descriptor_base_type, SampleFilterT>;
+  using kernel_type          = typename kernel_config_type::kernel_t;
+  using job_desc_type        = job_desc_t<descriptor_base_type>;
   kernel_type kernel;
   uint32_t block_size;
+  dataset_descriptor_host<DataT, IndexT, DistanceT> dd_host;
   rmm::device_uvector<worker_handle_t> worker_handles;
   rmm::device_uvector<job_desc_type> job_descriptors;
   rmm::device_uvector<uint32_t> completion_counters;
@@ -1616,7 +1618,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
    * NB: this must have the same argument types as the constructor.
    */
   static inline auto calculate_parameter_hash(
-    const DATASET_DESCRIPTOR_T* dataset_desc,
+    std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
     raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
     uint32_t num_itopk_candidates,
     uint32_t block_size,  //
@@ -1631,34 +1633,35 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     size_t search_width,
     size_t min_iterations,
     size_t max_iterations,
-    SAMPLE_FILTER_T sample_filter,
+    SampleFilterT sample_filter,
     float persistent_lifetime,
     float persistent_device_usage) -> uint64_t
   {
-    return uint64_t(graph.data_handle()) ^ uint64_t(dataset_desc) ^ num_itopk_candidates ^
+    return uint64_t(graph.data_handle()) ^ dataset_desc.get().team_size ^ num_itopk_candidates ^
            block_size ^ smem_size ^ hash_bitlen ^ small_hash_reset_interval ^ num_random_samplings ^
            rand_xor_mask ^ num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^
            uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000);
   }
 
-  persistent_runner_t(const DATASET_DESCRIPTOR_T* dataset_desc,
-                      raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
-                      uint32_t num_itopk_candidates,
-                      uint32_t block_size,  //
-                      uint32_t smem_size,
-                      int64_t hash_bitlen,
-                      size_t small_hash_bitlen,
-                      size_t small_hash_reset_interval,
-                      uint32_t num_random_samplings,
-                      uint64_t rand_xor_mask,
-                      uint32_t num_seeds,
-                      size_t itopk_size,
-                      size_t search_width,
-                      size_t min_iterations,
-                      size_t max_iterations,
-                      SAMPLE_FILTER_T sample_filter,
-                      float persistent_lifetime,
-                      float persistent_device_usage)
+  persistent_runner_t(
+    std::reference_wrapper<const dataset_descriptor_host<DataT, IndexT, DistanceT>> dataset_desc,
+    raft::device_matrix_view<const index_type, int64_t, raft::row_major> graph,
+    uint32_t num_itopk_candidates,
+    uint32_t block_size,  //
+    uint32_t smem_size,
+    int64_t hash_bitlen,
+    size_t small_hash_bitlen,
+    size_t small_hash_reset_interval,
+    uint32_t num_random_samplings,
+    uint64_t rand_xor_mask,
+    uint32_t num_seeds,
+    size_t itopk_size,
+    size_t search_width,
+    size_t min_iterations,
+    size_t max_iterations,
+    SampleFilterT sample_filter,
+    float persistent_lifetime,
+    float persistent_device_usage)
     : persistent_runner_base_t{persistent_lifetime},
       kernel{kernel_config_type::choose_itopk_and_mx_candidates(
         itopk_size, num_itopk_candidates, block_size)},
@@ -1667,7 +1670,8 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
       job_descriptors(kMaxJobsNum, stream, job_descriptor_mr),
       completion_counters(kMaxJobsNum, stream, device_mr),
       hashmap(0, stream, device_mr),
-      param_hash(calculate_parameter_hash(dataset_desc,
+      dd_host{dataset_desc.get()},
+      param_hash(calculate_parameter_hash(dd_host,
                                           graph,
                                           num_itopk_candidates,
                                           block_size,
@@ -1686,6 +1690,9 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                                           persistent_lifetime,
                                           persistent_device_usage))
   {
+    // initialize the dataset/distance descriptor
+    auto* dd_dev_ptr = dd_host.dev_ptr(stream);
+
     // set kernel attributes same as in normal kernel
     RAFT_CUDA_TRY(
       cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
@@ -1733,7 +1740,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     const index_type* dev_seed_ptr    = nullptr;  // optional arg [num_queries, num_seeds]
 
     void* args[] =  // NOLINT
-      {&dataset_desc,
+      {&dd_dev_ptr,
        &worker_handles_ptr,
        &job_descriptors_ptr,
        &completion_counters_ptr,
@@ -1812,9 +1819,8 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     launcher.wait();
   }
 
-  auto calc_coop_grid_size(uint32_t block_size,
-                           uint32_t smem_size,
-                           float persistent_device_usage) -> dim3
+  auto calc_coop_grid_size(uint32_t block_size, uint32_t smem_size, float persistent_device_usage)
+    -> dim3
   {
     // determine the grid size
     int ctas_per_sm = 1;
@@ -1916,7 +1922,7 @@ auto get_runner(Args... args) -> std::shared_ptr<RunnerT>
 }
 
 template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
-void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
                     IndexT* topk_indices_ptr,       // [num_queries, topk]
                     DistanceT* topk_distances_ptr,  // [num_queries, topk]
@@ -1937,10 +1943,15 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
                     SampleFilterT sample_filter,
                     cudaStream_t stream)
 {
-  using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   if (ps.persistent) {
-    using runner_type = persistent_runner_t<descriptor_base_type, SampleFilterT>;
-    get_runner<runner_type>(dataset_desc,
+    using runner_type = persistent_runner_t<DataT, IndexT, DistanceT, SampleFilterT>;
+
+    get_runner<runner_type>(/*
+Note, we're passing the descriptor by reference here, and this reference is going to be passed to a
+new spawned thread, which is dangerous. However, the descriptor is copied in that thread before the
+control is returned in this thread (in persistent_runner_t constructor), so we're safe.
+*/
+                            std::cref(dataset_desc),
                             graph,
                             num_itopk_candidates,
                             block_size,
@@ -1960,7 +1971,8 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
                             ps.persistent_device_usage)
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
   } else {
-    auto kernel = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
+    using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+    auto kernel                = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
       choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
     RAFT_CUDA_TRY(
       cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
@@ -1971,7 +1983,7 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
     kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
                                                            topk_distances_ptr,
                                                            topk,
-                                                           dataset_desc,
+                                                           dataset_desc.dev_ptr(stream),
                                                            queries_ptr,
                                                            graph.data_handle(),
                                                            graph.extent(1),
