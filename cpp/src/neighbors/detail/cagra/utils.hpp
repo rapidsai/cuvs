@@ -125,24 +125,24 @@ union fp_conv {
   FP_T fp;
 };
 template <class T>
-_RAFT_HOST_DEVICE inline T get_max_value();
+_RAFT_HOST_DEVICE constexpr inline T get_max_value();
 template <>
-_RAFT_HOST_DEVICE inline float get_max_value<float>()
+_RAFT_HOST_DEVICE constexpr inline float get_max_value<float>()
 {
   return FLT_MAX;
 };
 template <>
-_RAFT_HOST_DEVICE inline half get_max_value<half>()
+_RAFT_HOST_DEVICE constexpr inline half get_max_value<half>()
 {
   return fp_conv<std::uint16_t, half>{.bs = 0x7aff}.fp;
 };
 template <>
-_RAFT_HOST_DEVICE inline std::uint32_t get_max_value<std::uint32_t>()
+_RAFT_HOST_DEVICE constexpr inline std::uint32_t get_max_value<std::uint32_t>()
 {
   return 0xffffffffu;
 };
 template <>
-_RAFT_HOST_DEVICE inline std::uint64_t get_max_value<std::uint64_t>()
+_RAFT_HOST_DEVICE constexpr inline std::uint64_t get_max_value<std::uint64_t>()
 {
   return 0xfffffffffffffffflu;
 };

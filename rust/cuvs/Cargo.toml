@@ -9,7 +9,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-ffi = { package = "cuvs-sys", path = "../cuvs-sys", version = "24.8.0" }
+ffi = { package = "cuvs-sys", path = "../cuvs-sys", version = "24.12.0" }
 ndarray = "0.15"
 
 [dev-dependencies]

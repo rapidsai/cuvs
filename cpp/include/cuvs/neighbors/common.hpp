@@ -90,15 +90,6 @@ struct index_params {
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
   /** The argument used by some distance metrics. */
   float metric_arg = 2.0f;
-  /**
-   * Whether to add the dataset content to the index, i.e.:
-   *
-   *  - `true` means the index is filled with the dataset vectors and ready to search after calling
-   * `build`.
-   *  - `false` means `build` only trains the underlying model (e.g. quantizer or clustering), but
-   * the index is left empty; you'd need to call `extend` on the index afterwards to populate it.
-   */
-  bool add_data_on_build = true;
 };
 
 struct search_params {};
@@ -180,6 +171,22 @@ struct owning_dataset : public strided_dataset<DataT, IdxT> {
     return view_type{data.data_handle(), view_mapping};
   };
 };
+
+template <typename DatasetT>
+struct is_strided_dataset : std::false_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<strided_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<non_owning_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
+struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPolicy>>
+  : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
 
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
@@ -293,23 +300,25 @@ auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t 
  */
 template <typename MathT, typename IdxT>
 struct vpq_dataset : public dataset<IdxT> {
+  using index_type = IdxT;
+  using math_type  = MathT;
   /** Vector Quantization codebook - "coarse cluster centers". */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> vq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book;
   /** Product Quantization codebook - "fine cluster centers".  */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> pq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book;
   /** Compressed dataset.  */
-  raft::device_matrix<uint8_t, IdxT, raft::row_major> data;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data;
 
-  vpq_dataset(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq_code_book,
-              raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq_code_book,
-              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data)
+  vpq_dataset(raft::device_matrix<math_type, uint32_t, raft::row_major>&& vq_code_book,
+              raft::device_matrix<math_type, uint32_t, raft::row_major>&& pq_code_book,
+              raft::device_matrix<uint8_t, index_type, raft::row_major>&& data)
     : vq_code_book{std::move(vq_code_book)},
       pq_code_book{std::move(pq_code_book)},
       data{std::move(data)}
   {
   }
 
-  [[nodiscard]] auto n_rows() const noexcept -> IdxT final { return data.extent(0); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book.extent(1); }
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 
@@ -362,6 +371,15 @@ struct vpq_dataset : public dataset<IdxT> {
     return pq_code_book.extent(0);
   }
 };
+
+template <typename DatasetT>
+struct is_vpq_dataset : std::false_type {};
+
+template <typename MathT, typename IdxT>
+struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
@@ -596,7 +614,6 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                std::shared_ptr<ListT>& ld,
                                                const typename ListT::spec_type& store_spec,
                                                const typename ListT::spec_type& device_spec);
-
 }  // namespace ivf
 
 };  // namespace cuvs::neighbors
