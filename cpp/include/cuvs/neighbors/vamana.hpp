@@ -43,20 +43,20 @@ namespace cuvs::neighbors::vamana {
  */
 struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
-  size_t graph_degree = 32;
+  int32_t graph_degree = 32;
   /** Maximum number of visited nodes per search **/
   int32_t visited_size = 64;
   /** Number of Vamana iterations. */
-  size_t vamana_iters = 1;
+  int32_t vamana_iters = 1;
   /** Alpha for pruning parameter */
   float alpha = 1.2;
   /** Maximum fraction of dataset inserted per batch.              *
    * Larger max batch decreases graph quality, but improves speed */
   float max_fraction = 0.06;
   /** Base of growth rate of batch sies **/
-  double batch_base = 2;
+  float batch_base = 2;
   /** Size of candidate queue structure - should be (2^x)-1 */
-  int queue_size = 127;
+  int32_t queue_size = 127;
 };
 
 /**

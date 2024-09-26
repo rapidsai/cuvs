@@ -24,6 +24,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <rmm/resource_ref.hpp>
+#include <raft/util/warp_primitives.cuh>
 
 #include <chrono>
 #include <cstdio>
@@ -193,7 +194,7 @@ __global__ void GreedySearchKernel(
 __syncthreads();
 
 
-      cand_num = __shfl_sync(FULL_BITMASK, cand_num, 0);
+      cand_num = raft::shfl(cand_num, 0);
 
       __syncthreads();
 
@@ -201,7 +202,7 @@ __syncthreads();
         continue;
       }
 
-      cur_distance = __shfl_sync(FULL_BITMASK, cur_distance, 0);
+      cur_distance = raft::shfl(cur_distance, 0);
 
       //stop condidtion for the graph traversal process
       bool done = false;
@@ -216,7 +217,7 @@ __syncthreads();
           }
         }
 
-        done = __shfl_sync(FULL_BITMASK, done, 0);
+        done = raft::shfl(done, 0);
         if (done) {
           if(query_list[i].size < topk) {
             pass_flag = true;
