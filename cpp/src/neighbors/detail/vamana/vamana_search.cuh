@@ -204,7 +204,7 @@ __syncthreads();
 
       cur_distance = raft::shfl(cur_distance, 0);
 
-      //stop condidtion for the graph traversal process
+      //stop condition for the graph traversal process
       bool done = false;
       bool pass_flag = false;
 

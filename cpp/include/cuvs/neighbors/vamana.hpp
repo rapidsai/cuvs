@@ -106,15 +106,6 @@ struct index : cuvs::neighbors::index {
     return graph_view_.extent(1);
   }
 
-  [[nodiscard]] inline auto dataset() const noexcept
-    -> raft::device_matrix_view<const T, int64_t, raft::layout_stride>
-  {
-    auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
-    if (p != nullptr) { return p->view(); }
-    auto d = dataset_->dim();
-    return raft::make_device_strided_matrix_view<const T, int64_t>(nullptr, 0, d, d);
-  }
-
   /** Dataset [size, dim] */
   [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
   {
@@ -164,53 +155,6 @@ struct index : cuvs::neighbors::index {
     update_graph(res, vamana_graph);
 
     raft::resource::sync_stream(res);
-  }
-
-
-  /**
-   * Replace the dataset with a new dataset.
-   *
-   * If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the
-   * dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the
-   * index.
-   */
-  void update_dataset(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
-  {
-    dataset_ = make_aligned_dataset(res, dataset, 16);
-  }
-
-  /** Set the dataset reference explicitly to a device matrix view with padding. */
-  void update_dataset(raft::resources const& res,
-                      raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
-  {
-    dataset_ = make_aligned_dataset(res, dataset, 16);
-  }
-
-  /**
-   * Replace the dataset with a new dataset.
-   *
-   * We create a copy of the dataset on the device. The index manages the lifetime of this copy.
-   */
-  void update_dataset(raft::resources const& res,
-                      raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
-  {
-    dataset_ = make_aligned_dataset(res, dataset, 16);
-  }
-
-  /** Replace the dataset with a new dataset. */
-  template <typename DatasetT>
-  auto update_dataset(raft::resources const& res, DatasetT&& dataset)
-    -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<int64_t>, DatasetT>>
-  {
-    dataset_ = std::make_unique<DatasetT>(std::move(dataset));
-  }
-
-  template <typename DatasetT>
-  auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
-    -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<int64_t>, DatasetT>>
-  {
-    dataset_ = std::move(dataset);
   }
 
   /**

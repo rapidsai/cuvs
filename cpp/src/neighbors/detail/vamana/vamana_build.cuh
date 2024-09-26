@@ -76,71 +76,6 @@ void create_insert_permutation(std::vector<IdxT>& insert_order, uint32_t N)
   }
 }
 
-// TODO - fix true approximate medoid selection below
-/*
-template<typename T, typename accT, typename IdxT = uint32_t,
-         typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
-IdxT select_medoid(raft::resources const& dev_resources,
-	  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-          float fraction) {
-
-  auto stream = raft::resource::get_cuda_stream(dev_resources);
-  IdxT medoid;
-  int64_t n = dataset.extent(0);
-  int64_t dim = dataset.extent(1);
-//  int64_t n_sample = n * fraction;
-  int64_t n_samples = 1024;
-
-  const int num_reduc_threads=256;
-  if(n_samples < num_reduc_threads) n_samples = num_reduc_threads;
-
-  int seed = 137;
-  raft::random::RngState rng(seed);
-
-  auto random_indices = raft::make_device_vector<int>(dev_resources, n_samples);
-  raft::random::uniformInt(dev_resources, rng,
-		  random_indices.view(), (int)0, (int)n);
-
-
-  auto trainset     = raft::make_device_matrix<T, int64_t>(dev_resources, n_samples, dim);
-//  auto train_indices = raft::make_device_vector<int64_t>(dev_resources, n_samples);
-//  raft::random::sample_without_replacement(dev_resources, rng, data
-  raft::matrix::copy_rows(dev_resources, dataset, trainset.view(), raft::make_const_mdspan(random_indices.view()));
-
-  raft::cluster::KMeansParams params;
-  params.n_clusters = 1;
-  int inertia, n_iter;
-  auto centroids = raft::make_device_matrix<T, int64_t>(dev_resources, 1, dim);
-
-  raft::cluster::kmeans::fit(dev_resources,
-		  	params,
-			trainset.view(),
-			std::nullopt,
-			centroids.view(),
-			raft::make_host_scalar_view(&inertia),
-			raft::make_host_scalar_view(&n_iter));
-			
-
-  auto h_centroid = raft::make_host_matrix<T,int64_t>(1, dim);
-  raft::copy(h_centroid.data_handle(), centroids.data_handle(), centroids.size(), stream);
-
-  printf("centroid\n");
-  for(int i=0; i<dim; i++){
-    printf("%f, ", h_centroid(0,i));
-  }
-  printf("\n");
-
-//  rmm::device_uvector<DistPair<IdxT,accT>> d_medoid(
-//        num_reduc_threads, stream, raft::resource::get_large_workspace_resource(res));
-
-
-  IdxT final_medoid=0;
-  return final_medoid;
- 
-}
-*/
-
 /********************************************************************************************
  * Main Vamana building function - insert vectors into empty graph in batches
  * Pre - dataset contains the vector data, host matrix allocated to store the graph
@@ -195,7 +130,7 @@ void batched_insert_vamana(
                   raft::resource::get_large_workspace_resource(res),
                   raft::make_extents<int64_t>(max_batchsize,visited_size));
 
-  // Assign memory to query_list stuctures and initiailize
+  // Assign memory to query_list structures and initiailize
   init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(query_list, visited_ids.data_handle(), visited_dists.data_handle(), (int)max_batchsize, visited_size);
 
   // Create random permutation for order of node inserts into graph
@@ -216,7 +151,7 @@ void batched_insert_vamana(
                   raft::resource::get_large_workspace_resource(res),
                   raft::make_extents<int64_t>(2*max_batchsize,degree));
   
-  // Calcualte the shared memory sizes of each kernel
+  // Calculate the shared memory sizes of each kernel
   int search_smem_sort_size=0;
   int prune_smem_sort_size=0;
   SELECT_SMEM_SIZES(degree, visited_size); // Sets above 2 variables to appropriate sizes
@@ -241,10 +176,7 @@ void batched_insert_vamana(
 		    degree, visited_size);
   }
 
-// TODO - fix medoid selection
-//  IdxT medoid_test = select_medoid<T, accT>(res, dataset, 0.01);
-
-// Random medoid has minor impact on recall - TODO compute actual approximate medoid
+// Random medoid has minor impact on recall 
     int medoid_id = rand()%N; 
 
   // size of current batch of inserts, increases logarithmically until max_batchsize
@@ -444,7 +376,7 @@ index<T, IdxT> build(
   RAFT_EXPECTS((params.visited_size & (params.visited_size-1)) == 0, "visited_size must be a power of 2");
 
   int dim = dataset.extent(1);
-  // TODO - Fix issue with alignment when dataset dimenion is odd
+  // TODO - Fix issue with alignment when dataset dimension is odd
   RAFT_EXPECTS(dim%2 == 0, "Datasets with an odd number of dimensions not currently supported");
 
   RAFT_LOG_DEBUG("Creating empty graph structure");

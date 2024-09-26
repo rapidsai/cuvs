@@ -17,6 +17,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <raft/util/warp_primitives.cuh>
 #include "vamana_structs.cuh"
 
 namespace cuvs::neighbors::vamana::detail {
@@ -36,7 +37,7 @@ class PriorityQueue {
     DistPair<IdxT,accT> temp;
   
     int* q_size;
-    // Enforce max-heap property on the entires
+    // Enforce max-heap property on the entries
     __forceinline__ __device__ void heapify() {
       int i=0;
       int swapDest=0;
@@ -208,7 +209,7 @@ __device__ bool check_duplicate(const Node<accT> *pq, const int size,
     }
   }
 
-  unsigned mask = __ballot_sync(FULL_BITMASK, found);
+  unsigned mask = raft::ballot(found);
 
   if (mask == 0)
     return false;
@@ -218,7 +219,7 @@ __device__ bool check_duplicate(const Node<accT> *pq, const int size,
 }
 
 /*  
-  Enqueing a input value into parallel queue with tracker
+  Enqueuing a input value into parallel queue with tracker
 */
 template <typename SUMTYPE>
 __inline__ __device__ void
@@ -260,15 +261,15 @@ parallel_pq_max_enqueue(Node<SUMTYPE> *pq, int *size, const int pq_size,
     }
 
     for (int offset = 16; offset > 0; offset /= 2) {
-      SUMTYPE new_max_val = __shfl_down_sync(FULL_BITMASK, max_val, offset);
-      int new_idx = __shfl_down_sync(FULL_BITMASK, idx, offset);
+      SUMTYPE new_max_val = raft::shfl_up(max_val, offset);
+      int new_idx = raft::shfl_up(idx, offset);
       if (new_max_val > max_val) {
         max_val = new_max_val;
         idx = new_idx;
       }
     }
 
-    if (threadIdx.x == 0) {
+    if (threadIdx.x == 31) {
       *max_idx = idx;
       *cur_max_val = max_val;
     }
@@ -276,88 +277,6 @@ parallel_pq_max_enqueue(Node<SUMTYPE> *pq, int *size, const int pq_size,
   __syncthreads();
 }
 
-/*  
-  Enqueing a input value into parallel queue without tracker
-*/
-
-template <typename SUMTYPE>
-__inline__ __device__ void parallel_pq_max_enque_no_track(Node<SUMTYPE> *pq, int *size,
-                                                 const int pq_size,
-                                                 Node<SUMTYPE> input_data) {
-
-  if (*size < pq_size) {
-    __syncthreads();
-    if (threadIdx.x == 0) {
-      pq[*size].distance = input_data.distance;
-      pq[*size].nodeid = input_data.nodeid;
-      *size = *size + 1;
-    }
-    __syncthreads();
-    return;
-  }
-
-  else {
-   int idx = 0;
-    SUMTYPE max_val = pq[0].distance;
-
-    for (int i = threadIdx.x; i < pq_size; i += 32) {
-      if (pq[i].distance > max_val) {
-        max_val = pq[i].distance;
-        idx = i;
-      }
-    }
-
-    for (int offset = 16; offset > 0; offset /= 2) {
-      SUMTYPE new_max_val = __shfl_down_sync(FULL_BITMASK, max_val, offset);
-      int new_idx = __shfl_down_sync(FULL_BITMASK, idx, offset);
-      if (new_max_val > max_val) {
-        max_val = new_max_val;
-        idx = new_idx;
-      }
-    }
-
-    if (threadIdx.x == 0) {
-      if (input_data.distance < max_val) {
-        pq[idx].distance = input_data.distance;
-       pq[idx].nodeid = input_data.nodeid;
-      }
-    }
-  }
-}
-
-/*
-  Return the root value in the queue without poping the value
-*/
-template <typename SUMTYPE>
-__device__ bool peek_max_value(const Node<SUMTYPE> *pq, const int size,
-                               SUMTYPE *output) {
-  if (size == 0)
-    return false;
-
-  int idx = 0;
-  SUMTYPE max_val = pq[0].distance;
-
-  for (int i = threadIdx.x; i < size; i += 32) {
-    if (pq[i].distance > max_val) {
-      max_val = pq[i].distance;
-      idx = i;
-    }
-  }
-
-  for (int offset = 16; offset > 0; offset /= 2) {
-    SUMTYPE new_max_val = __shfl_down_sync(FULL_BITMASK, max_val, offset);
-    int new_idx = __shfl_down_sync(FULL_BITMASK, idx, offset);
-    if (new_max_val > max_val) {
-      max_val = new_max_val;
-      idx = new_idx;
-    }
-  }
-
-  if (threadIdx.x == 0)
-    *output = max_val;
-
-  return true;
-}
 
 /*
   Compute the distances between the source vector and all nodes in the neighbor_array and enqueue them in the PQ
