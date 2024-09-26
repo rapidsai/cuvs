@@ -52,7 +52,7 @@ struct AnnVamanaInputs {
   int dim;
   int graph_degree;
   int visited_size;
-  double max_batchsize;
+  double max_fraction;
   cuvs::distance::DistanceType metric;
   bool host_dataset;
 };
@@ -112,7 +112,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
         index_params.metric = ps.metric;  
         index_params.graph_degree = ps.graph_degree;
 	index_params.visited_size = ps.visited_size;
-	index_params.max_batchsize = ps.max_batchsize;
+	index_params.max_fraction = ps.max_fraction;
 	
                                           
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(

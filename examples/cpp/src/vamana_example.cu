@@ -35,14 +35,14 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                                std::string out_fname,
 			       int degree,
 			       int visited_size,
-			       float max_batchsize,
+			       float max_fraction,
 			       int iters) 
 {
   using namespace cuvs::neighbors;
 
   // use default index parameters
   vamana::index_params index_params;
-  index_params.max_batchsize = max_batchsize;
+  index_params.max_fraction = max_fraction;
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
@@ -67,11 +67,11 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
 
 void usage() {
-  printf("Usage: ./vamana_example <data filename> <output filename> <graph degree> <visited_size> <max_batchsize_fraction> <iterations> \n");
+  printf("Usage: ./vamana_example <data filename> <output filename> <graph degree> <visited_size> <max_fraction> <iterations> \n");
   printf("Input file expected to be binary file of fp32 vectors.\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
-  printf("max_batchsize_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
+  printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
   printf("Default iterations = 1, increase for better quality graph.\n");
   exit(1);
 }
@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
   std::string out_fname = (std::string)argv[2]; // Output index filename
   int degree = atoi(argv[3]); 
   int max_visited = atoi(argv[4]); 
-  float max_batchsize = atof(argv[5]);
+  float max_fraction = atof(argv[5]);
   int iters = atoi(argv[6]);
 
   // Read in binary dataset file
@@ -106,6 +106,6 @@ int main(int argc, char* argv[])
 
   // Simple build example to create graph and write to a file
   vamana_build_and_write<float>(dev_resources, raft::make_const_mdspan(dataset.view()),
-		    out_fname, degree, max_visited, max_batchsize, iters);
+		    out_fname, degree, max_visited, max_fraction, iters);
 
 }

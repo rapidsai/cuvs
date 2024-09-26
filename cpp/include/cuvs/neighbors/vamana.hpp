@@ -52,7 +52,7 @@ struct index_params : cuvs::neighbors::index_params {
   float alpha = 1.2;
   /** Maximum fraction of dataset inserted per batch.              *
    * Larger max batch decreases graph quality, but improves speed */
-  float max_batchsize = 0.06;
+  float max_fraction = 0.06;
   /** Base of growth rate of batch sies **/
   double batch_base = 2;
   /** Size of candidate queue structure - should be (2^x)-1 */

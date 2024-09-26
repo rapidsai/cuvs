@@ -90,8 +90,8 @@ class PriorityQueue {
     __device__ void reset() {
       *q_size = 0;
       for(int i=0; i<KVAL; i++) {
-        vals[i].dist =  INFTY<accT>();
-        vals[i].idx = INFTY<IdxT>();
+        vals[i].dist =  raft::upper_bound<accT>();
+        vals[i].idx = raft::upper_bound<IdxT>();
       }
     }
 
@@ -106,8 +106,8 @@ class PriorityQueue {
     // Initialize all nodes of the heap to +infinity
     __device__ void initialize() {
       for(int i=0; i<KVAL; i++) {
-        vals[i].idx = INFTY<IdxT>();
-        vals[i].dist =  INFTY<accT>();
+        vals[i].idx = raft::upper_bound<IdxT>();
+        vals[i].dist =  raft::upper_bound<accT>();
       }
     }
 
@@ -144,7 +144,7 @@ class PriorityQueue {
 
     __device__ void insert_back(accT newDist, IdxT newIdx){
       if(newDist < vals[insert_pointer].dist){
-        if(vals[insert_pointer].idx == INFTY<IdxT>())
+        if(vals[insert_pointer].idx == raft::upper_bound<IdxT>())
 		*q_size += 1;
 	vals[insert_pointer].dist = newDist;
         vals[insert_pointer].idx = newIdx;
@@ -162,8 +162,8 @@ class PriorityQueue {
       DistPair<IdxT,accT> result;
       result.dist = vals[0].dist;
       result.idx = vals[0].idx;
-      vals[0].dist =  INFTY<accT>();
-       vals[0].idx = INFTY<IdxT>();
+      vals[0].dist =  raft::upper_bound<accT>();
+       vals[0].idx = raft::upper_bound<IdxT>();
        heapify();    
        *q_size -= 1;         
        return result;

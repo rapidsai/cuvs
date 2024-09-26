@@ -78,16 +78,6 @@ void create_insert_permutation(std::vector<IdxT>& insert_order, uint32_t N)
   }
 }
 
-// Initialize empty graph memory
-template<typename IdxT>
-__global__ void memset_graph(raft::device_matrix_view<IdxT, int64_t> graph) {
-  for(int i = blockIdx.x; i<graph.extent(0); i+=gridDim.x) {
-    for(int j=threadIdx.x; j<graph.extent(1); j+=blockDim.x) {
-      graph(i,j) = INFTY<IdxT>();
-    }
-  }
-}
-
 // TODO - fix true approximate medoid selection below
 /*
 template<typename T, typename accT, typename IdxT = uint32_t,
@@ -175,10 +165,10 @@ void batched_insert_vamana(
   int degree = graph.extent(1);
 
   // Algorithm params
-  int max_batchsize = (int)(params.max_batchsize*(float)N);
+  int max_batchsize = (int)(params.max_fraction*(float)N);
   if (max_batchsize > (int)dataset.extent(0)) {
     RAFT_LOG_WARN(
-      "Max batch insert size cannot be larger 1.0, reducing it to 1");
+      "Max fraction is the fraction of the total dataset, so it cannot be larger 1.0, reducing it to 1.0");
     max_batchsize = (int)dataset.extent(0);
   }
   int insert_iters = (int)(params.vamana_iters);
@@ -189,7 +179,7 @@ void batched_insert_vamana(
 
   // create gpu graph and set to all -1s
   auto d_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph.extent(0), graph.extent(1));
-  memset_graph<IdxT><<<256,blockD>>>(d_graph.view());
+  raft::linalg::map(res, d_graph.view(), raft::const_op<IdxT>{raft::upper_bound<IdxT>()});
 
   // Temp storage about each batch of inserts being performed
   auto query_ids = raft::make_device_vector<IdxT>(res, max_batchsize);
@@ -246,10 +236,6 @@ void batched_insert_vamana(
     RAFT_FAIL("Vamana graph parameters not supported: graph_degree=%d, visited_size:%d\n", 
 		    degree, visited_size);
   }
-
-  size_t free, total;
-  cudaMemGetInfo(&free, &total);
-  RAFT_LOG_DEBUG("Device memory - free:%ld, total:%ld", free, total);
 
 // TODO - fix medoid selection
 //  IdxT medoid_test = select_medoid<T, accT>(res, dataset, 0.01);
@@ -438,7 +424,7 @@ index<T, IdxT> build(
   RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded, 
               "Currently only L2Expanded metric is supported");
 
-  int* deg_size = std::find(std::begin(DEGREE_SIZES), std::end(DEGREE_SIZES), graph_degree);
+  const int* deg_size = std::find(std::begin(DEGREE_SIZES), std::end(DEGREE_SIZES), graph_degree);
   RAFT_EXPECTS(deg_size != std::end(DEGREE_SIZES), "Provided graph_degree not currently supported");
 
   RAFT_EXPECTS(params.visited_size > graph_degree, "visited_size must be > graph_degree");

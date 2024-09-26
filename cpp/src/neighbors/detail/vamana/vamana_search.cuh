@@ -253,7 +253,7 @@ __syncthreads();
       for (size_t j = threadIdx.x; j < degree; j += blockDim.x) {
         //Load neighbors from the graph array and store them in neighbor array (shared memory)
           neighbor_array[j] = graph(cand_num, j);
-          if(neighbor_array[j] == INFTY<IdxT>()) atomicMin(&num_neighbors, (int)j); // warp-wide min to find the number of neighbors
+          if(neighbor_array[j] == raft::upper_bound<IdxT>()) atomicMin(&num_neighbors, (int)j); // warp-wide min to find the number of neighbors
       }
 
         //computing distances between the query vector and neighbor vectors then enqueue in priority queue.
@@ -268,15 +268,15 @@ __syncthreads();
     // Remove self edges
     for(int j=threadIdx.x; j<query_list[i].size; j+=blockDim.x) { 
       if(query_list[i].ids[j] == query_vec->id) {
-        query_list[i].dists[j] = INFTY<accT>();
-        query_list[i].ids[j] = INFTY<IdxT>();
+        query_list[i].dists[j] = raft::upper_bound<accT>();
+        query_list[i].ids[j] = raft::upper_bound<IdxT>();
         self_found = true; // Flag to reduce size by 1
       }
     }
 
     for(int j=query_list[i].size + threadIdx.x; j<query_list[i].maxSize; j+=blockDim.x) {
-      query_list[i].ids[j] = INFTY<IdxT>();
-      query_list[i].dists[j] = INFTY<accT>();
+      query_list[i].ids[j] = raft::upper_bound<IdxT>();
+      query_list[i].dists[j] = raft::upper_bound<accT>();
     }
 
     __syncthreads();

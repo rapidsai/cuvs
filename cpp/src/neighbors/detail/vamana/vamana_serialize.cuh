@@ -86,7 +86,7 @@ void serialize(raft::resources const& res,
   for(uint32_t i=0; i<h_graph.extent(0); i++) {
     uint32_t node_edges = 0;
     for(; node_edges < h_graph.extent(1); node_edges++) {
-      if(h_graph(i,node_edges) == INFTY<IdxT>()) { 
+      if(h_graph(i,node_edges) == raft::upper_bound<IdxT>()) { 
 	break;
       }
     }

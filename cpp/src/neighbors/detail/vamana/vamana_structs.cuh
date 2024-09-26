@@ -42,24 +42,7 @@ namespace cuvs::neighbors::vamana::detail {
 
 #define FULL_BITMASK 0xFFFFFFFF
 
-static const int DEGREE_SIZES = {32, 64, 128, 256};
-
-// Templated MAX and MIN values for different datatypes
-template<typename T> __host__ __device__ T INFTY() {}
-template<> __forceinline__ __host__ __device__ int INFTY<int>() {return INT_MAX;}
-template<> __forceinline__ __host__ __device__ long long int INFTY<long long int>() {return LLONG_MAX;}
-template<> __forceinline__ __host__ __device__ float INFTY<float>() {return FLT_MAX;}
-template<> __forceinline__ __host__ __device__ uint8_t INFTY<uint8_t>() {return 255;}
-template<> __forceinline__ __host__ __device__ int8_t INFTY<int8_t>() {return 127;}
-template<> __forceinline__ __host__ __device__ uint32_t INFTY<uint32_t>() {return INT_MAX;}
-
-template<typename T> __host__ __device__ T SMALLEST() {}
-template<> __forceinline__ __host__ __device__ int SMALLEST<int>() {return INT_MIN;}
-template<> __forceinline__ __host__ __device__ long long int SMALLEST<long long int>() {return LLONG_MIN;}
-template<> __forceinline__ __host__ __device__ float SMALLEST<float>() {return FLT_MIN;}
-template<> __forceinline__ __host__ __device__ uint8_t SMALLEST<uint8_t>() {return 0;}
-template<> __forceinline__ __host__ __device__ int8_t SMALLEST<int8_t>() {return -127;}
-template<> __forceinline__ __host__ __device__ uint32_t SMALLEST<uint32_t>() {return 0;}
+static const int DEGREE_SIZES[4] = {32, 64, 128, 256};
 
 
 // Object used to store id,distance combination graph construction operations
@@ -287,8 +270,8 @@ struct QueryCandidates
 
   __device__ void reset() {
     for(int i=threadIdx.x; i<maxSize; i+=blockDim.x) {
-      ids[i] = INFTY<IdxT>();
-      dists[i] = INFTY<accT>();
+      ids[i] = raft::upper_bound<IdxT>();
+      dists[i] = raft::upper_bound<accT>();
     }
     size = 0;
   }
@@ -347,9 +330,14 @@ __global__ void print_query_results(void* query_list_ptr, int count) {
 template<typename IdxT, typename accT>
 __global__ void init_query_candidate_list(QueryCandidates<IdxT,accT>* query_list, IdxT* visited_id_ptr, accT* visited_dist_ptr, int num_queries, int maxSize) {
 
-//  QueryCandidates<IdxT, accT>* query_list = static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
   IdxT* ids_ptr = static_cast<IdxT*>(visited_id_ptr);
   accT* dist_ptr = static_cast<accT*>(visited_dist_ptr);
+
+  for(int i=blockIdx.x*blockDim.x + threadIdx.x; i<num_queries*maxSize; i+=blockDim.x+gridDim.x) {
+    ids_ptr[i] = raft::upper_bound<IdxT>();
+    dist_ptr[i] = raft::upper_bound<accT>();
+  }
+
 
   for(size_t i=blockIdx.x*blockDim.x + threadIdx.x; i<num_queries; i+=blockDim.x+gridDim.x) {
     query_list[i].maxSize = maxSize;
@@ -357,10 +345,6 @@ __global__ void init_query_candidate_list(QueryCandidates<IdxT,accT>* query_list
     query_list[i].ids = &ids_ptr[i*(size_t)(maxSize)];
     query_list[i].dists = &dist_ptr[i*(size_t)(maxSize)];
 
-    for(int j=0; j<maxSize; j++) {
-      query_list[i].ids[j] = INFTY<IdxT>();
-      query_list[i].dists[j] = INFTY<accT>();
-    }
   }
 }
 
@@ -456,8 +440,8 @@ __global__ void populate_reverse_list_struct(
       reverse_list[i].ids[j] = edge_src[unique_indices[i]+j];
     }
     for(int j=reverse_list[i].size; j<reverse_list[i].maxSize; j++) {
-      reverse_list[i].ids[j] = INFTY<IdxT>();
-      reverse_list[i].dists[j] = INFTY<accT>();
+      reverse_list[i].ids[j] = raft::upper_bound<IdxT>();
+      reverse_list[i].dists[j] = raft::upper_bound<accT>();
     }
   } 
 }
