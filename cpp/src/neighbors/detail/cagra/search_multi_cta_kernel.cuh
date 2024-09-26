@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,32 @@
  */
 #pragma once
 
-#ifndef _CUVS_EXPLICIT_INSTANTIATE_ONLY
-#include "search_multi_cta_kernel-inl.cuh"
-#endif
+#include "compute_distance-ext.cuh"
 
-#ifdef RAFT_COMPILED
-#include "search_multi_cta_kernel-ext.cuh"
-#endif
+#include <cuvs/neighbors/cagra.hpp>
+
+namespace cuvs::neighbors::cagra::detail::multi_cta_search {
+
+template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
+void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+                    raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
+                    IndexT* topk_indices_ptr,       // [num_queries, topk]
+                    DistanceT* topk_distances_ptr,  // [num_queries, topk]
+                    const DataT* queries_ptr,       // [num_queries, dataset_dim]
+                    uint32_t num_queries,
+                    const IndexT* dev_seed_ptr,         // [num_queries, num_seeds]
+                    uint32_t* num_executed_iterations,  // [num_queries,]
+                    const search_params& ps,
+                    uint32_t topk,
+                    // multi_cta_search (params struct)
+                    uint32_t block_size,  //
+                    uint32_t result_buffer_size,
+                    uint32_t smem_size,
+                    int64_t hash_bitlen,
+                    IndexT* hashmap_ptr,
+                    uint32_t num_cta_per_query,
+                    uint32_t num_seeds,
+                    SampleFilterT sample_filter,
+                    cudaStream_t stream);
+
+}
