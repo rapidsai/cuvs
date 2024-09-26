@@ -38,6 +38,7 @@ files:
       - develop
       - bench
       - bench_python
+      - rapids_build_setuptools
   test_cpp:
     output: none
     includes:
@@ -194,7 +195,7 @@ dependencies:
 
   rapids_build_setuptools:
     common:
-      - output_types: [requirements, pyproject]
+      - output_types: [conda, requirements, pyproject]
         packages:
           - &rapids_build_backend rapids-build-backend>=0.3.0,<0.4.0.dev0
           - setuptools
@@ -476,13 +477,12 @@ dependencies:
           - openblas
   bench_python:
     common:
-      - output_types: [conda]
+      - output_types: [conda, pyproject, requirements]
         packages:
+          - click
           - matplotlib
           - pandas
           - pyyaml
-          - pandas
-          - click
   depends_on_librmm:
     common:
       - output_types: conda
