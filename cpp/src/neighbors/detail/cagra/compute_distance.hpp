@@ -20,303 +20,363 @@
 #include "utils.hpp"
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/common.hpp>
+#include <raft/core/logger-macros.hpp>
 #include <raft/core/operators.hpp>
 
 // TODO: This shouldn't be invoking spatial/knn
 #include "../ann_utils.cuh"
 
+#include <raft/util/device_loads_stores.cuh>
 #include <raft/util/vectorized.cuh>
 
+#include <functional>
+#include <memory>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
-namespace device {
 
-// using LOAD_256BIT_T = ulonglong4;
-using LOAD_128BIT_T = uint4;
-using LOAD_64BIT_T  = uint64_t;
+/**
+ * @brief Dataset and distance description.
+ *
+ * This is the base type for the dataset/distance descriptors.
+ * The actual implementations are hidden in `compute_distance_***-impl.cuh` files, which should be
+ * included only in `compute_distance_***.cu` files to enforce separable compilation.
+ *
+ * [Note: manual dispatch]
+ * The descriptor type hierarchy declared here resembles the usual C++ inheritance: the search
+ * kernels take a pointer to the base type as an argument, but the actual implementation types are
+ * passed by the host. The kernels only ever need two functions `setup_workspace` and
+ * `compute_distance`; the choice of the implementation happens at the runtime.
+ *
+ * However, for performance reasons, we don't use the C++ virtual dispatch mechanics here.
+ * The extra pointer-chasing and register usage overheads associated with virtual tables turn out to
+ * cause a significant slowdown in the performance-critical `compute_distance`.
+ * Instead, we manually dispatch the two polymorphic functions and store them as fields in the
+ * descriptor structure.
+ *
+ * [Note: initialization/dispatch]
+ * The host doesn't know the addresses of the device symbols. That means we either need to resolve
+ * the device functions and store them in the descriptor directly on the device, or use
+ * `cudaMemcpyFromSymbolAsync` to fetch them (note, there is same problem with classes: if an object
+ * is created on the host, its pointer to the vtable would be invalid on device).
+ * We take the first approach: there's an `***_init_kernel` for each descriptor instance that is
+ * called before the search kernel; all it does is call a (placement) new with an appropriate type
+ * and arguments in a single GPU thread.
+ *
+ */
+template <typename DataT, typename IndexT, typename DistanceT>
+struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
+  using base_type  = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  using LOAD_T     = device::LOAD_128BIT_T;
+  using DATA_T     = DataT;
+  using INDEX_T    = IndexT;
+  using DISTANCE_T = DistanceT;
 
-template <class LOAD_T, class DATA_T>
-_RAFT_DEVICE constexpr unsigned get_vlen()
-{
-  return utils::size_of<LOAD_T>() / utils::size_of<DATA_T>();
-}
+  /**
+   * @brief "polymorphic" `compute_distance` arguments.
+   *
+   * This is a tightly-packed POD arguments of `compute_distance`.
+   * **Important** this structure is passed by value to `compute_distance`; it's important it
+   * remains small.
+   *
+   * [Note: arguments layout]
+   * The descriptor implementations require different sets of arguments (with couple arguments
+   * overlapping). At the same time the `compute_distance` is defined such that it accepts the
+   * `args_t` by value. That means the layout of the struct must be identical for all descriptor
+   * implementations. We workaround this requirement by defining generic fields in this struct and
+   * assignging the meaning to them on the implementation side.
+   */
+  struct alignas(LOAD_T) args_t {
+    void* extra_ptr1;
+    void* extra_ptr2;
+    /** Pointer to the workspace in the shared memory (filled in every copy by a thread block). */
+    uint32_t smem_ws_ptr;
+    /** Dimensionality of the data/queries. */
+    uint32_t dim;
+    uint32_t extra_word1;
+    uint32_t extra_word2;
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          class DATASET_DESCRIPTOR_T,
-          class DISTANCE_T,
-          class INDEX_T>
-_RAFT_DEVICE void compute_distance_to_random_nodes(
-  INDEX_T* const result_indices_ptr,       // [num_pickup]
-  DISTANCE_T* const result_distances_ptr,  // [num_pickup]
-  const typename DATASET_DESCRIPTOR_T::QUERY_T* const query_buffer,
-  const DATASET_DESCRIPTOR_T& dataset_desc,
-  const std::size_t num_pickup,
-  const unsigned num_distilation,
-  const uint64_t rand_xor_mask,
-  const INDEX_T* const seed_ptr,  // [num_seeds]
-  const uint32_t num_seeds,
-  INDEX_T* const visited_hash_ptr,
-  const uint32_t hash_bitlen,
-  const cuvs::distance::DistanceType metric,
-  const uint32_t block_id   = 0,
-  const uint32_t num_blocks = 1)
-{
-  uint32_t max_i = num_pickup;
-  if (max_i % (32 / TEAM_SIZE)) { max_i += (32 / TEAM_SIZE) - (max_i % (32 / TEAM_SIZE)); }
-
-  for (uint32_t i = threadIdx.x / TEAM_SIZE; i < max_i; i += blockDim.x / TEAM_SIZE) {
-    const bool valid_i = (i < num_pickup);
-
-    INDEX_T best_index_team_local;
-    DISTANCE_T best_norm2_team_local = utils::get_max_value<DISTANCE_T>();
-    for (uint32_t j = 0; j < num_distilation; j++) {
-      // Select a node randomly and compute the distance to it
-      INDEX_T seed_index;
-      if (valid_i) {
-        // uint32_t gid = i + (num_pickup * (j + (num_distilation * block_id)));
-        uint32_t gid = block_id + (num_blocks * (i + (num_pickup * j)));
-        if (seed_ptr && (gid < num_seeds)) {
-          seed_index = seed_ptr[gid];
-        } else {
-          seed_index = device::xorshift64(gid ^ rand_xor_mask) % dataset_desc.size;
-        }
+    /**
+     * Load this struct from shared memory.
+     *
+     * NB: until `compute_distance` is called, the arguments struct is stored in the shared memory
+     * as a member of the descriptor struct. This helper functions saves a few instructions by
+     * forcing the compiler to assume it is indeed in the shared memory address space.
+     */
+    RAFT_DEVICE_INLINE_FUNCTION auto load() const -> args_t
+    {
+      constexpr int kCount = sizeof(*this) / sizeof(LOAD_T);
+      using blob_type      = LOAD_T[kCount];
+      args_t r;
+      auto& src = reinterpret_cast<const blob_type&>(*this);
+      auto& dst = reinterpret_cast<blob_type&>(r);
+#pragma unroll
+      for (int i = 0; i < kCount; i++) {
+        device::lds(dst[i], src + i);
       }
-
-      DISTANCE_T norm2;
-      switch (metric) {
-        case cuvs::distance::DistanceType::L2Expanded:
-          norm2 =
-            dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                     TEAM_SIZE,
-                                                     cuvs::distance::DistanceType::L2Expanded>(
-              query_buffer, seed_index, valid_i);
-          break;
-        case cuvs::distance::DistanceType::InnerProduct:
-          norm2 =
-            dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                     TEAM_SIZE,
-                                                     cuvs::distance::DistanceType::InnerProduct>(
-              query_buffer, seed_index, valid_i);
-          break;
-        default: break;
-      }
-
-      if (valid_i && (norm2 < best_norm2_team_local)) {
-        best_norm2_team_local = norm2;
-        best_index_team_local = seed_index;
-      }
+      return r;
     }
+  };
 
-    const unsigned lane_id = threadIdx.x % TEAM_SIZE;
-    if (valid_i && lane_id == 0) {
-      if (hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
-        result_distances_ptr[i] = best_norm2_team_local;
-        result_indices_ptr[i]   = best_index_team_local;
-      } else {
-        result_distances_ptr[i] = utils::get_max_value<DISTANCE_T>();
-        result_indices_ptr[i]   = utils::get_max_value<INDEX_T>();
-      }
+  /** Shared memory usage and team_size packed into a single uint32_t to save on memory requests. */
+  struct smem_and_team_size_t {
+    uint32_t value;
+    RAFT_INLINE_FUNCTION constexpr smem_and_team_size_t(uint32_t smem_size_bytes,
+                                                        uint32_t team_size_bitshift)
+      : value{(team_size_bitshift << 24) | smem_size_bytes}
+    {
     }
+    /** Total dynamic shared memory required by the descriptor.  */
+    RAFT_INLINE_FUNCTION constexpr auto smem_ws_size_in_bytes() const noexcept -> uint32_t
+    {
+      return value & 0xffffffu;
+    }
+    RAFT_INLINE_FUNCTION constexpr auto team_size_bitshift() const noexcept -> uint32_t
+    {
+      return (value >> 24) & 0xffu;
+    }
+    /** How many threads are involved in computing a single distance. */
+    RAFT_INLINE_FUNCTION constexpr auto team_size() const noexcept -> uint32_t
+    {
+      return 1u << team_size_bitshift();
+    }
+  };
+  static_assert(sizeof(smem_and_team_size_t) == sizeof(uint32_t));
+
+  using setup_workspace_type  = const base_type*(const base_type*, void*, const DATA_T*, uint32_t);
+  using compute_distance_type = DISTANCE_T(const args_t, const INDEX_T);
+
+  args_t args;
+
+  /** Copy the descriptor and the query into shared memory and do any other work, such as
+   * initializing the codebook. */
+  setup_workspace_type* setup_workspace_impl;
+  /** Compute the distance from the query vector (stored in the smem_workspace) and a dataset vector
+   * given by the dataset_index. */
+  compute_distance_type* compute_distance_impl;
+  /** A placeholder for an implementation-specific pointer. */
+  void* extra_ptr3;
+  smem_and_team_size_t smem_and_team_size;
+
+  /** Number of records in the database. */
+  INDEX_T size;
+
+  RAFT_INLINE_FUNCTION dataset_descriptor_base_t(setup_workspace_type* setup_workspace_impl,
+                                                 compute_distance_type* compute_distance_impl,
+                                                 INDEX_T size,
+                                                 uint32_t dim,
+                                                 uint32_t team_size_bitshift,
+                                                 uint32_t smem_ws_size_in_bytes)
+    : setup_workspace_impl(setup_workspace_impl),
+      compute_distance_impl(compute_distance_impl),
+      size(size),
+      smem_and_team_size(smem_ws_size_in_bytes, team_size_bitshift),
+      args{nullptr, nullptr, 0, dim, 0, 0}
+  {
   }
-}
 
-template <unsigned TEAM_SIZE,
-          unsigned DATASET_BLOCK_DIM,
-          unsigned MAX_N_FRAGS,
-          class DATASET_DESCRIPTOR_T,
-          class DISTANCE_T,
-          class INDEX_T>
-_RAFT_DEVICE void compute_distance_to_child_nodes(
-  INDEX_T* const result_child_indices_ptr,
-  DISTANCE_T* const result_child_distances_ptr,
-  // query
-  const typename DATASET_DESCRIPTOR_T::QUERY_T* const query_buffer,
-  // [dataset_dim, dataset_size]
-  const DATASET_DESCRIPTOR_T& dataset_desc,
-  // [knn_k, dataset_size]
-  const INDEX_T* const knn_graph,
-  const std::uint32_t knn_k,
-  // hashmap
-  INDEX_T* const visited_hashmap_ptr,
-  const std::uint32_t hash_bitlen,
-  const INDEX_T* const parent_indices,
-  const INDEX_T* const internal_topk_list,
-  const std::uint32_t search_width,
-  const cuvs::distance::DistanceType metric)
-{
-  constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-  const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
-
-  // Read child indices of parents from knn graph and check if the distance
-  // computaiton is necessary.
-  for (uint32_t i = threadIdx.x; i < knn_k * search_width; i += blockDim.x) {
-    const INDEX_T smem_parent_id = parent_indices[i / knn_k];
-    INDEX_T child_id             = invalid_index;
-    if (smem_parent_id != invalid_index) {
-      const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
-      child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
-    }
-    if (child_id != invalid_index) {
-      if (hashmap::insert(visited_hashmap_ptr, hash_bitlen, child_id) == 0) {
-        child_id = invalid_index;
-      }
-    }
-    result_child_indices_ptr[i] = child_id;
+  /** Total dynamic shared memory required by the descriptor.  */
+  RAFT_INLINE_FUNCTION constexpr auto smem_ws_size_in_bytes() const noexcept -> uint32_t
+  {
+    return smem_and_team_size.smem_ws_size_in_bytes();
   }
-  __syncthreads();
-
-  // Compute the distance to child nodes
-  std::uint32_t max_i = knn_k * search_width;
-  if (max_i % (32 / TEAM_SIZE)) { max_i += (32 / TEAM_SIZE) - (max_i % (32 / TEAM_SIZE)); }
-  for (std::uint32_t tid = threadIdx.x; tid < max_i * TEAM_SIZE; tid += blockDim.x) {
-    const auto i       = tid / TEAM_SIZE;
-    const bool valid_i = (i < (knn_k * search_width));
-    INDEX_T child_id   = invalid_index;
-    if (valid_i) { child_id = result_child_indices_ptr[i]; }
-
-    DISTANCE_T norm2;
-    switch (metric) {
-      case cuvs::distance::DistanceType::L2Expanded:
-        norm2 = dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                         TEAM_SIZE,
-                                                         cuvs::distance::DistanceType::L2Expanded>(
-          query_buffer, child_id, child_id != invalid_index);
-        break;
-      case cuvs::distance::DistanceType::InnerProduct:
-        norm2 =
-          dataset_desc.template compute_similarity<DATASET_BLOCK_DIM,
-                                                   TEAM_SIZE,
-                                                   cuvs::distance::DistanceType::InnerProduct>(
-            query_buffer, child_id, child_id != invalid_index);
-        break;
-      default: break;
-    }
-
-    // Store the distance
-    const unsigned lane_id = threadIdx.x % TEAM_SIZE;
-    if (valid_i && lane_id == 0) {
-      if (child_id != invalid_index) {
-        result_child_distances_ptr[i] = norm2;
-      } else {
-        result_child_distances_ptr[i] = utils::get_max_value<DISTANCE_T>();
-      }
-    }
+  RAFT_INLINE_FUNCTION constexpr auto team_size_bitshift() const noexcept -> uint32_t
+  {
+    return smem_and_team_size.team_size_bitshift();
   }
-}
+  RAFT_DEVICE_INLINE_FUNCTION constexpr auto team_size_bitshift_from_smem() const noexcept
+    -> uint32_t
+  {
+    uint32_t sts;
+    raft::lds(sts, reinterpret_cast<const uint32_t*>(&smem_and_team_size));
+    return reinterpret_cast<smem_and_team_size_t&>(sts).team_size_bitshift();
+  }
 
-}  // namespace device
+  /** How many threads are involved in computing a single distance. */
+  RAFT_INLINE_FUNCTION constexpr auto team_size() const noexcept -> uint32_t
+  {
+    return smem_and_team_size.team_size();
+  }
 
-template <class QUERY_T_, class DISTANCE_T_, class INDEX_T_>
-struct dataset_descriptor_base_t {
-  using INDEX_T    = INDEX_T_;
-  using QUERY_T    = QUERY_T_;
-  using DISTANCE_T = DISTANCE_T_;
+  RAFT_DEVICE_INLINE_FUNCTION auto setup_workspace(void* smem_ptr,
+                                                   const DATA_T* queries_ptr,
+                                                   uint32_t query_id) const -> const base_type*
+  {
+    return setup_workspace_impl(this, smem_ptr, queries_ptr, query_id);
+  }
 
-  const INDEX_T size;
-  const std::uint32_t dim;
-
-  dataset_descriptor_base_t(const INDEX_T size, const std::uint32_t dim) : size(size), dim(dim) {}
+  RAFT_DEVICE_INLINE_FUNCTION auto compute_distance(INDEX_T dataset_index, bool valid) const
+    -> DISTANCE_T
+  {
+    auto per_thread_distances = valid ? compute_distance_impl(args.load(), dataset_index) : 0;
+    return device::team_sum(per_thread_distances, team_size_bitshift_from_smem());
+  }
 };
 
-template <class DATA_T_, class INDEX_T, class DISTANCE_T = float>
-struct standard_dataset_descriptor_t
-  : public dataset_descriptor_base_t<float, DISTANCE_T, INDEX_T> {
-  using LOAD_T  = device::LOAD_128BIT_T;
-  using DATA_T  = DATA_T_;
-  using QUERY_T = typename dataset_descriptor_base_t<float, DISTANCE_T, INDEX_T>::QUERY_T;
+/**
+ * @brief Hosting a device descriptor.
+ *
+ * The dataset descriptor is initialized on the device side and stays there.
+ * The host struct manages the lifetime of the associated device pointer and a couple parameters
+ * affecting the search kernel launch config.
+ *
+ */
+template <typename DataT, typename IndexT, typename DistanceT>
+struct dataset_descriptor_host {
+  using dev_descriptor_t         = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  uint32_t smem_ws_size_in_bytes = 0;
+  uint32_t team_size             = 0;
 
-  const DATA_T* const ptr;
-  const std::size_t ld;
-  using dataset_descriptor_base_t<float, DISTANCE_T, INDEX_T>::size;
-  using dataset_descriptor_base_t<float, DISTANCE_T, INDEX_T>::dim;
-
-  standard_dataset_descriptor_t(const DATA_T* const ptr,
-                                const std::size_t size,
-                                const std::uint32_t dim,
-                                const std::size_t ld)
-    : dataset_descriptor_base_t<float, DISTANCE_T, INDEX_T>(size, dim), ptr(ptr), ld(ld)
+  template <typename DescriptorImpl>
+  dataset_descriptor_host(const DescriptorImpl& dd_host, rmm::cuda_stream_view stream)
+    : dev_ptr_{[stream]() {
+                 dev_descriptor_t* p;
+                 RAFT_CUDA_TRY(cudaMallocAsync(&p, sizeof(DescriptorImpl), stream));
+                 return p;
+               }(),
+               [stream](dev_descriptor_t* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(p, stream)); }},
+      smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
+      team_size{dd_host.team_size()}
   {
   }
 
-  static const std::uint32_t smem_buffer_size_in_byte = 0;
-  __device__ void set_smem_ptr(void* const){};
+  [[nodiscard]] auto dev_ptr() const -> const dev_descriptor_t* { return dev_ptr_.get(); }
+  [[nodiscard]] auto dev_ptr() -> dev_descriptor_t* { return dev_ptr_.get(); }
 
-  template <uint32_t DATASET_BLOCK_DIM>
-  __device__ void copy_query(const DATA_T* const dmem_query_ptr,
-                             QUERY_T* const smem_query_ptr,
-                             const std::uint32_t query_smem_buffer_length)
+ private:
+  std::unique_ptr<dev_descriptor_t, std::function<void(dev_descriptor_t*)>> dev_ptr_;
+};
+
+/**
+ * @brief The signature for descriptor initialization.
+ *
+ * There is an init function associated with every descriptor implementation. It's responsible for
+ * initializing the device-side descriptor instance (calling the init kernel).
+ *
+ */
+template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+using init_desc_type =
+  dataset_descriptor_host<DataT, IndexT, DistanceT> (*)(const cagra::search_params&,
+                                                        const DatasetT&,
+                                                        cuvs::distance::DistanceType,
+                                                        rmm::cuda_stream_view);
+
+/**
+ * @brief Descriptor instance specification.
+ *
+ * This type provides a decentralized way for selecting a descriptor instance best suitable for the
+ * given dataset and distance metric.
+ * There is a spec for every descriptor (described in the interface files
+ * `compute_distance_***.hpp`).
+ *
+ * The `instance_spec` implementation must have the following static member template functions:
+ *   * constexpr bool accepts_dataset()
+ *     - tells whether the spec is compatible with the dataset type, executed at compile time.
+ *   * double priority(..)
+ *     - tells how to select a single spec out of possibly several compatible specs
+ *   * init_desc_type init
+ *     - (see `init_desc_type` above) the function to initialize the descriptor.
+ */
+template <typename DataT, typename IndexT, typename DistanceT>
+struct instance_spec {
+  using data_type     = DataT;
+  using index_type    = IndexT;
+  using distance_type = DistanceT;
+  using host_type     = dataset_descriptor_host<DataT, IndexT, DistanceT>;
+  /** Use this to constrain the input dataset type. */
+  template <typename DatasetT>
+  constexpr static inline bool accepts_dataset()
   {
-    for (unsigned i = threadIdx.x; i < query_smem_buffer_length; i += blockDim.x) {
-      unsigned j = device::swizzling(i);
-      if (i < dim) {
-        smem_query_ptr[j] =
-          cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(dmem_query_ptr[i]);
-      } else {
-        smem_query_ptr[j] = 0.0;
-      }
-    }
+    return false;
+  }
+};
+
+/** Whether the descriptor is compatible with the dataset and arguments at the type level
+ * (compile-time check).
+ */
+template <typename InstanceSpec,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename DatasetT>
+constexpr bool spec_sound = std::is_same_v<DataT, typename InstanceSpec::data_type> &&
+                            std::is_same_v<IndexT, typename InstanceSpec::index_type> &&
+                            std::is_same_v<DistanceT, typename InstanceSpec::distance_type> &&
+                            InstanceSpec::template accepts_dataset<DatasetT>();
+
+/**
+ * @brief Get the init function and the priority of the descriptor given by the InstanceSpec.
+ *
+ * @return (init function, priority)
+ */
+template <typename InstanceSpec,
+          typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename DatasetT>
+constexpr auto spec_match(const cagra::search_params& params,
+                          const DatasetT& dataset,
+                          cuvs::distance::DistanceType metric)
+  -> std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>
+{
+  if constexpr (spec_sound<InstanceSpec, DataT, IndexT, DistanceT, DatasetT>) {
+    return std::make_tuple(InstanceSpec::template init<DatasetT>,
+                           InstanceSpec::template priority(params, dataset, metric));
+  }
+  return std::make_tuple(nullptr, -1.0);
+}
+
+/**
+ * @brief Select the best matching descriptor instance from the given type-level list.
+ *
+ * This is a helper struct that goes through the given list of specs (given as template arguments),
+ * filters is (partially at compile time and partially at runtime), and selects the descriptor with
+ * the highest priority.
+ *
+ * There is a single point in the codebase, where all specs are brought together; it's in the
+ * `neighbors/detail/cagra/compute_distance-ext.cuh`, which is generated by
+ * `neighbors/detail/cagra/compute_distance_00_generate.py`.
+ * Hence, `compute_distance_00_generate.py` is the only place you need to manually change to modify
+ * or extend the list supported dataset descriptors.
+ * The logic of selecting the descriptor is fully defined in this file, whereas the priorities of
+ * specific implementations are defined next to the implementations.
+ */
+template <typename... Specs>
+struct instance_selector {
+  template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+  static auto select(const cagra::search_params&, const DatasetT&, cuvs::distance::DistanceType)
+    -> std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>
+  {
+    return std::make_tuple(nullptr, -1.0);
+  }
+};
+
+template <typename Spec, typename... Specs>
+struct instance_selector<Spec, Specs...> {
+  template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+  static auto select(const cagra::search_params& params,
+                     const DatasetT& dataset,
+                     cuvs::distance::DistanceType metric)
+    -> std::enable_if_t<spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
+                        std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
+  {
+    auto s0 = spec_match<Spec, DataT, IndexT, DistanceT, DatasetT>(params, dataset, metric);
+    auto ss = instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
+      params, dataset, metric);
+    return std::get<1>(s0) >= std::get<1>(ss) ? s0 : ss;
   }
 
-  template <typename T, cuvs::distance::DistanceType METRIC>
-  std::enable_if_t<METRIC == cuvs::distance::DistanceType::L2Expanded, T> __device__
-  dist_op(T a, T b) const
+  template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
+  static auto select(const cagra::search_params& params,
+                     const DatasetT& dataset,
+                     cuvs::distance::DistanceType metric)
+    -> std::enable_if_t<!spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
+                        std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
   {
-    T diff = a - b;
-    return diff * diff;
-  }
-
-  template <typename T, cuvs::distance::DistanceType METRIC>
-  std::enable_if_t<METRIC == cuvs::distance::DistanceType::InnerProduct, T> __device__
-  dist_op(T a, T b) const
-  {
-    return -a * b;
-  }
-
-  template <uint32_t DATASET_BLOCK_DIM, uint32_t TEAM_SIZE, cuvs::distance::DistanceType METRIC>
-  __device__ DISTANCE_T compute_similarity(const QUERY_T* const query_ptr,
-                                           const INDEX_T dataset_i,
-                                           const bool valid) const
-  {
-    const auto dataset_ptr  = ptr + dataset_i * ld;
-    const unsigned lane_id  = threadIdx.x % TEAM_SIZE;
-    constexpr unsigned vlen = device::get_vlen<LOAD_T, DATA_T>();
-    // #include <raft/util/cuda_dev_essentials.cuh
-    constexpr unsigned reg_nelem = raft::ceildiv<unsigned>(DATASET_BLOCK_DIM, TEAM_SIZE * vlen);
-    raft::TxN_t<DATA_T, vlen> dl_buff[reg_nelem];
-
-    DISTANCE_T norm2 = 0;
-    if (valid) {
-      for (uint32_t elem_offset = 0; elem_offset < dim; elem_offset += DATASET_BLOCK_DIM) {
-#pragma unroll
-        for (uint32_t e = 0; e < reg_nelem; e++) {
-          const uint32_t k = (lane_id + (TEAM_SIZE * e)) * vlen + elem_offset;
-          if (k >= dim) break;
-          dl_buff[e].load(dataset_ptr, k);
-        }
-#pragma unroll
-        for (uint32_t e = 0; e < reg_nelem; e++) {
-          const uint32_t k = (lane_id + (TEAM_SIZE * e)) * vlen + elem_offset;
-          if (k >= dim) break;
-#pragma unroll
-          for (uint32_t v = 0; v < vlen; v++) {
-            const uint32_t kv = k + v;
-            // Note this loop can go above the dataset_dim for padded arrays. This is not a problem
-            // because:
-            // - Above the last element (dataset_dim-1), the query array is filled with zeros.
-            // - The data buffer has to be also padded with zeros.
-            DISTANCE_T d = query_ptr[device::swizzling(kv)];
-            norm2 += dist_op<DISTANCE_T, METRIC>(
-              d, cuvs::spatial::knn::detail::utils::mapping<float>{}(dl_buff[e].val.data[v]));
-          }
-        }
-      }
-    }
-    for (uint32_t offset = TEAM_SIZE / 2; offset > 0; offset >>= 1) {
-      norm2 += __shfl_xor_sync(0xffffffff, norm2, offset);
-    }
-    return norm2;
+    return instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
+      params, dataset, metric);
   }
 };
 
