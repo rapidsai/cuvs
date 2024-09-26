@@ -18,10 +18,11 @@
 
 #include "hashmap.hpp"
 
+#include "compute_distance-ext.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 // #include "search_single_cta_inst.cuh"
-// #include "topk_for_cagra/topk_core.cuh"
+// #include "topk_for_cagra/topk.h"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
@@ -107,19 +108,12 @@ struct lightweight_uvector {
 };
 
 struct search_plan_impl_base : public search_params {
-  int64_t dataset_block_dim;
   int64_t dim;
   int64_t graph_degree;
   uint32_t topk;
-  cuvs::distance::DistanceType metric;
-  search_plan_impl_base(search_params params,
-                        int64_t dim,
-                        int64_t graph_degree,
-                        uint32_t topk,
-                        cuvs::distance::DistanceType metric)
-    : search_params(params), dim(dim), graph_degree(graph_degree), topk(topk), metric(metric)
+  search_plan_impl_base(search_params params, int64_t dim, int64_t graph_degree, uint32_t topk)
+    : search_params(params), dim(dim), graph_degree(graph_degree), topk(topk)
   {
-    set_dataset_block_and_team_size(dim);
     if (algo == search_algo::AUTO) {
       const size_t num_sm = raft::getMultiProcessorCount();
       if (itopk_size <= 512 && search_params::max_queries >= num_sm * 2lu) {
@@ -134,35 +128,13 @@ struct search_plan_impl_base : public search_params {
       }
     }
   }
-
-  void set_dataset_block_and_team_size(int64_t dim)
-  {
-    switch (team_size) {
-      case 8: dataset_block_dim = 128; return;
-      case 16: dataset_block_dim = 256; return;
-      case 32: dataset_block_dim = 512; return;
-      default: break;
-    }
-    constexpr int64_t max_dataset_block_dim = 512;
-    dataset_block_dim                       = 128;
-    while (dataset_block_dim < dim && dataset_block_dim < max_dataset_block_dim) {
-      dataset_block_dim *= 2;
-    }
-    // To keep binary size in check we limit only one team size specialization for each max_dim.
-    // TODO(tfeher): revise this decision.
-    switch (dataset_block_dim) {
-      case 128: team_size = 8; break;
-      case 256: team_size = 16; break;
-      default: team_size = 32; break;
-    }
-  }
 };
 
-template <class DATASET_DESCRIPTOR_T, class SAMPLE_FILTER_T>
+template <typename DataT, typename IndexT, typename DistanceT, typename SAMPLE_FILTER_T>
 struct search_plan_impl : public search_plan_impl_base {
-  using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
-  using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
-  using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
+  using DATA_T     = DataT;
+  using INDEX_T    = IndexT;
+  using DISTANCE_T = DistanceT;
 
   int64_t hash_bitlen;
 
@@ -179,23 +151,24 @@ struct search_plan_impl : public search_plan_impl_base {
   lightweight_uvector<INDEX_T> hashmap;
   lightweight_uvector<uint32_t> num_executed_iterations;  // device or managed?
   lightweight_uvector<INDEX_T> dev_seed;
+  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc;
 
   search_plan_impl(raft::resources const& res,
                    search_params params,
+                   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                    int64_t dim,
                    int64_t graph_degree,
-                   uint32_t topk,
-                   cuvs::distance::DistanceType metric)
-    : search_plan_impl_base(params, dim, graph_degree, topk, metric),
+                   uint32_t topk)
+    : search_plan_impl_base(params, dim, graph_degree, topk),
       hashmap(res),
       num_executed_iterations(res),
       dev_seed(res),
-      num_seeds(0)
+      num_seeds(0),
+      dataset_desc(dataset_desc)
   {
     adjust_search_params();
     check_params();
     calc_hashmap_params(res);
-    set_dataset_block_and_team_size(dim);
     if (!persistent) {  // Persistent kernel does not provide this functionality
       num_executed_iterations.resize(max_queries, raft::resource::get_cuda_stream(res));
     }
@@ -205,7 +178,6 @@ struct search_plan_impl : public search_plan_impl_base {
   virtual ~search_plan_impl() {}
 
   virtual void operator()(raft::resources const& res,
-                          DATASET_DESCRIPTOR_T dataset_desc,
                           raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
                           INDEX_T* const result_indices_ptr,       // [num_queries, topk]
                           DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
@@ -214,7 +186,7 @@ struct search_plan_impl : public search_plan_impl_base {
                           const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
                           std::uint32_t* const num_executed_iterations,  // [num_queries]
                           uint32_t topk,
-                          SAMPLE_FILTER_T sample_filter){};
+                          SAMPLE_FILTER_T sample_filter) {};
 
   void adjust_search_params()
   {
@@ -241,6 +213,7 @@ struct search_plan_impl : public search_plan_impl_base {
                      itopk32);
       itopk_size = itopk32;
     }
+    team_size = dataset_desc.team_size;
   }
 
   // defines hash_bitlen, small_hash_bitlen, small_hash_reset interval, hash_size
@@ -373,10 +346,6 @@ struct search_plan_impl : public search_plan_impl_base {
         algo != search_algo::MULTI_KERNEL) {
       error_message += "An invalid kernel mode has been given: " + std::to_string((int)algo) + "";
     }
-    if (team_size != 0 && team_size != 4 && team_size != 8 && team_size != 16 && team_size != 32) {
-      error_message +=
-        "`team_size` must be 0, 4, 8, 16 or 32. " + std::to_string(team_size) + " has been given.";
-    }
     if (thread_block_size != 0 && thread_block_size != 64 && thread_block_size != 128 &&
         thread_block_size != 256 && thread_block_size != 512 && thread_block_size != 1024) {
       error_message += "`thread_block_size` must be 0, 64, 128, 256 or 512. " +
@@ -410,21 +379,5 @@ struct search_plan_impl : public search_plan_impl_base {
     if (error_message.length() != 0) { THROW("[CAGRA Error] %s", error_message.c_str()); }
   }
 };
-
-// template <class DATA_T, class DISTANCE_T, class INDEX_T>
-// struct search_plan {
-//   search_plan(raft::resources const& res,
-//               search_params param,
-//               int64_t dim,
-//               int64_t graph_degree)
-//     : plan(res, param, dim, graph_degree)
-//   {
-//   }
-//   void check(uint32_t topk) { plan.check(topk); }
-
-//   // private:
-//   detail::search_plan_impl<DATA_T, DISTANCE_T, INDEX_T> plan;
-// };
-/** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra::detail
