@@ -432,7 +432,7 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
-  size_t graph_degree = params.graph_degree;
+  uint32_t graph_degree = params.graph_degree;
  
   RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded, 
               "Currently only L2Expanded metric is supported");
