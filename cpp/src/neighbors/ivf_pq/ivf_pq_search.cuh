@@ -716,13 +716,14 @@ inline void search(raft::resources const& handle,
                        rot_queries.data(),
                        index.rot_dim(),
                        stream);
-
-    auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
-      rot_queries.data(), max_queries, index.rot_dim());
-    raft::linalg::row_normalize(handle,
-                                raft::make_const_mdspan(rot_queries_view),
-                                rot_queries_view,
-                                raft::linalg::NormType::L2Norm);
+    if (index.metric() == distance::DistanceType::CosineExpanded) {
+      auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
+        rot_queries.data(), max_queries, index.rot_dim());
+      raft::linalg::row_normalize(handle,
+                                  raft::make_const_mdspan(rot_queries_view),
+                                  rot_queries_view,
+                                  raft::linalg::NormType::L2Norm);
+    }
     for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
       uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);
       /* The distance calculation is done in the rotated/transformed space;
