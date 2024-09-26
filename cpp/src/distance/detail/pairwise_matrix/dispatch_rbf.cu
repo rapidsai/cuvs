@@ -38,8 +38,8 @@
       IdxT k,                                                                          \
       const DataT* x,                                                                  \
       const DataT* y,                                                                  \
-      const DataT* x_norm,                                                             \
-      const DataT* y_norm,                                                             \
+      const OutT* x_norm,                                                              \
+      const OutT* y_norm,                                                              \
       OutT* out,                                                                       \
       FinOpT fin_op,                                                                   \
       cudaStream_t stream,                                                             \
@@ -59,6 +59,14 @@ instantiate_raft_distance_detail_pairwise_matrix_dispatch(
   double,
   double,
   cuvs::distance::kernels::detail::rbf_fin_op<double>,
+  int64_t);
+
+instantiate_raft_distance_detail_pairwise_matrix_dispatch(
+  cuvs::distance::detail::ops::l2_unexp_distance_op,
+  half,
+  float,
+  float,
+  cuvs::distance::kernels::detail::rbf_fin_op<half>,
   int64_t);
 
 #undef instantiate_raft_distance_detail_pairwise_matrix_dispatch
