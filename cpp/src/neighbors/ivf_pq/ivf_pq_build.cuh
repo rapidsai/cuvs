@@ -257,7 +257,6 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
                         raft::linalg::L2Norm,
                         true,
                         stream);
-
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
                                   sizeof(float) * index->dim_ext(),
                                   center_norms.data(),
@@ -1584,13 +1583,7 @@ void extend(raft::resources const& handle,
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
         auto float_vec_batch =
           raft::make_device_matrix<float, internal_extents_t>(handle, batch.size(), index->dim());
-        raft::linalg::map_offset(
-          handle,
-          raft::make_device_vector_view<const T, internal_extents_t>(batch.data(),
-                                                                     batch.size() * index->dim()),
-          raft::make_device_vector_view<float, internal_extents_t>(float_vec_batch.data_handle(),
-                                                                   float_vec_batch.size()),
-          [=] __device__(internal_extents_t idx, T i) { return utils::mapping<float>{}(i); });
+        raft::linalg::map(handle, float_vec_batch.view(), utils::mapping<float>{}, batch_data_view);
         raft::linalg::row_normalize(handle,
                                     raft::make_const_mdspan(float_vec_batch.view()),
                                     float_vec_batch.view(),
@@ -1662,13 +1655,11 @@ void extend(raft::resources const& handle,
     const auto& idx_batch = *idx_batches++;
     auto float_vec_batch =
       raft::make_device_matrix<float, internal_extents_t>(handle, vec_batch.size(), index->dim());
-    raft::linalg::map_offset(
-      handle,
-      raft::make_device_vector_view<const T, internal_extents_t>(vec_batch.data(),
-                                                                 vec_batch.size() * index->dim()),
-      raft::make_device_vector_view<float, internal_extents_t>(float_vec_batch.data_handle(),
-                                                               vec_batch.size() * index->dim()),
-      [=] __device__(internal_extents_t idx, T i) { return utils::mapping<float>{}(i); });
+    raft::linalg::map(handle,
+                      float_vec_batch.view(),
+                      utils::mapping<float>{},
+                      raft::make_device_matrix_view<const T, internal_extents_t>(
+                        vec_batch.data(), vec_batch.size(), index->dim()));
     if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize(handle,
                                   raft::make_const_mdspan(float_vec_batch.view()),
@@ -1677,7 +1668,7 @@ void extend(raft::resources const& handle,
     }
     process_and_fill_codes(handle,
                            *index,
-                           float_vec_batch.data_handle(),
+                           vec_batch.data(),
                            new_indices != nullptr
                              ? std::variant<IdxT, const IdxT*>(idx_batch.data())
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
