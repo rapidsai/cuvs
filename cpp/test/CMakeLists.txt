@@ -22,7 +22,7 @@ rapids_test_init()
 function(ConfigureTest)
 
   set(options OPTIONAL NOCUDA C_LIB)
-  set(oneValueArgs NAME GPUS PERCENT)
+  set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -56,6 +56,7 @@ function(ConfigureTest)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
+            ${_CUVS_TEST_ADDITIONAL_DEP}
   )
   set_target_properties(
     ${TEST_NAME}
@@ -165,7 +166,9 @@ if(BUILD_TESTS)
   endif()
 
   if(BUILD_MG_ALGOS)
-    ConfigureTest(NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100)
+    ConfigureTest(
+      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP nccl
+    )
   endif()
 
   ConfigureTest(

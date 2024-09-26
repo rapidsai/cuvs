@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../detail/knn_merge_parts.cuh"
+#include <raft/core/resource/nccl_clique.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -40,7 +41,7 @@ void deserialize_and_distribute(const raft::device_resources& handle,
                                 index<AnnIndexType, T, IdxT>& index,
                                 const std::string& filename)
 {
-  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     int dev_id                            = clique.device_ids_[rank];
     const raft::device_resources& dev_res = clique.device_resources_[rank];
@@ -59,7 +60,7 @@ void deserialize(const raft::device_resources& handle,
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
 
   index.mode_      = (cuvs::neighbors::mg::distribution_mode)deserialize_scalar<int>(handle, is);
   index.num_ranks_ = deserialize_scalar<int>(handle, is);
@@ -87,7 +88,7 @@ void build(const raft::device_resources& handle,
            const cuvs::neighbors::index_params* index_params,
            raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
-  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
 
   if (index.mode_ == REPLICATED) {
     int64_t n_rows = index_dataset.extent(0);
@@ -134,7 +135,7 @@ void extend(const raft::device_resources& handle,
             raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)
 {
-  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
 
   int64_t n_rows = new_vectors.extent(0);
   if (index.mode_ == REPLICATED) {
@@ -480,7 +481,7 @@ void search(const raft::device_resources& handle,
             raft::host_matrix_view<float, int64_t, row_major> distances,
             int64_t n_rows_per_batch)
 {
-  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
 
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
@@ -599,7 +600,7 @@ void serialize(const raft::device_resources& handle,
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  const raft::comms::nccl_clique& clique = handle.get_nccl_clique_handle();
+  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
 
   serialize_scalar(handle, of, (int)index.mode_);
   serialize_scalar(handle, of, index.num_ranks_);

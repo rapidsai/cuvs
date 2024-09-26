@@ -261,6 +261,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_MG)
     $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_cagra.cu>
     LINKS
     cuvs
+    nccl
   )
 endif()
 

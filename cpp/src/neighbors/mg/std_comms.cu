@@ -14,6 +14,4 @@
  * limitations under the License.
  */
 
-#include <omp.h>
-#include <raft/comms/nccl_clique.cuh>
 #include <raft/comms/std_comms.hpp>

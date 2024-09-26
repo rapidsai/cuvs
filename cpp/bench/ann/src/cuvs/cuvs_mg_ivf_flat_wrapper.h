@@ -19,6 +19,7 @@
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_ivf_flat_wrapper.h"
 #include <cuvs/neighbors/mg.hpp>
+#include <raft/core/resource/nccl_clique.hpp>
 
 namespace cuvs::bench {
 using namespace cuvs::neighbors;
@@ -40,7 +41,7 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
   {
     index_params_.metric = parse_metric_type(metric);
     // init nccl clique outside as to not affect benchmark
-    const raft::comms::nccl_clique& clique = handle_.get_nccl_clique_handle();
+    const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle_);
   }
 
   void build(const T* dataset, size_t nrow) final;

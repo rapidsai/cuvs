@@ -20,6 +20,7 @@
 #include "naive_knn.cuh"
 
 #include <cuvs/neighbors/mg.hpp>
+#include <raft/core/resource/nccl_clique.hpp>
 
 namespace cuvs::neighbors::mg {
 
@@ -46,7 +47,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
  public:
   AnnMGTest()
     : stream_(resource::get_cuda_stream(handle_)),
-      clique_(handle_.get_nccl_clique_handle()),
+      clique_(raft::resource::get_nccl_clique(handle_)),
       ps(::testing::TestWithParam<AnnMGInputs>::GetParam()),
       d_index_dataset(0, stream_),
       d_queries(0, stream_),
