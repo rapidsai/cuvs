@@ -66,11 +66,11 @@ namespace cuvs::neighbors::reachability {
  */
 void mutual_reachability_graph(
   const raft::resources& handle,
-  raft::device_matrix_view<const float, int64_t, raft::row_major> X,
+  raft::device_matrix_view<const float, int, raft::row_major> X,
   int min_samples,
-  raft::device_vector_view<int64_t> indptr,
+  raft::device_vector_view<int> indptr,
   raft::device_vector_view<float> core_dists,
-  raft::sparse::COO<float, int64_t>& out,
+  raft::sparse::COO<float, int>& out,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
   float alpha                         = 1.0);
 /**
