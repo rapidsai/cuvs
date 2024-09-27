@@ -89,6 +89,7 @@ void batched_insert_vamana(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t> graph,
+  IdxT* medoid_id,
   cuvs::distance::DistanceType metric,
   int dim)
 {
@@ -186,7 +187,9 @@ void batched_insert_vamana(
   }
 
   // Random medoid has minor impact on recall
-  int medoid_id = rand() % N;
+  // TODO: use heuristic for better medoid selection, issue:
+  // https://github.com/rapidsai/cuvs/issues/355
+  *medoid_id = rand() % N;
 
   // size of current batch of inserts, increases logarithmically until max_batchsize
   int step_size = 1;
@@ -213,7 +216,7 @@ void batched_insert_vamana(
                                                                  dataset,
                                                                  query_list_ptr.data_handle(),
                                                                  step_size,
-                                                                 medoid_id,
+                                                                 *medoid_id,
                                                                  degree,
                                                                  dataset.extent(0),
                                                                  visited_size,
@@ -381,12 +384,13 @@ index<T, IdxT> build(
 
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 
+  IdxT medoid_id;
   batched_insert_vamana<T, float, IdxT, Accessor>(
-    res, params, dataset, vamana_graph.view(), metric, dim);
+    res, params, dataset, vamana_graph.view(), &medoid_id, metric, dim);
 
   try {
     return index<T, IdxT>(
-      res, params.metric, dataset, raft::make_const_mdspan(vamana_graph.view()));
+      res, params.metric, dataset, raft::make_const_mdspan(vamana_graph.view()), medoid_id);
   } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("Insufficient GPU memory to construct VAMANA index with dataset on GPU");
     // We just add the graph. User is expected to update dataset separately (e.g allocating in

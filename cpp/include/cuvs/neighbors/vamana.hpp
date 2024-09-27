@@ -42,11 +42,13 @@ namespace cuvs::neighbors::vamana {
  *
  */
 struct index_params : cuvs::neighbors::index_params {
-  /** Degree of output graph. */
+  /** Maximum degree of output graph corresponds to the R parameter in the original Vamana
+   * literature. */
   uint32_t graph_degree = 32;
-  /** Maximum number of visited nodes per search **/
+  /** Maximum number of visited nodes per search corresponds to the L parameter in the Vamana
+   * literature **/
   uint32_t visited_size = 64;
-  /** Number of Vamana iterations. */
+  /** Number of Vamana vector insertion iterations (each iteration inserts all vectors). */
   uint32_t vamana_iters = 1;
   /** Alpha for pruning parameter */
   float alpha = 1.2;
@@ -119,6 +121,9 @@ struct index : cuvs::neighbors::index {
     return graph_view_;
   }
 
+  /** Return the id of the vector selected as the medoid. */
+  [[nodiscard]] inline auto medoid() const noexcept -> IdxT { return medoid_id_; }
+
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
   index(index&&)                         = default;
@@ -144,11 +149,13 @@ struct index : cuvs::neighbors::index {
         cuvs::distance::DistanceType metric,
         raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
         raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
-          vamana_graph)
+          vamana_graph,
+        IdxT medoid_id)
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      dataset_(make_aligned_dataset(res, dataset, 16))
+      dataset_(make_aligned_dataset(res, dataset, 16)),
+      medoid_id_(medoid_id)
   {
     RAFT_EXPECTS(dataset.extent(0) == vamana_graph.extent(0),
                  "Dataset and vamana_graph must have equal number of rows");
@@ -197,6 +204,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  IdxT medoid_id_;
 };
 /**
  * @}

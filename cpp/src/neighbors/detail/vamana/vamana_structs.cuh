@@ -42,6 +42,7 @@ namespace cuvs::neighbors::vamana::detail {
 
 #define FULL_BITMASK 0xFFFFFFFF
 
+// Currently supported values for graph_degree.
 static const int DEGREE_SIZES[4] = {32, 64, 128, 256};
 
 // Object used to store id,distance combination graph construction operations
@@ -114,27 +115,6 @@ class Point {
     id = other.id;
     return *this;
   }
-
-  /*
-  // Computes Cosine dist.  Uses 2 registers to increase pipeline efficiency and ILP
-  // Assumes coordinates are normalized so each vector is of unit length.  This lets us
-  // perform a dot-product instead of the full cosine distance computation.
-//  __device__ SUMTYPE cosine(Point<T,SUMTYPE,Dim>* other, bool test) {return NULL;}
-  __device__ SUMTYPE cosine(Point<T,SUMTYPE>* other) {
-    SUMTYPE total[2]={0,0};
-
-    for(int i=0; i<Dim; i+=2) {
-      total[0] += ((SUMTYPE)((SUMTYPE)coords[i] * (SUMTYPE)other->coords[i]));
-      total[1] += ((SUMTYPE)((SUMTYPE)coords[i+1] * (SUMTYPE)other->coords[i+1]));
-    }
-    return (SUMTYPE)1.0 - (total[0]+total[1]);
-  }
-
-  __forceinline__ __device__ SUMTYPE dist(Point<T,SUMTYPE>* other, int metric) {
-    if(metric == 0) return l2(other);
-    else return cosine(other);
-  }
-  */
 };
 
 /* L2 fallback for low dimension when ILP is not possible */

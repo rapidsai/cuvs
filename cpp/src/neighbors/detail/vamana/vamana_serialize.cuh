@@ -61,7 +61,7 @@ void serialize(raft::resources const& res,
   index_of.seekp(file_offset, index_of.beg);
   uint32_t max_degree          = 0;
   size_t index_size            = 24;  // Starting metadata
-  uint32_t start               = 0;
+  uint32_t start               = static_cast<uint32_t>(index_.medoid());
   size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;
 
