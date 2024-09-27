@@ -296,20 +296,20 @@ Sometimes, we need to temporarily change the log pattern (eg: for reporting deci
 
 RAFT is a heavily templated library. Several core functions are expensive to compile and we want to prevent duplicate compilation of this functionality. To limit build time, RAFT provides a precompiled library (libraft.so) where expensive function templates are instantiated for the most commonly used template parameters. To prevent (1) accidental instantiation of these templates and (2) unnecessary dependency on the internals of these templates, we use a split header structure and define macros to control template instantiation. This section describes the macros and header structure.
 
-**Macros.** We define the macros `CUVS_COMPILED` and `CUVS_EXPLICIT_INSTANTIATE_ONLY`. The `CUVS_COMPILED` macro is defined by `CMake` when compiling code that (1) is part of `libraft.so` or (2) is linked with `libraft.so`. It indicates that a precompiled `libraft.so` is present at runtime.
+**Macros.** We define the macros `RAFT_COMPILED` and `RAFT_EXPLICIT_INSTANTIATE_ONLY`. The `RAFT_COMPILED` macro is defined by `CMake` when compiling code that (1) is part of `libraft.so` or (2) is linked with `libraft.so`. It indicates that a precompiled `libraft.so` is present at runtime.
 
-The `CUVS_EXPLICIT_INSTANTIATE_ONLY` macro is defined by `CMake` during compilation of `libraft.so` itself. When defined, it indicates that implicit instantiations of expensive function templates are forbidden (they result in a compiler error). In the RAFT project, we additionally define this macro during compilation of the tests and benchmarks. 
+The `RAFT_EXPLICIT_INSTANTIATE_ONLY` macro is defined by `CMake` during compilation of `libraft.so` itself. When defined, it indicates that implicit instantiations of expensive function templates are forbidden (they result in a compiler error). In the RAFT project, we additionally define this macro during compilation of the tests and benchmarks. 
 
-Below, we summarize which combinations of `CUVS_COMPILED` and `CUVS_EXPLICIT_INSTANTIATE_ONLY` are used in practice and what the effect of the combination is. 
+Below, we summarize which combinations of `RAFT_COMPILED` and `RAFT_EXPLICIT_INSTANTIATE_ONLY` are used in practice and what the effect of the combination is. 
 
-| CUVS_COMPILED | CUVS_EXPLICIT_INSTANTIATE_ONLY | Which targets                                                                                        |
+| RAFT_COMPILED | RAFT_EXPLICIT_INSTANTIATE_ONLY | Which targets                                                                                        |
 |---------------|--------------------------------|------------------------------------------------------------------------------------------------------|
 | defined       | defined                        | `raft::compiled`, RAFT tests, RAFT benchmarks                                                        |
 | defined       |                                | Downstream libraries depending on `libraft` like cuML, cuGraph.                                      |
 |               |                                | Downstream libraries depending on `libraft-headers` like cugraph-ops.                                |
 
 
-| CUVS_COMPILED | CUVS_EXPLICIT_INSTANTIATE_ONLY | Effect                                                                                                |
+| RAFT_COMPILED | RAFT_EXPLICIT_INSTANTIATE_ONLY | Effect                                                                                                |
 |---------------|--------------------------------|-------------------------------------------------------------------------------------------------------|
 | defined       | defined                        | Templates are precompiled. Compiler error on accidental instantiation of expensive function template. |
 | defined       |                                | Templates are precompiled. Implicit instantiation allowed.                                            |
@@ -318,16 +318,16 @@ Below, we summarize which combinations of `CUVS_COMPILED` and `CUVS_EXPLICIT_INS
 
 
 
-**Header organization.** Any header file that defines an expensive function template (say `expensive.cuh`) should be split in three parts: `expensive.cuh`, `expensive-inl.cuh`, and `expensive-ext.cuh`. The file `expensive-inl.cuh` ("inl" for "inline") contains the template definitions, i.e., the actual code. The file `expensive.cuh` includes one or both of the other two files, depending on the values of the `CUVS_COMPILED` and `CUVS_EXPLICIT_INSTANTIATE_ONLY` macros. The file `expensive-ext.cuh` contains `extern template` instantiations. In addition, if `CUVS_EXPLICIT_INSTANTIATE_ONLY` is set, it contains template definitions to ensure that a compiler error is raised in case of accidental instantiation.
+**Header organization.** Any header file that defines an expensive function template (say `expensive.cuh`) should be split in three parts: `expensive.cuh`, `expensive-inl.cuh`, and `expensive-ext.cuh`. The file `expensive-inl.cuh` ("inl" for "inline") contains the template definitions, i.e., the actual code. The file `expensive.cuh` includes one or both of the other two files, depending on the values of the `RAFT_COMPILED` and `RAFT_EXPLICIT_INSTANTIATE_ONLY` macros. The file `expensive-ext.cuh` contains `extern template` instantiations. In addition, if `RAFT_EXPLICIT_INSTANTIATE_ONLY` is set, it contains template definitions to ensure that a compiler error is raised in case of accidental instantiation.
 
 The dispatching by `expensive.cuh` is performed as follows:
 ``` c++
-#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifndef RAFT_EXPLICIT_INSTANTIATE_ONLY
 // If implicit instantiation is allowed, include template definitions.
 #include "expensive-inl.cuh"
 #endif
 
-#ifdef CUVS_COMPILED
+#ifdef RAFT_COMPILED
 // Include extern template instantiations when RAFT is compiled.
 #include "expensive-ext.cuh"
 #endif
@@ -347,12 +347,12 @@ The file `expensive-ext.cuh` contains the following:
 ``` c++
 #include <raft/util/raft_explicit.cuh> // RAFT_EXPLICIT
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifdef RAFT_EXPLICIT_INSTANTIATE_ONLY
 namespace raft {
 // (1) define templates to raise an error in case of accidental instantiation 
 template <typename T> void expensive(T arg) RAFT_EXPLICIT;
 } // namespace raft
-#endif //CUVS_EXPLICIT_INSTANTIATE_ONLY
+#endif //RAFT_EXPLICIT_INSTANTIATE_ONLY
 
 // (2) Provide extern template instantiations.
 extern template void raft::expensive<int>(int);
@@ -360,7 +360,7 @@ extern template void raft::expensive<float>(float);
 ```
 
 This header has two responsibilities: (1) define templates to raise an error in case of accidental instantiation and (2) provide `extern template` instantiations.
-First, if `CUVS_EXPLICIT_INSTANTIATE_ONLY` is set, `expensive` is defined. This is done for two reasons: (1) to give a definition, because the definition in `expensive-inl.cuh` was skipped and (2) to indicate that the template should be explicitly instantiated by taging it with the `RAFT_EXPLICIT` macro. This macro defines the function body, and it ensures that an informative error message is generated when an implicit instantiation erroneously occurs. Finally, the `extern template` instantiations are listed.
+First, if `RAFT_EXPLICIT_INSTANTIATE_ONLY` is set, `expensive` is defined. This is done for two reasons: (1) to give a definition, because the definition in `expensive-inl.cuh` was skipped and (2) to indicate that the template should be explicitly instantiated by taging it with the `RAFT_EXPLICIT` macro. This macro defines the function body, and it ensures that an informative error message is generated when an implicit instantiation erroneously occurs. Finally, the `extern template` instantiations are listed.
 
 To actually generate the code for the template instances, the file `src/expensive.cu` contains the following. Note that the only difference between the extern template instantiations in `expensive-ext.cuh` and these lines are the removal of the word `extern`:
 
@@ -377,7 +377,7 @@ template void raft::expensive<float>(float);
 
 2. Keep docstrings in the `-inl.cuh` header, as it is closer to the code. Remove docstrings from template definitions in the `-ext.cuh` header. Make sure to explicitly include public APIs in the RAFT API docs. That is, add `#include <raft/expensive.cuh>` to the docs in `docs/source/cpp_api/expensive.rst` (instead of `#include <raft/expensive-inl.cuh>`).
 
-3. The order of inclusion in `expensive.cuh` is extremely important. If `CUVS_EXPLICIT_INSTANTIATE_ONLY` is not defined, but `CUVS_COMPILED` is defined, then we must include the template definitions before the `extern template` instantiations.
+3. The order of inclusion in `expensive.cuh` is extremely important. If `RAFT_EXPLICIT_INSTANTIATE_ONLY` is not defined, but `RAFT_COMPILED` is defined, then we must include the template definitions before the `extern template` instantiations.
 
 4. If a header file defines multiple expensive templates, it can be that one of them is not instantiated. In this case, **do define** the template with `RAFT_EXPLICIT` in the `-ext` header. This way, when the template is instantiated, the developer gets a helpful error message instead of a confusing "function not found".
 
