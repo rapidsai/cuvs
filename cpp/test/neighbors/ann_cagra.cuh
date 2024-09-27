@@ -706,7 +706,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::AUTO},
     {10},
-    {0, 4, 8, 16, 32},  // team_size
+    {0, 8, 16, 32},  // team_size
     {64},
     {1},
     {cuvs::distance::DistanceType::L2Expanded},

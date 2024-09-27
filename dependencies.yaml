@@ -151,7 +151,6 @@ dependencies:
         packages:
           - c-compiler
           - cxx-compiler
-          - nccl>=2.9.9
     specific:
       - output_types: conda
         matrices:
