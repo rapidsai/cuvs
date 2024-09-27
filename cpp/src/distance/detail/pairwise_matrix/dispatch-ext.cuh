@@ -22,8 +22,6 @@
 #include <raft/core/operators.hpp>        // raft::identity_op
 #include <raft/util/raft_explicit.hpp>    // RAFT_EXPLICIT
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
-
 namespace cuvs::distance::detail {
 
 template <typename OpT,
@@ -46,8 +44,6 @@ void pairwise_matrix_dispatch(OpT distance_op,
                               bool is_row_major) RAFT_EXPLICIT;
 
 };  // namespace cuvs::distance::detail
-
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_cuvs_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \

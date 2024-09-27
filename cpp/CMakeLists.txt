@@ -420,8 +420,6 @@ add_library(
   src/stats/trustworthiness_score.cu
 )
 
-target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
-
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
                  --expt-relaxed-constexpr>

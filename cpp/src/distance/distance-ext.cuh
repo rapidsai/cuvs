@@ -26,8 +26,6 @@
 
 #include <cuda_fp16.h>
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
-
 namespace cuvs {
 namespace distance {
 
@@ -148,8 +146,6 @@ void pairwise_distance(raft::resources const& handle,
 
 };  // namespace distance
 };  // namespace cuvs
-
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 /*
  * Hierarchy of instantiations:
