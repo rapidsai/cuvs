@@ -11,5 +11,6 @@ Nearest Neighbors
 
    neighbors_brute_force.rst
    neighbors_cagra.rst
+   neighbors_hnsw.rst
    neighbors_ivf_flat.rst
    neighbors_ivf_pq.rst

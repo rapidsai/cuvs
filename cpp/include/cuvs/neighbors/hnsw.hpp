@@ -173,6 +173,8 @@ std::unique_ptr<index<int8_t>> from_cagra(
 
 /**@}*/
 
+// TODO: Filtered Search APIs: https://github.com/rapidsai/cuvs/issues/363
+
 /**
  * @defgroup hnsw_cpp_index_search Search hnswlib index
  * @{

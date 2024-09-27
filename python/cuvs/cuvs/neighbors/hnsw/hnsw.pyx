@@ -224,12 +224,13 @@ def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
 
 
 @auto_sync_resources
-def from_cagra(cagra.Index index, resources=None):
+def from_cagra(cagra.Index index, temporary_index_path=None, resources=None):
     """
     Returns an hnsw base-layer-only index from a CAGRA index.
 
     NOTE: This method uses the filesystem to write the CAGRA index in
-          `/tmp/<random_number>.bin` before reading it as an hnsw index,
+          `/tmp/<random_number>.bin` or the parameter `temporary_index_path`
+          if not None before reading it as an hnsw index,
           then deleting the temporary file. The returned index is immutable
           and can only be searched by the hnsw wrapper in cuVS, as the
           format is not compatible with the original hnswlib library.
@@ -244,6 +245,9 @@ def from_cagra(cagra.Index index, resources=None):
     ----------
     index : Index
         Trained CAGRA index.
+    temporary_index_path : string, default = None
+        Path to save the temporary index file. If None, the temporary file
+        will be saved in `/tmp/<random_number>.bin`.
     {resources_docstring}
 
     Examples
@@ -261,7 +265,8 @@ def from_cagra(cagra.Index index, resources=None):
     >>> hnsw_index = hnsw.from_cagra(index)
     """
     uuid_num = uuid.uuid4()
-    filename = f"/tmp/{uuid_num}.bin"
+    filename = temporary_index_path if temporary_index_path else \
+        f"/tmp/{uuid_num}.bin"
     save(filename, index, resources=resources)
     hnsw_index = load(filename, index.dim, np.dtype(index.active_index_type),
                       "sqeuclidean", resources=resources)
