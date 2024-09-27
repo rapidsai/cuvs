@@ -14,10 +14,13 @@ IVF-Flat tends to be a great choice when
 in the index, and
 2. exact recall is not needed. as with the other index types, the tuning parameters are used to trade-off recall for search latency / throughput.
 
-[ C API | C++ API | Python API | Rust API ]
+[ :doc:`C API <../c_api/neighbors_ivf_flat_c>` | :doc:`C++ API <../cpp_api/neighbors_ivf_flat>` | :doc:`Python API <../python_api/neighbors_ivf_flat>` | :doc:`Rust API <../rust_api/index>` ]
 
 Filtering considerations
 ------------------------
+
+IVF methods only apply filters to the lists which are probed for each query point. As a result, the results of a filtered query will likely differ signficiantly from the results of a filtering applid to an exact method like brute-force. For example. imagine you have 3 IVF lists each containing 2 vectors and you perform a query against only the closest 2 lists but you filter out all but 1 element. If that remaining element happens to be in one of the lists which was not proved, it will not be considered at all in the search results. It's important to consider this when using any of the IVF methods in your applications.
+
 
 Configuration parameters
 ------------------------
@@ -74,8 +77,8 @@ assumption that the number of lists, and thus the max size of the data in the in
 might not matter. For example, most vector databases build many smaller physical approximate nearest neighbors indexes, each from
 fixed-size or maximum-sized immutable segments and so the number of lists can be tuned based on the number of vectors in the indexes.
 
-Empirically, we've found `sqrt(n_index_vectors)` to be a good starting point for the `n_lists` hyper-parameter. Remember, having more
-lists means less points to search within each list, but it could also mean more `n_probes` are needed at search time to reach an acceptable
+Empirically, we've found :math:`\sqrt{n_index_vectors}` to be a good starting point for the :math:`n_lists` hyper-parameter. Remember, having more
+lists means less points to search within each list, but it could also mean more :math:`n_probes` are needed at search time to reach an acceptable
 recall.
 
 
@@ -83,7 +86,7 @@ Memory footprint
 ----------------
 
 Each cluster is padded to at least 32 vectors (but potentially up to 1024). Assuming uniform random distribution of vectors/list, we would have
-:math:`cluster\_overhead = (conservative\_memory\_allocation ? 16 : 512 ) * dim * sizeof(T)`
+:math:`cluster\_overhead = (conservative\_memory\_allocation ? 16 : 512 ) * dim * sizeof_{float})`
 
 Note that each cluster is allocated as a separate allocation. If we use a `cuda_memory_resource`, that would grab memory in 1 MiB chunks, so on average we might have 0.5 MiB overhead per cluster. If we us 10s of thousands of clusters, it becomes essential to use pool allocator to avoid this overhead.
 
@@ -95,14 +98,19 @@ Index (device memory):
 
 .. math::
 
-   n_vectors * n_dimensions * sizeof(T) + // interleaved form
-   n_vectors  * sizeof(int_type) +          // list indices
-   n_clusters * n_dimensions * sizeof(T) + // cluster centers
-   n_clusters * cluster_overhead`
+   n\_vectors * n\_dimensions * sizeof(T) +
+
+   n\_vectors  * sizeof(int_type) +
+
+   n\_clusters * n\_dimensions * sizeof(T) +
+
+   n\_clusters * cluster_overhead`
 
 
 Peak device memory usage for index build:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-:math:`workspace = min(1GB, n\_queries * [(n\_lists + 1 + n\_probes*(k+1))*sizeof(T) + n\_probes*k*sizeof(Idx)])`
+
+:math:`workspace = min(1GB, n\_queries * [(n\_lists + 1 + n\_probes * (k + 1)) * sizeof_{float}) + n\_probes * k * sizeof_{idx}])`
+
 :math:`index\_size + workspace`
 

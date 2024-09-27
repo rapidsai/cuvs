@@ -13,15 +13,13 @@ I-force could be used to construct the initial kNN graph. This would yield the m
 we find that in practice the kNN graph does not need to be very accurate since the pruning step helps to boost the overall recall of
 the index. cuVS provides IVF-PQ and NN-Descent strategies for building the initial kNN graph and these can be selected in index params object during index construction.
 
+[ :doc:`C API <../c_api/neighbors_cagra_c>` | :doc:`C++ API <../cpp_api/neighbors_cagra>` | :doc:`Python API <../python_api/neighbors_cagra>` | :doc:`Rust API <../rust_api/index>` ]
+
 Interoperability with HNSW
 --------------------------
 
 cuVS provides the capability to convert a CAGRA graph to an HNSW graph, which enables the GPU to be used only for building the index
 while the CPU can be leveraged for search.
-
-# TODO: Add code example for this conversion
-
-[ :ref:`C API <../c_api.rst>` | :ref:`C++ API <../cpp_api.rst>` | :ref:`Python API <../python_api.rst>` | :ref:`Rust API <../rust_api/index.rst>` ]
 
 Filtering considerations
 ------------------------
@@ -110,13 +108,14 @@ IVFPQ or NN-DESCENT can be used to build the graph (additions to the peak memory
 Dataset on device (graph on host):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Index memory footprint (device): :math: `n\_index\_vectors * n\_dims * sizeof(T)`
-Index memory footprint (host): :math: `graph\_degree * n\_index\_vectors * sizeof(T)``
+Index memory footprint (device): :math:`n_index_vectors * n_dims * sizeof(T)`
+
+Index memory footprint (host): :math:`graph_degree * n_index_vectors * sizeof(T)``
 
 Dataset on host (graph on host):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Index memory footprint (host): :math: `n\_index\_vectors * n\_dims * sizeof(T) + graph\_degree * n\_index\_vectors * sizeof(T)`
+Index memory footprint (host): :math:`n_index_vectors * n_dims * sizeof(T) + graph_degree * n_index_vectors * sizeof(T)`
 
 Build peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -124,7 +123,7 @@ Build peak memory usage:
 When built using NN-descent / IVF-PQ, the build process consists of two phases: (1) building an initial/(intermediate) graph and then (2) optimizing the graph. Key input parameters are n_vectors, intermediate_graph_degree, graph_degree.
 The memory usage in the first phase (building) depends on the chosen method. The biggest allocation is the graph (n_vectors*intermediate_graph_degree), but it’s stored in the host memory.
 Usually, the second phase (optimize) uses the most device memory. The peak memory usage is achieved during the pruning step (graph_core.cuh/optimize)
-Optimize: formula for peak memory usage (device): :math: `n\_vectors * (4 + (sizeof(IdxT) + 1) * intermediate\_degree)``
+Optimize: formula for peak memory usage (device): :math:`n_vectors * (4 + (sizeof(IdxT) + 1) * intermediate_degree)``
 
 Build with out-of-core IVF-PQ peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,6 +133,7 @@ Out-of-core CAGA build consists of IVF-PQ build, IVF-PQ search, CAGRA optimizati
 IVF-PQ Build:
 
 .. math::
+
    n_vectors / train_set_ratio * dim * sizeof(float)   // trainset, may be in managed mem
    + n_vectors / train_set_ratio * sizeof(uint32_t)    // labels, may be in managed mem
    + n_clusters * n_dim * sizeof(float)                // cluster centers
@@ -141,6 +141,7 @@ IVF-PQ Build:
 IVF-PQ Search (max batch size 1024 vectors on device at a time):
 
 .. math::
+
    [n_vectors * (pq_dim * pq_bits / 8 + sizeof(int64_t)) + O(n_clusters)]
    + [batch_size * n_dim * sizeof(float)] + [batch_size * intermediate_degree * sizeof(uint32_t)] +
    [batch_size * intermediate_degree * sizeof(float)]

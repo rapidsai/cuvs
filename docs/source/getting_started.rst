@@ -4,7 +4,9 @@ Getting Started
 
 - `New to vector search?`_
 
-  * :doc:`Primer on vector search <vector_databases_vs_vector_search>`
+  * :doc:`Primer on vector search <choosing_and_configuring_indexes>`
+
+  * :doc:`Vector search indexes vs vector databases <vector_databases_vs_vector_search>`
 
   * :doc:`Index tuning guide <tuning_guide>`
 
@@ -41,7 +43,7 @@ Getting Started
 New to vector search?
 =====================
 
-If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then :doc:`this primer on vector search guide <vector_databases_vs_vector_search>` should provide some good insight. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results of not tuned correctly.
+If you are unfamiliar with the basics of vector search or how vector search differs from vector databases, then :doc:`this primer on vector search guide <choosing_and_configuring_index>` should provide some good insight. Another good resource for the uninitiated is our :doc:`vector databases vs vector search <vector_databases_vs_vector_search>` guide. As outlined in the primer, vector search as used in vector databases is often closer to machine learning than to traditional databases. This means that while traditional databases can often be slow without any performance tuning, they will usually still yield the correct results. Unfortunately, vector search indexes, like other machine learning models, can yield garbage results of not tuned correctly.
 
 Fortunately, this opens up the whole world of hyperparamer optimization to improve vector search performance and quality. Please see our :doc:`index tuning guide <tuning_guide>` for more information.
 
@@ -103,3 +105,16 @@ Get involved
 ------------
 
 We always welcome patches for new features and bug fixes. Please read our `contributing guide <contributing.md>`_ for more information on contributing patches to cuVS.
+
+
+
+.. toctree::
+   :hidden:
+
+   choosing_and_configuring_indexes.rst
+   vector_databases_vs_vector_search.rst
+   tuning_guide.rst
+   comparing_indexes.rst
+   indexes/indexes.rst
+   api_basics.rst
+   api_interoperability.rst
