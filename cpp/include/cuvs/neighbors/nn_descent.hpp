@@ -27,6 +27,8 @@
 
 #include <cuvs/distance/distance.hpp>
 
+#include <cuda_fp16.h>
+
 namespace cuvs::neighbors::nn_descent {
 /**
  * @defgroup nn_descent_cpp_index_params The nn-descent algorithm parameters.
@@ -235,6 +237,68 @@ auto build(raft::resources const& res,
 auto build(raft::resources const& res,
            index_params const& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+
+/**
+ * @brief Build nn-descent Index with dataset in device memory
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   nn_descent::index_params index_params;
+ *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
+ *   auto index = nn_descent::build(res, index_params, dataset);
+ *   // index.graph() provides a raft::host_matrix_view of an
+ *   // all-neighbors knn graph of dimensions [N, k] of the input
+ *   // dataset
+ * @endcode
+ *
+ * @param[in] res raft::resources is an object mangaging resources
+ * @param[in] params an instance of nn_descent::index_params that are parameters
+ *               to run the nn-descent algorithm
+ * @param[in] dataset raft::device_matrix_view input dataset expected to be located
+ *                in device memory
+ * @return index<IdxT> index containing all-neighbors knn graph in host memory
+ */
+auto build(raft::resources const& res,
+           index_params const& params,
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+
+/**
+ * @brief Build nn-descent Index with dataset in host memory
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors::experimental;
+ *   // use default index parameters
+ *   nn_descent::index_params index_params;
+ *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // index.graph() provides a raft::host_matrix_view of an
+ *   // all-neighbors knn graph of dimensions [N, k] of the input
+ *   // dataset
+ * @endcode
+ *
+ * @tparam T data-type of the input dataset
+ * @tparam IdxT data-type for the output index
+ * @param res raft::resources is an object mangaging resources
+ * @param[in] params an instance of nn_descent::index_params that are parameters
+ *               to run the nn-descent algorithm
+ * @param[in] dataset raft::host_matrix_view input dataset expected to be located
+ *                in host memory
+ * @return index<IdxT> index containing all-neighbors knn graph in host memory
+ */
+auto build(raft::resources const& res,
+           index_params const& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
