@@ -1,7 +1,7 @@
 name: cuvs_ivf_pq
 constraints:
-  build: cuvs_bench.constraints.cuvs_ivf_pq_build
-  search: cuvs_bench.constraints.cuvs_ivf_pq_search
+  build: cuvs_bench.config.algos.constraints.cuvs_ivf_pq_build
+  search: cuvs_bench.config.algos.constraints.cuvs_ivf_pq_search
 groups:
   base:
     build:

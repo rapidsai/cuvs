@@ -55,7 +55,7 @@ option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
 option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
 option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
-option(BUILD_ANN_BENCH "Build cuVS ann benchmarks" OFF)
+option(BUILD_CUVS_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
@@ -96,7 +96,7 @@ include(CMakeDependentOption)
 
 message(VERBOSE "cuVS: Build cuVS unit-tests: ${BUILD_TESTS}")
 message(VERBOSE "cuVS: Build CPU only components: ${BUILD_CPU_ONLY}")
-message(VERBOSE "cuVS: Build ANN benchmarks: ${BUILD_ANN_BENCH}")
+message(VERBOSE "cuVS: Build ANN benchmarks: ${BUILD_CUVS_BENCH}")
 message(VERBOSE "cuVS: Enable detection of conda environment for dependencies: ${DETECT_CONDA_ENV}")
 message(VERBOSE "cuVS: Disable depreaction warnings " ${DISABLE_DEPRECATION_WARNINGS})
 message(VERBOSE "cuVS: Disable OpenMP: ${DISABLE_OPENMP}")
@@ -188,7 +188,7 @@ endif()
 
 include(cmake/thirdparty/get_cutlass.cmake)
 
-if(BUILD_ANN_BENCH)
+if(BUILD_CUVS_BENCH)
   include(${rapids-cmake-dir}/cpm/gbench.cmake)
   rapids_cpm_gbench(BUILD_STATIC)
 endif()
@@ -654,6 +654,6 @@ endif()
 # ##################################################################################################
 # * build ann benchmark executable -----------------------------------------------
 
-if(BUILD_ANN_BENCH)
+if(BUILD_CUVS_BENCH)
   add_subdirectory(bench/ann/)
 endif()
