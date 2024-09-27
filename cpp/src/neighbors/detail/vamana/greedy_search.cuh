@@ -32,7 +32,7 @@
 
 namespace cuvs::neighbors::vamana::detail {
 
-/* @defgroup vamana_search_detail vamana search
+/* @defgroup greedy_search_detail greedy search
  * @{
  */
 

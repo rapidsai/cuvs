@@ -17,7 +17,7 @@
 #pragma once
 
 #include "robust_prune.cuh"
-#include "vamana_search.cuh"
+#include "greedy_search.cuh"
 #include "vamana_structs.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
