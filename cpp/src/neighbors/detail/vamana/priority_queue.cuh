@@ -24,10 +24,32 @@ namespace cuvs::neighbors::vamana::detail {
 
 
 /***************************************************************************************
-* Priority queue structure used by GreedySearch. Stores a total of KVAL pairs.
-* NOTE: Currently KVAL must be 2i-1 for some integer i since the heap must be complete.
-* This size is determined during vamana build with the "queue_size" parameter (default 127)
 ***************************************************************************************/
+/**
+ * @defgroup vamana_priority_queue Vamana Priority queue structure
+ * @{
+ */
+
+/**
+ * @brief Priority Queue structure used by Vamana GreedySearch during
+ * graph construction.
+ *
+ * The structure keeps the nearest visited neighbors seen thus far during
+ * search and lets us efficiently find the next node to visit during the search.
+ * Stores a total of KVAL pairs, where currently KVAL must be 2i-1 for some integer 
+ * i since the heap must be complete.
+ * This size is determined during vamana build with the "queue_size" parameter (default 127)
+ * 
+ * The queue and all methods are device-side, with a work group size or 32 (one warp).
+ * During search, each warp creates their own queue to search a single query at a time.
+ * The device memory pointed to by `vals` is assigned during the call to `initialize`.
+ * The Vamana GreedySearch call uses shared memory, but any device-accessible memory is applicable.
+ *
+ * 
+ * @tparam IdxT type of the vector indices (represent dataset.extent(0))
+ * @tparam accT type of distances between vectors (accumuator type)
+ *
+ */
 template<typename IdxT, typename accT>
 class PriorityQueue {
   public:
