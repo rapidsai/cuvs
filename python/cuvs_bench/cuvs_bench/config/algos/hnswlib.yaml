@@ -1,6 +1,6 @@
 name: hnswlib
 constraints:
-  search: cuvs_bench.constraints.hnswlib_search
+  search: cuvs_bench.config.algos.constraints.hnswlib_search
 groups:
   base:
     build:

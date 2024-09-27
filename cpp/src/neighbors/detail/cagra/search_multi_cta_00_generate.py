@@ -39,8 +39,6 @@ header = """/*
 
 #include "search_multi_cta_inst.cuh"
 
-#include "compute_distance.hpp"
-
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 """
 
@@ -48,7 +46,6 @@ trailer = """
 }  // namespace cuvs::neighbors::cagra::detail::multi_cta_search
 """
 
-mxdim_team = [(128, 8), (256, 16), (512, 32), (1024, 32)]
 # block = [(64, 16), (128, 8), (256, 4), (512, 2), (1024, 1)]
 # mxelem = [64, 128, 256]
 load_types = ["uint4"]
@@ -66,13 +63,12 @@ search_types = dict(
 )
 # knn
 for type_path, (data_t, idx_t, distance_t) in search_types.items():
-    for (mxdim, team) in mxdim_team:
-        path = f"search_multi_cta_{type_path}_dim{mxdim}_t{team}.cu"
-        with open(path, "w") as f:
-            f.write(header)
-            f.write(
-                    f"instantiate_kernel_selection(\n  {team}, {mxdim}, cuvs::neighbors::cagra::detail::standard_dataset_descriptor_t<{data_t} COMMA {idx_t} COMMA {distance_t}>, cuvs::neighbors::filtering::none_cagra_sample_filter);\n"
-            )
-            f.write(trailer)
-            # For pasting into CMakeLists.txt
-        print(f"src/neighbors/detail/cagra/{path}")
+    path = f"search_multi_cta_{type_path}.cu"
+    with open(path, "w") as f:
+        f.write(header)
+        f.write(
+                f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, cuvs::neighbors::filtering::none_cagra_sample_filter);\n"
+        )
+        f.write(trailer)
+        # For pasting into CMakeLists.txt
+    print(f"src/neighbors/detail/cagra/{path}")
