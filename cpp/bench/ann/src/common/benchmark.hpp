@@ -687,17 +687,17 @@ inline auto run_main(int argc, char** argv) -> int
                               override_kv,
                               metric_objective,
                               threads);
-    // } else if (dtype == "half") {
-    //   dispatch_benchmark<half>(cmdline
-    //                            conf,
-    //                            force_overwrite,
-    //                            build_mode,
-    //                            search_mode,
-    //                            data_prefix,
-    //                            index_prefix,
-    //                            override_kv,
-    //                            metric_objective,
-    //                            threads);
+  } else if (dtype == "half") {
+    dispatch_benchmark<half>(cmdline,
+                             conf,
+                             force_overwrite,
+                             build_mode,
+                             search_mode,
+                             data_prefix,
+                             index_prefix,
+                             override_kv,
+                             metric_objective,
+                             threads);
   } else if (dtype == "uint8") {
     dispatch_benchmark<std::uint8_t>(cmdline,
                                      conf,
