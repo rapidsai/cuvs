@@ -205,6 +205,30 @@ struct search_params : cuvs::neighbors::search_params {
   uint32_t num_random_samplings = 1;
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask = 0x128394;
+
+  /** Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) */
+  bool persistent = false;
+  /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
+  float persistent_lifetime = 2;
+  /**
+   * Set the fraction of maximum grid size used by persistent kernel.
+   * Value 1.0 means the kernel grid size is maximum possible for the selected device.
+   * The value must be greater than 0.0 and not greater than 1.0.
+   *
+   * One may need to run other kernels alongside this persistent kernel. This parameter can
+   * be used to reduce the grid size of the persistent kernel to leave a few SMs idle.
+   * Note: running any other work on GPU alongside with the persistent kernel makes the setup
+   * fragile.
+   *   - Running another kernel in another thread usually works, but no progress guaranteed
+   *   - Any CUDA allocations block the context (this issue may be obscured by using pools)
+   *   - Memory copies to not-pinned host memory may block the context
+   *
+   * Even when we know there are no other kernels working at the same time, setting
+   * kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care.
+   * If you suspect this is an issue, you can reduce this number to ~0.9 without a significant
+   * impact on the throughput.
+   */
+  float persistent_device_usage = 1.0;
 };
 
 /**
