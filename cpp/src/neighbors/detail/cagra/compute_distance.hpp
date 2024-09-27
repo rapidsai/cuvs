@@ -34,6 +34,7 @@
 #include <functional>
 #include <memory>
 #include <type_traits>
+#include <variant>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -222,31 +223,61 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
  * The host struct manages the lifetime of the associated device pointer and a couple parameters
  * affecting the search kernel launch config.
  *
+ * [Note: lazy initialization]
+ * Initialization of the descriptor involves allocating device memory and calling a kernel.
+ * This can interfere with other workloads (such as the persistent kernel) and generally adds
+ * overhead. To mitigate this, we don't call any CUDA api at the construction of the descriptor
+ * host. Instead, we postpone the initialization till the device pointer is requested.
+ *
  */
 template <typename DataT, typename IndexT, typename DistanceT>
 struct dataset_descriptor_host {
-  using dev_descriptor_t         = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  using dev_descriptor_t = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+  using dd_ptr_t         = std::shared_ptr<dev_descriptor_t>;
+  using init_f =
+    std::tuple<std::function<void(dev_descriptor_t*, rmm::cuda_stream_view stream)>, size_t>;
   uint32_t smem_ws_size_in_bytes = 0;
   uint32_t team_size             = 0;
 
-  template <typename DescriptorImpl>
-  dataset_descriptor_host(const DescriptorImpl& dd_host, rmm::cuda_stream_view stream)
-    : dev_ptr_{[stream]() {
-                 dev_descriptor_t* p;
-                 RAFT_CUDA_TRY(cudaMallocAsync(&p, sizeof(DescriptorImpl), stream));
-                 return p;
-               }(),
-               [stream](dev_descriptor_t* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(p, stream)); }},
+  template <typename DescriptorImpl, typename InitF>
+  dataset_descriptor_host(const DescriptorImpl& dd_host, InitF init)
+    : value_{std::make_tuple(init, sizeof(DescriptorImpl))},
       smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
       team_size{dd_host.team_size()}
   {
   }
 
-  [[nodiscard]] auto dev_ptr() const -> const dev_descriptor_t* { return dev_ptr_.get(); }
-  [[nodiscard]] auto dev_ptr() -> dev_descriptor_t* { return dev_ptr_.get(); }
+  /**
+   * Return the device pointer, possibly evaluating it in the given thread.
+   */
+  [[nodiscard]] auto dev_ptr(rmm::cuda_stream_view stream) const -> const dev_descriptor_t*
+  {
+    if (std::holds_alternative<init_f>(value_)) { value_ = eval(std::get<init_f>(value_), stream); }
+    return std::get<dd_ptr_t>(value_).get();
+  }
+  [[nodiscard]] auto dev_ptr(rmm::cuda_stream_view stream) -> dev_descriptor_t*
+  {
+    if (std::holds_alternative<init_f>(value_)) { value_ = eval(std::get<init_f>(value_), stream); }
+    return std::get<dd_ptr_t>(value_).get();
+  }
 
  private:
-  std::unique_ptr<dev_descriptor_t, std::function<void(dev_descriptor_t*)>> dev_ptr_;
+  mutable std::variant<dd_ptr_t, init_f> value_;
+
+  static auto eval(init_f init, rmm::cuda_stream_view stream) -> dd_ptr_t
+  {
+    using raft::RAFT_NAME;
+    auto& [fun, size] = init;
+    dd_ptr_t dev_ptr{
+      [stream, s = size]() {
+        dev_descriptor_t* p;
+        RAFT_CUDA_TRY(cudaMallocAsync(&p, s, stream));
+        return p;
+      }(),
+      [stream](dev_descriptor_t* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(p, stream)); }};
+    fun(dev_ptr.get(), stream);
+    return dev_ptr;
+  }
 };
 
 /**
@@ -257,11 +288,8 @@ struct dataset_descriptor_host {
  *
  */
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
-using init_desc_type =
-  dataset_descriptor_host<DataT, IndexT, DistanceT> (*)(const cagra::search_params&,
-                                                        const DatasetT&,
-                                                        cuvs::distance::DistanceType,
-                                                        rmm::cuda_stream_view);
+using init_desc_type = dataset_descriptor_host<DataT, IndexT, DistanceT> (*)(
+  const cagra::search_params&, const DatasetT&, cuvs::distance::DistanceType);
 
 /**
  * @brief Descriptor instance specification.

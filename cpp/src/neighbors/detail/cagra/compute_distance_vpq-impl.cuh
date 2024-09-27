@@ -421,8 +421,7 @@ vpq_descriptor_spec<Metric,
                                       const CodebookT* vq_code_book_ptr,
                                       const CodebookT* pq_code_book_ptr,
                                       IndexT size,
-                                      uint32_t dim,
-                                      rmm::cuda_stream_view stream)
+                                      uint32_t dim)
 {
   using desc_type = cagra_q_dataset_descriptor_t<Metric,
                                                  TeamSize,
@@ -443,24 +442,27 @@ vpq_descriptor_spec<Metric,
                     pq_code_book_ptr,
                     size,
                     dim};
-  host_type result{dd_host, stream};
-  vpq_dataset_descriptor_init_kernel<Metric,
-                                     TeamSize,
-                                     DatasetBlockDim,
-                                     PqBits,
-                                     PqLen,
-                                     CodebookT,
-                                     DataT,
-                                     IndexT,
-                                     DistanceT><<<1, 1, 0, stream>>>(result.dev_ptr(),
-                                                                     encoded_dataset_ptr,
-                                                                     encoded_dataset_dim,
-                                                                     vq_code_book_ptr,
-                                                                     pq_code_book_ptr,
-                                                                     size,
-                                                                     dim);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-  return result;
+  return host_type{dd_host,
+                   [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
+                       rmm::cuda_stream_view stream) {
+                     vpq_dataset_descriptor_init_kernel<Metric,
+                                                        TeamSize,
+                                                        DatasetBlockDim,
+                                                        PqBits,
+                                                        PqLen,
+                                                        CodebookT,
+                                                        DataT,
+                                                        IndexT,
+                                                        DistanceT>
+                       <<<1, 1, 0, stream>>>(dev_ptr,
+                                             encoded_dataset_ptr,
+                                             encoded_dataset_dim,
+                                             vq_code_book_ptr,
+                                             pq_code_book_ptr,
+                                             size,
+                                             dim);
+                     RAFT_CUDA_TRY(cudaPeekAtLastError());
+                   }};
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
