@@ -345,13 +345,13 @@ void cuvs_cagra<T, IdxT>::search_base(const T* queries,
         neighbors[i] = algo_base::index_type(neighbors_idx_t[i]);
       }
     } else {
-    raft::linalg::unaryOp(neighbors,
-                          neighbors_idx_t,
-                          batch_size * k,
-                          raft::cast_op<algo_base::index_type>(),
-                          raft::resource::get_cuda_stream(handle_));
+      raft::linalg::unaryOp(neighbors,
+                            neighbors_idx_t,
+                            batch_size * k,
+                            raft::cast_op<algo_base::index_type>(),
+                            raft::resource::get_cuda_stream(handle_));
+    }
   }
-}
 }
 
 template <typename T, typename IdxT>
