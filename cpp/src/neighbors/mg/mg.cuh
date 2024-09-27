@@ -25,11 +25,11 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/mg.hpp>
 
-#define SMALL_SEARCH_BATCH 4
-
 namespace cuvs::neighbors::mg {
+constexpr int smallSearchBatchSize = 4;
+
 void check_omp_threads(const int requirements);
-}
+}  // namespace cuvs::neighbors::mg
 
 namespace cuvs::neighbors::mg::detail {
 using namespace cuvs::neighbors;
@@ -487,7 +487,8 @@ void search(const raft::device_resources& handle,
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
 
-  bool run_load_balancer = index.mode_ == REPLICATED && n_rows <= SMALL_SEARCH_BATCH;
+  bool run_load_balancer =
+    index.mode_ == REPLICATED && n_rows <= cuvs::neighbors::mg::smallSearchBatchSize;
   if (run_load_balancer) {
     auto& lbc    = *index.load_balancing_counter_;
     int64_t rank = lbc++;
