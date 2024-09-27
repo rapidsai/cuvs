@@ -337,7 +337,10 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *        It is also important to note that the CAGRA Index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        1. `queries`:
+ *`         a. kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *          b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *          c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
@@ -394,7 +397,7 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
- * @code{.cpp}
+ * @code{.c}
  * #include <cuvs/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
@@ -415,6 +418,34 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                const char* filename,
                                cuvsCagraIndex_t index,
                                bool include_dataset);
+
+/**
+ * Save the CAGRA index to file in hnswlib format.
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsCagraBuild`
+ * cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ *
+ */
+cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
+                                        const char* filename,
+                                        cuvsCagraIndex_t index);
 
 /**
  * Load index from file.
