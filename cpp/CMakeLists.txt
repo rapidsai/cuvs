@@ -415,6 +415,7 @@ add_library(
   src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
   src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_int32_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
   src/stats/silhouette_score.cu
