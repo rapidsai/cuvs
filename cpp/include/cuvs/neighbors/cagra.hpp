@@ -1534,6 +1534,8 @@ void deserialize(raft::resources const& handle,
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1560,6 +1562,8 @@ void serialize_to_hnswlib(raft::resources const& handle,
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1587,6 +1591,8 @@ void serialize_to_hnswlib(raft::resources const& handle,
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1613,6 +1619,8 @@ void serialize_to_hnswlib(raft::resources const& handle,
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1640,6 +1648,8 @@ void serialize_to_hnswlib(raft::resources const& handle,
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1666,6 +1676,8 @@ void serialize_to_hnswlib(raft::resources const& handle,
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *

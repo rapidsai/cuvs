@@ -15,10 +15,8 @@
  */
 #pragma once
 
-#ifndef XCUVS_EXPLICIT_INSTANTIATE_ONLY
+#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
 #include "distance-inl.cuh"
 #endif
 
-#ifdef XCUVS_COMPILED
 #include "distance-ext.cuh"
-#endif
