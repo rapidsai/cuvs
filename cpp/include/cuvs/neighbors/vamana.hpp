@@ -136,10 +136,10 @@ struct index : cuvs::neighbors::index {
   {
   }
 
-/** Construct an index from dataset and vamana graph
+  /** Construct an index from dataset and vamana graph
    *
    */
-  template<typename data_accessor, typename graph_accessor>
+  template <typename data_accessor, typename graph_accessor>
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
         raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
@@ -249,19 +249,19 @@ auto build(raft::resources const& handle,
  */
 
 void serialize(raft::resources const& handle,
-                    const std::string& file_prefix,
-                    const cuvs::neighbors::vamana::index<float, uint32_t>& index,
-                    bool include_dataset = true);
+               const std::string& file_prefix,
+               const cuvs::neighbors::vamana::index<float, uint32_t>& index,
+               bool include_dataset = true);
 
 void serialize(raft::resources const& handle,
-                    const std::string& file_prefix,
-                    const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
-                    bool include_dataset = true);
+               const std::string& file_prefix,
+               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
+               bool include_dataset = true);
 
 void serialize(raft::resources const& handle,
-                    const std::string& file_prefix,
-                    const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
-                    bool include_dataset = true);
+               const std::string& file_prefix,
+               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
+               bool include_dataset = true);
 
 /**
  * @}

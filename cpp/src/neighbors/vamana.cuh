@@ -38,7 +38,6 @@ namespace cuvs::neighbors::vamana {
  * @{
  */
 
-
 /**
  * @brief Build the VAMANA / DiskANN index from the dataset.
  *
@@ -89,12 +88,12 @@ index<T, IdxT> build(
   return cuvs::neighbors::vamana::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }
 
-
 template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_prefix,
                const index<T, IdxT>& index_,
-               bool include_dataset) {
+               bool include_dataset)
+{
   cuvs::neighbors::vamana::detail::build<T, IdxT>(res, file_prefix, index_, include_dataset);
 }
 

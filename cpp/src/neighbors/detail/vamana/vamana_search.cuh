@@ -17,14 +17,14 @@
 #pragma once
 
 #include "macros.cuh"
-#include "vamana_structs.cuh"
 #include "priority_queue.cuh"
-#include <cuvs/neighbors/vamana.hpp>
+#include "vamana_structs.cuh"
 #include <cub/cub.cuh>
+#include <cuvs/neighbors/vamana.hpp>
 
 #include <cuvs/distance/distance.hpp>
-#include <rmm/resource_ref.hpp>
 #include <raft/util/warp_primitives.cuh>
+#include <rmm/resource_ref.hpp>
 
 #include <chrono>
 #include <cstdio>
@@ -32,38 +32,35 @@
 
 namespace cuvs::neighbors::vamana::detail {
 
-
 /* @defgroup vamana_search_detail vamana search
  * @{
  */
 
-
 /* Combines edge and candidate lists, removes duplicates, and sorts by distance
  * Uses CUB primitives, so needs to be templated. Called with Macros for supported sizes above */
-template<typename accT, typename IdxT, int CANDS>
+template <typename accT, typename IdxT, int CANDS>
 __forceinline__ __device__ void sort_visited(
-		  QueryCandidates<IdxT,accT>* query,
-		  typename cub::BlockMergeSort<DistPair<IdxT,accT>,32,(CANDS/32)>::TempStorage* sort_mem) {
-
-  const int ELTS = CANDS/32;
-  using BlockSortT = cub::BlockMergeSort<DistPair<IdxT,accT>,32,ELTS>;
+  QueryCandidates<IdxT, accT>* query,
+  typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, (CANDS / 32)>::TempStorage* sort_mem)
+{
+  const int ELTS   = CANDS / 32;
+  using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, ELTS>;
   DistPair<IdxT, accT> tmp[ELTS];
-  for(int i=0; i<ELTS; i++) {
-    tmp[i].idx = query->ids[ELTS*threadIdx.x + i];
-    tmp[i].dist = query->dists[ELTS*threadIdx.x + i];
+  for (int i = 0; i < ELTS; i++) {
+    tmp[i].idx  = query->ids[ELTS * threadIdx.x + i];
+    tmp[i].dist = query->dists[ELTS * threadIdx.x + i];
   }
 
   __syncthreads();
-  BlockSortT(*sort_mem).Sort(tmp,CmpDist());
+  BlockSortT(*sort_mem).Sort(tmp, CmpDist());
   __syncthreads();
 
-  for(int i=0; i<ELTS; i++) {
-    query->ids[ELTS*threadIdx.x + i] = tmp[i].idx;
-    query->dists[ELTS*threadIdx.x + i] = tmp[i].dist;
+  for (int i = 0; i < ELTS; i++) {
+    query->ids[ELTS * threadIdx.x + i]   = tmp[i].idx;
+    query->dists[ELTS * threadIdx.x + i] = tmp[i].dist;
   }
   __syncthreads();
 }
-
 
 /********************************************************************************************
   GPU kernel to perform a batched GreedySearch on a graph. Since this is used for
@@ -74,28 +71,29 @@ __forceinline__ __device__ void sort_visited(
   Output - the id and dist lists in query_list_ptr will be updated with the nodes visited
            during the GreedySearch.
 **********************************************************************************************/
-template <typename T, 
-          typename accT, 
-          typename IdxT = uint32_t,
+template <typename T,
+          typename accT,
+          typename IdxT     = uint32_t,
           typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                          raft::memory_type::host>>
+                                                         raft::memory_type::host>>
 __global__ void GreedySearchKernel(
-    raft::device_matrix_view<IdxT, int64_t> graph,
-    raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-    void* query_list_ptr,
-    int num_queries, 
-    int medoid_id, 
-    int degree, 
-    int n, 
-    int topk,
-    cuvs::distance::DistanceType metric, 
-    int dim,
-    int max_queue_size,
-    int sort_smem_size) {
-    
-  QueryCandidates<IdxT,accT>* query_list = static_cast<QueryCandidates<IdxT,accT>*>(query_list_ptr);
+  raft::device_matrix_view<IdxT, int64_t> graph,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  void* query_list_ptr,
+  int num_queries,
+  int medoid_id,
+  int degree,
+  int n,
+  int topk,
+  cuvs::distance::DistanceType metric,
+  int dim,
+  int max_queue_size,
+  int sort_smem_size)
+{
+  QueryCandidates<IdxT, accT>* query_list =
+    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
   const T* vec_ptr = dataset.data_handle();
-  
+
   static __shared__ int topk_q_size;
   static __shared__ int cand_q_size;
   static __shared__ accT cur_k_max;
@@ -103,20 +101,19 @@ __global__ void GreedySearchKernel(
 
   static __shared__ Point<T, accT> s_query;
 
-  union ShmemLayout
-  {
-	// All blocksort sizes have same alignment (16)
-    typename cub::BlockMergeSort<DistPair<IdxT,accT>,32,1>::TempStorage sort_mem; 
+  union ShmemLayout {
+    // All blocksort sizes have same alignment (16)
+    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
     T coords;
     Node<accT> topk_pq;
     int neighborhood_arr;
-    DistPair<IdxT,accT> candidate_queue;
+    DistPair<IdxT, accT> candidate_queue;
   };
 
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-  size_t smem_offset = sort_smem_size; // temp sorting memory takes first chunk
+  size_t smem_offset = sort_smem_size;  // temp sorting memory takes first chunk
 
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
   smem_offset += dim * sizeof(T);
@@ -127,99 +124,88 @@ __global__ void GreedySearchKernel(
   int* neighbor_array = reinterpret_cast<int*>(&smem[smem_offset]);
   smem_offset += degree * sizeof(int);
 
-  DistPair<IdxT, accT>* candidate_queue_smem = reinterpret_cast<DistPair<IdxT,accT>*>
-	  (&smem[smem_offset]);
+  DistPair<IdxT, accT>* candidate_queue_smem =
+    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[smem_offset]);
 
   s_query.coords = s_coords;
-  s_query.Dim = dim;
+  s_query.Dim    = dim;
 
   PriorityQueue<IdxT, accT> heap_queue;
 
   if (threadIdx.x == 0) {
-    heap_queue.initialize(candidate_queue_smem,
-                          max_queue_size, &cand_q_size);
+    heap_queue.initialize(candidate_queue_smem, max_queue_size, &cand_q_size);
   }
 
   static __shared__ int num_neighbors;
 
-  for (int i = blockIdx.x; i<num_queries; i+=gridDim.x) {
+  for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     __syncthreads();
 
-    //resetting visited list
+    // resetting visited list
     query_list[i].reset();
 
-    //storing the current query vector into shared memory
+    // storing the current query vector into shared memory
     update_shared_point<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim);
 
     if (threadIdx.x == 0) {
       topk_q_size = 0;
       cand_q_size = 0;
-//      visited_cnt = 0;
+      //      visited_cnt = 0;
       s_query.id = query_list[i].queryId;
-      cur_k_max = 0;
-      k_max_idx = 0;
+      cur_k_max  = 0;
+      k_max_idx  = 0;
       heap_queue.reset();
     }
 
     __syncthreads();
 
-    Point<T, accT> *query_vec;
+    Point<T, accT>* query_vec;
 
-   // Just start from medoid every time, rather than multiple set_ups
-    query_vec = &s_query;
-    query_vec->Dim = dim;
-    const T* medoid = &vec_ptr[(size_t)medoid_id*(size_t)dim];
-    accT medoid_dist = dist<T,accT>(query_vec->coords, medoid, dim, metric);
+    // Just start from medoid every time, rather than multiple set_ups
+    query_vec        = &s_query;
+    query_vec->Dim   = dim;
+    const T* medoid  = &vec_ptr[(size_t)medoid_id * (size_t)dim];
+    accT medoid_dist = dist<T, accT>(query_vec->coords, medoid, dim, metric);
 
-    if(threadIdx.x==0) {
-      heap_queue.insert_back(medoid_dist, medoid_id);
-    }
+    if (threadIdx.x == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
     __syncthreads();
 
     while (cand_q_size != 0) {
       __syncthreads();
 
-
       int cand_num;
       accT cur_distance;
       if (threadIdx.x == 0) {
         Node<accT> test_cand;
-        DistPair<IdxT,accT> test_cand_out = heap_queue.pop();
-        test_cand.distance = test_cand_out.dist;
-        test_cand.nodeid = test_cand_out.idx;
-        cand_num = test_cand.nodeid;
-        cur_distance = test_cand_out.dist;
-
+        DistPair<IdxT, accT> test_cand_out = heap_queue.pop();
+        test_cand.distance                 = test_cand_out.dist;
+        test_cand.nodeid                   = test_cand_out.idx;
+        cand_num                           = test_cand.nodeid;
+        cur_distance                       = test_cand_out.dist;
       }
-__syncthreads();
-
+      __syncthreads();
 
       cand_num = raft::shfl(cand_num, 0);
 
       __syncthreads();
 
-      if(query_list[i].check_visited(cand_num, cur_distance)) {
-        continue;
-      }
+      if (query_list[i].check_visited(cand_num, cur_distance)) { continue; }
 
       cur_distance = raft::shfl(cur_distance, 0);
 
-      //stop condition for the graph traversal process
-      bool done = false;
+      // stop condition for the graph traversal process
+      bool done      = false;
       bool pass_flag = false;
 
       if (topk_q_size == topk) {
-
-        //Check the current node with the worst candidate in top-k queue
-        if (threadIdx.x == 0){
-          if (cur_k_max <= cur_distance){
-            done = true;
-          }
+        // Check the current node with the worst candidate in top-k queue
+        if (threadIdx.x == 0) {
+          if (cur_k_max <= cur_distance) { done = true; }
         }
 
         done = raft::shfl(done, 0);
         if (done) {
-          if(query_list[i].size < topk) {
+          if (query_list[i].size < topk) {
             pass_flag = true;
           }
 
@@ -229,16 +215,16 @@ __syncthreads();
         }
       }
 
-      //The current node is closer to the query vector than the worst candidate in top-K queue, so 
-      //enquee the current node in top-k queue
+      // The current node is closer to the query vector than the worst candidate in top-K queue, so
+      // enquee the current node in top-k queue
       Node<accT> new_cand;
       new_cand.distance = cur_distance;
-      new_cand.nodeid = cand_num;
+      new_cand.nodeid   = cand_num;
 
       if (check_duplicate(topk_pq, topk_q_size, new_cand) == false) {
         if (!pass_flag) {
-          parallel_pq_max_enqueue<accT>(topk_pq, &topk_q_size, topk,
-                                           new_cand, &cur_k_max, &k_max_idx);
+          parallel_pq_max_enqueue<accT>(
+            topk_pq, &topk_q_size, topk, new_cand, &cur_k_max, &k_max_idx);
 
           __syncthreads();
         }
@@ -247,47 +233,47 @@ __syncthreads();
         continue;
       }
 
-      num_neighbors=degree;
+      num_neighbors = degree;
       __syncthreads();
-
 
       for (size_t j = threadIdx.x; j < degree; j += blockDim.x) {
-        //Load neighbors from the graph array and store them in neighbor array (shared memory)
-          neighbor_array[j] = graph(cand_num, j);
-          if(neighbor_array[j] == raft::upper_bound<IdxT>()) atomicMin(&num_neighbors, (int)j); // warp-wide min to find the number of neighbors
+        // Load neighbors from the graph array and store them in neighbor array (shared memory)
+        neighbor_array[j] = graph(cand_num, j);
+        if (neighbor_array[j] == raft::upper_bound<IdxT>())
+          atomicMin(&num_neighbors, (int)j);  // warp-wide min to find the number of neighbors
       }
 
-        //computing distances between the query vector and neighbor vectors then enqueue in priority queue.
-      enqueue_all_neighbors<T, accT, IdxT>(num_neighbors, query_vec, vec_ptr,
-                                              neighbor_array, heap_queue, dim, metric);
-                                              
+      // computing distances between the query vector and neighbor vectors then enqueue in priority
+      // queue.
+      enqueue_all_neighbors<T, accT, IdxT>(
+        num_neighbors, query_vec, vec_ptr, neighbor_array, heap_queue, dim, metric);
+
       __syncthreads();
 
-    } // End cand_q_size != 0 loop
+    }  // End cand_q_size != 0 loop
 
-    bool self_found=false;
+    bool self_found = false;
     // Remove self edges
-    for(int j=threadIdx.x; j<query_list[i].size; j+=blockDim.x) { 
-      if(query_list[i].ids[j] == query_vec->id) {
+    for (int j = threadIdx.x; j < query_list[i].size; j += blockDim.x) {
+      if (query_list[i].ids[j] == query_vec->id) {
         query_list[i].dists[j] = raft::upper_bound<accT>();
-        query_list[i].ids[j] = raft::upper_bound<IdxT>();
-        self_found = true; // Flag to reduce size by 1
+        query_list[i].ids[j]   = raft::upper_bound<IdxT>();
+        self_found             = true;  // Flag to reduce size by 1
       }
     }
 
-    for(int j=query_list[i].size + threadIdx.x; j<query_list[i].maxSize; j+=blockDim.x) {
-      query_list[i].ids[j] = raft::upper_bound<IdxT>();
+    for (int j = query_list[i].size + threadIdx.x; j < query_list[i].maxSize; j += blockDim.x) {
+      query_list[i].ids[j]   = raft::upper_bound<IdxT>();
       query_list[i].dists[j] = raft::upper_bound<accT>();
     }
 
     __syncthreads();
-    if(self_found) query_list[i].size--;
+    if (self_found) query_list[i].size--;
 
     SEARCH_SELECT_SORT(topk);
   }
 
   return;
-  
 }
 
 /**

@@ -53,24 +53,22 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_,
                bool include_dataset)
 {
-  
   // Write graph to first index file (format from MSFT DiskANN OSS)
   std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
   if (!index_of) { RAFT_FAIL("Cannot open file %s", file_name.c_str()); }
 
   size_t file_offset = 0;
   index_of.seekp(file_offset, index_of.beg);
-  uint32_t max_degree = 0;
-  size_t index_size=24; // Starting metadata
-  uint32_t start = 0;
-  size_t num_frozen_points = 0;
+  uint32_t max_degree          = 0;
+  size_t index_size            = 24;  // Starting metadata
+  uint32_t start               = 0;
+  size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;
 
   index_of.write((char*)&index_size, sizeof(uint64_t));
   index_of.write((char*)&max_observed_degree, sizeof(uint32_t));
   index_of.write((char*)&start, sizeof(uint32_t));
   index_of.write((char*)&num_frozen_points, sizeof(size_t));
-
 
   auto d_graph = index_.graph();
   auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
@@ -79,39 +77,43 @@ void serialize(raft::resources const& res,
              d_graph.size(),
              raft::resource::get_cuda_stream(res));
 
-  size_t total_edges=0;
-  size_t num_sparse=0;
-  size_t num_single=0;
+  size_t total_edges = 0;
+  size_t num_sparse  = 0;
+  size_t num_single  = 0;
 
-  for(uint32_t i=0; i<h_graph.extent(0); i++) {
+  for (uint32_t i = 0; i < h_graph.extent(0); i++) {
     uint32_t node_edges = 0;
-    for(; node_edges < h_graph.extent(1); node_edges++) {
-      if(h_graph(i,node_edges) == raft::upper_bound<IdxT>()) { 
-	break;
-      }
+    for (; node_edges < h_graph.extent(1); node_edges++) {
+      if (h_graph(i, node_edges) == raft::upper_bound<IdxT>()) { break; }
     }
 
-    if(node_edges < 3) num_sparse++;
-    if(node_edges < 2) num_single++;
+    if (node_edges < 3) num_sparse++;
+    if (node_edges < 2) num_single++;
     total_edges += node_edges;
 
     index_of.write((char*)&node_edges, sizeof(uint32_t));
     // Need to convert graph edges to uint32_t??
-    index_of.write((char*)&h_graph(i,0), node_edges*sizeof(uint32_t));
-
+    index_of.write((char*)&h_graph(i, 0), node_edges * sizeof(uint32_t));
 
     max_degree = node_edges > max_degree ? (uint32_t)node_edges : max_degree;
     index_size += (size_t)(sizeof(uint32_t) * (node_edges + 1));
   }
   index_of.seekp(file_offset, index_of.beg);
-  index_of.write((char *)&index_size, sizeof(uint64_t));
-  index_of.write((char *)&max_degree, sizeof(uint32_t));
+  index_of.write((char*)&index_size, sizeof(uint64_t));
+  index_of.write((char*)&max_degree, sizeof(uint32_t));
 
-  RAFT_LOG_DEBUG("Wrote file out, index size:%lu, max_degree:%u, num_sparse:%ld, num_single:%ld, total edges:%ld, avg degree:%f", index_size, max_degree, num_sparse, num_single, total_edges, (float)total_edges / (float)h_graph.extent(0));
+  RAFT_LOG_DEBUG(
+    "Wrote file out, index size:%lu, max_degree:%u, num_sparse:%ld, num_single:%ld, total "
+    "edges:%ld, avg degree:%f",
+    index_size,
+    max_degree,
+    num_sparse,
+    num_single,
+    total_edges,
+    (float)total_edges / (float)h_graph.extent(0));
 
   index_of.close();
   if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
-
 }
 
 }  // namespace cuvs::neighbors::vamana::detail

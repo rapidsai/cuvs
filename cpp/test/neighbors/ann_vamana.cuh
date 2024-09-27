@@ -57,42 +57,47 @@ struct AnnVamanaInputs {
   bool host_dataset;
 };
 
-template<typename DataT, typename IdxT>
-inline void CheckGraph(vamana::index<DataT, IdxT>* index_, AnnVamanaInputs inputs, cudaStream_t stream) {
+template <typename DataT, typename IdxT>
+inline void CheckGraph(vamana::index<DataT, IdxT>* index_,
+                       AnnVamanaInputs inputs,
+                       cudaStream_t stream)
+{
+  EXPECT_TRUE(index_->graph().size() == (inputs.n_rows * inputs.graph_degree));
+  EXPECT_TRUE(index_->graph().extent(0) == inputs.n_rows);
+  EXPECT_TRUE(index_->graph().extent(1) == inputs.graph_degree);
 
-	EXPECT_TRUE(index_->graph().size() == (inputs.n_rows * inputs.graph_degree));
-	EXPECT_TRUE(index_->graph().extent(0) == inputs.n_rows);
-	EXPECT_TRUE(index_->graph().extent(1) == inputs.graph_degree);
-	
-	// Copy graph to host
-	auto h_graph = raft::make_host_matrix<IdxT, int64_t>(inputs.n_rows, inputs.graph_degree);
-        raft::copy(h_graph.data_handle(), index_->graph().data_handle(), index_->graph().size(), stream);
+  // Copy graph to host
+  auto h_graph = raft::make_host_matrix<IdxT, int64_t>(inputs.n_rows, inputs.graph_degree);
+  raft::copy(h_graph.data_handle(), index_->graph().data_handle(), index_->graph().size(), stream);
 
-	size_t edge_count=0;
-	int max_degree=0;
-	for(int i=0; i<h_graph.extent(0); i++) {
-          int temp_degree=0;
-	  for(int j=0; j<h_graph.extent(1); j++) {
-            if(h_graph(i,j) < (uint32_t)(inputs.n_rows)) temp_degree++;
-	  }
-	  if(temp_degree > max_degree) max_degree = temp_degree;
-	  edge_count += (size_t)temp_degree;
-	}
+  size_t edge_count = 0;
+  int max_degree    = 0;
+  for (int i = 0; i < h_graph.extent(0); i++) {
+    int temp_degree = 0;
+    for (int j = 0; j < h_graph.extent(1); j++) {
+      if (h_graph(i, j) < (uint32_t)(inputs.n_rows)) temp_degree++;
+    }
+    if (temp_degree > max_degree) max_degree = temp_degree;
+    edge_count += (size_t)temp_degree;
+  }
 
-	// Tests for acceptable range of edges - low dim can also impact this
-        // Minimum expected maximum degree across the whole graph
-	EXPECT_TRUE(max_degree >= std::min(inputs.graph_degree, inputs.dim)); 
+  // Tests for acceptable range of edges - low dim can also impact this
+  // Minimum expected maximum degree across the whole graph
+  EXPECT_TRUE(max_degree >= std::min(inputs.graph_degree, inputs.dim));
 
-	float max_edges = (float)(inputs.n_rows * std::min(inputs.graph_degree,inputs.dim));
+  float max_edges = (float)(inputs.n_rows * std::min(inputs.graph_degree, inputs.dim));
 
-	RAFT_LOG_INFO("dim:%d, degree:%d, visited_size:%d, edge_count:%lu, max_edges:%lu\n", inputs.dim, inputs.graph_degree, inputs.visited_size, edge_count, (size_t)max_edges);
+  RAFT_LOG_INFO("dim:%d, degree:%d, visited_size:%d, edge_count:%lu, max_edges:%lu\n",
+                inputs.dim,
+                inputs.graph_degree,
+                inputs.visited_size,
+                edge_count,
+                (size_t)max_edges);
 
-        // Graph won't always be full, but <75% is very unlikely
-	EXPECT_TRUE(((float)edge_count / max_edges) > 0.75); 
+  // Graph won't always be full, but <75% is very unlikely
+  EXPECT_TRUE(((float)edge_count / max_edges) > 0.75);
 
-	// TODO - Anything else we can test without search
-
-
+  // TODO - Anything else we can test without search
 }
 
 template <typename DistanceT, typename DataT, typename IdxT>
@@ -108,34 +113,33 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
  protected:
   void testVamana()
   {
-        vamana::index_params index_params;
-        index_params.metric = ps.metric;  
-        index_params.graph_degree = ps.graph_degree;
-	index_params.visited_size = ps.visited_size;
-	index_params.max_fraction = ps.max_fraction;
-	
-                                          
-        auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
-          (const DataT*)database.data(), ps.n_rows, ps.dim);
+    vamana::index_params index_params;
+    index_params.metric       = ps.metric;
+    index_params.graph_degree = ps.graph_degree;
+    index_params.visited_size = ps.visited_size;
+    index_params.max_fraction = ps.max_fraction;
 
-//        {
-          vamana::index<DataT, IdxT> index(handle_);
-          if (ps.host_dataset) {
-            auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
-            raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
-            auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+    auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
+      (const DataT*)database.data(), ps.n_rows, ps.dim);
 
-            index = vamana::build(handle_, index_params, database_host_view);
-          } else {
-            index = vamana::build(handle_, index_params, database_view);
-          };
+    //        {
+    vamana::index<DataT, IdxT> index(handle_);
+    if (ps.host_dataset) {
+      auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
+      raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
+      auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
+        (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
 
-	  CheckGraph<DataT, IdxT>(&index, ps, stream_);
+      index = vamana::build(handle_, index_params, database_host_view);
+    } else {
+      index = vamana::build(handle_, index_params, database_view);
+    };
 
-	  // Can we test serialize here without deserialize implemented?
-//          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
-//        }
+    CheckGraph<DataT, IdxT>(&index, ps, stream_);
+
+    // Can we test serialize here without deserialize implemented?
+    //          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
+    //        }
   }
 
   void SetUp() override
@@ -166,13 +170,13 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
 inline std::vector<AnnVamanaInputs> generate_inputs()
 {
-
   std::vector<AnnVamanaInputs> inputs = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-//    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // TODO - fix alignment issue for odd dims
+    //    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // TODO - fix alignment
+    //    issue for odd dims
     {2, 8, 16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-    {32}, // graph degree
-    {64,128,256}, // visited_size
+    {32},                                          // graph degree
+    {64, 128, 256},                                // visited_size
     {0.06, 0.2},
     {cuvs::distance::DistanceType::L2Expanded},
     {false});
@@ -180,8 +184,8 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
   std::vector<AnnVamanaInputs> inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
     {2, 8, 16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-    {64}, // graph degree
-    {128,256,512}, // visited_size
+    {64},                                          // graph degree
+    {128, 256, 512},                               // visited_size
     {0.06, 0.2},
     {cuvs::distance::DistanceType::L2Expanded},
     {false});
@@ -190,8 +194,8 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
   inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
     {2, 8, 16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-    {128}, // graph degree
-    {256,512}, // visited_size
+    {128},                                         // graph degree
+    {256, 512},                                    // visited_size
     {0.06, 0.2},
     {cuvs::distance::DistanceType::L2Expanded},
     {false});
@@ -200,8 +204,8 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
   inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
     {2, 8, 16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-    {256}, // graph degree
-    {512,1024}, // visited_size
+    {256},                                         // graph degree
+    {512, 1024},                                   // visited_size
     {0.06, 0.2},
     {cuvs::distance::DistanceType::L2Expanded},
     {false});
@@ -209,7 +213,6 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 
   return inputs;
 }
-
 
 const std::vector<AnnVamanaInputs> inputs = generate_inputs();
 
