@@ -258,14 +258,10 @@ add_library(
   src/neighbors/detail/cagra/search_multi_cta_half_uint32.cu
   src/neighbors/detail/cagra/search_multi_cta_int8_uint32.cu
   src/neighbors/detail/cagra/search_multi_cta_uint8_uint32.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint64.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_int8_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_uint8_uint32.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint64.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64.cu
 )
 
 file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
