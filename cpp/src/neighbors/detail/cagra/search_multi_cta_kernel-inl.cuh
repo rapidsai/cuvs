@@ -413,7 +413,7 @@ struct search_kernel_config {
 };
 
 template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
-void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
                     IndexT* topk_indices_ptr,       // [num_queries, topk]
                     DistanceT* topk_distances_ptr,  // [num_queries, topk]
@@ -455,7 +455,7 @@ void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* d
 
   kernel<<<grid_dims, block_dims, smem_size, stream>>>(topk_indices_ptr,
                                                        topk_distances_ptr,
-                                                       dataset_desc,
+                                                       dataset_desc.dev_ptr(stream),
                                                        queries_ptr,
                                                        graph.data_handle(),
                                                        graph.extent(1),
