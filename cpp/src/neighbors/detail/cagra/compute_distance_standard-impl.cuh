@@ -252,28 +252,24 @@ template <cuvs::distance::DistanceType Metric,
           typename DistanceT>
 dataset_descriptor_host<DataT, IndexT, DistanceT>
 standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>::init_(
-  const cagra::search_params& params,
-  const DataT* ptr,
-  IndexT size,
-  uint32_t dim,
-  uint32_t ld,
-  rmm::cuda_stream_view stream)
+  const cagra::search_params& params, const DataT* ptr, IndexT size, uint32_t dim, uint32_t ld)
 {
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
   desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld};
-  host_type result{dd_host, stream};
-
-  standard_dataset_descriptor_init_kernel<Metric,
-                                          TeamSize,
-                                          DatasetBlockDim,
-                                          DataT,
-                                          IndexT,
-                                          DistanceT>
-    <<<1, 1, 0, stream>>>(result.dev_ptr(), ptr, size, dim, desc_type::ld(dd_host.args));
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-  return result;
+  return host_type{dd_host,
+                   [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
+                       rmm::cuda_stream_view stream) {
+                     standard_dataset_descriptor_init_kernel<Metric,
+                                                             TeamSize,
+                                                             DatasetBlockDim,
+                                                             DataT,
+                                                             IndexT,
+                                                             DistanceT>
+                       <<<1, 1, 0, stream>>>(dev_ptr, ptr, size, dim, ld);
+                     RAFT_CUDA_TRY(cudaPeekAtLastError());
+                   }};
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
