@@ -21,6 +21,9 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <rmm/cuda_stream_view.hpp>
+#include <rmm/mr/device/device_memory_resource.hpp>
+#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/device/owning_wrapper.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
 #include <thread>
@@ -83,10 +86,14 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   });
 }
 
-thread_local std::unique_ptr<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>> pool_mr;
+thread_local std::shared_ptr<
+  rmm::mr::owning_wrapper<rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>,
+                          rmm::mr::device_memory_resource>>
+  pool_mr;
 
 extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
-                                                       int max_pool_size_percent)
+                                                       int max_pool_size_percent,
+                                                       bool managed)
 {
   return cuvs::core::translate_exceptions([=] {
     // Upstream memory resource needs to be a cuda_memory_resource
@@ -95,10 +102,22 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
     if (cuda_mr_casted == nullptr) {
       throw std::runtime_error("Current memory resource is not a cuda_memory_resource");
     }
+
     auto initial_size = rmm::percent_of_free_device_memory(initial_pool_size_percent);
     auto max_size     = rmm::percent_of_free_device_memory(max_pool_size_percent);
-    pool_mr = std::make_unique<rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource>>(
-      cuda_mr_casted, initial_size, max_size);
+
+    auto mr = std::shared_ptr<rmm::mr::device_memory_resource>();
+    if (managed) {
+      mr = std::static_pointer_cast<rmm::mr::device_memory_resource>(
+        std::make_shared<rmm::mr::managed_memory_resource>());
+    } else {
+      mr = std::static_pointer_cast<rmm::mr::device_memory_resource>(
+        std::make_shared<rmm::mr::cuda_memory_resource>());
+    }
+
+    pool_mr =
+      rmm::mr::make_owning_wrapper<rmm::mr::pool_memory_resource>(mr, initial_size, max_size);
+
     rmm::mr::set_current_device_resource(pool_mr.get());
   });
 }
