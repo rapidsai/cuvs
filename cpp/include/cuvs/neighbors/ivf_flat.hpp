@@ -304,6 +304,12 @@ struct index : cuvs::neighbors::index {
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -326,6 +332,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -351,6 +363,12 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -373,6 +391,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -398,6 +422,12 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -420,6 +450,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -444,6 +480,12 @@ void build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
@@ -474,6 +516,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
@@ -506,6 +554,12 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
@@ -535,6 +589,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
@@ -567,6 +627,12 @@ void build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
+ *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
  * overlapping.
@@ -596,6 +662,12 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
+ *
+ * NB: Currently, the following distance metrics are supported:
+ * - L2Expanded
+ * - L2Unexpanded
+ * - InnerProduct
+ * - CosineExpanded
  *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy

@@ -29,10 +29,12 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace hashmap {
 
-_RAFT_HOST_DEVICE inline uint32_t get_size(const uint32_t bitlen) { return 1U << bitlen; }
+RAFT_INLINE_FUNCTION uint32_t get_size(const uint32_t bitlen) { return 1U << bitlen; }
 
 template <class IdxT>
-_RAFT_DEVICE inline void init(IdxT* const table, const unsigned bitlen, unsigned FIRST_TID = 0)
+RAFT_DEVICE_INLINE_FUNCTION void init(IdxT* const table,
+                                      const unsigned bitlen,
+                                      unsigned FIRST_TID = 0)
 {
   if (threadIdx.x < FIRST_TID) return;
   for (unsigned i = threadIdx.x - FIRST_TID; i < get_size(bitlen); i += blockDim.x - FIRST_TID) {
@@ -41,7 +43,9 @@ _RAFT_DEVICE inline void init(IdxT* const table, const unsigned bitlen, unsigned
 }
 
 template <class IdxT>
-_RAFT_DEVICE inline uint32_t insert(IdxT* const table, const uint32_t bitlen, const IdxT key)
+RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
+                                            const uint32_t bitlen,
+                                            const IdxT key)
 {
   // Open addressing is used for collision resolution
   const uint32_t size     = get_size(bitlen);
@@ -68,11 +72,25 @@ _RAFT_DEVICE inline uint32_t insert(IdxT* const table, const uint32_t bitlen, co
 }
 
 template <unsigned TEAM_SIZE, class IdxT>
-_RAFT_DEVICE inline uint32_t insert(IdxT* const table, const uint32_t bitlen, const IdxT key)
+RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
+                                            const uint32_t bitlen,
+                                            const IdxT key)
 {
   IdxT ret = 0;
   if (threadIdx.x % TEAM_SIZE == 0) { ret = insert(table, bitlen, key); }
   for (unsigned offset = 1; offset < TEAM_SIZE; offset *= 2) {
+    ret |= __shfl_xor_sync(0xffffffff, ret, offset);
+  }
+  return ret;
+}
+
+template <class IdxT>
+RAFT_DEVICE_INLINE_FUNCTION uint32_t
+insert(unsigned team_size, IdxT* const table, const uint32_t bitlen, const IdxT key)
+{
+  IdxT ret = 0;
+  if (threadIdx.x % team_size == 0) { ret = insert(table, bitlen, key); }
+  for (unsigned offset = 1; offset < team_size; offset *= 2) {
     ret |= __shfl_xor_sync(0xffffffff, ret, offset);
   }
   return ret;

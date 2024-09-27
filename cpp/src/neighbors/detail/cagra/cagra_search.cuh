@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "compute_distance_vpq.cuh"
 #include "factory.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta_inst.cuh"
@@ -85,29 +84,22 @@ inline
   return filter;
 }
 
-template <typename DatasetDescriptorT, typename CagraSampleFilterT>
-void search_main_core(
-  raft::resources const& res,
-  search_params params,
-  DatasetDescriptorT dataset_desc,
-  raft::device_matrix_view<const typename DatasetDescriptorT::INDEX_T, int64_t, raft::row_major>
-    graph,
-  raft::device_matrix_view<const typename DatasetDescriptorT::DATA_T, int64_t, raft::row_major>
-    queries,
-  raft::device_matrix_view<typename DatasetDescriptorT::INDEX_T, int64_t, raft::row_major>
-    neighbors,
-  raft::device_matrix_view<typename DatasetDescriptorT::DISTANCE_T, int64_t, raft::row_major>
-    distances,
-  CagraSampleFilterT sample_filter    = CagraSampleFilterT(),
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+template <typename DataT, typename IndexT, typename DistanceT, typename CagraSampleFilterT>
+void search_main_core(raft::resources const& res,
+                      search_params params,
+                      const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+                      raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
+                      raft::device_matrix_view<const DataT, int64_t, raft::row_major> queries,
+                      raft::device_matrix_view<IndexT, int64_t, raft::row_major> neighbors,
+                      raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
+                      CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
   RAFT_LOG_DEBUG("# dataset size = %lu, dim = %lu\n",
-                 static_cast<size_t>(dataset_desc.size),
-                 static_cast<size_t>(dataset_desc.dim));
+                 static_cast<size_t>(graph.extent(0)),
+                 static_cast<size_t>(queries.extent(1)));
   RAFT_LOG_DEBUG("# query size = %lu, dim = %lu\n",
                  static_cast<size_t>(queries.extent(0)),
                  static_cast<size_t>(queries.extent(1)));
-  RAFT_EXPECTS(queries.extent(1) == dataset_desc.dim, "Queries and index dim must match");
   const uint32_t topk = neighbors.extent(1);
 
   cudaDeviceProp deviceProp = raft::resource::get_device_properties(res);
@@ -119,12 +111,12 @@ void search_main_core(
     "cagra::search(max_queries = %u, k = %u, dim = %zu)",
     params.max_queries,
     topk,
-    dataset_desc.dim);
+    queries.extent(1));
 
   using CagraSampleFilterT_s = typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type;
-  std::unique_ptr<search_plan_impl<DatasetDescriptorT, CagraSampleFilterT_s>> plan =
-    factory<DatasetDescriptorT, CagraSampleFilterT_s>::create(
-      res, params, dataset_desc.dim, graph.extent(1), topk, metric);
+  std::unique_ptr<search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT_s>> plan =
+    factory<DataT, IndexT, DistanceT, CagraSampleFilterT_s>::create(
+      res, params, dataset_desc, queries.extent(1), graph.extent(1), topk);
 
   plan->check(topk);
 
@@ -134,21 +126,17 @@ void search_main_core(
 
   for (unsigned qid = 0; qid < queries.extent(0); qid += max_queries) {
     const uint32_t n_queries = std::min<std::size_t>(max_queries, queries.extent(0) - qid);
-    auto _topk_indices_ptr =
-      reinterpret_cast<typename DatasetDescriptorT::INDEX_T*>(neighbors.data_handle()) +
-      (topk * qid);
+    auto _topk_indices_ptr   = reinterpret_cast<IndexT*>(neighbors.data_handle()) + (topk * qid);
     auto _topk_distances_ptr = distances.data_handle() + (topk * qid);
     // todo(tfeher): one could keep distances optional and pass nullptr
     const auto* _query_ptr = queries.data_handle() + (query_dim * qid);
     const auto* _seed_ptr =
       plan->num_seeds > 0
-        ? reinterpret_cast<const typename DatasetDescriptorT::INDEX_T*>(plan->dev_seed.data()) +
-            (plan->num_seeds * qid)
+        ? reinterpret_cast<const IndexT*>(plan->dev_seed.data()) + (plan->num_seeds * qid)
         : nullptr;
     uint32_t* _num_executed_iterations = nullptr;
 
     (*plan)(res,
-            dataset_desc,
             graph,
             _topk_indices_ptr,
             _topk_distances_ptr,
@@ -158,77 +146,6 @@ void search_main_core(
             _num_executed_iterations,
             topk,
             set_offset(sample_filter, qid));
-  }
-}
-
-template <class T,
-          class DatasetT,
-          class DatasetIdxT,
-          class InternalIdxT,
-          class DistanceT,
-          class CagraSampleFilterT>
-void launch_vpq_search_main_core(
-  raft::resources const& res,
-  const vpq_dataset<DatasetT, DatasetIdxT>* vpq_dset,
-  search_params params,
-  raft::device_matrix_view<const InternalIdxT, int64_t, raft::row_major> graph,
-  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
-  raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
-  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
-  CagraSampleFilterT sample_filter,
-  const cuvs::distance::DistanceType metric)
-{
-  RAFT_EXPECTS(vpq_dset->pq_bits() == 8, "Only pq_bits = 8 is supported for now");
-  RAFT_EXPECTS(vpq_dset->pq_len() == 2 || vpq_dset->pq_len() == 4,
-               "Only pq_len 2 or 4 is supported for now");
-  RAFT_EXPECTS(vpq_dset->dim() % vpq_dset->pq_dim() == 0,
-               "dim must be a multiple of pq_dim at the moment");
-
-  const float vq_scale = 1.0f;
-  const float pq_scale = 1.0f;
-
-  if (vpq_dset->pq_bits() == 8) {
-    if (vpq_dset->pq_len() == 2) {
-      using dataset_desc_t = cagra_q_dataset_descriptor_t<T,
-                                                          DatasetT,
-                                                          8 /*PQ bit*/,
-                                                          2 /* Subspace dimension*/,
-                                                          DistanceT,
-                                                          InternalIdxT>;
-      dataset_desc_t dataset_desc(vpq_dset->data.data_handle(),
-                                  vpq_dset->encoded_row_length(),
-                                  vpq_dset->pq_dim(),
-                                  vpq_dset->vq_code_book.data_handle(),
-                                  vq_scale,
-                                  vpq_dset->pq_code_book.data_handle(),
-                                  pq_scale,
-                                  size_t(vpq_dset->n_rows()),
-                                  vpq_dset->dim());
-      search_main_core(
-        res, params, dataset_desc, graph, queries, neighbors, distances, sample_filter, metric);
-    } else if (vpq_dset->pq_len() == 4) {
-      using dataset_desc_t = cagra_q_dataset_descriptor_t<T,
-                                                          DatasetT,
-                                                          8 /*PQ bit*/,
-                                                          4 /* Subspace dimension*/,
-                                                          DistanceT,
-                                                          InternalIdxT>;
-      dataset_desc_t dataset_desc(vpq_dset->data.data_handle(),
-                                  vpq_dset->encoded_row_length(),
-                                  vpq_dset->pq_dim(),
-                                  vpq_dset->vq_code_book.data_handle(),
-                                  vq_scale,
-                                  vpq_dset->pq_code_book.data_handle(),
-                                  pq_scale,
-                                  size_t(vpq_dset->n_rows()),
-                                  vpq_dset->dim());
-      search_main_core(
-        res, params, dataset_desc, graph, queries, neighbors, distances, sample_filter, metric);
-    } else {
-      RAFT_FAIL("Subspace dimension must be 2 or 4");
-    }
-  } else {
-    RAFT_FAIL("Only 8-bit PQ is supported now");
   }
 }
 
@@ -264,6 +181,7 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  auto stream         = raft::resource::get_cuda_stream(res);
   const auto& graph   = index.graph();
   auto graph_internal = raft::make_device_matrix_view<const InternalIdxT, int64_t, raft::row_major>(
     reinterpret_cast<const InternalIdxT*>(graph.data_handle()), graph.extent(0), graph.extent(1));
@@ -273,39 +191,21 @@ void search_main(raft::resources const& res,
   // Dispatch search parameters based on the dataset kind.
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
-    // Set TEAM_SIZE and DATASET_BLOCK_SIZE to zero tentatively since these parameters cannot be
-    // determined here. They are set just before kernel launch.
-    using dataset_desc_t = standard_dataset_descriptor_t<T, InternalIdxT, DistanceT>;
     // Search using a plain (strided) row-major dataset
-    const dataset_desc_t dataset_desc(strided_dset->view().data_handle(),
-                                      strided_dset->n_rows(),
-                                      strided_dset->dim(),
-                                      strided_dset->stride());
-    search_main_core<dataset_desc_t, CagraSampleFilterT>(res,
-                                                         params,
-                                                         dataset_desc,
-                                                         graph_internal,
-                                                         queries,
-                                                         neighbors,
-                                                         distances,
-                                                         sample_filter,
-                                                         index.metric());
+    auto& desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
+      res, params, *strided_dset, index.metric());
+    search_main_core<T, InternalIdxT, DistanceT, CagraSampleFilterT>(
+      res, params, desc, graph_internal, queries, neighbors, distances, sample_filter);
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
     // Search using a compressed dataset
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
-    launch_vpq_search_main_core<T, half, ds_idx_type, InternalIdxT, DistanceT, CagraSampleFilterT>(
-      res,
-      vpq_dset,
-      params,
-      graph_internal,
-      queries,
-      neighbors,
-      distances,
-      sample_filter,
-      index.metric());
+    auto& desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
+      res, params, *vpq_dset, index.metric());
+    search_main_core<T, InternalIdxT, DistanceT, CagraSampleFilterT>(
+      res, params, desc, graph_internal, queries, neighbors, distances, sample_filter);
   } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(&index.data());
              empty_dset != nullptr) {
     // Forgot to add a dataset.

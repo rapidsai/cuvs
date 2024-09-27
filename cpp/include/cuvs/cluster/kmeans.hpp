@@ -120,6 +120,7 @@ struct params : base_params {
  * Simple object to specify hyper-parameters to the balanced k-means algorithm.
  *
  * The following metrics are currently supported in k-means balanced:
+ *  - CosineExpanded
  *  - InnerProduct
  *  - L2Expanded
  *  - L2SqrtExpanded

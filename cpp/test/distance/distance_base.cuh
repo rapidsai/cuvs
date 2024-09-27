@@ -18,7 +18,6 @@
 
 #include "../test_utils.cuh"
 
-#include <cuvs/distance/distance.hpp>
 #include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
 #include <raft/common/nvtx.hpp>         // raft::common::nvtx::range
 #include <raft/core/device_mdspan.hpp>  //raft::make_device_matrix_view
@@ -34,8 +33,18 @@
 namespace cuvs {
 namespace distance {
 
-template <typename DataType>
-RAFT_KERNEL naiveDistanceKernel(DataType* dist,
+template <typename T>
+_RAFT_DEVICE inline auto half2float(T& a)
+{
+  if constexpr (std::is_same_v<typename std::remove_const<T>::type, half>) {
+    return __half2float(a);
+  } else {
+    return a;
+  }
+}
+
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveDistanceKernel(OutputType* dist,
                                 const DataType* x,
                                 const DataType* y,
                                 std::int64_t m,
@@ -47,11 +56,11 @@ RAFT_KERNEL naiveDistanceKernel(DataType* dist,
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  DataType acc = DataType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto diff         = x[xidx] - y[yidx];
+    auto diff         = half2float(x[xidx]) - half2float(y[yidx]);
     acc += diff * diff;
   }
   if (type == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -61,8 +70,8 @@ RAFT_KERNEL naiveDistanceKernel(DataType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveL1_Linf_CanberraDistanceKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveL1_Linf_CanberraDistanceKernel(OutputType* dist,
                                                 const DataType* x,
                                                 const DataType* y,
                                                 std::int64_t m,
@@ -75,12 +84,12 @@ RAFT_KERNEL naiveL1_Linf_CanberraDistanceKernel(DataType* dist,
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) { return; }
 
-  DataType acc = DataType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     auto diff         = (a > b) ? (a - b) : (b - a);
     if (type == cuvs::distance::DistanceType::Linf) {
       acc = raft::max(acc, diff);
@@ -98,8 +107,8 @@ RAFT_KERNEL naiveL1_Linf_CanberraDistanceKernel(DataType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveCosineDistanceKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveCosineDistanceKernel(OutputType* dist,
                                       const DataType* x,
                                       const DataType* y,
                                       std::int64_t m,
@@ -111,15 +120,15 @@ RAFT_KERNEL naiveCosineDistanceKernel(DataType* dist,
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) { return; }
 
-  DataType acc_a  = DataType(0);
-  DataType acc_b  = DataType(0);
-  DataType acc_ab = DataType(0);
+  OutputType acc_a  = OutputType(0);
+  OutputType acc_b  = OutputType(0);
+  OutputType acc_ab = OutputType(0);
 
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     acc_a += a * a;
     acc_b += b * b;
     acc_ab += a * b;
@@ -128,11 +137,11 @@ RAFT_KERNEL naiveCosineDistanceKernel(DataType* dist,
   std::int64_t outidx = isRowMajor ? midx * n + nidx : midx + m * nidx;
 
   // Use 1.0 - (cosine similarity) to calc the distance
-  dist[outidx] = (DataType)1.0 - acc_ab / (raft::sqrt(acc_a) * raft::sqrt(acc_b));
+  dist[outidx] = (OutputType)1.0 - acc_ab / (raft::sqrt(acc_a) * raft::sqrt(acc_b));
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveInnerProductKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveInnerProductKernel(OutputType* dist,
                                     const DataType* x,
                                     const DataType* y,
                                     std::int64_t m,
@@ -144,13 +153,13 @@ RAFT_KERNEL naiveInnerProductKernel(DataType* dist,
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) { return; }
 
-  DataType acc_ab = DataType(0);
+  OutputType acc_ab = OutputType(0);
 
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     acc_ab += a * b;
   }
 
@@ -158,8 +167,8 @@ RAFT_KERNEL naiveInnerProductKernel(DataType* dist,
   dist[outidx]        = acc_ab;
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveHellingerDistanceKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveHellingerDistanceKernel(OutputType* dist,
                                          const DataType* x,
                                          const DataType* y,
                                          std::int64_t m,
@@ -171,13 +180,13 @@ RAFT_KERNEL naiveHellingerDistanceKernel(DataType* dist,
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) { return; }
 
-  DataType acc_ab = DataType(0);
+  OutputType acc_ab = OutputType(0);
 
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     acc_ab += raft::sqrt(a) * raft::sqrt(b);
   }
 
@@ -189,25 +198,25 @@ RAFT_KERNEL naiveHellingerDistanceKernel(DataType* dist,
   dist[outidx]   = raft::sqrt(rectifier * acc_ab);
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveLpUnexpDistanceKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveLpUnexpDistanceKernel(OutputType* dist,
                                        const DataType* x,
                                        const DataType* y,
                                        std::int64_t m,
                                        std::int64_t n,
                                        std::int64_t k,
                                        bool isRowMajor,
-                                       DataType p)
+                                       OutputType p)
 {
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  DataType acc = DataType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     auto diff         = raft::abs(a - b);
     acc += raft::pow(diff, p);
   }
@@ -217,8 +226,8 @@ RAFT_KERNEL naiveLpUnexpDistanceKernel(DataType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveHammingDistanceKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveHammingDistanceKernel(OutputType* dist,
                                        const DataType* x,
                                        const DataType* y,
                                        std::int64_t m,
@@ -229,12 +238,12 @@ RAFT_KERNEL naiveHammingDistanceKernel(DataType* dist,
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  DataType acc = DataType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     acc += (a != b);
   }
   acc                 = acc / k;
@@ -242,8 +251,8 @@ RAFT_KERNEL naiveHammingDistanceKernel(DataType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType>
-RAFT_KERNEL naiveJensenShannonDistanceKernel(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveJensenShannonDistanceKernel(OutputType* dist,
                                              const DataType* x,
                                              const DataType* y,
                                              std::int64_t m,
@@ -254,19 +263,19 @@ RAFT_KERNEL naiveJensenShannonDistanceKernel(DataType* dist,
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  DataType acc = DataType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
 
-    DataType m  = 0.5f * (a + b);
-    bool a_zero = a == 0;
-    bool b_zero = b == 0;
+    OutputType m = 0.5f * (a + b);
+    bool a_zero  = a == 0;
+    bool b_zero  = b == 0;
 
-    DataType p = (!a_zero * m) / (a_zero + a);
-    DataType q = (!b_zero * m) / (b_zero + b);
+    OutputType p = (!a_zero * m) / (a_zero + a);
+    OutputType q = (!b_zero * m) / (b_zero + b);
 
     bool p_zero = p == 0;
     bool q_zero = q == 0;
@@ -278,8 +287,8 @@ RAFT_KERNEL naiveJensenShannonDistanceKernel(DataType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType, typename OutType>
-RAFT_KERNEL naiveRussellRaoDistanceKernel(OutType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveRussellRaoDistanceKernel(OutputType* dist,
                                           const DataType* x,
                                           const DataType* y,
                                           std::int64_t m,
@@ -290,12 +299,12 @@ RAFT_KERNEL naiveRussellRaoDistanceKernel(OutType* dist,
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  OutType acc = OutType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     acc += (a * b);
   }
   acc                 = (k - acc) / k;
@@ -303,8 +312,8 @@ RAFT_KERNEL naiveRussellRaoDistanceKernel(OutType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType, typename OutType>
-RAFT_KERNEL naiveKLDivergenceDistanceKernel(OutType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveKLDivergenceDistanceKernel(OutputType* dist,
                                             const DataType* x,
                                             const DataType* y,
                                             std::int64_t m,
@@ -315,12 +324,12 @@ RAFT_KERNEL naiveKLDivergenceDistanceKernel(OutType* dist,
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  OutType acc = OutType(0);
+  OutputType acc = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     bool b_zero       = (b == 0);
     bool a_zero       = (a == 0);
     acc += a * (log(a + a_zero) - log(b + b_zero));
@@ -330,8 +339,8 @@ RAFT_KERNEL naiveKLDivergenceDistanceKernel(OutType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType, typename OutType>
-RAFT_KERNEL naiveCorrelationDistanceKernel(OutType* dist,
+template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveCorrelationDistanceKernel(OutputType* dist,
                                            const DataType* x,
                                            const DataType* y,
                                            std::int64_t m,
@@ -342,16 +351,16 @@ RAFT_KERNEL naiveCorrelationDistanceKernel(OutType* dist,
   std::int64_t midx = threadIdx.x + blockIdx.x * blockDim.x;
   std::int64_t nidx = threadIdx.y + blockIdx.y * blockDim.y;
   if (midx >= m || nidx >= n) return;
-  OutType acc    = OutType(0);
-  auto a_norm    = DataType(0);
-  auto b_norm    = DataType(0);
-  auto a_sq_norm = DataType(0);
-  auto b_sq_norm = DataType(0);
+  OutputType acc = OutputType(0);
+  auto a_norm    = OutputType(0);
+  auto b_norm    = OutputType(0);
+  auto a_sq_norm = OutputType(0);
+  auto b_sq_norm = OutputType(0);
   for (std::int64_t i = 0; i < k; ++i) {
     std::int64_t xidx = isRowMajor ? i + midx * k : i * m + midx;
     std::int64_t yidx = isRowMajor ? i + nidx * k : i * n + nidx;
-    auto a            = x[xidx];
-    auto b            = y[yidx];
+    auto a            = half2float(x[xidx]);
+    auto b            = half2float(y[yidx]);
     a_norm += a;
     b_norm += b;
     a_sq_norm += (a * a);
@@ -369,8 +378,8 @@ RAFT_KERNEL naiveCorrelationDistanceKernel(OutType* dist,
   dist[outidx]        = acc;
 }
 
-template <typename DataType>
-void naiveDistance(DataType* dist,
+template <typename DataType, typename OutputType = DataType>
+void naiveDistance(OutputType* dist,
                    const DataType* x,
                    const DataType* y,
                    std::int64_t m,
@@ -378,8 +387,8 @@ void naiveDistance(DataType* dist,
                    std::int64_t k,
                    cuvs::distance::DistanceType type,
                    bool isRowMajor,
-                   DataType metric_arg = 2.0f,
-                   cudaStream_t stream = 0)
+                   OutputType metric_arg = 2.0f,
+                   cudaStream_t stream   = 0)
 {
   static const dim3 TPB(4, 256, 1);
   dim3 nblks(raft::ceildiv(m, (std::int64_t)TPB.x), raft::ceildiv(n, (std::int64_t)TPB.y), 1);
@@ -388,49 +397,50 @@ void naiveDistance(DataType* dist,
     case cuvs::distance::DistanceType::Canberra:
     case cuvs::distance::DistanceType::Linf:
     case cuvs::distance::DistanceType::L1:
-      naiveL1_Linf_CanberraDistanceKernel<DataType>
+      naiveL1_Linf_CanberraDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, type, isRowMajor);
       break;
     case cuvs::distance::DistanceType::L2SqrtUnexpanded:
     case cuvs::distance::DistanceType::L2Unexpanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded:
-      naiveDistanceKernel<DataType>
+      naiveDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, type, isRowMajor);
       break;
     case cuvs::distance::DistanceType::CosineExpanded:
-      naiveCosineDistanceKernel<DataType>
+      naiveCosineDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::HellingerExpanded:
-      naiveHellingerDistanceKernel<DataType>
+      naiveHellingerDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::LpUnexpanded:
-      naiveLpUnexpDistanceKernel<DataType>
+      naiveLpUnexpDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor, metric_arg);
       break;
     case cuvs::distance::DistanceType::HammingUnexpanded:
-      naiveHammingDistanceKernel<DataType>
+      naiveHammingDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::InnerProduct:
-      naiveInnerProductKernel<DataType><<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
+      naiveInnerProductKernel<DataType, OutputType>
+        <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::JensenShannon:
-      naiveJensenShannonDistanceKernel<DataType>
+      naiveJensenShannonDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::RusselRaoExpanded:
-      naiveRussellRaoDistanceKernel<DataType>
+      naiveRussellRaoDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::KLDivergence:
-      naiveKLDivergenceDistanceKernel<DataType>
+      naiveKLDivergenceDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     case cuvs::distance::DistanceType::CorrelationExpanded:
-      naiveCorrelationDistanceKernel<DataType>
+      naiveCorrelationDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     default: FAIL() << "should be here\n";
@@ -438,13 +448,13 @@ void naiveDistance(DataType* dist,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
-template <typename DataType>
+template <typename DataType, typename OutputType = DataType>
 struct DistanceInputs {
-  DataType tolerance;
+  OutputType tolerance;
   std::int64_t m, n, k;
   bool isRowMajor;
   unsigned long long int seed;
-  DataType metric_arg = 2.0f;
+  OutputType metric_arg = 2.0f;
 };
 
 template <typename DataType>
@@ -472,31 +482,38 @@ constexpr bool layout_to_row_major<raft::layout_f_contiguous>()
   return false;
 }
 
-template <cuvs::distance::DistanceType distanceType, typename DataType, typename layout>
+template <cuvs::distance::DistanceType distanceType,
+          typename DataType,
+          typename Layout,
+          typename OutputType = float>
 void distanceLauncher(raft::resources const& handle,
                       DataType* x,
                       DataType* y,
-                      DataType* dist,
-                      DataType* dist2,
+                      OutputType* dist,
+                      OutputType* dist2,
                       std::int64_t m,
                       std::int64_t n,
                       std::int64_t k,
-                      DistanceInputs<DataType>& params,
-                      DataType threshold,
-                      DataType metric_arg = 2.0f)
+                      DistanceInputs<OutputType>& params,
+                      OutputType threshold,
+                      OutputType metric_arg = 2.0f)
 {
-  auto x_v    = raft::make_device_matrix_view<DataType, std::int64_t, layout>(x, m, k);
-  auto y_v    = raft::make_device_matrix_view<DataType, std::int64_t, layout>(y, n, k);
-  auto dist_v = raft::make_device_matrix_view<DataType, std::int64_t, layout>(dist, m, n);
+  // Create device matrix views for the input and output data
+  auto x_v    = raft::make_device_matrix_view<DataType, std::int64_t, Layout>(x, m, k);
+  auto y_v    = raft::make_device_matrix_view<DataType, std::int64_t, Layout>(y, n, k);
+  auto dist_v = raft::make_device_matrix_view<OutputType, std::int64_t, Layout>(dist, m, n);
 
+  // Explicitly instantiate the template function
   cuvs::distance::pairwise_distance(handle, x_v, y_v, dist_v, distanceType, metric_arg);
 }
 
-template <cuvs::distance::DistanceType distanceType, typename DataType>
-class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
+template <cuvs::distance::DistanceType distanceType,
+          typename DataType,
+          typename OutputType = DataType>
+class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType, OutputType>> {
  public:
   DistanceTest()
-    : params(::testing::TestWithParam<DistanceInputs<DataType>>::GetParam()),
+    : params(::testing::TestWithParam<DistanceInputs<OutputType>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       x(params.m * params.k, stream),
       y(params.n * params.k, stream),
@@ -513,11 +530,11 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
       "test::%s/%s", testInfo->test_suite_name(), testInfo->name());
 
     raft::random::RngState r(params.seed);
-    std::int64_t m      = params.m;
-    std::int64_t n      = params.n;
-    std::int64_t k      = params.k;
-    DataType metric_arg = params.metric_arg;
-    bool isRowMajor     = params.isRowMajor;
+    std::int64_t m        = params.m;
+    std::int64_t n        = params.n;
+    std::int64_t k        = params.k;
+    OutputType metric_arg = params.metric_arg;
+    bool isRowMajor       = params.isRowMajor;
     if (distanceType == cuvs::distance::DistanceType::HellingerExpanded ||
         distanceType == cuvs::distance::DistanceType::JensenShannon ||
         distanceType == cuvs::distance::DistanceType::KLDivergence) {
@@ -537,33 +554,33 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
     naiveDistance(
       dist_ref.data(), x.data(), y.data(), m, n, k, distanceType, isRowMajor, metric_arg, stream);
 
-    DataType threshold = -10000.f;
+    OutputType threshold = -10000.f;
 
     if (isRowMajor) {
-      distanceLauncher<distanceType, DataType, raft::layout_c_contiguous>(handle,
-                                                                          x.data(),
-                                                                          y.data(),
-                                                                          dist.data(),
-                                                                          dist2.data(),
-                                                                          m,
-                                                                          n,
-                                                                          k,
-                                                                          params,
-                                                                          threshold,
-                                                                          metric_arg);
+      distanceLauncher<distanceType, DataType, raft::layout_c_contiguous, OutputType>(handle,
+                                                                                      x.data(),
+                                                                                      y.data(),
+                                                                                      dist.data(),
+                                                                                      dist2.data(),
+                                                                                      m,
+                                                                                      n,
+                                                                                      k,
+                                                                                      params,
+                                                                                      threshold,
+                                                                                      metric_arg);
 
     } else {
-      distanceLauncher<distanceType, DataType, raft::layout_f_contiguous>(handle,
-                                                                          x.data(),
-                                                                          y.data(),
-                                                                          dist.data(),
-                                                                          dist2.data(),
-                                                                          m,
-                                                                          n,
-                                                                          k,
-                                                                          params,
-                                                                          threshold,
-                                                                          metric_arg);
+      distanceLauncher<distanceType, DataType, raft::layout_f_contiguous, OutputType>(handle,
+                                                                                      x.data(),
+                                                                                      y.data(),
+                                                                                      dist.data(),
+                                                                                      dist2.data(),
+                                                                                      m,
+                                                                                      n,
+                                                                                      k,
+                                                                                      params,
+                                                                                      threshold,
+                                                                                      metric_arg);
     }
     raft::resource::sync_stream(handle, stream);
   }
@@ -572,8 +589,9 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
   raft::resources handle;
   cudaStream_t stream;
 
-  DistanceInputs<DataType> params;
-  rmm::device_uvector<DataType> x, y, dist_ref, dist, dist2;
+  DistanceInputs<OutputType> params;
+  rmm::device_uvector<DataType> x, y;
+  rmm::device_uvector<OutputType> dist_ref, dist, dist2;
 };
 
 /*
@@ -583,12 +601,15 @@ class DistanceTest : public ::testing::TestWithParam<DistanceInputs<DataType>> {
  * It may happen that though both X and Y are same buffer but user passes
  * different dimensions for them like in case of tiled_brute_force_knn.
  */
-template <cuvs::distance::DistanceType distanceType, typename DataType>
-class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<DataType>> {
+template <cuvs::distance::DistanceType distanceType,
+          typename DataType,
+          typename OutputType = DataType>
+class DistanceTestSameBuffer
+  : public ::testing::TestWithParam<DistanceInputs<DataType, OutputType>> {
  public:
-  using dev_vector = rmm::device_uvector<DataType>;
+  using dev_vector = rmm::device_uvector<OutputType>;
   DistanceTestSameBuffer()
-    : params(::testing::TestWithParam<DistanceInputs<DataType>>::GetParam()),
+    : params(::testing::TestWithParam<DistanceInputs<OutputType>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
       x(params.m * params.k, stream),
       dist_ref({dev_vector(params.m * params.m, stream), dev_vector(params.m * params.m, stream)}),
@@ -604,11 +625,11 @@ class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<Da
       "test::%s/%s", testInfo->test_suite_name(), testInfo->name());
 
     raft::random::RngState r(params.seed);
-    std::int64_t m      = params.m;
-    std::int64_t n      = params.m;
-    std::int64_t k      = params.k;
-    DataType metric_arg = params.metric_arg;
-    bool isRowMajor     = params.isRowMajor;
+    std::int64_t m        = params.m;
+    std::int64_t n        = params.m;
+    std::int64_t k        = params.k;
+    OutputType metric_arg = params.metric_arg;
+    bool isRowMajor       = params.isRowMajor;
     if (distanceType == cuvs::distance::DistanceType::HellingerExpanded ||
         distanceType == cuvs::distance::DistanceType::JensenShannon ||
         distanceType == cuvs::distance::DistanceType::KLDivergence) {
@@ -637,33 +658,35 @@ class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<Da
                     metric_arg,
                     stream);
 
-      DataType threshold = -10000.f;
+      OutputType threshold = -10000.f;
 
       if (isRowMajor) {
-        distanceLauncher<distanceType, DataType, raft::layout_c_contiguous>(handle,
-                                                                            x.data(),
-                                                                            x.data(),
-                                                                            dist[i].data(),
-                                                                            dist2[i].data(),
-                                                                            m,
-                                                                            n,
-                                                                            k,
-                                                                            params,
-                                                                            threshold,
-                                                                            metric_arg);
+        distanceLauncher<distanceType, DataType, raft::layout_c_contiguous, OutputType>(
+          handle,
+          x.data(),
+          x.data(),
+          dist[i].data(),
+          dist2[i].data(),
+          m,
+          n,
+          k,
+          params,
+          threshold,
+          metric_arg);
 
       } else {
-        distanceLauncher<distanceType, DataType, raft::layout_f_contiguous>(handle,
-                                                                            x.data(),
-                                                                            x.data(),
-                                                                            dist[i].data(),
-                                                                            dist2[i].data(),
-                                                                            m,
-                                                                            n,
-                                                                            k,
-                                                                            params,
-                                                                            threshold,
-                                                                            metric_arg);
+        distanceLauncher<distanceType, DataType, raft::layout_f_contiguous, OutputType>(
+          handle,
+          x.data(),
+          x.data(),
+          dist[i].data(),
+          dist2[i].data(),
+          m,
+          n,
+          k,
+          params,
+          threshold,
+          metric_arg);
       }
     }
     raft::resource::sync_stream(handle, stream);
@@ -673,8 +696,8 @@ class DistanceTestSameBuffer : public ::testing::TestWithParam<DistanceInputs<Da
   raft::resources handle;
   cudaStream_t stream;
 
-  DistanceInputs<DataType> params;
-  dev_vector x;
+  DistanceInputs<OutputType> params;
+  rmm::device_uvector<DataType> x;
   static const std::int64_t N = 2;
   std::array<dev_vector, N> dist_ref, dist, dist2;
 };
