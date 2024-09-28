@@ -191,6 +191,49 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<float, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
 
+/**
+ * @brief Find clusters with k-means algorithm.
+ *   Initial centroids are chosen with k-means++ algorithm. Empty
+ *   clusters are reinitialized by choosing new centroids with
+ *   k-means++ algorithm.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
+ *   using namespace  cuvs::cluster;
+ *   ...
+ *   raft::resources handle;
+ *   cuvs::cluster::kmeans::params params;
+ *   int64_t n_features = 15, inertia, n_iter;
+ *   auto centroids = raft::make_device_matrix<float, int64_t>(handle, params.n_clusters,
+ * n_features);
+ *
+ *   kmeans::fit(handle,
+ *               params,
+ *               X,
+ *               std::nullopt,
+ *               centroids,
+ *               raft::make_scalar_view(&inertia),
+ *               raft::make_scalar_view(&n_iter));
+ * @endcode
+ *
+ * @param[in]     handle        The raft handle.
+ * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     X             Training instances to cluster. The data must
+ *                              be in row-major format.
+ *                              [dim = n_samples x n_features]
+ * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              [len = n_samples]
+ * @param[inout]  centroids     [in] When init is InitMethod::Array, use
+ *                              centroids as the initial cluster centers.
+ *                              [out] The generated centroids from the
+ *                              kmeans algorithm are stored at the address
+ *                              pointed by 'centroids'.
+ *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
+ * @param[out]    n_iter        Number of iterations run.
+ */
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const float, int64_t> X,
@@ -249,6 +292,49 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<double, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
 
+/**
+ * @brief Find clusters with k-means algorithm.
+ *   Initial centroids are chosen with k-means++ algorithm. Empty
+ *   clusters are reinitialized by choosing new centroids with
+ *   k-means++ algorithm.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
+ *   using namespace  cuvs::cluster;
+ *   ...
+ *   raft::resources handle;
+ *   cuvs::cluster::kmeans::params params;
+ *   int64_t n_features = 15, inertia, n_iter;
+ *   auto centroids = raft::make_device_matrix<double, int64_t>(handle, params.n_clusters,
+ * n_features);
+ *
+ *   kmeans::fit(handle,
+ *               params,
+ *               X,
+ *               std::nullopt,
+ *               centroids,
+ *               raft::make_scalar_view(&inertia),
+ *               raft::make_scalar_view(&n_iter));
+ * @endcode
+ *
+ * @param[in]     handle        The raft handle.
+ * @param[in]     params        Parameters for KMeans model.
+ * @param[in]     X             Training instances to cluster. The data must
+ *                              be in row-major format.
+ *                              [dim = n_samples x n_features]
+ * @param[in]     sample_weight Optional weights for each observation in X.
+ *                              [len = n_samples]
+ * @param[inout]  centroids     [in] When init is InitMethod::Array, use
+ *                              centroids as the initial cluster centers.
+ *                              [out] The generated centroids from the
+ *                              kmeans algorithm are stored at the address
+ *                              pointed by 'centroids'.
+ *                              [dim = n_clusters x n_features]
+ * @param[out]    inertia       Sum of squared distances of samples to their
+ *                              closest cluster center.
+ * @param[out]    n_iter        Number of iterations run.
+ */
 void fit(raft::resources const& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const double, int64_t> X,
