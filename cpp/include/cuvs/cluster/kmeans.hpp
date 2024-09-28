@@ -153,7 +153,7 @@ struct balanced_params : base_params {
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -203,7 +203,7 @@ void fit(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
  *
@@ -253,7 +253,7 @@ void fit(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -300,7 +300,7 @@ void fit(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::balanced_params params;
+ *   cuvs::cluster::kmeans::balanced_params params;
  *   int n_features = 15;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -334,7 +334,7 @@ void fit(const raft::resources& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::balanced_params params;
+ *   cuvs::cluster::kmeans::balanced_params params;
  *   int n_features = 15;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -367,7 +367,7 @@ void fit(const raft::resources& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -433,7 +433,7 @@ void predict(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
  *
@@ -499,7 +499,7 @@ void predict(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *
@@ -550,7 +550,7 @@ void predict(const raft::resources& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
@@ -613,7 +613,7 @@ void fit_predict(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::params params;
+ *   cuvs::cluster::kmeans::params params;
  *   int n_features = 15, inertia, n_iter;
  *   auto centroids = raft::make_device_matrix<double, int>(handle, params.n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
@@ -676,7 +676,7 @@ void fit_predict(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::balanced_params params;
+ *   cuvs::cluster::kmeans::balanced_params params;
  *   int n_features = 15;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
@@ -720,7 +720,7 @@ void fit_predict(const raft::resources& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *    cuvs::cluster::kmeans::balanced_params params;
+ *   cuvs::cluster::kmeans::balanced_params params;
  *   int n_features = 15;
  *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));

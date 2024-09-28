@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,22 @@
       FinOpT fin_op,                                                                   \
       cudaStream_t stream,                                                             \
       bool is_row_major)
+
+instantiate_raft_distance_detail_pairwise_matrix_dispatch(
+  cuvs::distance::detail::ops::l2_unexp_distance_op,
+  float,
+  float,
+  float,
+  cuvs::distance::kernels::detail::rbf_fin_op<float>,
+  int64_t);
+
+instantiate_raft_distance_detail_pairwise_matrix_dispatch(
+  cuvs::distance::detail::ops::l2_unexp_distance_op,
+  double,
+  double,
+  double,
+  cuvs::distance::kernels::detail::rbf_fin_op<double>,
+  int64_t);
 
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
   cuvs::distance::detail::ops::l2_unexp_distance_op,

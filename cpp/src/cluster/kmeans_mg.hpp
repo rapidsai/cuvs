@@ -22,7 +22,7 @@
 namespace cuvs::cluster::kmeans::mg {
 
 /**
- * @brief Find clusters with k-means algorithm.
+ * @brief MNMG kmeans fit
  *
  * @param[in]     handle        The raft handle.
  * @param[in]     params        Parameters for KMeans model.

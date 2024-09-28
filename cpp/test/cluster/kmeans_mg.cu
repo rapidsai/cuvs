@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/cluster/kmeans_mg.hpp>
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 
@@ -123,13 +123,14 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     auto X_view = raft::make_device_matrix_view<const T, int>(X.data(), n_samples, n_features);
     auto centroids_view =
       raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
-    cuvs::cluster::kmeans::mg::fit(handle,
-                                   params,
-                                   X_view,
-                                   d_sw,
-                                   centroids_view,
-                                   raft::make_host_scalar_view<T>(&inertia),
-                                   raft::make_host_scalar_view<int>(&n_iter));
+
+    cuvs::cluster::kmeans::fit(handle,
+                               params,
+                               X_view,
+                               d_sw,
+                               centroids_view,
+                               raft::make_host_scalar_view<T>(&inertia),
+                               raft::make_host_scalar_view<int>(&n_iter));
 
     cuvs::cluster::kmeans::predict(
       handle,
