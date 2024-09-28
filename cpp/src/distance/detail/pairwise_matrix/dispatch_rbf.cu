@@ -63,22 +63,6 @@ instantiate_raft_distance_detail_pairwise_matrix_dispatch(
 
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
   cuvs::distance::detail::ops::l2_unexp_distance_op,
-  float,
-  float,
-  float,
-  cuvs::distance::kernels::detail::rbf_fin_op<float>,
-  int64_t);
-
-instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
-  double,
-  double,
-  double,
-  cuvs::distance::kernels::detail::rbf_fin_op<double>,
-  int64_t);
-
-instantiate_raft_distance_detail_pairwise_matrix_dispatch(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
   half,
   float,
   float,
