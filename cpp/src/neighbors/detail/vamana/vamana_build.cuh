@@ -111,6 +111,14 @@ void batched_insert_vamana(
   int visited_size = params.visited_size;
   int queue_size   = params.queue_size;
 
+  if ((visited_size & (visited_size - 1)) != 0) {
+    RAFT_LOG_WARN("visited_size must be a power of 2, rounding up.");
+    int power = params.graph_degree;
+    while (power < visited_size)
+      power <<= 1;
+    visited_size = power;
+  }
+
   // create gpu graph and set to all -1s
   auto d_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph.extent(0), graph.extent(1));
   raft::linalg::map(res, d_graph.view(), raft::const_op<IdxT>{raft::upper_bound<IdxT>()});
@@ -248,7 +256,6 @@ void batched_insert_vamana(
         res, raft::resource::get_workspace_resource(res), raft::make_extents<int64_t>(1));
       prefix_sums_sizes<accT, IdxT>
         <<<1, 1, 0, stream>>>(query_list, step_size, d_total_edges.data_handle());
-      //      cudaDeviceSynchronize(); // TODO -remove?
 
       int total_edges;
       raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
@@ -370,8 +377,6 @@ index<T, IdxT> build(
   RAFT_EXPECTS(deg_size != std::end(DEGREE_SIZES), "Provided graph_degree not currently supported");
 
   RAFT_EXPECTS(params.visited_size > graph_degree, "visited_size must be > graph_degree");
-  RAFT_EXPECTS((params.visited_size & (params.visited_size - 1)) == 0,
-               "visited_size must be a power of 2");
 
   int dim = dataset.extent(1);
   // TODO - Fix issue with alignment when dataset dimension is odd

@@ -20,7 +20,7 @@ namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to compute the shared memory requirements for CUB primitives used by search and prune */
 #define COMPUTE_SMEM_SIZES(degree, visited_size, DEG, CANDS)                                     \
-  if (degree == DEG && visited_size == CANDS) {                                                  \
+  if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                      \
     search_smem_sort_size = static_cast<int>(                                                    \
       sizeof(typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>::TempStorage));  \
                                                                                                  \
@@ -44,7 +44,7 @@ namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to call the CUB BlockSort primitives for supported sizes for ROBUST_PRUNE*/
 #define PRUNE_CALL_SORT(degree, visited_list, DEG, CANDS)                                  \
-  if (degree == DEG && visited_list == CANDS) {                                            \
+  if (degree == DEG && visited_list <= CANDS && visited_list > CANDS / 2) {                \
     using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, (DEG + CANDS) / 32>;  \
     auto& sort_mem   = reinterpret_cast<typename BlockSortT::TempStorage&>(smem);          \
     sort_edges_and_cands<accT, IdxT, DEG, CANDS>(new_nbh_list, &query_list[i], &sort_mem); \
@@ -65,7 +65,7 @@ namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to call the CUB BlockSort primitives for supported sizes for GREEDY SEARCH */
 #define SEARCH_CALL_SORT(topk, CANDS)                                             \
-  if (topk == CANDS) {                                                            \
+  if (topk <= CANDS && topk > CANDS / 2) {                                        \
     using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>; \
     auto& sort_mem   = reinterpret_cast<typename BlockSortT::TempStorage&>(smem); \
     sort_visited<accT, IdxT, CANDS>(&query_list[i], &sort_mem);                   \
