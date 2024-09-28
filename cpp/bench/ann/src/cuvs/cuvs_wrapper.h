@@ -26,6 +26,7 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <stdint.h>
 #include <string>
 #include <type_traits>
 
