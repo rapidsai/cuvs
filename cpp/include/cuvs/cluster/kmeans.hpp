@@ -191,6 +191,14 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<float, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
 
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const float, int64_t> X,
+         std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
+         raft::device_matrix_view<float, int64_t> centroids,
+         raft::host_scalar_view<float, int64_t> inertia,
+         raft::host_scalar_view<int64_t, int64_t> n_iter);
+
 /**
  * @brief Find clusters with k-means algorithm.
  *   Initial centroids are chosen with k-means++ algorithm. Empty
@@ -240,6 +248,14 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<double, int> centroids,
          raft::host_scalar_view<double, int> inertia,
          raft::host_scalar_view<int, int> n_iter);
+
+void fit(raft::resources const& handle,
+         const cuvs::cluster::kmeans::params& params,
+         raft::device_matrix_view<const double, int64_t> X,
+         std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
+         raft::device_matrix_view<double, int64_t> centroids,
+         raft::host_scalar_view<double, int64_t> inertia,
+         raft::host_scalar_view<int64_t, int64_t> n_iter);
 
 /**
  * @brief Find clusters with k-means algorithm.
