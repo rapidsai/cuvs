@@ -29,8 +29,10 @@ void mutual_reachability_graph(const raft::resources& handle,
                                cuvs::distance::DistanceType metric,
                                float alpha)
 {
-  RAFT_EXPECTS(core_dists.extent(0) == X.extent(0), "core_dists doesn't have expected size");
-  RAFT_EXPECTS(indptr.extent(0) == X.extent(0) + 1, "indptr doesn't have expected size");
+  RAFT_EXPECTS(core_dists.extent(0) == static_cast<size_t>(X.extent(0)),
+               "core_dists doesn't have expected size");
+  RAFT_EXPECTS(indptr.extent(0) == static_cast<size_t>(X.extent(0) + 1),
+               "indptr doesn't have expected size");
 
   cuvs::neighbors::detail::reachability::mutual_reachability_graph<int, float>(
     handle,
