@@ -29,8 +29,9 @@ void mutual_reachability_graph(const raft::resources& handle,
                                cuvs::distance::DistanceType metric,
                                float alpha)
 {
-  // TODO: assert core_dists/indptr have right shape
-  // TODO: add test
+  RAFT_EXPECTS(core_dists.size() == X.extents(0));
+  RAFT_EXPECTS(indptr.size() == X.extents(0) + 1);
+
   cuvs::neighbors::detail::reachability::mutual_reachability_graph<int, float>(
     handle,
     X.data_handle(),
