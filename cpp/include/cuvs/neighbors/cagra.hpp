@@ -960,7 +960,7 @@ void extend(
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
- * for a given query. (nullptr for no filtering)
+ * for a given query. (none_cagra_sample_filter for no filtering)
  */
 
 void search(raft::resources const& res,
@@ -969,7 +969,8 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_cagra_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
@@ -985,7 +986,7 @@ void search(raft::resources const& res,
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
- * for a given query. (nullptr for no filtering)
+ * for a given query. (none_cagra_sample_filter for no filtering)
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -993,7 +994,8 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_cagra_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1009,7 +1011,7 @@ void search(raft::resources const& res,
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
- * for a given query. (nullptr for no filtering)
+ * for a given query. (none_cagra_sample_filter for no filtering)
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -1017,7 +1019,8 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_cagra_sample_filter{});
 
 /**
  * @}

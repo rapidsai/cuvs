@@ -632,7 +632,7 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto bitset_filter_obj =
       cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
     cuvs::neighbors::ivf_pq::search(
-      handle_, ps.search_params, index, query_view, inds_view, dists_view, &bitset_filter_obj);
+      handle_, ps.search_params, index, query_view, inds_view, dists_view, bitset_filter_obj);
 
     raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);

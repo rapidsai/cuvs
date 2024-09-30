@@ -803,7 +803,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
                       search_queries_view,
                       indices_out_view,
                       dists_out_view,
-                      &bitset_filter_obj);
+                      bitset_filter_obj);
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);

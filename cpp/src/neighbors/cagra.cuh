@@ -333,21 +333,26 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter_ptr)
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
-  if (sample_filter_ptr == nullptr ||
-      dynamic_cast<cuvs::neighbors::filtering::none_cagra_sample_filter*>(sample_filter_ptr)) {
-    using none_filter_type = cuvs::neighbors::filtering::none_cagra_sample_filter;
+  try {
+    using none_filter_type  = cuvs::neighbors::filtering::none_cagra_sample_filter;
+    auto& sample_filter     = dynamic_cast<const none_filter_type&>(sample_filter_ref);
+    auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, none_filter_type>(
-      res, params, idx, queries, neighbors, distances, none_filter_type{});
-  } else if (auto* bitset_filter_ptr =
-               dynamic_cast<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>*>(
-                 sample_filter_ptr)) {
-    return search_with_filtering<T,
-                                 IdxT,
-                                 cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>(
-      res, params, idx, queries, neighbors, distances, *bitset_filter_ptr);
-  } else {
+      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+    return;
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
+        sample_filter_ref);
+    auto sample_filter_copy = sample_filter;
+    return search_with_filtering<T, IdxT, decltype(sample_filter_copy)>(
+      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+  } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type");
   }
 }

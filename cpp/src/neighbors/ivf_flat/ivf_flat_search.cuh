@@ -404,22 +404,21 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
             raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
             raft::device_matrix_view<float, IdxT, raft::row_major> distances,
-            cuvs::neighbors::filtering::base_filter* sample_filter_ptr)
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
-  if (sample_filter_ptr == nullptr ||
-      dynamic_cast<cuvs::neighbors::filtering::none_ivf_sample_filter*>(sample_filter_ptr)) {
-    search_with_filtering(handle,
-                          params,
-                          idx,
-                          queries,
-                          neighbors,
-                          distances,
-                          cuvs::neighbors::filtering::none_ivf_sample_filter());
-  } else if (auto* bitset_filter_ptr =
-               dynamic_cast<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>*>(
-                 sample_filter_ptr)) {
-    search_with_filtering(handle, params, idx, queries, neighbors, distances, *bitset_filter_ptr);
-  } else {
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::none_ivf_sample_filter&>(sample_filter_ref);
+    return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
+        sample_filter_ref);
+    return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
+  } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type");
   }
 }
