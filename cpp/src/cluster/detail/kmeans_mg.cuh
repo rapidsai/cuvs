@@ -25,6 +25,7 @@
 #include <raft/core/kvp.hpp>
 #include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/thrust_policy.hpp>
 #include <raft/linalg/map_then_reduce.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
@@ -462,10 +463,54 @@ void initKMeansPlusPlus(const raft::resources& handle,
 }
 
 template <typename DataT, typename IndexT>
+void checkWeights(const raft::resources& handle,
+                  rmm::device_uvector<char>& workspace,
+                  raft::device_vector_view<DataT, IndexT> weight)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  rmm::device_scalar<DataT> wt_aggr(stream);
+
+  const auto& comm = raft::resource::get_comms(handle);
+
+  auto n_samples            = weight.extent(0);
+  size_t temp_storage_bytes = 0;
+  RAFT_CUDA_TRY(cub::DeviceReduce::Sum(
+    nullptr, temp_storage_bytes, weight.data_handle(), wt_aggr.data(), n_samples, stream));
+
+  workspace.resize(temp_storage_bytes, stream);
+
+  RAFT_CUDA_TRY(cub::DeviceReduce::Sum(
+    workspace.data(), temp_storage_bytes, weight.data_handle(), wt_aggr.data(), n_samples, stream));
+
+  comm.allreduce<DataT>(wt_aggr.data(),  // sendbuff
+                        wt_aggr.data(),  // recvbuff
+                        1,               // count
+                        raft::comms::op_t::SUM,
+                        stream);
+  DataT wt_sum = wt_aggr.value(stream);
+  raft::resource::sync_stream(handle, stream);
+
+  if (wt_sum != n_samples) {
+    CUVS_LOG_KMEANS(handle,
+                    "[Warning!] KMeans: normalizing the user provided sample weights to "
+                    "sum up to %d samples",
+                    n_samples);
+
+    DataT scale = n_samples / wt_sum;
+    raft::linalg::unaryOp(
+      weight.data_handle(),
+      weight.data_handle(),
+      weight.size(),
+      cuda::proclaim_return_type<DataT>([=] __device__(const DataT& wt) { return wt * scale; }),
+      stream);
+  }
+}
+
+template <typename DataT, typename IndexT>
 void fit(const raft::resources& handle,
          const cuvs::cluster::kmeans::params& params,
          raft::device_matrix_view<const DataT, IndexT> X,
-         raft::device_vector_view<const DataT, IndexT> weight,
+         std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
          raft::device_matrix_view<DataT, IndexT> centroids,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter,
@@ -477,6 +522,38 @@ void fit(const raft::resources& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = params.n_clusters;
   auto metric         = params.metric;
+
+  auto weight = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
+  if (sample_weight) {
+    raft::copy(weight.data_handle(), sample_weight->data_handle(), n_samples, stream);
+  } else {
+    thrust::fill(raft::resource::get_thrust_policy(handle),
+                 weight.data_handle(),
+                 weight.data_handle() + weight.size(),
+                 1);
+  }
+
+  // check if weights sum up to n_samples
+  checkWeights(handle, workspace, weight.view());
+
+  if (params.init == cuvs::cluster::kmeans::params::InitMethod::Random) {
+    // initializing with random samples from input dataset
+    CUVS_LOG_KMEANS(handle,
+                    "KMeans.fit: initialize cluster centers by randomly choosing from the "
+                    "input data.\n");
+    initRandom<DataT, IndexT>(handle, params, X, centroids);
+  } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus) {
+    // default method to initialize is kmeans++
+    CUVS_LOG_KMEANS(handle, "KMeans.fit: initialize cluster centers using k-means++ algorithm.\n");
+    initKMeansPlusPlus<DataT, IndexT>(handle, params, X, centroids, workspace);
+  } else if (params.init == cuvs::cluster::kmeans::params::InitMethod::Array) {
+    CUVS_LOG_KMEANS(handle,
+                    "KMeans.fit: initialize cluster centers from the ndarray array input "
+                    "passed to init argument.\n");
+
+  } else {
+    THROW("unknown initialization method to select initial centers");
+  }
 
   // stores (key, value) pair corresponding to each sample where
   //   - key is the index of nearest cluster

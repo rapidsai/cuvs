@@ -31,7 +31,7 @@ void fit(raft::resources const& handle,
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
   cuvs::cluster::kmeans::mg::detail::fit<float, int>(
-    handle, params, X, sample_weight.value(), centroids, inertia, n_iter, workspace);
+    handle, params, X, sample_weight, centroids, inertia, n_iter, workspace);
 }
 
 void fit(raft::resources const& handle,
@@ -45,6 +45,6 @@ void fit(raft::resources const& handle,
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
   cuvs::cluster::kmeans::mg::detail::fit<float, int64_t>(
-    handle, params, X, sample_weight.value(), centroids, inertia, n_iter, workspace);
+    handle, params, X, sample_weight, centroids, inertia, n_iter, workspace);
 }
 }  // namespace cuvs::cluster::kmeans::mg
