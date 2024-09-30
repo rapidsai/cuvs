@@ -615,6 +615,78 @@ auto build(raft::resources const& res,
  */
 auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
@@ -975,9 +1047,6 @@ void extend(
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] res raft resources
  * @param[in] params configure the search
  * @param[in] idx cagra index
@@ -1000,8 +1069,26 @@ void search(raft::resources const& res,
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ */
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -1023,9 +1110,6 @@ void search(raft::resources const& res,
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -1156,6 +1240,111 @@ void serialize(raft::resources const& handle,
 void deserialize(raft::resources const& handle,
                  std::istream& is,
                  cuvs::neighbors::cagra::index<float, uint32_t>* index);
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, filename, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ *
+ */
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+
+ * cuvs::neighbors::cagra::index<half, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
+
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               std::ostream& os,
+               const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * cuvs::neighbors::cagra::index<half, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, is, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
 
 /**
  * Save the index to file.

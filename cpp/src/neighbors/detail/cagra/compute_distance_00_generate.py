@@ -66,8 +66,6 @@ search_types = dict(
     half_uint32=("half", "uint32_t", "float"),
     int8_uint32=("int8_t", "uint32_t", "float"),
     uint8_uint32=("uint8_t", "uint32_t", "float"),
-    # float_uint64=("float", "uint64_t", "float"),
-    # half_uint64=("half", "uint64_t", "float"),
 )
 
 metric_prefix = 'DistanceType::'
