@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
+#include "./detail/kmeans_mg.cuh"
 #include "kmeans_mg.hpp"
-#include "kmeans_mg_impl.cuh"
 #include <raft/core/resources.hpp>
 
 namespace cuvs::cluster::kmeans::mg {

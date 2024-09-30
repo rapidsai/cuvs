@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "kmeans.cuh"
+#include "../kmeans.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_mdarray.hpp>
