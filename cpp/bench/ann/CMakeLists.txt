@@ -199,30 +199,19 @@ if(NOT TARGET CUVS_ANN_BENCH_ALL)
 endif()
 
 if(CUVS_ANN_BENCH_USE_HNSWLIB)
-  ConfigureAnnBench(
-    NAME HNSWLIB PATH src/hnswlib/hnswlib_benchmark.cpp LINKS hnswlib::hnswlib
-  )
+  ConfigureAnnBench(NAME HNSWLIB PATH src/hnswlib/hnswlib_benchmark.cpp LINKS hnswlib::hnswlib)
 
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigureAnnBench(
-    NAME CUVS_IVF_PQ
-    PATH
-    src/cuvs/cuvs_benchmark.cu
-    src/cuvs/cuvs_ivf_pq.cu
-    LINKS cuvs
+    NAME CUVS_IVF_PQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_pq.cu LINKS cuvs
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   ConfigureAnnBench(
-    NAME CUVS_IVF_FLAT
-    PATH
-    src/cuvs/cuvs_benchmark.cu
-    src/cuvs/cuvs_ivf_flat.cu
-    LINKS
-    cuvs
+    NAME CUVS_IVF_FLAT PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_flat.cu LINKS cuvs
   )
 endif()
 
@@ -232,12 +221,8 @@ endif()
 
 if(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE)
   ConfigureAnnBench(
-    NAME
-    CUVS_KNN_BRUTE_FORCE
-    PATH
-    $<$<BOOL:${CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE}>:src/cuvs/cuvs_brute_force_knn.cu>
-    LINKS
-    cuvs
+    NAME CUVS_KNN_BRUTE_FORCE PATH
+    $<$<BOOL:${CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE}>:src/cuvs/cuvs_brute_force_knn.cu> LINKS cuvs
   )
 endif()
 
@@ -258,8 +243,7 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
   ConfigureAnnBench(
-    NAME CUVS_CAGRA_HNSWLIB PATH src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs
-    hnswlib::hnswlib
+    NAME CUVS_CAGRA_HNSWLIB PATH src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs hnswlib::hnswlib
   )
 endif()
 
@@ -267,36 +251,31 @@ message("CUVS_FAISS_TARGETS: ${CUVS_FAISS_TARGETS}")
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT)
   ConfigureAnnBench(
-    NAME FAISS_CPU_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_CPU_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT)
   ConfigureAnnBench(
-    NAME FAISS_CPU_IVF_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_CPU_IVF_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ)
   ConfigureAnnBench(
-    NAME FAISS_CPU_IVF_PQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_CPU_IVF_PQ PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS
-    ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
   )
 endif()
 
@@ -322,13 +301,8 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
 
   target_link_libraries(
     ANN_BENCH
-    PRIVATE raft::raft
-            nlohmann_json::nlohmann_json
-            benchmark::benchmark
-            dl
-            fmt::fmt-header-only
-            spdlog::spdlog_header_only
-            $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
+    PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl fmt::fmt-header-only
+            spdlog::spdlog_header_only $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
   )
   set_target_properties(
     ANN_BENCH

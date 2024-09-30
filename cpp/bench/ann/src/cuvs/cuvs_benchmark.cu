@@ -121,7 +121,7 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
 };  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
-// REGISTER_ALGO_INSTANCE(half);
+REGISTER_ALGO_INSTANCE(half);
 REGISTER_ALGO_INSTANCE(std::int8_t);
 REGISTER_ALGO_INSTANCE(std::uint8_t);
 

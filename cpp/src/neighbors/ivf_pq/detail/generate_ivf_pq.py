@@ -57,6 +57,7 @@ footer = """
 
 types = dict(
     float_int64_t=("float", "int64_t"),
+    half_int64_t=("half", "int64_t"),
     int8_t_int64_t=("int8_t", "int64_t"),
     uint8_t_int64_t=("uint8_t", "int64_t"),
 )
@@ -71,7 +72,7 @@ search_macro = """
               raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \\
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \\
               raft::device_matrix_view<float, IdxT, raft::row_major> distances, \\
-              const cuvs::neighbors::filtering::base_filter& sample_filter_ref)       \\
+              const cuvs::neighbors::filtering::base_filter& sample_filter_ref) \\
   {                                                                             \\
     cuvs::neighbors::ivf_pq::detail::search(                                    \\
       handle, params, index, queries, neighbors, distances, sample_filter_ref); \\
