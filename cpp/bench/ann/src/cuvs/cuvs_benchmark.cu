@@ -110,12 +110,14 @@ auto create_algo(const std::string& algo_name,
   }
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_MG
-
-  if (algo_name == "raft_mg_ivf_flat" || algo_name == "cuvs_mg_ivf_flat") {
-    typename cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>::build_param param;
-    parse_build_param<T, int64_t>(conf, param);
-    add_distribution_mode(&param.mode, conf);
-    a = std::make_unique<cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>>(metric, dim, param);
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
+                std::is_same_v<T, int8_t>) {
+    if (algo_name == "raft_mg_ivf_flat" || algo_name == "cuvs_mg_ivf_flat") {
+      typename cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>::build_param param;
+      parse_build_param<T, int64_t>(conf, param);
+      add_distribution_mode(&param.mode, conf);
+      a = std::make_unique<cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>>(metric, dim, param);
+    }
   }
 
   if (algo_name == "raft_mg_ivf_pq" || algo_name == "cuvs_mg_ivf_pq") {
