@@ -50,8 +50,7 @@ namespace cuvs::neighbors::vamana::detail {
 template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_name,
-               const index<T, IdxT>& index_,
-               bool include_dataset)
+               const index<T, IdxT>& index_)
 {
   // Write graph to first index file (format from MSFT DiskANN OSS)
   std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
@@ -92,7 +91,9 @@ void serialize(raft::resources const& res,
     total_edges += node_edges;
 
     index_of.write((char*)&node_edges, sizeof(uint32_t));
-    // Need to convert graph edges to uint32_t??
+    if constexpr (!std::is_same_v<IdxT, uint32_t>) {
+      RAFT_FAIL("serialization is only implemented for uint32_t graph");
+    }
     index_of.write((char*)&h_graph(i, 0), node_edges * sizeof(uint32_t));
 
     max_degree = node_edges > max_degree ? (uint32_t)node_edges : max_degree;

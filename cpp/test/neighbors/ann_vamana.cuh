@@ -122,7 +122,6 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
       (const DataT*)database.data(), ps.n_rows, ps.dim);
 
-    //        {
     vamana::index<DataT, IdxT> index(handle_);
     if (ps.host_dataset) {
       auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
@@ -137,9 +136,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
     CheckGraph<DataT, IdxT>(&index, ps, stream_);
 
-    // Can we test serialize here without deserialize implemented?
-    //          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
-    //        }
+    vamana::serialize(handle_, "vamana_index", index);
   }
 
   void SetUp() override

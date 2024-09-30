@@ -411,15 +411,13 @@ __global__ void create_reverse_edge_list(
 // Populate reverse edge QueryCandidates structure based on sorted edge list and unique indices
 // values
 template <typename T, typename accT, typename IdxT = uint32_t>
-__global__ void populate_reverse_list_struct(
-  QueryCandidates<IdxT, accT>* reverse_list,
-  //     raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  IdxT* edge_src,
-  IdxT* edge_dest,
-  int* unique_indices,
-  int unique_dests,
-  int total_edges,
-  int N)
+__global__ void populate_reverse_list_struct(QueryCandidates<IdxT, accT>* reverse_list,
+                                             IdxT* edge_src,
+                                             IdxT* edge_dest,
+                                             int* unique_indices,
+                                             int unique_dests,
+                                             int total_edges,
+                                             int N)
 {
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < unique_dests;
        i += blockDim.x * gridDim.x) {
@@ -453,9 +451,9 @@ __global__ void recompute_reverse_dists(
   QueryCandidates<IdxT, accT>* reverse_list,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   int unique_dests,
-  int dim,
   cuvs::distance::DistanceType metric)
 {
+  int dim          = dataset.extent(1);
   const T* vec_ptr = dataset.data_handle();
 
   for (int i = blockIdx.x; i < unique_dests; i += gridDim.x) {

@@ -106,7 +106,8 @@ __forceinline__ __device__ void sort_edges_and_cands(
 /********************************************************************************************
   GPU kernel for RobustPrune operation for Vamana graph creation
   Input - *graph to be an edgelist of degree number of edges per vector,
-  query_list should contain the list of visited nodes during GreedySearch
+  query_list should contain the list of visited nodes during GreedySearch.
+  All inputs, including dataset, must be device accessible.
 
   Output - candidate_ptr contains the new set of *degree* new neighbors that each node
            should have.
@@ -121,17 +122,16 @@ __global__ void RobustPruneKernel(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   void* query_list_ptr,
   int num_queries,
-  int degree,
   int visited_size,
-  int n,
   cuvs::distance::DistanceType metric,
   float alpha,
-  int dim,
   int sort_smem_size)
 {
+  int n      = dataset.extent(0);
+  int dim    = dataset.extent(1);
+  int degree = graph.extent(1);
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
-  const T* vec_ptr = dataset.data_handle();
 
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
@@ -154,7 +154,7 @@ __global__ void RobustPruneKernel(
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     int queryId = query_list[i].queryId;
 
-    update_shared_point<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim);
+    update_shared_point<T, accT>(&s_query, &dataset(0, 0), query_list[i].queryId, dim);
 
     // Load new neighbors to be sorted with candidates
     for (int j = threadIdx.x; j < degree; j += blockDim.x) {
@@ -163,8 +163,8 @@ __global__ void RobustPruneKernel(
     __syncthreads();
     for (int j = 0; j < degree; j++) {
       if (new_nbh_list[j].idx != raft::upper_bound<IdxT>()) {
-        new_nbh_list[j].dist = dist<T, accT>(
-          s_query.coords, &vec_ptr[(size_t)new_nbh_list[j].idx * (size_t)dim], dim, metric);
+        new_nbh_list[j].dist =
+          dist<T, accT>(s_query.coords, &dataset((size_t)new_nbh_list[j].idx, 0), dim, metric);
       } else {
         new_nbh_list[j].dist = raft::upper_bound<accT>();
       }
@@ -213,11 +213,11 @@ __global__ void RobustPruneKernel(
         writeId++;
         __syncthreads();
 
-        update_shared_point<T, accT>(&s_query, vec_ptr, new_nbh_list[j].idx, dim);
+        update_shared_point<T, accT>(&s_query, &dataset(0, 0), new_nbh_list[j].idx, dim);
 
         int tot_size = degree + query_list[i].size;
         for (int k = j + 1; k < tot_size; k++) {
-          T* mem_ptr = const_cast<T*>(&vec_ptr[(size_t)new_nbh_list[k].idx * (size_t)dim]);
+          T* mem_ptr = const_cast<T*>(&dataset((size_t)new_nbh_list[k].idx, 0));
           if (new_nbh_list[k].idx != raft::upper_bound<IdxT>()) {
             accT dist_starprime = dist<T, accT>(s_query.coords, mem_ptr, dim, metric);
             // TODO - create cosine and selector fcn

@@ -64,7 +64,7 @@ namespace cuvs::neighbors::vamana {
  *   // create and fill the index from a [N, D] dataset
  *   auto index = vamana::build(res, index_params, dataset);
  *   // write graph to file for later use.
-     vamana.serialize(res, filename, index, false);
+     vamana.serialize(res, filename, index);
  * @endcode
  *
  * @tparam T data element type
@@ -91,10 +91,9 @@ index<T, IdxT> build(
 template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_prefix,
-               const index<T, IdxT>& index_,
-               bool include_dataset)
+               const index<T, IdxT>& index_)
 {
-  cuvs::neighbors::vamana::detail::build<T, IdxT>(res, file_prefix, index_, include_dataset);
+  cuvs::neighbors::vamana::detail::build<T, IdxT>(res, file_prefix, index_);
 }
 
 /** @} */  // end group vamana

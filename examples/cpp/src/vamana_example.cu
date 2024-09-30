@@ -99,10 +99,10 @@ int main(int argc, char *argv[]) {
 
   // Read in binary dataset file
   auto dataset =
-      read_bin_dataset<float, int64_t>(dev_resources, data_fname, INT_MAX);
+      read_bin_dataset<uint8_t, int64_t>(dev_resources, data_fname, INT_MAX);
 
   // Simple build example to create graph and write to a file
-  vamana_build_and_write<float>(
+  vamana_build_and_write<uint8_t>(
       dev_resources, raft::make_const_mdspan(dataset.view()), out_fname, degree,
       max_visited, max_fraction, iters);
 }

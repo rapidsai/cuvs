@@ -66,7 +66,7 @@ __forceinline__ __device__ void sort_visited(
   GPU kernel to perform a batched GreedySearch on a graph. Since this is used for
   Vamana construction, the entire visited list is kept and stored within the query_list.
   Input - graph with edge lists, dataset vectors, query_list_ptr with the ids of dataset
-          vectors to be searched.
+          vectors to be searched. All inputs, including dataset,  must be device accessible.
 
   Output - the id and dist lists in query_list_ptr will be updated with the nodes visited
            during the GreedySearch.
@@ -82,17 +82,17 @@ __global__ void GreedySearchKernel(
   void* query_list_ptr,
   int num_queries,
   int medoid_id,
-  int degree,
-  int n,
   int topk,
   cuvs::distance::DistanceType metric,
-  int dim,
   int max_queue_size,
   int sort_smem_size)
 {
+  int n      = dataset.extent(0);
+  int dim    = dataset.extent(1);
+  int degree = graph.extent(1);
+
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
-  const T* vec_ptr = dataset.data_handle();
 
   static __shared__ int topk_q_size;
   static __shared__ int cand_q_size;
@@ -145,15 +145,14 @@ __global__ void GreedySearchKernel(
     query_list[i].reset();
 
     // storing the current query vector into shared memory
-    update_shared_point<T, accT>(&s_query, vec_ptr, query_list[i].queryId, dim);
+    update_shared_point<T, accT>(&s_query, &dataset(0, 0), query_list[i].queryId, dim);
 
     if (threadIdx.x == 0) {
       topk_q_size = 0;
       cand_q_size = 0;
-      //      visited_cnt = 0;
-      s_query.id = query_list[i].queryId;
-      cur_k_max  = 0;
-      k_max_idx  = 0;
+      s_query.id  = query_list[i].queryId;
+      cur_k_max   = 0;
+      k_max_idx   = 0;
       heap_queue.reset();
     }
 
@@ -164,7 +163,7 @@ __global__ void GreedySearchKernel(
     // Just start from medoid every time, rather than multiple set_ups
     query_vec        = &s_query;
     query_vec->Dim   = dim;
-    const T* medoid  = &vec_ptr[(size_t)medoid_id * (size_t)dim];
+    const T* medoid  = &dataset((size_t)medoid_id, 0);
     accT medoid_dist = dist<T, accT>(query_vec->coords, medoid, dim, metric);
 
     if (threadIdx.x == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
@@ -246,7 +245,7 @@ __global__ void GreedySearchKernel(
       // computing distances between the query vector and neighbor vectors then enqueue in priority
       // queue.
       enqueue_all_neighbors<T, accT, IdxT>(
-        num_neighbors, query_vec, vec_ptr, neighbor_array, heap_queue, dim, metric);
+        num_neighbors, query_vec, &dataset(0, 0), neighbor_array, heap_queue, dim, metric);
 
       __syncthreads();
 

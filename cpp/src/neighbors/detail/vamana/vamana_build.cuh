@@ -90,11 +90,12 @@ void batched_insert_vamana(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t> graph,
   IdxT* medoid_id,
-  cuvs::distance::DistanceType metric,
-  int dim)
+  cuvs::distance::DistanceType metric)
+//  int dim)
 {
   auto stream = raft::resource::get_cuda_stream(res);
   int N       = dataset.extent(0);
+  int dim     = dataset.extent(1);
   int degree  = graph.extent(1);
 
   // Algorithm params
@@ -225,11 +226,8 @@ void batched_insert_vamana(
                                                                  query_list_ptr.data_handle(),
                                                                  step_size,
                                                                  *medoid_id,
-                                                                 degree,
-                                                                 dataset.extent(0),
                                                                  visited_size,
                                                                  metric,
-                                                                 dim,
                                                                  queue_size,
                                                                  search_smem_sort_size);
 
@@ -239,12 +237,9 @@ void batched_insert_vamana(
                                                                 dataset,
                                                                 query_list_ptr.data_handle(),
                                                                 step_size,
-                                                                degree,
                                                                 visited_size,
-                                                                dataset.extent(0),
                                                                 metric,
                                                                 alpha,
-                                                                dim,
                                                                 prune_smem_sort_size);
 
       // Write results from first prune to graph edge list
@@ -328,7 +323,7 @@ void batched_insert_vamana(
 
       // Recompute distances (avoided keeping it during sorting)
       recompute_reverse_dists<T, accT, IdxT>
-        <<<num_blocks, blockD, 0, stream>>>(reverse_list, dataset, unique_dests, dim, metric);
+        <<<num_blocks, blockD, 0, stream>>>(reverse_list, dataset, unique_dests, metric);
 
       // Call 2nd RobustPrune on reverse query_list
       RobustPruneKernel<T, accT, IdxT>
@@ -336,12 +331,9 @@ void batched_insert_vamana(
                                                                 raft::make_const_mdspan(dataset),
                                                                 reverse_list_ptr.data_handle(),
                                                                 unique_dests,
-                                                                degree,
                                                                 visited_size,
-                                                                dataset.extent(0),
                                                                 metric,
                                                                 alpha,
-                                                                dim,
                                                                 prune_smem_sort_size);
 
       // Write new edge lists to graph
@@ -357,6 +349,8 @@ void batched_insert_vamana(
   }  // insert iterations
 
   raft::copy(graph.data_handle(), d_graph.data_handle(), d_graph.size(), stream);
+
+  RAFT_CHECK_CUDA(stream);
 }
 
 template <typename T,
@@ -391,7 +385,7 @@ index<T, IdxT> build(
 
   IdxT medoid_id;
   batched_insert_vamana<T, float, IdxT, Accessor>(
-    res, params, dataset, vamana_graph.view(), &medoid_id, metric, dim);
+    res, params, dataset, vamana_graph.view(), &medoid_id, metric);
 
   try {
     return index<T, IdxT>(
