@@ -1668,7 +1668,7 @@ void extend(raft::resources const& handle,
     }
     process_and_fill_codes(handle,
                            *index,
-                           vec_batch.data(),
+                           float_vec_batch.data_handle(),
                            new_indices != nullptr
                              ? std::variant<IdxT, const IdxT*>(idx_batch.data())
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
