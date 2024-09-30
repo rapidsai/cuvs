@@ -168,8 +168,8 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
       ->value;
   std::shared_ptr<desc_t> desc{nullptr};
   if (!cache.get(key, &desc)) {
-    desc = std::make_shared<desc_t>(std::move(dataset_descriptor_init<DataT, IndexT, DistanceT>(
-      params, dataset, metric, raft::resource::get_cuda_stream(res))));
+    desc = std::make_shared<desc_t>(
+      std::move(dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric)));
     cache.set(key, desc);
   }
   return *desc;

@@ -1,7 +1,7 @@
 name: faiss_gpu_ivf_pq
 constraints:
-  build: cuvs_bench.constraints.faiss_gpu_ivf_pq_build
-  search: cuvs_bench.constraints.faiss_gpu_ivf_pq_search
+  build: cuvs_bench.config.algos.constraints.faiss_gpu_ivf_pq_build
+  search: cuvs_bench.config.algos.constraints.faiss_gpu_ivf_pq_search
 groups:
   base:
     build:

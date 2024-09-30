@@ -23,7 +23,7 @@ namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
 #define instantiate_kernel_selection(DataT, IndexT, DistanceT, SampleFilterT) \
   template void select_and_run<DataT, IndexT, DistanceT, SampleFilterT>(      \
-    const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,  \
+    const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,    \
     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,   \
     IndexT* topk_indices_ptr,                                                 \
     DistanceT* topk_distances_ptr,                                            \
