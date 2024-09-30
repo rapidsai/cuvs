@@ -345,6 +345,20 @@ add_library(
   src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
+  src/neighbors/ball_cover.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_eps_pass_euclidean.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_one_2d_dist.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_one_2d_euclidean.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_one_2d_haversine.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_one_3d_dist.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_one_3d_euclidean.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_one_3d_haversine.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_two_2d_dist.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_two_2d_euclidean.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_two_2d_haversine.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_two_3d_dist.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_two_3d_euclidean.cu
+  src/neighbors/ball_cover/detail/ball_cover/registers_pass_two_3d_haversine.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cu
   src/neighbors/cagra_build_half.cu
@@ -426,8 +440,7 @@ add_library(
 target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
 
 target_compile_options(
-  cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
-                 --expt-relaxed-constexpr>
+  cuvs PUBLIC $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda --expt-relaxed-constexpr>
 )
 
 add_library(cuvs::cuvs ALIAS cuvs)

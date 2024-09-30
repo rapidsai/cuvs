@@ -161,6 +161,8 @@ if(BUILD_TESTS)
     100
   )
 
+  ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
+
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
   endif()
