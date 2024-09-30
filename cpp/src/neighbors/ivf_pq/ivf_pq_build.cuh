@@ -1581,8 +1581,10 @@ void extend(raft::resources const& handle,
       cuvs::cluster::kmeans::balanced_params kmeans_params;
 
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        auto float_vec_batch =
-          raft::make_device_matrix<float, internal_extents_t>(handle, batch.size(), index->dim());
+        auto float_vec_batch = raft::make_device_mdarray<float, internal_extents_t>(
+          handle,
+          device_memory,
+          raft::make_extents<internal_extents_t>(batch.size(), index->dim()));
         raft::linalg::map(handle, float_vec_batch.view(), utils::mapping<float>{}, batch_data_view);
         raft::linalg::row_normalize(handle,
                                     raft::make_const_mdspan(float_vec_batch.view()),
@@ -1653,8 +1655,10 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
-    auto float_vec_batch =
-      raft::make_device_matrix<float, internal_extents_t>(handle, vec_batch.size(), index->dim());
+    auto float_vec_batch  = raft::make_device_mdarray<float, internal_extents_t>(
+      handle,
+      device_memory,
+      raft::make_extents<internal_extents_t>(vec_batch.size(), index->dim()));
     raft::linalg::map(handle,
                       float_vec_batch.view(),
                       utils::mapping<float>{},
