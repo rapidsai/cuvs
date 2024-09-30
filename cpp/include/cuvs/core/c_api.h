@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -138,10 +139,12 @@ cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes);
  * available memory
  * @param[in] max_pool_size_percent The maximum pool size as a percentage of the total
  * available memory
+ * @param[in] managed Whether to use a managed memory resource as upstream resource or not
  * @return cuvsError_t
  */
 cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_percent,
-                                            int max_pool_size_percent);
+                                            int max_pool_size_percent,
+                                            bool managed);
 /**
  * @brief Resets the memory resource to use the default memory resource (cuda_memory_resource)
  * @return cuvsError_t

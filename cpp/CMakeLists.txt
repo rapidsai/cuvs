@@ -202,6 +202,7 @@ endif()
 add_library(
   cuvs-cagra-search STATIC
   src/neighbors/cagra_search_float.cu
+  src/neighbors/cagra_search_half.cu
   src/neighbors/cagra_search_int8.cu
   src/neighbors/cagra_search_uint8.cu
   src/neighbors/detail/cagra/compute_distance.cu
@@ -257,14 +258,10 @@ add_library(
   src/neighbors/detail/cagra/search_multi_cta_half_uint32.cu
   src/neighbors/detail/cagra/search_multi_cta_int8_uint32.cu
   src/neighbors/detail/cagra/search_multi_cta_uint8_uint32.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint64.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_int8_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_uint8_uint32.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint64.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64.cu
 )
 
 file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
@@ -350,6 +347,7 @@ add_library(
   src/distance/pairwise_distance.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cu
+  src/neighbors/cagra_build_half.cu
   src/neighbors/cagra_build_int8.cu
   src/neighbors/cagra_build_uint8.cu
   src/neighbors/cagra_extend_float.cu
@@ -357,6 +355,7 @@ add_library(
   src/neighbors/cagra_extend_uint8.cu
   src/neighbors/cagra_optimize.cu
   src/neighbors/cagra_serialize_float.cu
+  src/neighbors/cagra_serialize_half.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
   src/neighbors/detail/cagra/cagra_build.cpp
@@ -378,6 +377,7 @@ add_library(
   src/neighbors/ivf_pq/ivf_pq_serialize.cu
   src/neighbors/ivf_pq/ivf_pq_deserialize.cu
   src/neighbors/ivf_pq/detail/ivf_pq_build_extend_float_int64_t.cu
+  src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
@@ -395,13 +395,16 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
   src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
+  src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
+  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_half_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
   src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
+  src/neighbors/nn_descent_half.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
   src/neighbors/refine/detail/refine_device_float_float.cu

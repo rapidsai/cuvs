@@ -33,8 +33,6 @@
 #include <cuvs/neighbors/refine.hpp>
 
 // TODO: Fixme- this needs to be migrated
-#include "../../ivf_pq/ivf_pq_build.cuh"
-#include "../../ivf_pq/ivf_pq_search.cuh"
 #include "../../nn_descent.cuh"
 
 // TODO: This shouldn't be calling spatial/knn APIs
@@ -156,8 +154,7 @@ void build_knn_graph(
   }();
 
   RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
-  auto index =
-    cuvs::neighbors::ivf_pq::detail::build<DataT, int64_t>(res, pq.build_params, dataset);
+  auto index = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
 
   //
   // search top (k + 1) neighbors
@@ -169,7 +166,8 @@ void build_knn_graph(
   const auto num_queries = dataset.extent(0);
 
   // Use the same maximum batch size as the ivf_pq::search to avoid allocating more than needed.
-  using cuvs::neighbors::ivf_pq::detail::kMaxQueries;
+  constexpr uint32_t kMaxQueries = 4096;
+
   // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
   // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
   // multiple of what is required for the I/O batching below.
