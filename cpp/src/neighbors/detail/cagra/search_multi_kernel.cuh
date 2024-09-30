@@ -175,7 +175,7 @@ void random_pickup(const dataset_descriptor_host<DataT, IndexT, DistanceT>& data
                        num_queries);
 
   random_pickup_kernel<<<grid_size, block_size, dataset_desc.smem_ws_size_in_bytes, cuda_stream>>>(
-    dataset_desc.dev_ptr(),
+    dataset_desc.dev_ptr(cuda_stream),
     queries_ptr,
     num_pickup,
     num_distilation,
@@ -410,7 +410,7 @@ void compute_distance_to_child_nodes(
                                                           parent_distance_ptr,
                                                           lds,
                                                           search_width,
-                                                          dataset_desc.dev_ptr(),
+                                                          dataset_desc.dev_ptr(cuda_stream),
                                                           neighbor_graph_ptr,
                                                           graph_degree,
                                                           query_ptr,

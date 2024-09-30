@@ -22,7 +22,7 @@
 namespace cuvs::neighbors::cagra::detail::single_cta_search {
 
 template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
-void select_and_run(const dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dataset_desc,
+void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
                     IndexT* topk_indices_ptr,       // [num_queries, topk]
                     DistanceT* topk_distances_ptr,  // [num_queries, topk]

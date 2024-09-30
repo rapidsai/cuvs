@@ -17,7 +17,7 @@
 
 namespace cuvs::bench {
 template class cuvs_ivf_pq<float, int64_t>;
-// template class cuvs_ivf_pq<half, int64_t>;
+template class cuvs_ivf_pq<half, int64_t>;
 template class cuvs_ivf_pq<uint8_t, int64_t>;
 template class cuvs_ivf_pq<int8_t, int64_t>;
 }  // namespace cuvs::bench

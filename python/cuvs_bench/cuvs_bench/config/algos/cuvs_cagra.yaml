@@ -1,11 +1,11 @@
 name: cuvs_cagra
 constraints:
-  build: cuvs_bench.constraints.raft_cagra_build_constraints
-  search: cuvs_bench.constraints.raft_cagra_search_constraints
+  build: cuvs_bench.config.algos.constraints.cuvs_cagra_build
+  search: cuvs_bench.config.algos.constraints.cuvs_cagra_search
 groups:
   base:
     build:
-      graph_degree: [32, 64, 128, 256]
+      graph_degree: [32, 64, 96, 128]
       intermediate_graph_degree: [32, 64, 96, 128]
       graph_build_algo: ["NN_DESCENT"]
     search:
