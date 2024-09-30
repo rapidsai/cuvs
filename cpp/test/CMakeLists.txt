@@ -139,6 +139,7 @@ if(BUILD_TESTS)
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
     neighbors/ann_cagra/test_float_uint32_t.cu
+    neighbors/ann_cagra/test_half_uint32_t.cu
     neighbors/ann_cagra/test_int8_t_uint32_t.cu
     neighbors/ann_cagra/test_uint8_t_uint32_t.cu
     GPUS

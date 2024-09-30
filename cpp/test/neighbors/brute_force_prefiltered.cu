@@ -203,7 +203,7 @@ class PrefilteredBruteForceTest
       auto filter_view =
         raft::make_device_vector_view<const uint32_t, index_t>(filter_d.data(), filter_d.size());
       index_t size_h = m * n;
-      auto size_view = raft::make_host_scalar_view<index_t>(&size_h);
+      auto size_view = raft::make_host_scalar_view<const index_t, index_t>(&size_h);
 
       set_bitmap(src, dst, bitmap, n_edges, n, stream);
 

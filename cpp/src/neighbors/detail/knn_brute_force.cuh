@@ -595,7 +595,7 @@ void brute_force_search_filtered(
   auto filter_view =
     raft::make_device_vector_view<const BitmapT, IdxT>(filter.data(), filter.n_elements());
   IdxT size_h    = n_queries * n_dataset;
-  auto size_view = raft::make_host_scalar_view<IdxT>(&size_h);
+  auto size_view = raft::make_host_scalar_view<const IdxT, IdxT>(&size_h);
 
   raft::popc(res, filter_view, size_view, nnz_view);
   raft::copy(&nnz_h, nnz.data(), 1, stream);
