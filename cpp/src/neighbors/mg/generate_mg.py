@@ -226,40 +226,51 @@ cagra_macro = """
   }
 """
 
-macros_1 = dict(
-    flat=dict(
+flat_macros = dict (
+    flat = dict(
         include=include_macro,
         definition=flat_macro,
         name="CUVS_INST_MG_FLAT",
-    ),
-    pq=dict(
+    )
+)
+
+pq_macros = dict (
+    pq = dict(
         include=include_macro,
         definition=pq_macro,
         name="CUVS_INST_MG_PQ",
-    ),
+    )
 )
 
-macros_2 = dict(
-    cagra=dict(
+cagra_macros = dict (
+    cagra = dict(
         include=include_macro,
         definition=cagra_macro,
         name="CUVS_INST_MG_CAGRA",
-    ),
+    )
 )
 
-types_1 = dict(
+flat_types = dict(
     float_int64_t=("float", "int64_t"),
     int8_t_int64_t=("int8_t", "int64_t"),
     uint8_t_int64_t=("uint8_t", "int64_t"),
 )
 
-types_2 = dict(
+pq_types = dict(
+    float_int64_t=("float", "int64_t"),
+    half_int64_t=("half", "int64_t"),
+    int8_t_int64_t=("int8_t", "int64_t"),
+    uint8_t_int64_t=("uint8_t", "int64_t"),
+)
+
+cagra_types = dict(
     float_uint32_t=("float", "uint32_t"),
+    half_uint32_t=("half", "uint32_t"),
     int8_t_uint32_t=("int8_t", "uint32_t"),
     uint8_t_uint32_t=("uint8_t", "uint32_t"),
 )
 
-for macros, types in [(macros_1, types_1), (macros_2, types_2)]:
+for macros, types in [(flat_macros, flat_types), (pq_macros, pq_types), (cagra_macros, cagra_types)]:
   for type_path, (T, IdxT) in types.items():
       for macro_path, macro in macros.items():
           path = f"mg_{macro_path}_{type_path}.cu"

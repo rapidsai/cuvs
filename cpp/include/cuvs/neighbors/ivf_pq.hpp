@@ -1251,6 +1251,75 @@ void extend(raft::resources const& handle,
  * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
+            raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
+            const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
+  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_pq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+ *   // fill the index with the data
+ *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   ivf_pq::extend(handle, new_vectors, no_op, &index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
+ */
+void extend(raft::resources const& handle,
+            raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Extend the index with the new data.
+ *
+ * Note, the user can set a stream pool in the input raft::resource with
+ * at least one stream to enable kernel and copy overlapping.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   ivf_pq::index_params index_params;
+ *   index_params.add_data_on_build = false;      // don't populate index on build
+ *   index_params.kmeans_trainset_fraction = 1.0; // use whole dataset for kmeans training
+ *   // train the index from a [N, D] dataset
+ *   auto index_empty = ivf_pq::build(handle, index_params, dataset);
+ *   // optional: create a stream pool with at least one stream to enable kernel and copy
+ *   // overlapping
+ *   raft::resource::set_cuda_stream_pool(handle, std::make_shared<rmm::cuda_stream_pool>(1));
+ *   // fill the index with the data
+ *   std::optional<raft::host_vector_view<const IdxT, IdxT>> no_op = std::nullopt;
+ *   auto index = ivf_pq::extend(handle, new_vectors, no_op, index_empty);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a host vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
+ */
+auto extend(raft::resources const& handle,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)

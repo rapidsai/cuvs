@@ -175,12 +175,15 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
   }
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_MG
-  if (algo_name == "raft_mg_ivf_flat" || algo_name == "cuvs_mg_ivf_flat") {
-    auto param =
-      std::make_unique<typename cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>::search_param>();
-    parse_search_param<T, int64_t>(conf, *param);
-    add_merge_mode(&param->merge_mode, conf);
-    return param;
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
+                std::is_same_v<T, int8_t>) {
+    if (algo_name == "raft_mg_ivf_flat" || algo_name == "cuvs_mg_ivf_flat") {
+      auto param =
+        std::make_unique<typename cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>::search_param>();
+      parse_search_param<T, int64_t>(conf, *param);
+      add_merge_mode(&param->merge_mode, conf);
+      return param;
+    }
   }
 
   if (algo_name == "raft_mg_ivf_pq" || algo_name == "cuvs_mg_ivf_pq") {
