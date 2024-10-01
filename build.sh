@@ -277,14 +277,14 @@ fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
     BUILD_CUVS_BENCH=ON
+    if not hasArg tests; then
+        BUILD_TESTS=OFF
+    fi
+    COMPILE_LIBRARY=OFF
     CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
     if hasArg --cpu-only; then
-        COMPILE_LIBRARY=OFF
         BUILD_CPU_ONLY=ON
         NVTX=OFF
-    else
-        COMPILE_LIBRARY=ON
-    fi
 fi
 
 if hasArg --no-nvtx; then
