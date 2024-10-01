@@ -277,7 +277,7 @@ fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
     BUILD_CUVS_BENCH=ON
-    if not hasArg tests; then
+    if ! hasArg tests; then
         BUILD_TESTS=OFF
     fi
     COMPILE_LIBRARY=OFF
@@ -285,6 +285,7 @@ if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
     if hasArg --cpu-only; then
         BUILD_CPU_ONLY=ON
         NVTX=OFF
+    fi
 fi
 
 if hasArg --no-nvtx; then
