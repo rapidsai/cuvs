@@ -487,9 +487,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
           reinterpret_cast<const vec_t::io_t*>(pq_thread_data),
           lut_scores,
           early_stop_limit);
-        if (metric == distance::DistanceType::CosineExpanded) {
-          score = OutT(1) + score;
-        }
+        if (metric == distance::DistanceType::CosineExpanded) { score = OutT(1) + score; }
       }
       if constexpr (kManageLocalTopK) {
         block_topk.add(score, sample_offset + i);
