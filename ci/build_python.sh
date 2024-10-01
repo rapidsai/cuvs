@@ -31,4 +31,11 @@ rapids-conda-retry mambabuild \
   --channel "${CPP_CHANNEL}" \
   conda/recipes/cuvs
 
+# Build cuvs_bench for each cuda and python version
+rapids-conda-retry mambabuild \
+  --no-test \
+  --channel "${CPP_CHANNEL}" \
+  --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
+  conda/recipes/cuvs_bench
+
 rapids-upload-conda-to-s3 python
