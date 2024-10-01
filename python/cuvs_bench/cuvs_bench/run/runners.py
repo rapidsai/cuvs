@@ -187,6 +187,7 @@ log_levels = {
     "trace": 5,
 }
 
+
 def parse_log_level(level_str: str) -> int:
     """
     Parse the log level from string to integer.
