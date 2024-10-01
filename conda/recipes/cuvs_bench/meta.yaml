@@ -82,6 +82,8 @@ requirements:
   run:
     - python
     - libcuvs {{ version }}
+    - pylibraft {{ version }}
+    - cuvs {{ version }}
     - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
     {% if cuda_major == "11" %}
     - cudatoolkit
