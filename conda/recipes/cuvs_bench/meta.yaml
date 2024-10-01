@@ -1,7 +1,7 @@
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 
 # Usage:
-#   conda build . -c conda-forge -c nvidia -c rapidsai
+#   conda build . -c rapidsai -c conda-forge -c nvidia
 {% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
 {% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
 {% set py_version = environ['CONDA_PY'] %}
@@ -31,8 +31,8 @@ build:
     - SCCACHE_BUCKET
     - SCCACHE_IDLE_TIMEOUT
     - SCCACHE_REGION
-    - SCCACHE_S3_KEY_PREFIX=libraft-aarch64 # [aarch64]
-    - SCCACHE_S3_KEY_PREFIX=libraft-linux64 # [linux64]
+    - SCCACHE_S3_KEY_PREFIX=cuvs-bench-aarch64 # [aarch64]
+    - SCCACHE_S3_KEY_PREFIX=cuvs-bench-linux64 # [linux64]
     - SCCACHE_S3_USE_SSL
   number: {{ GIT_DESCRIBE_NUMBER }}
   string: cuda{{ cuda_major }}_py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
@@ -92,7 +92,6 @@ requirements:
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - benchmark
-    - glog {{ glog_version }}
     - matplotlib
     - python
     - pandas
@@ -102,4 +101,4 @@ requirements:
 about:
   home: https://rapids.ai/
   license: Apache-2.0
-  summary: cuVS ANN GPU and CPU benchmarks
+  summary: cuVS GPU and CPU benchmarks
