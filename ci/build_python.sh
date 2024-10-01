@@ -38,4 +38,15 @@ rapids-conda-retry mambabuild \
   --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
   conda/recipes/cuvs_bench
 
+# Build cuvs_bench_cpu only in CUDA 11 jobs since it only depends on python
+# version
+RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
+if [[ ${RAPIDS_CUDA_MAJOR} == "11" ]]; then
+  rapids-conda-retry mambabuild \
+  --no-test \
+  --channel "${CPP_CHANNEL}" \
+  --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
+  conda/recipes/cuvs_bench_cpu
+fi
+
 rapids-upload-conda-to-s3 python
