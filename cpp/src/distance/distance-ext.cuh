@@ -219,11 +219,9 @@ void pairwise_distance(raft::resources const& handle,
     raft::device_matrix_view<OutT, IdxT, raft::layout_c_contiguous> dist,              \
     OutT metric_arg)
 
-#define instantiate_cuvs_distance_distance_by_algo(DistT)                     \
-  instantiate_cuvs_distance_distance(DistT, float, float, float, int);        \
-  instantiate_cuvs_distance_distance(DistT, float, float, float, int64_t);    \
-  instantiate_cuvs_distance_distance(DistT, double, double, double, int);     \
-  instantiate_cuvs_distance_distance(DistT, double, double, double, int64_t); \
+#define instantiate_cuvs_distance_distance_by_algo(DistT)                 \
+  instantiate_cuvs_distance_distance(DistT, float, float, float, int);    \
+  instantiate_cuvs_distance_distance(DistT, double, double, double, int); \
   instantiate_cuvs_distance_distance(DistT, half, float, float, int)
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberra);
@@ -245,6 +243,11 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::L2Unexp
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Linf);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::LpUnexpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::RusselRaoExpanded);
+
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int64_t);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int64_t);
 
 #undef instantiate_cuvs_distance_distance_by_algo
 #undef instantiate_cuvs_distance_distance
@@ -341,9 +344,7 @@ instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType:
                                                          DistT metric_arg)
 
 instantiate_cuvs_distance_pairwise_distance(float, int, float);
-instantiate_cuvs_distance_pairwise_distance(float, int64_t, float);
 instantiate_cuvs_distance_pairwise_distance(double, int, double);
-instantiate_cuvs_distance_pairwise_distance(double, int64_t, double);
 instantiate_cuvs_distance_pairwise_distance(half, int, float);
 
 #undef instantiate_cuvs_distance_pairwise_distance
@@ -362,9 +363,7 @@ instantiate_cuvs_distance_pairwise_distance(half, int, float);
                                                          DistT metric_arg)
 
 instantiate_cuvs_distance_pairwise_distance(float, int, float);
-instantiate_cuvs_distance_pairwise_distance(float, int64_t, float);
 instantiate_cuvs_distance_pairwise_distance(double, int, double);
-instantiate_cuvs_distance_pairwise_distance(double, int64_t, double);
 instantiate_cuvs_distance_pairwise_distance(half, int, float);
 
 #undef instantiate_cuvs_distance_pairwise_distance
@@ -379,10 +378,8 @@ instantiate_cuvs_distance_pairwise_distance(half, int, float);
     DistT metric_arg)
 
 instantiate_cuvs_distance_pairwise_distance(float, raft::layout_c_contiguous, int, float);
-instantiate_cuvs_distance_pairwise_distance(float, raft::layout_c_contiguous, int64_t, float);
 instantiate_cuvs_distance_pairwise_distance(float, raft::layout_f_contiguous, int, float);
 instantiate_cuvs_distance_pairwise_distance(double, raft::layout_c_contiguous, int, double);
-instantiate_cuvs_distance_pairwise_distance(double, raft::layout_c_contiguous, int64_t, double);
 instantiate_cuvs_distance_pairwise_distance(double, raft::layout_f_contiguous, int, double);
 instantiate_cuvs_distance_pairwise_distance(half, raft::layout_c_contiguous, int, float);
 instantiate_cuvs_distance_pairwise_distance(half, raft::layout_f_contiguous, int, float);

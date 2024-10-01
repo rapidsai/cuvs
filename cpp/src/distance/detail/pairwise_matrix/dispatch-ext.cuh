@@ -125,31 +125,7 @@ instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo(
   cuvs::distance::kernels::detail::rbf_fin_op);
 
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::canberra_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::correlation_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::cosine_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::hamming_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::hellinger_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::jensen_shannon_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::kl_divergence_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::l1_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::l2_exp_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::l2_unexp_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::l_inf_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::lp_unexp_distance_op, int64_t);
-instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
-  cuvs::distance::detail::ops::russel_rao_distance_op, int64_t);
 
 #undef instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo
 #undef instantiate_cuvs_distance_detail_pairwise_matrix_dispatch

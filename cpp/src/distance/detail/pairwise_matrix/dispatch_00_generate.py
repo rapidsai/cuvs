@@ -78,18 +78,6 @@ data_type_instances = [
         IdxT="int",
     ),
     dict(
-        DataT="float",
-        AccT="float",
-        OutT="float",
-        IdxT="int64_t",
-    ),
-    dict(
-        DataT="double",
-        AccT="double",
-        OutT="double",
-        IdxT="int64_t",
-    ),
-    dict(
         DataT="half",
         AccT="float",
         OutT="float",

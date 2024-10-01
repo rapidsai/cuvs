@@ -234,10 +234,8 @@ instantiate_cuvs_distance_pairwise_distance(half, int, float);
     DistT metric_arg)
 
 instantiate_cuvs_distance_pairwise_distance(float, raft::layout_c_contiguous, int, float);
-instantiate_cuvs_distance_pairwise_distance(float, raft::layout_c_contiguous, int64_t, float);
 instantiate_cuvs_distance_pairwise_distance(float, raft::layout_f_contiguous, int, float);
 instantiate_cuvs_distance_pairwise_distance(double, raft::layout_c_contiguous, int, double);
-instantiate_cuvs_distance_pairwise_distance(double, raft::layout_c_contiguous, int64_t, double);
 instantiate_cuvs_distance_pairwise_distance(double, raft::layout_f_contiguous, int, double);
 instantiate_cuvs_distance_pairwise_distance(half, raft::layout_c_contiguous, int, float);
 instantiate_cuvs_distance_pairwise_distance(half, raft::layout_f_contiguous, int, float);

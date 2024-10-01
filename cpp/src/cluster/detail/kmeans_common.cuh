@@ -293,7 +293,6 @@ void pairwise_distance_kmeans(raft::resources const& handle,
                               raft::device_matrix_view<const DataT, IndexT> X,
                               raft::device_matrix_view<const DataT, IndexT> centroids,
                               raft::device_matrix_view<DataT, IndexT> pairwiseDistance,
-                              rmm::device_uvector<char>& workspace,
                               cuvs::distance::DistanceType metric)
 {
   auto n_samples  = X.extent(0);
@@ -303,15 +302,16 @@ void pairwise_distance_kmeans(raft::resources const& handle,
   ASSERT(X.extent(1) == centroids.extent(1),
          "# features in dataset and centroids are different (must be same)");
 
-  cuvs::distance::pairwise_distance(handle,
-                                    X.data_handle(),
-                                    centroids.data_handle(),
-                                    pairwiseDistance.data_handle(),
-                                    n_samples,
-                                    n_clusters,
-                                    n_features,
-                                    workspace,
-                                    metric);
+  if (metric == cuvs::distance::DistanceType::L2Expanded) {
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2Expanded,
+                             DataT,
+                             DataT,
+                             DataT,
+                             raft::layout_c_contiguous,
+                             IndexT>(handle, X, centroids, pairwiseDistance);
+  } else {
+    RAFT_FAIL("kmeans requires L2Expanded distance");
+  }
 }
 
 // shuffle and randomly select 'n_samples_to_gather' from input 'in' and stores
@@ -461,7 +461,7 @@ void minClusterAndDistanceCompute(
         // calculate pairwise distance between current tile of cluster centroids
         // and input dataset
         pairwise_distance_kmeans<DataT, IndexT>(
-          handle, datasetView, centroidsView, pairwiseDistanceView, workspace, metric);
+          handle, datasetView, centroidsView, pairwiseDistanceView, metric);
 
         // argmin reduction returning <index, value> pair
         // calculates the closest centroid and the distance to the closest
@@ -591,7 +591,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
         // calculate pairwise distance between current tile of cluster centroids
         // and input dataset
         pairwise_distance_kmeans<DataT, IndexT>(
-          handle, datasetView, centroidsView, pairwiseDistanceView, workspace, metric);
+          handle, datasetView, centroidsView, pairwiseDistanceView, metric);
 
         raft::linalg::coalescedReduction(minClusterDistanceView.data_handle(),
                                          pairwiseDistanceView.data_handle(),
