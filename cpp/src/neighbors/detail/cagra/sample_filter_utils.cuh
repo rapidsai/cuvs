@@ -43,8 +43,8 @@ struct CagraSampleFilterT_Selector {
   using type = CagraSampleFilterWithQueryIdOffset<CagraSampleFilterT>;
 };
 template <>
-struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter> {
-  using type = cuvs::neighbors::filtering::none_cagra_sample_filter;
+struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filter> {
+  using type = cuvs::neighbors::filtering::none_sample_filter;
 };
 
 // A helper function to set a query id offset
@@ -56,10 +56,9 @@ inline typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type set_offset
   return new_filter;
 }
 template <>
-inline
-  typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter>::type
-  set_offset<cuvs::neighbors::filtering::none_cagra_sample_filter>(
-    cuvs::neighbors::filtering::none_cagra_sample_filter filter, const uint32_t)
+inline typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_sample_filter>::type
+set_offset<cuvs::neighbors::filtering::none_sample_filter>(
+  cuvs::neighbors::filtering::none_sample_filter filter, const uint32_t)
 {
   return filter;
 }

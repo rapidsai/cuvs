@@ -388,7 +388,7 @@ struct base_filter {
 };
 
 /* A filter that filters nothing. This is the default behavior. */
-struct none_ivf_sample_filter : public base_filter {
+struct none_sample_filter : public base_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -396,10 +396,7 @@ struct none_ivf_sample_filter : public base_filter {
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
-};
 
-/* A filter that filters nothing. This is the default behavior. */
-struct none_cagra_sample_filter : public base_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,

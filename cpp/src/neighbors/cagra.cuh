@@ -336,7 +336,7 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
   try {
-    using none_filter_type  = cuvs::neighbors::filtering::none_cagra_sample_filter;
+    using none_filter_type  = cuvs::neighbors::filtering::none_sample_filter;
     auto& sample_filter     = dynamic_cast<const none_filter_type&>(sample_filter_ref);
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, none_filter_type>(

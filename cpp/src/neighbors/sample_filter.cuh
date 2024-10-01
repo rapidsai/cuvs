@@ -27,7 +27,7 @@
 namespace cuvs::neighbors::filtering {
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_ivf_sample_filter::operator()(
+inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the current inverted list index
@@ -39,7 +39,7 @@ inline _RAFT_HOST_DEVICE bool none_ivf_sample_filter::operator()(
 }
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_cagra_sample_filter::operator()(
+inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample

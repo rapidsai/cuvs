@@ -19,7 +19,7 @@
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"
-#include "../sample_filter.cuh"  // none_ivf_sample_filter
+#include "../sample_filter.cuh"  // none_sample_filter
 #include "ivf_pq_compute_similarity.cuh"
 #include "ivf_pq_fp_8bit.cuh"
 
@@ -592,7 +592,7 @@ constexpr uint32_t kMaxQueries = 4096;
 /** See raft::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 inline void search(raft::resources const& handle,
                    const search_params& params,
                    const index<IdxT>& index,
@@ -794,7 +794,7 @@ void search(raft::resources const& handle,
 {
   try {
     auto& sample_filter =
-      dynamic_cast<const cuvs::neighbors::filtering::none_ivf_sample_filter&>(sample_filter_ref);
+      dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
     return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
   } catch (const std::bad_cast&) {
   }

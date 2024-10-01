@@ -20,7 +20,7 @@
 #include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"              // cuvs::neighbors::detail::ivf
 #include "ivf_flat_interleaved_scan.cuh"  // interleaved_scan
-#include <cuvs/neighbors/common.hpp>      // none_ivf_sample_filter
+#include <cuvs/neighbors/common.hpp>      // none_sample_filter
 #include <cuvs/neighbors/ivf_flat.hpp>    // raft::neighbors::ivf_flat::index
 
 #include "../detail/ann_utils.cuh"      // utils::mapping
@@ -308,7 +308,7 @@ void search_impl(raft::resources const& handle,
 /** See raft::neighbors::ivf_flat::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 inline void search_with_filtering(raft::resources const& handle,
                                   const search_params& params,
                                   const index<T, IdxT>& index,
@@ -408,7 +408,7 @@ void search(raft::resources const& handle,
 {
   try {
     auto& sample_filter =
-      dynamic_cast<const cuvs::neighbors::filtering::none_ivf_sample_filter&>(sample_filter_ref);
+      dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
     return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
   } catch (const std::bad_cast&) {
   }
