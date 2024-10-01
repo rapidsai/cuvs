@@ -60,8 +60,7 @@ requirements:
     - {{ stdlib("c") }}
 
   host:
-    - python
-    - libcuvs {{ version }}
+    - benchmark
     - cuda-version ={{ cuda_version }}
     {% if cuda_major == "11" %}
     - cuda-profiler-api {{ cuda11_cuda_profiler_api_run_version }}
@@ -73,15 +72,15 @@ requirements:
     - libcublas-dev
     {% endif %}
     - glog {{ glog_version }}
+    - libcuvs {{ version }}
     - nlohmann_json {{ nlohmann_json_version }}
-    - benchmark
     # rmm is needed to determine if package is gpu-enabled
-    - rmm ={{ minor_version }}
+    - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
+    - rmm ={{ minor_version }}
 
   run:
-    - python
-    - libcuvs {{ version }}
+    - benchmark
     - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
     {% if cuda_major == "11" %}
     - cudatoolkit
@@ -90,13 +89,14 @@ requirements:
     - libcublas
     {% endif %}
     - glog {{ glog_version }}
+    - libcuvs {{ version }}
     - h5py {{ h5py_version }}
-    - benchmark
     - matplotlib
-    - python
     - pandas
     - pyyaml
     # rmm is needed to determine if package is gpu-enabled
+    - pylibraft ={{ minor_version }}
+    - python
     - rmm ={{ minor_version }}
 about:
   home: https://rapids.ai/

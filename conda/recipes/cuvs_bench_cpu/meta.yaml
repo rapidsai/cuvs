@@ -44,23 +44,22 @@ requirements:
     - {{ stdlib("c") }}
 
   host:
-    - glog {{ glog_version }}
-    - matplotlib
-    - nlohmann_json {{ nlohmann_json_version }}
-    - spdlog {{ spdlog_version }}
+    - benchmark
     - fmt {{ fmt_version }}
+    - glog {{ glog_version }}
+    - nlohmann_json {{ nlohmann_json_version }}
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
-    - benchmark
+    - spdlog {{ spdlog_version }}
 
   run:
+    - benchmark
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib
-    - python
-    - pyyaml
     - pandas
-    - benchmark
+    - pyyaml
+    - python
 about:
   home: https://rapids.ai/
   license: Apache-2.0
