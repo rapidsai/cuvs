@@ -1204,8 +1204,9 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterT,
                            inner_prod_dist<Veclen, T, AccT>>(
-        {}, raft::mul_const_op<float>{-1.0f}, std::forward<Args>(args)...);
-    // NB: update the description of `knn::ivf_flat::build` when adding here a new metric.
+        {},
+        raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
+        std::forward<Args>(args)...);    // NB: update the description of `knn::ivf_flat::build` when adding here a new metric.
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }

@@ -474,8 +474,14 @@ void ivfpq_search_worker(raft::resources const& handle,
     num_samples_vector);
 
   // Postprocessing
-  ivf::detail::postprocess_distances(
-    distances, topk_dists.data(), index.metric(), n_queries, topK, scaling_factor, true, stream);
+  ivf::detail::postprocess_distances(distances,
+                                     topk_dists.data(),
+                                     index.metric(),
+                                     n_queries,
+                                     topK,
+                                     scaling_factor,
+                                     index.metric() != distance::DistanceType::CosineExpanded,
+                                     stream);
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,
                                      index.inds_ptrs().data_handle(),
