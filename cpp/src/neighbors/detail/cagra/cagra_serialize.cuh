@@ -120,8 +120,8 @@ void serialize_to_hnswlib(raft::resources const& res,
   // Example:M: 16, dim = 128, data_t = float, index_t = uint32_t, list_size_type = uint32_t,
   // labeltype: size_t size_data_per_element_ = M * 2 * sizeof(index_t) + sizeof(list_size_type) +
   // dim * sizeof(T) + sizeof(labeltype)
-  auto size_data_per_element = static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) +
-                                                        sizeof(T) + index_.dim() * 4 + 8);
+  auto size_data_per_element = static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) + 4 +
+                                                        index_.dim() * sizeof(T) + 8);
   os.write(reinterpret_cast<char*>(&size_data_per_element), sizeof(std::size_t));
   // label_offset
   std::size_t label_offset = size_data_per_element - 8;
