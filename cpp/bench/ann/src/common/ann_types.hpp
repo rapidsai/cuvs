@@ -35,6 +35,7 @@ enum class Mode {
 enum class MemoryType {
   kHost,
   kHostMmap,
+  kHostPinned,
   kDevice,
 };
 
@@ -60,6 +61,8 @@ inline auto parse_memory_type(const std::string& memory_type) -> MemoryType
     return MemoryType::kHost;
   } else if (memory_type == "mmap") {
     return MemoryType::kHostMmap;
+  } else if (memory_type == "pinned") {
+    return MemoryType::kHostPinned;
   } else if (memory_type == "device") {
     return MemoryType::kDevice;
   } else {
