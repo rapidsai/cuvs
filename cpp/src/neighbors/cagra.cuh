@@ -332,11 +332,29 @@ void search(raft::resources const& res,
             const index<T, IdxT>& idx,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances)
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
-  using none_filter_type = cuvs::neighbors::filtering::none_cagra_sample_filter;
-  return cagra::search_with_filtering<T, IdxT, none_filter_type>(
-    res, params, idx, queries, neighbors, distances, none_filter_type{});
+  try {
+    using none_filter_type  = cuvs::neighbors::filtering::none_sample_filter;
+    auto& sample_filter     = dynamic_cast<const none_filter_type&>(sample_filter_ref);
+    auto sample_filter_copy = sample_filter;
+    return search_with_filtering<T, IdxT, none_filter_type>(
+      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+    return;
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
+        sample_filter_ref);
+    auto sample_filter_copy = sample_filter;
+    return search_with_filtering<T, IdxT, decltype(sample_filter_copy)>(
+      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+  } catch (const std::bad_cast&) {
+    RAFT_FAIL("Unsupported sample filter type");
+  }
 }
 
 template <class T, class IdxT, class Accessor>

@@ -282,7 +282,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
 
     // Filtering
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_sample_filter>::value) {
       constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
       const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
 
@@ -305,7 +305,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
 
   // Post process for filtering
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                              cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                              cuvs::neighbors::filtering::none_sample_filter>::value) {
     constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
     const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
 
