@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cuvs_ivf_pq_wrapper.h"
 
-namespace cuvs::bench {
-template class cuvs_ivf_pq<float, int64_t>;
-template class cuvs_ivf_pq<half, int64_t>;
-template class cuvs_ivf_pq<uint8_t, int64_t>;
-template class cuvs_ivf_pq<int8_t, int64_t>;
-}  // namespace cuvs::bench
+#include "./select_k.cuh"
+
+instantiate_cuvs_selection_select_k(float, int);

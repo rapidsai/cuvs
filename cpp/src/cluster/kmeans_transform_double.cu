@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "cuvs_ivf_pq_wrapper.h"
 
-namespace cuvs::bench {
-template class cuvs_ivf_pq<float, int64_t>;
-template class cuvs_ivf_pq<half, int64_t>;
-template class cuvs_ivf_pq<uint8_t, int64_t>;
-template class cuvs_ivf_pq<int8_t, int64_t>;
-}  // namespace cuvs::bench
+#include "kmeans.cuh"
+#include <raft/core/resources.hpp>
+
+namespace cuvs::cluster::kmeans {
+
+void transform(raft::resources const& handle,
+               const kmeans::params& params,
+               raft::device_matrix_view<const double, int> X,
+               raft::device_matrix_view<const double, int> centroids,
+               raft::device_matrix_view<double, int> X_new)
+
+{
+  cuvs::cluster::kmeans::transform<double, int>(handle, params, X, centroids, X_new);
+}
+}  // namespace cuvs::cluster::kmeans

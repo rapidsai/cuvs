@@ -194,6 +194,8 @@ void serialize_to_hnswlib(raft::resources const& res,
         auto data_elem = static_cast<int>(host_dataset(i, j));
         os.write(reinterpret_cast<char*>(&data_elem), sizeof(int));
       }
+    } else {
+      RAFT_FAIL("Unsupported dataset type while saving CAGRA dataset to HNSWlib format");
     }
 
     os.write(reinterpret_cast<char*>(&i), sizeof(std::size_t));
