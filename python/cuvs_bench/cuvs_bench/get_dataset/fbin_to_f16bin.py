@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import numpy as np
 
 def read_fbin(fname):
     shape = np.fromfile(fname, dtype=np.uint32, count=2)
-    if float(shape[0]) * shape[1] * 4 > 2000000000:
+    if float(shape[0]) * shape[1] * 4 > 2_000_000_000:
         data = np.memmap(fname, dtype=np.float32, offset=8, mode="r").reshape(
             shape
         )

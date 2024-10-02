@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,8 +92,6 @@ def memmap_bin_file(
             bin_file, mode="r+", dtype=dtype, offset=offset, shape=shape
         )
         return fp
-
-    # print('# {}: shape: {}, dtype: {}'.format(bin_file, shape, dtype))
 
 
 def write_bin(fname, data):

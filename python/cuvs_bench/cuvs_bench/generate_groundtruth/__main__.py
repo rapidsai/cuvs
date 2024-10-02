@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -171,7 +171,7 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
         type=str,
         default="sqeuclidean",
         help="Metric to use while calculating distances. Valid metrics are "
-        "those that are accepted by pylibraft.neighbors.brute_force.knn. Most"
+        "those that are accepted by cuvs.neighbors.brute_force.knn. Most"
         " commonly used with RAFT ANN are 'sqeuclidean' and 'inner_product'",
     )
 
