@@ -309,8 +309,15 @@ void pairwise_distance_kmeans(raft::resources const& handle,
                              DataT,
                              raft::layout_c_contiguous,
                              IndexT>(handle, X, centroids, pairwiseDistance);
+  } else if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2SqrtExpanded,
+                             DataT,
+                             DataT,
+                             DataT,
+                             raft::layout_c_contiguous,
+                             IndexT>(handle, X, centroids, pairwiseDistance);
   } else {
-    RAFT_FAIL("kmeans requires L2Expanded distance, have %i", metric);
+    RAFT_FAIL("kmeans requires L2Expanded or L2SqrtExpanded distance, have %i", metric);
   }
 }
 

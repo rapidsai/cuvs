@@ -248,6 +248,10 @@ instantiate_cuvs_distance_distance(
   cuvs::distance::DistanceType::L2Expanded, float, float, float, int64_t);
 instantiate_cuvs_distance_distance(
   cuvs::distance::DistanceType::L2Expanded, double, double, double, int64_t);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2SqrtExpanded, float, float, float, int64_t);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2SqrtExpanded, double, double, double, int64_t);
 
 #undef instantiate_cuvs_distance_distance_by_algo
 #undef instantiate_cuvs_distance_distance
