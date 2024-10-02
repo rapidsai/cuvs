@@ -130,7 +130,7 @@ auto create_algo(const std::string& algo_name,
   if (algo_name == "raft_mg_cagra" || algo_name == "cuvs_mg_cagra") {
     typename cuvs::bench::cuvs_mg_cagra<T, uint32_t>::build_param param;
     parse_build_param<T, uint32_t>(conf, param);
-    add_distribution_mode(&param.cagra_params.mode, conf);
+    add_distribution_mode(&param.mode, conf);
     a = std::make_unique<cuvs::bench::cuvs_mg_cagra<T, uint32_t>>(metric, dim, param);
   }
 

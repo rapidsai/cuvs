@@ -67,6 +67,10 @@ enum sharded_merge_mode {
 /// \ingroup mg_cpp_index_params
 template <typename Upstream>
 struct index_params : public Upstream {
+  index_params() : mode(SHARDED) {}
+
+  index_params(const Upstream& sp) : Upstream(sp), mode(SHARDED) {}
+
   /** Distribution mode */
   cuvs::neighbors::mg::distribution_mode mode = SHARDED;
 };
@@ -75,6 +79,13 @@ struct index_params : public Upstream {
 /// \ingroup mg_cpp_search_params
 template <typename Upstream>
 struct search_params : public Upstream {
+  search_params() : search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE) {}
+
+  search_params(const Upstream& sp)
+    : Upstream(sp), search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE)
+  {
+  }
+
   /** Replicated search mode */
   cuvs::neighbors::mg::replicated_search_mode search_mode = LOAD_BALANCER;
   /** Sharded merge mode */

@@ -188,11 +188,7 @@ nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
 
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
-#if defined(CUVS_ANN_BENCH_USE_CUVS_MG)
-                       typename cuvs::bench::cuvs_mg_cagra<T, IdxT>::build_param& param)
-#else
                        typename cuvs::bench::cuvs_cagra<T, IdxT>::build_param& param)
-#endif
 {
   if (conf.contains("graph_degree")) {
     param.cagra_params.graph_degree              = conf.at("graph_degree");

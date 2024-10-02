@@ -32,13 +32,8 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
 
-  struct build_param {
-    cuvs::neighbors::mg::index_params<cagra::index_params> cagra_params;
-    CagraBuildAlgo algo;
-    std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
-    std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
-    std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
-    std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
+  struct build_param : public cuvs::bench::cuvs_cagra<T, IdxT>::build_param {
+    cuvs::neighbors::mg::distribution_mode mode;
   };
 
   struct search_param : public cuvs::bench::cuvs_cagra<T, IdxT>::search_param {
@@ -104,31 +99,13 @@ template <typename T, typename IdxT>
 void cuvs_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_extents = raft::make_extents<IdxT>(nrow, dim_);
-
-  auto& params = index_params_.cagra_params;
-  if (index_params_.algo == CagraBuildAlgo::kIvfPq) {
-    auto pq_params =
-      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extents, params.metric);
-    if (index_params_.ivf_pq_build_params) {
-      pq_params.build_params = *index_params_.ivf_pq_build_params;
-    }
-    if (index_params_.ivf_pq_search_params) {
-      pq_params.search_params = *index_params_.ivf_pq_search_params;
-    }
-    if (index_params_.ivf_pq_refine_rate) {
-      pq_params.refinement_rate = *index_params_.ivf_pq_refine_rate;
-    }
-    params.graph_build_params = pq_params;
-  } else if (index_params_.algo == CagraBuildAlgo::kNnDescent) {
-    auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-      params.intermediate_graph_degree);
-    if (index_params_.nn_descent_params) { nn_params = *index_params_.nn_descent_params; }
-    params.graph_build_params = nn_params;
-  }
+  index_params_.prepare_build_params(dataset_extents);
+  cuvs::neighbors::mg::index_params<cagra::index_params> build_params = index_params_.cagra_params;
+  build_params.mode                                                   = index_params_.mode;
 
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, nrow, dim_);
-  auto idx = cuvs::neighbors::mg::build(handle_, params, dataset_view);
+  auto idx = cuvs::neighbors::mg::build(handle_, build_params, dataset_view);
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
       std::move(idx));
