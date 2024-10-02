@@ -198,7 +198,7 @@ void kmeansPlusPlus(raft::resources const& handle,
     // Output - pwd [n_trials x n_samples]
     auto pwd = distBuffer.view();
     cuvs::cluster::kmeans::detail::pairwise_distance_kmeans<DataT, IndexT>(
-      handle, centroidCandidates.view(), X, pwd, workspace, metric);
+      handle, centroidCandidates.view(), X, pwd, metric);
 
     // Update nearest cluster distance for each centroid candidate
     // Note pwd and minDistBuf points to same buffer which currently holds pairwise distance values.
@@ -1247,7 +1247,7 @@ void kmeans_transform(raft::resources const& handle,
     // calculate pairwise distance between cluster centroids and current batch
     // of input dataset
     pairwise_distance_kmeans<DataT, IndexT>(
-      handle, datasetView, centroids, pairwiseDistanceView, workspace, metric);
+      handle, datasetView, centroids, pairwiseDistanceView, metric);
   }
 }
 
