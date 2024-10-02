@@ -16,7 +16,7 @@ set(CUVS_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
 set(CUVS_FORK "rapidsai")
 set(CUVS_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
 
-function(find_and_configure_raft)
+function(find_and_configure_cuvs)
     set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
