@@ -177,8 +177,6 @@ function(ConfigureAnnBench)
     )
   endif()
 
-  target_compile_definitions(${BENCH_NAME} PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
-
   target_include_directories(
     ${BENCH_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
