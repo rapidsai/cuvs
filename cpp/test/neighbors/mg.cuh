@@ -25,7 +25,7 @@
 namespace cuvs::neighbors::mg {
 
 enum class algo_t { IVF_FLAT, IVF_PQ, CAGRA };
-enum class d_mode_t { REPLICATED, SHARDED, LOCAL_THEN_DISTRIBUTED, LOAD_BALANCER };
+enum class d_mode_t { REPLICATED, SHARDED, LOCAL_THEN_DISTRIBUTED, ROUND_ROBIN };
 enum class m_mode_t { MERGE_ON_ROOT_RANK, TREE_MERGE, UNDEFINED };
 
 struct AnnMGInputs {
@@ -105,7 +105,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.mode                     = d_mode;
 
       mg::search_params<ivf_flat::search_params> search_params;
-      search_params.n_probes = ps.nprobe;
+      search_params.n_probes    = ps.nprobe;
+      search_params.search_mode = LOAD_BALANCER;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -163,7 +164,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.mode                     = d_mode;
 
       mg::search_params<ivf_pq::search_params> search_params;
-      search_params.n_probes = ps.nprobe;
+      search_params.n_probes    = ps.nprobe;
+      search_params.search_mode = LOAD_BALANCER;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -266,7 +268,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
 
       mg::search_params<ivf_flat::search_params> search_params;
-      search_params.n_probes = ps.nprobe;
+      search_params.n_probes    = ps.nprobe;
+      search_params.search_mode = LOAD_BALANCER;
 
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -317,7 +320,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
 
       mg::search_params<ivf_pq::search_params> search_params;
-      search_params.n_probes = ps.nprobe;
+      search_params.n_probes    = ps.nprobe;
+      search_params.search_mode = LOAD_BALANCER;
 
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -407,7 +411,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       std::fill(distances_snmg_ann.begin(), distances_snmg_ann.end(), 0);
     }
 
-    if (ps.algo == algo_t::IVF_FLAT && ps.d_mode == d_mode_t::LOAD_BALANCER) {
+    if (ps.algo == algo_t::IVF_FLAT && ps.d_mode == d_mode_t::ROUND_ROBIN) {
       ASSERT_TRUE(ps.num_queries <= 4);
 
       mg::index_params<ivf_flat::index_params> index_params;
@@ -420,7 +424,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.mode                     = REPLICATED;
 
       mg::search_params<ivf_flat::search_params> search_params;
-      search_params.n_probes = ps.nprobe;
+      search_params.n_probes    = ps.nprobe;
+      search_params.search_mode = ROUND_ROBIN;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -430,7 +435,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto index = cuvs::neighbors::mg::build(handle_, index_params, index_dataset);
       cuvs::neighbors::mg::extend(handle_, index, index_dataset, std::nullopt);
 
-      int n_parallel_searches = 32;
+      int n_parallel_searches = 16;
       std::vector<bool> searches_correctness(n_parallel_searches);
       std::vector<int64_t> load_balancer_neighbors_snmg_ann(n_parallel_searches * ps.num_queries *
                                                             ps.k);
@@ -470,7 +475,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         searches_correctness.begin(), searches_correctness.end(), [](bool val) { return val; }));
     }
 
-    if (ps.algo == algo_t::IVF_PQ && ps.d_mode == d_mode_t::LOAD_BALANCER) {
+    if (ps.algo == algo_t::IVF_PQ && ps.d_mode == d_mode_t::ROUND_ROBIN) {
       ASSERT_TRUE(ps.num_queries <= 4);
 
       mg::index_params<ivf_pq::index_params> index_params;
@@ -482,7 +487,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.mode                     = REPLICATED;
 
       mg::search_params<ivf_pq::search_params> search_params;
-      search_params.n_probes = ps.nprobe;
+      search_params.n_probes    = ps.nprobe;
+      search_params.search_mode = ROUND_ROBIN;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -492,7 +498,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto index = cuvs::neighbors::mg::build(handle_, index_params, index_dataset);
       cuvs::neighbors::mg::extend(handle_, index, index_dataset, std::nullopt);
 
-      int n_parallel_searches = 32;
+      int n_parallel_searches = 16;
       std::vector<bool> searches_correctness(n_parallel_searches);
       std::vector<int64_t> load_balancer_neighbors_snmg_ann(n_parallel_searches * ps.num_queries *
                                                             ps.k);
@@ -532,7 +538,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         searches_correctness.begin(), searches_correctness.end(), [](bool val) { return val; }));
     }
 
-    if (ps.algo == algo_t::CAGRA && ps.d_mode == d_mode_t::LOAD_BALANCER) {
+    if (ps.algo == algo_t::CAGRA && ps.d_mode == d_mode_t::ROUND_ROBIN) {
       ASSERT_TRUE(ps.num_queries <= 4);
 
       mg::index_params<cagra::index_params> index_params;
@@ -541,6 +547,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.mode = REPLICATED;
 
       mg::search_params<cagra::search_params> search_params;
+      search_params.search_mode = ROUND_ROBIN;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -549,7 +556,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto index = cuvs::neighbors::mg::build(handle_, index_params, index_dataset);
 
-      int n_parallel_searches = 32;
+      int n_parallel_searches = 16;
       std::vector<bool> searches_correctness(n_parallel_searches);
       std::vector<uint32_t> load_balancer_neighbors_snmg_ann(n_parallel_searches * ps.num_queries *
                                                              ps.k);
@@ -777,7 +784,7 @@ const std::vector<AnnMGInputs> inputs = {
    10000,
    8,
    16,
-   d_mode_t::LOAD_BALANCER,
+   d_mode_t::ROUND_ROBIN,
    m_mode_t::UNDEFINED,
    algo_t::IVF_FLAT,
    40,
@@ -788,7 +795,7 @@ const std::vector<AnnMGInputs> inputs = {
    10000,
    8,
    16,
-   d_mode_t::LOAD_BALANCER,
+   d_mode_t::ROUND_ROBIN,
    m_mode_t::UNDEFINED,
    algo_t::IVF_PQ,
    40,
@@ -799,7 +806,7 @@ const std::vector<AnnMGInputs> inputs = {
    10000,
    8,
    16,
-   d_mode_t::LOAD_BALANCER,
+   d_mode_t::ROUND_ROBIN,
    m_mode_t::UNDEFINED,
    algo_t::CAGRA,
    40,

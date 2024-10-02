@@ -38,8 +38,6 @@ void search(const raft::device_resources& handle,
 }  // namespace cuvs::neighbors
 
 namespace cuvs::neighbors::mg {
-constexpr int smallSearchBatchSize = 4;
-
 void check_omp_threads(const int requirements);
 }  // namespace cuvs::neighbors::mg
 
@@ -499,47 +497,64 @@ void search(const raft::device_resources& handle,
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
 
-  bool run_load_balancer =
-    index.mode_ == REPLICATED && n_rows <= cuvs::neighbors::mg::smallSearchBatchSize;
-  if (run_load_balancer) {
-    auto& lbc    = *index.load_balancing_counter_;
-    int64_t rank = lbc++;
-    rank %= index.num_ranks_;
-
-    run_search_batch(clique,
-                     index,
-                     rank,
-                     search_params,
-                     queries,
-                     neighbors,
-                     distances,
-                     0,
-                     0,
-                     n_rows,
-                     n_cols,
-                     n_neighbors);
-    return;
-  }
-
   if (index.mode_ == REPLICATED) {
-    int64_t n_rows_per_rank = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
-    n_rows_per_batch =
-      std::min(n_rows_per_batch, n_rows_per_rank);  // get at least num_ranks_ batches
-  }
+    cuvs::neighbors::mg::replicated_search_mode search_mode;
+    if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
+      const cuvs::neighbors::mg::search_params<ivf_flat::search_params>* mg_search_params =
+        static_cast<const cuvs::neighbors::mg::search_params<ivf_flat::search_params>*>(
+          search_params);
+      search_mode = mg_search_params->search_mode;
+    } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
+      const cuvs::neighbors::mg::search_params<ivf_pq::search_params>* mg_search_params =
+        static_cast<const cuvs::neighbors::mg::search_params<ivf_pq::search_params>*>(
+          search_params);
+      search_mode = mg_search_params->search_mode;
+    } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
+      const cuvs::neighbors::mg::search_params<cagra::search_params>* mg_search_params =
+        static_cast<const cuvs::neighbors::mg::search_params<cagra::search_params>*>(search_params);
+      search_mode = mg_search_params->search_mode;
+    }
 
-  int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
-  if (n_batches <= 1) n_rows_per_batch = n_rows;
+    if (search_mode == LOAD_BALANCER) {
+      int64_t n_rows_per_rank = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
+      n_rows_per_batch =
+        std::min(n_rows_per_batch, n_rows_per_rank);  // get at least num_ranks_ batches
+      int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
+      if (n_batches <= 1) n_rows_per_batch = n_rows;
 
-  if (index.mode_ == REPLICATED) {
-    RAFT_LOG_INFO("REPLICATED SEARCH: %d*%drows", n_batches, n_rows_per_batch);
+      RAFT_LOG_INFO(
+        "REPLICATED SEARCH IN LOAD BALANCER MODE: %d*%drows", n_batches, n_rows_per_batch);
 
 #pragma omp parallel for
-    for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
-      int rank                        = batch_idx % index.num_ranks_;  // alternate GPUs
-      int64_t offset                  = batch_idx * n_rows_per_batch;
-      int64_t query_offset            = offset * n_cols;
-      int64_t output_offset           = offset * n_neighbors;
-      int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
+      for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
+        int rank                        = batch_idx % index.num_ranks_;  // alternate GPUs
+        int64_t offset                  = batch_idx * n_rows_per_batch;
+        int64_t query_offset            = offset * n_cols;
+        int64_t output_offset           = offset * n_neighbors;
+        int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
+
+        run_search_batch(clique,
+                         index,
+                         rank,
+                         search_params,
+                         queries,
+                         neighbors,
+                         distances,
+                         query_offset,
+                         output_offset,
+                         n_rows_of_current_batch,
+                         n_cols,
+                         n_neighbors);
+      }
+    } else if (search_mode == ROUND_ROBIN) {
+      RAFT_LOG_INFO("REPLICATED SEARCH IN ROUND ROBIN MODE: %d*%drows", 1, n_rows);
+
+      ASSERT(n_rows <= n_rows_per_batch,
+             "In round-robin mode, n_rows must lower or equal to n_rows_per_batch");
+
+      auto& rrc    = *index.round_robin_counter_;
+      int64_t rank = rrc++;
+      rank %= index.num_ranks_;
 
       run_search_batch(clique,
                        index,
@@ -548,9 +563,9 @@ void search(const raft::device_resources& handle,
                        queries,
                        neighbors,
                        distances,
-                       query_offset,
-                       output_offset,
-                       n_rows_of_current_batch,
+                       0,
+                       0,
+                       n_rows,
                        n_cols,
                        n_neighbors);
     }
@@ -571,6 +586,9 @@ void search(const raft::device_resources& handle,
         static_cast<const cuvs::neighbors::mg::search_params<cagra::search_params>*>(search_params);
       merge_mode = mg_search_params->merge_mode;
     }
+
+    int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
+    if (n_batches <= 1) n_rows_per_batch = n_rows;
 
     if (merge_mode == MERGE_ON_ROOT_RANK) {
       RAFT_LOG_INFO("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
@@ -640,14 +658,14 @@ template <typename AnnIndexType, typename T, typename IdxT>
 index<AnnIndexType, T, IdxT>::index(distribution_mode mode, int num_ranks_)
   : mode_(mode),
     num_ranks_(num_ranks_),
-    load_balancing_counter_(std::make_shared<std::atomic<int64_t>>(0))
+    round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
 index<AnnIndexType, T, IdxT>::index(const raft::device_resources& handle,
                                     const std::string& filename)
-  : load_balancing_counter_(std::make_shared<std::atomic<int64_t>>(0))
+  : round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
   cuvs::neighbors::mg::detail::deserialize(handle, *this, filename);
 }

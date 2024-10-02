@@ -45,6 +45,15 @@ enum distribution_mode {
 
 /// \defgroup mg_cpp_search_params ANN MG search parameters
 
+/** Search mode when using a replicated index */
+/// \ingroup mg_cpp_search_params
+enum replicated_search_mode {
+  /** Search queries are splited to maintain equal load on GPUs */
+  LOAD_BALANCER,
+  /** Each search query is processed by a single GPU in a round-robin fashion */
+  ROUND_ROBIN
+};
+
 /** Merge mode when using a sharded index */
 /// \ingroup mg_cpp_search_params
 enum sharded_merge_mode {
@@ -66,7 +75,9 @@ struct index_params : public Upstream {
 /// \ingroup mg_cpp_search_params
 template <typename Upstream>
 struct search_params : public Upstream {
-  /** Sharded search mode */
+  /** Replicated search mode */
+  cuvs::neighbors::mg::replicated_search_mode search_mode = LOAD_BALANCER;
+  /** Sharded merge mode */
   cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
 };
 
@@ -91,7 +102,7 @@ struct index {
   std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
 
   // for load balancing mechanism
-  std::shared_ptr<std::atomic<int64_t>> load_balancing_counter_;
+  std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
 };
 
 /// \defgroup mg_cpp_index_build ANN MG index build
