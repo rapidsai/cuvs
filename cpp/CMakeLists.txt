@@ -205,7 +205,7 @@ endif()
 
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
-if(NOT BUILD_SHARED_LIBS)
+if(BUILD_SHARED_LIBS)
   add_library(
     cuvs-cagra-search STATIC
     src/neighbors/cagra_search_float.cu
