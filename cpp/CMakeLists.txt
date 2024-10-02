@@ -181,6 +181,7 @@ rapids_cpm_init()
 
 if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
+  include(cmake/thirdparty/get_cutlass.cmake)
 endif()
 
 if(BUILD_C_LIBRARY)
@@ -191,8 +192,6 @@ if(BUILD_TESTS OR BUILD_C_TESTS)
   include(${rapids-cmake-dir}/cpm/gtest.cmake)
   rapids_cpm_gtest(BUILD_STATIC)
 endif()
-
-include(cmake/thirdparty/get_cutlass.cmake)
 
 if(BUILD_CUVS_BENCH)
   include(${rapids-cmake-dir}/cpm/gbench.cmake)
