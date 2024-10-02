@@ -528,7 +528,7 @@ void sort_knn_graph(
     kernel_sort                        = kern_sort<DataT, IdxT, numElementsPerThread>;
   } else {
     RAFT_FAIL(
-      "The degree of input knn graph is too large (%u). "
+      "The degree of input knn graph is too large (%lu). "
       "It must be equal to or smaller than %d.",
       input_graph_degree,
       1024);
