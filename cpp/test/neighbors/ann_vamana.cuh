@@ -46,7 +46,7 @@
 #include <string>
 #include <vector>
 
-namespace cuvs::neighbors::vamana {
+namespace cuvs::neighbors::experimental::vamana {
 
 struct edge_op {
   template <typename Type, typename... UnusedArgs>
@@ -336,4 +336,4 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 
 const std::vector<AnnVamanaInputs> inputs = generate_inputs();
 
-}  // namespace cuvs::neighbors::vamana
+}  // namespace cuvs::neighbors::experimental::vamana

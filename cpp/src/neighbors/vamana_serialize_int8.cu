@@ -16,8 +16,8 @@
 
 #include "vamana_serialize.cuh"
 
-namespace cuvs::neighbors::vamana {
+namespace cuvs::neighbors::experimental::vamana {
 
 CUVS_INST_VAMANA_SERIALIZE(int8_t);
 
-}  // namespace cuvs::neighbors::vamana
+}  // namespace cuvs::neighbors::experimental::vamana

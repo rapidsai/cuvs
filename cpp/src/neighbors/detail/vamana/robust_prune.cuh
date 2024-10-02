@@ -22,7 +22,7 @@
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
-namespace cuvs::neighbors::vamana::detail {
+namespace cuvs::neighbors::experimental::vamana::detail {
 
 // Load candidates (from query) and previous edges (from nbh_list) into registers (tmp) spanning
 // warp
@@ -241,4 +241,4 @@ __global__ void RobustPruneKernel(
   }
 }
 
-}  // namespace cuvs::neighbors::vamana::detail
+}  // namespace cuvs::neighbors::experimental::vamana::detail

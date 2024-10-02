@@ -34,7 +34,7 @@
 
 #include <cuvs/distance/distance.hpp>
 
-namespace cuvs::neighbors::vamana::detail {
+namespace cuvs::neighbors::experimental::vamana::detail {
 
 /* @defgroup vamana_structures vamana structures
  * @{
@@ -471,4 +471,4 @@ __global__ void recompute_reverse_dists(
  * @}
  */
 
-}  // namespace cuvs::neighbors::vamana::detail
+}  // namespace cuvs::neighbors::experimental::vamana::detail

@@ -18,11 +18,11 @@
 
 #include "../ann_vamana.cuh"
 
-namespace cuvs::neighbors::vamana {
+namespace cuvs::neighbors::experimental::vamana {
 
 typedef AnnVamanaTest<float, uint8_t, std::uint32_t> AnnVamanaTestU8_U32;
 TEST_P(AnnVamanaTestU8_U32, AnnVamana) { this->testVamana(); }
 
 INSTANTIATE_TEST_CASE_P(AnnVamanaTest, AnnVamanaTestU8_U32, ::testing::ValuesIn(inputs));
 
-}  // namespace cuvs::neighbors::vamana
+}  // namespace cuvs::neighbors::experimental::vamana
