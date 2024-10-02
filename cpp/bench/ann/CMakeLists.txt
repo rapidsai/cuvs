@@ -42,6 +42,10 @@ option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 
 find_package(Threads REQUIRED)
 
+if(NOT BUILD_SHARED_LIBS)
+  include(cmake/thirdparty/get_cuvs.cmake)
+endif()
+
 set(CUVS_ANN_BENCH_USE_FAISS ON)
 set(CUVS_FAISS_ENABLE_GPU ON)
 set(CUVS_USE_FAISS_STATIC ON)
