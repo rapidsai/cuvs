@@ -51,9 +51,9 @@ endfunction()
 # Change pinned tag here to test a commit in CI
 # To use a different cuVS locally, set the CMake variable
 # CPM_cuvs_SOURCE=/path/to/local/cuvs
-find_and_configure_cuvs(VERSION  ${RAFT_VERSION}.00
-        FORK                     ${RAFT_FORK}
-        PINNED_TAG               ${RAFT_PINNED_TAG}
+find_and_configure_cuvs(VERSION  ${CUVS_VERSION}.00
+        FORK                     ${CUVS_FORK}
+        PINNED_TAG               ${CUVS_PINNED_TAG}
         ENABLE_NVTX              OFF
         # When PINNED_TAG above doesn't match the default rapids branch,
         # force local raft clone in build directory
