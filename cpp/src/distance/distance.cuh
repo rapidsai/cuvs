@@ -15,8 +15,4 @@
  */
 #pragma once
 
-#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
-#include "distance-inl.cuh"
-#endif
-
 #include "distance-ext.cuh"
