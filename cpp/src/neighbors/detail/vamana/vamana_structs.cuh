@@ -286,6 +286,8 @@ struct QueryCandidates {
   */
 };
 
+namespace {
+
 /********************************************************************************************
  * Kernels that work on QueryCandidates objects *
  *******************************************************************************************/
@@ -466,6 +468,8 @@ __global__ void recompute_reverse_dists(
     }
   }
 }
+
+} // Empty namespace
 
 /**
  * @}

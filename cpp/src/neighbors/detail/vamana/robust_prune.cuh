@@ -103,6 +103,8 @@ __forceinline__ __device__ void sort_edges_and_cands(
   __syncthreads();
 }
 
+namespace {
+
 /********************************************************************************************
   GPU kernel for RobustPrune operation for Vamana graph creation
   Input - *graph to be an edgelist of degree number of edges per vector,
@@ -240,5 +242,7 @@ __global__ void RobustPruneKernel(
     }
   }
 }
+
+} // Empty namespace
 
 }  // namespace cuvs::neighbors::experimental::vamana::detail

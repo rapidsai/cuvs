@@ -62,6 +62,8 @@ __forceinline__ __device__ void sort_visited(
   __syncthreads();
 }
 
+namespace {
+
 /********************************************************************************************
   GPU kernel to perform a batched GreedySearch on a graph. Since this is used for
   Vamana construction, the entire visited list is kept and stored within the query_list.
@@ -274,6 +276,8 @@ __global__ void GreedySearchKernel(
 
   return;
 }
+
+} // Empty namespace
 
 /**
  * @}
