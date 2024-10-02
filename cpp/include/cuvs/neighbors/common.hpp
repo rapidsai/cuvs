@@ -649,7 +649,7 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void search(const raft::device_resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
-            raft::host_matrix_view<const T, int64_t, row_major> h_queries,
+            raft::device_matrix_view<const T, int64_t, row_major> h_queries,
             raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances);
 

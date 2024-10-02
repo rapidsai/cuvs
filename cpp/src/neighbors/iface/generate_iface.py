@@ -81,6 +81,13 @@ flat_macro = """
   template void search(const raft::device_resources& handle,                                                                    \\
               const cuvs::neighbors::iface<ivf_flat::index<T, IdxT>, T, IdxT>& interface,                                       \\
               const cuvs::neighbors::search_params* search_params,                                                              \\
+              raft::device_matrix_view<const T, int64_t, row_major> h_queries,                                                  \\
+              raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,                                                   \\
+              raft::device_matrix_view<float, int64_t, row_major> d_distances);                                                 \\
+                                                                                                                                \\
+  template void search(const raft::device_resources& handle,                                                                    \\
+              const cuvs::neighbors::iface<ivf_flat::index<T, IdxT>, T, IdxT>& interface,                                       \\
+              const cuvs::neighbors::search_params* search_params,                                                              \\
               raft::host_matrix_view<const T, int64_t, row_major> h_queries,                                                    \\
               raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,                                                   \\
               raft::device_matrix_view<float, int64_t, row_major> d_distances);                                                 \\
@@ -124,6 +131,13 @@ pq_macro = """
               cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                                                  \\
               raft::mdspan<const T, matrix_extent<int64_t>, row_major, T_da> new_vectors,                                       \\
               std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, IdxT_da>> new_indices);       \\
+                                                                                                                                \\
+  template void search(const raft::device_resources& handle,                                                                    \\
+              const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                                            \\
+              const cuvs::neighbors::search_params* search_params,                                                              \\
+              raft::device_matrix_view<const T, int64_t, row_major> h_queries,                                                  \\
+              raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,                                                   \\
+              raft::device_matrix_view<float, int64_t, row_major> d_distances);                                                 \\
                                                                                                                                 \\
   template void search(const raft::device_resources& handle,                                                                    \\
               const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                                            \\
@@ -173,6 +187,13 @@ cagra_macro = """
               std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, IdxT_da>> new_indices);       \\
                                                                                                                                 \\
   template void search(const raft::device_resources& handle,                                                                    \\
+              const cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                          \\
+              const cuvs::neighbors::search_params* search_params,                                                              \\
+              raft::device_matrix_view<const T, int64_t, row_major> h_queries,                                                  \\
+              raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,                                                   \\
+              raft::device_matrix_view<float, int64_t, row_major> d_distances);                                                 \\
+                                                                                                                                \\
+    template void search(const raft::device_resources& handle,                                                                  \\
               const cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                          \\
               const cuvs::neighbors::search_params* search_params,                                                              \\
               raft::host_matrix_view<const T, int64_t, row_major> h_queries,                                                    \\

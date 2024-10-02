@@ -25,6 +25,18 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/mg.hpp>
 
+namespace cuvs::neighbors {
+using namespace raft;
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void search(const raft::device_resources& handle,
+            const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+            const cuvs::neighbors::search_params* search_params,
+            raft::host_matrix_view<const T, int64_t, row_major> h_queries,
+            raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+            raft::device_matrix_view<float, int64_t, row_major> d_distances);
+}  // namespace cuvs::neighbors
+
 namespace cuvs::neighbors::mg {
 constexpr int smallSearchBatchSize = 4;
 

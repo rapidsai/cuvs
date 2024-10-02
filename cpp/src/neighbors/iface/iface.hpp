@@ -67,6 +67,44 @@ template <typename AnnIndexType, typename T, typename IdxT>
 void search(const raft::device_resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
+            raft::device_matrix_view<const T, int64_t, row_major> queries,
+            raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, row_major> distances)
+{
+  // interface.mutex_->lock();
+  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, int64_t>>::value) {
+    cuvs::neighbors::ivf_flat::search(
+      handle,
+      *reinterpret_cast<const ivf_flat::search_params*>(search_params),
+      interface.index_.value(),
+      queries,
+      neighbors,
+      distances);
+  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<int64_t>>::value) {
+    cuvs::neighbors::ivf_pq::search(handle,
+                                    *reinterpret_cast<const ivf_pq::search_params*>(search_params),
+                                    interface.index_.value(),
+                                    queries,
+                                    neighbors,
+                                    distances);
+  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, uint32_t>>::value) {
+    cuvs::neighbors::cagra::search(handle,
+                                   *reinterpret_cast<const cagra::search_params*>(search_params),
+                                   interface.index_.value(),
+                                   queries,
+                                   neighbors,
+                                   distances);
+  }
+  resource::sync_stream(handle);
+
+  // interface.mutex_->unlock();
+}
+
+// for MG ANN only
+template <typename AnnIndexType, typename T, typename IdxT>
+void search(const raft::device_resources& handle,
+            const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+            const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> h_queries,
             raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances)
@@ -82,30 +120,7 @@ void search(const raft::device_resources& handle,
              resource::get_cuda_stream(handle));
   auto d_query_view = raft::make_const_mdspan(d_queries.view());
 
-  if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, int64_t>>::value) {
-    cuvs::neighbors::ivf_flat::search(
-      handle,
-      *reinterpret_cast<const ivf_flat::search_params*>(search_params),
-      interface.index_.value(),
-      d_query_view,
-      d_neighbors,
-      d_distances);
-  } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<int64_t>>::value) {
-    cuvs::neighbors::ivf_pq::search(handle,
-                                    *reinterpret_cast<const ivf_pq::search_params*>(search_params),
-                                    interface.index_.value(),
-                                    d_query_view,
-                                    d_neighbors,
-                                    d_distances);
-  } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, uint32_t>>::value) {
-    cuvs::neighbors::cagra::search(handle,
-                                   *reinterpret_cast<const cagra::search_params*>(search_params),
-                                   interface.index_.value(),
-                                   d_query_view,
-                                   d_neighbors,
-                                   d_distances);
-  }
-  resource::sync_stream(handle);
+  search(handle, interface, search_params, d_query_view, d_neighbors, d_distances);
 
   // interface.mutex_->unlock();
 }
