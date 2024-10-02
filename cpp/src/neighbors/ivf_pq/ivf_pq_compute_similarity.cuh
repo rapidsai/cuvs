@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../sample_filter.cuh"  // none_ivf_sample_filter
+#include "../sample_filter.cuh"  // none_sample_filter
 #include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
 #include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
@@ -177,37 +177,37 @@ instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
   cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
   cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
   half,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
   half,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
   float,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
   cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   float,
   cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
   cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,

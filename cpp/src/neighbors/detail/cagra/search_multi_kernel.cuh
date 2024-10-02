@@ -365,7 +365,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   }
 
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                              cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                              cuvs::neighbors::filtering::none_sample_filter>::value) {
     if (!sample_filter(query_id, parent_index)) {
       parent_candidates_ptr[parent_list_index + (lds * query_id)] = utils::get_max_value<INDEX_T>();
       parent_distance_ptr[parent_list_index + (lds * query_id)] =
@@ -779,7 +779,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
 
     // Topk hint can not be used when applying a filter
     uint32_t* const top_hint_ptr =
-      std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_cagra_sample_filter>::value
+      std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value
         ? topk_hint.data()
         : nullptr;
     // Init topk_hint
@@ -878,7 +878,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
     auto result_distances_ptr = result_distances.data() + (iter & 0x1) * result_buffer_size;
 
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_sample_filter>::value) {
       // Remove parent bit in search results
       remove_parent_bit(num_queries,
                         result_buffer_size,
