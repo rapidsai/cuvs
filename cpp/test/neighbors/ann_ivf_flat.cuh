@@ -304,7 +304,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       ivf::resize_list(handle_, lists[label], list_device_spec, list_size, 0);
     }
 
-    idx.recompute_internal_state(handle_);
+    ivf_flat::helpers::recompute_internal_state(handle_, &idx);
 
     using interleaved_group = raft::Pow2<kIndexGroupSize>;
 
@@ -466,18 +466,19 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
         cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
           handle_, removed_indices.view(), ps.num_db_vecs);
+        auto bitset_filter_obj =
+          cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
 
         // Search with the filter
         auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
           search_queries.data(), ps.num_queries, ps.dim);
-        ivf_flat::search_with_filtering(
-          handle_,
-          search_params,
-          index,
-          search_queries_view,
-          indices_ivfflat_dev.view(),
-          distances_ivfflat_dev.view(),
-          cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+        ivf_flat::search(handle_,
+                         search_params,
+                         index,
+                         search_queries_view,
+                         indices_ivfflat_dev.view(),
+                         distances_ivfflat_dev.view(),
+                         bitset_filter_obj);
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);
