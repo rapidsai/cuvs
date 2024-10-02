@@ -100,9 +100,11 @@ def hnswlib_search(params, build_params, k, batch_size):
     if "ef" in params:
         return params["ef"] >= k
 
+
 ###############################################################################
 #                              DiskANN constraints                            #
 ###############################################################################
+
 
 def diskann_memory_build(params, dim):
     ret = True
