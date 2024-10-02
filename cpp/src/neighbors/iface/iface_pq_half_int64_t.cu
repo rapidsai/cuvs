@@ -66,9 +66,9 @@ namespace cuvs::neighbors {
   template void search(const raft::device_resources& handle,                                      \
                        const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,     \
                        const cuvs::neighbors::search_params* search_params,                       \
-                       raft::device_matrix_view<const T, int64_t, row_major> h_queries,           \
-                       raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,            \
-                       raft::device_matrix_view<float, int64_t, row_major> d_distances);          \
+                       raft::device_matrix_view<const T, int64_t, row_major> queries,             \
+                       raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,              \
+                       raft::device_matrix_view<float, int64_t, row_major> distances);            \
                                                                                                   \
   template void search(const raft::device_resources& handle,                                      \
                        const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,     \
