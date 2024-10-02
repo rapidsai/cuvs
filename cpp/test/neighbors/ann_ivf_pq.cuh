@@ -378,7 +378,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                   cuvs::Compare<uint8_t>{}));
 
     // Pack a few vectors back to the list.
-    int row_offset = 9;
+    int row_offset = 5;
     int n_vec      = 3;
     ASSERT_TRUE(row_offset + n_vec < n_rows);
     size_t offset      = row_offset * index->pq_dim();
