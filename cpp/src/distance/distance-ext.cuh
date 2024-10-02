@@ -26,8 +26,6 @@
 
 #include <cuda_fp16.h>
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
-
 namespace cuvs {
 namespace distance {
 
@@ -149,8 +147,6 @@ void pairwise_distance(raft::resources const& handle,
 };  // namespace distance
 };  // namespace cuvs
 
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
-
 /*
  * Hierarchy of instantiations:
  *
@@ -243,6 +239,15 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::L2Unexp
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Linf);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::LpUnexpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::RusselRaoExpanded);
+
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, float, float, float, int64_t);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2Expanded, double, double, double, int64_t);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2SqrtExpanded, float, float, float, int64_t);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::L2SqrtExpanded, double, double, double, int64_t);
 
 #undef instantiate_cuvs_distance_distance_by_algo
 #undef instantiate_cuvs_distance_distance
