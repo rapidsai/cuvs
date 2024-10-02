@@ -38,6 +38,9 @@ header = """/*
  */
 
 #include "search_multi_cta_inst.cuh"
+#include "sample_filter_utils.cuh"
+
+#define COMMA ,
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 """
@@ -58,8 +61,6 @@ search_types = dict(
     half_uint32=("half", "uint32_t", "float"),
     int8_uint32=("int8_t", "uint32_t", "float"),
     uint8_uint32=("uint8_t", "uint32_t", "float"),
-    float_uint64=("float", "uint64_t", "float"),
-    half_uint64=("half", "uint64_t", "float"),
 )
 # knn
 for type_path, (data_t, idx_t, distance_t) in search_types.items():
@@ -67,7 +68,10 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
     with open(path, "w") as f:
         f.write(header)
         f.write(
-                f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, cuvs::neighbors::filtering::none_cagra_sample_filter);\n"
+                f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, cuvs::neighbors::filtering::none_sample_filter);\n"
+        )
+        f.write(
+                f"instantiate_kernel_selection(\n  {data_t}, {idx_t}, {distance_t}, CagraSampleFilterWithQueryIdOffset<cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);\n"
         )
         f.write(trailer)
         # For pasting into CMakeLists.txt

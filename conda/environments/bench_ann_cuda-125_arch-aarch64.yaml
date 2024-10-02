@@ -38,5 +38,8 @@ dependencies:
 - pandas
 - pylibraft==24.10.*,>=0.0.0a0
 - pyyaml
+- rapids-build-backend>=0.3.0,<0.4.0.dev0
+- setuptools
 - sysroot_linux-aarch64==2.17
+- wheel
 name: bench_ann_cuda-125_arch-aarch64

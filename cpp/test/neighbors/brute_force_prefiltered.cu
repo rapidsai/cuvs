@@ -502,7 +502,12 @@ class PrefilteredBruteForceTest
     auto out_idx = raft::make_device_matrix_view<index_t, index_t, raft::row_major>(
       out_idx_d.data(), params.n_queries, params.top_k);
 
-    brute_force::search(handle, dataset, queries, out_idx, out_val, std::make_optional(filter));
+    brute_force::search(handle,
+                        dataset,
+                        queries,
+                        out_idx,
+                        out_val,
+                        cuvs::neighbors::filtering::bitmap_filter(filter));
     std::vector<dist_t> out_val_h(params.n_queries * params.top_k,
                                   std::numeric_limits<dist_t>::infinity());
 
