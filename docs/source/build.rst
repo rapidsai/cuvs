@@ -45,14 +45,14 @@ C/C++ Package
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
+   mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.5
+   mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.5
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
