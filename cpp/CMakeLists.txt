@@ -85,9 +85,6 @@ if(NOT BUILD_C_LIBRARY)
   set(BUILD_C_TESTS OFF)
 endif()
 
-message(STATUS "cuVS: Build cuVS shared library: ${BUILD_SHARED_LIBS}")
-message(STATUS "cuVS: Build cuVS bench: ${BUILD_CUVS_BENCH}")
-
 if(NOT BUILD_SHARED_LIBS)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
