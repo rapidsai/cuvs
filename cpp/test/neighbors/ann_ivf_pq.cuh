@@ -902,7 +902,7 @@ inline auto enum_variety_cosine() -> test_cases_t
         y.min_recall = y.min_recall.value() * 0.94;
       }
     }
-    y.index_params.metric        = distance::DistanceType::CosineExpanded;
+    y.index_params.metric = distance::DistanceType::CosineExpanded;
     return y;
   });
 }
