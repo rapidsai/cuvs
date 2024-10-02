@@ -290,9 +290,14 @@ target_compile_options(
 add_library(
   cuvs SHARED
   src/cluster/kmeans_balanced_fit_float.cu
+  src/cluster/kmeans_fit_mg_float.cu
+  src/cluster/kmeans_fit_mg_double.cu
+  src/cluster/kmeans_fit_double.cu
   src/cluster/kmeans_fit_float.cu
   src/cluster/kmeans_auto_find_k_float.cu
+  src/cluster/kmeans_fit_predict_double.cu
   src/cluster/kmeans_fit_predict_float.cu
+  src/cluster/kmeans_predict_double.cu
   src/cluster/kmeans_predict_float.cu
   src/cluster/kmeans_balanced_fit_float.cu
   src/cluster/kmeans_balanced_fit_predict_float.cu
@@ -300,6 +305,7 @@ add_library(
   src/cluster/kmeans_balanced_fit_int8.cu
   src/cluster/kmeans_balanced_fit_predict_int8.cu
   src/cluster/kmeans_balanced_predict_int8.cu
+  src/cluster/kmeans_transform_double.cu
   src/cluster/kmeans_transform_float.cu
   src/cluster/single_linkage_float.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
@@ -342,6 +348,8 @@ add_library(
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_rbf.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
   src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
