@@ -57,6 +57,7 @@ option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
 option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
 option(BUILD_CUVS_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
+option(BUILD_MG_ALGOS "Build with multi-GPU support" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF

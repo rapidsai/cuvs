@@ -131,11 +131,11 @@ Once installed, the shared libraries, headers (and any dependencies downloaded a
 Multi-GPU features
 ^^^^^^^^^^^^^^^^^^
 
-To enable the multi-gpu features run :
+To disable the multi-gpu features run :
 
 .. code-block:: bash
 
-    ./build.sh libcuvs --mg
+    ./build.sh libcuvs --no-mg
 
 
 Building the Googletests
