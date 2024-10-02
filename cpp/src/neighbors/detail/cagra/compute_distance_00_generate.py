@@ -66,8 +66,6 @@ search_types = dict(
     half_uint32=("half", "uint32_t", "float"),
     int8_uint32=("int8_t", "uint32_t", "float"),
     uint8_uint32=("uint8_t", "uint32_t", "float"),
-    # float_uint64=("float", "uint64_t", "float"),
-    # half_uint64=("half", "uint64_t", "float"),
 )
 
 metric_prefix = 'DistanceType::'
@@ -135,15 +133,14 @@ using descriptor_instances =
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,
                              const DatasetT& dataset,
-                             cuvs::distance::DistanceType metric,
-                             rmm::cuda_stream_view stream)
+                             cuvs::distance::DistanceType metric)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {{
   auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric);
   if (init == nullptr || priority < 0) {{
     RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
   }}
-  return init(params, dataset, metric, stream);
+  return init(params, dataset, metric);
 }}
 '''
     f.write(template.format(includes=includes, content=contents))

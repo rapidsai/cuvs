@@ -32,7 +32,80 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/util/pow2_utils.cuh>
 
+#include <optional>
+#include <tuple>
+#include <variant>
+
 namespace cuvs::neighbors::cagra::detail {
+
+/**
+ * A lightweight version of rmm::device_uvector.
+ * This version avoids calling cudaSetDevice / cudaGetDevice, and therefore it is required that
+ * the current cuda device does not change during the lifetime of this object. This is expected
+ * to be useful in multi-threaded scenarios where we want to minimize overhead due to
+ * thread sincronization during cuda API calls.
+ * If the size stays at zero, this struct never calls any CUDA driver / RAFT resource functions.
+ */
+template <typename T>
+struct lightweight_uvector {
+ private:
+  using raft_res_type = const raft::resources*;
+  using rmm_res_type  = std::tuple<rmm::device_async_resource_ref, rmm::cuda_stream_view>;
+  static constexpr size_t kAlign = 256;
+
+  std::variant<raft_res_type, rmm_res_type> res_;
+  T* ptr_;
+  size_t size_;
+
+ public:
+  explicit lightweight_uvector(const raft::resources& res) : res_(&res), ptr_{nullptr}, size_{0} {}
+
+  [[nodiscard]] auto data() noexcept -> T* { return ptr_; }
+  [[nodiscard]] auto data() const noexcept -> const T* { return ptr_; }
+  [[nodiscard]] auto size() const noexcept -> size_t { return size_; }
+
+  void resize(size_t new_size)
+  {
+    if (new_size == size_) { return; }
+    if (std::holds_alternative<raft_res_type>(res_)) {
+      auto& h = std::get<raft_res_type>(res_);
+      res_    = rmm_res_type{raft::resource::get_workspace_resource(*h),
+                          raft::resource::get_cuda_stream(*h)};
+    }
+    auto& [r, s] = std::get<rmm_res_type>(res_);
+    T* new_ptr   = nullptr;
+    if (new_size > 0) {
+      new_ptr = reinterpret_cast<T*>(r.allocate_async(new_size * sizeof(T), kAlign, s));
+    }
+    auto copy_size = std::min(size_, new_size);
+    if (copy_size > 0) {
+      cudaMemcpyAsync(new_ptr, ptr_, copy_size * sizeof(T), cudaMemcpyDefault, s);
+    }
+    if (size_ > 0) { r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s); }
+    ptr_  = new_ptr;
+    size_ = new_size;
+  }
+
+  void resize(size_t new_size, rmm::cuda_stream_view stream)
+  {
+    if (new_size == size_) { return; }
+    if (std::holds_alternative<raft_res_type>(res_)) {
+      auto& h = std::get<raft_res_type>(res_);
+      res_    = rmm_res_type{raft::resource::get_workspace_resource(*h), stream};
+    } else {
+      std::get<rmm::cuda_stream_view>(std::get<rmm_res_type>(res_)) = stream;
+    }
+    resize(new_size);
+  }
+
+  ~lightweight_uvector() noexcept
+  {
+    if (size_ > 0) {
+      auto& [r, s] = std::get<rmm_res_type>(res_);
+      r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s);
+    }
+  }
+};
 
 struct search_plan_impl_base : public search_params {
   int64_t dim;
@@ -75,9 +148,9 @@ struct search_plan_impl : public search_plan_impl_base {
   uint32_t topk;
   uint32_t num_seeds;
 
-  rmm::device_uvector<INDEX_T> hashmap;
-  rmm::device_uvector<uint32_t> num_executed_iterations;  // device or managed?
-  rmm::device_uvector<INDEX_T> dev_seed;
+  lightweight_uvector<INDEX_T> hashmap;
+  lightweight_uvector<uint32_t> num_executed_iterations;  // device or managed?
+  lightweight_uvector<INDEX_T> dev_seed;
   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc;
 
   search_plan_impl(raft::resources const& res,
@@ -87,16 +160,18 @@ struct search_plan_impl : public search_plan_impl_base {
                    int64_t graph_degree,
                    uint32_t topk)
     : search_plan_impl_base(params, dim, graph_degree, topk),
-      hashmap(0, raft::resource::get_cuda_stream(res)),
-      num_executed_iterations(0, raft::resource::get_cuda_stream(res)),
-      dev_seed(0, raft::resource::get_cuda_stream(res)),
+      hashmap(res),
+      num_executed_iterations(res),
+      dev_seed(res),
       num_seeds(0),
       dataset_desc(dataset_desc)
   {
     adjust_search_params();
     check_params();
     calc_hashmap_params(res);
-    num_executed_iterations.resize(max_queries, raft::resource::get_cuda_stream(res));
+    if (!persistent) {  // Persistent kernel does not provide this functionality
+      num_executed_iterations.resize(max_queries, raft::resource::get_cuda_stream(res));
+    }
     RAFT_LOG_DEBUG("# algo = %d", static_cast<int>(algo));
   }
 

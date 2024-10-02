@@ -57,8 +57,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   template <typename DatasetT>
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
-                   cuvs::distance::DistanceType metric,
-                   rmm::cuda_stream_view stream) -> host_type
+                   cuvs::distance::DistanceType metric) -> host_type
   {
     return init_(params,
                  dataset.data.data_handle(),
@@ -66,8 +65,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
                  dataset.vq_code_book.data_handle(),
                  dataset.pq_code_book.data_handle(),
                  IndexT(dataset.n_rows()),
-                 dataset.dim(),
-                 stream);
+                 dataset.dim());
   }
 
   template <typename DatasetT>
@@ -93,8 +91,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
     const CodebookT* vq_code_book_ptr,
     const CodebookT* pq_code_book_ptr,
     IndexT size,
-    uint32_t dim,
-    rmm::cuda_stream_view stream);
+    uint32_t dim);
 };
 
 }  // namespace cuvs::neighbors::cagra::detail

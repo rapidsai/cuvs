@@ -79,3 +79,6 @@ cagra_index
 ivf_flat_index
 ivf_pq_index
 
+# cuvs_bench
+datasets/
+/*.json
