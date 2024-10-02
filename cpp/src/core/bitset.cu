@@ -13,21 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <cuvs/core/bitset.hpp>
+#include <raft/core/bitset.cuh>
 
-#include <gtest/gtest.h>
-
-#include "../ann_ivf_flat.cuh"
-
-namespace cuvs::neighbors::ivf_flat {
-
-typedef AnnIVFFlatTest<float, int8_t, int64_t> AnnIVFFlatTestF_int8;
-TEST_P(AnnIVFFlatTestF_int8, AnnIVFFlat)
-{
-  this->testIVFFlat();
-  this->testPacker();
-  this->testFilter();
-}
-
-INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_int8, ::testing::ValuesIn(inputs));
-
-}  // namespace cuvs::neighbors::ivf_flat
+template struct raft::core::bitset<uint8_t, uint32_t>;
+template struct raft::core::bitset<uint16_t, uint32_t>;
+template struct raft::core::bitset<uint32_t, uint32_t>;
+template struct raft::core::bitset<uint32_t, int64_t>;
+template struct raft::core::bitset<uint64_t, int64_t>;

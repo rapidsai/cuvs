@@ -18,10 +18,10 @@
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
+#include <cuvs/core/bitset.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include <raft/core/bitset.cuh>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
@@ -629,14 +629,10 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
       handle_, removed_indices.view(), ps.num_db_vecs);
-    cuvs::neighbors::ivf_pq::search_with_filtering(
-      handle_,
-      ps.search_params,
-      index,
-      query_view,
-      inds_view,
-      dists_view,
-      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+    auto bitset_filter_obj =
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index, query_view, inds_view, dists_view, bitset_filter_obj);
 
     raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
