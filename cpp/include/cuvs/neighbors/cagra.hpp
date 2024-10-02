@@ -403,6 +403,13 @@ struct index : cuvs::neighbors::index {
     RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                  "Dataset and knn_graph must have equal number of rows");
     update_graph(res, knn_graph);
+    if constexpr (raft::is_device_mdspan_v<decltype(dataset)>) {
+      contiguous_dataset_ =
+        raft::make_device_matrix_view(dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    } else {
+      contiguous_dataset_ =
+        raft::make_host_matrix_view(dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    }
 
     raft::resource::sync_stream(res);
   }
@@ -417,13 +424,16 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    dataset_ = make_aligned_dataset(res, dataset, 16);
+    contiguous_dataset_ = dataset;
+    dataset_            = make_aligned_dataset(res, dataset, 16);
   }
 
   /** Set the dataset reference explicitly to a device matrix view with padding. */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {
+    contiguous_dataset_ =
+      raft::make_device_matrix_view(dataset.data_handle(), dataset.extent(0), dataset.extent(1));
     dataset_ = make_aligned_dataset(res, dataset, 16);
   }
 
@@ -436,7 +446,8 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    dataset_ = make_aligned_dataset(res, dataset, 16);
+    contiguous_dataset_ = dataset;
+    dataset_            = make_aligned_dataset(res, dataset, 16);
   }
 
   /**
@@ -447,14 +458,16 @@ struct index : cuvs::neighbors::index {
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
     -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<int64_t>, DatasetT>>
   {
-    dataset_ = std::make_unique<DatasetT>(std::move(dataset));
+    contiguous_dataset_ = std::monostate{};
+    dataset_            = std::make_unique<DatasetT>(std::move(dataset));
   }
 
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
     -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<int64_t>, DatasetT>>
   {
-    dataset_ = std::move(dataset);
+    contiguous_dataset_ = std::monostate{};
+    dataset_            = std::move(dataset);
   }
 
   /**
@@ -492,11 +505,17 @@ struct index : cuvs::neighbors::index {
     graph_view_ = graph_.view();
   }
 
+  auto contiguous_dataset() const { return contiguous_dataset_; }
+
  private:
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  std::variant<std::monostate,
+               raft::device_matrix_view<const T, int64_t, raft::row_major>,
+               raft::host_matrix_view<const T, int64_t, raft::row_major>>
+    contiguous_dataset_ = std::monostate{};
 };
 /**
  * @}

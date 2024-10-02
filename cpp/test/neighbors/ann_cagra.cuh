@@ -51,12 +51,12 @@ namespace cuvs::neighbors::cagra {
 namespace {
 
 struct test_cagra_sample_filter {
-  static constexpr unsigned offset = 300;
   inline _RAFT_HOST_DEVICE auto operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const
+    const uint32_t sample_ix,
+    const uint32_t offset) const
   {
     return sample_ix >= offset;
   }
@@ -276,6 +276,7 @@ struct AnnCagraInputs {
   bool include_serialized_dataset;
   // std::optional<double>
   double min_recall;  // = std::nullopt;
+  uint32_t filter_offset                          = 300;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
   std::optional<vpq_params> compression           = std::nullopt;
 
@@ -702,21 +703,20 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
       rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-      auto* database_filtered_ptr = database.data() + test_cagra_sample_filter::offset * ps.dim;
-      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(
-        handle_,
-        distances_naive_dev.data(),
-        indices_naive_dev.data(),
-        search_queries.data(),
-        database_filtered_ptr,
-        ps.n_queries,
-        ps.n_rows - test_cagra_sample_filter::offset,
-        ps.dim,
-        ps.k,
-        ps.metric);
+      auto* database_filtered_ptr = database.data() + ps.filter_offset * ps.dim;
+      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
+                                                         distances_naive_dev.data(),
+                                                         indices_naive_dev.data(),
+                                                         search_queries.data(),
+                                                         database_filtered_ptr,
+                                                         ps.n_queries,
+                                                         ps.n_rows - ps.filter_offset,
+                                                         ps.dim,
+                                                         ps.k,
+                                                         ps.metric);
       raft::linalg::addScalar(indices_naive_dev.data(),
                               indices_naive_dev.data(),
-                              IdxT(test_cagra_sample_filter::offset),
+                              IdxT(ps.filter_offset),
                               queries_size,
                               stream_);
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
@@ -787,7 +787,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
           distances_dev.data(), ps.n_queries, ps.k);
         auto removed_indices =
-          raft::make_device_vector<int64_t, int64_t>(handle_, test_cagra_sample_filter::offset);
+          raft::make_device_vector<int64_t, int64_t>(handle_, ps.filter_offset);
         thrust::sequence(
           raft::resource::get_thrust_policy(handle_),
           thrust::device_pointer_cast(removed_indices.data_handle()),
@@ -813,8 +813,9 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
       bool unacceptable_node = false;
       for (int q = 0; q < ps.n_queries; q++) {
         for (int i = 0; i < ps.k; i++) {
-          const auto n      = indices_Cagra[q * ps.k + i];
-          unacceptable_node = unacceptable_node | !test_cagra_sample_filter()(q, n);
+          const auto n = indices_Cagra[q * ps.k + i];
+          unacceptable_node =
+            unacceptable_node | !test_cagra_sample_filter()(q, n, ps.filter_offset);
         }
       }
       EXPECT_FALSE(unacceptable_node);
@@ -1002,6 +1003,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {false, true},
                                                    {false},
                                                    {0.99},
+                                                   {uint32_t(300)},
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
@@ -1028,6 +1030,34 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   return inputs;
 }
 
-const std::vector<AnnCagraInputs> inputs = generate_inputs();
+inline std::vector<AnnCagraInputs> generate_bf_inputs()
+{
+  // Add test cases for brute force as sparsity >= 0.9.
+  std::vector<AnnCagraInputs> inputs_for_brute_force;
+  auto inputs_original = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {10000, 100000},
+    {1, 8, 17},
+    {1, 16, 256},  // k
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
+    {0, 1, 10, 100},
+    {0},
+    {256},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {true},
+    {1.0});
+  for (auto input : inputs_original) {
+    input.filter_offset = 0.90 * input.n_rows;
+    inputs_for_brute_force.push_back(input);
+  }
+
+  return inputs_for_brute_force;
+}
+
+const std::vector<AnnCagraInputs> inputs             = generate_inputs();
+const std::vector<AnnCagraInputs> inputs_brute_force = generate_bf_inputs();
 
 }  // namespace cuvs::neighbors::cagra
