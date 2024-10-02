@@ -243,6 +243,6 @@ __global__ void RobustPruneKernel(
   }
 }
 
-} // Empty namespace
+}  // namespace
 
 }  // namespace cuvs::neighbors::experimental::vamana::detail

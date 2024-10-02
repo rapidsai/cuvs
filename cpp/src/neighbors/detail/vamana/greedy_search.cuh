@@ -277,7 +277,7 @@ __global__ void GreedySearchKernel(
   return;
 }
 
-} // Empty namespace
+}  // namespace
 
 /**
  * @}

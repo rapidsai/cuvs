@@ -469,7 +469,7 @@ __global__ void recompute_reverse_dists(
   }
 }
 
-} // Empty namespace
+}  // namespace
 
 /**
  * @}
