@@ -20,7 +20,7 @@
 
 namespace cuvs::neighbors::vamana {
 
-typedef AnnVamanaTest<uint8_t, float, std::uint32_t> AnnVamanaTestU8_U32;
+typedef AnnVamanaTest<float, uint8_t, std::uint32_t> AnnVamanaTestU8_U32;
 TEST_P(AnnVamanaTestU8_U32, AnnVamana) { this->testVamana(); }
 
 INSTANTIATE_TEST_CASE_P(AnnVamanaTest, AnnVamanaTestU8_U32, ::testing::ValuesIn(inputs));
