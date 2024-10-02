@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+
 from .data_export import convert_json_to_csv_build, convert_json_to_csv_search
 from .run import run_benchmark
 
