@@ -30,7 +30,6 @@
 #include "../../cluster/kmeans_balanced.cuh"
 
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/error.hpp>
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
@@ -1702,10 +1701,6 @@ auto build(raft::resources const& handle,
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-  if (params.metric == cuvs::distance::DistanceType::CosineExpanded &&
-      params.codebook_kind == codebook_gen::PER_CLUSTER) {
-    RAFT_FAIL("CosineExpanded metric only supported for codebook_gen::PER_SUBSPACE");
-  }
 
   auto stream = raft::resource::get_cuda_stream(handle);
 

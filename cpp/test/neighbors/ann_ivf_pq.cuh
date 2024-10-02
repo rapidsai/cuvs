@@ -903,7 +903,6 @@ inline auto enum_variety_cosine() -> test_cases_t
       }
     }
     y.index_params.metric        = distance::DistanceType::CosineExpanded;
-    y.index_params.codebook_kind = cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE;
     return y;
   });
 }
