@@ -85,7 +85,8 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
-  return cuvs::neighbors::experimental::vamana::detail::build<T, IdxT, Accessor>(res, params, dataset);
+  return cuvs::neighbors::experimental::vamana::detail::build<T, IdxT, Accessor>(
+    res, params, dataset);
 }
 
 template <typename T, typename IdxT>
