@@ -17,6 +17,7 @@
 #pragma once
 
 #include "factory.cuh"
+#include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta_inst.cuh"
 
@@ -41,48 +42,6 @@
 #include <rmm/cuda_stream_view.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
-
-template <class CagraSampleFilterT>
-struct CagraSampleFilterWithQueryIdOffset {
-  const uint32_t offset;
-  CagraSampleFilterT filter;
-
-  CagraSampleFilterWithQueryIdOffset(const uint32_t offset, const CagraSampleFilterT filter)
-    : offset(offset), filter(filter)
-  {
-  }
-
-  _RAFT_DEVICE auto operator()(const uint32_t query_id, const uint32_t sample_id)
-  {
-    return filter(query_id + offset, sample_id);
-  }
-};
-
-template <class CagraSampleFilterT>
-struct CagraSampleFilterT_Selector {
-  using type = CagraSampleFilterWithQueryIdOffset<CagraSampleFilterT>;
-};
-template <>
-struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter> {
-  using type = cuvs::neighbors::filtering::none_cagra_sample_filter;
-};
-
-// A helper function to set a query id offset
-template <class CagraSampleFilterT>
-inline typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type set_offset(
-  CagraSampleFilterT filter, const uint32_t offset)
-{
-  typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type new_filter(offset, filter);
-  return new_filter;
-}
-template <>
-inline
-  typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter>::type
-  set_offset<cuvs::neighbors::filtering::none_cagra_sample_filter>(
-    cuvs::neighbors::filtering::none_cagra_sample_filter filter, const uint32_t)
-{
-  return filter;
-}
 
 template <typename DataT, typename IndexT, typename DistanceT, typename CagraSampleFilterT>
 void search_main_core(raft::resources const& res,

@@ -71,4 +71,4 @@ instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
   half,
   half,
   cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>);
+    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
