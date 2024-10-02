@@ -108,6 +108,14 @@ void select_clusters(raft::resources const& handle,
       This is a negative inner-product distance. We minimize it to find the similar clusters.
 
       NB: qc_distances is NOT used further in ivfpq_search.
+
+    Cosine distance:
+      `qc_distances[i, j] = - (queries[i], cluster_centers[j])`
+
+      This is a negative inner-product distance. The queries and cluster centers are row normalized.
+      We minimize it to find the similar clusters.
+
+      NB: qc_distances is NOT used further in ivfpq_search.
  */
   float norm_factor;
   switch (metric) {
