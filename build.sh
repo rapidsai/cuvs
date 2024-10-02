@@ -286,6 +286,7 @@ if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
     CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
     if hasArg --cpu-only; then
         BUILD_CPU_ONLY=ON
+        BUILD_SHARED_LIBS=OFF
         NVTX=OFF
     fi
 fi
@@ -338,7 +339,7 @@ fi
 # Configure for building all C++ targets
 if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
-    if hasArg --no-shared-libs; then
+    if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
         CMAKE_TARGET="${CMAKE_TARGET};"
     else
         CMAKE_TARGET="${CMAKE_TARGET};cuvs"
