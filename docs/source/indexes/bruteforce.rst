@@ -60,8 +60,3 @@ Index footprint
 Raw vectors: :math:`n_vectors * n_dimensions * precision`
 
 Vector norms (for distances which require them): :math:`n_vectors * precision`
-
-Search footprint
-~~~~~~~~~~~~~~~~
-
-TBD

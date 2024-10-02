@@ -638,16 +638,37 @@ hnswlib
 
  * - `efConstruction`
    - `build`
-
+   - Y
+   - Positive integer >0
    -
+   - Controls index time and accuracy. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
 
+ * - `M`
+   - `build`
+   - Y
+   - Positive integer. Often between 2-100
+   -
+   - umber of bi-directional links create for every new element during construction. Higher values work for higher intrinsic dimensionality and/or high recall, low values can work for datasets with low intrinsic dimensionality and/or low recalls. Also affects the algorithm's memory consumption.
 
-| Parameter        | Type      | Required | Data Type                            | Default | Description                                                                                                                                                                                                                                                                                       |
-|------------------|-----------|----------|--------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `efConstruction` | `build`   | Y        | Positive Integer >0                  |         | Controls index time and accuracy. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.                                                                                                                                                    |
-| `M`              | `build`   | Y        | Positive Integer often between 2-100 |         | Number of bi-directional links create for every new element during construction. Higher values work for higher intrinsic dimensionality and/or high recall, low values can work for datasets with low intrinsic dimensionality and/or low recalls. Also affects the algorithm's memory consumption. |
-| `numThreads`     | `build`   | N        | Positive Integer >0                  | 1       | Number of threads to use to build the index.                                                                                                                                                                                                                                                      |
-| `ef`             | `search`  | Y        | Positive Integer >0                  |         | Size of the dynamic list for the nearest neighbors used for search. Higher value leads to more accurate but slower search. Cannot be lower than `k`.                                                                                                                                              |
-| `numThreads`     | `search` | N        | Positive Integer >0                  | 1       | Number of threads to use for queries.                                                                                                                                                                                                                                                             |
+ * - `numThreads`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - Number of threads to use to build the index.
+
+ * - `ef`
+   - `search`
+   - Y
+   - Positive integer >0
+   -
+   - Size of the dynamic list for the nearest neighbors used for search. Higher value leads to more accurate but slower search. Cannot be lower than `k`.
+
+ * - `numThreads`
+   - `search`
+   - N
+   - Positive integer >0
+   - 1
+   - Number of threads to use for queries.
 
 Please refer to `HNSW algorithm parameters guide <https://github.com/nmslib/hnswlib/blob/master/ALGO_PARAMS.md>`_ from `hnswlib` to learn more about these arguments.
