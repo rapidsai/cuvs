@@ -475,12 +475,12 @@ void sort_knn_graph(
 {
   RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                "dataset size is expected to have the same number of graph index size");
-  const uint32_t dataset_size = dataset.extent(0);
-  const uint32_t dataset_dim  = dataset.extent(1);
+  const uint64_t dataset_size = dataset.extent(0);
+  const uint64_t dataset_dim  = dataset.extent(1);
   const DataT* dataset_ptr    = dataset.data_handle();
 
   const IdxT graph_size             = dataset_size;
-  const uint32_t input_graph_degree = knn_graph.extent(1);
+  const uint64_t input_graph_degree = knn_graph.extent(1);
   IdxT* const input_graph_ptr       = knn_graph.data_handle();
 
   auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
