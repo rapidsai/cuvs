@@ -348,6 +348,8 @@ add_library(
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_rbf.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
   src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu

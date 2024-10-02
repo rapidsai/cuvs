@@ -197,4 +197,30 @@ with open("dispatch_rbf.cu", "w") as f:
 
         f.write("\n#undef instantiate_raft_distance_detail_pairwise_matrix_dispatch\n")
 
-print("src/distance/detail/pairwise_matrix/dispatch_rbf.cu")
+
+        print("src/distance/detail/pairwise_matrix/dispatch_rbf.cu")
+
+# L2 with int64_t indices for kmeans code
+int64_t_op_instances = [
+    dict(
+        path_prefix="l2_expanded",
+        OpT="cuvs::distance::detail::ops::l2_exp_distance_op",
+        archs = [60, 80],
+    )]
+
+for op in int64_t_op_instances:
+    for dt in data_type_instances:
+        DataT, AccT, OutT, IdxT = (dt[k] for k in ["DataT", "AccT", "OutT", "IdxT"]);
+
+        IdxT = "int64_t"
+        path = f"dispatch_{op['path_prefix']}_{DataT}_{AccT}_{OutT}_{IdxT}.cu"
+        with open(path, "w") as f:
+            f.write(header)
+            f.write(arch_headers(op["archs"]))
+            f.write(macro)
+
+            OpT = op['OpT']
+            FinOpT = "raft::identity_op"
+            f.write(f"\ninstantiate_raft_distance_detail_pairwise_matrix_dispatch({OpT}, {DataT}, {AccT}, {OutT}, {FinOpT}, {IdxT});\n")
+            f.write("\n#undef instantiate_raft_distance_detail_pairwise_matrix_dispatch\n")
+        print(f"src/distance/detail/pairwise_matrix/{path}")

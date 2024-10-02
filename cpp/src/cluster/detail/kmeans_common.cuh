@@ -310,7 +310,7 @@ void pairwise_distance_kmeans(raft::resources const& handle,
                              raft::layout_c_contiguous,
                              IndexT>(handle, X, centroids, pairwiseDistance);
   } else {
-    RAFT_FAIL("kmeans requires L2Expanded distance");
+    RAFT_FAIL("kmeans requires L2Expanded distance, have %i", metric);
   }
 }
 
