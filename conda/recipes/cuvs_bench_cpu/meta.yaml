@@ -1,11 +1,10 @@
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# Copyright (c) 2024, NVIDIA CORPORATION.
 
 # Usage:
-#   conda build . -c conda-forge -c nvidia -c rapidsai
+#   conda build .  -c rapidsai -c conda-forge -c nvidia
 {% set version = environ['RAPIDS_PACKAGE_VERSION'].lstrip('v') + environ.get('VERSION_SUFFIX', '') %}
 {% set minor_version = version.split('.')[0] + '.' + version.split('.')[1] %}
 {% set py_version = environ['CONDA_PY'] %}
-{% set cuda_version = '.'.join(environ['RAPIDS_CUDA_VERSION'].split('.')[:2]) %}
 {% set date_string = environ['RAPIDS_DATE_STRING'] %}
 
 package:
@@ -30,8 +29,8 @@ build:
     - SCCACHE_BUCKET
     - SCCACHE_IDLE_TIMEOUT
     - SCCACHE_REGION
-    - SCCACHE_S3_KEY_PREFIX=libraft-aarch64 # [aarch64]
-    - SCCACHE_S3_KEY_PREFIX=libraft-linux64 # [linux64]
+    - SCCACHE_S3_KEY_PREFIX=cuvs-bench-cpu-aarch64 # [aarch64]
+    - SCCACHE_S3_KEY_PREFIX=cuvs-bench-cpu-linux64 # [linux64]
     - SCCACHE_S3_USE_SSL
   number: {{ GIT_DESCRIBE_NUMBER }}
   string: py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
@@ -45,24 +44,23 @@ requirements:
     - {{ stdlib("c") }}
 
   host:
-    - glog {{ glog_version }}
-    - matplotlib
-    - nlohmann_json {{ nlohmann_json_version }}
-    - spdlog {{ spdlog_version }}
+    - benchmark
     - fmt {{ fmt_version }}
+    - glog {{ glog_version }}
+    - nlohmann_json {{ nlohmann_json_version }}
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
-    - benchmark
+    - spdlog {{ spdlog_version }}
 
   run:
+    - benchmark
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib
-    - python
-    - pyyaml
     - pandas
-    - benchmark
+    - pyyaml
+    - python
 about:
   home: https://rapids.ai/
   license: Apache-2.0
-  summary: cuVS ANN CPU benchmarks
+  summary: cuVS CPU benchmarks

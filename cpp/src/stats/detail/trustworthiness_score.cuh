@@ -108,7 +108,7 @@ void run_knn(const raft::resources& h,
     input_view,
     raft::make_device_matrix_view<int64_t, int64_t>(indices, n, n_neighbors),
     raft::make_device_matrix_view<math_t, int64_t>(distances, n, n_neighbors),
-    std::nullopt);
+    cuvs::neighbors::filtering::none_sample_filter{});
 }
 
 /**

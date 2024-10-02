@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch  --cpu-only --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -37,11 +37,12 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    -n                          - no install step
    --uninstall                 - uninstall files for specified targets which were built and installed prior
    --compile-static-lib        - compile static library for all components
-   --cpu-only                  - build CPU only components without CUDA. Applies to bench-ann only currently.
+   --cpu-only                  - build CPU only components without CUDA. Currently only applies to bench-ann.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
+   --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
    --build-metrics             - filename for generating build metrics report for libcuvs
    --incl-cache-stats          - include cache statistics in build metrics report
@@ -71,6 +72,7 @@ COMPILE_LIBRARY=OFF
 INSTALL_TARGET=install
 BUILD_REPORT_METRICS=""
 BUILD_REPORT_INCL_CACHE_STATS=OFF
+BUILD_SHARED_LIBS=ON
 
 TEST_TARGETS="NEIGHBORS_ANN_CAGRA_TEST"
 ANN_BENCH_TARGETS="CUVS_ANN_BENCH_ALL"
@@ -277,14 +279,19 @@ fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
     BUILD_CUVS_BENCH=ON
+    if ! hasArg tests; then
+        BUILD_TESTS=OFF
+    fi
+    COMPILE_LIBRARY=OFF
     CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
     if hasArg --cpu-only; then
-        COMPILE_LIBRARY=OFF
         BUILD_CPU_ONLY=ON
         NVTX=OFF
-    else
-        COMPILE_LIBRARY=ON
     fi
+fi
+
+if hasArg --no-shared-libs; then
+    BUILD_SHARED_LIBS=OFF
 fi
 
 if hasArg --no-nvtx; then
@@ -331,7 +338,11 @@ fi
 # Configure for building all C++ targets
 if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
-    CMAKE_TARGET="${CMAKE_TARGET};cuvs"
+    if hasArg --no-shared-libs; then
+        CMAKE_TARGET="${CMAKE_TARGET};"
+    else
+        CMAKE_TARGET="${CMAKE_TARGET};cuvs"
+    fi
 
     if (( ${BUILD_ALL_GPU_ARCH} == 0 )); then
         CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
@@ -362,6 +373,7 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           -DBUILD_CUVS_BENCH=${BUILD_CUVS_BENCH} \
           -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \
+          -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
           ${CACHE_ARGS} \
           ${EXTRA_CMAKE_ARGS}
 
