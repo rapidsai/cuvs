@@ -699,6 +699,38 @@ void brute_force_search_filtered(
   return;
 }
 
+template <typename T, typename IdxT, typename DistT, typename LayoutT>
+void search(raft::resources const& res,
+            const cuvs::neighbors::brute_force::index<T, DistT>& idx,
+            raft::device_matrix_view<const T, int64_t, LayoutT> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
+{
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
+    return brute_force_search<T, int64_t, DistT>(res, idx, queries, neighbors, distances);
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitmap_filter<const uint32_t, int64_t>&>(
+        sample_filter_ref);
+    if constexpr (std::is_same_v<LayoutT, raft::col_major>) {
+      RAFT_FAIL("filtered search isn't available with col_major queries yet");
+    } else {
+      cuvs::core::bitmap_view<const uint32_t, int64_t> sample_filter_view =
+        sample_filter.bitmap_view_;
+      return brute_force_search_filtered<T, int64_t, uint32_t, DistT>(
+        res, idx, queries, sample_filter_view, neighbors, distances);
+    }
+  } catch (const std::bad_cast&) {
+    RAFT_FAIL("Unsupported sample filter type");
+  }
+}
+
 template <typename T, typename DistT, typename LayoutT = raft::row_major>
 cuvs::neighbors::brute_force::index<T, DistT> build(
   raft::resources const& res,
