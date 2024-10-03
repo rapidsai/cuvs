@@ -2,7 +2,7 @@
 Primer on vector search indexes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Vector search indexes often use approximations to trade-off accuracy of the results for speed, either through lowering latency (end-to-end single query speed) or by increating throughput (the number of query vectors that can be satisfied in a short period of time). Vector search indexes, especially ones that use approximations, are very closely related to machine learning models but they are optimized for fast search and accuracy of results.
+Vector search indexes often use approximations to trade-off accuracy of the results for speed, either through lowering latency (end-to-end single query speed) or by increasing throughput (the number of query vectors that can be satisfied in a short period of time). Vector search indexes, especially ones that use approximations, are very closely related to machine learning models but they are optimized for fast search and accuracy of results.
 
 When the number of vectors is very small, such as less than 100 thousand vectors, it could be fast enough to use a brute-force (also known as a flat index), which returns exact results but at the expense of exhaustively searching all possible neighbors
 

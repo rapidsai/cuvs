@@ -129,7 +129,7 @@ The usage of the script `cuvs_bench.run` is:
       --build
       --search
       --algorithms ALGORITHMS
-                            run only comma separated list of named algorithms. If parameters `groups` and `algo-groups are both undefined, then group `base` is run by default (default: None)
+                            run only comma separated list of named algorithms. If parameters `groups` and `algo-groups` are both undefined, then group `base` is run by default (default: None)
       --groups GROUPS       run only comma separated groups of parameters (default: base)
       --algo-groups ALGO_GROUPS
                             add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large" (default: None)
