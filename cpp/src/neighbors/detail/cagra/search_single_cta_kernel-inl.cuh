@@ -627,8 +627,7 @@ __device__ void search_core(
 
       // topk with bitonic sort
       _CLK_START();
-      if (std::is_same<SAMPLE_FILTER_T,
-                       cuvs::neighbors::filtering::none_cagra_sample_filter>::value ||
+      if (std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value ||
           *filter_flag == 0) {
         topk_by_bitonic_sort<MAX_ITOPK, MAX_CANDIDATES>(result_distances_buffer,
                                                         result_indices_buffer,
@@ -716,7 +715,7 @@ __device__ void search_core(
 
     // Filtering
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_sample_filter>::value) {
       if (threadIdx.x == 0) { *filter_flag = 0; }
       __syncthreads();
 
@@ -742,7 +741,7 @@ __device__ void search_core(
 
   // Post process for filtering
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                              cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                              cuvs::neighbors::filtering::none_sample_filter>::value) {
     constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
     const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
 

@@ -383,8 +383,12 @@ inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
+struct base_filter {
+  virtual ~base_filter() = default;
+};
+
 /* A filter that filters nothing. This is the default behavior. */
-struct none_ivf_sample_filter {
+struct none_sample_filter : public base_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -392,10 +396,7 @@ struct none_ivf_sample_filter {
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
-};
 
-/* A filter that filters nothing. This is the default behavior. */
-struct none_cagra_sample_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -432,12 +433,32 @@ struct ivf_to_sample_filter {
 };
 
 /**
+ * @brief Filter an index with a bitmap
+ *
+ * @tparam bitmap_t Data type of the bitmap
+ * @tparam index_t Indexing type
+ */
+template <typename bitmap_t, typename index_t>
+struct bitmap_filter : public base_filter {
+  // View of the bitset to use as a filter
+  const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_view_;
+
+  bitmap_filter(const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_for_filtering);
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample
+    const uint32_t sample_ix) const;
+};
+
+/**
  * @brief Filter an index with a bitset
  *
+ * @tparam bitset_t Data type of the bitset
  * @tparam index_t Indexing type
  */
 template <typename bitset_t, typename index_t>
-struct bitset_filter {
+struct bitset_filter : public base_filter {
   // View of the bitset to use as a filter
   const cuvs::core::bitset_view<bitset_t, index_t> bitset_view_;
 

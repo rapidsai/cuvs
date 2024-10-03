@@ -126,7 +126,7 @@ void refine_device(
            0,
            chunk_index.data(),
            cuvs::distance::is_min_close(cuvs::distance::DistanceType(metric)),
-           cuvs::neighbors::filtering::none_ivf_sample_filter(),
+           cuvs::neighbors::filtering::none_sample_filter(),
            neighbors_uint32,
            distances.data_handle(),
            grid_dim_x,
