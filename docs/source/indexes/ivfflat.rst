@@ -77,8 +77,8 @@ assumption that the number of lists, and thus the max size of the data in the in
 might not matter. For example, most vector databases build many smaller physical approximate nearest neighbors indexes, each from
 fixed-size or maximum-sized immutable segments and so the number of lists can be tuned based on the number of vectors in the indexes.
 
-Empirically, we've found :math:`\sqrt{n_index_vectors}` to be a good starting point for the :math:`n_lists` hyper-parameter. Remember, having more
-lists means less points to search within each list, but it could also mean more :math:`n_probes` are needed at search time to reach an acceptable
+Empirically, we've found :math:`\sqrt{n\_index\_vectors}` to be a good starting point for the :math:`n\_lists` hyper-parameter. Remember, having more
+lists means less points to search within each list, but it could also mean more :math:`n\_probes` are needed at search time to reach an acceptable
 recall.
 
 

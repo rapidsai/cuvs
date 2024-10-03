@@ -40,7 +40,7 @@ We suggest averaging performance within a range of recall. For general guidance,
 .. image:: images/recall_buckets.png
 
 
-This allows us to say things like “okay at 95% recall level, model A can be built  3x faster than model B, but model B has 2x lower latency than model A”
+This allows us to make observations such as “at 95% recall level, model A can be built 3x faster than model B, but model B has 2x lower latency than model A”
 
 .. image:: images/build_benchmarks.png
 
