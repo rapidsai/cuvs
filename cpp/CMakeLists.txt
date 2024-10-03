@@ -484,8 +484,6 @@ target_include_directories(
   INTERFACE "$<INSTALL_INTERFACE:include>"
 )
 
-target_link_libraries(cuvs_static PUBLIC ${CUVS_CTK_MATH_DEPENDENCIES})
-
 # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
 target_link_options(cuvs_static PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 
@@ -519,6 +517,12 @@ if(NOT BUILD_CPU_ONLY)
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
+    PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> cuvs-cagra-search
+  )
+
+  target_link_libraries(
+    cuvs_static
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
     PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> cuvs-cagra-search
   )
