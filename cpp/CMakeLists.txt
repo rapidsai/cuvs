@@ -467,10 +467,6 @@ add_library(
   ${CUVS_MG_ALGOS}
 )
 
-if(BUILD_MG_ALGOS)
-  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
-endif()
-
 set_target_properties(
   cuvs_objs
   PROPERTIES CXX_STANDARD 17
@@ -572,6 +568,11 @@ if(NOT BUILD_CPU_ONLY)
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
     PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> cuvs-cagra-search
   )
+endif()
+
+if(BUILD_MG_ALGOS)
+  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
+  target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
 endif()
 
 if(BUILD_CAGRA_HNSWLIB)
