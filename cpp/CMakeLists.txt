@@ -308,6 +308,7 @@ add_library(
   src/cluster/kmeans_transform_double.cu
   src/cluster/kmeans_transform_float.cu
   src/cluster/single_linkage_float.cu
+  src/core/bitset.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
@@ -406,10 +407,6 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_half_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
   src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
   src/neighbors/nn_descent_half.cu
@@ -425,6 +422,12 @@ add_library(
   src/neighbors/refine/detail/refine_host_int8_t_float.cpp
   src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/neighbors/vamana_build_float.cu
+  src/neighbors/vamana_build_uint8.cu
+  src/neighbors/vamana_build_int8.cu
+  src/neighbors/vamana_serialize_float.cu
+  src/neighbors/vamana_serialize_uint8.cu
+  src/neighbors/vamana_serialize_int8.cu
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_int32_t.cu
   src/selection/select_k_float_uint32_t.cu
@@ -432,8 +435,6 @@ add_library(
   src/stats/silhouette_score.cu
   src/stats/trustworthiness_score.cu
 )
-
-target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
 
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
