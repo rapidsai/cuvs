@@ -12,19 +12,32 @@ As much as 75% of users have told us they will not be able to tune a vector data
 
 Since vector search indexes are more closely related to machine learning models than traditional databases indexes, one option for easing the parameter tuning burden is to use hyper-parameter optimization tools like `Ray Tune <https://medium.com/rapids-ai/30x-faster-hyperparameter-search-with-raytune-and-rapids-403013fbefc5>`_ and `Optuna <https://docs.rapids.ai/deployment/stable/examples/rapids-optuna-hpo/notebook/>`_. to verify this.
 
-But how would this work when we have an index that's massively large- like 1TB?
+:italic:`But how would this work when we have an index that's massively large- like 1TB?`
 
-One benefit to locally indexed vector databases is that they tend to scale by breaking a larger set of vectors down into smaller small subsampling from a dataset and does a parameter search on it. Then we actually evaluate random queries against the ground truth to test that the index params actually generalized well (I'm confident they will).
+One benefit to locally indexed vector databases is that they often scale by breaking the larger set of vectors down into a smaller set by uniformly random subsampling and training smaller vector search index models on the sub-samples. Most often, the same set of tuning parameters are applied to all of the smaller sub-index models, rather than trying to set them individually for each one. During search, the query vectors are often sent to all of the sub-indexes and the resulting neighbors list reduced down to `k` based on the closest distances (or similarities).
 
-Getting Started with Optuna and RAPIDS for HPO — RAPIDS Deployment Documentation documentation
+Because many databases use this sub-sampling trick, it's possible to perform an automated parameter tuning on the larger index just by randomly samplnig some number of vectors from it, splitting them into disjoint train/test/eval datasets, computing ground truth with brute-force, and then performing a hyper-parameter optimization on it. This procedure can also be repeated multiple times to simulate a monte-carlo cross validation.
 
-Ray tune / Optune should allow us to plug in cuvs' Python API trivially and then we just specify a bunch of params to tune and let it go to town- this would ideally be done on a multi-node multi-GPU setup where we can try 10's of combinations at once, starting with "empirical heuristics" as defaults and iterate through something like a bayesian optimizer to find the best params.
+GPUs are naturally great at performing massively parallel tasks, especially when they are largely independent tasks, such as training and evaluating models with different hyper-parameter settings in parallel. Hyper-parameter optimization also lends itself well to distributed processing, such as multi-node multi-GPU operation.
 
-#. Generate a dataset with a reasonable number of vectors (say 10Mx768)
-#. Subsample from the population uniformly, let's say 10% of that (1M vectors)
-#. Subsample from the population uniformly, let's say 1% of the 1M vectors from the prior step, this is a validation set.
-#. Compute ground truth on the vectors from prior step against all 10M vectors
-#. Start tuning process for the 1M vectors from step 2 using the vectors from step 3 as the query set
-#. Using the ideal params that provide the target objective (e.g. build vs quality), ingest all 10M vectors into the database and create an index.
-#. Query the vectors from the database and calculate the recall. Verify it's close to the recall from the model params chosen in 5 (within some small epsilon). .
+More formally, an automated parameter tuning workflow with monte-carlo cross-validaton looks likes something like this:
 
+#. Ingest a large dataset into the vector database of your choice
+
+#. Choose an index size based on number of vectors. This should usually align with the average number of vectors the database will end up putting in a single ANN sub-index model.
+
+#. Uniformly random sample the number of vectors specified above from the database for a training set. This is often accomplished by generating some number of random (unique) numbers up to the dataset size.
+
+#. Uniformly sample some number of vectors for a test set and do this again for an evaluation set. 1-10% of the vectors in the training set.
+
+#. Use the test set to compute ground truth on the vectors from prior step against all vectors in the training set.
+
+#. Start the HPO tuning process for the training set, using the test vectors for the query set. It's important to make sure your HPO is multi-objective and optimizes for: a) low build time, b) high throughput or low latency sarch (depending on needs), and c) acceptable recall.
+
+#. Use the evaluation dataset to test that the optimal hyper-parameters generalize to unseen points that were not used in the optimization process.
+
+#. Optionally, the above steps multiple times on different uniform sub-samplings. Optimal parameters can then be combined over the multiple monte-optimization iterations. For example, many hyper-parameters can simply be averaged but care might need to be taken for other parameters.
+
+#. Create a new index in the database using the ideal params from above that meet the target constraints (e.g. build vs search vs quality)
+
+By the end of this process, you should have a set of parameters that meet your target constraints while demonstrating how well the optimal hyper-parameters generalize across the dataset. The major benefit to this approach is that it breaks a potentially unbounded dataset size down into manageable chunks and accelerates tuning on those chunks. We see this process as a major value add for vector search on the GPU.
