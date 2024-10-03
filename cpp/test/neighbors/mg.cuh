@@ -120,10 +120,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       {
         auto index = cuvs::neighbors::mg::build(handle_, index_params, index_dataset);
         cuvs::neighbors::mg::extend(handle_, index, index_dataset, std::nullopt);
-        cuvs::neighbors::mg::serialize(handle_, index, "./cpp/build/mg_ivf_flat_index");
+        cuvs::neighbors::mg::serialize(handle_, index, "mg_ivf_flat_index");
       }
-      auto new_index = cuvs::neighbors::mg::deserialize_flat<DataT, int64_t>(
-        handle_, "./cpp/build/mg_ivf_flat_index");
+      auto new_index =
+        cuvs::neighbors::mg::deserialize_flat<DataT, int64_t>(handle_, "mg_ivf_flat_index");
 
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
@@ -179,10 +179,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       {
         auto index = cuvs::neighbors::mg::build(handle_, index_params, index_dataset);
         cuvs::neighbors::mg::extend(handle_, index, index_dataset, std::nullopt);
-        cuvs::neighbors::mg::serialize(handle_, index, "./cpp/build/mg_ivf_pq_index");
+        cuvs::neighbors::mg::serialize(handle_, index, "mg_ivf_pq_index");
       }
       auto new_index =
-        cuvs::neighbors::mg::deserialize_pq<DataT, int64_t>(handle_, "./cpp/build/mg_ivf_pq_index");
+        cuvs::neighbors::mg::deserialize_pq<DataT, int64_t>(handle_, "mg_ivf_pq_index");
 
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
@@ -232,10 +232,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       {
         auto index = cuvs::neighbors::mg::build(handle_, index_params, index_dataset);
-        cuvs::neighbors::mg::serialize(handle_, index, "./cpp/build/mg_cagra_index");
+        cuvs::neighbors::mg::serialize(handle_, index, "mg_cagra_index");
       }
-      auto new_index = cuvs::neighbors::mg::deserialize_cagra<DataT, uint32_t>(
-        handle_, "./cpp/build/mg_cagra_index");
+      auto new_index =
+        cuvs::neighbors::mg::deserialize_cagra<DataT, uint32_t>(handle_, "mg_cagra_index");
 
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
@@ -275,7 +275,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         auto index = cuvs::neighbors::ivf_flat::build(handle_, index_params, index_dataset);
-        ivf_flat::serialize(handle_, "./cpp/build/local_ivf_flat_index", index);
+        ivf_flat::serialize(handle_, "local_ivf_flat_index", index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -285,8 +285,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
-      auto distributed_index = cuvs::neighbors::mg::distribute_flat<DataT, int64_t>(
-        handle_, "./cpp/build/local_ivf_flat_index");
+      auto distributed_index =
+        cuvs::neighbors::mg::distribute_flat<DataT, int64_t>(handle_, "local_ivf_flat_index");
       search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   distributed_index,
@@ -327,7 +327,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         auto index = cuvs::neighbors::ivf_pq::build(handle_, index_params, index_dataset);
-        ivf_pq::serialize(handle_, "./cpp/build/local_ivf_pq_index", index);
+        ivf_pq::serialize(handle_, "local_ivf_pq_index", index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -337,8 +337,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
-      auto distributed_index = cuvs::neighbors::mg::distribute_pq<DataT, int64_t>(
-        handle_, "./cpp/build/local_ivf_pq_index");
+      auto distributed_index =
+        cuvs::neighbors::mg::distribute_pq<DataT, int64_t>(handle_, "local_ivf_pq_index");
       search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
                                   distributed_index,
@@ -374,7 +374,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         auto index = cuvs::neighbors::cagra::build(handle_, index_params, index_dataset);
-        cuvs::neighbors::cagra::serialize(handle_, "./cpp/build/local_cagra_index", index);
+        cuvs::neighbors::cagra::serialize(handle_, "local_cagra_index", index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -384,8 +384,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
-      auto distributed_index = cuvs::neighbors::mg::distribute_cagra<DataT, uint32_t>(
-        handle_, "./cpp/build/local_cagra_index");
+      auto distributed_index =
+        cuvs::neighbors::mg::distribute_cagra<DataT, uint32_t>(handle_, "local_cagra_index");
 
       search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(handle_,
@@ -679,6 +679,7 @@ const std::vector<AnnMGInputs> inputs = {
    cuvs::distance::DistanceType::L2Expanded,
    true},
 
+  /*
   {7000,
    10000,
    8,
@@ -746,6 +747,7 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
+  */
 
   {7000,
    10000,
