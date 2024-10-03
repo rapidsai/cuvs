@@ -159,7 +159,7 @@ dependencies:
         packages:
           - c-compiler
           - cxx-compiler
-          - nccl>=2.18.1.1
+          - nccl>=2.19
     specific:
       - output_types: conda
         matrices:
