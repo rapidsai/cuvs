@@ -133,6 +133,8 @@ outputs:
         - librmm ={{ minor_version }}
         - libraft-headers ={{ minor_version }}
         - nccl {{ nccl_version }}
+        - libucxx {{ ucxx_version }}
+        - distributed-ucxx {{ ucxx_version }}
         - cuda-version ={{ cuda_version }}
         {% if cuda_major == "11" %}
         - cuda-profiler-api {{ cuda11_cuda_profiler_api_host_version }}
