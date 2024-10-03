@@ -38,15 +38,6 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
-  param.use_cagra_graph = conf.at("use_cagra_graph");
-  if (param.use_cagra_graph) {
-    if (conf.contains("cagra_graph_degree")) {
-      param.cagra_graph_degree = conf.at("cagra_graph_degree");
-    } else {
-      param.cagra_graph_degree = param.R;
-    }
-    param.cagra_intermediate_graph_degree = conf.at("cagra_intermediate_graph_degree");
-  }
 }
 
 template <typename T>
@@ -57,15 +48,6 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
-  param.use_cagra_graph = conf.at("use_cagra_graph");
-  if (param.use_cagra_graph) {
-    if (conf.contains("cagra_graph_degree")) {
-      param.cagra_graph_degree = conf.at("cagra_graph_degree");
-    } else {
-      param.cagra_graph_degree = param.R;
-    }
-    param.cagra_intermediate_graph_degree = conf.at("cagra_intermediate_graph_degree");
-  }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
 }
 

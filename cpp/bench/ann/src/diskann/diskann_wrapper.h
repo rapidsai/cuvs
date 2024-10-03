@@ -20,7 +20,6 @@
 #include "cuvs/neighbors/nn_descent.hpp"
 #include "linux_aligned_file_reader.h"
 
-#include <cuvs/neighbors/cagra.hpp>
 #include <limits>
 #include <raft/core/host_mdspan.hpp>
 
@@ -56,9 +55,6 @@ class diskann_memory : public algo<T> {
     uint32_t build_pq_bytes = 0;
     float alpha             = 1.2;
     int num_threads         = omp_get_num_procs();
-    bool use_cagra_graph;
-    uint32_t cagra_graph_degree;
-    uint32_t cagra_intermediate_graph_degree;
   };
 
   using search_param_base = typename algo<T>::search_param;
@@ -97,11 +93,9 @@ class diskann_memory : public algo<T> {
   }
 
  protected:
-  bool use_cagra_graph_;
   std::shared_ptr<diskann::IndexWriteParameters> diskann_index_write_params_{nullptr};
   uint32_t max_points_;
   uint32_t build_pq_bytes_ = 0;
-  std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_index_params_{nullptr};
   int num_threads_;
 
   uint32_t L_search_;
@@ -127,18 +121,6 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
       .with_saturate_graph(false)
       .with_num_threads(num_threads_)
       .build());
-  use_cagra_graph_ = param.use_cagra_graph;
-  if (use_cagra_graph_) {
-    cuvs::neighbors::cagra::index_params cagra_index_params;
-    cagra_index_params.intermediate_graph_degree = param.cagra_intermediate_graph_degree;
-    cagra_index_params.graph_degree              = param.cagra_graph_degree;
-    auto nn_descent_params =
-      cuvs::neighbors::nn_descent::index_params(cagra_index_params.intermediate_graph_degree);
-    cagra_index_params.graph_build_params     = nn_descent_params;
-    cagra_index_params.guarantee_connectivity = true;
-    cagra_index_params_ =
-      std::make_shared<cuvs::neighbors::cagra::index_params>(cagra_index_params);
-  }
 }
 
 template <typename T>
@@ -153,12 +135,10 @@ void diskann_memory<T>::initialize_index_()
                                                          false,
                                                          false,
                                                          false,
-                                                         !use_cagra_graph_ && build_pq_bytes_ > 0,
-                                                         use_cagra_graph_ ? 0 : build_pq_bytes_,
+                                                         build_pq_bytes_ > 0,
+                                                         build_pq_bytes_,
                                                          false,
-                                                         false,
-                                                         use_cagra_graph_,
-                                                         cagra_index_params_);
+                                                         false);
 }
 template <typename T>
 void diskann_memory<T>::build(const T* dataset, size_t nrow)
@@ -285,8 +265,7 @@ void diskann_ssd<T>::build_from_bin(std::string dataset_path,
                                    std::string(""),
                                    std::string(""),
                                    static_cast<const uint32_t>(0),
-                                   static_cast<const uint32_t>(0),
-                                   this->cagra_index_params_);
+                                   static_cast<const uint32_t>(0));
 }
 
 template <typename T>
