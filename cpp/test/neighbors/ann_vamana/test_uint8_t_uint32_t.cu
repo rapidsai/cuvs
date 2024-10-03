@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
 
-#include "distance-ext.cuh"
+#include <gtest/gtest.h>
+
+#include "../ann_vamana.cuh"
+
+namespace cuvs::neighbors::experimental::vamana {
+
+typedef AnnVamanaTest<float, uint8_t, std::uint32_t> AnnVamanaTestU8_U32;
+TEST_P(AnnVamanaTestU8_U32, AnnVamana) { this->testVamana(); }
+
+INSTANTIATE_TEST_CASE_P(AnnVamanaTest, AnnVamanaTestU8_U32, ::testing::ValuesIn(inputs));
+
+}  // namespace cuvs::neighbors::experimental::vamana
