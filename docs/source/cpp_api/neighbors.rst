@@ -15,3 +15,4 @@ Nearest Neighbors
    neighbors_ivf_pq.rst
    neighbors_nn_descent.rst
    neighbors_refine.rst
+   neighbors_mg.rst
