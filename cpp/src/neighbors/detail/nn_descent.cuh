@@ -1189,7 +1189,6 @@ void GNND<Data_t, Index_t>::add_reverse_edges(Index_t* graph_ptr,
     graph_ptr, d_rev_graph_ptr, NUM_SAMPLES, list_sizes);
   raft::copy(
     h_rev_graph_ptr, d_rev_graph_ptr, nrow_ * NUM_SAMPLES, raft::resource::get_cuda_stream(res));
-  raft::resource::sync_stream(res);
 }
 
 template <typename Data_t, typename Index_t>
@@ -1328,11 +1327,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
                graph_buffer_.data_handle(),
                nrow_ * DEGREE_ON_DEVICE,
                raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
     raft::copy(thrust::raw_pointer_cast(dists_host_buffer_.data()),
                dists_buffer_.data_handle(),
                nrow_ * DEGREE_ON_DEVICE,
                raft::resource::get_cuda_stream(res));
-    raft::resource::sync_stream(res);
 
     graph_.sample_graph_new(thrust::raw_pointer_cast(graph_host_buffer_.data()), DEGREE_ON_DEVICE);
   }
