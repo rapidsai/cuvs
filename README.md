@@ -43,6 +43,18 @@ It is recommended to use [mamba](https://conda.github.io/conda-libmamba-solver/u
 conda install -c conda-forge -c nvidia -c rapidsai cuvs
 ```
 
+The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
+
+For CUDA 11 packages:
+```bash
+pip install cuvs-cu11 --extra-index-url=https://pypi.nvidia.com
+````
+
+And CUDA 12 packages:
+```bash
+pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
+```    
+
 ### Nightlies
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
 
@@ -50,7 +62,7 @@ If installing a version that has not yet been released, the `rapidsai` channel c
 conda install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.10
 ```
 
-Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing cuVS and building from source.
+cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
 
 ## Getting Started
 

@@ -24,14 +24,14 @@ Conda
 
 .. code-block:: bash
 
-   mamba create --name raft_ann_benchmarks
-   conda activate raft_ann_benchmarks
+   conda create --name cuvs_benchmarks
+   conda activate cuvs_benchmarks
 
    # to install GPU package:
-   mamba install -c rapidsai -c conda-forge -c nvidia raft-ann-bench=<rapids_version> cuda-version=11.8*
+   conda install -c rapidsai -c conda-forge -c nvidia cuvs-ann-bench=<rapids_version> cuda-version=11.8*
 
    # to install CPU package for usage in CPU-only systems:
-   mamba install -c rapidsai -c conda-forge  raft-ann-bench-cpu
+   conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
 
 The channel `rapidsai` can easily be substituted `rapidsai-nightly` if nightly benchmarks are desired. The CPU package currently allows to run the HNSW benchmarks.
 
@@ -42,13 +42,13 @@ Docker
 
 We provide images for GPU enabled systems, as well as systems without a GPU. The following images are available:
 
-- `cuvs_bench`: Contains GPU and CPU benchmarks, can run all algorithms supported. Will download million-scale datasets as required. Best suited for users that prefer a smaller container size for GPU based systems. Requires the NVIDIA Container Toolkit to run GPU algorithms, can run CPU algorithms without it.
-- `cuvs_bench-datasets`: Contains the GPU and CPU benchmarks with million-scale datasets already included in the container. Best suited for users that want to run multiple million scale datasets already included in the image.
-- `cuvs_bench-cpu`: Contains only CPU benchmarks with minimal size. Best suited for users that want the smallest containers to reproduce benchmarks on systems without a GPU.
+- `cuvs-bench`: Contains GPU and CPU benchmarks, can run all algorithms supported. Will download million-scale datasets as required. Best suited for users that prefer a smaller container size for GPU based systems. Requires the NVIDIA Container Toolkit to run GPU algorithms, can run CPU algorithms without it.
+- `cuvs-bench-datasets`: Contains the GPU and CPU benchmarks with million-scale datasets already included in the container. Best suited for users that want to run multiple million scale datasets already included in the image.
+- `cuvs-bench-cpu`: Contains only CPU benchmarks with minimal size. Best suited for users that want the smallest containers to reproduce benchmarks on systems without a GPU.
 
-Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/raft-ann-bench/tags>`_, meanwhile release (stable) versions are located in `NGC <https://hub.docker.com/r/rapidsai/cuvs_bench>`_, starting with release 24.10.
+Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-ann-bench/tags>`_, meanwhile release (stable) versions are located in `NGC <https://hub.docker.com/r/rapidsai/cuvs_bench>`_, starting with release 24.10.
 
-The following command pulls the nightly container for python version 10, cuda version 12, and RAFT version 23.10:
+The following command pulls the nightly container for python version 10, cuda version 12, and CUVS version 23.10:
 
 .. code-block:: bash
 
@@ -60,8 +60,8 @@ The CUDA and python versions can be changed for the supported values:
 
 You can see the exact versions as well in the dockerhub site:
 - `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs_bench/tags>`_
-- `cuVS bench with datasets preloaded images <https://hub.docker.com/r/rapidsai/raft-ann-bench-cpu/tags>`_
-- `cuVS bench CPU only images <https://hub.docker.com/r/rapidsai/raft-ann-bench-datasets/tags>`_
+- `cuVS bench with datasets preloaded images <https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags>`_
+- `cuVS bench CPU only images <https://hub.docker.com/r/rapidsai/cuvs-bench-datasets/tags>`_
 
 **Note:** GPU containers use the CUDA toolkit from inside the container, the only requirement is a driver installed on the host machine that supports that version. So, for example, CUDA 11.8 containers can run in systems with a CUDA 12.x capable driver. Please also note that the Nvidia-Docker runtime from the `Nvidia Container Toolkit <https://github.com/NVIDIA/nvidia-docker>`_ is required to use GPUs inside docker containers.
 
@@ -132,7 +132,7 @@ The usage of the script `cuvs_bench.run` is:
                             run only comma separated list of named algorithms. If parameters `groups` and `algo-groups` are both undefined, then group `base` is run by default (default: None)
       --groups GROUPS       run only comma separated groups of parameters (default: base)
       --algo-groups ALGO_GROUPS
-                            add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large" (default: None)
+                            add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=cuvs_cagra.large,hnswlib.large" (default: None)
       -f, --force           re-run algorithms even if their results already exist (default: False)
       -m SEARCH_MODE, --search-mode SEARCH_MODE
                             run search in 'latency' (measure individual batches) or 'throughput' (pipeline batches and measure end-to-end) mode (default: throughput)
@@ -207,15 +207,15 @@ The usage of this script is:
       -h, --help            show this help message and exit
       --dataset DATASET     dataset to plot (default: glove-100-inner)
       --dataset-path DATASET_PATH
-                            path to dataset folder (default: /home/coder/raft/datasets/)
+                            path to dataset folder (default: /home/coder/cuvs/datasets/)
       --output-filepath OUTPUT_FILEPATH
-                            directory for PNG to be saved (default: /home/coder/raft)
+                            directory for PNG to be saved (default: /home/coder/cuvs)
       --algorithms ALGORITHMS
                             plot only comma separated list of named algorithms. If parameters `groups` and `algo-groups are both undefined, then group `base` is plot by default
                             (default: None)
       --groups GROUPS       plot only comma separated groups of parameters (default: base)
       --algo-groups ALGO_GROUPS, --algo-groups ALGO_GROUPS
-                            add comma separated <algorithm>.<group> to plot. Example usage: "--algo-groups=raft_cagra.large,hnswlib.large" (default: None)
+                            add comma separated <algorithm>.<group> to plot. Example usage: "--algo-groups=cuvs_cagra.large,hnswlib.large" (default: None)
       -k COUNT, --count COUNT
                             the number of nearest neighbors to search for (default: 10)
       -bs BATCH_SIZE, --batch-size BATCH_SIZE
@@ -238,7 +238,7 @@ The usage of this script is:
 
 `groups`: plot only specific groups of parameters configurations for an algorithm. Groups are defined in YAML configs (see `configuration`), and by default run `base` group
 
-`algo-groups`: this parameter is helpful to append any specific algorithm+group combination to plot results for in addition to all the arguments from `algorithms` and `groups`. It is of the format `<algorithm>.<group>`, or for example, `raft_cagra.large`
+`algo-groups`: this parameter is helpful to append any specific algorithm+group combination to plot results for in addition to all the arguments from `algorithms` and `groups`. It is of the format `<algorithm>.<group>`, or for example, `cuvs_cagra.large`
 
 Running the benchmarks
 ======================
@@ -335,17 +335,17 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     # (1) prepare dataset
     # download manually "Ground Truth" file of "Yandex DEEP"
     # suppose the file name is deep_new_groundtruth.public.10K.bin
-    python -m raft_ann_bench.split_groundtruth --groundtruth datasets/deep-1B/deep_new_groundtruth.public.10K.bin
+    python -m cuvs_bench.split_groundtruth --groundtruth datasets/deep-1B/deep_new_groundtruth.public.10K.bin
     # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
 
     # (2) build and search index
-    python -m raft_ann_bench.run --dataset deep-1B --algorithms raft_cagra --batch-size 10 -k 10
+    python -m cuvs_bench.run --dataset deep-1B --algorithms cuvs_cagra --batch-size 10 -k 10
 
     # (3) export data
-    python -m raft_ann_bench.data_export --dataset deep-1B
+    python -m cuvs_bench.data_export --dataset deep-1B
 
     # (4) plot results
-    python -m raft_ann_bench.plot --dataset deep-1B
+    python -m cuvs_bench.plot --dataset deep-1B
 
 The usage of `python -m cuvs_bench.split_groundtruth` is:
 
@@ -525,7 +525,7 @@ Creating and customizing dataset configurations
 
 A single configuration will often define a set of algorithms, with associated index and search parameters, that can be generalize across datasets. We use YAML to define dataset specific and algorithm specific configurations.
 
-A default `datasets.yaml` is provided by RAFT in `${RAFT_HOME}/python/raft-ann-bench/src/raft_ann_bench/run/conf` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
+A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs-ann-bench/src/cuvs_bench/run/conf` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
 
 .. code-block:: yaml
 
@@ -536,7 +536,7 @@ A default `datasets.yaml` is provided by RAFT in `${RAFT_HOME}/python/raft-ann-b
       dims: 128
       distance: euclidean
 
-Configuration files for ANN algorithms supported by `cuvs-bench` are provided in `${RAFT_HOME}/python/cuvs-bench/src/raft_ann_bench/run/conf`. `cuvs_cagra` algorithm configuration looks like:
+Configuration files for ANN algorithms supported by `cuvs-bench` are provided in `${CUVS_HOME}/python/cuvs-bench/src/cuvs_bench/run/conf`. `cuvs_cagra` algorithm configuration looks like:
 
 .. code-block:: yaml
 
@@ -695,7 +695,7 @@ Add a new entry to `algos.yaml` to map the name of the algorithm to its binary e
 
 .. code-block:: yaml
     cuvs_ivf_pq:
-      executable: RAFT_IVF_PQ_ANN_BENCH
+      executable: CUVS_IVF_PQ_ANN_BENCH
       requires_gpu: true
 
 `executable` : specifies the name of the binary that will build/search the index. It is assumed to be available in `cuvs/cpp/build/`.

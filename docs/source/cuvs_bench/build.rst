@@ -5,7 +5,7 @@ Build cuVS Bench From Source
 Dependencies
 ============
 
-CUDA 11 and a GPU with Pascal architecture or later are required to run the benchmarks.
+CUDA 11 and a GPU with Volta architecture or later are required to run the benchmarks.
 
 Please refer to the  :doc:`installation docs <../build>` for the base requirements to build cuVS.
 
@@ -23,7 +23,7 @@ The easiest (and most reproducible) way to install the dependencies needed to bu
 
 .. code-block:: bash
 
-    mamba env create --name cuvs_benchmarks -f conda/environments/cuvs_bench_cuda-118_arch-x86_64.yaml
+    conda env create --name cuvs_benchmarks -f conda/environments/cuvs_bench_cuda-118_arch-x86_64.yaml
     conda activate cuvs_benchmarks
 
 The above conda environment will also reduce the compile times as dependencies like FAISS will already be installed and not need to be compiled with `rapids-cmake`.
@@ -35,13 +35,13 @@ After the needed dependencies are satisfied, the easiest way to compile ANN benc
 
 .. code-block:: bash
 
-    ./build.sh cuvs-bench
+    ./build.sh bench-ann
 
 You can limit the algorithms that are built by providing a semicolon-delimited list of executable names (each algorithm is suffixed with `_ANN_BENCH`):
 
 .. code-block:: bash
 
-    ./build.sh cuvs-bench -n --limit-bench-ann=HNSWLIB_ANN_BENCH;CUVS_IVF_PQ_ANN_BENCH
+    ./build.sh bench-ann -n --limit-bench-ann=HNSWLIB_ANN_BENCH;CUVS_IVF_PQ_ANN_BENCH
 
 Available targets to use with `--limit-bench-ann` are:
 - FAISS_GPU_IVF_FLAT_ANN_BENCH

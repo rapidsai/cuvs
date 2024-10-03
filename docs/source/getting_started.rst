@@ -66,7 +66,7 @@ The primary goal of cuVS is to enable speed, scale, and flexibility (in that ord
 Using cuVS APIs
 ===============
 
-cuVS is a C++ library its core, which is wrapped with a C library and exposed further through various different languages. cuVS currently provides APIs and documentation for :doc:`C <c_api>`, :doc:`C++ <cpp_api>`, :doc:`Python <python_api>`, and :doc:`Rust <rust_api/index>` with more languages in the works. our :doc:`API basics <api_basics>` provides some background and context about the important paradigms and vocabulary types you'll encounter when working with cuVS types.
+cuVS is a C++ library at its core, which is wrapped with a C library and exposed further through various different languages. cuVS currently provides APIs and documentation for :doc:`C <c_api>`, :doc:`C++ <cpp_api>`, :doc:`Python <python_api>`, and :doc:`Rust <rust_api/index>` with more languages in the works. our :doc:`API basics <api_basics>` provides some background and context about the important paradigms and vocabulary types you'll encounter when working with cuVS types.
 
 Please refer to the :doc:`guide on API interoperability <api_interoperability>` for more information on how cuVS can work seamlessly with other libraries like numpy, cupy, tensorflow, and pytorch, even without having to copy device memory.
 

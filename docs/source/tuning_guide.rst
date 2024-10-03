@@ -46,7 +46,7 @@ More formally, an automated parameter tuning workflow with monte-carlo cross-val
 
 #. Use the evaluation dataset to test that the optimal hyper-parameters generalize to unseen points that were not used in the optimization process.
 
-#. Optionally, the above steps multiple times on different uniform sub-samplings. Optimal parameters can then be combined over the multiple monte-optimization iterations. For example, many hyper-parameters can simply be averaged but care might need to be taken for other parameters.
+#. Optionally, the above steps multiple times on different uniform sub-samplings. Optimal parameters can then be combined over the multiple monte-carlo optimization iterations. For example, many hyper-parameters can simply be averaged but care might need to be taken for other parameters.
 
 #. Create a new index in the database using the ideal params from above that meet the target constraints (e.g. build vs search vs quality)
 
