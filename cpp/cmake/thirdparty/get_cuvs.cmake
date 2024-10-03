@@ -17,7 +17,7 @@ set(CUVS_FORK "rapidsai")
 set(CUVS_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
 
 function(find_and_configure_cuvs)
-    set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
+    set(oneValueArgs VERSION FORK PINNED_TAG ENABLE_NVTX CLONE_ON_PIN BUILD_CPU_ONLY BUILD_SHARED_LIBS)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
@@ -39,7 +39,8 @@ function(find_and_configure_cuvs)
               GIT_TAG               ${PKG_PINNED_TAG}
               SOURCE_SUBDIR         cpp
               OPTIONS
-              "BUILD_SHARED_LIBS OFF"
+              "BUILD_SHARED_LIBS ${PKG_BUILD_SHARED_LIBS}"
+              "BUILD_CPU_ONLY ${PKG_BUILD_CPU_ONLY}"
               "BUILD_TESTS OFF"
               "BUILD_CAGRA_HNSWLIB OFF"
               "RAFT_COMPILE_LIBRARY OFF"
@@ -59,4 +60,6 @@ find_and_configure_cuvs(VERSION  ${CUVS_VERSION}.00
         # force local raft clone in build directory
         # even if it's already installed.
         CLONE_ON_PIN     ${CUVS_RAFT_CLONE_ON_PIN}
+        BUILD_CPU_ONLY ${BUILD_CPU_ONLY}
+        BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS}
 )
