@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-mg --no-cpu --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -41,6 +41,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
+   --no-mg                     - disable multi-GPU support
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
@@ -67,6 +68,7 @@ CMAKE_LOG_LEVEL=""
 VERBOSE_FLAG=""
 BUILD_ALL_GPU_ARCH=0
 BUILD_TESTS=ON
+BUILD_MG_ALGOS=ON
 BUILD_TYPE=Release
 COMPILE_LIBRARY=OFF
 INSTALL_TARGET=install
@@ -264,6 +266,10 @@ if hasArg --allgpuarch; then
     BUILD_ALL_GPU_ARCH=1
 fi
 
+if hasArg --no-mg; then
+    BUILD_MG_ALGOS=OFF
+fi
+
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
     CMAKE_TARGET="${CMAKE_TARGET};${TEST_TARGETS}"
@@ -373,6 +379,7 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           -DBUILD_C_TESTS=${BUILD_TESTS} \
           -DBUILD_CUVS_BENCH=${BUILD_CUVS_BENCH} \
           -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
+          -DBUILD_MG_ALGOS=${BUILD_MG_ALGOS} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \
           -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
           ${CACHE_ARGS} \
