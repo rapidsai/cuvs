@@ -361,7 +361,7 @@ struct search_plan_impl : public search_plan_impl_base {
         std::to_string(hashmap_max_fill_rate) + " has been given.";
     }
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
-                                cuvs::neighbors::filtering::none_cagra_sample_filter>::value) {
+                                cuvs::neighbors::filtering::none_sample_filter>::value) {
       if (hashmap_mode == hash_mode::SMALL) {
         error_message += "`SMALL` hash is not available when filtering";
       } else {
