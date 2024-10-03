@@ -301,8 +301,8 @@ if(BUILD_MG_ALGOS)
       src/neighbors/mg/mg_cagra_half_uint32_t.cu
       src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
       src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
-      src/neighbors/mg/std_comms.cpp
       src/neighbors/mg/omp_checks.cpp
+      src/neighbors/mg/nccl_comm.cpp
   )
 endif()
 

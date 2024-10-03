@@ -229,7 +229,6 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
       int dev_id                            = clique.device_ids_[rank];
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       auto& ann_if                          = index.ann_interfaces_[rank];
-      const auto& comms                     = resource::get_comms(dev_res);
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
 
       if (rank == clique.root_rank_) {  // root rank
@@ -242,21 +241,25 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
           dev_res, ann_if, search_params, query_partition, d_neighbors, d_distances);
 
         // wait for other ranks
-        comms.group_start();
+        ncclGroupStart();
         for (int from_rank = 0; from_rank < index.num_ranks_; from_rank++) {
           if (from_rank == clique.root_rank_) continue;
 
           batch_offset = from_rank * part_size;
-          comms.device_recv(in_neighbors.data_handle() + batch_offset,
-                            part_size,
-                            from_rank,
-                            resource::get_cuda_stream(dev_res));
-          comms.device_recv(in_distances.data_handle() + batch_offset,
-                            part_size,
-                            from_rank,
-                            resource::get_cuda_stream(dev_res));
+          ncclRecv(in_neighbors.data_handle() + batch_offset,
+                   part_size * sizeof(IdxT),
+                   ncclUint8,
+                   from_rank,
+                   clique.nccl_comms_[rank],
+                   resource::get_cuda_stream(dev_res));
+          ncclRecv(in_distances.data_handle() + batch_offset,
+                   part_size * sizeof(float),
+                   ncclUint8,
+                   from_rank,
+                   clique.nccl_comms_[rank],
+                   resource::get_cuda_stream(dev_res));
         }
-        comms.group_end();
+        ncclGroupEnd();
         resource::sync_stream(dev_res);
       } else {  // non-root ranks
         auto d_neighbors = raft::make_device_matrix<IdxT, int64_t, row_major>(
@@ -267,16 +270,20 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
           dev_res, ann_if, search_params, query_partition, d_neighbors.view(), d_distances.view());
 
         // send results to root rank
-        comms.group_start();
-        comms.device_send(d_neighbors.data_handle(),
-                          part_size,
-                          clique.root_rank_,
-                          resource::get_cuda_stream(dev_res));
-        comms.device_send(d_distances.data_handle(),
-                          part_size,
-                          clique.root_rank_,
-                          resource::get_cuda_stream(dev_res));
-        comms.group_end();
+        ncclGroupStart();
+        ncclSend(d_neighbors.data_handle(),
+                 part_size * sizeof(IdxT),
+                 ncclUint8,
+                 clique.root_rank_,
+                 clique.nccl_comms_[rank],
+                 resource::get_cuda_stream(dev_res));
+        ncclSend(d_distances.data_handle(),
+                 part_size * sizeof(float),
+                 ncclUint8,
+                 clique.root_rank_,
+                 clique.nccl_comms_[rank],
+                 resource::get_cuda_stream(dev_res));
+        ncclGroupEnd();
         resource::sync_stream(dev_res);
       }
     }
@@ -345,7 +352,6 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
       int dev_id                            = clique.device_ids_[rank];
       const raft::device_resources& dev_res = clique.device_resources_[rank];
       auto& ann_if                          = index.ann_interfaces_[rank];
-      const auto& comms                     = resource::get_comms(dev_res);
       RAFT_CUDA_TRY(cudaSetDevice(dev_id));
 
       int64_t part_size = n_rows_of_current_batch * n_neighbors;
@@ -381,31 +387,43 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
       while (remaining > 1) {
         bool received_something = false;
         int64_t offset          = radix / 2;
-        comms.group_start();
+        ncclGroupStart();
         if (rank % radix == 0)  // This is one of the receivers
         {
           int other_id = rank + offset;
           if (other_id < index.num_ranks_)  // Make sure someone's sending anything
           {
-            comms.device_recv(tmp_neighbors.data_handle() + part_size,
-                              part_size,
-                              other_id,
-                              resource::get_cuda_stream(dev_res));
-            comms.device_recv(tmp_distances.data_handle() + part_size,
-                              part_size,
-                              other_id,
-                              resource::get_cuda_stream(dev_res));
+            ncclRecv(tmp_neighbors.data_handle() + part_size,
+                     part_size * sizeof(IdxT),
+                     ncclUint8,
+                     other_id,
+                     clique.nccl_comms_[rank],
+                     resource::get_cuda_stream(dev_res));
+            ncclRecv(tmp_distances.data_handle() + part_size,
+                     part_size * sizeof(float),
+                     ncclUint8,
+                     other_id,
+                     clique.nccl_comms_[rank],
+                     resource::get_cuda_stream(dev_res));
             received_something = true;
           }
         } else if (rank % radix == offset)  // This is one of the senders
         {
           int other_id = rank - offset;
-          comms.device_send(
-            tmp_neighbors.data_handle(), part_size, other_id, resource::get_cuda_stream(dev_res));
-          comms.device_send(
-            tmp_distances.data_handle(), part_size, other_id, resource::get_cuda_stream(dev_res));
+          ncclSend(tmp_neighbors.data_handle(),
+                   part_size * sizeof(IdxT),
+                   ncclUint8,
+                   other_id,
+                   clique.nccl_comms_[rank],
+                   resource::get_cuda_stream(dev_res));
+          ncclSend(tmp_distances.data_handle(),
+                   part_size * sizeof(float),
+                   ncclUint8,
+                   other_id,
+                   clique.nccl_comms_[rank],
+                   resource::get_cuda_stream(dev_res));
         }
-        comms.group_end();
+        ncclGroupEnd();
 
         remaining = (remaining + 1) / 2;
         radix *= 2;
