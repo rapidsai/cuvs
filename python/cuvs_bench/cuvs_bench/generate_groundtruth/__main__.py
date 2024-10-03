@@ -97,16 +97,16 @@ def main():
         "The input and output files are in big-ann-benchmark's binary format.",
         epilog="""Example usage
     # With existing query file
-    python -m raft_ann_bench.generate_groundtruth --dataset /dataset/base.\
+    python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.\
 fbin --output=groundtruth_dir --queries=/dataset/query.public.10K.fbin
 
     # With randomly generated queries
-    python -m raft_ann_bench.generate_groundtruth --dataset /dataset/base.\
+    python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.\
 fbin --output=groundtruth_dir --queries=random --n_queries=10000
 
     # Using only a subset of the dataset. Define queries by randomly
     # selecting vectors from the (subset of the) dataset.
-    python -m raft_ann_bench.generate_groundtruth --dataset /dataset/base.\
+    python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.\
 fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
 --queries=random-choice --n_queries=10000
     """,
@@ -172,7 +172,7 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
         default="sqeuclidean",
         help="Metric to use while calculating distances. Valid metrics are "
         "those that are accepted by cuvs.neighbors.brute_force.knn. Most"
-        " commonly used with RAFT ANN are 'sqeuclidean' and 'inner_product'",
+        " commonly used with cuVS are 'sqeuclidean' and 'inner_product'",
     )
 
     if len(sys.argv) == 1:

@@ -22,8 +22,8 @@ function(find_and_configure_cuvs)
             "${multiValueArgs}" ${ARGN} )
 
     if(PKG_CLONE_ON_PIN AND NOT PKG_PINNED_TAG STREQUAL "branch-${CUVS_VERSION}")
-        message(STATUS "cuVS: RAFT pinned tag found: ${PKG_PINNED_TAG}. Cloning raft locally.")
-        set(CPM_DOWNLOAD_raft ON)
+        message(STATUS "cuVS: pinned tag found: ${PKG_PINNED_TAG}. Cloning cuVS locally.")
+        set(CPM_DOWNLOAD_cuvs ON)
     endif()
 
     #-----------------------------------------------------
@@ -43,8 +43,7 @@ function(find_and_configure_cuvs)
               "BUILD_CPU_ONLY ${PKG_BUILD_CPU_ONLY}"
               "BUILD_TESTS OFF"
               "BUILD_CAGRA_HNSWLIB OFF"
-              "RAFT_COMPILE_LIBRARY OFF"
-              "CUVS_RAFT_CLONE_ON_PIN ${PKG_CLONE_ON_PIN}"
+              "CUVS_CLONE_ON_PIN ${PKG_CLONE_ON_PIN}"
             )
 endfunction()
 
@@ -57,9 +56,9 @@ find_and_configure_cuvs(VERSION  ${CUVS_VERSION}.00
         PINNED_TAG               ${CUVS_PINNED_TAG}
         ENABLE_NVTX              OFF
         # When PINNED_TAG above doesn't match the default rapids branch,
-        # force local raft clone in build directory
+        # force local cuvs clone in build directory
         # even if it's already installed.
-        CLONE_ON_PIN     ${CUVS_RAFT_CLONE_ON_PIN}
+        CLONE_ON_PIN     ${CUVS_CLONE_ON_PIN}
         BUILD_CPU_ONLY ${BUILD_CPU_ONLY}
         BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS}
 )
