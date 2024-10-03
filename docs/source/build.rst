@@ -38,21 +38,21 @@ C, C++, and Python through Conda
 
 The easiest way to install the pre-compiled C, C++, and Python packages is through conda. You can get a minimal conda installation with `miniforge <https://github.com/conda-forge/miniforge>`__.
 
-Use the following commands, depending on your CUDA version, to install cuVS packages (replace `rapidsai` with `rapidsai-nightly` to install more up-to-date but less stable nightly packages). `mamba` is preferred over the `conda` command.
+Use the following commands, depending on your CUDA version, to install cuVS packages (replace `rapidsai` with `rapidsai-nightly` to install more up-to-date but less stable nightly packages). `mamba` is preferred over the `conda` command and can be enabled using `this guide <https://conda.github.io/conda-libmamba-solver/user-guide/>`_.
 
 C/C++ Package
 ~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
+   conda install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.5
+   conda install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.5
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
@@ -97,15 +97,15 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    mamba env create --name cuvs -f conda/environments/all_cuda-125_arch-x86_64.yaml
-    mamba activate cuvs
+    conda env create --name cuvs -f conda/environments/all_cuda-125_arch-x86_64.yaml
+    conda activate cuvs
 
 The process for building from source with CUDA 11 differs slightly in that your host system will also need to have CUDA toolkit installed which is greater than, or equal to, the version you install into you conda environment. Installing CUDA toolkit into your host system is necessary because `nvcc` is not provided with Conda's cudatoolkit dependencies for CUDA 11. The following example will install create and install dependencies for a CUDA 11.8 conda environment
 
 .. code-block:: bash
 
-    mamba env create --name cuvs -f conda/environments/all_cuda-118_arch-x86_64.yaml
-    mamba activate cuvs
+    conda env create --name cuvs -f conda/environments/all_cuda-118_arch-x86_64.yaml
+    conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
 
