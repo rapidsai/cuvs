@@ -24,6 +24,7 @@
 #include <raft/core/error.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
 
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
@@ -1162,15 +1163,19 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
 {
   static_assert(NUM_SAMPLES <= 32);
 
-  thrust::fill(thrust::device,
+  thrust::fill(raft::resource::get_thrust_policy(res),
                dists_buffer_.data_handle(),
                dists_buffer_.data_handle() + dists_buffer_.size(),
                std::numeric_limits<float>::max());
-  thrust::fill(thrust::device,
+  thrust::fill(raft::resource::get_thrust_policy(res),
                reinterpret_cast<Index_t*>(graph_buffer_.data_handle()),
                reinterpret_cast<Index_t*>(graph_buffer_.data_handle()) + graph_buffer_.size(),
                std::numeric_limits<Index_t>::max());
-  thrust::fill(thrust::device, d_locks_.data_handle(), d_locks_.data_handle() + d_locks_.size(), 0);
+  thrust::fill(raft::resource::get_thrust_policy(res),
+               d_locks_.data_handle(),
+               d_locks_.data_handle() + d_locks_.size(),
+               0);
+  raft::resource::sync_stream(res);
 };
 
 template <typename Data_t, typename Index_t>
@@ -1190,7 +1195,7 @@ void GNND<Data_t, Index_t>::add_reverse_edges(Index_t* graph_ptr,
 template <typename Data_t, typename Index_t>
 void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
 {
-  thrust::fill(thrust::device.on(stream),
+  thrust::fill(raft::resource::get_thrust_policy(res),
                dists_buffer_.data_handle(),
                dists_buffer_.data_handle() + dists_buffer_.size(),
                std::numeric_limits<float>::max());
@@ -1209,6 +1214,7 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
     DEGREE_ON_DEVICE,
     d_locks_.data_handle(),
     l2_norms_.data_handle());
+  raft::resource::sync_stream(res);
 }
 
 template <typename Data_t, typename Index_t>
@@ -1240,10 +1246,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
                                        batch.offset());
   }
 
-  thrust::fill(thrust::device.on(stream),
+  thrust::fill(raft::resource::get_thrust_policy(res),
                (Index_t*)graph_buffer_.data_handle(),
                (Index_t*)graph_buffer_.data_handle() + graph_buffer_.size(),
                std::numeric_limits<Index_t>::max());
+  raft::resource::sync_stream(res);
 
   graph_.clear();
   graph_.init_random_graph();
@@ -1330,6 +1337,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
     graph_.sample_graph_new(thrust::raw_pointer_cast(graph_host_buffer_.data()), DEGREE_ON_DEVICE);
   }
 
+  raft::resource::sync_stream(res);
   graph_.update_graph(thrust::raw_pointer_cast(graph_host_buffer_.data()),
                       thrust::raw_pointer_cast(dists_host_buffer_.data()),
                       DEGREE_ON_DEVICE,
@@ -1415,6 +1423,7 @@ void build(raft::resources const& res,
 
   GNND<const T, int> nnd(res, build_config);
   nnd.build(dataset.data_handle(), dataset.extent(0), int_graph.data_handle());
+  raft::resource::sync_stream(res);
 
 #pragma omp parallel for
   for (size_t i = 0; i < static_cast<size_t>(dataset.extent(0)); i++) {
