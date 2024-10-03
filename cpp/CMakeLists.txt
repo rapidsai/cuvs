@@ -422,6 +422,12 @@ add_library(
   src/neighbors/refine/detail/refine_host_int8_t_float.cpp
   src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/neighbors/vamana_build_float.cu
+  src/neighbors/vamana_build_uint8.cu
+  src/neighbors/vamana_build_int8.cu
+  src/neighbors/vamana_serialize_float.cu
+  src/neighbors/vamana_serialize_uint8.cu
+  src/neighbors/vamana_serialize_int8.cu
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_int32_t.cu
   src/selection/select_k_float_uint32_t.cu
