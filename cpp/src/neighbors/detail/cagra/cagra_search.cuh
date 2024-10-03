@@ -177,6 +177,7 @@ void search_main(raft::resources const& res,
         std::get_if<raft::device_matrix_view<const T, int64_t, raft::row_major>>(&dataset_view);
 
       if (brute_force_dataset) {
+        RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%d", sparsity);
         auto brute_force_idx =
           cuvs::neighbors::brute_force::build(res, *brute_force_dataset, index.metric());
         cuvs::neighbors::brute_force::search(
