@@ -288,7 +288,7 @@ target_compile_options(
 )
 
 add_library(
-  cuvs SHARED
+  cuvs_objs OBJECT
   src/cluster/kmeans_balanced_fit_float.cu
   src/cluster/kmeans_fit_mg_float.cu
   src/cluster/kmeans_fit_mg_double.cu
@@ -430,12 +430,61 @@ add_library(
   src/stats/trustworthiness_score.cu
 )
 
+set_target_properties(
+  cuvs_objs
+  PROPERTIES CXX_STANDARD 17
+             CXX_STANDARD_REQUIRED ON
+             CUDA_STANDARD 17
+             CUDA_STANDARD_REQUIRED ON
+             POSITION_INDEPENDENT_CODE ON
+)
+target_compile_options(
+  cuvs_objs PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                    "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+)
+target_link_libraries(
+  cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+                   $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+)
+
+add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
+add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
+
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
                  --expt-relaxed-constexpr>
 )
 
 add_library(cuvs::cuvs ALIAS cuvs)
+add_library(cuvs::cuvs_static ALIAS cuvs_static)
+
+set_target_properties(
+  cuvs_static
+  PROPERTIES BUILD_RPATH "\$ORIGIN"
+             INSTALL_RPATH "\$ORIGIN"
+             CXX_STANDARD 17
+             CXX_STANDARD_REQUIRED ON
+             POSITION_INDEPENDENT_CODE ON
+             INTERFACE_POSITION_INDEPENDENT_CODE ON
+             EXPORT_NAME cuvs_static
+)
+
+target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
+
+target_include_directories(
+  cuvs_static
+  PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+  INTERFACE "$<INSTALL_INTERFACE:include>"
+)
+
+target_link_libraries(
+  cuvs_static
+  PUBLIC ${CUVS_CTK_MATH_DEPENDENCIES}
+  PRIVATE raft::raft
+)
+
+# ensure CUDA symbols aren't relocated to the middle of the debug build binaries
+target_link_options(cuvs_static PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
 
 target_include_directories(
   cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -468,8 +517,8 @@ if(NOT BUILD_CPU_ONLY)
 endif()
 
 if(BUILD_CAGRA_HNSWLIB)
-  target_link_libraries(cuvs PRIVATE hnswlib::hnswlib)
-  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+  target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
 endif()
 
 # Endian detection
@@ -551,10 +600,15 @@ if(BUILD_C_LIBRARY)
     src/neighbors/ivf_flat_c.cpp
     src/neighbors/ivf_pq_c.cpp
     src/neighbors/cagra_c.cpp
-    src/neighbors/hnsw_c.cpp
+    $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
     src/neighbors/refine/refine_c.cpp
     src/distance/pairwise_distance_c.cpp
   )
+
+  if(BUILD_CAGRA_HNSWLIB)
+    target_link_libraries(cuvs_c PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(cuvs_c PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+  endif()
 
   add_library(cuvs::c_api ALIAS cuvs_c)
 
@@ -594,7 +648,7 @@ include(GNUInstallDirs)
 include(CPack)
 
 install(
-  TARGETS cuvs
+  TARGETS cuvs cuvs_static
   DESTINATION ${lib_dir}
   COMPONENT cuvs
   EXPORT cuvs-exports

@@ -161,6 +161,8 @@ if(BUILD_TESTS)
 
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
+    target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
   ConfigureTest(
@@ -214,6 +216,8 @@ if(BUILD_C_TESTS)
 
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
+    target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 endif()
 
