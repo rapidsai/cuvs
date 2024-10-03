@@ -27,8 +27,7 @@ void build(const raft::device_resources& handle,
       handle, *static_cast<const ivf_pq::index_params*>(index_params), index_dataset);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
-    cagra::index<T, IdxT> idx(handle);
-    idx = cuvs::neighbors::cagra::build(
+    auto idx = cuvs::neighbors::cagra::build(
       handle, *static_cast<const cagra::index_params*>(index_params), index_dataset);
     interface.index_.emplace(std::move(idx));
   }
