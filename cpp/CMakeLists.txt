@@ -524,7 +524,7 @@ if(NOT BUILD_CPU_ONLY)
   target_link_libraries(
     cuvs_static
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
-    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> cuvs-cagra-search
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
@@ -660,7 +660,7 @@ include(GNUInstallDirs)
 include(CPack)
 
 install(
-  TARGETS cuvs cuvs_static
+  TARGETS cuvs cuvs_static cuvs-cagra-search
   DESTINATION ${lib_dir}
   COMPONENT cuvs
   EXPORT cuvs-exports
