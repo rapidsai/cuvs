@@ -472,16 +472,18 @@ set_target_properties(
 target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
 
 target_include_directories(
+  cuvs_objs
+  PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+  INTERFACE "$<INSTALL_INTERFACE:include>"
+)
+
+target_include_directories(
   cuvs_static
   PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
   INTERFACE "$<INSTALL_INTERFACE:include>"
 )
 
-target_link_libraries(
-  cuvs_static
-  PUBLIC ${CUVS_CTK_MATH_DEPENDENCIES}
-  PRIVATE raft::raft
-)
+target_link_libraries(cuvs_static PUBLIC ${CUVS_CTK_MATH_DEPENDENCIES})
 
 # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
 target_link_options(cuvs_static PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
