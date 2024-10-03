@@ -145,21 +145,10 @@ void select_clusters(raft::resources const& handle,
       gemm_k = dim + 1;
       RAFT_EXPECTS(gemm_k <= dim_ext, "unexpected gemm_k or dim_ext");
     } break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: {
       alpha = -1.0;
       beta  = 0.0;
-    } break;
-    case cuvs::distance::DistanceType::CosineExpanded: {
-      alpha = -1.0;
-      beta  = 0.0;
-
-      auto float_queries_matrix_view =
-        raft::make_device_matrix_view<float, uint32_t>(float_queries, n_queries, dim_ext);
-
-      raft::linalg::row_normalize(handle,
-                                  raft::make_const_mdspan(float_queries_matrix_view),
-                                  float_queries_matrix_view,
-                                  raft::linalg::NormType::L2Norm);
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
@@ -638,6 +627,12 @@ inline void search(raft::resources const& handle,
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "Unsupported element type.");
+  if (index.metric() == distance::DistanceType::CosineExpanded) {
+    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+      RAFT_FAIL(
+        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
+        "type");
+  }
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,

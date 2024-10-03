@@ -893,9 +893,8 @@ inline auto enum_variety_cosine() -> test_cases_t
     ivf_pq_inputs y(x);
     if (y.min_recall.has_value()) {
       if (y.search_params.lut_dtype == CUDA_R_8U) {
-        // CosineExpanded score is signed,
-        // thus we're forced to used signed 8-bit representation,
-        // thus we have one bit less precision
+        // TODO: Increase this recall threshold for 8 bit lut
+        // (https://github.com/rapidsai/cuvs/issues/390)
         y.min_recall = y.min_recall.value() * 0.70;
       } else {
         // In other cases it seems to perform a little bit better, still worse than L2

@@ -27,10 +27,10 @@ TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(f32_u08_i64)
 TEST_BUILD_EXTEND_SEARCH(f32_u08_i64)
 INSTANTIATE(f32_u08_i64,
             small_dims_per_cluster() + enum_variety() + enum_variety_l2() + enum_variety_l2sqrt() +
-              enum_variety_ip() + enum_variety_cosine());
+              enum_variety_ip());
 
 TEST_BUILD_SEARCH(f32_u08_i64_filter)
 INSTANTIATE(f32_u08_i64_filter,
             small_dims_per_cluster() + enum_variety() + enum_variety_l2() + enum_variety_l2sqrt() +
-              enum_variety_ip() + enum_variety_cosine());
+              enum_variety_ip());
 }  // namespace cuvs::neighbors::ivf_pq

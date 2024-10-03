@@ -1469,6 +1469,13 @@ void extend(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
+  if (index->metric() == distance::DistanceType::CosineExpanded) {
+    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+      RAFT_FAIL(
+        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
+        "type");
+  }
+
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
   rmm::device_async_resource_ref large_memory =
     raft::resource::get_large_workspace_resource(handle);
@@ -1635,24 +1642,17 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
-    auto float_vec_batch  = raft::make_device_mdarray<float, internal_extents_t>(
-      handle,
-      device_memory,
-      raft::make_extents<internal_extents_t>(vec_batch.size(), index->dim()));
-    raft::linalg::map(handle,
-                      float_vec_batch.view(),
-                      utils::mapping<float>{},
-                      raft::make_device_matrix_view<const T, internal_extents_t>(
-                        vec_batch.data(), vec_batch.size(), index->dim()));
-    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    if (index->metric() == CosineExpanded) {
+      auto vec_batch_view = raft::make_device_matrix_view<T, internal_extents_t>(
+        const_cast<T*>(vec_batch.data()), vec_batch.size(), index->dim());
       raft::linalg::row_normalize(handle,
-                                  raft::make_const_mdspan(float_vec_batch.view()),
-                                  float_vec_batch.view(),
+                                  raft::make_const_mdspan(vec_batch_view),
+                                  vec_batch_view,
                                   raft::linalg::NormType::L2Norm);
     }
     process_and_fill_codes(handle,
                            *index,
-                           float_vec_batch.data_handle(),
+                           vec_batch.data(),
                            new_indices != nullptr
                              ? std::variant<IdxT, const IdxT*>(idx_batch.data())
                              : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
@@ -1701,6 +1701,13 @@ auto build(raft::resources const& handle,
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
+  if (params.metric == distance::DistanceType::CosineExpanded) {
+    // TODO: support int8_t and uint8_t types (https://github.com/rapidsai/cuvs/issues/389)
+    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+      RAFT_FAIL(
+        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
+        "type");
+  }
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
