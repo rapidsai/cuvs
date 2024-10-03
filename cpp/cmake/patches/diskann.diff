@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3d3d2b8..94ea453 100644
+index 3d3d2b8..e5da6b7 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -145,62 +145,20 @@ if (MSVC)
+@@ -145,62 +145,15 @@ if (MSVC)
          "${DISKANN_MKL_LIB_PATH}/mkl_intel_thread.lib")
  else()
      # expected path for manual intel mkl installs
@@ -12,16 +12,12 @@ index 3d3d2b8..94ea453 100644
 -            get_filename_component(OMP_PATH ${POSSIBLE_OMP_PATH} DIRECTORY)
 -        endif()
 -    endforeach()
-+    find_package(MKL CONFIG REQUIRED)
-+    #target_compile_options(${PROJECT_NAME} PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
-+    include_directories($<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
-+    link_libraries($<LINK_ONLY:MKL::MKL>)
- 
-     if(NOT OMP_PATH)
-         message(FATAL_ERROR "Could not find Intel OMP in standard locations; use -DOMP_PATH to specify the install location for your environment")
-     endif()
-     link_directories(${OMP_PATH})
- 
+-
+-    if(NOT OMP_PATH)
+-        message(FATAL_ERROR "Could not find Intel OMP in standard locations; use -DOMP_PATH to specify the install location for your environment")
+-    endif()
+-    link_directories(${OMP_PATH})
+-
 -    set(POSSIBLE_MKL_LIB_PATHS "/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_core.so;/usr/lib/x86_64-linux-gnu/libmkl_core.so;/opt/intel/mkl/lib/intel64/libmkl_core.so")
 -    foreach(POSSIBLE_MKL_LIB_PATH ${POSSIBLE_MKL_LIB_PATHS})
 -        if (EXISTS ${POSSIBLE_MKL_LIB_PATH})
@@ -49,7 +45,11 @@ index 3d3d2b8..94ea453 100644
 -    endif()
 -    link_directories(${MKL_PATH})
 -    include_directories(${MKL_INCLUDE_PATH})
--
++    find_package(MKL CONFIG REQUIRED)
++    #target_compile_options(${PROJECT_NAME} PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
++    include_directories($<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
++    link_libraries($<LINK_ONLY:MKL::MKL>)
+ 
      # compile flags and link libraries
      add_compile_options(-m64 -Wl,--no-as-needed)
      if (NOT PYBIND)
@@ -69,7 +69,7 @@ index 3d3d2b8..94ea453 100644
      endif()
  endif()
  
-@@ -286,7 +244,7 @@ if(MSVC)
+@@ -286,7 +239,7 @@ if(MSVC)
  	set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${PROJECT_SOURCE_DIR}/x64/Release)
  else()
      set(ENV{TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD} 500000000000)
@@ -78,7 +78,7 @@ index 3d3d2b8..94ea453 100644
      set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG")
      if (NOT PYBIND)
          set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG -Ofast")
-@@ -300,10 +258,6 @@ else()
+@@ -300,10 +253,6 @@ else()
  endif()
  
  add_subdirectory(src)

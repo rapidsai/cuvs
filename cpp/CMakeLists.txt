@@ -57,6 +57,7 @@ option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
 option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
 option(BUILD_CUVS_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
+option(BUILD_MG_ALGOS "Build with multi-GPU support" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
        "Enable the -lineinfo option for nvcc (useful for cuda-memcheck / profiler)" OFF
@@ -287,8 +288,26 @@ target_compile_options(
                             "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
 )
 
+if(BUILD_MG_ALGOS)
+  set(CUVS_MG_ALGOS
+      src/neighbors/mg/mg_flat_float_int64_t.cu
+      src/neighbors/mg/mg_flat_int8_t_int64_t.cu
+      src/neighbors/mg/mg_flat_uint8_t_int64_t.cu
+      src/neighbors/mg/mg_pq_float_int64_t.cu
+      src/neighbors/mg/mg_pq_half_int64_t.cu
+      src/neighbors/mg/mg_pq_int8_t_int64_t.cu
+      src/neighbors/mg/mg_pq_uint8_t_int64_t.cu
+      src/neighbors/mg/mg_cagra_float_uint32_t.cu
+      src/neighbors/mg/mg_cagra_half_uint32_t.cu
+      src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
+      src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
+      src/neighbors/mg/omp_checks.cpp
+      src/neighbors/mg/nccl_comm.cpp
+  )
+endif()
+
 add_library(
-  cuvs SHARED
+  cuvs_objs OBJECT
   src/cluster/kmeans_balanced_fit_float.cu
   src/cluster/kmeans_fit_mg_float.cu
   src/cluster/kmeans_fit_mg_double.cu
@@ -367,6 +386,17 @@ add_library(
   src/neighbors/cagra_serialize_half.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
+  src/neighbors/iface/iface_cagra_float_uint32_t.cu
+  src/neighbors/iface/iface_cagra_half_uint32_t.cu
+  src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
+  src/neighbors/iface/iface_cagra_uint8_t_uint32_t.cu
+  src/neighbors/iface/iface_flat_float_int64_t.cu
+  src/neighbors/iface/iface_flat_int8_t_int64_t.cu
+  src/neighbors/iface/iface_flat_uint8_t_int64_t.cu
+  src/neighbors/iface/iface_pq_float_int64_t.cu
+  src/neighbors/iface/iface_pq_half_int64_t.cu
+  src/neighbors/iface/iface_pq_int8_t_int64_t.cu
+  src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
   src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/topk_for_cagra/topk.cu
   $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
@@ -422,13 +452,40 @@ add_library(
   src/neighbors/refine/detail/refine_host_int8_t_float.cpp
   src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/neighbors/vamana_build_float.cu
+  src/neighbors/vamana_build_uint8.cu
+  src/neighbors/vamana_build_int8.cu
+  src/neighbors/vamana_serialize_float.cu
+  src/neighbors/vamana_serialize_uint8.cu
+  src/neighbors/vamana_serialize_int8.cu
   src/selection/select_k_float_int64_t.cu
   src/selection/select_k_float_int32_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
   src/stats/silhouette_score.cu
   src/stats/trustworthiness_score.cu
+  ${CUVS_MG_ALGOS}
 )
+
+set_target_properties(
+  cuvs_objs
+  PROPERTIES CXX_STANDARD 17
+             CXX_STANDARD_REQUIRED ON
+             CUDA_STANDARD 17
+             CUDA_STANDARD_REQUIRED ON
+             POSITION_INDEPENDENT_CODE ON
+)
+target_compile_options(
+  cuvs_objs PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                    "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+)
+target_link_libraries(
+  cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+                   $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+)
+
+add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
+add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
 
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
@@ -436,6 +493,41 @@ target_compile_options(
 )
 
 add_library(cuvs::cuvs ALIAS cuvs)
+add_library(cuvs::cuvs_static ALIAS cuvs_static)
+
+set_target_properties(
+  cuvs_static
+  PROPERTIES BUILD_RPATH "\$ORIGIN"
+             INSTALL_RPATH "\$ORIGIN"
+             CXX_STANDARD 17
+             CXX_STANDARD_REQUIRED ON
+             POSITION_INDEPENDENT_CODE ON
+             INTERFACE_POSITION_INDEPENDENT_CODE ON
+             EXPORT_NAME cuvs_static
+)
+
+target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
+
+target_include_directories(
+  cuvs_objs
+  PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  INTERFACE "$<INSTALL_INTERFACE:include>"
+)
+
+target_include_directories(
+  cuvs_static
+  PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+  INTERFACE "$<INSTALL_INTERFACE:include>"
+)
+
+# ensure CUDA symbols aren't relocated to the middle of the debug build binaries
+target_link_options(cuvs_static PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
+
+target_include_directories(
+  cuvs_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                     "$<INSTALL_INTERFACE:include>"
+)
 
 target_include_directories(
   cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -459,17 +551,33 @@ if(NOT BUILD_CPU_ONLY)
                                  ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
   )
 
+  if(BUILD_MG_ALGOS)
+    set(CUVS_COMMS_DEPENDENCY nccl)
+  endif()
+
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
   target_link_libraries(
     cuvs
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
     PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> cuvs-cagra-search
+            ${CUVS_COMMS_DEPENDENCY}
+  )
+
+  target_link_libraries(
+    cuvs_static
+    PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
 
+if(BUILD_MG_ALGOS)
+  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
+  target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
+endif()
+
 if(BUILD_CAGRA_HNSWLIB)
-  target_link_libraries(cuvs PRIVATE hnswlib::hnswlib)
-  target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+  target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
 endif()
 
 # Endian detection
@@ -551,10 +659,15 @@ if(BUILD_C_LIBRARY)
     src/neighbors/ivf_flat_c.cpp
     src/neighbors/ivf_pq_c.cpp
     src/neighbors/cagra_c.cpp
-    src/neighbors/hnsw_c.cpp
+    $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
     src/neighbors/refine/refine_c.cpp
     src/distance/pairwise_distance_c.cpp
   )
+
+  if(BUILD_CAGRA_HNSWLIB)
+    target_link_libraries(cuvs_c PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(cuvs_c PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+  endif()
 
   add_library(cuvs::c_api ALIAS cuvs_c)
 
@@ -594,7 +707,7 @@ include(GNUInstallDirs)
 include(CPack)
 
 install(
-  TARGETS cuvs
+  TARGETS cuvs cuvs_static
   DESTINATION ${lib_dir}
   COMPONENT cuvs
   EXPORT cuvs-exports

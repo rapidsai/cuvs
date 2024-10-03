@@ -158,8 +158,7 @@ void bench_build(::benchmark::State& state,
       try {
         if (!parse_base_file) {
           algo->build(base_set, index_size);
-        }
-        else {
+        } else {
           make_sure_parent_dir_exists(index.file);
           algo->build_from_bin(dataset->base_filename(), index.file, index_size);
         }

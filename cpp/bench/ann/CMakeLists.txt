@@ -33,6 +33,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW searc
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ${BUILD_MG_ALGOS})
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -56,6 +57,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
   set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_MG OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -67,6 +69,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
+   OR CUVS_ANN_BENCH_USE_CUVS_MG
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -250,6 +253,21 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_CUVS_MG)
+  ConfigureAnnBench(
+    NAME
+    CUVS_MG
+    PATH
+    src/cuvs/cuvs_benchmark.cu
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_ivf_flat.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_ivf_pq.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_cagra.cu>
+    LINKS
+    cuvs
+    nccl
+  )
+endif()
+
 message("CUVS_FAISS_TARGETS: ${CUVS_FAISS_TARGETS}")
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT)
@@ -296,8 +314,12 @@ if(CUVS_ANN_BENCH_USE_GGNN)
 endif()
 
 if(CUVS_ANN_BENCH_USE_DISKANN)
-  ConfigureAnnBench(NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann)
-  ConfigureAnnBench(NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann)
+  ConfigureAnnBench(
+    NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann
+  )
+  ConfigureAnnBench(
+    NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann
+  )
 endif()
 
 # ##################################################################################################

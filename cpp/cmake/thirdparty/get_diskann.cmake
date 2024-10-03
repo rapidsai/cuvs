@@ -34,7 +34,7 @@ function(find_and_configure_diskann)
           CPM_ARGS
           GIT_REPOSITORY ${repository}
           GIT_TAG ${tag}
-          GIT_SHALLOW ${patch_command}
+          GIT_SHALLOW ${shallow} ${patch_command}
           OPTIONS
           "PYBIND OFF"
           "UNIT_TEST OFF"

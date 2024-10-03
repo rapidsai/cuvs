@@ -102,7 +102,7 @@ class diskann_memory : public algo<T> {
   Mode bench_mode_;
   int num_search_threads_;
   std::shared_ptr<fixed_thread_pool> thread_pool_;
- 
+
  private:
   std::shared_ptr<diskann::Index<T>> mem_index_{nullptr};
   void initialize_index_();
@@ -211,7 +211,7 @@ class diskann_ssd : public diskann_memory<T> {
   diskann_ssd(Metric metric, int dim, const build_param& param);
 
   void build_from_bin(std::string dataset_path, std::string path_to_index, size_t nrow) override;
-  void build(const T* dataset, size_t nrow) override {
+  void build(const T* dataset, size_t nrow) override{
     // do nothing. will not be used.
   };
 
@@ -236,7 +236,8 @@ class diskann_ssd : public diskann_memory<T> {
 };
 
 template <typename T>
-diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : diskann_memory<T>(metric, dim, param)
+diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param)
+  : diskann_memory<T>(metric, dim, param)
 {
   // Currently set the indexing RAM budget and the search RAM budget to max value avoid sharding
   uint32_t build_dram_budget  = std::numeric_limits<uint32_t>::max();
