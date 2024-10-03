@@ -485,7 +485,7 @@ target_include_directories(
 )
 
 # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-target_link_options(cuvs_static PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
+target_link_options(cuvs_static PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
 target_include_directories(
   cuvs_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -524,7 +524,7 @@ if(NOT BUILD_CPU_ONLY)
   target_link_libraries(
     cuvs_static
     PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
-    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+    PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> cuvs-cagra-search
   )
 endif()
 
