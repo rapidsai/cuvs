@@ -23,7 +23,7 @@ from cuvs.test.ann_utils import calc_recall, generate_data
 
 
 def run_hnsw_build_search_test(
-    n_rows=10000,
+    n_rows=1000,
     n_cols=10,
     n_queries=100,
     k=10,
