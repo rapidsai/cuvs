@@ -74,6 +74,7 @@ requirements:
     - glog {{ glog_version }}
     - libcuvs {{ version }}
     - nlohmann_json {{ nlohmann_json_version }}
+    - openblas
     # rmm is needed to determine if package is gpu-enabled
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0

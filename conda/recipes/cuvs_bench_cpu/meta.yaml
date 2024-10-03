@@ -48,6 +48,7 @@ requirements:
     - fmt {{ fmt_version }}
     - glog {{ glog_version }}
     - nlohmann_json {{ nlohmann_json_version }}
+    - openblas
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
     - spdlog {{ spdlog_version }}
