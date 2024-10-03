@@ -495,7 +495,7 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   if(BUILD_MG_ALGOS)
-    set(CUVS_COMMS_DEPENDENCY nccl ucp)
+    set(CUVS_COMMS_DEPENDENCY nccl)
   endif()
 
   # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
