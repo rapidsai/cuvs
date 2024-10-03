@@ -305,6 +305,8 @@ outputs:
         - libcusolver
         - libcusparse
         {% endif %}
+        - libucxx {{ ucxx_version }}
+        - distributed-ucxx {{ ucxx_version }}
         - {{ pin_subpackage('libcuvs', exact=True) }}
     about:
       home: https://rapids.ai/
