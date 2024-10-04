@@ -31,6 +31,15 @@ cuvs_cagra:
 cuvs_brute_force:
   executable: CUVS_BRUTE_FORCE_ANN_BENCH
   requires_gpu: true
+cuvs_mg_ivf_flat:
+  executable: CUVS_MG_ANN_BENCH
+  requires_gpu: true
+cuvs_mg_ivf_pq:
+  executable: CUVS_MG_ANN_BENCH
+  requires_gpu: true
+cuvs_mg_cagra:
+  executable: CUVS_MG_ANN_BENCH
+  requires_gpu: true
 ggnn:
   executable: GGNN_ANN_BENCH
   requires_gpu: true
