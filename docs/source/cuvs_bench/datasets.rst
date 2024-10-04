@@ -12,14 +12,7 @@ Some implementation can take `float16` database and query vectors as inputs and 
 Commonly used datasets can be downloaded from two websites:
 #. Million-scale datasets can be found at the `Data sets <https://github.com/erikbern/ann-benchmarks#data-sets>`_ section of `ann-benchmarks <https://github.com/erikbern/ann-benchmarks>`_.
 
-    However, these datasets are in HDF5 format. Use `python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py` to transform the format. A few Python packages are required to run it:
-
-    .. code-block:: bash
-
-       pip3 install numpy h5py
-
-    The usage of this script is:
-
+    However, these datasets are in HDF5 format. Use `python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py` to transform the format. The usage of this script is:
 
     .. code-block:: bash
 
