@@ -80,7 +80,7 @@ Conda
 
 The channel `rapidsai` can easily be substituted `rapidsai-nightly` if nightly benchmarks are desired. The CPU package currently allows to run the HNSW benchmarks.
 
-Please see the :doc:`build instructions <../build>` to build the benchmarks from source.
+Please see the :doc:`build instructions <build>` to build the benchmarks from source.
 
 Docker
 ------
@@ -607,7 +607,7 @@ There config above has 2 fields:
 1. `name` - define the name of the algorithm for which the parameters are being specified.
 2. `groups` - define a run group which has a particular set of parameters. Each group helps create a cross-product of all hyper-parameter fields for `build` and `search`.
 
-The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The :doc:`ANN Algorithm Parameter Tuning Guide <ann_benchmarks_param_tuning>` contains detailed instructions on choosing build and search parameters for each supported algorithm.
+The table below contains all algorithms supported by cuVS. Each unique algorithm will have its own set of `build` and `search` settings. The :doc:`ANN Algorithm Parameter Tuning Guide <param_tuning>` contains detailed instructions on choosing build and search parameters for each supported algorithm.
 
 .. list-table::
 
