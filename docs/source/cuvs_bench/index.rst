@@ -630,7 +630,7 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
    - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`
 
 Adding a new index algorithm
-=============================
+============================
 
 Implementation and configuration
 --------------------------------

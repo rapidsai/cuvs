@@ -13,3 +13,4 @@ Nearest Neighbors
    neighbors_ivf_flat_c.rst
    neighbors_ivf_pq_c.rst
    neighbors_cagra_c.rst
+   neighbors_hnsw_c.rst
