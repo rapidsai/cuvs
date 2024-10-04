@@ -122,7 +122,7 @@ We provide a collection of lightweight Python scripts to run the benchmarks. The
 Step 1: Prepare the dataset
 ---------------------------
 
-The script `cuvs_bench.get_dataset` will download and unpack the dataset in directory that the user provides. As of now, only million-scale datasets are supported by this script. For more information on :doc:`datasets and formats <ann_benchmarks_dataset>`.
+The script `cuvs_bench.get_dataset` will download and unpack the dataset in directory that the user provides. As of now, only million-scale datasets are supported by this script. For more information on :doc:`datasets and formats <datasets>`.
 
 The usage of this script is:
 
