@@ -2,7 +2,21 @@
 cuVS Bench
 ~~~~~~~~~~
 
-cuVS bench provides a benchmarking tool for various ANN search implementations. It's especially suitable for comparing GPU implementations as well as comparing GPU against CPU.
+cuVS bench provides a reproducible benchmarking tool for various ANN search implementations. It's especially suitable for comparing GPU implementations as well as comparing GPU against CPU. One of the primary goals of cuVS is to capture ideal index configurations for a variety of important usage patterns so the results can be reproduced easily on different hardware environments, such as on-prem and cloud.
+
+This tool offers several benefits, including
+
+#. Making fair comparisons of index build times
+
+#. Making fair comparisons of index search throughput and/or latency
+
+#. Finding the optimal parameter settings for a range of recall buckets
+
+#. Easily generating consistently styled plots for index build and search
+
+#. Profiling blind spots and potential for algorithm optimization
+
+#. Investigating the relationship between different parameter settings, index build times, and search performance.
 
 - `Installing the benchmarks`_
 
@@ -10,6 +24,37 @@ cuVS bench provides a benchmarking tool for various ANN search implementations. 
 
   * `Docker`_
 
+- `How to run the benchmarks`_
+
+  * `Step 1: Prepare the dataset`_
+
+  * `Step 2: Build and search index`_
+
+  * `Step 3: Data export`_
+
+  * `Step 4: Plot the results`_
+
+- `Running the benchmarks`_
+
+  * `End-to-end: smaller-scale benchmarks (<1M to 10M)`_
+
+  * `End-to-end: large-scale benchmarks (>10M vectors)`_
+
+  * `Running with Docker containers`_
+
+    * `End-to-end run on GPU`_
+
+    * `Manually run the scripts inside the container`_
+
+  * `Evaluating the results`_
+
+- `Creating and customizing dataset configurations`_
+
+- `Adding a new index algorithm`_
+
+  * `Implementation and configuration`_
+
+  * `Adding a Cmake target`_
 
 Installing the benchmarks
 =========================
@@ -190,8 +235,8 @@ and index search statistics CSV file in `<dataset-path/<dataset>/result/search/<
 #. `throughput`: Pareto frontier of throughput results is exported
 #. `latency`: Pareto frontier of latency results is exported
 
-Step 4: Plot results
---------------------
+Step 4: Plot the results
+------------------------
 
 The script `cuvs_bench.plot` will plot results for all algorithms found in index search statistics CSV files `<dataset-path/<dataset>/result/search/*.csv`.
 
@@ -584,8 +629,8 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
  * - cuVS
    - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`
 
-Adding a new ANN algorithm
-==========================
+Adding a new index algorithm
+=============================
 
 Implementation and configuration
 --------------------------------

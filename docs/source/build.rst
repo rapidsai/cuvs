@@ -9,8 +9,6 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
 
   * `Python through Pip`_
 
-  * `Rust through crates.io`_
-
 - `Build from source`_
 
   * `Prerequisites`_
@@ -72,9 +70,6 @@ And CUDA 12 packages:
     pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
-
-Rust through crates.io
-^^^^^^^^^^^^^^^^^^^^^^
 
 Build from source
 -----------------

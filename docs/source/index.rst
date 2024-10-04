@@ -35,6 +35,7 @@ Contents
    build.rst
    getting_started.rst
    integrations.rst
+   cuvs_bench/index.rst
    api_docs.rst
    contributing.md
 
