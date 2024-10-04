@@ -357,6 +357,25 @@ The usage of `python -m cuvs_bench.split_groundtruth` is:
       --groundtruth GROUNDTRUTH
                             Path to billion-scale dataset groundtruth file (default: None)
 
+Running the MG versions of benchmarks
+-------------------------------------
+
+cuVS implements the single node multi-GPU versions of IVF-Flat, IVF-PQ and CAGRA.
+
+.. list-table::
+
+ * - ANN type
+   - algorithms names
+
+ * - IVF-Flat
+   - `cuvs_mg_ivf_flat`
+
+ * - IVF-PQ
+   - `cuvs_mg_ivf_pq`
+
+ * - CAGRA
+   - `cuvs_mg_cagra`
+
 Running with Docker containers
 ------------------------------
 
