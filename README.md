@@ -14,7 +14,7 @@
 
 ## Useful Resources
 
-- [Documentation](https://docs.rapids.ai/api/cuvs/): Library documentation.
+- [Documentation](https://docs.rapids.ai/api/cuvs/nightly/): Library documentation.
 - [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
 - [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Guide to getting started with cuVS.
 - [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
