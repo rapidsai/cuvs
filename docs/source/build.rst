@@ -123,6 +123,16 @@ Once installed, the shared libraries, headers (and any dependencies downloaded a
     ./build.sh libcuvs --uninstall
 
 
+Multi-GPU features
+^^^^^^^^^^^^^^^^^^
+
+To disable the multi-gpu features run :
+
+.. code-block:: bash
+
+    ./build.sh libcuvs --no-mg
+
+
 Building the Googletests
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

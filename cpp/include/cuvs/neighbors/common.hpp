@@ -19,7 +19,8 @@
 #include <cstdint>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_mdspan.hpp>
+#include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>   // get_device_for_address
@@ -636,5 +637,56 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                const typename ListT::spec_type& store_spec,
                                                const typename ListT::spec_type& device_spec);
 }  // namespace ivf
+}  // namespace cuvs::neighbors
+
+namespace cuvs::neighbors {
+using namespace raft;
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct iface {
+  iface() : mutex_(std::make_shared<std::mutex>()) {}
+
+  const IdxT size() const { return index_.value().size(); }
+
+  std::optional<AnnIndexType> index_;
+  std::shared_ptr<std::mutex> mutex_;
+};
+
+template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
+void build(const raft::device_resources& handle,
+           cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+           const cuvs::neighbors::index_params* index_params,
+           raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
+
+template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
+void extend(
+  const raft::device_resources& handle,
+  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+  raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
+  std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
+    new_indices);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void search(const raft::device_resources& handle,
+            const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+            const cuvs::neighbors::search_params* search_params,
+            raft::device_matrix_view<const T, int64_t, row_major> h_queries,
+            raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+            raft::device_matrix_view<float, int64_t, row_major> d_distances);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void serialize(const raft::device_resources& handle,
+               const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+               std::ostream& os);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void deserialize(const raft::device_resources& handle,
+                 cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+                 std::istream& is);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void deserialize(const raft::device_resources& handle,
+                 cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+                 const std::string& filename);
 
 };  // namespace cuvs::neighbors
