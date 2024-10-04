@@ -23,8 +23,8 @@ Commonly used datasets can be downloaded from two websites:
 
     .. code-block:: bash
 
-        $ cpp/bench/ann/scripts/hdf5_to_fbin.py
-        usage: scripts/hdf5_to_fbin.py [-n] <input>.hdf5
+        $ python/cuvs_bench/cuvs_bench/get_dataset/hdf5_to_fbin.py
+        usage: hdf5_to_fbin.py [-n] <input>.hdf5
            -n: normalize base/query set
          outputs: <input>.base.fbin
                   <input>.query.fbin
@@ -36,21 +36,18 @@ Commonly used datasets can be downloaded from two websites:
     Most datasets provided by `ann-benchmarks` use `Angular` or `Euclidean` distance. `Angular` denotes cosine distance. However, computing cosine distance reduces to computing inner product by normalizing vectors beforehand. In practice, we can always do the normalization to decrease computation cost, so it's better to measure the performance of inner product rather than cosine distance. The `-n` option of `hdf5_to_fbin.py` can be used to normalize the dataset.
 
 #. Billion-scale datasets can be found at `big-ann-benchmarks <http://big-ann-benchmarks.com>`_. The ground truth file contains both neighbors and distances, thus should be split. A script is provided for this:
-    .. code-block:: bash
-        $ cpp/bench/ann/scripts/split_groundtruth.pl
-        usage: script/split_groundtruth.pl input output_prefix
 
     Take Deep-1B dataset as an example:
 
     .. code-block:: bash
-        pushd
-        cd cpp/bench/ann
+
         mkdir -p data/deep-1B && cd data/deep-1B
+
         # download manually "Ground Truth" file of "Yandex DEEP"
         # suppose the file name is deep_new_groundtruth.public.10K.bin
-        ../../scripts/split_groundtruth.pl deep_new_groundtruth.public.10K.bin groundtruth
+        python -m cuvs_bench.split_groundtruth deep_new_groundtruth.public.10K.bin groundtruth
+
         # two files 'groundtruth.neighbors.ibin' and 'groundtruth.distances.fbin' should be produced
-        popd
 
     Besides ground truth files for the whole billion-scale datasets, this site also provides ground truth files for the first 10M or 100M vectors of the base sets. This mean we can use these billion-scale datasets as million-scale datasets. To facilitate this, an optional parameter `subset_size` for dataset can be used. See the next step for further explanation.
 
@@ -59,14 +56,14 @@ Generate ground truth
 
 If you have a dataset, but no corresponding ground truth file, then you can generate ground trunth using the `generate_groundtruth` utility. Example usage:
 
-..code-block:: bash
+.. code-block:: bash
 
     # With existing query file
-    python -m raft_ann_bench.generate_groundtruth --dataset /dataset/base.fbin --output=groundtruth_dir --queries=/dataset/query.public.10K.fbin
+    python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.fbin --output=groundtruth_dir --queries=/dataset/query.public.10K.fbin
 
     # With randomly generated queries
-    python -m raft_ann_bench.generate_groundtruth --dataset /dataset/base.fbin --output=groundtruth_dir --queries=random --n_queries=10000
+    python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.fbin --output=groundtruth_dir --queries=random --n_queries=10000
 
     # Using only a subset of the dataset. Define queries by randomly
     # selecting vectors from the (subset of the) dataset.
-    python -m raft_ann_bench.generate_groundtruth --dataset /dataset/base.fbin --nrows=2000000 --output=groundtruth_dir --queries=random-choice --n_queries=10000
+    python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.fbin --nrows=2000000 --output=groundtruth_dir --queries=random-choice --n_queries=10000
