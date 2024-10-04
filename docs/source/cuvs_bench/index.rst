@@ -50,6 +50,8 @@ This tool offers several benefits, including
 
 - `Creating and customizing dataset configurations`_
 
+  * `Multi-GPU benchmarks`_
+
 - `Adding a new index algorithm`_
 
   * `Implementation and configuration`_
@@ -402,25 +404,6 @@ The usage of `python -m cuvs_bench.split_groundtruth` is:
       --groundtruth GROUNDTRUTH
                             Path to billion-scale dataset groundtruth file (default: None)
 
-Running the MG versions of benchmarks
--------------------------------------
-
-cuVS implements the single node multi-GPU versions of IVF-Flat, IVF-PQ and CAGRA.
-
-.. list-table::
-
- * - ANN type
-   - algorithms names
-
- * - IVF-Flat
-   - `cuvs_mg_ivf_flat`
-
- * - IVF-PQ
-   - `cuvs_mg_ivf_pq`
-
- * - CAGRA
-   - `cuvs_mg_cagra`
-
 Running with Docker containers
 ------------------------------
 
@@ -647,6 +630,27 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
 
  * - cuVS
    - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`
+
+
+Multi-GPU benchmarks
+--------------------
+
+cuVS implements single node multi-GPU versions of IVF-Flat, IVF-PQ and CAGRA indexes.
+
+.. list-table::
+
+ * - ANN type
+   - algorithms names
+
+ * - IVF-Flat
+   - `cuvs_mg_ivf_flat`
+
+ * - IVF-PQ
+   - `cuvs_mg_ivf_pq`
+
+ * - CAGRA
+   - `cuvs_mg_cagra`
+
 
 Adding a new index algorithm
 ============================
