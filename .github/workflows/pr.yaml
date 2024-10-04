@@ -45,6 +45,8 @@ jobs:
           - '!python/**'
           - '!rust/**'
           - '!thirdparty/LICENSES/**'
+          # TODO: Remove before merging
+          - '!.github/workflows/**'
         test_notebooks:
           - '**'
           - '!.devcontainer/**'
@@ -52,6 +54,8 @@ jobs:
           - '!README.md'
           - '!rust/**'
           - '!thirdparty/LICENSES/**'
+          # TODO: Remove before merging
+          - '!.github/workflows/**'
         test_python:
           - '**'
           - '!.devcontainer/**'
@@ -62,6 +66,8 @@ jobs:
           - '!notebooks/**'
           - '!rust/**'
           - '!thirdparty/LICENSES/**'
+          # TODO: Remove before merging
+          - '!.github/workflows/**'
   checks:
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/checks.yaml@branch-24.12
