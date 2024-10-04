@@ -50,7 +50,6 @@ Common use-cases for vector search
   - Class balancing
   - Ensemble methods
   - k-NN graph construction
-  - 
 
 ## Why cuVS?
 
@@ -63,6 +62,8 @@ There are several benefits to using cuVS and GPUs for vector search, including
 5. Interoperability (build on GPU, deploy on CPU)
 6. Multiple language support
 7. Building blocks for composing new or accelerating existing algorithms
+
+In addition to the items above, cuVS takes on the burden of keeping non-trivial accelerated code up to date as new Nvidia architectures and CUDA versions are released. This provides a deslightful development experimence, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale. 
 
 ## Installing cuVS
 
