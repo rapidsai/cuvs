@@ -639,8 +639,8 @@ cuVS implements single node multi-GPU versions of IVF-Flat, IVF-PQ and CAGRA ind
 
 .. list-table::
 
- * - ANN type
-   - algorithms names
+ * - Index type
+   - Multi-GPU algo name
 
  * - IVF-Flat
    - `cuvs_mg_ivf_flat`
