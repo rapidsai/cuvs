@@ -275,9 +275,9 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
       cuvs::neighbors::dynamic_batching::index_params<cuvs::neighbors::cagra::index<T, IdxT>>{
         index_params_.cagra_params.metric,
         index_params_.cagra_params.metric_arg,
-        false,
         *index_,
         search_params_,
+        nullptr,
         sp.dynamic_batching_k,
         int64_t(this->dim_),
         sp.dynamic_batching_max_batch_size,

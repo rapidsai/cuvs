@@ -35,6 +35,8 @@ struct index_params : cuvs::neighbors::index_params {
   Upstream& upstream;
   /** Search paramerets for all requests within a batch. */
   typename Upstream::search_params_type& upstream_params;
+  /** Filtering function, if any, must be the same for all requests in a batch. */
+  cuvs::neighbors::filtering::base_filter* sample_filter = nullptr;
   /** The number of neighbors to search is fixed at construction time. */
   int64_t k;
   /** Input data (queries) dimensionality. */
@@ -82,6 +84,13 @@ void search(raft::resources const& res,
 
 void search(raft::resources const& res,
             cuvs::neighbors::dynamic_batching::search_params const& params,
+            dynamic_batching::index<half, uint32_t> const& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+void search(raft::resources const& res,
+            cuvs::neighbors::dynamic_batching::search_params const& params,
             dynamic_batching::index<int8_t, uint32_t> const& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
@@ -98,6 +107,13 @@ void search(raft::resources const& res,
             cuvs::neighbors::dynamic_batching::search_params const& params,
             dynamic_batching::index<float, int64_t> const& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+
+void search(raft::resources const& res,
+            cuvs::neighbors::dynamic_batching::search_params const& params,
+            dynamic_batching::index<half, int64_t> const& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 

@@ -38,7 +38,8 @@ using upstream_search_type_const = void(raft::resources const&,
                                         Upstream const&,
                                         raft::device_matrix_view<const T, int64_t, raft::row_major>,
                                         raft::device_matrix_view<IdxT, int64_t, raft::row_major>,
-                                        raft::device_matrix_view<float, int64_t, raft::row_major>);
+                                        raft::device_matrix_view<float, int64_t, raft::row_major>,
+                                        const cuvs::neighbors::filtering::base_filter&);
 
 template <typename Upstream, typename T, typename IdxT>
 using upstream_search_type = void(raft::resources const&,
@@ -46,7 +47,8 @@ using upstream_search_type = void(raft::resources const&,
                                   Upstream&,
                                   raft::device_matrix_view<const T, int64_t, raft::row_major>,
                                   raft::device_matrix_view<IdxT, int64_t, raft::row_major>,
-                                  raft::device_matrix_view<float, int64_t, raft::row_major>);
+                                  raft::device_matrix_view<float, int64_t, raft::row_major>,
+                                  const cuvs::neighbors::filtering::base_filter&);
 
 template <typename T, typename IdxT>
 using function_search_type = void(raft::resources const&,
@@ -116,12 +118,23 @@ class batch_runner {
                const dynamic_batching::index_params<Upstream>& params,
                const upstream_search_type_const<Upstream, T, IdxT>* upstream_search)
     : res_(res),
-      upstream_search_{[&ix = params.upstream, &ps = params.upstream_params, upstream_search](
+      upstream_search_{[&ix = params.upstream,
+                        &ps = params.upstream_params,
+                        upstream_search,
+                        sample_filter = params.sample_filter](
                          raft::resources const& res,
                          raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                          raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
                          raft::device_matrix_view<float, int64_t, raft::row_major> distances) {
-        return upstream_search(res, ps, ix, queries, neighbors, distances);
+        return upstream_search(res,
+                               ps,
+                               ix,
+                               queries,
+                               neighbors,
+                               distances,
+                               (sample_filter != nullptr)
+                                 ? *sample_filter
+                                 : cuvs::neighbors::filtering::none_sample_filter{});
       }},
       n_queues_{params.n_queues},
       batch_bufs_{reinterpret_cast<batch<T, IdxT>*>(
