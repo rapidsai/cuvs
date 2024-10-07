@@ -134,7 +134,7 @@ class BruteForceKNNBenchmark {
             search_queries.data(), params_.num_queries, params_.dim),
           indices,
           distances,
-          std::nullopt);
+          cuvs::neighbors::filtering::none_sample_filter{});
         flush_l2_cache();
         raft::resource::sync_stream(handle_, stream_);
       }
@@ -158,7 +158,7 @@ class BruteForceKNNBenchmark {
           search_queries.data(), params_.num_queries, params_.dim),
         indices,
         distances,
-        std::nullopt);
+        cuvs::neighbors::filtering::none_sample_filter{});
       raft::resource::sync_stream(handle_, stream_);
       end        = std::chrono::high_resolution_clock::now();
       search_dur = end - start;
@@ -178,7 +178,7 @@ class BruteForceKNNBenchmark {
             search_queries.data(), params_.num_queries, params_.dim),
           indices,
           distances,
-          std::nullopt);
+          cuvs::neighbors::filtering::none_sample_filter{});
         flush_l2_cache();
         raft::resource::sync_stream(handle_, stream_);
       }
@@ -202,7 +202,7 @@ class BruteForceKNNBenchmark {
           search_queries.data(), params_.num_queries, params_.dim),
         indices,
         distances,
-        std::nullopt);
+        cuvs::neighbors::filtering::none_sample_filter{});
       raft::resource::sync_stream(handle_, stream_);
       end        = std::chrono::high_resolution_clock::now();
       search_dur = end - start;

@@ -29,15 +29,17 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-#define CUVS_INST_IVF_PQ_SEARCH(T, IdxT)                                                           \
-  void search(raft::resources const& handle,                                                       \
-              const cuvs::neighbors::ivf_pq::search_params& params,                                \
-              cuvs::neighbors::ivf_pq::index<IdxT>& index,                                         \
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries,                    \
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,                     \
-              raft::device_matrix_view<float, IdxT, raft::row_major> distances)                    \
-  {                                                                                                \
-    cuvs::neighbors::ivf_pq::detail::search(handle, params, index, queries, neighbors, distances); \
+#define CUVS_INST_IVF_PQ_SEARCH(T, IdxT)                                        \
+  void search(raft::resources const& handle,                                    \
+              const cuvs::neighbors::ivf_pq::search_params& params,             \
+              cuvs::neighbors::ivf_pq::index<IdxT>& index,                      \
+              raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \
+              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \
+              raft::device_matrix_view<float, IdxT, raft::row_major> distances, \
+              const cuvs::neighbors::filtering::base_filter& sample_filter_ref) \
+  {                                                                             \
+    cuvs::neighbors::ivf_pq::detail::search(                                    \
+      handle, params, index, queries, neighbors, distances, sample_filter_ref); \
   }
 CUVS_INST_IVF_PQ_SEARCH(uint8_t, int64_t);
 

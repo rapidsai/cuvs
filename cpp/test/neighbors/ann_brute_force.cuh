@@ -96,8 +96,12 @@ class AnnBruteForceTest : public ::testing::TestWithParam<AnnBruteForceInputs<Id
       auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
         distances_bruteforce_dev.data(), ps.num_queries, ps.k);
 
-      brute_force::search(
-        handle_, idx, search_queries_view, indices_out_view, dists_out_view, std::nullopt);
+      brute_force::search(handle_,
+                          idx,
+                          search_queries_view,
+                          indices_out_view,
+                          dists_out_view,
+                          cuvs::neighbors::filtering::none_sample_filter{});
 
       raft::resource::sync_stream(handle_);
 
@@ -110,8 +114,12 @@ class AnnBruteForceTest : public ::testing::TestWithParam<AnnBruteForceInputs<Id
                                                       0.001f,
                                                       stream_,
                                                       true));
-      brute_force::search(
-        handle_, idx, search_queries_view, indices_out_view, dists_out_view, std::nullopt);
+      brute_force::search(handle_,
+                          idx,
+                          search_queries_view,
+                          indices_out_view,
+                          dists_out_view,
+                          cuvs::neighbors::filtering::none_sample_filter{});
     }
   }
 

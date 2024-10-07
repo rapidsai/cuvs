@@ -291,7 +291,8 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
@@ -326,7 +327,8 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
 /**
  * @brief Search ANN using the constructed index.
  *
@@ -346,7 +348,8 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::col_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
 /**
  * @brief Search ANN using the constructed index.
  *
@@ -366,7 +369,8 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::col_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            std::optional<cuvs::core::bitmap_view<const uint32_t, int64_t>> sample_filter);
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
 /**
  * @}
  */
