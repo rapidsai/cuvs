@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include "kmeans_common.cuh"
 #include "../../core/nvtx.hpp"
+#include "kmeans_common.cuh"
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
