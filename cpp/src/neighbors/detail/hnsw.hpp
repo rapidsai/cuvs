@@ -110,9 +110,9 @@ std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
   return std::unique_ptr<index<T>>(hnsw_index);
 }
 
-template <typename QueriesT>
-void get_search_knn_results(hnswlib::HierarchicalNSW<QueriesT> const* idx,
-                            const QueriesT* query,
+template <typename T>
+void get_search_knn_results(hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type> const* idx,
+                            const T* query,
                             int k,
                             uint64_t* indices,
                             float* distances)
@@ -127,11 +127,11 @@ void get_search_knn_results(hnswlib::HierarchicalNSW<QueriesT> const* idx,
   }
 }
 
-template <typename T, typename QueriesT>
+template <typename T>
 void search(raft::resources const& res,
             const search_params& params,
             const index<T>& idx,
-            raft::host_matrix_view<const QueriesT, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances)
 {
@@ -146,7 +146,8 @@ void search(raft::resources const& res,
 
   idx.set_ef(params.ef);
   auto const* hnswlib_index =
-    reinterpret_cast<hnswlib::HierarchicalNSW<QueriesT> const*>(idx.get_index());
+    reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type> const*>(
+      idx.get_index());
 
   // when num_threads == 0, automatically maximize parallelism
   if (params.num_threads) {

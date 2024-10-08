@@ -143,7 +143,10 @@ void bench_build(::benchmark::State& state,
 
   const auto algo_property = parse_algo_property(algo->get_preference(), index.build_param);
 
-  const T* base_set      = dataset->base_set(algo_property.dataset_memory_type);
+  bool parse_base_file = index.algo == "diskann_ssd";
+
+  const T* base_set = nullptr;
+  if (!parse_base_file) base_set = dataset->base_set(algo_property.dataset_memory_type);
   std::size_t index_size = dataset->base_set_size();
 
   cuda_timer gpu_timer{algo};
@@ -153,7 +156,12 @@ void bench_build(::benchmark::State& state,
       [[maybe_unused]] auto ntx_lap = nvtx.lap();
       [[maybe_unused]] auto gpu_lap = gpu_timer.lap();
       try {
-        algo->build(base_set, index_size);
+        if (!parse_base_file) {
+          algo->build(base_set, index_size);
+        } else {
+          make_sure_parent_dir_exists(index.file);
+          algo->build_from_bin(dataset->base_filename(), index.file, index_size);
+        }
       } catch (const std::exception& e) {
         state.SkipWithError(std::string(e.what()));
       }

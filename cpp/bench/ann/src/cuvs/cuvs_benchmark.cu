@@ -29,6 +29,43 @@
 
 namespace cuvs::bench {
 
+#ifdef CUVS_ANN_BENCH_USE_CUVS_MG
+void add_distribution_mode(cuvs::neighbors::mg::distribution_mode* dist_mode,
+                           const nlohmann::json& conf)
+{
+  if (conf.contains("distribution_mode")) {
+    std::string distribution_mode = conf.at("distribution_mode");
+    if (distribution_mode == "replicated") {
+      *dist_mode = cuvs::neighbors::mg::distribution_mode::REPLICATED;
+    } else if (distribution_mode == "sharded") {
+      *dist_mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+    } else {
+      throw std::runtime_error("invalid value for distribution_mode");
+    }
+  } else {
+    // default
+    *dist_mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+  }
+};
+
+void add_merge_mode(cuvs::neighbors::mg::sharded_merge_mode* merge_mode, const nlohmann::json& conf)
+{
+  if (conf.contains("merge_mode")) {
+    std::string sharded_merge_mode = conf.at("merge_mode");
+    if (sharded_merge_mode == "tree_merge") {
+      *merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+    } else if (sharded_merge_mode == "merge_on_root_rank") {
+      *merge_mode = cuvs::neighbors::mg::sharded_merge_mode::MERGE_ON_ROOT_RANK;
+    } else {
+      throw std::runtime_error("invalid value for merge_mode");
+    }
+  } else {
+    // default
+    *merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+  }
+};
+#endif
+
 template <typename T>
 auto create_algo(const std::string& algo_name,
                  const std::string& distance,
@@ -72,6 +109,32 @@ auto create_algo(const std::string& algo_name,
     a = std::make_unique<cuvs::bench::cuvs_cagra<T, uint32_t>>(metric, dim, param);
   }
 #endif
+#ifdef CUVS_ANN_BENCH_USE_CUVS_MG
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
+                std::is_same_v<T, int8_t>) {
+    if (algo_name == "raft_mg_ivf_flat" || algo_name == "cuvs_mg_ivf_flat") {
+      typename cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>::build_param param;
+      parse_build_param<T, int64_t>(conf, param);
+      add_distribution_mode(&param.mode, conf);
+      a = std::make_unique<cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>>(metric, dim, param);
+    }
+  }
+
+  if (algo_name == "raft_mg_ivf_pq" || algo_name == "cuvs_mg_ivf_pq") {
+    typename cuvs::bench::cuvs_mg_ivf_pq<T, int64_t>::build_param param;
+    parse_build_param<T, int64_t>(conf, param);
+    add_distribution_mode(&param.mode, conf);
+    a = std::make_unique<cuvs::bench::cuvs_mg_ivf_pq<T, int64_t>>(metric, dim, param);
+  }
+
+  if (algo_name == "raft_mg_cagra" || algo_name == "cuvs_mg_cagra") {
+    typename cuvs::bench::cuvs_mg_cagra<T, uint32_t>::build_param param;
+    parse_build_param<T, uint32_t>(conf, param);
+    add_distribution_mode(&param.mode, conf);
+    a = std::make_unique<cuvs::bench::cuvs_mg_cagra<T, uint32_t>>(metric, dim, param);
+  }
+
+#endif
 
   if (!a) { throw std::runtime_error("invalid algo: '" + algo_name + "'"); }
 
@@ -110,6 +173,32 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
   if (algo_name == "raft_cagra" || algo_name == "cuvs_cagra") {
     auto param = std::make_unique<typename cuvs::bench::cuvs_cagra<T, uint32_t>::search_param>();
     parse_search_param<T, uint32_t>(conf, *param);
+    return param;
+  }
+#endif
+#ifdef CUVS_ANN_BENCH_USE_CUVS_MG
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, uint8_t> ||
+                std::is_same_v<T, int8_t>) {
+    if (algo_name == "raft_mg_ivf_flat" || algo_name == "cuvs_mg_ivf_flat") {
+      auto param =
+        std::make_unique<typename cuvs::bench::cuvs_mg_ivf_flat<T, int64_t>::search_param>();
+      parse_search_param<T, int64_t>(conf, *param);
+      add_merge_mode(&param->merge_mode, conf);
+      return param;
+    }
+  }
+
+  if (algo_name == "raft_mg_ivf_pq" || algo_name == "cuvs_mg_ivf_pq") {
+    auto param = std::make_unique<typename cuvs::bench::cuvs_mg_ivf_pq<T, int64_t>::search_param>();
+    parse_search_param<T, int64_t>(conf, *param);
+    add_merge_mode(&param->merge_mode, conf);
+    return param;
+  }
+
+  if (algo_name == "raft_mg_cagra" || algo_name == "cuvs_mg_cagra") {
+    auto param = std::make_unique<typename cuvs::bench::cuvs_mg_cagra<T, uint32_t>::search_param>();
+    parse_search_param<T, uint32_t>(conf, *param);
+    add_merge_mode(&param->merge_mode, conf);
     return param;
   }
 #endif
