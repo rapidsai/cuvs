@@ -21,7 +21,8 @@ from importlib import import_module
 from typing import Any, Dict, Optional, Tuple
 
 import yaml
-from runners import cuvs_bench_cpp
+
+from .runners import cuvs_bench_cpp
 
 
 def rmm_present() -> bool:

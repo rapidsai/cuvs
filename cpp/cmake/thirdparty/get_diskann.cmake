@@ -30,11 +30,8 @@ function(find_and_configure_diskann)
   rapids_cpm_generate_patch_command(diskann ${version} patch_command)
 
   rapids_cpm_find(diskann ${version}
-          GLOBAL_TARGETS diskann::diskann
+          GLOBAL_TARGETS diskann
           CPM_ARGS
-          GIT_REPOSITORY ${repository}
-          GIT_TAG ${tag}
-          GIT_SHALLOW ${shallow} ${patch_command}
           OPTIONS
           "PYBIND OFF"
           "UNIT_TEST OFF"

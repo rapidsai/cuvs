@@ -17,16 +17,16 @@
 
 #include "../common/ann_types.hpp"
 #include "../common/thread_pool.hpp"
-#include "cuvs/neighbors/nn_descent.hpp"
-#include "linux_aligned_file_reader.h"
 
 #include <limits>
 #include <raft/core/host_mdspan.hpp>
 
 #include <disk_utils.h>
 #include <index.h>
+#include <linux_aligned_file_reader.h>
 #include <omp.h>
 #include <pq_flash_index.h>
+#include <raft/util/cudart_utils.hpp>
 #include <utils.h>
 
 #include <chrono>
@@ -102,10 +102,11 @@ class diskann_memory : public algo<T> {
   Mode bench_mode_;
   int num_search_threads_;
   std::shared_ptr<fixed_thread_pool> thread_pool_;
+  std::string index_path_prefix_;
 
  private:
   std::shared_ptr<diskann::Index<T>> mem_index_{nullptr};
-  void initialize_index_();
+  void initialize_index_(size_t max_points);
 };
 
 template <typename T>
@@ -119,16 +120,16 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
       .with_filter_list_size(0)
       .with_alpha(param.alpha)
       .with_saturate_graph(false)
-      .with_num_threads(num_threads_)
+      .with_num_threads(param.num_threads)
       .build());
 }
 
 template <typename T>
-void diskann_memory<T>::initialize_index_()
+void diskann_memory<T>::initialize_index_(size_t max_points)
 {
   this->mem_index_ = std::make_shared<diskann::Index<T>>(parse_metric_to_diskann(this->metric_),
                                                          this->dim_,
-                                                         max_points_,
+                                                         max_points,
                                                          diskann_index_write_params_,
                                                          nullptr,
                                                          0,
@@ -143,8 +144,7 @@ void diskann_memory<T>::initialize_index_()
 template <typename T>
 void diskann_memory<T>::build(const T* dataset, size_t nrow)
 {
-  max_points_ = nrow;
-  initialize_index_();
+  initialize_index_(nrow);
   mem_index_->build(dataset, nrow, std::vector<uint32_t>());
 }
 
@@ -152,13 +152,15 @@ template <typename T>
 void diskann_memory<T>::set_search_param(const search_param_base& param_)
 {
   auto param          = dynamic_cast<const search_param&>(param_);
-  this->L_search_     = param.L_search;
+  L_search_     = param.L_search;
   num_search_threads_ = param.num_threads;
 
-  // bench_mode_   = param.metric_objective;
-  bench_mode_ = Mode::kLatency;
+  // only latency mode supported with thread pool
+  bench_mode_   = Mode::kLatency;
 
   // Create a pool if multiple query threads have been set and the pool hasn't been created already
+  initialize_index_(0);
+  this->mem_index_->load(index_path_prefix_.c_str(), num_search_threads_, L_search_);
   bool create_pool = (bench_mode_ == Mode::kLatency && num_search_threads_ > 1 && !thread_pool_);
   if (create_pool) { thread_pool_ = std::make_shared<fixed_thread_pool>(num_search_threads_); }
 }
@@ -172,10 +174,10 @@ void diskann_memory<T>::search(
     mem_index_->search(queries + i * this->dim_,
                        static_cast<size_t>(k),
                        L_search_,
-                       reinterpret_cast<uint32_t*>(indices + i * k),
+                       reinterpret_cast<uint64_t*>(indices + i * k),
                        distances + i * k);
   };
-  if (bench_mode_ == Mode::kLatency && num_threads_ > 1) {
+  if (bench_mode_ == Mode::kLatency && num_search_threads_ > 1) {
     thread_pool_->submit(f, batch_size);
   } else {
     for (int i = 0; i < batch_size; i++) {
@@ -193,8 +195,8 @@ void diskann_memory<T>::save(const std::string& path_to_index) const
 template <typename T>
 void diskann_memory<T>::load(const std::string& path_to_index)
 {
-  initialize_index_();
-  this->mem_index_->load(path_to_index.c_str(), num_threads_, 100);
+  // only save the index path prefix here
+  index_path_prefix_ = path_to_index;
 }
 
 template <typename T>

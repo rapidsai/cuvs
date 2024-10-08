@@ -1,11 +1,7 @@
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;cuVS: Vector Search and Clustering on the GPU</div>
 
 > [!note]
-> cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai/raft) library of data mining primitives. RAPIDS RAFT currently contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms in cuVS. We are in the process of migrating the algorithms from RAFT to cuVS, but if you are unsure of which to use, please consider the following:
-> 1. RAFT contains C++ and Python APIs for all of the approximate nearest neighbors and clustering algorithms.
-> 2. cuVS contains a growing support for different languages, including C, C++, Python, and Rust. We will be adding more language support to cuVS in the future but will not be improving the language support for RAFT.
-> 3. Once all of RAFT's approximate nearest neighbors and clustering algorithms are moved to cuVS, the RAFT APIs will be deprecated and eventually removed altogether. Once removed, RAFT will become a lightweight header-only library. In the meantime, there's no harm in using RAFT if support for additional languages is not needed.
-
+> cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai/raft) library of machine learning and data mining primitives. As of version 24.10 (Release in October 2024), cuVS contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms from RAFT. The algorithms which have been migrated over to cuVS will be removed from RAFT in version 24.12 (released in December 2024).
 
 ## Contents
 
@@ -18,10 +14,11 @@
 
 ## Useful Resources
 
+- [Documentation](https://docs.rapids.ai/api/cuvs/nightly/): Library documentation.
+- [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
+- [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Guide to getting started with cuVS.
 - [Code Examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples): Self-contained Code Examples.
 - [API Reference Documentation](https://docs.rapids.ai/api/cuvs/nightly/api_docs): API Documentation.
-- [Getting Started Guide](https://docs.rapids.ai/api/cuvs/nightly/getting_started): Getting started with RAFT.
-- [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build): Instructions for installing and building cuVS.
 - [RAPIDS Community](https://rapids.ai/community.html): Get help, contribute, and collaborate.
 - [GitHub repository](https://github.com/rapidsai/cuvs): Download the cuVS source code.
 - [Issue tracker](https://github.com/rapidsai/cuvs/issues): Report issues or request features.
@@ -30,21 +27,74 @@
 
 cuVS contains state-of-the-art implementations of several algorithms for running approximate nearest neighbors and clustering on the GPU. It can be used directly or through the various databases and other libraries that have integrated it. The primary goal of cuVS is to simplify the use of GPUs for vector similarity search and clustering.
 
+Vector search is an information retrieval method that has been growing in popularity over the past few  years, partly because of the rising importance of multimedia embeddings created from unstructured data and the need to perform semantic search on the embeddings to find items which are semantically similar to each other.
+
+Vector search is also used in _data mining and machine learning_ tasks and comprises an important step in many _clustering_ and _visualization_ algorithms like [UMAP](https://arxiv.org/abs/2008.00325), [t-SNE](https://lvdmaaten.github.io/tsne/), K-means, and [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html). 
+
+Finally, faster vector search enables interactions between dense vectors and graphs. Converting a pile of dense vectors into nearest neighbors graphs unlocks the entire world of graph analysis algorithms, such as those found in [GraphBLAS](https://graphblas.org/) and [cuGraph](https://github.com/rapidsai/cugraph). 
+
+Below are some common use-cases for vector search
+
+- ### Semantic search
+  - Generative AI & Retrieval augmented generation (RAG)
+  - Recommender systems
+  - Computer vision
+  - Image search
+  - Text search
+  - Audio search
+  - Molecular search
+  - Model training
+  
+
+- ### Data mining
+  - Clustering algorithms
+  - Visualization algorithms
+  - Sampling algorithms
+  - Class balancing
+  - Ensemble methods
+  - k-NN graph construction
+
+## Why cuVS?
+
+There are several benefits to using cuVS and GPUs for vector search, including
+
+1. Fast index build
+2. Latency critical and high throughput search
+3. Parameter tuning
+4. Cost savings
+5. Interoperability (build on GPU, deploy on CPU)
+6. Multiple language support
+7. Building blocks for composing new or accelerating existing algorithms
+
+In addition to the items above, cuVS takes on the burden of keeping non-trivial accelerated code up to date as new NVIDIA architectures and CUDA versions are released. This provides a deslightful development experimence, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale. 
+
 ## Installing cuVS
 
-cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python). Different packages are available for the different languages supported by cuVS:
+cuVS comes with pre-built packages that can be installed through [conda](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python) and [pip](https://pip.pypa.io/en/stable/). Different packages are available for the different languages supported by cuVS:
 
-| Python | C/C++                       |
-|--------|-----------------------------|
-| `cuvs` | `libcuvs`, `libcuvs-static` |
+| Python | C/C++     |
+|--------|-----------|
+| `cuvs` | `libcuvs` |
 
 ### Stable release
 
-It is recommended to use [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) to install the desired packages. The following command will install the Python package. You can substitute `cuvs` for any of the packages in the table above:
+It is recommended to use [mamba](https://conda.github.io/conda-libmamba-solver/user-guide/) to install the desired packages. The following command will install the Python package. You can substitute `cuvs` for any of the packages in the table above:
 
 ```bash
-mamba install -c conda-forge -c nvidia -c rapidsai cuvs
+conda install -c conda-forge -c nvidia -c rapidsai cuvs
 ```
+
+The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
+
+For CUDA 11 packages:
+```bash
+pip install cuvs-cu11 --extra-index-url=https://pypi.nvidia.com
+````
+
+And CUDA 12 packages:
+```bash
+pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
+```    
 
 ### Nightlies
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
@@ -53,11 +103,11 @@ If installing a version that has not yet been released, the `rapidsai` channel c
 mamba install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.12
 ```
 
-Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/stable/build/) for more information on installing cuVS and building from source.
+cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
 
 ## Getting Started
 
-The following code snippets train an approximate nearest neighbors index for the CAGRA algorithm.
+The following code snippets train an approximate nearest neighbors index for the CAGRA algorithm in the various different languages supported by cuVS.
 
 ### Python API
 
@@ -85,7 +135,7 @@ cagra::index_params index_params;
 auto index = cagra::build(res, index_params, dataset);
 ```
 
-For more examples of the C++ APIs, refer to the [examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples) directory in the codebase.
+For more code examples of the C++ APIs, including drop-in Cmake project templates, please refer to the [C++ examples](https://github.com/rapidsai/cuvs/tree/HEAD/examples) directory in the codebase.
 
 ### C API
 
@@ -109,6 +159,8 @@ cuvsCagraIndexDestroy(index);
 cuvsCagraIndexParamsDestroy(index_params);
 cuvsResourcesDestroy(res);
 ```
+
+For more code examples of the C APIs, including drop-in Cmake project templates, please refer to the [C examples](https://github.com/rapidsai/cuvs/tree/branch-24.10/examples/c)
 
 ### Rust API
 
@@ -171,6 +223,7 @@ fn cagra_example() -> Result<()> {
 }
 ```
 
+For more code examples of the Rust APIs, including a drop-in project templates, please refer to the [Rust examples](https://github.com/rapidsai/cuvs/tree/branch-24.10/examples/rust).
 
 ## Contributing
 
@@ -178,60 +231,9 @@ If you are interested in contributing to the cuVS library, please read our [Cont
 
 ## References
 
-When citing cuVS generally, please consider referencing this Github repository.
-```bibtex
-@misc{rapidsai,
-  title={Rapidsai/cuVS: Vector Search and Clustering on the GPU.},
-  url={https://github.com/rapidsai/cuvs},
-  journal={GitHub},
-  publisher={Nvidia RAPIDS},
-  author={Rapidsai},
-  year={2024}
-}
-```
-
-If citing CAGRA, please consider the following bibtex:
-```bibtex
-@misc{ootomo2023cagra,
-      title={CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search for GPUs},
-      author={Hiroyuki Ootomo and Akira Naruse and Corey Nolet and Ray Wang and Tamas Feher and Yong Wang},
-      year={2023},
-      eprint={2308.15136},
-      archivePrefix={arXiv},
-      primaryClass={cs.DS}
-}
-```
-
-If citing the k-selection routines, please consider the following bibtex:
-```bibtex
-@proceedings{10.1145/3581784,
-    title = {SC '23: Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis},
-    year = {2023},
-    isbn = {9798400701092},
-    publisher = {Association for Computing Machinery},
-    address = {New York, NY, USA},
-    abstract = {Started in 1988, the SC Conference has become the annual nexus for researchers and practitioners from academia, industry and government to share information and foster collaborations to advance the state of the art in High Performance Computing (HPC), Networking, Storage, and Analysis.},
-    location = {, Denver, CO, USA, }
-}
-```
-
-If citing the nearest neighbors descent API, please consider the following bibtex:
-```bibtex
-@inproceedings{10.1145/3459637.3482344,
-    author = {Wang, Hui and Zhao, Wan-Lei and Zeng, Xiangxiang and Yang, Jianye},
-    title = {Fast K-NN Graph Construction by GPU Based NN-Descent},
-    year = {2021},
-    isbn = {9781450384469},
-    publisher = {Association for Computing Machinery},
-    address = {New York, NY, USA},
-    url = {https://doi.org/10.1145/3459637.3482344},
-    doi = {10.1145/3459637.3482344},
-    abstract = {NN-Descent is a classic k-NN graph construction approach. It is still widely employed in machine learning, computer vision, and information retrieval tasks due to its efficiency and genericness. However, the current design only works well on CPU. In this paper, NN-Descent has been redesigned to adapt to the GPU architecture. A new graph update strategy called selective update is proposed. It reduces the data exchange between GPU cores and GPU global memory significantly, which is the processing bottleneck under GPU computation architecture. This redesign leads to full exploitation of the parallelism of the GPU hardware. In the meantime, the genericness, as well as the simplicity of NN-Descent, are well-preserved. Moreover, a procedure that allows to k-NN graph to be merged efficiently on GPU is proposed. It makes the construction of high-quality k-NN graphs for out-of-GPU-memory datasets tractable. Our approach is 100-250\texttimes{} faster than the single-thread NN-Descent and is 2.5-5\texttimes{} faster than the existing GPU-based approaches as we tested on million as well as billion scale datasets.},
-    booktitle = {Proceedings of the 30th ACM International Conference on Information \& Knowledge Management},
-    pages = {1929–1938},
-    numpages = {10},
-    keywords = {high-dimensional, nn-descent, gpu, k-nearest neighbor graph},
-    location = {Virtual Event, Queensland, Australia},
-    series = {CIKM '21}
-}
-```
+For the interested reader, many of the accelerated implementations in cuVS are also based on research papers which can provide a lot more background. We also ask you to please cite the corresponding algorithms by referencing them in your own research. 
+- [CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search](https://arxiv.org/abs/2308.15136)
+- [Top-K Algorithms on GPU: A Comprehensive Study and New Methods](https://dl.acm.org/doi/10.1145/3581784.3607062>)
+- [Fast K-NN Graph Construction by GPU Based NN-Descent](https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>)
+- [cuSLINK: Single-linkage Agglomerative Clustering on the GPU](https://arxiv.org/abs/2306.16354)
+- [GPU Semiring Primitives for Sparse Neighborhood Methods](https://arxiv.org/abs/2104.06357)
