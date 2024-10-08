@@ -20,10 +20,16 @@ import os
 import tempfile
 import time
 import urllib
+import numpy as np
+
 
 ## Check the quality of the prediction (recall)
-def calc_recall(found_indices, ground_truth):
-    found_indices = cp.asarray(found_indices)
+def calc_recall(found_indices, ground_truth, use_cupy):
+    if use_cupy:
+        np_lib = cp
+    else:
+        np_lib = np
+    found_indices = np_lib.asarray(found_indices)
     bs, k = found_indices.shape
     if bs != ground_truth.shape[0]:
         raise RuntimeError(
@@ -41,7 +47,7 @@ def calc_recall(found_indices, ground_truth):
     # Go over the batch
     for i in range(bs):
         # Note, ivf-pq does not guarantee the ordered input, hence the use of intersect1d
-        n += cp.intersect1d(found_indices[i, :k], ground_truth[i, :k]).size
+        n += np_lib.intersect1d(found_indices[i, :k], ground_truth[i, :k]).size
     recall = n / found_indices.size
     return recall
 
