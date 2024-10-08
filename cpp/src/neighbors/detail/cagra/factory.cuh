@@ -159,7 +159,7 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
                                         const cagra::search_params& params,
                                         const DatasetT& dataset,
                                         cuvs::distance::DistanceType metric)
-  -> const dataset_descriptor_host<DataT, IndexT, DistanceT>&
+  -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   using desc_t = dataset_descriptor_host<DataT, IndexT, DistanceT>;
   auto key     = descriptor_cache::make_key(params, dataset, metric);

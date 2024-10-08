@@ -126,15 +126,20 @@ class batch_runner {
                          raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                          raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
                          raft::device_matrix_view<float, int64_t, raft::row_major> distances) {
-        return upstream_search(res,
-                               ps,
-                               ix,
-                               queries,
-                               neighbors,
-                               distances,
-                               (sample_filter != nullptr)
-                                 ? *sample_filter
-                                 : cuvs::neighbors::filtering::none_sample_filter{});
+        if (sample_filter == nullptr) {
+          using base_filter_type = cuvs::neighbors::filtering::base_filter;
+          const auto none_filter = cuvs::neighbors::filtering::none_sample_filter{};
+          return upstream_search(res,
+                                 ps,
+                                 ix,
+                                 queries,
+                                 neighbors,
+                                 distances,
+                                 static_cast<const base_filter_type&>(none_filter));
+
+        } else {
+          return upstream_search(res, ps, ix, queries, neighbors, distances, *sample_filter);
+        }
       }},
       n_queues_{params.n_queues},
       batch_bufs_{reinterpret_cast<batch<T, IdxT>*>(
