@@ -88,21 +88,6 @@ if(CUVS_ANN_BENCH_USE_FAISS)
 endif()
 
 # ##################################################################################################
-# * Enable NVTX if available
-
-# Note: ANN_BENCH wrappers have extra NVTX code not related to raft::nvtx.They track gbench
-# benchmark cases and iterations. This is to make limited NVTX available to all algos, not just
-# raft/cuVS.
-if(TARGET CUDA::nvtx3)
-  set(_CMAKE_REQUIRED_INCLUDES_ORIG ${CMAKE_REQUIRED_INCLUDES})
-  get_target_property(CMAKE_REQUIRED_INCLUDES CUDA::nvtx3 INTERFACE_INCLUDE_DIRECTORIES)
-  unset(NVTX3_HEADERS_FOUND CACHE)
-  # Check the headers explicitly to make sure the cpu-only build succeeds
-  CHECK_INCLUDE_FILE_CXX(nvtx3/nvToolsExt.h NVTX3_HEADERS_FOUND)
-  set(CMAKE_REQUIRED_INCLUDES ${_CMAKE_REQUIRED_INCLUDES_ORIG})
-endif()
-
-# ##################################################################################################
 # * Target function -------------------------------------------------------------
 
 function(ConfigureAnnBench)
@@ -298,9 +283,8 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   target_include_directories(ANN_BENCH PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
   target_link_libraries(
-    ANN_BENCH
-    PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl fmt::fmt-header-only
-            spdlog::spdlog_header_only $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
+    ANN_BENCH PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl
+                      fmt::fmt-header-only spdlog::spdlog_header_only
   )
   set_target_properties(
     ANN_BENCH
@@ -318,7 +302,6 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
     ANN_BENCH
     PRIVATE
       $<$<BOOL:${CUDAToolkit_FOUND}>:ANN_BENCH_LINK_CUDART="libcudart.so.${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}.${CUDAToolkit_VERSION_PATCH}">
-      $<$<BOOL:${NVTX3_HEADERS_FOUND}>:ANN_BENCH_NVTX3_HEADERS_FOUND>
   )
 
   target_link_options(ANN_BENCH PRIVATE -export-dynamic)
