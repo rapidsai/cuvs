@@ -16,13 +16,14 @@
 
 #pragma once
 
+#include "../../../core/nvtx.hpp"
 #include "factory.cuh"
+#include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta_inst.cuh"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
@@ -41,48 +42,6 @@
 #include <rmm/cuda_stream_view.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
-
-template <class CagraSampleFilterT>
-struct CagraSampleFilterWithQueryIdOffset {
-  const uint32_t offset;
-  CagraSampleFilterT filter;
-
-  CagraSampleFilterWithQueryIdOffset(const uint32_t offset, const CagraSampleFilterT filter)
-    : offset(offset), filter(filter)
-  {
-  }
-
-  _RAFT_DEVICE auto operator()(const uint32_t query_id, const uint32_t sample_id)
-  {
-    return filter(query_id + offset, sample_id);
-  }
-};
-
-template <class CagraSampleFilterT>
-struct CagraSampleFilterT_Selector {
-  using type = CagraSampleFilterWithQueryIdOffset<CagraSampleFilterT>;
-};
-template <>
-struct CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter> {
-  using type = cuvs::neighbors::filtering::none_cagra_sample_filter;
-};
-
-// A helper function to set a query id offset
-template <class CagraSampleFilterT>
-inline typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type set_offset(
-  CagraSampleFilterT filter, const uint32_t offset)
-{
-  typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type new_filter(offset, filter);
-  return new_filter;
-}
-template <>
-inline
-  typename CagraSampleFilterT_Selector<cuvs::neighbors::filtering::none_cagra_sample_filter>::type
-  set_offset<cuvs::neighbors::filtering::none_cagra_sample_filter>(
-    cuvs::neighbors::filtering::none_cagra_sample_filter filter, const uint32_t)
-{
-  return filter;
-}
 
 template <typename DataT, typename IndexT, typename DistanceT, typename CagraSampleFilterT>
 void search_main_core(raft::resources const& res,
@@ -107,7 +66,7 @@ void search_main_core(raft::resources const& res,
     params.max_queries = std::min<size_t>(queries.extent(0), deviceProp.maxGridSize[1]);
   }
 
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "cagra::search(max_queries = %u, k = %u, dim = %zu)",
     params.max_queries,
     topk,

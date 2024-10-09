@@ -202,6 +202,7 @@ endif()
 add_library(
   cuvs-cagra-search STATIC
   src/neighbors/cagra_search_float.cu
+  src/neighbors/cagra_search_half.cu
   src/neighbors/cagra_search_int8.cu
   src/neighbors/cagra_search_uint8.cu
   src/neighbors/detail/cagra/compute_distance.cu
@@ -257,14 +258,10 @@ add_library(
   src/neighbors/detail/cagra/search_multi_cta_half_uint32.cu
   src/neighbors/detail/cagra/search_multi_cta_int8_uint32.cu
   src/neighbors/detail/cagra/search_multi_cta_uint8_uint32.cu
-  src/neighbors/detail/cagra/search_multi_cta_float_uint64.cu
-  src/neighbors/detail/cagra/search_multi_cta_half_uint64.cu
   src/neighbors/detail/cagra/search_single_cta_float_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_half_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_int8_uint32.cu
   src/neighbors/detail/cagra/search_single_cta_uint8_uint32.cu
-  src/neighbors/detail/cagra/search_single_cta_float_uint64.cu
-  src/neighbors/detail/cagra/search_single_cta_half_uint64.cu
 )
 
 file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
@@ -293,9 +290,14 @@ target_compile_options(
 add_library(
   cuvs SHARED
   src/cluster/kmeans_balanced_fit_float.cu
+  src/cluster/kmeans_fit_mg_float.cu
+  src/cluster/kmeans_fit_mg_double.cu
+  src/cluster/kmeans_fit_double.cu
   src/cluster/kmeans_fit_float.cu
   src/cluster/kmeans_auto_find_k_float.cu
+  src/cluster/kmeans_fit_predict_double.cu
   src/cluster/kmeans_fit_predict_float.cu
+  src/cluster/kmeans_predict_double.cu
   src/cluster/kmeans_predict_float.cu
   src/cluster/kmeans_balanced_fit_float.cu
   src/cluster/kmeans_balanced_fit_predict_float.cu
@@ -303,8 +305,10 @@ add_library(
   src/cluster/kmeans_balanced_fit_int8.cu
   src/cluster/kmeans_balanced_fit_predict_int8.cu
   src/cluster/kmeans_balanced_predict_int8.cu
+  src/cluster/kmeans_transform_double.cu
   src/cluster/kmeans_transform_float.cu
   src/cluster/single_linkage_float.cu
+  src/core/bitset.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
@@ -345,11 +349,14 @@ add_library(
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_half_float_float_int.cu
   src/distance/detail/pairwise_matrix/dispatch_russel_rao_double_double_double_int.cu
   src/distance/detail/pairwise_matrix/dispatch_rbf.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
+  src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
   src/distance/detail/fused_distance_nn.cu
   src/distance/distance.cu
   src/distance/pairwise_distance.cu
   src/neighbors/brute_force.cu
   src/neighbors/cagra_build_float.cu
+  src/neighbors/cagra_build_half.cu
   src/neighbors/cagra_build_int8.cu
   src/neighbors/cagra_build_uint8.cu
   src/neighbors/cagra_extend_float.cu
@@ -357,6 +364,7 @@ add_library(
   src/neighbors/cagra_extend_uint8.cu
   src/neighbors/cagra_optimize.cu
   src/neighbors/cagra_serialize_float.cu
+  src/neighbors/cagra_serialize_half.cu
   src/neighbors/cagra_serialize_int8.cu
   src/neighbors/cagra_serialize_uint8.cu
   src/neighbors/detail/cagra/cagra_build.cpp
@@ -378,6 +386,7 @@ add_library(
   src/neighbors/ivf_pq/ivf_pq_serialize.cu
   src/neighbors/ivf_pq/ivf_pq_deserialize.cu
   src/neighbors/ivf_pq/detail/ivf_pq_build_extend_float_int64_t.cu
+  src/neighbors/ivf_pq/detail/ivf_pq_build_extend_half_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_build_extend_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_build_extend_uint8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false.cu
@@ -395,15 +404,15 @@ add_library(
   src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
   src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
+  src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
   src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_float_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_int8_t_int64_t.cu
-  src/neighbors/ivf_pq/detail/ivf_pq_search_with_filter_uint8_t_int64_t.cu
   src/neighbors/nn_descent.cu
   src/neighbors/nn_descent_float.cu
+  src/neighbors/nn_descent_half.cu
   src/neighbors/nn_descent_int8.cu
   src/neighbors/nn_descent_uint8.cu
+  src/neighbors/reachability.cu
   src/neighbors/refine/detail/refine_device_float_float.cu
   src/neighbors/refine/detail/refine_device_half_float.cu
   src/neighbors/refine/detail/refine_device_int8_t_float.cu
@@ -413,14 +422,19 @@ add_library(
   src/neighbors/refine/detail/refine_host_int8_t_float.cpp
   src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
   src/neighbors/sample_filter.cu
+  src/neighbors/vamana_build_float.cu
+  src/neighbors/vamana_build_uint8.cu
+  src/neighbors/vamana_build_int8.cu
+  src/neighbors/vamana_serialize_float.cu
+  src/neighbors/vamana_serialize_uint8.cu
+  src/neighbors/vamana_serialize_int8.cu
   src/selection/select_k_float_int64_t.cu
+  src/selection/select_k_float_int32_t.cu
   src/selection/select_k_float_uint32_t.cu
   src/selection/select_k_half_uint32_t.cu
   src/stats/silhouette_score.cu
   src/stats/trustworthiness_score.cu
 )
-
-target_compile_definitions(cuvs PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
 
 target_compile_options(
   cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda

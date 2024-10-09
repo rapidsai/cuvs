@@ -86,7 +86,7 @@ declaration_macro = """
 """
 
 none_filter_int64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                    "<int64_t COMMA cuvs::neighbors::filtering::none_ivf_sample_filter>"
+                    "<int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>"
 bitset_filter64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
                   "<int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>"
 

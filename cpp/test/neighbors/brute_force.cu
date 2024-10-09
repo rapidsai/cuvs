@@ -93,7 +93,8 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
 
     auto metric = cuvs::distance::DistanceType::L2Unexpanded;
     auto idx    = cuvs::neighbors::brute_force::build(handle, index, metric);
-    cuvs::neighbors::brute_force::search(handle, idx, search, indices, distances, std::nullopt);
+    cuvs::neighbors::brute_force::search(
+      handle, idx, search, indices, distances, cuvs::neighbors::filtering::none_sample_filter{});
 
     build_actual_output<<<raft::ceildiv(rows_ * k_, 32), 32, 0, stream>>>(
       actual_labels_.data(), rows_, k_, search_labels_.data(), indices_.data());
@@ -401,7 +402,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
           search_queries.data(), params_.num_queries, params_.dim),
         indices,
         distances,
-        std::nullopt);
+        cuvs::neighbors::filtering::none_sample_filter{});
     } else {
       auto idx = cuvs::neighbors::brute_force::build(
         handle_,
@@ -417,7 +418,7 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
           search_queries.data(), params_.num_queries, params_.dim),
         indices,
         distances,
-        std::nullopt);
+        cuvs::neighbors::filtering::none_sample_filter{});
     }
 
     ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(ref_indices_.data(),

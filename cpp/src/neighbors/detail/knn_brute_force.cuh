@@ -62,7 +62,10 @@ namespace cuvs::neighbors::detail {
  * Calculates brute force knn, using a fixed memory budget
  * by tiling over both the rows and columns of pairwise_distances
  */
-template <typename ElementType = float, typename IndexType = int64_t, typename DistanceT = float>
+template <typename ElementType      = float,
+          typename IndexType        = int64_t,
+          typename DistanceT        = float,
+          typename DistanceEpilogue = raft::identity_op>
 void tiled_brute_force_knn(const raft::resources& handle,
                            const ElementType* search,  // size (m ,d)
                            const ElementType* index,   // size (n ,d)
@@ -78,7 +81,8 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            size_t max_col_tile_size                  = 0,
                            const DistanceT* precomputed_index_norms  = nullptr,
                            const DistanceT* precomputed_search_norms = nullptr,
-                           const uint32_t* filter_bitmap             = nullptr)
+                           const uint32_t* filter_bitmap             = nullptr,
+                           DistanceEpilogue distance_epilogue        = raft::identity_op())
 {
   // Figure out the number of rows/cols to tile for
   size_t tile_rows = 0;
@@ -207,7 +211,8 @@ void tiled_brute_force_knn(const raft::resources& handle,
             IndexType col = j + (idx % current_centroid_size);
 
             cuvs::distance::detail::ops::l2_exp_cutlass_op<DistanceT, DistanceT> l2_op(sqrt);
-            return l2_op(row_norms[row], col_norms[col], dist[idx]);
+            auto val = l2_op(row_norms[row], col_norms[col], dist[idx]);
+            return distance_epilogue(val, row, col);
           });
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         auto row_norms = precomputed_search_norms ? precomputed_search_norms : search_norms.data();
@@ -221,8 +226,22 @@ void tiled_brute_force_knn(const raft::resources& handle,
             IndexType row = i + (idx / current_centroid_size);
             IndexType col = j + (idx % current_centroid_size);
             auto val      = DistanceT(1.0) - dist[idx] / DistanceT(row_norms[row] * col_norms[col]);
-            return val;
+            return distance_epilogue(val, row, col);
           });
+      } else {
+        // if we're not l2 distance, and we have a distance epilogue - run it now
+        if constexpr (!std::is_same_v<DistanceEpilogue, raft::identity_op>) {
+          auto distances_ptr = temp_distances.data();
+          raft::linalg::map_offset(
+            handle,
+            raft::make_device_vector_view(temp_distances.data(),
+                                          current_query_size * current_centroid_size),
+            [=] __device__(size_t idx) {
+              IndexType row = i + (idx / current_centroid_size);
+              IndexType col = j + (idx % current_centroid_size);
+              return distance_epilogue(distances_ptr[idx], row, col);
+            });
+        }
       }
 
       if (filter_bitmap != nullptr) {
@@ -697,6 +716,38 @@ void brute_force_search_filtered(
   }
 
   return;
+}
+
+template <typename T, typename IdxT, typename DistT, typename LayoutT>
+void search(raft::resources const& res,
+            const cuvs::neighbors::brute_force::index<T, DistT>& idx,
+            raft::device_matrix_view<const T, int64_t, LayoutT> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
+{
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
+    return brute_force_search<T, int64_t, DistT>(res, idx, queries, neighbors, distances);
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitmap_filter<const uint32_t, int64_t>&>(
+        sample_filter_ref);
+    if constexpr (std::is_same_v<LayoutT, raft::col_major>) {
+      RAFT_FAIL("filtered search isn't available with col_major queries yet");
+    } else {
+      cuvs::core::bitmap_view<const uint32_t, int64_t> sample_filter_view =
+        sample_filter.bitmap_view_;
+      return brute_force_search_filtered<T, int64_t, uint32_t, DistT>(
+        res, idx, queries, sample_filter_view, neighbors, distances);
+    }
+  } catch (const std::bad_cast&) {
+    RAFT_FAIL("Unsupported sample filter type");
+  }
 }
 
 template <typename T, typename DistT, typename LayoutT = raft::row_major>

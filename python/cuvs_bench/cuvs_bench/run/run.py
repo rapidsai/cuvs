@@ -580,6 +580,7 @@ def run_benchmark(
     search_mode: str,
     search_threads: int,
     dry_run: bool,
+    data_export: bool,
     raft_log_level: int,
 ) -> None:
     """

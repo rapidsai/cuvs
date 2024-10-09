@@ -71,8 +71,6 @@ function(ConfigureTest)
                          "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
 
-  target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
-
   if(_CUVS_TEST_NOCUDA)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
   endif()
@@ -139,6 +137,7 @@ if(BUILD_TESTS)
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
     neighbors/ann_cagra/test_float_uint32_t.cu
+    neighbors/ann_cagra/test_half_uint32_t.cu
     neighbors/ann_cagra/test_int8_t_uint32_t.cu
     neighbors/ann_cagra/test_uint8_t_uint32_t.cu
     GPUS
@@ -154,6 +153,19 @@ if(BUILD_TESTS)
     neighbors/ann_nn_descent/test_float_uint32_t.cu
     neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
     neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
+ ConfigureTest(
+    NAME
+    NEIGHBORS_ANN_VAMANA_TEST
+    PATH
+    neighbors/ann_vamana/test_float_uint32_t.cu
+    neighbors/ann_vamana/test_int8_t_uint32_t.cu
+    neighbors/ann_vamana/test_uint8_t_uint32_t.cu
     GPUS
     1
     PERCENT

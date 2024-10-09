@@ -29,7 +29,7 @@ namespace cuvs::neighbors::cagra::detail {
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_cagra_sample_filter>
+          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 class factory {
  public:
   /**

@@ -18,10 +18,13 @@ cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
 include(../cmake/thirdparty/fetch_rapids.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
+include(rapids-cuda)
 include(rapids-export)
 include(rapids-find)
 
 # ------------- configure project --------------#
+
+rapids_cuda_init_architectures(test_cuvs)
 
 project(test_cuvs_c LANGUAGES C CXX CUDA)
 

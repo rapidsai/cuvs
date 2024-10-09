@@ -21,10 +21,10 @@
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
 
+#include "../../../core/nvtx.hpp"
 #include "../dataset_serialize.hpp"
 
 #include <cstddef>
@@ -53,7 +53,7 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_,
                bool include_dataset)
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::serialize");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
   RAFT_LOG_DEBUG(
     "Saving CAGRA index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
@@ -103,7 +103,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 {
   // static_assert(std::is_same_v<IdxT, int> or std::is_same_v<IdxT, uint32_t>,
   //               "An hnswlib index can only be trained with int32 or uint32 IdxT");
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::serialize");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
   RAFT_LOG_DEBUG("Saving CAGRA index to hnswlib format, size %zu, dim %u",
                  static_cast<size_t>(index_.size()),
                  index_.dim());
@@ -194,6 +194,8 @@ void serialize_to_hnswlib(raft::resources const& res,
         auto data_elem = static_cast<int>(host_dataset(i, j));
         os.write(reinterpret_cast<char*>(&data_elem), sizeof(int));
       }
+    } else {
+      RAFT_FAIL("Unsupported dataset type while saving CAGRA dataset to HNSWlib format");
     }
 
     os.write(reinterpret_cast<char*>(&i), sizeof(std::size_t));
@@ -232,7 +234,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 template <typename T, typename IdxT>
 void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* index_)
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::deserialize");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
   char dtype_string[4];
   is.read(dtype_string, 4);
