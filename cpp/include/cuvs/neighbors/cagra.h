@@ -142,6 +142,42 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
  */
 
 /**
+ * @defgroup cagra_c_extend_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+/**
+ * @brief Supplemental parameters to extend CAGRA Index
+ *
+ */
+struct cuvsCagraExtendParams {
+  /** Degree of input graph for pruning. */
+  uint32_t max_chunk_size;
+  /** Degree of output graph. */
+};
+
+typedef struct cuvsCagraExtendParams* cuvsCagraExtendParams_t;
+
+/**
+ * @brief Allocate CAGRA Extend params, and populate with default values
+ *
+ * @param[in] params cuvsCagraExtendParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
+
+/**
+ * @brief De-allocate CAGRA Extend params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
+
+/**
+ * @}
+ */
+
+/**
  * @defgroup cagra_c_search_params C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
@@ -322,6 +358,35 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            cuvsCagraIndexParams_t params,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_extend_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+
+/**
+ * @brief Extend a CAGRA index with a `DLManagedTensor` which has underlying
+ *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
+ *        or `kDLCPU`. Also, acceptable underlying types are:
+ *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
+ * @param[in] additional_dataset DLManagedTensor* additional dataset
+ * @param[out] index cuvsCagraIndex_t Extended CAGRA index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                            cuvsCagraExtendParams_t params,
+                            DLManagedTensor* additional_dataset,
+                            DLManagedTensor* return_dataset,
+                            cuvsCagraIndex_t index);
 
 /**
  * @}
