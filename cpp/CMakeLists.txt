@@ -369,6 +369,7 @@ add_library(
   src/neighbors/cagra_serialize_uint8.cu
   src/neighbors/detail/cagra/cagra_build.cpp
   src/neighbors/detail/cagra/topk_for_cagra/topk.cu
+  src/neighbors/dynamic_batching.cpp
   $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
   src/neighbors/ivf_flat_index.cpp
   src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
