@@ -19,7 +19,8 @@
 #include <cstdint>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_mdspan.hpp>
+#include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>   // get_device_for_address
@@ -172,6 +173,22 @@ struct owning_dataset : public strided_dataset<DataT, IdxT> {
   };
 };
 
+template <typename DatasetT>
+struct is_strided_dataset : std::false_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<strided_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<non_owning_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
+struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPolicy>>
+  : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
+
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
  *
@@ -284,23 +301,25 @@ auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t 
  */
 template <typename MathT, typename IdxT>
 struct vpq_dataset : public dataset<IdxT> {
+  using index_type = IdxT;
+  using math_type  = MathT;
   /** Vector Quantization codebook - "coarse cluster centers". */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> vq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book;
   /** Product Quantization codebook - "fine cluster centers".  */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> pq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book;
   /** Compressed dataset.  */
-  raft::device_matrix<uint8_t, IdxT, raft::row_major> data;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data;
 
-  vpq_dataset(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq_code_book,
-              raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq_code_book,
-              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data)
+  vpq_dataset(raft::device_matrix<math_type, uint32_t, raft::row_major>&& vq_code_book,
+              raft::device_matrix<math_type, uint32_t, raft::row_major>&& pq_code_book,
+              raft::device_matrix<uint8_t, index_type, raft::row_major>&& data)
     : vq_code_book{std::move(vq_code_book)},
       pq_code_book{std::move(pq_code_book)},
       data{std::move(data)}
   {
   }
 
-  [[nodiscard]] auto n_rows() const noexcept -> IdxT final { return data.extent(0); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book.extent(1); }
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 
@@ -354,10 +373,23 @@ struct vpq_dataset : public dataset<IdxT> {
   }
 };
 
+template <typename DatasetT>
+struct is_vpq_dataset : std::false_type {};
+
+template <typename MathT, typename IdxT>
+struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
+
 namespace filtering {
 
+struct base_filter {
+  virtual ~base_filter() = default;
+};
+
 /* A filter that filters nothing. This is the default behavior. */
-struct none_ivf_sample_filter {
+struct none_sample_filter : public base_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -365,10 +397,7 @@ struct none_ivf_sample_filter {
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
-};
 
-/* A filter that filters nothing. This is the default behavior. */
-struct none_cagra_sample_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -405,12 +434,32 @@ struct ivf_to_sample_filter {
 };
 
 /**
+ * @brief Filter an index with a bitmap
+ *
+ * @tparam bitmap_t Data type of the bitmap
+ * @tparam index_t Indexing type
+ */
+template <typename bitmap_t, typename index_t>
+struct bitmap_filter : public base_filter {
+  // View of the bitset to use as a filter
+  const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_view_;
+
+  bitmap_filter(const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_for_filtering);
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample
+    const uint32_t sample_ix) const;
+};
+
+/**
  * @brief Filter an index with a bitset
  *
+ * @tparam bitset_t Data type of the bitset
  * @tparam index_t Indexing type
  */
 template <typename bitset_t, typename index_t>
-struct bitset_filter {
+struct bitset_filter : public base_filter {
   // View of the bitset to use as a filter
   const cuvs::core::bitset_view<bitset_t, index_t> bitset_view_;
 
@@ -588,5 +637,56 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                const typename ListT::spec_type& store_spec,
                                                const typename ListT::spec_type& device_spec);
 }  // namespace ivf
+}  // namespace cuvs::neighbors
+
+namespace cuvs::neighbors {
+using namespace raft;
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct iface {
+  iface() : mutex_(std::make_shared<std::mutex>()) {}
+
+  const IdxT size() const { return index_.value().size(); }
+
+  std::optional<AnnIndexType> index_;
+  std::shared_ptr<std::mutex> mutex_;
+};
+
+template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
+void build(const raft::device_resources& handle,
+           cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+           const cuvs::neighbors::index_params* index_params,
+           raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
+
+template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
+void extend(
+  const raft::device_resources& handle,
+  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+  raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
+  std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
+    new_indices);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void search(const raft::device_resources& handle,
+            const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+            const cuvs::neighbors::search_params* search_params,
+            raft::device_matrix_view<const T, int64_t, row_major> h_queries,
+            raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+            raft::device_matrix_view<float, int64_t, row_major> d_distances);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void serialize(const raft::device_resources& handle,
+               const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+               std::ostream& os);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void deserialize(const raft::device_resources& handle,
+                 cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+                 std::istream& is);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void deserialize(const raft::device_resources& handle,
+                 cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+                 const std::string& filename);
 
 };  // namespace cuvs::neighbors

@@ -286,7 +286,28 @@ class dataset {
   {
     switch (memory_type) {
       case MemoryType::kDevice: return query_set_on_gpu();
-      default: return query_set();
+      case MemoryType::kHost: {
+        auto r = query_set();
+#ifndef BUILD_CPU_ONLY
+        if (query_set_pinned_) {
+          cudaHostUnregister(const_cast<T*>(r));
+          query_set_pinned_ = false;
+        }
+#endif
+        return r;
+      }
+      case MemoryType::kHostPinned: {
+        auto r = query_set();
+#ifndef BUILD_CPU_ONLY
+        if (!query_set_pinned_) {
+          cudaHostRegister(
+            const_cast<T*>(r), query_set_size() * dim() * sizeof(T), cudaHostRegisterDefault);
+          query_set_pinned_ = true;
+        }
+#endif
+        return r;
+      }
+      default: return nullptr;
     }
   }
 
@@ -294,7 +315,27 @@ class dataset {
   {
     switch (memory_type) {
       case MemoryType::kDevice: return base_set_on_gpu();
-      case MemoryType::kHost: return base_set();
+      case MemoryType::kHost: {
+        auto r = base_set();
+#ifndef BUILD_CPU_ONLY
+        if (base_set_pinned_) {
+          cudaHostUnregister(const_cast<T*>(r));
+          base_set_pinned_ = false;
+        }
+#endif
+        return r;
+      }
+      case MemoryType::kHostPinned: {
+        auto r = base_set();
+#ifndef BUILD_CPU_ONLY
+        if (!base_set_pinned_) {
+          cudaHostRegister(
+            const_cast<T*>(r), base_set_size() * dim() * sizeof(T), cudaHostRegisterDefault);
+          base_set_pinned_ = true;
+        }
+#endif
+        return r;
+      }
       case MemoryType::kHostMmap: return mapped_base_set();
       default: return nullptr;
     }
@@ -315,18 +356,23 @@ class dataset {
   mutable T* d_query_set_     = nullptr;
   mutable T* mapped_base_set_ = nullptr;
   mutable int32_t* gt_set_    = nullptr;
+
+  mutable bool base_set_pinned_  = false;
+  mutable bool query_set_pinned_ = false;
 };
 
 template <typename T>
 dataset<T>::~dataset()
 {
-  delete[] base_set_;
-  delete[] query_set_;
-  delete[] gt_set_;
 #ifndef BUILD_CPU_ONLY
   if (d_base_set_) { cudaFree(d_base_set_); }
   if (d_query_set_) { cudaFree(d_query_set_); }
+  if (base_set_pinned_) { cudaHostUnregister(base_set_); }
+  if (query_set_pinned_) { cudaHostUnregister(query_set_); }
 #endif
+  delete[] base_set_;
+  delete[] query_set_;
+  delete[] gt_set_;
 }
 
 template <typename T>

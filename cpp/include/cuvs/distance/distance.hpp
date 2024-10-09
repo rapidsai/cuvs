@@ -19,6 +19,7 @@
 #include "distance.h"
 
 #include <cstdint>
+#include <cuda_fp16.h>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
@@ -156,6 +157,49 @@ void pairwise_distance(
   raft::device_matrix_view<double, std::int64_t, raft::layout_c_contiguous> dist,
   cuvs::distance::DistanceType metric,
   double metric_arg = 2.0f);
+/**
+ * @brief Compute pairwise distances for two matrices
+ *
+ * Note: Only contiguous row- or column-major layouts supported currently.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <raft/core/device_mdarray.hpp>
+ * #include <cuvs/distance/distance.hpp>
+ *
+ * raft::resources handle;
+ * int n_samples = 5000;
+ * int n_features = 50;
+ *
+ * auto input = raft::make_device_matrix<float>(handle, n_samples, n_features);
+ *
+ * // ... fill input with data ...
+ *
+ * auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
+ *
+ * auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
+ * cuvs::distance::pairwise_distance(handle,
+ *                                   raft::make_const(input.view()),
+ *                                   raft::make_const(input.view()),
+ *                                   output.view(),
+ *                                   metric);
+ * @endcode
+ *
+ * @param[in] handle raft handle for managing expensive resources
+ * @param[in] x first set of points (size n*k)
+ * @param[in] y second set of points (size m*k)
+ * @param[out] dist output distance matrix (size n*m)
+ * @param[in] metric distance to evaluate
+ * @param[in] metric_arg metric argument (used for Minkowski distance)
+ */
+void pairwise_distance(
+  raft::resources const& handle,
+  raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const x,
+  raft::device_matrix_view<const half, std::int64_t, raft::layout_c_contiguous> const y,
+  raft::device_matrix_view<float, std::int64_t, raft::layout_c_contiguous> dist,
+  cuvs::distance::DistanceType metric,
+  float metric_arg = 2.0f);
 
 /**
  * @brief Compute pairwise distances for two matrices
@@ -243,6 +287,49 @@ void pairwise_distance(
   raft::device_matrix_view<double, std::int64_t, raft::layout_f_contiguous> dist,
   cuvs::distance::DistanceType metric,
   double metric_arg = 2.0f);
+/**
+ * @brief Compute pairwise distances for two matrices
+ *
+ * Note: Only contiguous row- or column-major layouts supported currently.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <raft/core/device_mdarray.hpp>
+ * #include <cuvs/distance/distance.hpp>
+ *
+ * raft::resources handle;
+ * int n_samples = 5000;
+ * int n_features = 50;
+ *
+ * auto input = raft::make_device_matrix<float>(handle, n_samples, n_features);
+ *
+ * // ... fill input with data ...
+ *
+ * auto output = raft::make_device_matrix<float>(handle, n_samples, n_samples);
+ *
+ * auto metric = cuvs::distance::DistanceType::L2SqrtExpanded;
+ * cuvs::distance::pairwise_distance(handle,
+ *                                   raft::make_const(input.view()),
+ *                                   raft::make_const(input.view()),
+ *                                   output.view(),
+ *                                   metric);
+ * @endcode
+ *
+ * @param[in] handle raft handle for managing expensive resources
+ * @param[in] x first set of points (size n*k)
+ * @param[in] y second set of points (size m*k)
+ * @param[out] dist output distance matrix (size n*m)
+ * @param[in] metric distance to evaluate
+ * @param[in] metric_arg metric argument (used for Minkowski distance)
+ */
+void pairwise_distance(
+  raft::resources const& handle,
+  raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const x,
+  raft::device_matrix_view<const half, std::int64_t, raft::layout_f_contiguous> const y,
+  raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
+  cuvs::distance::DistanceType metric,
+  float metric_arg = 2.0f);
 
 /** @} */  // end group pairwise_distance_runtime
 

@@ -1,3 +1,76 @@
+# cuvs 24.10.00 (9 Oct 2024)
+
+## 🐛 Bug Fixes
+
+- Use 64 bit types for dataset size calculation in CAGRA graph optimizer ([#380](https://github.com/rapidsai/cuvs/pull/380)) [@tfeher](https://github.com/tfeher)
+- Remove EXPLICIT_INSTANTIATE_ONLY macros ([#358](https://github.com/rapidsai/cuvs/pull/358)) [@achirkin](https://github.com/achirkin)
+- Fix order of operations for cosine IVF Flat ([#329](https://github.com/rapidsai/cuvs/pull/329)) [@lowener](https://github.com/lowener)
+- Exclude any kernel symbol that uses cutlass ([#314](https://github.com/rapidsai/cuvs/pull/314)) [@benfred](https://github.com/benfred)
+- [Fix] pin raft dependent to rapidsai ([#299](https://github.com/rapidsai/cuvs/pull/299)) [@rhdong](https://github.com/rhdong)
+- Fix dataset dimension in IVF-PQ C wrappers ([#292](https://github.com/rapidsai/cuvs/pull/292)) [@tfeher](https://github.com/tfeher)
+- Fix python ivf-pq for int8/uint8 dtypes ([#271](https://github.com/rapidsai/cuvs/pull/271)) [@benfred](https://github.com/benfred)
+- FP16 API for CAGRA and IVF-PQ ([#264](https://github.com/rapidsai/cuvs/pull/264)) [@tfeher](https://github.com/tfeher)
+
+## 📖 Documentation
+
+- More doc updates for 24.10 ([#396](https://github.com/rapidsai/cuvs/pull/396)) [@cjnolet](https://github.com/cjnolet)
+- fix 404 in documentation link in readme ([#395](https://github.com/rapidsai/cuvs/pull/395)) [@benfred](https://github.com/benfred)
+- Improving getting started materials ([#342](https://github.com/rapidsai/cuvs/pull/342)) [@cjnolet](https://github.com/cjnolet)
+- Fix broken examples link in README. ([#326](https://github.com/rapidsai/cuvs/pull/326)) [@bdice](https://github.com/bdice)
+- Recommend `miniforge` for conda install ([#325](https://github.com/rapidsai/cuvs/pull/325)) [@bdice](https://github.com/bdice)
+
+## 🚀 New Features
+
+- Port remaining scripts to `cuvs_bench` ([#368](https://github.com/rapidsai/cuvs/pull/368)) [@divyegala](https://github.com/divyegala)
+- [Feat] Relative change with `bitset` API feature #2439 in raft ([#350](https://github.com/rapidsai/cuvs/pull/350)) [@rhdong](https://github.com/rhdong)
+- cuvs_bench plotting functions ([#347](https://github.com/rapidsai/cuvs/pull/347)) [@dantegd](https://github.com/dantegd)
+- CosineExpanded Metric for IVF-PQ (normalize inputs) ([#346](https://github.com/rapidsai/cuvs/pull/346)) [@tarang-jain](https://github.com/tarang-jain)
+- Python API for CAGRA+HNSW ([#246](https://github.com/rapidsai/cuvs/pull/246)) [@divyegala](https://github.com/divyegala)
+- C API for CAGRA+HNSW ([#240](https://github.com/rapidsai/cuvs/pull/240)) [@divyegala](https://github.com/divyegala)
+- SNMG ANN ([#231](https://github.com/rapidsai/cuvs/pull/231)) [@viclafargue](https://github.com/viclafargue)
+- [FEA] Support for half-float mixed precise in brute-force ([#225](https://github.com/rapidsai/cuvs/pull/225)) [@rhdong](https://github.com/rhdong)
+
+## 🛠️ Improvements
+
+- Remove cuvs-cagra-search from cuvs_static link ([#388](https://github.com/rapidsai/cuvs/pull/388)) [@benfred](https://github.com/benfred)
+- Add a static library for cuvs ([#382](https://github.com/rapidsai/cuvs/pull/382)) [@benfred](https://github.com/benfred)
+- Put the ann-bench large_workspace_resource in managed memory ([#372](https://github.com/rapidsai/cuvs/pull/372)) [@achirkin](https://github.com/achirkin)
+- Add multigpu kmeans fit function ([#348](https://github.com/rapidsai/cuvs/pull/348)) [@benfred](https://github.com/benfred)
+- Update update-version.sh to use packaging lib ([#344](https://github.com/rapidsai/cuvs/pull/344)) [@AyodeAwe](https://github.com/AyodeAwe)
+- remove NCCL pins in build and test environments ([#341](https://github.com/rapidsai/cuvs/pull/341)) [@jameslamb](https://github.com/jameslamb)
+- Vamana/DiskANN index build ([#339](https://github.com/rapidsai/cuvs/pull/339)) [@bkarsin](https://github.com/bkarsin)
+- Use CI workflow branch &#39;branch-24.10&#39; again ([#331](https://github.com/rapidsai/cuvs/pull/331)) [@jameslamb](https://github.com/jameslamb)
+- fix style checks on Python 3.12 ([#328](https://github.com/rapidsai/cuvs/pull/328)) [@jameslamb](https://github.com/jameslamb)
+- Update flake8 to 7.1.1. ([#327](https://github.com/rapidsai/cuvs/pull/327)) [@bdice](https://github.com/bdice)
+- Add function for calculating the mutual_reachability_graph ([#323](https://github.com/rapidsai/cuvs/pull/323)) [@benfred](https://github.com/benfred)
+- Simplify libcuvs conda recipe. ([#322](https://github.com/rapidsai/cuvs/pull/322)) [@bdice](https://github.com/bdice)
+- Refactor dependencies.yaml to use depends-on pattern. ([#321](https://github.com/rapidsai/cuvs/pull/321)) [@bdice](https://github.com/bdice)
+- Update Python versions in cuvs_bench pyproject.toml. ([#318](https://github.com/rapidsai/cuvs/pull/318)) [@bdice](https://github.com/bdice)
+- Brute force knn tile size heuristic ([#316](https://github.com/rapidsai/cuvs/pull/316)) [@mfoerste4](https://github.com/mfoerste4)
+- Euclidean distance example ([#315](https://github.com/rapidsai/cuvs/pull/315)) [@abner-ma](https://github.com/abner-ma)
+- Migrate trustworthiness and silhouette_score stats from RAFT ([#313](https://github.com/rapidsai/cuvs/pull/313)) [@benfred](https://github.com/benfred)
+- Add support for Python 3.12 ([#312](https://github.com/rapidsai/cuvs/pull/312)) [@jameslamb](https://github.com/jameslamb)
+- Add `managed` option for RMM Pool memory resource to C API ([#305](https://github.com/rapidsai/cuvs/pull/305)) [@ajit283](https://github.com/ajit283)
+- Update rapidsai/pre-commit-hooks ([#303](https://github.com/rapidsai/cuvs/pull/303)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Expose search function with pre-filter for ANN ([#302](https://github.com/rapidsai/cuvs/pull/302)) [@lowener](https://github.com/lowener)
+- Drop Python 3.9 support ([#301](https://github.com/rapidsai/cuvs/pull/301)) [@jameslamb](https://github.com/jameslamb)
+- Use CUDA math wheels ([#298](https://github.com/rapidsai/cuvs/pull/298)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Remove NumPy &lt;2 pin ([#297](https://github.com/rapidsai/cuvs/pull/297)) [@seberg](https://github.com/seberg)
+- CAGRA - separable compilation for distance computation ([#296](https://github.com/rapidsai/cuvs/pull/296)) [@achirkin](https://github.com/achirkin)
+- Updating example notebooks ([#294](https://github.com/rapidsai/cuvs/pull/294)) [@cjnolet](https://github.com/cjnolet)
+- Add RMM Pool memory resource to C API ([#285](https://github.com/rapidsai/cuvs/pull/285)) [@ajit283](https://github.com/ajit283)
+- Update pre-commit hooks ([#283](https://github.com/rapidsai/cuvs/pull/283)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Improve update-version.sh ([#282](https://github.com/rapidsai/cuvs/pull/282)) [@bdice](https://github.com/bdice)
+- Use tool.scikit-build.cmake.version, set scikit-build-core minimum-version ([#280](https://github.com/rapidsai/cuvs/pull/280)) [@jameslamb](https://github.com/jameslamb)
+- Add cuvs_bench.run python code and build ([#279](https://github.com/rapidsai/cuvs/pull/279)) [@dantegd](https://github.com/dantegd)
+- Add cuvs-bench to dependencies and conda environments ([#275](https://github.com/rapidsai/cuvs/pull/275)) [@dantegd](https://github.com/dantegd)
+- Update pip devcontainers to UCX v1.17.0 ([#262](https://github.com/rapidsai/cuvs/pull/262)) [@jameslamb](https://github.com/jameslamb)
+- Adding example for tuning build and search params using Optuna ([#257](https://github.com/rapidsai/cuvs/pull/257)) [@dpadmanabhan03](https://github.com/dpadmanabhan03)
+- Fixed link to build docs and corrected ivf_flat_example ([#255](https://github.com/rapidsai/cuvs/pull/255)) [@mmccarty](https://github.com/mmccarty)
+- Merge branch-24.08 into branch-24.10 ([#254](https://github.com/rapidsai/cuvs/pull/254)) [@jameslamb](https://github.com/jameslamb)
+- Persistent CAGRA kernel ([#215](https://github.com/rapidsai/cuvs/pull/215)) [@achirkin](https://github.com/achirkin)
+- [FEA] Support for Cosine distance in IVF-Flat ([#179](https://github.com/rapidsai/cuvs/pull/179)) [@lowener](https://github.com/lowener)
+
 # cuvs 24.08.00 (7 Aug 2024)
 
 ## 🚨 Breaking Changes

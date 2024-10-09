@@ -31,9 +31,51 @@ int main()
   cuvsError_t stream_error = cuvsStreamSet(res, stream);
   if (stream_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
+  // Allocate memory
+  void* ptr;
+  size_t bytes      = 1024;
+  cuvsError_t error = cuvsRMMAlloc(res, &ptr, bytes);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Free memory
+  error = cuvsRMMFree(res, ptr, bytes);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Enable pool memory resource
+  error = cuvsRMMPoolMemoryResourceEnable(10, 100, false);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Allocate memory again
+  error = cuvsRMMAlloc(res, &ptr, 1024);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Free memory
+  error = cuvsRMMFree(res, ptr, 1024);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Reset pool memory resource
+  error = cuvsRMMMemoryResourceReset();
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Enable pool memory resource (managed)
+  error = cuvsRMMPoolMemoryResourceEnable(10, 100, true);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Allocate memory again
+  error = cuvsRMMAlloc(res, &ptr, 1024);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Free memory
+  error = cuvsRMMFree(res, ptr, 1024);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Reset pool memory resource
+  error = cuvsRMMMemoryResourceReset();
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
   // Destroy resources
-  cuvsError_t destroy_error = cuvsResourcesDestroy(res);
-  if (destroy_error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+  error = cuvsResourcesDestroy(res);
+  if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
   return 0;
 }
