@@ -144,7 +144,7 @@ search_macro = """
   void search(                                                              \\
     raft::resources const& handle,                                          \\
     const cuvs::neighbors::ivf_flat::search_params& params,                 \\
-    cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                       \\
+    const cuvs::neighbors::ivf_flat::index<T, IdxT>& index,                 \\
     raft::device_matrix_view<const T, IdxT, raft::row_major> queries,       \\
     raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,        \\
     raft::device_matrix_view<float, IdxT, raft::row_major> distances,       \\

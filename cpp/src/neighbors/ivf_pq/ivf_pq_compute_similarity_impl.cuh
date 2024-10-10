@@ -369,6 +369,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
             reinterpret_cast<float*>(lut_end)[i] = query[i] - cluster_center[i];
           }
         } break;
+        case distance::DistanceType::CosineExpanded:
         case distance::DistanceType::InnerProduct: {
           float2 pvals;
           for (uint32_t i = threadIdx.x; i < dim; i += blockDim.x) {
@@ -408,6 +409,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               diff -= pq_c;
               score += diff * diff;
             } break;
+            case distance::DistanceType::CosineExpanded:
             case distance::DistanceType::InnerProduct: {
               // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
               float q;
@@ -485,6 +487,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
           reinterpret_cast<const vec_t::io_t*>(pq_thread_data),
           lut_scores,
           early_stop_limit);
+        if (metric == distance::DistanceType::CosineExpanded) { score = OutT(1) + score; }
       }
       if constexpr (kManageLocalTopK) {
         block_topk.add(score, sample_offset + i);
