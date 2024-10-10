@@ -173,6 +173,8 @@ std::unique_ptr<index<int8_t>> from_cagra(
 
 /**@}*/
 
+// TODO: Filtered Search APIs: https://github.com/rapidsai/cuvs/issues/363
+
 /**
  * @defgroup hnsw_cpp_index_search Search hnswlib index
  * @{
@@ -260,7 +262,7 @@ void search(raft::resources const& res,
 void search(raft::resources const& res,
             const search_params& params,
             const index<uint8_t>& idx,
-            raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
@@ -303,7 +305,7 @@ void search(raft::resources const& res,
 void search(raft::resources const& res,
             const search_params& params,
             const index<int8_t>& idx,
-            raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
