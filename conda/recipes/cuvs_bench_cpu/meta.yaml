@@ -55,6 +55,7 @@ requirements:
 
   run:
     - benchmark
+    - click
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib
