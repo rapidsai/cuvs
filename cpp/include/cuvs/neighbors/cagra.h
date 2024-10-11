@@ -268,6 +268,15 @@ cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 
 /**
+ * @brief Get dimension of the CAGRA index
+ *
+ * @param[in] index CAGRA index
+ * @param[out] dim return dimension of the index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
+
+/**
  * @}
  */
 
@@ -338,7 +347,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
  *        1. `queries`:
- *`         a. kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *          a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *          b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
  *          c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
