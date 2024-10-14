@@ -101,6 +101,11 @@ func (p *SearchParams) SetMinIterations(min_iterations uintptr) (*SearchParams, 
 	return p, nil
 }
 
+func (p *SearchParams) SetSearchWidth(search_width uintptr) (*SearchParams, error) {
+	p.params.search_width = C.size_t(search_width)
+	return p, nil
+}
+
 func (p *SearchParams) SetThreadBlockSize(thread_block_size uintptr) (*SearchParams, error) {
 	p.params.thread_block_size = C.size_t(thread_block_size)
 	return p, nil

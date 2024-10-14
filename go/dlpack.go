@@ -101,6 +101,76 @@ func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
 
 }
 
+func NewTensorOnDevice[T any](res *Resource, shape []int64) (Tensor[T], error) {
+
+	if len(shape) < 2 {
+		return Tensor[T]{}, errors.New("shape must be atleast 2")
+	}
+
+	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
+
+	if dlm == nil {
+		return Tensor[T]{}, errors.New("memory allocation failed")
+	}
+
+	device := C.DLDevice{
+		device_type: C.DLDeviceType(C.kDLCUDA),
+		device_id:   0,
+	}
+
+	var zero T
+
+	var dtype C.DLDataType
+	switch any(zero).(type) {
+	case int64:
+		dtype = C.DLDataType{
+			bits:  C.uchar(64),
+			lanes: C.ushort(1),
+			code:  C.kDLInt,
+		}
+	case uint32:
+		dtype = C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLUInt,
+		}
+	case float32:
+		dtype = C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLFloat,
+		}
+	default:
+		return Tensor[T]{}, errors.New("unsupported data type")
+	}
+
+	var DeviceDataPointer unsafe.Pointer
+
+	bytes := GetBytesFromShape(shape, dtype)
+
+	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes))))
+	if err != nil {
+		//	panic(err)
+		return Tensor[T]{}, err
+	}
+
+	dlm.dl_tensor.data = unsafe.Pointer(DeviceDataPointer)
+
+	dlm.dl_tensor.device = device
+
+	dlm.dl_tensor.dtype = dtype
+	dlm.dl_tensor.ndim = C.int(len(shape))
+	dlm.dl_tensor.shape = (*C.long)(unsafe.Pointer(&shape[0]))
+	dlm.dl_tensor.strides = nil
+	dlm.dl_tensor.byte_offset = 0
+
+	dlm.manager_ctx = nil
+	dlm.deleter = nil
+
+	return Tensor[T]{C_tensor: dlm, shape: shape}, nil
+
+}
+
 func (t *Tensor[T]) GetBytes() int {
 	bytes := 1
 
@@ -118,6 +188,29 @@ func (t *Tensor[T]) GetBytes() int {
 	}
 
 	bytes *= int(t.C_tensor.dl_tensor.dtype.bits) / 8
+
+	// println("bytes: " + strconv.Itoa(bytes))
+
+	return bytes
+}
+
+func GetBytesFromShape(shape []int64, dtype C.DLDataType) int {
+	bytes := 1
+
+	// for dim := 0; dim < int(t.C_tensor.dl_tensor.ndim); dim++ {
+	// 	offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.C_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.C_tensor.dl_tensor.shape))
+
+	// 	// Convert the pointer to the correct type and dereference it to get the value
+	// 	dimSize := *(*C.long)(offset)
+
+	// 	bytes *= int(dimSize)
+	// }
+
+	for dim := range shape {
+		bytes *= int(shape[dim])
+	}
+
+	bytes *= int(dtype.bits) / 8
 
 	// println("bytes: " + strconv.Itoa(bytes))
 
