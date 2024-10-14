@@ -156,7 +156,8 @@ void bench_build(::benchmark::State& state,
     and `gpu_lap` variables) and added to the `gpu_timer` object.
 
     We sync with the GPU (cudaEventSynchronize) either each iteration (lifetime of the `gpu_lap`
-    variable) or once per benchmark loop (lifetime of the `qpu_all` variable). The decision is
+    variable) or once per benchmark loop (lifetime of the `gpu_all` variable). The decision is
+
     controlled by the `no_lap_sync` argument. In either case, we need at least one sync throughout
     the benchmark loop to make sure the GPU has finished its work before we measure the total run
     time.
