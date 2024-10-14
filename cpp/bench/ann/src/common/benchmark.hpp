@@ -150,6 +150,17 @@ void bench_build(::benchmark::State& state,
   cuda_timer gpu_timer{algo};
   {
     nvtx_case nvtx{state.name()};
+    /* Note: GPU timing
+
+    The GPU time is measured between construction and destruction of `cuda_lap` objects (`gpu_all`
+    and `gpu_lap` variables) and added to the `gpu_timer` object.
+
+    We sync with the GPU (cudaEventSynchronize) either each iteration (lifetime of the `gpu_lap`
+    variable) or once per benchmark loop (lifetime of the `qpu_all` variable). The decision is
+    controlled by the `no_lap_sync` argument. In either case, we need at least one sync throughout
+    the benchmark loop to make sure the GPU has finished its work before we measure the total run
+    time.
+    */
     [[maybe_unused]] auto gpu_all = gpu_timer.lap(no_lap_sync);
     for (auto _ : state) {
       [[maybe_unused]] auto ntx_lap = nvtx.lap();
@@ -304,6 +315,7 @@ void bench_search(::benchmark::State& state,
     cuda_timer gpu_timer{a};
     auto start = std::chrono::high_resolution_clock::now();
     {
+      /* See the note above: GPU timing */
       [[maybe_unused]] auto gpu_all = gpu_timer.lap(no_lap_sync);
       for (auto _ : state) {
         [[maybe_unused]] auto ntx_lap = nvtx.lap();
