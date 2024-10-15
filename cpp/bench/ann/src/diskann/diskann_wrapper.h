@@ -217,7 +217,7 @@ class diskann_ssd : public algo<T> {
   diskann_ssd(Metric metric, int dim, const build_param& param);
 
   void build_from_bin(std::string dataset_path, std::string path_to_index, size_t nrow) override;
-  void build(const T* dataset, size_t nrow) override {
+  void build(const T* dataset, size_t nrow) override{
     // do nothing. will not be used.
   };
 
