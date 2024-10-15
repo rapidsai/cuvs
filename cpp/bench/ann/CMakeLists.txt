@@ -33,6 +33,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW searc
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_VAMANA "Include cuVS Vamana with DiskANN search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ${BUILD_MG_ALGOS})
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
@@ -301,6 +302,12 @@ if(CUVS_ANN_BENCH_USE_DISKANN)
   )
   ConfigureAnnBench(
     NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
+  ConfigureAnnBench(
+    NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cpp LINKS cuvs diskann::diskann
   )
 endif()
 

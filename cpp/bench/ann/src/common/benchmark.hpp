@@ -216,10 +216,19 @@ void bench_search(::benchmark::State& state,
 
   const T* query_set = nullptr;
 
-  if (!file_exists(index.file)) {
+  std::string filename;
+  std::cout << "index.algo " << index.algo << std::endl;
+  if (index.algo != "diskann_ssd")
+    filename = index.file;
+  else
+    filename = index.file + "_disk.index";
+  std::cout << "filename " << filename << std::endl;
+  if (!file_exists(filename)) {
     state.SkipWithError("Index file is missing. Run the benchmark in the build mode first.");
     return;
   }
+
+  std::cout << "state.threads" << state.threads() << std::endl;
 
   /**
    * Make sure the first thread loads the algo and dataset
