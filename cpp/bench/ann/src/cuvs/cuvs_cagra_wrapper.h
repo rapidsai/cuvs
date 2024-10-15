@@ -78,6 +78,23 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
+
+    void prepare_build_params(const raft::extent_2d<IdxT>& dataset_extents)
+    {
+      if (algo == CagraBuildAlgo::kIvfPq) {
+        auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+          dataset_extents, cagra_params.metric);
+        if (ivf_pq_build_params) { pq_params.build_params = *ivf_pq_build_params; }
+        if (ivf_pq_search_params) { pq_params.search_params = *ivf_pq_search_params; }
+        if (ivf_pq_refine_rate) { pq_params.refinement_rate = *ivf_pq_refine_rate; }
+        cagra_params.graph_build_params = pq_params;
+      } else if (algo == CagraBuildAlgo::kNnDescent) {
+        auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
+          cagra_params.intermediate_graph_degree);
+        if (nn_descent_params) { nn_params = *nn_descent_params; }
+        cagra_params.graph_build_params = nn_params;
+      }
+    }
   };
 
   cuvs_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
@@ -177,28 +194,9 @@ template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_extents = raft::make_extents<IdxT>(nrow, dimension_);
+  index_params_.prepare_build_params(dataset_extents);
 
   auto& params = index_params_.cagra_params;
-
-  if (index_params_.algo == CagraBuildAlgo::kIvfPq) {
-    auto pq_params =
-      cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extents, params.metric);
-    if (index_params_.ivf_pq_build_params) {
-      pq_params.build_params = *index_params_.ivf_pq_build_params;
-    }
-    if (index_params_.ivf_pq_search_params) {
-      pq_params.search_params = *index_params_.ivf_pq_search_params;
-    }
-    if (index_params_.ivf_pq_refine_rate) {
-      pq_params.refinement_rate = *index_params_.ivf_pq_refine_rate;
-    }
-    params.graph_build_params = pq_params;
-  } else if (index_params_.algo == CagraBuildAlgo::kNnDescent) {
-    auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-      params.intermediate_graph_degree);
-    if (index_params_.nn_descent_params) { nn_params = *index_params_.nn_descent_params; }
-    params.graph_build_params = nn_params;
-  }
   auto dataset_view_host =
     raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);
   auto dataset_view_device =

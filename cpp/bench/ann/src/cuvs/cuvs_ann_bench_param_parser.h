@@ -45,7 +45,18 @@ extern template class cuvs::bench::cuvs_cagra<uint8_t, uint32_t>;
 extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 #endif
 
-#ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
+#ifdef CUVS_ANN_BENCH_USE_CUVS_MG
+#include "cuvs_ivf_flat_wrapper.h"
+#include "cuvs_mg_ivf_flat_wrapper.h"
+
+#include "cuvs_ivf_pq_wrapper.h"
+#include "cuvs_mg_ivf_pq_wrapper.h"
+
+#include "cuvs_cagra_wrapper.h"
+#include "cuvs_mg_cagra_wrapper.h"
+#endif
+
+#if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_ivf_flat<T, IdxT>::build_param& param)
@@ -64,7 +75,7 @@ void parse_search_param(const nlohmann::json& conf,
 #endif
 
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::build_param& param)
@@ -130,7 +141,8 @@ void parse_search_param(const nlohmann::json& conf,
 }
 #endif
 
-#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || \
+  defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::nn_descent::index_params& param)
 {
