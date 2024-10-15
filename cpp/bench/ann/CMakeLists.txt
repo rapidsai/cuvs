@@ -71,8 +71,13 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_MG
+   OR CUVS_ANN_BENCH_USE_CUVS_VAMANA
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
+  set(CUVS_ANN_BENCH_USE_DISKANN ON)
 endif()
 
 # ##################################################################################################

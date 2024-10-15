@@ -36,7 +36,7 @@ template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::cuvs_vamana<T, IdxT>::search_param& param)
 {
-  if (conf.contains("L_search")) { param.L_search = conf.at("L_build"); }
+  if (conf.contains("L_search")) { param.L_search = conf.at("L_search"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
 }
 
