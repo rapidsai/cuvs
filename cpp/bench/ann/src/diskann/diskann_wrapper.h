@@ -210,13 +210,14 @@ class diskann_ssd : public algo<T> {
     uint32_t L_search;
     uint32_t num_threads        = omp_get_num_procs();
     uint32_t num_nodes_to_cache = 10000;
+    int beam_width              = 2;
     // Mode metric_objective;
   };
 
   diskann_ssd(Metric metric, int dim, const build_param& param);
 
   void build_from_bin(std::string dataset_path, std::string path_to_index, size_t nrow) override;
-  void build(const T* dataset, size_t nrow) override{
+  void build(const T* dataset, size_t nrow) override {
     // do nothing. will not be used.
   };
 
@@ -244,14 +245,14 @@ class diskann_ssd : public algo<T> {
  private:
   std::string index_build_params_str;
   std::shared_ptr<diskann::PQFlashIndex<T, uint32_t>> p_flash_index_;
+  int beam_width_;
+  uint32_t num_nodes_to_cache_;
 
-  uint32_t num_nodes_to_cache_ = 10000;
-  uint32_t num_search_threads_;
-
-  // mem index params
-  uint32_t max_points_;
+  // in-memory index params
   uint32_t build_pq_bytes_ = 0;
+  uint32_t max_points_;
   int num_threads_;
+  int num_search_threads_;
   uint32_t L_search_;
   Mode bench_mode_;
   std::shared_ptr<fixed_thread_pool> thread_pool_;
@@ -299,6 +300,7 @@ void diskann_ssd<T>::set_search_param(const search_param_base& param_)
   L_search_           = param.L_search;
   num_search_threads_ = param.num_threads;
   num_nodes_to_cache_ = param.num_nodes_to_cache;
+  beam_width_         = param.beam_width;
 
   // only latency mode supported with thread pool
   bench_mode_ = Mode::kLatency;
@@ -315,10 +317,10 @@ void diskann_ssd<T>::search(
     // diskann ssd index can only handle a single vector at a time.
     p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
-                                       this->L_search_,
+                                       L_search_,
                                        reinterpret_cast<uint64_t*>(neighbors + i * k),
                                        distances + i * k,
-                                       1,
+                                       beam_width_,
                                        false,
                                        nullptr);
   };

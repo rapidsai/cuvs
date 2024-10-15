@@ -5,7 +5,7 @@ groups:
   base:
     build:
       R: [64, 96]
-      L_build: [100, 200, 300]
+      L_build: [128, 256, 384]
       alpha: [1.2]
       num_threads: [32]
     search:

@@ -241,8 +241,6 @@ void bench_search(::benchmark::State& state,
     return;
   }
 
-  std::cout << "state.threads" << state.threads() << std::endl;
-
   /**
    * Make sure the first thread loads the algo and dataset
    */

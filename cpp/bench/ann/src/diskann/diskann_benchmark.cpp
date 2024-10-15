@@ -68,6 +68,9 @@ void parse_search_param(const nlohmann::json& conf,
   if (conf.contains("num_nodes_to_cache")) {
     param.num_nodes_to_cache = conf.at("num_nodes_to_cache");
   }
+  if (conf.contains("beam_width")) {
+    param.beam_width = conf.at("beam_width");
+  }
 }
 
 template <typename T, template <typename> class Algo>
