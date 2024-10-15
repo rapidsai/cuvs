@@ -29,10 +29,9 @@ namespace cuvs::bench {
 template <typename T, typename IdxT>
 class cuvs_vamana : public algo<T>, public algo_gpu {
  public:
-  using build_param       = typename cuvs::neighbors::experimental::vamana::index_params;
+  using build_param       = cuvs::neighbors::experimental::vamana::index_params;
   using search_param_base = typename algo<T>::search_param;
-
-  using search_param = typename diskann_memory<T>::search_param;
+  using search_param      = typename diskann_memory<T>::search_param;
 
   cuvs_vamana(Metric metric, int dim, const build_param& param);
 
@@ -46,11 +45,16 @@ class cuvs_vamana : public algo<T>, public algo_gpu {
               algo_base::index_type* neighbors,
               float* distances) const override;
 
+  [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
+  {
+    return handle_.get_sync_stream();
+  }
+
   // to enable dataset access from GPU memory
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
     algo_property property;
-    property.dataset_memory_type = MemoryType::kHostMmap;
+    property.dataset_memory_type = MemoryType::kDevice;
     property.query_memory_type   = MemoryType::kHost;
     return property;
   }
@@ -61,7 +65,7 @@ class cuvs_vamana : public algo<T>, public algo_gpu {
 
  private:
   std::shared_ptr<cuvs::neighbors::experimental::vamana::index<T, IdxT>> vamana_index_;
-  diskann_memory<T> diskann_memory_search_;
+  std::shared_ptr<diskann_memory<T>> diskann_memory_search_;
   configured_raft_resources handle_{};
   build_param vamana_index_params_;
 };
@@ -71,6 +75,8 @@ cuvs_vamana<T, IdxT>::cuvs_vamana(Metric metric, int dim, const build_param& par
   : algo<T>(metric, dim)
 {
   this->vamana_index_params_ = param;
+  diskann_memory_search_     = std::make_shared<cuvs::bench::diskann_memory<T>>(
+    metric, dim, typename diskann_memory<T>::build_param{param.graph_degree, param.visited_size});
 }
 
 template <typename T, typename IdxT>
@@ -83,9 +89,9 @@ void cuvs_vamana<T, IdxT>::build(const T* dataset, size_t nrow)
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
 
   vamana_index_ = std::make_shared<cuvs::neighbors::experimental::vamana::index<T, uint32_t>>(
-    std::move(dataset_is_on_host ? cuvs::neighbors::experimental::vamana::index<T, uint32_t>::build(
+    std::move(dataset_is_on_host ? cuvs::neighbors::experimental::vamana::build(
                                      handle_, vamana_index_params_, dataset_view_host)
-                                 : cuvs::neighbors::experimental::vamana::index<T, uint32_t>::build(
+                                 : cuvs::neighbors::experimental::vamana::build(
                                      handle_, vamana_index_params_, dataset_view_device)));
 }
 

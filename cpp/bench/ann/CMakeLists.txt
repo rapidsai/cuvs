@@ -306,9 +306,7 @@ if(CUVS_ANN_BENCH_USE_DISKANN)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
-  ConfigureAnnBench(
-    NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cpp LINKS cuvs diskann::diskann
-  )
+  ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cpp LINKS cuvs diskann::diskann)
 endif()
 
 # ##################################################################################################

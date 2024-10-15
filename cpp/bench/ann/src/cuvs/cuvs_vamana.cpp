@@ -36,9 +36,7 @@ template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::cuvs_vamana<T, IdxT>::search_param& param)
 {
-  param.R = conf.at("R");
-  if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
-  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
+  if (conf.contains("L_search")) { param.L_search = conf.at("L_build"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
 }
 
@@ -64,13 +62,13 @@ auto create_algo(const std::string& algo_name,
   return a;
 }
 
-template <typename T, typename IdxT>
-std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param(const std::string& algo_name, const nlohmann::json& conf)
+template <typename T>
+auto create_search_param(const std::string& algo_name, const nlohmann::json& conf)
+  -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
   if (algo_name == "cuvs_vamana") {
-    auto param =
-      std::make_unique<typename cuvs::bench::cuvs_vamana<T, IdxT>::search_param>();
-    parse_search_param<T, IdxT>(conf, *param);
+    auto param = std::make_unique<typename cuvs::bench::cuvs_vamana<T, uint32_t>::search_param>();
+    parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }
 
