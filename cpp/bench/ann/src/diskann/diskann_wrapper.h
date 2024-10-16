@@ -238,7 +238,7 @@ class diskann_ssd : public algo<T> {
   // in-memory index params
   uint32_t build_pq_bytes_ = 0;
   uint32_t max_points_;
-  // for safe scratch space allocs, set the defualt to half the number of procs for loading the
+  // for safe scratch space allocs, set the default to half the number of procs for loading the
   // index. User must ensure that the number of search threads is less than or equal to this value
   int num_search_threads_ = omp_get_num_procs() / 2;
   // L_search is hardcoded to the maximum visited list size in the search params. This default is
