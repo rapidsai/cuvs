@@ -43,10 +43,13 @@ func TestCagra(t *testing.T) {
 	}
 
 	dataset, _ := cuvs.NewTensor(true, TestDataset)
+	defer dataset.Close()
 
 	extend_dataset, _ := cuvs.NewTensor(true, ExtendDataset)
+	defer extend_dataset.Close()
 
 	extend_return_dataset, _ := cuvs.NewTensor(true, ExtendReturnEmptyDataset)
+	defer extend_return_dataset.Close()
 
 	// CompressionParams, _ := CreateCompressionParams()
 

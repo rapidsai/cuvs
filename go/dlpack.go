@@ -225,7 +225,9 @@ func (t *Tensor[T]) Close() error {
 		if err != nil {
 			return err
 		}
-		return CheckCuvs(CuvsError(C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+		err = CheckCuvs(CuvsError(C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
+
+		return err
 
 		// C.run_callback(t.c_tensor.deleter, t.c_tensor)
 	}
