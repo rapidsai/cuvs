@@ -215,7 +215,7 @@ if(BUILD_TESTS)
   )
 endif()
 
-if(BUILD_C_TESTS)
+if(TARGET cuvs::c_api)
   ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu C_LIB)
   ConfigureTest(
     NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
@@ -246,7 +246,7 @@ endif()
 # ##################################################################################################
 rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
 
-if(BUILD_C_TESTS)
+if(TARGET cuvs::c_api)
   enable_language(C)
 
   add_executable(cuvs_c_test core/c_api.c)
