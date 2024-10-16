@@ -135,6 +135,12 @@ void bench_build(::benchmark::State& state,
     }
   }
 
+  if (index.algo == "diskann_ssd") {
+    make_sure_parent_dir_exists(index.file);
+    index.build_param["dataset_file"]  = dataset->base_filename();
+    index.build_param["path_to_index"] = index.file;
+  }
+
   std::unique_ptr<algo<T>> algo;
   try {
     algo = create_algo<T>(index.algo, dataset->distance(), dataset->dim(), index.build_param);
@@ -144,10 +150,8 @@ void bench_build(::benchmark::State& state,
 
   const auto algo_property = parse_algo_property(algo->get_preference(), index.build_param);
 
-  bool parse_base_file = index.algo == "diskann_ssd";
-
   const T* base_set = nullptr;
-  if (!parse_base_file) base_set = dataset->base_set(algo_property.dataset_memory_type);
+  if (index.algo != "diskann_ssd") base_set = dataset->base_set(algo_property.dataset_memory_type);
   std::size_t index_size = dataset->base_set_size();
 
   cuda_timer gpu_timer{algo};
@@ -170,12 +174,7 @@ void bench_build(::benchmark::State& state,
       [[maybe_unused]] auto ntx_lap = nvtx.lap();
       [[maybe_unused]] auto gpu_lap = gpu_timer.lap(!no_lap_sync);
       try {
-        if (!parse_base_file) {
-          algo->build(base_set, index_size);
-        } else {
-          make_sure_parent_dir_exists(index.file);
-          algo->build_from_bin(dataset->base_filename(), index.file, index_size);
-        }
+        algo->build(base_set, index_size);
       } catch (const std::exception& e) {
         state.SkipWithError(std::string(e.what()));
       }

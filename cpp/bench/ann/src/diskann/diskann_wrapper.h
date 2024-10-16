@@ -16,17 +16,14 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "../common/thread_pool.hpp"
 
 #include <limits>
-#include <raft/core/host_mdspan.hpp>
 
 #include <disk_utils.h>
 #include <index.h>
 #include <linux_aligned_file_reader.h>
 #include <omp.h>
 #include <pq_flash_index.h>
-#include <raft/util/cudart_utils.hpp>
 #include <utils.h>
 
 #include <chrono>
@@ -97,7 +94,6 @@ class diskann_memory : public algo<T> {
   uint32_t L_search_;
   Mode bench_mode_;
   int num_search_threads_;
-  std::shared_ptr<fixed_thread_pool> thread_pool_;
   std::string index_path_prefix_;
   std::shared_ptr<diskann::Index<T>> mem_index_{nullptr};
   void initialize_index_(size_t max_points);
@@ -149,34 +145,26 @@ void diskann_memory<T>::set_search_param(const search_param_base& param_)
   L_search_           = param.L_search;
   num_search_threads_ = param.num_threads;
 
-  // only latency mode supported with thread pool
+  // only latency mode supported. Use the num_threads search param to run search with multiple
+  // threads
   bench_mode_ = Mode::kLatency;
 
   // Create a pool if multiple query threads have been set and the pool hasn't been created already
   initialize_index_(0);
   this->mem_index_->load(index_path_prefix_.c_str(), num_search_threads_, L_search_);
-  bool create_pool = (bench_mode_ == Mode::kLatency && num_search_threads_ > 1 && !thread_pool_);
-  if (create_pool) { thread_pool_ = std::make_shared<fixed_thread_pool>(num_search_threads_); }
 }
 
 template <typename T>
 void diskann_memory<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
-  auto f = [&](int i) {
-    // diskann in-memory index can only handle a single vector at a time.
+#pragma omp parallel for schedule(dynamic, 1)
+  for (int i = 0; i < batch_size; i++) {
     mem_index_->search(queries + i * this->dim_,
                        static_cast<size_t>(k),
                        L_search_,
                        reinterpret_cast<uint64_t*>(indices + i * k),
                        distances + i * k);
-  };
-  if (bench_mode_ == Mode::kLatency && num_search_threads_ > 1) {
-    thread_pool_->submit(f, batch_size);
-  } else {
-    for (int i = 0; i < batch_size; i++) {
-      f(i);
-    }
   }
 }
 
@@ -199,16 +187,18 @@ class diskann_ssd : public algo<T> {
   struct build_param {
     uint32_t R;
     uint32_t L_build;
-    uint32_t build_pq_bytes = 0;
-    float alpha             = 1.2;
-    int num_threads         = omp_get_num_procs();
-    uint32_t QD             = 192;
+    uint32_t build_pq_bytes   = 0;
+    float alpha               = 1.2;
+    int num_threads           = omp_get_num_procs();
+    uint32_t QD               = 192;
+    std::string dataset_file  = "";
+    std::string path_to_index = "";
   };
   using search_param_base = typename algo<T>::search_param;
 
   struct search_param : public search_param_base {
     uint32_t L_search;
-    uint32_t num_threads        = omp_get_num_procs();
+    uint32_t num_threads        = omp_get_num_procs() / 2;
     uint32_t num_nodes_to_cache = 10000;
     int beam_width              = 2;
     // Mode metric_objective;
@@ -216,10 +206,7 @@ class diskann_ssd : public algo<T> {
 
   diskann_ssd(Metric metric, int dim, const build_param& param);
 
-  void build_from_bin(std::string dataset_path, std::string path_to_index, size_t nrow) override;
-  void build(const T* dataset, size_t nrow) override{
-    // do nothing. will not be used.
-  };
+  void build(const T* dataset, size_t nrow) override;
 
   void set_search_param(const search_param_base& param) override;
 
@@ -251,11 +238,14 @@ class diskann_ssd : public algo<T> {
   // in-memory index params
   uint32_t build_pq_bytes_ = 0;
   uint32_t max_points_;
-  int num_threads_;
-  int num_search_threads_;
-  uint32_t L_search_;
+  // for safe scratch space allocs, set the defualt to half the number of procs for loading the
+  // index. User must ensure that the number of search threads is less than or equal to this value
+  int num_search_threads_ = omp_get_num_procs() / 2;
+  // L_search is hardcoded to the maximum visited list size in the search params. This default is
+  // for loading the index
+  uint32_t L_search_ = 384;
   Mode bench_mode_;
-  std::shared_ptr<fixed_thread_pool> thread_pool_;
+  std::string base_file_;
   std::string index_path_prefix_;
   std::shared_ptr<AlignedFileReader> reader = nullptr;
 };
@@ -273,15 +263,15 @@ diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : 
     std::string(std::to_string(param.num_threads)) + " " + std::string(std::to_string(false)) +
     " " + std::string(std::to_string(false)) + " " + std::string(std::to_string(0)) + " " +
     std::string(std::to_string(param.QD));
+  base_file_         = param.dataset_file;
+  index_path_prefix_ = param.path_to_index;
 }
 
 template <typename T>
-void diskann_ssd<T>::build_from_bin(std::string dataset_path,
-                                    std::string path_to_index,
-                                    size_t nrow)
+void diskann_ssd<T>::build(const T* dataset, size_t nrow)
 {
-  diskann::build_disk_index<float>(dataset_path.c_str(),
-                                   path_to_index.c_str(),
+  diskann::build_disk_index<float>(base_file_.c_str(),
+                                   index_path_prefix_.c_str(),
                                    index_build_params_str.c_str(),
                                    parse_metric_to_diskann(this->metric_),
                                    false,
@@ -304,17 +294,14 @@ void diskann_ssd<T>::set_search_param(const search_param_base& param_)
 
   // only latency mode supported with thread pool
   bench_mode_ = Mode::kLatency;
-
-  bool create_pool = (bench_mode_ == Mode::kLatency && num_search_threads_ > 1 && !thread_pool_);
-  if (create_pool) { thread_pool_ = std::make_shared<fixed_thread_pool>(num_search_threads_); }
 }
 
 template <typename T>
 void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  auto f = [&](int i) {
-    // diskann ssd index can only handle a single vector at a time.
+#pragma omp parallel for schedule(dynamic, 1)
+  for (int64_t i = 0; i < (int64_t)batch_size; i++) {
     p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
                                        L_search_,
@@ -323,13 +310,6 @@ void diskann_ssd<T>::search(
                                        beam_width_,
                                        false,
                                        nullptr);
-  };
-  if (this->bench_mode_ == Mode::kLatency && this->num_search_threads_ > 1) {
-    this->thread_pool_->submit(f, batch_size);
-  } else {
-    for (int i = 0; i < batch_size; i++) {
-      f(i);
-    }
   }
 }
 

@@ -49,6 +49,8 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
+  if (conf.contains("dataset_file")) { param.dataset_file = conf.at("dataset_file"); }
+  if (conf.contains("path_to_index")) { param.path_to_index = conf.at("path_to_index"); }
 }
 
 template <typename T>
