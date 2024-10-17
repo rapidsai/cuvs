@@ -34,5 +34,8 @@ INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
                         AnnCagraAddNodesTestF_U32,
                         ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest, AnnCagraFilterTestF_U32, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnCagraFilterToBruteForceTest,
+                        AnnCagraFilterTestF_U32,
+                        ::testing::ValuesIn(inputs_brute_force));
 
 }  // namespace cuvs::neighbors::cagra
