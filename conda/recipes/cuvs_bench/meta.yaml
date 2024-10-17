@@ -91,9 +91,12 @@ requirements:
     - libcublas
     {% endif %}
     - glog {{ glog_version }}
+    - libaio
+    - libboost-devel
     - libcuvs {{ version }}
     - h5py {{ h5py_version }}
     - matplotlib
+    - mkl-devel
     - pandas
     - pyyaml
     # rmm is needed to determine if package is gpu-enabled
