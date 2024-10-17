@@ -8,7 +8,7 @@
 {% set date_string = environ['RAPIDS_DATE_STRING'] %}
 
 package:
-  name: cuvs_bench_cpu
+  name: cuvs-bench-cpu
   version: {{ version }}
   script: build.sh
 

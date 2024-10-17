@@ -93,20 +93,20 @@ We provide images for GPU enabled systems, as well as systems without a GPU. The
 - `cuvs-bench-datasets`: Contains the GPU and CPU benchmarks with million-scale datasets already included in the container. Best suited for users that want to run multiple million scale datasets already included in the image.
 - `cuvs-bench-cpu`: Contains only CPU benchmarks with minimal size. Best suited for users that want the smallest containers to reproduce benchmarks on systems without a GPU.
 
-Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-ann-bench/tags>`_, meanwhile release (stable) versions are located in `NGC <https://hub.docker.com/r/rapidsai/cuvs_bench>`_, starting with release 24.10.
+Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_, meanwhile release (stable) versions are located in `NGC <https://hub.docker.com/r/rapidsai/cuvs-bench>`_, starting with release 24.10.
 
-The following command pulls the nightly container for python version 10, cuda version 12, and CUVS version 23.10:
+The following command pulls the nightly container for Python version 3.10, CUDA version 12.0, and cuVS version 24.10:
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs_bench:24.10a-cuda12.0-py3.10 #substitute cuvs_bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:24.10a-cuda12.0-py3.10 #substitute cuvs-bench for the exact desired container.
 
 The CUDA and python versions can be changed for the supported values:
 - Supported CUDA versions: 11.4 and 12.x
 - Supported Python versions: 3.9 and 3.10.
 
 You can see the exact versions as well in the dockerhub site:
-- `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs_bench/tags>`_
+- `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_
 - `cuVS bench with datasets preloaded images <https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags>`_
 - `cuVS bench CPU only images <https://hub.docker.com/r/rapidsai/cuvs-bench-datasets/tags>`_
 
@@ -583,7 +583,7 @@ A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs-ann-b
       dims: 128
       distance: euclidean
 
-Configuration files for ANN algorithms supported by `cuvs-bench` are provided in `${CUVS_HOME}/python/cuvs-bench/src/cuvs_bench/run/conf`. `cuvs_cagra` algorithm configuration looks like:
+Configuration files for ANN algorithms supported by `cuvs-bench` are provided in `${CUVS_HOME}/python/cuvs_bench/cuvs_bench/config/algos`. `cuvs_cagra` algorithm configuration looks like:
 
 .. code-block:: yaml
 
