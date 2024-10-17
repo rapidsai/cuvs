@@ -49,7 +49,7 @@ requirements:
     - glog {{ glog_version }}
     - libaio
     - libboost-devel
-    - mkl-devel
+    - mkl-devel  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     - python
