@@ -476,8 +476,8 @@ dependencies:
           - h5py>=3.8.0
           - benchmark>=1.8.2
           - openblas
-          - libboost-devel
           - libaio
+          - libboost-devel
           - mkl-devel
   bench_python:
     common:

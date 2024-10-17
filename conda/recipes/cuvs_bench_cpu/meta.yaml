@@ -47,6 +47,9 @@ requirements:
     - benchmark
     - fmt {{ fmt_version }}
     - glog {{ glog_version }}
+    - libaio
+    - libboost-devel
+    - mkl-devel
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     - python
@@ -58,10 +61,7 @@ requirements:
     - click
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
-    - libaio
-    - libboost-devel
     - matplotlib
-    - mkl-devel
     - pandas
     - pyyaml
     - python
