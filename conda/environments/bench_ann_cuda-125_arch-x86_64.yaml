@@ -26,12 +26,15 @@ dependencies:
 - glog>=0.6.0
 - h5py>=3.8.0
 - hnswlib=0.6.2
+- libaio
+- libboost-devel
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
 - librmm==24.12.*,>=0.0.0a0
 - matplotlib
+- mkl-devel
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2
