@@ -53,8 +53,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
-option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
-option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
+option(BUILD_C_LIBRARY "Build cuVS C API library" ON)
 option(BUILD_CUVS_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(BUILD_MG_ALGOS "Build with multi-GPU support" ON)
@@ -72,21 +71,12 @@ option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 option(CUVS_RAFT_CLONE_ON_PIN "Explicitly clone RAFT branch when pinned to non-feature branch" ON)
 
-if((BUILD_TESTS OR BUILD_C_LIBRARY) AND NOT BUILD_CPU_ONLY)
-
-endif()
-
 if(BUILD_CPU_ONLY)
   set(BUILD_SHARED_LIBS OFF)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
-endif()
-
-if(NOT BUILD_C_LIBRARY)
-  set(BUILD_C_TESTS OFF)
-endif()
-
-if(NOT BUILD_SHARED_LIBS)
+  set(BUILD_CAGRA_HNSWLIB OFF)
+elseif(NOT BUILD_SHARED_LIBS)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
   set(BUILD_CAGRA_HNSWLIB OFF)
@@ -771,7 +761,7 @@ endif()
 # ##################################################################################################
 # * build test executable ----------------------------------------------------
 
-if(BUILD_TESTS OR BUILD_C_TESTS)
+if(BUILD_TESTS)
   add_subdirectory(internal)
   add_subdirectory(test)
 endif()
