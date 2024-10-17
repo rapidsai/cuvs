@@ -216,6 +216,8 @@ if(BUILD_TESTS)
 endif()
 
 if(TARGET cuvs::c_api)
+  enable_language(C)
+
   ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu C_LIB)
   ConfigureTest(
     NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
@@ -239,19 +241,37 @@ if(TARGET cuvs::c_api)
     target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
     target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
-endif()
 
-# ##################################################################################################
-# Install tests ####################################################################################
-# ##################################################################################################
-rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
-
-if(TARGET cuvs::c_api)
-  enable_language(C)
 
   add_executable(cuvs_c_test core/c_api.c)
   target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
 
   add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
   target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
+
+  set_target_properties(
+    cuvs_c_test cuvs_c_neighbors_test
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_BINARY_DIR}/gtests>"
+               INSTALL_RPATH "\$ORIGIN/../../../lib"
+  )
+
+  rapids_test_add(
+    NAME cuvs_c_test
+    COMMAND cuvs_c_test
+    GPUS 1
+    PERCENT 100
+    INSTALL_COMPONENT_SET testing
+  )
+  rapids_test_add(
+    NAME cuvs_c_neighbors_test
+    COMMAND cuvs_c_neighbors_test
+    GPUS 1
+    PERCENT 100
+    INSTALL_COMPONENT_SET testing
+  )
 endif()
+
+# ##################################################################################################
+# Install tests ####################################################################################
+# ##################################################################################################
+rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
