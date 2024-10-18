@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "detail/dynamic_batching.hpp"
+#include "detail/dynamic_batching.cuh"
 
 #include <cuvs/neighbors/dynamic_batching.hpp>
 
