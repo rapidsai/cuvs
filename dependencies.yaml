@@ -485,6 +485,9 @@ dependencies:
               - mkl-devel
               - libaio
               - libboost-devel
+          - matrix:
+              arch: aarch64
+            packages: null
   bench_python:
     common:
       - output_types: [conda, pyproject, requirements]
