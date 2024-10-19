@@ -108,8 +108,6 @@ def hnswlib_search(params, build_params, k, batch_size):
 
 def diskann_memory_build(params, dim):
     ret = True
-    if "cagra_intermediate_graph_degree" in params:
-        ret = params["R"] <= params["cagra_intermediate_graph_degree"]
     if "R" in params and "L_build" in params:
         ret = params["R"] <= params["L_build"]
     return ret
@@ -117,8 +115,6 @@ def diskann_memory_build(params, dim):
 
 def diskann_ssd_build(params, dim):
     ret = True
-    if "cagra_intermediate_graph_degree" in params:
-        ret = params["R"] <= params["cagra_intermediate_graph_degree"]
     if "R" in params and "L_build" in params:
         ret = params["R"] <= params["L_build"]
     if "QD" in params:

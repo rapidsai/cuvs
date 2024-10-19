@@ -253,7 +253,7 @@ class diskann_ssd : public algo<T> {
 template <typename T>
 diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
-  // Currently set the indexing RAM budget and the search RAM budget to max value avoid sharding
+  // Currently set the indexing RAM budget and the search RAM budget to max value to avoid sharding
   uint32_t build_dram_budget  = std::numeric_limits<uint32_t>::max();
   uint32_t search_dram_budget = std::numeric_limits<uint32_t>::max();
   index_build_params_str =
