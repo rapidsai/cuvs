@@ -80,10 +80,6 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
 
-if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
-  set(CUVS_ANN_BENCH_USE_DISKANN ON)
-endif()
-
 # ##################################################################################################
 # * Fetch requirements -------------------------------------------------------------
 
@@ -101,7 +97,7 @@ if(CUVS_ANN_BENCH_USE_FAISS)
   include(cmake/thirdparty/get_faiss)
 endif()
 
-if(CUVS_ANN_BENCH_USE_DISKANN)
+if(CUVS_ANN_BENCH_USE_DISKANN OR CUVS_ANN_BENCH_USE_CUVS_VAMANA)
   include(cmake/thirdparty/get_diskann)
 endif()
 
