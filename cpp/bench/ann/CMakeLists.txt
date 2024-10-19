@@ -35,9 +35,10 @@ option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_VAMANA "Include cuVS Vamana with DiskANN search in benchmark" ON)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(ARM|arm|aarch64)")
-  option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" OFF)
-  option(CUVS_ANN_BENCH_USE_CUVS_VAMANA "Include cuVS Vamana with DiskANN search in benchmark" OFF)
+  set(CUVS_ANN_BENCH_USE_DISKANN OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
 endif()
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ${BUILD_MG_ALGOS})
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
