@@ -63,6 +63,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
   set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_MG OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -303,11 +304,9 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_DISKANN)
   ConfigureAnnBench(
-    NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann
+    NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann
   )
-  ConfigureAnnBench(
-    NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS cuvs diskann::diskann
-  )
+  ConfigureAnnBench(NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
