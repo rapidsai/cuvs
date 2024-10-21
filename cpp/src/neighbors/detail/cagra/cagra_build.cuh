@@ -34,7 +34,8 @@
 #include <cuvs/neighbors/refine.hpp>
 
 // TODO: Fixme- this needs to be migrated
-#include "../../nn_descent.cuh"
+// #include "../../nn_descent.cuh"
+#include <cuvs/neighbors/nn_descent.hpp>
 
 // TODO: This shouldn't be calling spatial/knn APIs
 #include "../ann_utils.cuh"
@@ -357,7 +358,7 @@ void build_knn_graph(
   cuvs::neighbors::nn_descent::index_params build_params)
 {
   auto nn_descent_idx = cuvs::neighbors::nn_descent::index<IdxT>(res, knn_graph);
-  cuvs::neighbors::nn_descent::build<DataT, IdxT>(res, build_params, dataset, nn_descent_idx);
+  cuvs::neighbors::nn_descent::build(res, build_params, dataset);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
