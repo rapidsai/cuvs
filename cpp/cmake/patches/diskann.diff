@@ -88,3 +88,140 @@ index 3d3d2b8..3079d12 100644
  
  if (UNIT_TEST)
      enable_testing()
+diff --git a/include/distance.h b/include/distance.h
+index f3b1de2..d4da72e 100644
+--- a/include/distance.h
++++ b/include/distance.h
+@@ -77,6 +77,7 @@ class DistanceCosineInt8 : public Distance<int8_t>
+     DistanceCosineInt8() : Distance<int8_t>(diskann::Metric::COSINE)
+     {
+     }
++    using Distance<int8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t length) const;
+ };
+ 
+@@ -86,6 +87,7 @@ class DistanceL2Int8 : public Distance<int8_t>
+     DistanceL2Int8() : Distance<int8_t>(diskann::Metric::L2)
+     {
+     }
++    using Distance<int8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t size) const;
+ };
+ 
+@@ -96,6 +98,7 @@ class AVXDistanceL2Int8 : public Distance<int8_t>
+     AVXDistanceL2Int8() : Distance<int8_t>(diskann::Metric::L2)
+     {
+     }
++    using Distance<int8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t length) const;
+ };
+ 
+@@ -105,6 +108,7 @@ class DistanceCosineFloat : public Distance<float>
+     DistanceCosineFloat() : Distance<float>(diskann::Metric::COSINE)
+     {
+     }
++    using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
+ };
+ 
+@@ -114,7 +118,7 @@ class DistanceL2Float : public Distance<float>
+     DistanceL2Float() : Distance<float>(diskann::Metric::L2)
+     {
+     }
+-
++    using Distance<float>::compare;
+ #ifdef _WINDOWS
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t size) const;
+ #else
+@@ -128,6 +132,7 @@ class AVXDistanceL2Float : public Distance<float>
+     AVXDistanceL2Float() : Distance<float>(diskann::Metric::L2)
+     {
+     }
++    using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
+ };
+ 
+@@ -146,6 +151,7 @@ class SlowDistanceCosineUInt8 : public Distance<uint8_t>
+     SlowDistanceCosineUInt8() : Distance<uint8_t>(diskann::Metric::COSINE)
+     {
+     }
++    using Distance<uint8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const uint8_t *a, const uint8_t *b, uint32_t length) const;
+ };
+ 
+@@ -155,6 +161,7 @@ class DistanceL2UInt8 : public Distance<uint8_t>
+     DistanceL2UInt8() : Distance<uint8_t>(diskann::Metric::L2)
+     {
+     }
++    using Distance<uint8_t>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const uint8_t *a, const uint8_t *b, uint32_t size) const;
+ };
+ 
+@@ -198,6 +205,7 @@ class AVXDistanceInnerProductFloat : public Distance<float>
+     AVXDistanceInnerProductFloat() : Distance<float>(diskann::Metric::INNER_PRODUCT)
+     {
+     }
++    using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
+ };
+ 
+@@ -213,6 +221,7 @@ class AVXNormalizedCosineDistanceFloat : public Distance<float>
+     AVXNormalizedCosineDistanceFloat() : Distance<float>(diskann::Metric::COSINE)
+     {
+     }
++    using Distance<float>::compare;
+     DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const
+     {
+         // Inner product returns negative values to indicate distance.
+diff --git a/include/utils.h b/include/utils.h
+index d3af5c3..417af31 100644
+--- a/include/utils.h
++++ b/include/utils.h
+@@ -29,6 +29,7 @@ typedef int FileHandle;
+ #include "types.h"
+ #include "tag_uint128.h"
+ #include <any>
++#include <xmmintrin.h>
+ 
+ #ifdef EXEC_ENV_OLS
+ #include "content_buf.h"
+diff --git a/src/index.cpp b/src/index.cpp
+index bf93344..9d8336c 100644
+--- a/src/index.cpp
++++ b/src/index.cpp
+@@ -17,9 +17,7 @@
+ #include "gperftools/malloc_extension.h"
+ #endif
+ 
+-#ifdef _WINDOWS
+ #include <xmmintrin.h>
+-#endif
+ 
+ #include "index.h"
+ 
+diff --git a/src/partition.cpp b/src/partition.cpp
+index 570d45c..fb54cbf 100644
+--- a/src/partition.cpp
++++ b/src/partition.cpp
+@@ -21,9 +21,7 @@
+ #include "parameters.h"
+ #include "memory_mapper.h"
+ #include "partition.h"
+-#ifdef _WINDOWS
+ #include <xmmintrin.h>
+-#endif
+ 
+ // block size for reading/ processing large files and matrices in blocks
+ #define BLOCK_SIZE 5000000
+diff --git a/src/pq_flash_index.cpp b/src/pq_flash_index.cpp
+index d9ad506..145a978 100644
+--- a/src/pq_flash_index.cpp
++++ b/src/pq_flash_index.cpp
+@@ -8,6 +8,7 @@
+ #include "pq_scratch.h"
+ #include "pq_flash_index.h"
+ #include "cosine_similarity.h"
++#include <xmmintrin.h>
+ 
+ #ifdef _WINDOWS
+ #include "windows_aligned_file_reader.h"

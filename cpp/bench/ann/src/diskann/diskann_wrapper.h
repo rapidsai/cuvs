@@ -279,8 +279,8 @@ void diskann_ssd<T>::build(const T* dataset, size_t nrow)
                                    false,
                                    std::string(""),
                                    std::string(""),
-                                   static_cast<const uint32_t>(0),
-                                   static_cast<const uint32_t>(0));
+                                   0,
+                                   0);
 }
 
 template <typename T>
