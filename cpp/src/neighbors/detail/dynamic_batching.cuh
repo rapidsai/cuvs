@@ -84,10 +84,10 @@ class cuda_pinned_array {
   cuda_pinned_array(size_t size)
     : value_{[size]() {
                T* p = nullptr;
-               RAFT_CUDA_TRY(cudaMallocManaged(&p, size * sizeof(T)));
+               RAFT_CUDA_TRY(cudaMallocHost(&p, size * sizeof(T)));
                return p;
              }(),
-             [](T* p) { RAFT_CUDA_TRY_NO_THROW(cudaFree(p)); }}
+             [](T* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeHost(p)); }}
   {
   }
 
