@@ -602,10 +602,9 @@ class batch_runner {
       batch_token t{0};
       t.id() = i;
       batch_queue_.push().store(t);
-      // Make sure to initialize queries, because they are used for synchronization
+      // Make sure to initialize query pointers, because they are used for synchronization
       for (uint32_t j = 0; j < max_batch_size_; j++) {
         new (&request_ptrs_(i, j)) request_pointers<T, IdxT>{};
-        // request_queries_ptrs_(i, j).store(nullptr, cuda::std::memory_order_relaxed);
       }
     }
   }
