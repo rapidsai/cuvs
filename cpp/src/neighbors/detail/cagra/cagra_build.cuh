@@ -33,8 +33,6 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
-// TODO: Fixme- this needs to be migrated
-// #include "../../nn_descent.cuh"
 #include <cuvs/neighbors/nn_descent.hpp>
 
 // TODO: This shouldn't be calling spatial/knn APIs
