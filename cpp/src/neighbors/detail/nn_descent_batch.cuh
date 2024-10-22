@@ -586,9 +586,10 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             host_device_accessor<std::experimental::default_accessor<float>, memory_type::host>>
-index<IdxT> batch_build(raft::resources const& res,
-                        const index_params& params,
-                        mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset)
+void batch_build(raft::resources const& res,
+                 const index_params& params,
+                 mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
+                 index<IdxT>& global_idx)
 {
   size_t graph_degree        = params.graph_degree;
   size_t intermediate_degree = params.intermediate_graph_degree;
@@ -699,9 +700,6 @@ index<IdxT> batch_build(raft::resources const& res,
                        batch_distances_d.data_handle(),
                        build_config);
 
-  index<IdxT> global_idx{
-    res, dataset.extent(0), static_cast<int64_t>(graph_degree), params.return_distances};
-
   raft::copy(global_idx.graph().data_handle(),
              global_indices_h.data_handle(),
              num_rows * graph_degree,
@@ -712,7 +710,34 @@ index<IdxT> batch_build(raft::resources const& res,
                num_rows * graph_degree,
                raft::resource::get_cuda_stream(res));
   }
-  return global_idx;
+}
+
+template <typename T,
+          typename IdxT = uint32_t,
+          typename Accessor =
+            host_device_accessor<std::experimental::default_accessor<float>, memory_type::host>>
+index<IdxT> batch_build(raft::resources const& res,
+                        const index_params& params,
+                        mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset)
+{
+  size_t intermediate_degree = params.intermediate_graph_degree;
+  size_t graph_degree        = params.graph_degree;
+
+  if (intermediate_degree < graph_degree) {
+    RAFT_LOG_WARN(
+      "Graph degree (%lu) cannot be larger than intermediate graph degree (%lu), reducing "
+      "graph_degree.",
+      graph_degree,
+      intermediate_degree);
+    graph_degree = intermediate_degree;
+  }
+
+  index<IdxT> idx{
+    res, dataset.extent(0), static_cast<int64_t>(graph_degree), params.return_distances};
+
+  batch_build(res, params, dataset, idx);
+
+  return idx;
 }
 
 }  // namespace cuvs::neighbors::nn_descent::detail::experimental

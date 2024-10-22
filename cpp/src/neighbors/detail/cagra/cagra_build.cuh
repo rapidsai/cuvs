@@ -358,7 +358,7 @@ void build_knn_graph(
   cuvs::neighbors::nn_descent::index_params build_params)
 {
   auto nn_descent_idx = cuvs::neighbors::nn_descent::index<IdxT>(res, knn_graph);
-  cuvs::neighbors::nn_descent::build(res, build_params, dataset);
+  cuvs::neighbors::nn_descent::build(res, build_params, dataset, nn_descent_idx);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
