@@ -98,33 +98,6 @@ class cuda_pinned_array {
   std::unique_ptr<T, std::function<void(T*)>> value_;
 };
 
-template <typename T>
-class cuda_managed_array {
- public:
-  cuda_managed_array(cuda_managed_array&&)            = default;
-  cuda_managed_array& operator=(cuda_managed_array&&) = default;
-  ~cuda_managed_array()                               = default;
-  cuda_managed_array(cuda_managed_array const&) =
-    delete;  // Copying disallowed: one array one owner
-  cuda_managed_array& operator=(cuda_managed_array&) = delete;
-
-  cuda_managed_array(size_t size)
-    : value_{[size]() {
-               T* p = nullptr;
-               RAFT_CUDA_TRY(cudaMallocHost(&p, size * sizeof(T)));
-               return p;
-             }(),
-             [](T* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeHost(p)); }}
-  {
-  }
-
-  inline auto operator()(size_t i) const noexcept -> const T& { return value_.get()[i]; }
-  inline auto operator()(size_t i) noexcept -> T& { return value_.get()[i]; }
-
- private:
-  std::unique_ptr<T, std::function<void(T*)>> value_;
-};
-
 template <typename MdSpanOrArray>
 struct get_accessor_type_t {
   using type = typename MdSpanOrArray::accessor_type;
@@ -166,16 +139,6 @@ constexpr inline auto slice_2d(typename Source2DT::index_type i, const Source2DT
     const_cast<element_type*>(source2d.data_handle()) + stride * i, extent1d};
 }
 
-template <typename T, typename MdarrayT>
-constexpr inline auto unsafe_cast_pinned_mdarray(MdarrayT&& src) noexcept
-{
-  // using element_type          = typename MdarrayT::element_type;
-  using extents_type = typename MdarrayT::extents_type;
-  using layout_type  = typename MdarrayT::layout_type;
-  using return_type  = raft::pinned_mdarray<T, extents_type, layout_type>;
-  return reinterpret_cast<return_type&&>(src);
-}
-
 // ---------------------------------------------
 
 constexpr size_t kCacheLineBytes = 64;
@@ -203,25 +166,6 @@ using function_search_type = void(raft::resources const&,
                                   raft::device_matrix_view<const T, int64_t, raft::row_major>,
                                   raft::device_matrix_view<IdxT, int64_t, raft::row_major>,
                                   raft::device_matrix_view<float, int64_t, raft::row_major>);
-
-/*
-NOTE: resource queue for the batches
-What operations do I need to perform on this queue?
-  peek(), which would ideally return not only the value, but also the counter state, so that..
-  pop(internal_counter_state) updates the counter, but only if it is not updated yet
-    * maybe s = head() and advance(s)?
-  then I'd need a function that returns the value by that id.
-
-  On the other side, I need to be able to put the batch back to the queue from the scatter kernel,
-  with minimum amount of sync. This could be done by incrementing the tail on the host side,
-  ensuring the slot is empty, and then passing the pointer to the kernel, so it only needs to
-  execute a single store().
-  Compared to the CAGRA batch_queue_t, we lose the ability to notify() in this case;
-  but we assume the resource is plentiful (enough batches) and read is not a bottleneck. Then, we
-  can afford to spin/yield on the value.
-
-  I still need the kEmpty value here.
-*/
 
 /**
  * @brief Resource queue
@@ -347,6 +291,21 @@ struct alignas(kCacheLineBytes) batch_queue_t {
     cuda_pinned_array<cuda::atomic<value_type, cuda::thread_scope_system>> buf_;
 };
 
+template <typename T, typename IdxT>
+struct alignas(kCacheLineBytes) request_pointers {
+  /**
+   * A pointer to `dim` values of a single query (input).
+   *
+   * Serves as a synchronization point between the CPU thread (producer) and a GPU block in the
+   * `gather_inputs` kernel (consumer).
+   */
+  cuda::atomic<const T*, cuda::thread_scope_system> query{nullptr};
+  /** A pointer to `k` nearest neighbors (output) */
+  IdxT* neighbors{nullptr};
+  /** A pointer to distances of `k` nearest neighbors (output) */
+  float* distances{nullptr};
+};
+
 struct gpu_time_keeper {
   RAFT_DEVICE_INLINE_FUNCTION gpu_time_keeper(
     cuda::atomic<int32_t, cuda::thread_scope_system>* cpu_provided_remaining_time_us)
@@ -407,11 +366,10 @@ struct gpu_time_keeper {
  * Block size: (n, 1, 1) any number of threads copying a single row of data.
  * Grid size: (max_batch_size, 1, 1) - one block per query
  */
-template <typename T>
+template <typename T, typename IdxT>
 RAFT_KERNEL gather_inputs(
   raft::device_matrix_view<T, uint32_t, raft::row_major> batch_queries,
-  raft::pinned_vector_view<cuda::atomic<const T*, cuda::thread_scope_system>, uint32_t>
-    request_queries_ptrs,
+  raft::pinned_vector_view<request_pointers<T, IdxT>, uint32_t> request_ptrs,
   /* The remaining time may be updated on the host side: a thread with a tighter deadline may reduce
      it (but not increase). */
   cuda::atomic<int32_t, cuda::thread_scope_system>* remaining_time_us,
@@ -428,7 +386,7 @@ RAFT_KERNEL gather_inputs(
     query_ptr = nullptr;
     gpu_time_keeper runtime{remaining_time_us};
     bool committed          = false;  // if the query is committed, we have to wait for it to arrive
-    auto& request_query_ptr = request_queries_ptrs(query_id);
+    auto& request_query_ptr = request_ptrs(query_id).query;
     while (true) {
       query_ptr = request_query_ptr.load(cuda::std::memory_order_acquire);
       if (query_ptr != nullptr) {
@@ -483,15 +441,15 @@ RAFT_KERNEL gather_inputs(
 
 /** Copy the results of the search back to the requesters. */
 template <typename T, typename IdxT>
-RAFT_KERNEL scatter_outputs(raft::pinned_vector_view<IdxT*, uint32_t> request_neighbor_ptrs,
-                            raft::pinned_vector_view<T*, uint32_t> request_distance_ptrs,
-                            raft::device_matrix_view<const IdxT, uint32_t> batch_neighbors,
-                            raft::device_matrix_view<const T, uint32_t> batch_distances,
-                            cuda::atomic<int32_t, cuda::thread_scope_system>* remaining_time_us,
-                            cuda::atomic<uint64_t, cuda::thread_scope_system>* this_token,
-                            uint64_t empty_token_value,
-                            cuda::atomic<uint64_t, cuda::thread_scope_system>* next_token,
-                            uint32_t batch_id)
+RAFT_KERNEL scatter_outputs(
+  raft::pinned_vector_view<request_pointers<T, IdxT>, uint32_t> request_ptrs,
+  raft::device_matrix_view<const IdxT, uint32_t> batch_neighbors,
+  raft::device_matrix_view<const float, uint32_t> batch_distances,
+  cuda::atomic<int32_t, cuda::thread_scope_system>* remaining_time_us,
+  cuda::atomic<uint64_t, cuda::thread_scope_system>* this_token,
+  uint64_t empty_token_value,
+  cuda::atomic<uint64_t, cuda::thread_scope_system>* next_token,
+  uint32_t batch_id)
 {
   __shared__ uint32_t batch_size;
   if (threadIdx.x == 0 && threadIdx.y == 0) {
@@ -502,8 +460,8 @@ RAFT_KERNEL scatter_outputs(raft::pinned_vector_view<IdxT*, uint32_t> request_ne
   cooperative_groups::this_thread_block().sync();
   auto k = batch_neighbors.extent(1);
   for (uint32_t i = threadIdx.y; i < batch_size; i += blockDim.y) {
-    auto* request_neighbors = request_neighbor_ptrs(i);
-    auto* request_distances = request_distance_ptrs(i);
+    auto* request_neighbors = request_ptrs(i).neighbors;
+    auto* request_distances = request_ptrs(i).distances;
     for (uint32_t j = threadIdx.x; j < k; j += blockDim.x) {
       request_neighbors[j] = batch_neighbors(i, j);
       request_distances[j] = batch_distances(i, j);
@@ -633,13 +591,8 @@ class batch_runner {
       queries_{raft::make_device_mdarray<T>(res_, input_extents_)},
       neighbors_{raft::make_device_mdarray<IdxT>(res_, output_extents_)},
       distances_{raft::make_device_mdarray<float>(res_, output_extents_)},
-      request_queries_ptrs_{
-        unsafe_cast_pinned_mdarray<cuda::atomic<const T*, cuda::thread_scope_system>>(
-          raft::make_pinned_matrix<const T*, uint32_t>(res_, n_queues_, max_batch_size_))},
-      request_neighbor_ptrs_{
-        raft::make_pinned_matrix<IdxT*, uint32_t>(res_, n_queues_, max_batch_size_)},
-      request_distance_ptrs_{
-        raft::make_pinned_matrix<float*, uint32_t>(res_, n_queues_, max_batch_size_)}
+      request_ptrs_{raft::make_pinned_matrix<request_pointers<T, IdxT>, uint32_t>(
+        res_, n_queues_, max_batch_size_)}
   {
     // Make sure to initialize the atomic values in the batch_state structs.
     for (uint32_t i = 0; i < n_queues_; i++) {
@@ -651,7 +604,8 @@ class batch_runner {
       batch_queue_.push().store(t);
       // Make sure to initialize queries, because they are used for synchronization
       for (uint32_t j = 0; j < max_batch_size_; j++) {
-        request_queries_ptrs_(i, j).store(nullptr, cuda::std::memory_order_relaxed);
+        new (&request_ptrs_(i, j)) request_pointers<T, IdxT>{};
+        // request_queries_ptrs_(i, j).store(nullptr, cuda::std::memory_order_relaxed);
       }
     }
   }
@@ -706,12 +660,13 @@ class batch_runner {
       auto stream        = raft::resource::get_cuda_stream(res);
       auto batch_id      = batch_token_observed.id();
       auto& state        = states_(batch_id);
+      auto request_ptrs  = slice_2d(batch_id, request_ptrs_);
 
       if (is_dispatcher) {
         // run the gather kernel before submitting the data to reduce the latency
-        gather_inputs<T><<<max_batch_size_, 32, 0, stream>>>(
+        gather_inputs<T, IdxT><<<max_batch_size_, 32, 0, stream>>>(
           slice_3d(batch_id, queries_),
-          slice_2d(batch_id, request_queries_ptrs_),
+          request_ptrs,
           &state.rem_time_us,
           reinterpret_cast<cuda::atomic<uint32_t, cuda::thread_scope_system>*>(
             &reinterpret_cast<batch_token*>(&batch_token_ref)->size_committed()));
@@ -719,12 +674,11 @@ class batch_runner {
 
       // *** Set the pointers to queries, neighbors, distances - query-by-query
       for (uint32_t i = 0; i < queries_committed; i++) {
-        const auto j                        = batch_offset + i;
-        const auto o                        = local_io_offset + i;
-        request_neighbor_ptrs_(batch_id, j) = neighbors.data_handle() + o * k_;
-        request_distance_ptrs_(batch_id, j) = distances.data_handle() + o * k_;
-        request_queries_ptrs_(batch_id, j)
-          .store(queries.data_handle() + o * dim_, cuda::std::memory_order_release);
+        const auto o   = local_io_offset + i;
+        auto& ptrs     = request_ptrs(batch_offset + i);
+        ptrs.neighbors = neighbors.data_handle() + o * k_;
+        ptrs.distances = distances.data_handle() + o * k_;
+        ptrs.query.store(queries.data_handle() + o * dim_, cuda::std::memory_order_release);
       }
 
       // Submit estimated remaining time
@@ -743,9 +697,8 @@ class batch_runner {
         auto& next_token_ref = batch_queue_.push();
         // next_batch_token);
         auto bs = dim3(128, 8, 1);
-        scatter_outputs<float, IdxT><<<1, bs, 0, stream>>>(
-          slice_2d(batch_id, request_neighbor_ptrs_),
-          slice_2d(batch_id, request_distance_ptrs_),
+        scatter_outputs<T, IdxT><<<1, bs, 0, stream>>>(
+          request_ptrs,
           batch_neighbors,
           batch_distances,
           &state.rem_time_us,
@@ -802,11 +755,7 @@ class batch_runner {
   mutable raft::device_mdarray<IdxT, batch_extents, raft::row_major> neighbors_;
   mutable raft::device_mdarray<float, batch_extents, raft::row_major> distances_;
 
-  mutable raft::
-    pinned_matrix<cuda::atomic<const T*, cuda::thread_scope_system>, uint32_t, raft::row_major>
-      request_queries_ptrs_;
-  mutable raft::pinned_matrix<IdxT*, uint32_t, raft::row_major> request_neighbor_ptrs_;
-  mutable raft::pinned_matrix<float*, uint32_t, raft::row_major> request_distance_ptrs_;
+  mutable raft::pinned_matrix<request_pointers<T, IdxT>, uint32_t, raft::row_major> request_ptrs_;
 
   /**
    * Try to commit n_queries at most; returns the last observed batch_token (where `size_committed`
