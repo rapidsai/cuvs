@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <sys/types.h>
 #undef RAFT_EXPLICIT_INSTANTIATE_ONLY
@@ -104,15 +105,17 @@ void get_global_nearest_k(
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, dataset));
   float* ptr = reinterpret_cast<float*>(attr.devicePointer);
 
+  size_t num_batches = n_clusters;
+  size_t batch_size  = (num_rows + n_clusters) / n_clusters;
   if (ptr == nullptr) {  // data on host
-    size_t num_batches = n_clusters;
-    size_t batch_size  = (num_rows + n_clusters) / n_clusters;
 
     auto d_dataset_batch =
       raft::make_device_matrix<T, int64_t, raft::row_major>(res, batch_size, num_cols);
 
     auto nearest_clusters_idx =
       raft::make_device_matrix<int64_t, int64_t, raft::row_major>(res, batch_size, k);
+    auto nearest_clusters_idxt =
+      raft::make_device_matrix<IdxT, int64_t, raft::row_major>(res, batch_size, k);
     auto nearest_clusters_dist =
       raft::make_device_matrix<T, int64_t, raft::row_major>(res, batch_size, k);
 
@@ -125,13 +128,6 @@ void get_global_nearest_k(
                  batch_size_ * num_cols,
                  resource::get_cuda_stream(res));
 
-      //   raft::neighbors::brute_force::fused_l2_knn<T, IdxT, raft::row_major, raft::row_major>(
-      //     res,
-      //     raft::make_const_mdspan(centroids),
-      //     raft::make_const_mdspan(d_dataset_batch.view()),
-      //     nearest_clusters_idx.view(),
-      //     nearest_clusters_dist.view(),
-      //     static_cast<raft::distance::DistanceType>(metric));
       std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
       cuvs::neighbors::brute_force::index<T> brute_force_index(
         res, centroids_view, norms_view, metric);
@@ -140,28 +136,21 @@ void get_global_nearest_k(
                                            raft::make_const_mdspan(d_dataset_batch.view()),
                                            nearest_clusters_idx.view(),
                                            nearest_clusters_dist.view());
-      //   raft::copy(global_nearest_cluster.data_handle() + i * batch_size * k,
-      //              nearest_clusters_idx.data_handle(),
-      //              batch_size_ * k,
-      //              resource::get_cuda_stream(res));
+
       thrust::copy(raft::resource::get_thrust_policy(res),
                    nearest_clusters_idx.data_handle(),
                    nearest_clusters_idx.data_handle() + nearest_clusters_idx.size(),
-                   global_nearest_cluster.data_handle() + i * batch_size * k);
+                   nearest_clusters_idxt.data_handle());
+      raft::copy(global_nearest_cluster.data_handle() + i * batch_size * k,
+                 nearest_clusters_idxt.data_handle(),
+                 batch_size_ * k,
+                 resource::get_cuda_stream(res));
     }
   } else {  // data on device
     auto nearest_clusters_idx =
       raft::make_device_matrix<int64_t, int64_t, raft::row_major>(res, num_rows, k);
     auto nearest_clusters_dist =
       raft::make_device_matrix<T, int64_t, raft::row_major>(res, num_rows, k);
-
-    // raft::neighbors::brute_force::fused_l2_knn<T, IdxT, raft::row_major, raft::row_major>(
-    //   res,
-    //   raft::make_const_mdspan(centroids),
-    //   raft::make_device_matrix_view<const T, IdxT, row_major>(dataset, num_rows, num_cols),
-    //   nearest_clusters_idx.view(),
-    //   nearest_clusters_dist.view(),
-    //   static_cast<raft::distance::DistanceType>(metric));
 
     std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
     cuvs::neighbors::brute_force::index<T> brute_force_index(
@@ -173,14 +162,22 @@ void get_global_nearest_k(
                                          dataset_view,
                                          nearest_clusters_idx.view(),
                                          nearest_clusters_dist.view());
-    // raft::copy(global_nearest_cluster.data_handle(),
-    //            nearest_clusters_idx.data_handle(),
-    //            num_rows * k,
-    //            resource::get_cuda_stream(res));
-    thrust::copy(raft::resource::get_thrust_policy(res),
-                 nearest_clusters_idx.data_handle(),
-                 nearest_clusters_idx.data_handle() + nearest_clusters_idx.size(),
-                 global_nearest_cluster.data_handle());
+
+    auto nearest_clusters_idxt =
+      raft::make_device_matrix<IdxT, int64_t, raft::row_major>(res, batch_size, k);
+    for (size_t i = 0; i < num_batches; i++) {
+      size_t batch_size_ = batch_size;
+
+      if (i == num_batches - 1) { batch_size_ = num_rows - batch_size * i; }
+      thrust::copy(raft::resource::get_thrust_policy(res),
+                   nearest_clusters_idx.data_handle() + i * batch_size_ * k,
+                   nearest_clusters_idx.data_handle() + (i + 1) * batch_size_ * k,
+                   nearest_clusters_idxt.data_handle());
+      raft::copy(global_nearest_cluster.data_handle() + i * batch_size_ * k,
+                 nearest_clusters_idxt.data_handle(),
+                 batch_size_ * k,
+                 resource::get_cuda_stream(res));
+    }
   }
 }
 
