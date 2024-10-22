@@ -267,68 +267,27 @@ struct alignas(kCacheLineBytes) batch_queue_t {
     head_.store(0, kMemOrder);
     for (uint32_t i = 0; i < kSize; i++) {
       buf_(i).store(kEmpty, kMemOrder);
-      // buf_(i).store(T{0xffffffffff000000ull},
-      //               kMemOrder);  // TMP hack to avoid advancing head too far
     }
   }
 
   /** Nominal capacity of the queue. */
   [[nodiscard]] auto capacity() const { return capacity_; }
 
-  /** This does not affect the queue behavior, but merely declares a nominal capacity. */
-  void set_capacity(uint32_t capacity) { capacity_ = capacity; }
-
   /**
-   * A an empty slot in the queue to fill with a pre-defined value in one store op.
-   * This struct is to be passed to the scatter kernel and used exactly once.
-   */
-  struct hole_t {
-    explicit constexpr hole_t(cuda::atomic<value_type, cuda::thread_scope_system>* loc,
-                              value_type val)
-      : loc_{loc}, val_{val}
-    {
-    }
-
-    constexpr void fill() noexcept { loc_->store(val_, cuda::std::memory_order_seq_cst); }
-
-   private:
-    cuda::atomic<value_type, cuda::thread_scope_system>* loc_;
-    value_type val_;
-  };
-
-  /**
-   * Advance the tail position, ensure the slot is empty, and return the hole object.
-   * The hole should be filled using `fill()` function at a later time.
-   *
+   * Advance the tail position, ensure the slot is empty, and return the reference to the new slot.
+   * The calling side is responsible for filling-in the slot with an actual value at the later time.
    */
   auto push() noexcept -> cuda::atomic<value_type, cuda::thread_scope_system>&
   {
-    // TODO: TMP not sure if we need this limit.
-    while (static_cast<int32_t>(tail_.load(kMemOrder) - head_.load(kMemOrder)) >=
-           static_cast<int32_t>(kSize * kCounterIncrement)) {
-      std::this_thread::yield();
-    }
     auto& loc = buf_(tail_.fetch_add(kCounterIncrement, kMemOrder) & kCounterLocMask);
     while (loc.load(kMemOrder).value < 0xfffffffe00000000ull) {  // TODO TMP kEmpty.value
-      // This should never hit in our setup, because we have a limited resource count.
-      // TODO: but it is a deadlock :(
+      // Wait till the slot becomes empty (doesn't matter future or past).
+      // The batch id is only every updated in the scatter kernel, which is the only source of truth
+      // whether a batch buffers are currently used by the GPU.
       std::this_thread::yield();
     }
     return loc;
   }
-
-  /*
-  NB: this implementation wouldn't work due to kEmpty in the compare_exchange_weak
-      (any value not smaller than kEmpty should be treated as invalid/empty).
-  void push(value_type x) noexcept
-  {
-    auto& loc    = buf_(tail_.fetch_add(kCounterIncrement, kMemOrder) & kCounterLocMask);
-    value_type e = kEmpty;
-    while (!loc.compare_exchange_weak(e, x, kMemOrder, kMemOrder)) {
-      e = kEmpty;
-    }
-  }
-  */
 
   /** Get the reference to the first element in the queue. */
   auto head() noexcept -> seq_order_id
@@ -343,68 +302,15 @@ struct alignas(kCacheLineBytes) batch_queue_t {
     return seq_order_id{h};
   }
 
-  auto tail() noexcept -> seq_order_id { return seq_order_id{tail_.load(kMemOrder)}; }
-
-  // auto peek(seq_order_id id) -> value_type
-  // {
-  //   auto& loc = buf_(id.value & kCounterLocMask);
-  //   // The loop condition ensures `peek` returns the empty value immediately if the value at this
-  //   // slot has already been popped.
-  //   while (static_cast<int32_t>(id.value - head_.load(kMemOrder)) >= 0) {
-  //     auto val = loc.load(kMemOrder);
-  //     if (val < kEmpty) {
-  //       return val;
-  //     } else {
-  //       // Spin until the slot is populated (it can be empty due to push_later)
-  //       // TODO: `yield` is not always the best way to spend time. Reconsider after benchmarking
-  //       std::this_thread::yield();
-  //     }
-  //   }
-  //   return kEmpty;
-  // }
-
   auto peek(seq_order_id id) -> cuda::atomic<value_type, cuda::thread_scope_system>&
   {
-    // if (static_cast<int32_t>(id.value - head_.load(kMemOrder)) >= 0) {
     return buf_(id.value & kCounterLocMask);
-    // }
-    // return nullptr;
   }
 
   /**
-   * Update the head counter (if necessary) and return the value (if any).
-   * Blocks the thread until the given `id` is at the head.
+   * An `atomicMax` on the queue head in disguise.
+   * This makes the given batch slot and all prior slots unreachable (not possible to commit).
    */
-  // auto pop(seq_order_id id) noexcept -> value_type
-  // {
-  //   auto observed = id.value;
-  //   // The head_ can advance beyond the tail_ meaining that the consumers take "promises" of the
-  //   // future values. There is however a limit: maximum kSize promises are available.
-  //   // The consumer thread will block unless this ratio is within limit.
-  //   // while (static_cast<int32_t>(id.value - tail_.load(kMemOrder)) >=
-  //   //        static_cast<int32_t>((std::max(kSize, 2 * capacity()) - 2 * capacity()) *
-  //   //                             kCounterIncrement)) {
-  //   //   std::this_thread::yield();
-  //   // }
-  //   // TMP: failsafe: don't allow oversubscrubing to the queue
-  //   // while (static_cast<int32_t>(id.value - tail_.load(kMemOrder)) >= 0) {
-  //   //   std::this_thread::yield();
-  //   // }
-  //   while (
-  //     !head_.compare_exchange_weak(observed, id.value + kCounterIncrement, kMemOrder, kMemOrder))
-  //     { if (observed > id.value) {
-  //       // Someone else has popped the value
-  //       return kEmpty;
-  //     }
-  //     observed = id.value;
-  //   }
-  //   auto& loc = buf_(id.value & kCounterLocMask);
-  //   // NB: we use the load instead of exchange, thus allow a non-kEmpty value stay in the slot
-  //   //     to let the gather kernel perform fetch_add on the value.
-  //   // return loc.exchange(kEmpty, kMemOrder);
-  //   // TODO: question: do we need to return a value here at all?..
-  //   return loc.load(kMemOrder);
-  // }
   void pop(seq_order_id id) noexcept
   {
     const auto desired = id.value + kCounterIncrement;
@@ -413,23 +319,15 @@ struct alignas(kCacheLineBytes) batch_queue_t {
                                    observed, std::max(observed, desired), kMemOrder, kMemOrder)) {}
   }
 
+  /**
+   * Whether this is an odd (or even) loop over the queue.
+   * This information is used to distinguish between the empty slots available for committing
+   * (future batches) and the invalid, already used slots ("empty past").
+   */
   auto loop_oddity(seq_order_id id) noexcept -> bool
   {
     return (((id.value / kCounterIncrement) / kSize) & 0x1) == 0x1;
   }
-
-  /*
-  auto pop() noexcept -> value_type
-  {
-    auto& loc = buf_(head_.fetch_add(kCounterIncrement, kMemOrder) & kCounterLocMask);
-    auto val  = kEmpty;
-    do {
-      // TODO: consider adding yield or something else to limit busy spinning
-      val = loc.exchange(kEmpty, kMemOrder);
-    } while (val == kEmpty);
-    return val;
-  }
-   */
 
  private:
   alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> tail_{};
@@ -747,6 +645,7 @@ class batch_runner {
               raft::device_matrix_view<float, int64_t, raft::row_major> distances) const
   {
     uint32_t n_queries = queries.extent(0);
+    // TODO: uncomment when finished testing to disable the dynamic batching for big-batch searches.
     // if (n_queries >= max_batch_size_) {
     //   return upstream_search_(res, queries, neighbors, distances);
     // }
@@ -755,20 +654,18 @@ class batch_runner {
                     std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1000000.0));
 
     int64_t local_io_offset = 0;
+    batch_token batch_token_observed{0};
     while (true) {
-      auto seq_id                                    = batch_queue_.head();
-      auto [batch_token_observed, queries_committed] = try_commit(seq_id, n_queries);
-      if (batch_token_observed.size_committed() + queries_committed >= max_batch_size_) {
-        // The batch is already full, let's try to pop it from the queue
-        //                                 (if nobody has done so already)
-        batch_queue_.pop(seq_id);
-      }
+      const auto seq_id            = batch_queue_.head();
+      const auto commit_result     = try_commit(seq_id, n_queries);
+      const auto queries_committed = std::get<uint32_t>(commit_result);
       if (queries_committed == 0) {
         // try to get a new batch
         continue;
       }
-      auto batch_offset     = batch_token_observed.size_committed();
-      auto& batch_token_ref = batch_queue_.peek(seq_id);
+      batch_token_observed    = std::get<batch_token>(commit_result);
+      const auto batch_offset = batch_token_observed.size_committed();
+      auto& batch_token_ref   = batch_queue_.peek(seq_id);
       while (batch_token_observed.id() >= n_queues_) {
         // Wait till the batch has a valid id.
         // TODO: reconsider waiting behavior and the memory order
@@ -802,19 +699,9 @@ class batch_runner {
 
       // Submit estimated remaining time
       {
-        auto& rt = state.rem_time_us;
-        // auto expected    = rt.load(cuda::std::memory_order_relaxed);
-        // auto rem_time_us = expected;
-        // do {
-        //   rem_time_us = static_cast<int32_t>(
-        //     std::max<int64_t>(0, (deadline - std::chrono::system_clock::now()).count()) / 1000);
-        // } while (!rt.compare_exchange_weak(expected,
-        //                                    std::min(rem_time_us, expected),
-        //                                    cuda::std::memory_order_relaxed,
-        //                                    cuda::std::memory_order_relaxed));
         auto rem_time_us = static_cast<int32_t>(
           std::max<int64_t>(0, (deadline - std::chrono::system_clock::now()).count()) / 1000);
-        rt.fetch_min(rem_time_us, cuda::std::memory_order_relaxed);
+        state.rem_time_us.fetch_min(rem_time_us, cuda::std::memory_order_relaxed);
       }
 
       // *** Update size_submitted, so that the dispatcher can copy the data
@@ -907,34 +794,38 @@ class batch_runner {
   /**
    * Try to commit n_queries at most; returns the last observed batch_token (where `size_committed`
    * represents offset at which new queries are committed if successful) and the number of committed
-   * queries
+   * queries.
    */
   auto try_commit(batch_queue_t::seq_order_id seq_id, uint32_t n_queries) const noexcept
     -> std::tuple<batch_token, uint32_t>
   {
     using raft::RAFT_NAME;
-    auto& batch_token         = batch_queue_.peek(seq_id);
-    auto batch_token_observed = batch_token.load();
-    auto batch_token_updated  = batch_token_observed;
+    auto& batch_token_ref            = batch_queue_.peek(seq_id);
+    batch_token batch_token_observed = batch_token_ref.load();
+    batch_token batch_token_updated  = batch_token_observed;
     // We have two values indicating the empty slot and switch between them once a full loop over
     // the token buffer. This allows us to distinguish between the empty future slots (into which a
     // thread can commit) and empty past slots (which are invalid).
     uint32_t empty_past = batch_queue_.loop_oddity(seq_id) ? 0xffffffffu : 0xfffffffeu;
     do {
-      if (batch_token_observed.size_committed() >= max_batch_size_) {
-        return std::make_tuple(batch_token_observed, 0);
-      }
       // If the slot was recently used and now empty, it is an indication that the queue head
       // counter is outdated due to batches being finalized by the kernel (by the timeout).
       // That means we need to update the head counter and find a new slot to commit.
-      if (batch_token_observed.id() == empty_past) {
+      if (batch_token_observed.size_committed() >= max_batch_size_ ||
+          batch_token_observed.id() == empty_past) {
         batch_queue_.pop(seq_id);
         return std::make_tuple(batch_token_observed, 0);
       }
       batch_token_updated.id() = batch_token_observed.id();
       batch_token_updated.size_committed() =
         std::min(batch_token_observed.size_committed() + n_queries, max_batch_size_);
-    } while (!batch_token.compare_exchange_weak(batch_token_observed, batch_token_updated));
+      // TODO: reconsider waiting behavior and the memory order
+    } while (!batch_token_ref.compare_exchange_weak(batch_token_observed, batch_token_updated));
+    if (batch_token_updated.size_committed() >= max_batch_size_) {
+      // The batch is already full, let's try to pop it from the queue
+      //                                 (if nobody has done so already)
+      batch_queue_.pop(seq_id);
+    }
     return std::make_tuple(
       batch_token_observed,
       batch_token_updated.size_committed() - batch_token_observed.size_committed());
