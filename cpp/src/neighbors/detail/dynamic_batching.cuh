@@ -337,6 +337,58 @@ struct alignas(kCacheLineBytes) batch_queue_t {
     cuda_pinned_array<cuda::atomic<value_type, cuda::thread_scope_system>> buf_;
 };
 
+struct gpu_time_keeper {
+  RAFT_DEVICE_INLINE_FUNCTION gpu_time_keeper(
+    cuda::atomic<int32_t, cuda::thread_scope_system>* cpu_provided_remaining_time_us)
+    : cpu_provided_remaining_time_us_{cpu_provided_remaining_time_us}
+  {
+    update_timestamp();
+  }
+
+  RAFT_DEVICE_INLINE_FUNCTION auto has_time() noexcept -> bool
+  {
+    if (timeout) { return false; }
+    update_local_remaining_time();
+    if (local_remaining_time_us_ <= 0) {
+      timeout = true;
+      return false;
+    }
+    update_cpu_provided_remaining_time();
+    if (local_remaining_time_us_ <= 0) {
+      timeout = true;
+      return false;
+    }
+    return true;
+  }
+
+ private:
+  cuda::atomic<int32_t, cuda::thread_scope_system>* cpu_provided_remaining_time_us_;
+  uint64_t timestamp_ns_           = 0;
+  int32_t local_remaining_time_us_ = std::numeric_limits<int32_t>::max();
+  bool timeout                     = false;
+
+  RAFT_DEVICE_INLINE_FUNCTION void update_timestamp() noexcept
+  {
+    asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(timestamp_ns_));
+  }
+
+  RAFT_DEVICE_INLINE_FUNCTION void update_local_remaining_time() noexcept
+  {
+    auto prev_timestamp = timestamp_ns_;
+    update_timestamp();
+    // subtract the time passed since the last check
+    // (assuming local time is updated every time timestamp is read)
+    local_remaining_time_us_ -= static_cast<int32_t>((timestamp_ns_ - prev_timestamp) / 1000ull);
+  }
+
+  RAFT_DEVICE_INLINE_FUNCTION void update_cpu_provided_remaining_time() noexcept
+  {
+    local_remaining_time_us_ =
+      std::min<int32_t>(local_remaining_time_us_,
+                        cpu_provided_remaining_time_us_->load(cuda::std::memory_order_relaxed));
+  }
+};
+
 /**
  * Copy the queries from the submitted pointers to the batch store, one query per block.
  * Upon completion of this kernel, the actual batch size is in `batch_size_submitted` (which is
@@ -366,9 +418,7 @@ RAFT_KERNEL gather_inputs(
 
   if (threadIdx.x == 0) {
     query_ptr = nullptr;
-    uint64_t last_read_time_ns;
-    asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(last_read_time_ns));
-    auto remaining_time_local_us = remaining_time_us->load(cuda::std::memory_order_relaxed);
+    gpu_time_keeper runtime{remaining_time_us};
     bool committed = false;  // if the query is committed, we have to wait for it to arrive
     while (true) {
       if (batch_size_submitted->load(cuda::std::memory_order_acquire) > query_id) {
@@ -393,47 +443,22 @@ RAFT_KERNEL gather_inputs(
       // the query
       if (committed_count > 0x00ffffff) { break; }
       // The query hasn't been submitted yet; check if we're past the deadline
-      uint64_t cur_time_ns;
-      asm volatile("mov.u64 %0, %%globaltimer;" : "=l"(cur_time_ns));
-      remaining_time_local_us -= (cur_time_ns - last_read_time_ns) / 1000;
-      if (remaining_time_local_us <= 0) {
-        // increase the commit count by batch_size to indicate the time is out for committing more
-        // queries
-        asm volatile("st.volatile.global.u8 [%0], %1;"
-                     :
-                     : "l"(batch_fully_committed), "r"(1)
-                     : "memory");
-        // cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
-        // committed_count = batch_size_committed->load(cuda::std::memory_order_seq_cst);
-        asm volatile("ld.volatile.global.u32 %0, [%1];"
-                     : "=r"(committed_count)
-                     : "l"(bs_committed)
-                     : "memory");
-        committed = (committed_count & 0x00ffffff) > query_id;
-        if (committed) { continue; }
-        break;
-      }
-      // Check the remaining time again in case if it's reduced by incoming requests.
-      last_read_time_ns = cur_time_ns;
-      remaining_time_local_us =
-        min(remaining_time_local_us, remaining_time_us->load(cuda::std::memory_order_relaxed));
-      if (remaining_time_local_us <= 0) {
-        // increase the commit count by batch_size to indicate the time is out for committing more
-        // queries
-        // *batch_fully_committed = 0xff;
-        asm volatile("st.volatile.global.u8 [%0], %1;"
-                     :
-                     : "l"(batch_fully_committed), "r"(1)
-                     : "memory");
-        // committed_count = batch_size_committed->load(cuda::std::memory_order_seq_cst);
-        asm volatile("ld.volatile.global.u32 %0, [%1];"
-                     : "=r"(committed_count)
-                     : "l"(bs_committed)
-                     : "memory");
-        committed = (committed_count & 0x00ffffff) > query_id;
-        if (committed) { continue; }
-        break;
-      }
+      if (runtime.has_time()) { continue; }
+      // Otherwise, let the others now time is out
+      // Set the highest byte of the commit counter to 1 (thus avoiding RMW atomic)
+      // This prevents any more CPU threads from committing to this batch.
+      asm volatile("st.volatile.global.u8 [%0], %1;"
+                   :
+                   : "l"(batch_fully_committed), "r"(1)
+                   : "memory");
+      // committed_count = batch_size_committed->load(cuda::std::memory_order_seq_cst);
+      asm volatile("ld.volatile.global.u32 %0, [%1];"
+                   : "=r"(committed_count)
+                   : "l"(bs_committed)
+                   : "memory");
+      committed = (committed_count & 0x00ffffff) > query_id;
+      if (committed) { continue; }
+      break;
     }
   }
   // The block waits till the leading thread gets the query pointer
