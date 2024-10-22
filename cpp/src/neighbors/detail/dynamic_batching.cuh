@@ -473,7 +473,7 @@ RAFT_KERNEL gather_inputs(
     auto remaining_time_local_us = remaining_time_us->load(cuda::std::memory_order_relaxed);
     bool committed = false;  // if the query is committed, we have to wait for it to arrive
     while (true) {
-      if (batch_size_submitted->load(cuda::std::memory_order_acquire) >= query_id) {
+      if (batch_size_submitted->load(cuda::std::memory_order_acquire) > query_id) {
         // The query is submitted to this block's slot; read the pointer and exit the loop.
         // The `memory_order_acquire` above ensures `request_queries_ptrs` is already written by the
         // host thread.
@@ -489,7 +489,7 @@ RAFT_KERNEL gather_inputs(
                    : "=r"(committed_count)
                    : "l"(bs_committed)
                    : "memory");
-      committed = (committed_count & 0x00ffffff) >= query_id;
+      committed = (committed_count & 0x00ffffff) > query_id;
       if (committed) { continue; }
       // If the query is not committed, but the batch is past the deadline, we exit without copying
       // the query
@@ -511,7 +511,7 @@ RAFT_KERNEL gather_inputs(
                      : "=r"(committed_count)
                      : "l"(bs_committed)
                      : "memory");
-        committed = (committed_count & 0x00ffffff) >= query_id;
+        committed = (committed_count & 0x00ffffff) > query_id;
         if (committed) { continue; }
         break;
       }
@@ -532,7 +532,7 @@ RAFT_KERNEL gather_inputs(
                      : "=r"(committed_count)
                      : "l"(bs_committed)
                      : "memory");
-        committed = (committed_count & 0x00ffffff) >= query_id;
+        committed = (committed_count & 0x00ffffff) > query_id;
         if (committed) { continue; }
         break;
       }
