@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include "../../../core/nvtx.hpp"
 #include "../../vpq_dataset.cuh"
 #include "graph_core.cuh"
 #include <cuvs/neighbors/cagra.hpp>
@@ -130,7 +131,7 @@ void build_knn_graph(
                "Currently only L2Expanded or InnerProduct metric are supported");
 
   uint32_t node_degree = knn_graph.extent(1);
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "cagra::build_graph(%zu, %zu, %u)",
     size_t(dataset.extent(0)),
     size_t(dataset.extent(1)),

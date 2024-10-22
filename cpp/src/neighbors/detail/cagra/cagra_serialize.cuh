@@ -21,10 +21,10 @@
 #include <raft/core/logger-ext.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/serialize.hpp>
 
+#include "../../../core/nvtx.hpp"
 #include "../dataset_serialize.hpp"
 
 #include <cstddef>
@@ -32,8 +32,9 @@
 #include <fstream>
 #include <type_traits>
 
-static const std::string RAFT_NAME = "raft";
 namespace cuvs::neighbors::cagra::detail {
+
+static const std::string RAFT_NAME = "raft";
 
 constexpr int serialization_version = 4;
 
@@ -53,7 +54,7 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_,
                bool include_dataset)
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::serialize");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
   RAFT_LOG_DEBUG(
     "Saving CAGRA index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
@@ -103,7 +104,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 {
   // static_assert(std::is_same_v<IdxT, int> or std::is_same_v<IdxT, uint32_t>,
   //               "An hnswlib index can only be trained with int32 or uint32 IdxT");
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::serialize");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
   RAFT_LOG_DEBUG("Saving CAGRA index to hnswlib format, size %zu, dim %u",
                  static_cast<size_t>(index_.size()),
                  index_.dim());
@@ -119,9 +120,9 @@ void serialize_to_hnswlib(raft::resources const& res,
   os.write(reinterpret_cast<char*>(&curr_element_count), sizeof(std::size_t));
   // Example:M: 16, dim = 128, data_t = float, index_t = uint32_t, list_size_type = uint32_t,
   // labeltype: size_t size_data_per_element_ = M * 2 * sizeof(index_t) + sizeof(list_size_type) +
-  // dim * 4 + sizeof(labeltype)
-  auto size_data_per_element =
-    static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) + 4 + index_.dim() * 4 + 8);
+  // dim * sizeof(T) + sizeof(labeltype)
+  auto size_data_per_element = static_cast<std::size_t>(index_.graph_degree() * sizeof(IdxT) + 4 +
+                                                        index_.dim() * sizeof(T) + 8);
   os.write(reinterpret_cast<char*>(&size_data_per_element), sizeof(std::size_t));
   // label_offset
   std::size_t label_offset = size_data_per_element - 8;
@@ -184,18 +185,9 @@ void serialize_to_hnswlib(raft::resources const& res,
     }
 
     auto data_row = host_dataset.data_handle() + (index_.dim() * i);
-    if constexpr (std::is_same_v<T, float>) {
-      for (std::size_t j = 0; j < index_.dim(); ++j) {
-        auto data_elem = static_cast<float>(host_dataset(i, j));
-        os.write(reinterpret_cast<char*>(&data_elem), sizeof(float));
-      }
-    } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
-      for (std::size_t j = 0; j < index_.dim(); ++j) {
-        auto data_elem = static_cast<int>(host_dataset(i, j));
-        os.write(reinterpret_cast<char*>(&data_elem), sizeof(int));
-      }
-    } else {
-      RAFT_FAIL("Unsupported dataset type while saving CAGRA dataset to HNSWlib format");
+    for (std::size_t j = 0; j < index_.dim(); ++j) {
+      auto data_elem = static_cast<T>(host_dataset(i, j));
+      os.write(reinterpret_cast<char*>(&data_elem), sizeof(T));
     }
 
     os.write(reinterpret_cast<char*>(&i), sizeof(std::size_t));
@@ -234,7 +226,7 @@ void serialize_to_hnswlib(raft::resources const& res,
 template <typename T, typename IdxT>
 void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* index_)
 {
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope("cagra::deserialize");
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::deserialize");
 
   char dtype_string[4];
   is.read(dtype_string, 4);
