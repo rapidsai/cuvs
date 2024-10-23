@@ -258,8 +258,10 @@ struct batch_queue_t {
   inline auto head() noexcept -> seq_order_id
   {
     auto h = head_.load(kMemOrder);
-    while (static_cast<int32_t>(h - tail_.load(kMemOrder)) >=
-           static_cast<int32_t>(std::max(kSize, 2 * capacity()) - 2 * capacity())) {
+    // The head cannot go ahead of the tail by more than the queue buffer size.
+    // If the head is ahead by not more than kSize elements though, everything is fine;
+    // The slots too far ahead are protected by loop_invalid_token().
+    while (static_cast<int32_t>(h - tail_.load(kMemOrder)) >= static_cast<int32_t>(kSize)) {
       std::this_thread::yield();
       h = head_.load(kMemOrder);
     }
@@ -532,7 +534,6 @@ RAFT_KERNEL scatter_outputs(
   __shared__ uint32_t batch_size;
   if (threadIdx.x == 0 && threadIdx.y == 0) {
     batch_size = this_token->load(cuda::std::memory_order_relaxed) & 0x00ffffff;
-    this_token->store(empty_token_value, cuda::std::memory_order_seq_cst);
   }
   // Copy output
   cooperative_groups::this_thread_block().sync();
@@ -551,7 +552,8 @@ RAFT_KERNEL scatter_outputs(
   remaining_time_us->store(std::numeric_limits<int32_t>::max(), cuda::std::memory_order_relaxed);
   reinterpret_cast<cuda::atomic<uint32_t, cuda::thread_scope_system>*>(
     next_token)[CUVS_SYSTEM_LITTLE_ENDIAN]
-    .store(batch_id, cuda::std::memory_order_seq_cst);
+    .store(batch_id, cuda::std::memory_order_relaxed);
+  this_token->store(empty_token_value, cuda::std::memory_order_release);
 }
 
 /**
@@ -641,10 +643,9 @@ class batch_runner {
               raft::device_matrix_view<float, int64_t, raft::row_major> distances) const
   {
     uint32_t n_queries = queries.extent(0);
-    // TODO: uncomment when finished testing to disable the dynamic batching for big-batch searches.
-    // if (n_queries >= max_batch_size_) {
-    //   return upstream_search_(res, queries, neighbors, distances);
-    // }
+    if (n_queries >= max_batch_size_) {
+      return upstream_search_(res, queries, neighbors, distances);
+    }
 
     auto deadline = std::chrono::system_clock::now() +
                     std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1000000.0));
@@ -664,10 +665,33 @@ class batch_runner {
       auto& batch_token_ref          = batch_queue_.token(seq_id);
       auto& rem_time_us_ref          = batch_queue_.rem_time_us(seq_id);
       auto& dispatch_sequence_id_ref = batch_queue_.dispatch_sequence_id(seq_id);
-      while (batch_token_observed.id() >= n_queues_) {
-        // Wait till the batch has a valid id.
-        // TODO: reconsider waiting behavior and the memory order
-        batch_token_observed = batch_token_ref.load();
+      for (uint64_t wait_iteration = 0; batch_token_observed.id() >= n_queues_; wait_iteration++) {
+        /* Note: waiting for batch IO buffers
+        The CPU threads can commit to the incoming batches in the queue in advance (this happens in
+        try_commit).
+        In this loop, a thread waits for the batch IO buffer to be released by a running search on
+        the GPU side (scatter_outputs kernel). Hence, this loop is engaged only if all buffers are
+        currently used, which suggests that the GPU is busy (or there's not enough IO buffers).
+        This also means the current search is not likely to meet the deadline set by the user.
+
+        The scatter kernel returns its buffer id into an acquired slot in the batch queue; in this
+        loop we wait for that id to arrive.
+
+        Generally, we want to waste as little as possible CPU cycles here to let other threads wait
+        on dispatch_sequence_id_ref below more efficiently. At the same time, we shouldn't use
+        `.wait()` here, because `.notify_all()` would have to come from GPU.
+        */
+        if (wait_iteration < 2) {
+          // Don't wait and try get the value asap
+        } else if (wait_iteration < 20) {
+          std::this_thread::yield();
+        } else {
+          // sleep for 1/10 of deadline time or more
+          std::this_thread::sleep_for(
+            std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 100000.0) *
+                                     raft::div_rounding_up_safe<uint64_t>(wait_iteration, 100)));
+        }
+        batch_token_observed = batch_token_ref.load(cuda::std::memory_order_acquire);
       }
       // Whether this thread is responsible for dispatching the batch.
       bool is_dispatcher = batch_offset == 0;
@@ -723,9 +747,10 @@ class batch_runner {
 
       } else {
         // Wait till the dispatch_sequence_id counter is updated, which means the event is recorded
-        auto dispatched_id_observed = dispatch_sequence_id_ref.load();
+        auto dispatched_id_observed =
+          dispatch_sequence_id_ref.load(cuda::std::memory_order_acquire);
         while (static_cast<int32_t>(seq_id.value - dispatched_id_observed) > 0) {
-          dispatch_sequence_id_ref.wait(dispatched_id_observed, cuda::std::memory_order_acquire);
+          dispatch_sequence_id_ref.wait(dispatched_id_observed, cuda::std::memory_order_relaxed);
           dispatched_id_observed = dispatch_sequence_id_ref.load(cuda::std::memory_order_acquire);
         }
         // Now we can safely record the event
@@ -771,7 +796,6 @@ class batch_runner {
   auto try_commit(batch_queue_t<kMaxNumQueues>::seq_order_id seq_id,
                   uint32_t n_queries) const noexcept -> std::tuple<batch_token, uint32_t>
   {
-    using raft::RAFT_NAME;
     auto& batch_token_ref            = batch_queue_.token(seq_id);
     batch_token batch_token_observed = batch_token_ref.load();
     batch_token batch_token_updated  = batch_token_observed;
@@ -791,8 +815,10 @@ class batch_runner {
       batch_token_updated.id() = batch_token_observed.id();
       batch_token_updated.size_committed() =
         std::min(batch_token_observed.size_committed() + n_queries, max_batch_size_);
-      // TODO: reconsider waiting behavior and the memory order
-    } while (!batch_token_ref.compare_exchange_weak(batch_token_observed, batch_token_updated));
+    } while (!batch_token_ref.compare_exchange_weak(batch_token_observed,
+                                                    batch_token_updated,
+                                                    cuda::std::memory_order_acq_rel,
+                                                    cuda::std::memory_order_relaxed));
     if (batch_token_updated.size_committed() >= max_batch_size_) {
       // The batch is already full, let's try to pop it from the queue
       //                                 (if nobody has done so already)
