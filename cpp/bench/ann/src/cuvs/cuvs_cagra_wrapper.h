@@ -24,6 +24,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/dynamic_batching.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -63,6 +64,11 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     AllocatorType graph_mem   = AllocatorType::kDevice;
     AllocatorType dataset_mem = AllocatorType::kDevice;
     [[nodiscard]] auto needs_dataset() const -> bool override { return true; }
+    bool dynamic_batching = false;
+    int64_t dynamic_batching_k;
+    int64_t dynamic_batching_max_batch_size  = 100;
+    double dynamic_batching_soft_deadline_ms = 1.0;
+    size_t dynamic_batching_n_queues         = 3;
   };
 
   struct build_param {
@@ -171,6 +177,11 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
   std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
 
+  std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, IdxT>> dynamic_batcher_;
+  cuvs::neighbors::dynamic_batching::search_params dynamic_batcher_sp_{};
+  int64_t dynamic_batching_max_batch_size_;
+  size_t dynamic_batching_n_queues_;
+
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
     switch (mem_type) {
@@ -214,9 +225,11 @@ inline auto allocator_to_string(AllocatorType mem_type) -> std::string
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
 {
-  auto sp        = dynamic_cast<const search_param&>(param);
-  search_params_ = sp.p;
-  refine_ratio_  = sp.refine_ratio;
+  auto sp                          = dynamic_cast<const search_param&>(param);
+  dynamic_batching_max_batch_size_ = sp.dynamic_batching_max_batch_size;
+  dynamic_batching_n_queues_       = sp.dynamic_batching_n_queues;
+  search_params_                   = sp.p;
+  refine_ratio_                    = sp.refine_ratio;
   if (sp.graph_mem != graph_mem_) {
     // Move graph to correct memory space
     graph_mem_ = sp.graph_mem;
@@ -255,6 +268,26 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
     index_->update_dataset(handle_, dataset_view);
 
     need_dataset_update_ = false;
+  }
+
+  // dynamic batching
+  if (sp.dynamic_batching) {
+    dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
+      handle_,
+      cuvs::neighbors::dynamic_batching::index_params<cuvs::neighbors::cagra::index<T, IdxT>>{
+        index_params_.cagra_params.metric,
+        index_params_.cagra_params.metric_arg,
+        *index_,
+        search_params_,
+        nullptr,
+        sp.dynamic_batching_k,
+        int64_t(this->dim_),
+        sp.dynamic_batching_max_batch_size,
+        sp.dynamic_batching_n_queues});
+
+    dynamic_batcher_sp_.soft_deadline_ms = sp.dynamic_batching_soft_deadline_ms;
+  } else {
+    dynamic_batcher_.reset();
   }
 }
 
@@ -328,8 +361,17 @@ void cuvs_cagra<T, IdxT>::search_base(const T* queries,
     raft::make_device_matrix_view<IdxT, int64_t>(neighbors_idx_t, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
-  cuvs::neighbors::cagra::search(
-    handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
+  if (dynamic_batcher_) {
+    cuvs::neighbors::dynamic_batching::search(handle_,
+                                              dynamic_batcher_sp_,
+                                              *dynamic_batcher_,
+                                              queries_view,
+                                              neighbors_view,
+                                              distances_view);
+  } else {
+    cuvs::neighbors::cagra::search(
+      handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
+  }
 
   if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
     if (raft::get_device_for_address(neighbors) < 0 &&
@@ -365,11 +407,23 @@ void cuvs_cagra<T, IdxT>::search(
   const raft::resources& res    = handle_;
   auto mem_type =
     raft::get_device_for_address(neighbors) >= 0 ? MemoryType::kDevice : MemoryType::kHostPinned;
-  auto& tmp_buf = get_tmp_buffer_from_global_pool(
-    ((disable_refinement ? 0 : (sizeof(float) + sizeof(algo_base::index_type))) +
-     (kNeedsIoMapping ? sizeof(IdxT) : 0)) *
-    batch_size * k0);
-  auto* candidates_ptr = reinterpret_cast<algo_base::index_type*>(tmp_buf.data(mem_type));
+
+  // If dynamic batching is used and there's no sync between benchmark laps, multiple sequential
+  // requests can group together. The data is copied asynchronously, and if the same intermediate
+  // buffer is used for multiple requests, they can override each other's data. Hence, we need to
+  // allocate as much space as required by the maximum number of sequential requests.
+  auto max_dyn_grouping = dynamic_batcher_ ? raft::div_rounding_up_safe<int64_t>(
+                                               dynamic_batching_max_batch_size_, batch_size) *
+                                               dynamic_batching_n_queues_
+                                           : 1;
+  auto tmp_buf_size = ((disable_refinement ? 0 : (sizeof(float) + sizeof(algo_base::index_type))) +
+                       (kNeedsIoMapping ? sizeof(IdxT) : 0)) *
+                      batch_size * k0;
+  auto& tmp_buf = get_tmp_buffer_from_global_pool(tmp_buf_size * max_dyn_grouping);
+  thread_local static int64_t group_id = 0;
+  auto* candidates_ptr                 = reinterpret_cast<algo_base::index_type*>(
+    reinterpret_cast<uint8_t*>(tmp_buf.data(mem_type)) + tmp_buf_size * group_id);
+  group_id = (group_id + 1) % max_dyn_grouping;
   auto* candidate_dists_ptr =
     reinterpret_cast<float*>(candidates_ptr + (disable_refinement ? 0 : batch_size * k0));
   auto* neighbors_idx_t =
