@@ -8,7 +8,7 @@
 {% set date_string = environ['RAPIDS_DATE_STRING'] %}
 
 package:
-  name: cuvs_bench_cpu
+  name: cuvs-bench-cpu
   version: {{ version }}
   script: build.sh
 
@@ -55,6 +55,7 @@ requirements:
 
   run:
     - benchmark
+    - click
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib
