@@ -102,6 +102,7 @@ struct index : cuvs::neighbors::index {
    * @param res raft::resources is an object mangaging resources
    * @param n_rows number of rows in knn-graph
    * @param n_cols number of cols in knn-graph
+   * @param return_distances whether to return distances
    */
   index(raft::resources const& res, int64_t n_rows, int64_t n_cols, bool return_distances = false)
     : cuvs::neighbors::index(),
@@ -126,6 +127,9 @@ struct index : cuvs::neighbors::index {
    *
    * @param res raft::resources is an object mangaging resources
    * @param graph_view raft::host_matrix_view<IdxT, int64_t, raft::row_major> for storing knn-graph
+   * @param distances_view optional raft::device_matrix_view<float, int64_t, row_major> for storing
+   * distances
+   * @param return_distances whether to return distances
    */
   index(raft::resources const& res,
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view,
