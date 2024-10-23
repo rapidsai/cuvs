@@ -168,25 +168,53 @@ using function_search_type = void(raft::resources const&,
                                   raft::device_matrix_view<float, int64_t, raft::row_major>);
 
 /**
- * @brief Resource queue
- *
- * @tparam T the element type
- * @tparam Size the maximum capacity of the queue (power-of-two)
- * @tparam Empty a special element value designating an empty queue slot.
- *    NB: `Empty` is treated as a start of the invalid value range in this implementation;
- *        all values starting from `Empty` are considered empty slots.
- *
+ * Identifies the batch and its job-commit state.
+ * Should be in the pinned memory for fast shared access on CPU and GPU side.
  */
-template <typename T, uint32_t Size, auto Empty = std::numeric_limits<T>::max()>
-struct alignas(kCacheLineBytes) batch_queue_t {
-  using value_type                   = T;
-  static constexpr uint32_t kSize    = Size;
-  static constexpr value_type kEmpty = T{Empty};
-  static_assert(cuda::std::atomic<value_type>::is_always_lock_free,
+struct batch_token {
+  uint64_t value = 0;
+
+  constexpr inline batch_token() {}
+  explicit constexpr inline batch_token(uint32_t buffer_id) { id() = buffer_id; }
+
+  /** Sequential id of the batch in the array of batches. */
+  inline auto id() noexcept -> uint32_t&
+  {
+    return *(reinterpret_cast<uint32_t*>(&value) + kOffsetOfId);
+  }
+  /**
+   * How many queries are promised by the participating CPU threads (requesters).
+   * Any actor (CPU or GPU thread) may atomically add (max_batch_size+1) to this value (multiple
+   * times even), which indicates that the actor cannot wait for more queries to come anymore.
+   * Hence, the actual number of committed queries is `size_committed % (max_batch_size+1)`.
+   *
+   * The gather kernel cannot finish while `size_committed < max_batch_size`.
+   */
+  inline auto size_committed() noexcept -> uint32_t&
+  {
+    return *(reinterpret_cast<uint32_t*>(&value) + kOffsetOfSC);
+  }
+
+ private:
+  /** Offset of the `id()` value in the token if it's interpreted as uint32_t[2]. */
+  static constexpr inline uint32_t kOffsetOfId = CUVS_SYSTEM_LITTLE_ENDIAN;
+  /** Offset of the `size_committed()` value in the token if it's interpreted as uint32_t[2]. */
+  static constexpr inline uint32_t kOffsetOfSC = 1 - kOffsetOfId;
+};
+static_assert(sizeof(batch_token) == sizeof(uint64_t));
+static_assert(cuda::std::atomic<batch_token>::is_always_lock_free);
+
+template <uint32_t Size>
+struct batch_queue_t {
+  static constexpr uint32_t kSize        = Size;
+  static constexpr uint32_t kMinElemSize = sizeof(uint32_t);
+  static_assert(cuda::std::atomic<batch_token>::is_always_lock_free,
+                "The value type must be lock-free.");
+  static_assert(cuda::std::atomic<uint32_t>::is_always_lock_free,
+                "The value type must be lock-free.");
+  static_assert(cuda::std::atomic<int32_t>::is_always_lock_free,
                 "The value type must be lock-free.");
   static_assert(raft::is_a_power_of_two(kSize), "The size must be a power-of-two for efficiency.");
-  static constexpr uint32_t kElemsPerCacheLine =
-    raft::div_rounding_up_safe<uint32_t>(kCacheLineBytes, sizeof(value_type));
 
   static constexpr auto kMemOrder = cuda::std::memory_order_relaxed;
 
@@ -196,12 +224,14 @@ struct alignas(kCacheLineBytes) batch_queue_t {
   };
 
   explicit batch_queue_t(const raft::resources& res, uint32_t capacity = Size) noexcept
-    : capacity_{capacity}, buf_{kSize}
+    : tokens_(kSize), rem_time_us_(kSize), dispatch_sequence_id_(kSize), capacity_{capacity}
   {
     tail_.store(0, kMemOrder);
     head_.store(0, kMemOrder);
     for (uint32_t i = 0; i < kSize; i++) {
-      buf_(i).store(kEmpty, kMemOrder);
+      rem_time_us_(i).store(std::numeric_limits<int32_t>::max(), kMemOrder);
+      dispatch_sequence_id_[i].store(uint32_t(-1), kMemOrder);
+      tokens_(i).store(loop_invalid_token(seq_order_id{uint32_t(-1)}), kMemOrder);
     }
   }
 
@@ -212,9 +242,9 @@ struct alignas(kCacheLineBytes) batch_queue_t {
    * Advance the tail position, ensure the slot is empty, and return the reference to the new slot.
    * The calling side is responsible for filling-in the slot with an actual value at the later time.
    */
-  auto push() noexcept -> cuda::atomic<value_type, cuda::thread_scope_system>&
+  inline auto push() noexcept -> cuda::atomic<batch_token, cuda::thread_scope_system>&
   {
-    auto& loc = buf_(cache_friendly_idx(tail_.fetch_add(1, kMemOrder)));
+    auto& loc = token(seq_order_id{tail_.fetch_add(1, kMemOrder)});
     while (loc.load(kMemOrder).value < 0xfffffffe00000000ull) {  // TODO TMP kEmpty.value
       // Wait till the slot becomes empty (doesn't matter future or past).
       // The batch id is only every updated in the scatter kernel, which is the only source of truth
@@ -225,7 +255,7 @@ struct alignas(kCacheLineBytes) batch_queue_t {
   }
 
   /** Get the reference to the first element in the queue. */
-  auto head() noexcept -> seq_order_id
+  inline auto head() noexcept -> seq_order_id
   {
     auto h = head_.load(kMemOrder);
     while (static_cast<int32_t>(h - tail_.load(kMemOrder)) >=
@@ -236,16 +266,44 @@ struct alignas(kCacheLineBytes) batch_queue_t {
     return seq_order_id{h};
   }
 
-  auto peek(seq_order_id id) -> cuda::atomic<value_type, cuda::thread_scope_system>&
+  /** Batch commit state and IO buffer id (see `batch_token`) */
+  inline auto token(seq_order_id id) -> cuda::atomic<batch_token, cuda::thread_scope_system>&
   {
-    return buf_(cache_friendly_idx(id.value));
+    return tokens_(cache_friendly_idx(id.value));
+  }
+
+  /**
+   * How much time has this batch left for waiting.
+   * It is an approximate value by design - to minimize the synchronization between CPU and GPU.
+   *
+   * The clocks on GPU and CPU may have different values, so the running kernel and the CPU thread
+   * have different ideas on how much time is left. Rather than trying to synchronize the clocks, we
+   * maintain independent timers and accept the uncertainty.
+   *
+   * Access pattern: CPU write-only (producer); GPU read-only (consumer).
+   */
+  inline auto rem_time_us(seq_order_id id) -> cuda::atomic<int32_t, cuda::thread_scope_system>&
+  {
+    return rem_time_us_(cache_friendly_idx(id.value));
+  }
+
+  /**
+   * This value is updated by the host thread after it submits the job completion event to indicate
+   * to other threads can wait on the event to get the results back.
+   * Other threads get the value from the batch queue and compare that value against this atomic.
+   *
+   * Access pattern: CPU-only; dispatching thread writes the id once, other threads wait on it.
+   */
+  inline auto dispatch_sequence_id(seq_order_id id) -> cuda::std::atomic<uint32_t>&
+  {
+    return dispatch_sequence_id_[cache_friendly_idx(id.value)];
   }
 
   /**
    * An `atomicMax` on the queue head in disguise.
    * This makes the given batch slot and all prior slots unreachable (not possible to commit).
    */
-  void pop(seq_order_id id) noexcept
+  inline void pop(seq_order_id id) noexcept
   {
     const auto desired = id.value + 1;
     auto observed      = id.value;
@@ -258,14 +316,30 @@ struct alignas(kCacheLineBytes) batch_queue_t {
    * This information is used to distinguish between the empty slots available for committing
    * (future batches) and the invalid, already used slots ("empty past").
    */
-  auto loop_oddity(seq_order_id id) noexcept -> bool { return (id.value & kSize) > 0; }
+  static constexpr inline auto loop_oddity(seq_order_id id) noexcept -> bool
+  {
+    return (id.value & kSize) > 0;
+  }
+
+  static constexpr inline auto loop_invalid_id(seq_order_id id) noexcept -> uint32_t
+  {
+    return loop_oddity(id) ? 0xffffffffu : 0xfffffffeu;
+  }
+
+  static constexpr inline auto loop_invalid_token(seq_order_id id) noexcept -> batch_token
+  {
+    return batch_token{loop_invalid_id(id)};
+  }
 
  private:
   alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> tail_{};
   alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> head_{};
-  alignas(kCacheLineBytes) uint32_t capacity_;
+
   alignas(kCacheLineBytes)
-    cuda_pinned_array<cuda::atomic<value_type, cuda::thread_scope_system>> buf_;
+    cuda_pinned_array<cuda::atomic<batch_token, cuda::thread_scope_system>> tokens_;
+  cuda_pinned_array<cuda::atomic<int32_t, cuda::thread_scope_system>> rem_time_us_;
+  std::vector<cuda::std::atomic<uint32_t>> dispatch_sequence_id_;
+  uint32_t capacity_;
 
   /* [Note: cache-friendly indexing]
      To avoid false sharing, the queue pushes and pops values not sequentially, but with an
@@ -277,11 +351,13 @@ struct alignas(kCacheLineBytes) batch_queue_t {
        2) Easy to ensure GCD(kCounterIncrement, kSize) == 1 by construction
           (see the definition below).
    */
+  static constexpr uint32_t kElemsPerCacheLine =
+    raft::div_rounding_up_safe<uint32_t>(kCacheLineBytes, kMinElemSize);
   static constexpr uint32_t kCounterIncrement = raft::bound_by_power_of_two(kElemsPerCacheLine) + 1;
   static constexpr uint32_t kCounterLocMask   = kSize - 1;
   // These props hold by design, but we add them here as a documentation and a sanity check.
   static_assert(
-    kCounterIncrement * sizeof(value_type) >= kCacheLineBytes,
+    kCounterIncrement * kMinElemSize >= kCacheLineBytes,
     "The counter increment should be larger than the cache line size to avoid false sharing.");
   static_assert(
     std::gcd(kCounterIncrement, kSize) == 1,
@@ -479,65 +555,6 @@ RAFT_KERNEL scatter_outputs(
 }
 
 /**
- * Identifies the batch and its job-commit state.
- * Should be in the pinned memory for fast shared access on CPU and GPU side.
- */
-struct batch_token {
-  uint64_t value;
-  /** Sequential id of the batch in the array of batches. */
-  inline auto id() noexcept -> uint32_t&
-  {
-    return *(reinterpret_cast<uint32_t*>(&value) + kOffsetOfId);
-  }
-  /**
-   * How many queries are promised by the participating CPU threads (requesters).
-   * Any actor (CPU or GPU thread) may atomically add (max_batch_size+1) to this value (multiple
-   * times even), which indicates that the actor cannot wait for more queries to come anymore.
-   * Hence, the actual number of committed queries is `size_committed % (max_batch_size+1)`.
-   *
-   * The gather kernel cannot finish while `size_committed < max_batch_size`.
-   */
-  inline auto size_committed() noexcept -> uint32_t&
-  {
-    return *(reinterpret_cast<uint32_t*>(&value) + kOffsetOfSC);
-  }
-
-  static constexpr inline auto invalid_range_start() noexcept -> batch_token
-  {
-    return batch_token{uint64_t{std::numeric_limits<uint32_t>::max()} << 32};
-  }
-
- private:
-  /** Offset of the `id()` value in the token if it's interpreted as uint32_t[2]. */
-  static constexpr inline uint32_t kOffsetOfId = CUVS_SYSTEM_LITTLE_ENDIAN;
-  /** Offset of the `size_committed()` value in the token if it's interpreted as uint32_t[2]. */
-  static constexpr inline uint32_t kOffsetOfSC = 1 - kOffsetOfId;
-};
-static_assert(sizeof(batch_token) == sizeof(uint64_t));
-static_assert(cuda::std::atomic<batch_token>::is_always_lock_free);
-
-/*
-Batch state should be in the pinned memory for fast shared access on CPU and GPU side.
- */
-struct alignas(kCacheLineBytes) batch_state {
-  /**
-   * How much time has this batch left for waiting.
-   * It is an approximate value by design - to minimize the synchronization between CPU and GPU.
-   *
-   * The clocks on GPU and CPU may have different values, so the running kernel and the CPU thread
-   * have different ideas on how much time is left. Rather than trying to synchronize the clocks, we
-   * maintain independent timers and accept the uncertainty.
-   */
-  alignas(kCacheLineBytes) cuda::atomic<int32_t, cuda::thread_scope_system> rem_time_us{0};
-  /**
-   * This value is updated by the host thread after it submits the job completion event to indicate
-   * to other threads can wait on the event to get the results back.
-   * Other threads get the value from the batch queue and compare that value against this atomic.
-   */
-  alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> dispatch_sequence_id{uint32_t(-1)};
-};
-
-/**
  * Batch runner is shared among the users of the `dynamic_batching::index` (i.e. the index can be
  * copied, but the copies hold shared pointers to a single batch runner).
  *
@@ -586,7 +603,6 @@ class batch_runner {
       max_batch_size_{uint32_t(params.max_batch_size)},
       n_queues_{uint32_t(params.n_queues)},
       batch_queue_{res_, n_queues_},
-      states_{raft::make_pinned_vector<batch_state>(res_, n_queues_)},
       completion_events_(n_queues_),
       input_extents_{n_queues_, max_batch_size_, dim_},
       output_extents_{n_queues_, max_batch_size_, k_},
@@ -598,12 +614,7 @@ class batch_runner {
   {
     // Make sure to initialize the atomic values in the batch_state structs.
     for (uint32_t i = 0; i < n_queues_; i++) {
-      auto& s = states_(i);
-      s.rem_time_us.store(0);
-      s.dispatch_sequence_id.store(uint32_t(-1));
-      batch_token t{0};
-      t.id() = i;
-      batch_queue_.push().store(t);
+      batch_queue_.push().store(batch_token{i});
       // Make sure to initialize query pointers, because they are used for synchronization
       for (uint32_t j = 0; j < max_batch_size_; j++) {
         new (&request_ptrs_(i, j)) request_pointers<T, IdxT>{};
@@ -648,9 +659,11 @@ class batch_runner {
         // try to get a new batch
         continue;
       }
-      batch_token_observed    = std::get<batch_token>(commit_result);
-      const auto batch_offset = batch_token_observed.size_committed();
-      auto& batch_token_ref   = batch_queue_.peek(seq_id);
+      batch_token_observed           = std::get<batch_token>(commit_result);
+      const auto batch_offset        = batch_token_observed.size_committed();
+      auto& batch_token_ref          = batch_queue_.token(seq_id);
+      auto& rem_time_us_ref          = batch_queue_.rem_time_us(seq_id);
+      auto& dispatch_sequence_id_ref = batch_queue_.dispatch_sequence_id(seq_id);
       while (batch_token_observed.id() >= n_queues_) {
         // Wait till the batch has a valid id.
         // TODO: reconsider waiting behavior and the memory order
@@ -660,7 +673,6 @@ class batch_runner {
       bool is_dispatcher = batch_offset == 0;
       auto stream        = raft::resource::get_cuda_stream(res);
       auto batch_id      = batch_token_observed.id();
-      auto& state        = states_(batch_id);
       auto request_ptrs  = slice_2d(batch_id, request_ptrs_);
 
       if (is_dispatcher) {
@@ -668,7 +680,7 @@ class batch_runner {
         gather_inputs<T, IdxT><<<max_batch_size_, 32, 0, stream>>>(
           slice_3d(batch_id, queries_),
           request_ptrs,
-          &state.rem_time_us,
+          &rem_time_us_ref,
           reinterpret_cast<cuda::atomic<uint32_t, cuda::thread_scope_system>*>(
             &reinterpret_cast<batch_token*>(&batch_token_ref)->size_committed()));
       }
@@ -686,15 +698,13 @@ class batch_runner {
       {
         auto rem_time_us = static_cast<int32_t>(
           std::max<int64_t>(0, (deadline - std::chrono::system_clock::now()).count()) / 1000);
-        state.rem_time_us.fetch_min(rem_time_us, cuda::std::memory_order_relaxed);
+        rem_time_us_ref.fetch_min(rem_time_us, cuda::std::memory_order_relaxed);
       }
 
       if (is_dispatcher) {
         auto batch_neighbors = slice_3d(batch_id, neighbors_);
         auto batch_distances = slice_3d(batch_id, distances_);
         upstream_search_(res, slice_3d(batch_id, queries_), batch_neighbors, batch_distances);
-        // batch_token next_batch_token{0};
-        // next_batch_token.id() = batch_id;
         auto& next_token_ref = batch_queue_.push();
         // next_batch_token);
         auto bs = dim3(128, 8, 1);
@@ -702,22 +712,21 @@ class batch_runner {
           request_ptrs,
           batch_neighbors,
           batch_distances,
-          &state.rem_time_us,
+          &rem_time_us_ref,
           reinterpret_cast<cuda::atomic<uint64_t, cuda::thread_scope_system>*>(&batch_token_ref),
-          batch_queue_.loop_oddity(seq_id) ? 0xffffffff00000000ull : 0xfffffffe00000000ull,
+          batch_queue_.loop_invalid_token(seq_id).value,
           reinterpret_cast<cuda::atomic<uint64_t, cuda::thread_scope_system>*>(&next_token_ref),
           batch_id);
         RAFT_CUDA_TRY(cudaEventRecord(completion_events_[batch_id].value(), stream));
-        state.dispatch_sequence_id.store(seq_id.value, cuda::std::memory_order_release);
-        state.dispatch_sequence_id.notify_all();
+        dispatch_sequence_id_ref.store(seq_id.value, cuda::std::memory_order_release);
+        dispatch_sequence_id_ref.notify_all();
 
       } else {
         // Wait till the dispatch_sequence_id counter is updated, which means the event is recorded
-        auto& dispatched_id         = state.dispatch_sequence_id;
-        auto dispatched_id_observed = dispatched_id.load();
+        auto dispatched_id_observed = dispatch_sequence_id_ref.load();
         while (static_cast<int32_t>(seq_id.value - dispatched_id_observed) > 0) {
-          dispatched_id.wait(dispatched_id_observed, cuda::std::memory_order_acquire);
-          dispatched_id_observed = dispatched_id.load(cuda::std::memory_order_acquire);
+          dispatch_sequence_id_ref.wait(dispatched_id_observed, cuda::std::memory_order_acquire);
+          dispatched_id_observed = dispatch_sequence_id_ref.load(cuda::std::memory_order_acquire);
         }
         // Now we can safely record the event
         RAFT_CUDA_TRY(cudaStreamWaitEvent(stream, completion_events_[batch_id].value()));
@@ -741,11 +750,7 @@ class batch_runner {
   uint32_t max_batch_size_;
   uint32_t n_queues_;
 
-  using batch_queue_t =
-    batch_queue_t<batch_token, kMaxNumQueues, batch_token::invalid_range_start().value>;
-  mutable batch_queue_t batch_queue_;
-
-  mutable raft::pinned_vector<batch_state, uint32_t> states_;
+  mutable batch_queue_t<kMaxNumQueues> batch_queue_;
   std::vector<cuda_event> completion_events_;
 
   using batch_extents = raft::extent_3d<uint32_t>;
@@ -763,17 +768,17 @@ class batch_runner {
    * represents offset at which new queries are committed if successful) and the number of committed
    * queries.
    */
-  auto try_commit(batch_queue_t::seq_order_id seq_id, uint32_t n_queries) const noexcept
-    -> std::tuple<batch_token, uint32_t>
+  auto try_commit(batch_queue_t<kMaxNumQueues>::seq_order_id seq_id,
+                  uint32_t n_queries) const noexcept -> std::tuple<batch_token, uint32_t>
   {
     using raft::RAFT_NAME;
-    auto& batch_token_ref            = batch_queue_.peek(seq_id);
+    auto& batch_token_ref            = batch_queue_.token(seq_id);
     batch_token batch_token_observed = batch_token_ref.load();
     batch_token batch_token_updated  = batch_token_observed;
     // We have two values indicating the empty slot and switch between them once a full loop over
     // the token buffer. This allows us to distinguish between the empty future slots (into which a
     // thread can commit) and empty past slots (which are invalid).
-    uint32_t empty_past = batch_queue_.loop_oddity(seq_id) ? 0xffffffffu : 0xfffffffeu;
+    uint32_t empty_past = batch_queue_.loop_invalid_id(seq_id);
     do {
       // If the slot was recently used and now empty, it is an indication that the queue head
       // counter is outdated due to batches being finalized by the kernel (by the timeout).
