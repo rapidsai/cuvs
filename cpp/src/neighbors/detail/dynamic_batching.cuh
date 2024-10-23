@@ -187,25 +187,6 @@ struct alignas(kCacheLineBytes) batch_queue_t {
   static_assert(raft::is_a_power_of_two(kSize), "The size must be a power-of-two for efficiency.");
   static constexpr uint32_t kElemsPerCacheLine =
     raft::div_rounding_up_safe<uint32_t>(kCacheLineBytes, sizeof(value_type));
-  /* [Note: cache-friendly indexing]
-     To avoid false sharing, the queue pushes and pops values not sequentially, but with an
-     increment that is larger than the cache line size.
-     Hence we introduce the `kCounterIncrement > kCacheLineBytes`.
-     However, to make sure all indices are used, we choose the increment to be coprime with the
-     buffer size. We also require that the buffer size is a power-of-two for two reasons:
-       1) Fast modulus operation - reduces to binary `and` (with `kCounterLocMask`).
-       2) Easy to ensure GCD(kCounterIncrement, kSize) == 1 by construction
-          (see the definition below).
-   */
-  static constexpr uint32_t kCounterIncrement = raft::bound_by_power_of_two(kElemsPerCacheLine) + 1;
-  static constexpr uint32_t kCounterLocMask   = kSize - 1;
-  // These props hold by design, but we add them here as a documentation and a sanity check.
-  static_assert(
-    kCounterIncrement * sizeof(value_type) >= kCacheLineBytes,
-    "The counter increment should be larger than the cache line size to avoid false sharing.");
-  static_assert(
-    std::gcd(kCounterIncrement, kSize) == 1,
-    "The counter increment and the size must be coprime to allow using all of the queue slots.");
 
   static constexpr auto kMemOrder = cuda::std::memory_order_relaxed;
 
@@ -233,7 +214,7 @@ struct alignas(kCacheLineBytes) batch_queue_t {
    */
   auto push() noexcept -> cuda::atomic<value_type, cuda::thread_scope_system>&
   {
-    auto& loc = buf_(tail_.fetch_add(kCounterIncrement, kMemOrder) & kCounterLocMask);
+    auto& loc = buf_(cache_friendly_idx(tail_.fetch_add(1, kMemOrder)));
     while (loc.load(kMemOrder).value < 0xfffffffe00000000ull) {  // TODO TMP kEmpty.value
       // Wait till the slot becomes empty (doesn't matter future or past).
       // The batch id is only every updated in the scatter kernel, which is the only source of truth
@@ -248,8 +229,7 @@ struct alignas(kCacheLineBytes) batch_queue_t {
   {
     auto h = head_.load(kMemOrder);
     while (static_cast<int32_t>(h - tail_.load(kMemOrder)) >=
-           static_cast<int32_t>((std::max(kSize, 2 * capacity()) - 2 * capacity()) *
-                                kCounterIncrement)) {
+           static_cast<int32_t>(std::max(kSize, 2 * capacity()) - 2 * capacity())) {
       std::this_thread::yield();
       h = head_.load(kMemOrder);
     }
@@ -258,7 +238,7 @@ struct alignas(kCacheLineBytes) batch_queue_t {
 
   auto peek(seq_order_id id) -> cuda::atomic<value_type, cuda::thread_scope_system>&
   {
-    return buf_(id.value & kCounterLocMask);
+    return buf_(cache_friendly_idx(id.value));
   }
 
   /**
@@ -267,7 +247,7 @@ struct alignas(kCacheLineBytes) batch_queue_t {
    */
   void pop(seq_order_id id) noexcept
   {
-    const auto desired = id.value + kCounterIncrement;
+    const auto desired = id.value + 1;
     auto observed      = id.value;
     while (observed < desired && !head_.compare_exchange_weak(
                                    observed, std::max(observed, desired), kMemOrder, kMemOrder)) {}
@@ -278,10 +258,7 @@ struct alignas(kCacheLineBytes) batch_queue_t {
    * This information is used to distinguish between the empty slots available for committing
    * (future batches) and the invalid, already used slots ("empty past").
    */
-  auto loop_oddity(seq_order_id id) noexcept -> bool
-  {
-    return (((id.value / kCounterIncrement) / kSize) & 0x1) == 0x1;
-  }
+  auto loop_oddity(seq_order_id id) noexcept -> bool { return (id.value & kSize) > 0; }
 
  private:
   alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> tail_{};
@@ -289,6 +266,31 @@ struct alignas(kCacheLineBytes) batch_queue_t {
   alignas(kCacheLineBytes) uint32_t capacity_;
   alignas(kCacheLineBytes)
     cuda_pinned_array<cuda::atomic<value_type, cuda::thread_scope_system>> buf_;
+
+  /* [Note: cache-friendly indexing]
+     To avoid false sharing, the queue pushes and pops values not sequentially, but with an
+     increment that is larger than the cache line size.
+     Hence we introduce the `kCounterIncrement > kCacheLineBytes`.
+     However, to make sure all indices are used, we choose the increment to be coprime with the
+     buffer size. We also require that the buffer size is a power-of-two for two reasons:
+       1) Fast modulus operation - reduces to binary `and` (with `kCounterLocMask`).
+       2) Easy to ensure GCD(kCounterIncrement, kSize) == 1 by construction
+          (see the definition below).
+   */
+  static constexpr uint32_t kCounterIncrement = raft::bound_by_power_of_two(kElemsPerCacheLine) + 1;
+  static constexpr uint32_t kCounterLocMask   = kSize - 1;
+  // These props hold by design, but we add them here as a documentation and a sanity check.
+  static_assert(
+    kCounterIncrement * sizeof(value_type) >= kCacheLineBytes,
+    "The counter increment should be larger than the cache line size to avoid false sharing.");
+  static_assert(
+    std::gcd(kCounterIncrement, kSize) == 1,
+    "The counter increment and the size must be coprime to allow using all of the queue slots.");
+  /** Map the sequential index onto cache-friendly strided index. */
+  static constexpr inline auto cache_friendly_idx(uint32_t source_idx) noexcept -> uint32_t
+  {
+    return (source_idx * kCounterIncrement) & kCounterLocMask;
+  }
 };
 
 template <typename T, typename IdxT>
