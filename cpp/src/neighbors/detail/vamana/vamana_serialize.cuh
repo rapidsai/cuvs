@@ -75,6 +75,7 @@ void serialize(raft::resources const& res,
              d_graph.data_handle(),
              d_graph.size(),
              raft::resource::get_cuda_stream(res));
+  raft::resource::sync_stream(res);
 
   size_t total_edges = 0;
   size_t num_sparse  = 0;

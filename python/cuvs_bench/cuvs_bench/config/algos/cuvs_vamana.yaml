@@ -1,0 +1,10 @@
+name: cuvs_vamana
+groups:
+  base:
+    build:
+      graph_degree: [64, 96]
+      visited_size: [128, 256, 512]
+      alpha: [1.2]
+    search:
+      L_search: [10, 20, 30, 40, 50, 100, 200, 300]
+      num_threads: [32]
