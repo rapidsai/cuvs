@@ -1048,7 +1048,7 @@ void GnndGraph<Index_t>::init_random_graph()
   std::vector<Index_t> rand_seq(nrow);
   std::iota(rand_seq.begin(), rand_seq.end(), 0);
   std::random_shuffle(rand_seq.begin(), rand_seq.end());
-  auto h_dist_ptr = h_dists.data_handle();
+  auto h_dists_ptr = h_dists.data_handle();
 
 #pragma omp parallel for
   for (size_t i = 0; i < nrow; i++) {
