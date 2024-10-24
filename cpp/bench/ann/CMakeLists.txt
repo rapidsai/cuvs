@@ -306,7 +306,9 @@ if(CUVS_ANN_BENCH_USE_DISKANN)
   ConfigureAnnBench(
     NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio
   )
-  ConfigureAnnBench(NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio)
+  ConfigureAnnBench(
+    NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio
+  )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
