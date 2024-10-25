@@ -65,7 +65,7 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
 
         index = build(X, metric=metric, resources=resources)
         D, Ind = search(index, queries, k, resources=resources)
-        handle.sync()
+        resources.sync()
 
         D, Ind = cp.asarray(D), cp.asarray(Ind)
         Ind += i  # shift neighbor index by offset i
