@@ -167,7 +167,7 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
     // Search the `index` built using `ivfFlatBuild`
     cuvsError_t search_status = cuvsIvfFlatSearch(*res, search_params, index,
      queries_tensor, &neighbors_tensor, &distances_tensor);
-    if (build_status != CUVS_SUCCESS) {
+    if (search_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
     }
 
