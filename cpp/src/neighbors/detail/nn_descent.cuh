@@ -1183,15 +1183,11 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
 {
   static_assert(NUM_SAMPLES <= 32);
 
-  thrust::fill(thrust::device,
-               dists_buffer_.data_handle(),
-               dists_buffer_.data_handle() + dists_buffer_.size(),
-               std::numeric_limits<float>::max());
-  thrust::fill(thrust::device,
-               reinterpret_cast<Index_t*>(graph_buffer_.data_handle()),
-               reinterpret_cast<Index_t*>(graph_buffer_.data_handle()) + graph_buffer_.size(),
-               std::numeric_limits<Index_t>::max());
-  thrust::fill(thrust::device, d_locks_.data_handle(), d_locks_.data_handle() + d_locks_.size(), 0);
+  raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
+  auto graph_buffer_view = raft::make_device_matrix_view<Index_t, int64_t>(
+    reinterpret_cast<Index_t*>(graph_buffer_.data_handle()), nrow_, DEGREE_ON_DEVICE);
+  raft::matrix::fill(res, graph_buffer_view, std::numeric_limits<Index_t>::max());
+  raft::matrix::fill(res, d_locks_.view(), 0);
 };
 
 template <typename Data_t, typename Index_t>
