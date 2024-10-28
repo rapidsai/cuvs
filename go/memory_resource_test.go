@@ -6,29 +6,31 @@ import (
 )
 
 func CheckGpuMemory() error {
-	// run nvidia-smi
 	cmd := exec.Command("nvidia-smi")
 	out, err := cmd.Output()
 	println("nvidia-smi output (CheckGpuMemory()): ", string(out))
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func TestMemoryResource(t *testing.T) {
-	err := EnablePoolMemoryResource(50, 100, false)
-	if err != nil {
-		t.Error("failed to enable pool memory resource")
+	t.Log("Starting memory resource test")
+
+	mem := NewCuvsPoolMemory(60, 100, false)
+	defer mem.Close()
+
+	t.Log("Instantiating memory pool...")
+	mem.Instantiate()
+
+	if err := CheckGpuMemory(); err != nil {
+		t.Fatal("GPU memory check failed after instantiation:", err)
 	}
-	CheckGpuMemory()
 
-	err = ResetMemoryResource()
+	t.Log("Releasing memory pool...")
+	mem.Release()
 
-	if err != nil {
-		t.Error("failed to reset memory resource")
+	if err := CheckGpuMemory(); err != nil {
+		t.Fatal("GPU memory check failed after release:", err)
 	}
 
-	CheckGpuMemory()
-
+	t.Log("Memory resource test completed")
 }

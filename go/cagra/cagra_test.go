@@ -126,16 +126,8 @@ func TestCagra(t *testing.T) {
 
 	resource.Sync()
 
-	println("extend return dataset: ------------------------")
-
 	extend_return_dataset.ToHost(&resource)
-	arr_extend_return_dataset, _ := extend_return_dataset.GetArray()
-	for i := range arr_extend_return_dataset {
-		println(arr_extend_return_dataset[i][0])
-		// if arr_extend_return_dataset[i][0] != float32(i) {
-		// 	t.Error("wrong neighbor, expected", i, "got", arr_extend_return_dataset[i][0])
-		// }
-	}
+	// arr_extend_return_dataset, _ := extend_return_dataset.GetArray()
 
 	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
 	arr, _ := neighbors.GetArray()

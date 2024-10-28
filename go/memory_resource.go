@@ -9,81 +9,66 @@ package cuvs
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
 import (
-	"fmt"
 	"runtime"
-	"sync"
 )
 
-var (
-	threadRoutine sync.Once
-	threadChan    chan func() error
-	threadDone    chan struct{}
-	threadWG      sync.WaitGroup
+type CuvsMemoryCommand struct {
+	cmd  int
+	done chan struct{} // Response channel
+}
+
+const (
+	CuvsMemoryNew = iota
+	CuvsMemoryRelease
 )
 
-func initThreadRoutine() {
-	threadChan = make(chan func() error)
-	threadDone = make(chan struct{})
-	threadWG.Add(1)
+type CuvsPoolMemory struct {
+	ch                        chan CuvsMemoryCommand
+	initial_pool_size_percent int
+	max_pool_size_percent     int
+	managed                   bool
+}
+
+func NewCuvsPoolMemory(initial_pool_size_percent int, max_pool_size_percent int, managed bool) *CuvsPoolMemory {
+	c := CuvsPoolMemory{ch: make(chan CuvsMemoryCommand), initial_pool_size_percent: initial_pool_size_percent, max_pool_size_percent: max_pool_size_percent, managed: managed}
+	c.start()
+	return &c
+}
+
+func (m *CuvsPoolMemory) start() {
 	go func() {
-		defer threadWG.Done()
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
-		for {
-			select {
-			case f := <-threadChan:
-				err := f()
-				if err != nil {
-					fmt.Printf("Error in thread routine: %v\n", err)
-				}
-			case <-threadDone:
-				return
+		for command := range m.ch {
+			switch command.cmd {
+			case CuvsMemoryNew:
+				CheckCuvs(CuvsError(C.cuvsRMMPoolMemoryResourceEnable(C.int(m.initial_pool_size_percent), C.int(m.max_pool_size_percent), C._Bool(m.managed))))
+			case CuvsMemoryRelease:
+				CheckCuvs(CuvsError(C.cuvsRMMMemoryResourceReset()))
 			}
 
+			close(command.done)
 		}
 	}()
 }
-
-func runOnSameThread(f func() error) error {
-	threadRoutine.Do(initThreadRoutine)
-	errChan := make(chan error)
-	threadChan <- func() error {
-		err := f()
-		errChan <- err
-		return err
+func (m *CuvsPoolMemory) Close() {
+	close(m.ch)
+}
+func (m *CuvsPoolMemory) Instantiate() {
+	done := make(chan struct{})
+	m.ch <- CuvsMemoryCommand{
+		cmd:  CuvsMemoryNew,
+		done: done,
 	}
-	return <-errChan
+	<-done // Wait for completion
 }
 
-func ShutdownThreadRoutine() {
-	threadRoutine.Do(func() {}) // Ensure the routine was started
-	close(threadDone)
-	threadWG.Wait()
-}
-
-func EnablePoolMemoryResource(initial_pool_size_percent int, max_pool_size_percent int, managed bool) error {
-	return runOnSameThread(func() error {
-		err := CheckCuvs(CuvsError(C.cuvsRMMPoolMemoryResourceEnable(C.int(initial_pool_size_percent), C.int(max_pool_size_percent), C._Bool(managed))))
-		if err != nil {
-			return fmt.Errorf("failed to enable pool memory resource: %v", err)
-		}
-		return nil
-	})
-}
-
-func ResetMemoryResource() error {
-	err := runOnSameThread(func() error {
-
-		err := CheckCuvs(CuvsError(C.cuvsRMMMemoryResourceReset()))
-		if err != nil {
-			return fmt.Errorf("failed to reset memory resource: %v", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
+func (m *CuvsPoolMemory) Release() *CuvsPoolMemory {
+	done := make(chan struct{})
+	m.ch <- CuvsMemoryCommand{
+		cmd:  CuvsMemoryRelease,
+		done: done,
 	}
-
-	ShutdownThreadRoutine()
-	return nil
+	<-done // Wait for completion
+	return m
 }
