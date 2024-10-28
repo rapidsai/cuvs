@@ -169,6 +169,7 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
      queries_tensor, &neighbors_tensor, &distances_tensor);
     if (search_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
+        exit(-1);
     }
 
     int64_t *neighbors = (int64_t *)malloc(n_queries * topk * sizeof(int64_t));
