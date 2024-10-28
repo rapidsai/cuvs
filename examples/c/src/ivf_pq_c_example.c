@@ -76,6 +76,7 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
      queries_tensor, &neighbors_tensor, &distances_tensor);
     if (search_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
+        exit(-1);
     }
 
     int64_t *neighbors = (int64_t *)malloc(n_queries * topk * sizeof(int64_t));
@@ -111,6 +112,7 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
                        &neighbors_refined_tensor, &distances_refined_tensor);
     if (refine_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
+        exit(-1);
     }
 
     int64_t *neighbors_refine = (int64_t *)malloc(n_queries * topk_refined * sizeof(int64_t));
