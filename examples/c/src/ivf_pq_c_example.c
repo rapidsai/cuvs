@@ -74,7 +74,7 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
     // Search the `index` built using `cuvsIvfPqBuild`
     cuvsError_t search_status = cuvsIvfPqSearch(*res, search_params, index,
      queries_tensor, &neighbors_tensor, &distances_tensor);
-    if (build_status != CUVS_SUCCESS) {
+    if (search_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
     }
 
