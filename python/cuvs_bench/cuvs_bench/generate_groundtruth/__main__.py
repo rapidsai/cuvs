@@ -24,7 +24,7 @@ import rmm
 from pylibraft.common import DeviceResources
 from rmm.allocators.cupy import rmm_cupy_allocator
 
-from cuvs.neighbors.brute_force import knn
+from cuvs.neighbors.brute_force import build, search
 
 from .utils import memmap_bin_file, suffix_from_dtype, write_bin
 
@@ -49,7 +49,7 @@ def choose_random_queries(dataset, n_queries):
 
 
 def calc_truth(dataset, queries, k, metric="sqeuclidean"):
-    handle = DeviceResources()
+    resources = DeviceResources()
     n_samples = dataset.shape[0]
     n = 500000  # batch size for processing neighbors
     i = 0
@@ -63,8 +63,9 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
 
         X = cp.asarray(dataset[i : i + n_batch, :], cp.float32)
 
-        D, Ind = knn(X, queries, k, metric=metric, handle=handle)
-        handle.sync()
+        index = build(X, metric=metric, resources=resources)
+        D, Ind = search(index, queries, k, resources=resources)
+        resources.sync()
 
         D, Ind = cp.asarray(D), cp.asarray(Ind)
         Ind += i  # shift neighbor index by offset i
