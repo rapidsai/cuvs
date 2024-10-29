@@ -24,7 +24,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
-#include "../../../../src/neighbors/detail/cagra/utils.hpp"
+#include <../../../../src/neighbors/detail/cagra/utils.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
