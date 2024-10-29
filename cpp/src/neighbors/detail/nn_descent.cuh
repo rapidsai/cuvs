@@ -1256,7 +1256,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
                                        l2_norms_.data_handle(),
                                        batch.offset());
   }
-  raft::print_device_vector("loaded_data", d_data_, nrow_ * ndim_, std::cout);
+  raft::print_device_vector("loaded_data", d_data_.data_handle(), nrow_ * ndim_, std::cout);
 
   thrust::fill(thrust::device.on(stream),
                (Index_t*)graph_buffer_.data_handle(),
@@ -1265,9 +1265,9 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
 
   graph_.clear();
   graph_.init_random_graph();
-  raft::print_host_vector("graph_init", graph_.h_graph, nrow_ * DEGREE_ON_DEVICE, std::cout);
+  raft::print_host_vector("graph_init", graph_.h_graph, nrow_ * graph_.node_degree std::cout);
   graph_.sample_graph(true);
-  raft::print_host_vector("graph_sample", graph_.h_graph, nrow_ * DEGREE_ON_DEVICE, std::cout);
+  raft::print_host_vector("graph_sample", graph_.h_graph, nrow_ * graph_.node_degree, std::cout);
 
   auto update_and_sample = [&](bool update_graph) {
     if (update_graph) {
