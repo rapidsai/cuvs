@@ -135,11 +135,9 @@ template <typename DataT, typename IndexT, typename DistanceT>
 struct store {
   /** Number of descriptors to cache. */
   static constexpr size_t kDefaultSize = 100;
-  raft::cache::lru<key,
-                   key_hash,
-                   std::equal_to<>,
-                   std::shared_ptr<dataset_descriptor_host<DataT, IndexT, DistanceT>>>
-    value{kDefaultSize};
+  raft::cache::
+    lru<key, key_hash, std::equal_to<>, dataset_descriptor_host<DataT, IndexT, DistanceT>>
+      value{kDefaultSize};
 };
 
 }  // namespace descriptor_cache
@@ -161,18 +159,16 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
                                         cuvs::distance::DistanceType metric)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
-  using desc_t = dataset_descriptor_host<DataT, IndexT, DistanceT>;
-  auto key     = descriptor_cache::make_key(params, dataset, metric);
+  auto key = descriptor_cache::make_key(params, dataset, metric);
   auto& cache =
     raft::resource::get_custom_resource<descriptor_cache::store<DataT, IndexT, DistanceT>>(res)
       ->value;
-  std::shared_ptr<desc_t> desc{nullptr};
+  dataset_descriptor_host<DataT, IndexT, DistanceT> desc;
   if (!cache.get(key, &desc)) {
-    desc = std::make_shared<desc_t>(
-      std::move(dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric)));
+    desc = dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric);
     cache.set(key, desc);
   }
-  return *desc;
+  return desc;
 }
 
 };  // namespace cuvs::neighbors::cagra::detail
