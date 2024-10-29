@@ -38,6 +38,7 @@ include(../cmake/thirdparty/get_cuvs.cmake)
 # -------------- compile tasks ----------------- #
 add_executable(CAGRA_EXAMPLE src/cagra_example.cu)
 add_executable(CAGRA_PERSISTENT_EXAMPLE src/cagra_persistent_example.cu)
+add_executable(DYNAMIC_BATCHING_EXAMPLE src/dynamic_batching_example.cu)
 add_executable(IVF_FLAT_EXAMPLE src/ivf_flat_example.cu)
 add_executable(IVF_PQ_EXAMPLE src/ivf_pq_example.cu)
 add_executable(VAMANA_EXAMPLE src/vamana_example.cu)
@@ -47,6 +48,9 @@ add_executable(VAMANA_EXAMPLE src/vamana_example.cu)
 target_link_libraries(CAGRA_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
 target_link_libraries(
   CAGRA_PERSISTENT_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env> Threads::Threads
+)
+target_link_libraries(
+  DYNAMIC_BATCHING_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env> Threads::Threads
 )
 target_link_libraries(IVF_PQ_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
 target_link_libraries(IVF_FLAT_EXAMPLE PRIVATE cuvs::cuvs $<TARGET_NAME_IF_EXISTS:conda_env>)
