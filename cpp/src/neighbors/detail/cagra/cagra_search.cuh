@@ -21,6 +21,7 @@
 #include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta_inst.cuh"
+#include "utils.hpp"
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -111,6 +112,109 @@ void search_main_core(raft::resources const& res,
 }
 
 /**
+ * @brief Performs ANN search using brute force when filter sparsity exceeds a specified threshold.
+ *
+ * This function switches to a brute force search approach to improve recall rate when the
+ * `sample_filter` function filters out a high proportion of samples, resulting in a sparsity level
+ * (proportion of unfiltered samples) exceeding the specified `threshold_to_bf`.
+ *
+ * @tparam T data element type
+ * @tparam IdxT type of database vector indices
+ * @tparam internal_IdxT during search we map IdxT to internal_IdxT, this way we do not need
+ * separate kernels for int/uint.
+ *
+ * @param[in] handle
+ * @param[in] params configure the search
+ * @param[in] idx ivf-pq constructed index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter a device filter function that greenlights samples for a given query
+ * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
+ * threshold, in the range [0, 1]
+ *
+ * @return true If the brute force search was applied successfully.
+ * @return false If the brute force search was not applied.
+ */
+template <typename T,
+          typename InternalIdxT,
+          typename CagraSampleFilterT,
+          typename IdxT      = uint32_t,
+          typename DistanceT = float>
+bool search_using_brute_force(
+  raft::resources const& res,
+  search_params& params,
+  const index<T, IdxT>& index,
+  raft::device_matrix_view<const T, int64_t, raft::row_major>& queries,
+  raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major>& neighbors,
+  raft::device_matrix_view<DistanceT, int64_t, raft::row_major>& distances,
+  CagraSampleFilterT& sample_filter,
+  double threshold_to_bf = 0.9)
+{
+  bool is_applied = false;
+  auto n_queries  = queries.extent(0);
+  auto n_dataset  = index.size();
+
+  auto bitset_filter_view = sample_filter.bitset_view_;
+  auto dataset_view       = index.contiguous_dataset();
+  auto sparsity           = bitset_filter_view.sparsity(res);
+
+  // TODO: Support host dataset in `brute_force::build`
+  if (sparsity >= threshold_to_bf &&
+      std::holds_alternative<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
+        dataset_view)) {
+    using bitmap_view_t = cuvs::core::bitmap_view<const uint32_t, int64_t>;
+
+    auto stream            = raft::resource::get_cuda_stream(res);
+    auto bitmap_n_elements = bitmap_view_t::eval_n_elements(bitset_filter_view.size() * n_queries);
+
+    rmm::device_uvector<uint32_t> raw_bitmap(bitmap_n_elements, stream);
+    rmm::device_uvector<int64_t> raw_neighbors(neighbors.size(), stream);
+
+    bitset_filter_view.repeat(res, n_queries, raw_bitmap.data());
+
+    auto brute_force_filter = bitmap_view_t(raw_bitmap.data(), n_queries, n_dataset);
+
+    auto brute_force_neighbors = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
+      raw_neighbors.data(), neighbors.extent(0), neighbors.extent(1));
+    auto brute_force_dataset =
+      std::get_if<raft::device_matrix_view<const T, int64_t, raft::row_major>>(&dataset_view);
+
+    if (brute_force_dataset) {
+      RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%d", sparsity);
+      auto brute_force_idx =
+        cuvs::neighbors::brute_force::build(res, *brute_force_dataset, index.metric());
+
+      auto brute_force_queries = queries;
+      auto padding_queries     = raft::make_device_matrix<T, int64_t>(res, 0, 0);
+
+      // Happens when the original dataset is a strided matrix.
+      if (brute_force_dataset->extent(1) != queries.extent(1)) {
+        cuvs::neighbors::cagra::detail::copy_with_padding(res, padding_queries, queries);
+        brute_force_queries = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+          padding_queries.data_handle(), padding_queries.extent(0), padding_queries.extent(1));
+      }
+      cuvs::neighbors::brute_force::search(
+        res,
+        brute_force_idx,
+        brute_force_queries,
+        brute_force_neighbors,
+        distances,
+        cuvs::neighbors::filtering::bitmap_filter(brute_force_filter));
+      raft::linalg::unaryOp(neighbors.data_handle(),
+                            brute_force_neighbors.data_handle(),
+                            neighbors.size(),
+                            raft::cast_op<InternalIdxT>(),
+                            raft::resource::get_cuda_stream(res));
+      is_applied = true;
+    }
+  }
+  return is_applied;
+}
+
+/**
  * @brief Search ANN using the constructed index.
  *
  * See the [build](#build) documentation for a usage example.
@@ -128,6 +232,7 @@ void search_main_core(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter a device filter function that greenlights samples for a given query
  */
 template <typename T,
           typename InternalIdxT,
@@ -145,56 +250,9 @@ void search_main(raft::resources const& res,
   if constexpr (!std::is_same_v<CagraSampleFilterT,
                                 cuvs::neighbors::filtering::none_sample_filter> &&
                 (std::is_same_v<T, float> || std::is_same_v<T, half>)) {
-    auto n_queries = queries.extent(0);
-    auto n_dataset = index.size();
-
-    auto bitset_filter_view = sample_filter.bitset_view_;
-    auto dataset_view       = index.contiguous_dataset();
-
-    auto sparsity                    = bitset_filter_view.sparsity(res);
-    constexpr double threshold_to_bf = 0.9;
-
-    // TODO: Support host dataset in `brute_force::build`
-    if (sparsity >= threshold_to_bf &&
-        std::holds_alternative<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
-          dataset_view)) {
-      using bitmap_view_t = cuvs::core::bitmap_view<const uint32_t, int64_t>;
-
-      auto stream = raft::resource::get_cuda_stream(res);
-      auto bitmap_n_elements =
-        bitmap_view_t::eval_n_elements(bitset_filter_view.size() * n_queries);
-
-      rmm::device_uvector<uint32_t> raw_bitmap(bitmap_n_elements, stream);
-      rmm::device_uvector<int64_t> raw_neighbors(neighbors.size(), stream);
-
-      bitset_filter_view.repeat(res, n_queries, raw_bitmap.data());
-
-      auto brute_force_filter = bitmap_view_t(raw_bitmap.data(), n_queries, n_dataset);
-
-      auto brute_force_neighbors = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
-        raw_neighbors.data(), neighbors.extent(0), neighbors.extent(1));
-      auto brute_force_dataset =
-        std::get_if<raft::device_matrix_view<const T, int64_t, raft::row_major>>(&dataset_view);
-
-      if (brute_force_dataset) {
-        RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%d", sparsity);
-        auto brute_force_idx =
-          cuvs::neighbors::brute_force::build(res, *brute_force_dataset, index.metric());
-        cuvs::neighbors::brute_force::search(
-          res,
-          brute_force_idx,
-          queries,
-          brute_force_neighbors,
-          distances,
-          cuvs::neighbors::filtering::bitmap_filter(brute_force_filter));
-        raft::linalg::unaryOp(neighbors.data_handle(),
-                              brute_force_neighbors.data_handle(),
-                              neighbors.size(),
-                              raft::cast_op<InternalIdxT>(),
-                              raft::resource::get_cuda_stream(res));
-        return;
-      }
-    }
+    bool bf_search_done =
+      search_using_brute_force(res, params, index, queries, neighbors, distances, sample_filter);
+    if (bf_search_done) return;
   }
 
   auto stream         = raft::resource::get_cuda_stream(res);

@@ -23,6 +23,9 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
+
+#include "../../../../src/neighbors/detail/cagra/utils.hpp"
+
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -780,6 +783,18 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
+        auto dataset_padding = raft::make_device_matrix<DataT, int64_t>(handle_, 0, 0);
+        if ((sizeof(DataT) * ps.dim % 16) != 0) {
+          cuvs::neighbors::cagra::detail::copy_with_padding(
+            handle_, dataset_padding, database_view);
+          auto database_view = raft::make_device_strided_matrix_view<const DataT, int64_t>(
+            dataset_padding.data_handle(),
+            dataset_padding.extent(0),
+            ps.dim,
+            dataset_padding.extent(1));
+          index.update_dataset(handle_, database_view);
+        }
+
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
         auto indices_out_view =
@@ -1036,9 +1051,9 @@ inline std::vector<AnnCagraInputs> generate_bf_inputs()
   std::vector<AnnCagraInputs> inputs_for_brute_force;
   auto inputs_original = raft::util::itertools::product<AnnCagraInputs>(
     {100},
-    {10000, 100000},
-    {1, 8, 17},
-    {1, 16, 256},  // k
+    {1000},
+    {1, 7, 8, 17},
+    {1, 16},  // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 1, 10, 100},

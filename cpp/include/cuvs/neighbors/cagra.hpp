@@ -432,11 +432,8 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {
-    contiguous_dataset_ = std::monostate{};
-    if (dataset.stride(0) == dataset.extent(1) && dataset.stride(1) == 1) {
-      contiguous_dataset_ =
-        raft::make_device_matrix_view(dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-    }
+    contiguous_dataset_ =
+      raft::make_device_matrix_view(dataset.data_handle(), dataset.extent(0), dataset.stride(0));
     dataset_ = make_aligned_dataset(res, dataset, 16);
   }
 
