@@ -19,6 +19,8 @@ from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
+import rmm
+
 from cuvs.neighbors import ivf_pq
 from cuvs.test.ann_utils import calc_recall, generate_data
 
@@ -44,83 +46,89 @@ def run_ivf_pq_build_search_test(
     compare=True,
     inplace=True,
 ):
-    dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product":
-        dataset = normalize(dataset, norm="l2", axis=1)
-    dataset_device = device_ndarray(dataset)
+    for i in range(2):
+        rmm.reinitialize(
+            managed_memory=False,
+            pool_allocator=False,
+            initial_pool_size=2 << 30,
+        )
+        dataset = generate_data((n_rows, n_cols), dtype)
+        if metric == "inner_product":
+            dataset = normalize(dataset, norm="l2", axis=1)
+        dataset_device = device_ndarray(dataset)
 
-    build_params = ivf_pq.IndexParams(
-        n_lists=n_lists,
-        metric=metric,
-        kmeans_n_iters=kmeans_n_iters,
-        kmeans_trainset_fraction=kmeans_trainset_fraction,
-        pq_bits=pq_bits,
-        pq_dim=pq_dim,
-        codebook_kind=codebook_kind,
-        force_random_rotation=force_random_rotation,
-        add_data_on_build=add_data_on_build,
-    )
+        build_params = ivf_pq.IndexParams(
+            n_lists=n_lists,
+            metric=metric,
+            kmeans_n_iters=kmeans_n_iters,
+            kmeans_trainset_fraction=kmeans_trainset_fraction,
+            pq_bits=pq_bits,
+            pq_dim=pq_dim,
+            codebook_kind=codebook_kind,
+            force_random_rotation=force_random_rotation,
+            add_data_on_build=add_data_on_build,
+        )
 
-    index = ivf_pq.build(build_params, dataset_device)
-    if not add_data_on_build:
-        dataset_1 = dataset[: n_rows // 2, :]
-        dataset_2 = dataset[n_rows // 2 :, :]
-        indices_1 = np.arange(n_rows // 2, dtype=np.int64)
-        indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.int64)
+        index = ivf_pq.build(build_params, dataset_device)
+        if not add_data_on_build:
+            dataset_1 = dataset[: n_rows // 2, :]
+            dataset_2 = dataset[n_rows // 2 :, :]
+            indices_1 = np.arange(n_rows // 2, dtype=np.int64)
+            indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.int64)
 
-        dataset_1_device = device_ndarray(dataset_1)
-        dataset_2_device = device_ndarray(dataset_2)
-        indices_1_device = device_ndarray(indices_1)
-        indices_2_device = device_ndarray(indices_2)
-        index = ivf_pq.extend(index, dataset_1_device, indices_1_device)
-        index = ivf_pq.extend(index, dataset_2_device, indices_2_device)
+            dataset_1_device = device_ndarray(dataset_1)
+            dataset_2_device = device_ndarray(dataset_2)
+            indices_1_device = device_ndarray(indices_1)
+            indices_2_device = device_ndarray(indices_2)
+            index = ivf_pq.extend(index, dataset_1_device, indices_1_device)
+            index = ivf_pq.extend(index, dataset_2_device, indices_2_device)
 
-    queries = generate_data((n_queries, n_cols), dtype)
-    out_idx = np.zeros((n_queries, k), dtype=np.int64)
-    out_dist = np.zeros((n_queries, k), dtype=np.float32)
+        queries = generate_data((n_queries, n_cols), dtype)
+        out_idx = np.zeros((n_queries, k), dtype=np.int64)
+        out_dist = np.zeros((n_queries, k), dtype=np.float32)
 
-    queries_device = device_ndarray(queries)
-    out_idx_device = device_ndarray(out_idx) if inplace else None
-    out_dist_device = device_ndarray(out_dist) if inplace else None
+        queries_device = device_ndarray(queries)
+        out_idx_device = device_ndarray(out_idx) if inplace else None
+        out_dist_device = device_ndarray(out_dist) if inplace else None
 
-    search_params = ivf_pq.SearchParams(
-        n_probes=n_probes,
-        lut_dtype=lut_dtype,
-        internal_distance_dtype=internal_distance_dtype,
-    )
+        search_params = ivf_pq.SearchParams(
+            n_probes=n_probes,
+            lut_dtype=lut_dtype,
+            internal_distance_dtype=internal_distance_dtype,
+        )
 
-    ret_output = ivf_pq.search(
-        search_params,
-        index,
-        queries_device,
-        k,
-        neighbors=out_idx_device,
-        distances=out_dist_device,
-    )
+        ret_output = ivf_pq.search(
+            search_params,
+            index,
+            queries_device,
+            k,
+            neighbors=out_idx_device,
+            distances=out_dist_device,
+        )
 
-    if not inplace:
-        out_dist_device, out_idx_device = ret_output
+        if not inplace:
+            out_dist_device, out_idx_device = ret_output
 
-    if not compare:
-        return
+        if not compare:
+            return
 
-    out_idx = out_idx_device.copy_to_host()
-    out_dist = out_dist_device.copy_to_host()
+        out_idx = out_idx_device.copy_to_host()
+        out_dist = out_dist_device.copy_to_host()
 
-    # Calculate reference values with sklearn
-    skl_metric = {
-        "sqeuclidean": "sqeuclidean",
-        "inner_product": "cosine",
-        "euclidean": "euclidean",
-    }[metric]
-    nn_skl = NearestNeighbors(
-        n_neighbors=k, algorithm="brute", metric=skl_metric
-    )
-    nn_skl.fit(dataset)
-    skl_idx = nn_skl.kneighbors(queries, return_distance=False)
+        # Calculate reference values with sklearn
+        skl_metric = {
+            "sqeuclidean": "sqeuclidean",
+            "inner_product": "cosine",
+            "euclidean": "euclidean",
+        }[metric]
+        nn_skl = NearestNeighbors(
+            n_neighbors=k, algorithm="brute", metric=skl_metric
+        )
+        nn_skl.fit(dataset)
+        skl_idx = nn_skl.kneighbors(queries, return_distance=False)
 
-    recall = calc_recall(out_idx, skl_idx)
-    assert recall > 0.7
+        recall = calc_recall(out_idx, skl_idx)
+        assert recall > 0.7
 
 
 @pytest.mark.parametrize("inplace", [True, False])

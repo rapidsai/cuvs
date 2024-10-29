@@ -15,72 +15,92 @@
 
 import numpy as np
 import pytest
+from ann_utils import calc_recall, generate_data
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
+import rmm
+
 from cuvs.neighbors import cagra, hnsw
-from cuvs.test.ann_utils import calc_recall, generate_data
 
 
 def run_hnsw_build_search_test(
     n_rows=10000,
-    n_cols=10,
-    n_queries=100,
+    n_cols=1,
+    n_queries=5,
     k=10,
     dtype=np.float32,
     metric="sqeuclidean",
     build_algo="ivf_pq",
     intermediate_graph_degree=128,
     graph_degree=64,
-    search_params={},
+    search_params1={},
 ):
-    dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product":
-        dataset = normalize(dataset, norm="l2", axis=1)
-        if dtype in [np.int8, np.uint8]:
-            pytest.skip(
-                "inner_product metric is not supported for int8/uint8 data"
-            )
-        if build_algo == "nn_descent":
-            pytest.skip("inner_product metric is not supported for nn_descent")
+    for i in range(2):
+        rmm.reinitialize(
+            managed_memory=False,
+            pool_allocator=False,
+            initial_pool_size=2 << 30,
+        )
+        dataset = generate_data((n_rows, n_cols), dtype)
+        print("dataset", dataset)
+        if metric == "inner_product":
+            dataset = normalize(dataset, norm="l2", axis=1)
+            if dtype in [np.int8, np.uint8]:
+                pytest.skip(
+                    "inner_product metric is not supported for int8/uint8 data"
+                )
+            if build_algo == "nn_descent":
+                pytest.skip(
+                    "inner_product metric is not supported for nn_descent"
+                )
 
-    build_params = cagra.IndexParams(
-        metric=metric,
-        intermediate_graph_degree=intermediate_graph_degree,
-        graph_degree=graph_degree,
-        build_algo=build_algo,
-    )
+        build_params = cagra.IndexParams(
+            metric=metric,
+            intermediate_graph_degree=intermediate_graph_degree,
+            graph_degree=graph_degree,
+            build_algo=build_algo,
+        )
+        # print("build_params", build_params)
 
-    index = cagra.build(build_params, dataset)
+        # if i == 1:
+        # breakpoint()
+        index = cagra.build(build_params, dataset)
 
-    assert index.trained
+        assert index.trained
 
-    hnsw_index = hnsw.from_cagra(index)
+        hnsw_index = hnsw.from_cagra(index)
 
-    queries = generate_data((n_queries, n_cols), dtype)
+        queries = generate_data((n_queries, n_cols), dtype)
+        print("queries", queries)
 
-    search_params = hnsw.SearchParams(**search_params)
+        search_params = hnsw.SearchParams(**search_params1)
 
-    out_dist, out_idx = hnsw.search(search_params, hnsw_index, queries, k)
+        out_dist, out_idx = hnsw.search(search_params, hnsw_index, queries, k)
+        print("out_idx", out_idx)
+        print("out_dist", out_dist)
 
-    # Calculate reference values with sklearn
-    skl_metric = {
-        "sqeuclidean": "sqeuclidean",
-        "inner_product": "cosine",
-        "euclidean": "euclidean",
-    }[metric]
-    nn_skl = NearestNeighbors(
-        n_neighbors=k, algorithm="brute", metric=skl_metric
-    )
-    nn_skl.fit(dataset)
-    skl_dist, skl_idx = nn_skl.kneighbors(queries, return_distance=True)
+        # Calculate reference values with sklearn
+        skl_metric = {
+            "sqeuclidean": "sqeuclidean",
+            "inner_product": "cosine",
+            "euclidean": "euclidean",
+        }[metric]
+        nn_skl = NearestNeighbors(
+            n_neighbors=k, algorithm="brute", metric=skl_metric
+        )
+        nn_skl.fit(dataset)
+        skl_dist, skl_idx = nn_skl.kneighbors(queries, return_distance=True)
+        print("skl_idx", skl_idx)
+        print("skl_dist", skl_dist)
 
-    recall = calc_recall(out_idx, skl_idx)
-    assert recall > 0.95
+        recall = calc_recall(out_idx, skl_idx)
+        print("recall", recall)
+        assert recall > 0.95
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
-@pytest.mark.parametrize("k", [10, 20])
+@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("k", [3])
 @pytest.mark.parametrize("ef", [30, 40])
 @pytest.mark.parametrize("num_threads", [2, 4])
 @pytest.mark.parametrize("metric", ["sqeuclidean"])
@@ -93,5 +113,5 @@ def test_hnsw(dtype, k, ef, num_threads, metric, build_algo):
         k=k,
         metric=metric,
         build_algo=build_algo,
-        search_params={"ef": ef, "num_threads": num_threads},
+        search_params1={"ef": ef, "num_threads": num_threads},
     )

@@ -19,6 +19,8 @@ from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
+import rmm
+
 from cuvs.neighbors import cagra
 from cuvs.test.ann_utils import calc_recall, generate_data
 
@@ -37,85 +39,91 @@ def run_cagra_build_search_test(
     compare=True,
     inplace=True,
     add_data_on_build=True,
-    search_params={},
+    search_params1={},
     compression=None,
 ):
-    dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product":
-        dataset = normalize(dataset, norm="l2", axis=1)
-    dataset_device = device_ndarray(dataset)
+    for i in range(2):
+        rmm.reinitialize(
+            managed_memory=False,
+            pool_allocator=False,
+            initial_pool_size=2 << 30,
+        )
+        dataset = generate_data((n_rows, n_cols), dtype)
+        if metric == "inner_product":
+            dataset = normalize(dataset, norm="l2", axis=1)
+        dataset_device = device_ndarray(dataset)
 
-    build_params = cagra.IndexParams(
-        metric=metric,
-        intermediate_graph_degree=intermediate_graph_degree,
-        graph_degree=graph_degree,
-        build_algo=build_algo,
-        compression=compression,
-    )
+        build_params = cagra.IndexParams(
+            metric=metric,
+            intermediate_graph_degree=intermediate_graph_degree,
+            graph_degree=graph_degree,
+            build_algo=build_algo,
+            compression=compression,
+        )
 
-    if array_type == "device":
-        index = cagra.build(build_params, dataset_device)
-    else:
-        index = cagra.build(build_params, dataset)
-
-    if not add_data_on_build:
-        dataset_1 = dataset[: n_rows // 2, :]
-        dataset_2 = dataset[n_rows // 2 :, :]
-        indices_1 = np.arange(n_rows // 2, dtype=np.uint32)
-        indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.uint32)
         if array_type == "device":
-            dataset_1_device = device_ndarray(dataset_1)
-            dataset_2_device = device_ndarray(dataset_2)
-            indices_1_device = device_ndarray(indices_1)
-            indices_2_device = device_ndarray(indices_2)
-            index = cagra.extend(index, dataset_1_device, indices_1_device)
-            index = cagra.extend(index, dataset_2_device, indices_2_device)
+            index = cagra.build(build_params, dataset_device)
         else:
-            index = cagra.extend(index, dataset_1, indices_1)
-            index = cagra.extend(index, dataset_2, indices_2)
+            index = cagra.build(build_params, dataset)
 
-    queries = generate_data((n_queries, n_cols), dtype)
-    out_idx = np.zeros((n_queries, k), dtype=np.uint32)
-    out_dist = np.zeros((n_queries, k), dtype=np.float32)
+            # if not add_data_on_build:
+            dataset_1 = dataset[: n_rows // 2, :]
+            dataset_2 = dataset[n_rows // 2 :, :]
+            indices_1 = np.arange(n_rows // 2, dtype=np.uint32)
+            indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.uint32)
+            if array_type == "device":
+                dataset_1_device = device_ndarray(dataset_1)
+                dataset_2_device = device_ndarray(dataset_2)
+                indices_1_device = device_ndarray(indices_1)
+                indices_2_device = device_ndarray(indices_2)
+                index = cagra.extend(index, dataset_1_device, indices_1_device)
+                index = cagra.extend(index, dataset_2_device, indices_2_device)
+            else:
+                index = cagra.extend(index, dataset_1, indices_1)
+                index = cagra.extend(index, dataset_2, indices_2)
 
-    queries_device = device_ndarray(queries)
-    out_idx_device = device_ndarray(out_idx) if inplace else None
-    out_dist_device = device_ndarray(out_dist) if inplace else None
+        queries = generate_data((n_queries, n_cols), dtype)
+        out_idx = np.zeros((n_queries, k), dtype=np.uint32)
+        out_dist = np.zeros((n_queries, k), dtype=np.float32)
 
-    search_params = cagra.SearchParams(**search_params)
+        queries_device = device_ndarray(queries)
+        out_idx_device = device_ndarray(out_idx) if inplace else None
+        out_dist_device = device_ndarray(out_dist) if inplace else None
 
-    ret_output = cagra.search(
-        search_params,
-        index,
-        queries_device,
-        k,
-        neighbors=out_idx_device,
-        distances=out_dist_device,
-    )
+        search_params = cagra.SearchParams(**search_params1)
 
-    if not inplace:
-        out_dist_device, out_idx_device = ret_output
+        ret_output = cagra.search(
+            search_params,
+            index,
+            queries_device,
+            k,
+            neighbors=out_idx_device,
+            distances=out_dist_device,
+        )
 
-    if not compare:
-        return
+        if not inplace:
+            out_dist_device, out_idx_device = ret_output
 
-    out_idx = out_idx_device.copy_to_host()
-    out_dist = out_dist_device.copy_to_host()
+        if not compare:
+            return
 
-    # Calculate reference values with sklearn
-    skl_metric = {
-        "sqeuclidean": "sqeuclidean",
-        "inner_product": "cosine",
-        "euclidean": "euclidean",
-    }[metric]
-    nn_skl = NearestNeighbors(
-        n_neighbors=k, algorithm="brute", metric=skl_metric
-    )
-    nn_skl.fit(dataset)
-    skl_idx = nn_skl.kneighbors(queries, return_distance=False)
+        out_idx = out_idx_device.copy_to_host()
+        out_dist = out_dist_device.copy_to_host()
 
-    recall = calc_recall(out_idx, skl_idx)
-    assert recall > 0.7
+        # Calculate reference values with sklearn
+        skl_metric = {
+            "sqeuclidean": "sqeuclidean",
+            "inner_product": "cosine",
+            "euclidean": "euclidean",
+        }[metric]
+        nn_skl = NearestNeighbors(
+            n_neighbors=k, algorithm="brute", metric=skl_metric
+        )
+        nn_skl.fit(dataset)
+        skl_idx = nn_skl.kneighbors(queries, return_distance=False)
+
+        recall = calc_recall(out_idx, skl_idx)
+        assert recall > 0.7
 
 
 @pytest.mark.parametrize("inplace", [True, False])

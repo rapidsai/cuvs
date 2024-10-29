@@ -16,6 +16,7 @@ import numpy as np
 
 
 def generate_data(shape, dtype):
+    np.random.seed(0)
     if dtype == np.byte:
         x = np.random.randint(-127, 128, size=shape, dtype=np.byte)
     elif dtype == np.ubyte:
