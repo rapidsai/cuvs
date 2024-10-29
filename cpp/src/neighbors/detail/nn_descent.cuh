@@ -25,6 +25,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/matrix/init.cuh>
 
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
