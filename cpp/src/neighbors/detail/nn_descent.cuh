@@ -1381,12 +1381,12 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
 }
 
 template <typename T,
-          typename IdxT = uint32_t,
-          typename Accessor =
-            host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
 void build(raft::resources const& res,
            const index_params& params,
-           mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
+           raft::mdspan<const T, matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
            index<IdxT>& idx)
 {
   RAFT_EXPECTS(dataset.extent(0) < std::numeric_limits<int>::max() - 1,
@@ -1418,7 +1418,7 @@ void build(raft::resources const& res,
   size_t extended_intermediate_degree = align32::roundUp(
     static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
-  auto int_graph = raft::make_host_matrix<int, int64_t, row_major>(
+  auto int_graph = raft::make_host_matrix<int, int64_t, raft::row_major>(
     dataset.extent(0), static_cast<int64_t>(extended_graph_degree));
 
   BuildConfig build_config{.max_dataset_size      = static_cast<size_t>(dataset.extent(0)),
@@ -1442,12 +1442,12 @@ void build(raft::resources const& res,
 }
 
 template <typename T,
-          typename IdxT = uint32_t,
-          typename Accessor =
-            host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
 index<IdxT> build(raft::resources const& res,
                   const index_params& params,
-                  mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset)
+                  raft::mdspan<const T, matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
