@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "cagra/device_common.hpp"
+
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -26,7 +28,6 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/cagra/device_common.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
