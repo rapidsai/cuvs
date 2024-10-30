@@ -23,9 +23,6 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
-
-#include <../../../../src/neighbors/detail/cagra/utils.hpp>
-
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -95,6 +92,39 @@ void RandomSuffle(raft::host_matrix_view<IdxT, int64_t> index)
       row_ptr[i0]    = row_ptr[i1];
       row_ptr[i1]    = tmp;
     }
+  }
+}
+
+template <typename T, typename data_accessor>
+void copy_with_padding(
+  raft::resources const& res,
+  raft::device_matrix<T, int64_t, raft::row_major>& dst,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> src,
+  rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
+{
+  size_t padded_dim = raft::round_up_safe<size_t>(src.extent(1) * sizeof(T), 16) / sizeof(T);
+
+  if ((dst.extent(0) != src.extent(0)) || (static_cast<size_t>(dst.extent(1)) != padded_dim)) {
+    // clear existing memory before allocating to prevent OOM errors on large datasets
+    if (dst.size()) { dst = raft::make_device_matrix<T, int64_t>(res, 0, 0); }
+    dst =
+      raft::make_device_mdarray<T>(res, mr, raft::make_extents<int64_t>(src.extent(0), padded_dim));
+  }
+  if (dst.extent(1) == src.extent(1)) {
+    raft::copy(
+      dst.data_handle(), src.data_handle(), src.size(), raft::resource::get_cuda_stream(res));
+  } else {
+    // copy with padding
+    RAFT_CUDA_TRY(cudaMemsetAsync(
+      dst.data_handle(), 0, dst.size() * sizeof(T), raft::resource::get_cuda_stream(res)));
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst.data_handle(),
+                                    sizeof(T) * dst.extent(1),
+                                    src.data_handle(),
+                                    sizeof(T) * src.extent(1),
+                                    sizeof(T) * src.extent(1),
+                                    src.extent(0),
+                                    cudaMemcpyDefault,
+                                    raft::resource::get_cuda_stream(res)));
   }
 }
 
@@ -785,8 +815,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         auto dataset_padding = raft::make_device_matrix<DataT, int64_t>(handle_, 0, 0);
         if ((sizeof(DataT) * ps.dim % 16) != 0) {
-          cuvs::neighbors::cagra::detail::copy_with_padding(
-            handle_, dataset_padding, database_view);
+          copy_with_padding(handle_, dataset_padding, database_view);
           auto database_view = raft::make_device_strided_matrix_view<const DataT, int64_t>(
             dataset_padding.data_handle(),
             dataset_padding.extent(0),
