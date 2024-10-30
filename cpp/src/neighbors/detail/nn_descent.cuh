@@ -793,8 +793,8 @@ __launch_bounds__(BLOCK_SIZE, 4)
   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
   wmma::fill_fragment(c_frag, 0.0);
-  for (int step = 0; step < raft::raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-    int num_load_elems = (step == raft::raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
+  for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
+    int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
                            ? data_dim - step * TILE_COL_WIDTH
                            : TILE_COL_WIDTH;
 #pragma unroll
@@ -843,7 +843,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
   }
   __syncthreads();
 
-  for (int step = 0; step < raft::raft::ceildiv(list_new_size, num_warps); step++) {
+  for (int step = 0; step < raft::ceildiv(list_new_size, num_warps); step++) {
     int idx_in_list = step * num_warps + tx / raft::warp_size();
     if (idx_in_list >= list_new_size) continue;
     auto min_elem = get_min_item(s_list[idx_in_list], idx_in_list, new_neighbors, s_distances);
@@ -857,8 +857,8 @@ __launch_bounds__(BLOCK_SIZE, 4)
   __syncthreads();
 
   wmma::fill_fragment(c_frag, 0.0);
-  for (int step = 0; step < raft::raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-    int num_load_elems = (step == raft::raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
+  for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
+    int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
                            ? data_dim - step * TILE_COL_WIDTH
                            : TILE_COL_WIDTH;
     if (TILE_COL_WIDTH < data_dim) {
@@ -922,7 +922,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
   }
   __syncthreads();
 
-  for (int step = 0; step < raft::raft::ceildiv(MAX_NUM_BI_SAMPLES * 2, num_warps); step++) {
+  for (int step = 0; step < raft::ceildiv(MAX_NUM_BI_SAMPLES * 2, num_warps); step++) {
     int idx_in_list = step * num_warps + tx / raft::warp_size();
     if (idx_in_list >= list_new_size && idx_in_list < MAX_NUM_BI_SAMPLES) continue;
     if (idx_in_list >= MAX_NUM_BI_SAMPLES + list_old_size && idx_in_list < MAX_NUM_BI_SAMPLES * 2)
