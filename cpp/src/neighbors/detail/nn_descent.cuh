@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "cagra/device_common.hpp"
+
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -26,7 +28,6 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/neighbors/detail/cagra/device_common.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -1222,6 +1223,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
 
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
   nrow_               = nrow;
+  graph_.nrow         = nrow;
   graph_.h_graph      = (InternalID_t<Index_t>*)output_graph;
 
   cudaPointerAttributes data_ptr_attr;
@@ -1354,7 +1356,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
         graph_shrink_buffer[i * build_config_.node_degree + j] = id;
       } else {
         graph_shrink_buffer[i * build_config_.node_degree + j] =
-          raft::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
       }
     }
   }
