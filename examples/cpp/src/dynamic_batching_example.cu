@@ -157,7 +157,8 @@ void dynamic_batching_example(
 
   // You can implement job priorities by varying the deadlines of individual
   // requests
-  dynamic_batching::search_params dynb_search_params{.soft_deadline_ms = 0.1};
+  dynamic_batching::search_params dynb_search_params;
+  dynb_search_params.soft_deadline_ms = 0.1;
 
   // Define the big-batch setting as a baseline for measuring the throughput.
   auto search_batch_orig =
