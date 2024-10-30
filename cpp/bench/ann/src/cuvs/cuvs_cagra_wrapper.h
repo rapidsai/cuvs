@@ -225,7 +225,10 @@ inline auto allocator_to_string(AllocatorType mem_type) -> std::string
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
 {
-  auto sp                          = dynamic_cast<const search_param&>(param);
+  auto sp = dynamic_cast<const search_param&>(param);
+  bool needs_dynamic_batcher_update =
+    (dynamic_batching_max_batch_size_ != sp.dynamic_batching_max_batch_size) ||
+    (dynamic_batching_n_queues_ != sp.dynamic_batching_n_queues);
   dynamic_batching_max_batch_size_ = sp.dynamic_batching_max_batch_size;
   dynamic_batching_n_queues_       = sp.dynamic_batching_n_queues;
   search_params_                   = sp.p;
@@ -235,18 +238,18 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
     graph_mem_ = sp.graph_mem;
     RAFT_LOG_DEBUG("moving graph to new memory space: %s", allocator_to_string(graph_mem_).c_str());
     // We create a new graph and copy to it from existing graph
-    auto mr        = get_mr(graph_mem_);
-    auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(
+    auto mr = get_mr(graph_mem_);
+    *graph_ = raft::make_device_mdarray<IdxT, int64_t>(
       handle_, mr, raft::make_extents<int64_t>(index_->graph().extent(0), index_->graph_degree()));
 
-    raft::copy(new_graph.data_handle(),
+    raft::copy(graph_->data_handle(),
                index_->graph().data_handle(),
                index_->graph().size(),
                raft::resource::get_cuda_stream(handle_));
 
-    index_->update_graph(handle_, make_const_mdspan(new_graph.view()));
-    // update_graph() only stores a view in the index. We need to keep the graph object alive.
-    *graph_ = std::move(new_graph);
+    // NB: update_graph() only stores a view in the index. We need to keep the graph object alive.
+    index_->update_graph(handle_, make_const_mdspan(graph_->view()));
+    needs_dynamic_batcher_update = true;
   }
 
   if (sp.dataset_mem != dataset_mem_ || need_dataset_update_) {
@@ -267,27 +270,29 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
       dataset_->data_handle(), dataset_->extent(0), this->dim_, dataset_->extent(1));
     index_->update_dataset(handle_, dataset_view);
 
-    need_dataset_update_ = false;
+    need_dataset_update_         = false;
+    needs_dynamic_batcher_update = true;
   }
 
   // dynamic batching
   if (sp.dynamic_batching) {
-    dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
-      handle_,
-      cuvs::neighbors::dynamic_batching::index_params<cuvs::neighbors::cagra::index<T, IdxT>>{
-        index_params_.cagra_params.metric,
-        index_params_.cagra_params.metric_arg,
-        *index_,
-        search_params_,
-        nullptr,
-        sp.dynamic_batching_k,
-        int64_t(this->dim_),
-        sp.dynamic_batching_max_batch_size,
-        sp.dynamic_batching_n_queues});
-
+    if (!dynamic_batcher_ || needs_dynamic_batcher_update) {
+      dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
+        handle_,
+        cuvs::neighbors::dynamic_batching::index_params<cuvs::neighbors::cagra::index<T, IdxT>>{
+          index_params_.cagra_params.metric,
+          index_params_.cagra_params.metric_arg,
+          *index_,
+          search_params_,
+          nullptr,
+          sp.dynamic_batching_k,
+          int64_t(this->dim_),
+          sp.dynamic_batching_max_batch_size,
+          sp.dynamic_batching_n_queues});
+    }
     dynamic_batcher_sp_.soft_deadline_ms = sp.dynamic_batching_soft_deadline_ms;
   } else {
-    dynamic_batcher_.reset();
+    if (dynamic_batcher_) { dynamic_batcher_.reset(); }
   }
 }
 
@@ -337,7 +342,7 @@ void cuvs_cagra<T, IdxT>::load(const std::string& file)
 template <typename T, typename IdxT>
 std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
 {
-  return std::make_unique<cuvs_cagra<T, IdxT>>(*this);  // use copy constructor
+  return std::make_unique<cuvs_cagra<T, IdxT>>(std::cref(*this));  // use copy constructor
 }
 
 template <typename T, typename IdxT>
