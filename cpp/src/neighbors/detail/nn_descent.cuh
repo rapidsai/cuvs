@@ -352,7 +352,7 @@ class GNND {
   GNND(const GNND&)            = delete;
   GNND& operator=(const GNND&) = delete;
 
-  void build(Data_t* data, const Index_t nrow, Index_t* output_graph, DistData_t* output_distances);
+  void build(Data_t* data, const Index_t nrow, Index_t* output_graph);
   ~GNND()    = default;
   using ID_t = InternalID_t<Index_t>;
   void reset(raft::resources const& res);
@@ -1225,10 +1225,7 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
 }
 
 template <typename Data_t, typename Index_t>
-void GNND<Data_t, Index_t>::build(Data_t* data,
-                                  const Index_t nrow,
-                                  Index_t* output_graph,
-                                  DistData_t* output_distances)
+void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* output_graph)
 {
   using input_t = typename std::remove_const<Data_t>::type;
 
@@ -1432,6 +1429,7 @@ void build(raft::resources const& res,
                            .output_graph_degree   = params.graph_degree};
 
   GNND<const T, int> nnd(res, build_config);
+  nnd.build(dataset.data_handle(), dataset.extent(0), int_graph.data_handle());
 
 #pragma omp parallel for
   for (size_t i = 0; i < static_cast<size_t>(dataset.extent(0)); i++) {
