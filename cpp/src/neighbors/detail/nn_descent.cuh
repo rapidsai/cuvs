@@ -1266,9 +1266,15 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
 
   graph_.clear();
   graph_.init_random_graph();
-  raft::print_host_vector("graph_init", graph_.h_graph, nrow_ * graph_.node_degree, std::cout);
+  raft::print_host_vector("graph_init",
+                          reinterpret_cast<Index_t*>(graph_.h_graph),
+                          nrow_ * graph_.node_degree,
+                          std::cout);
   graph_.sample_graph(true);
-  raft::print_host_vector("graph_sample", graph_.h_graph, nrow_ * graph_.node_degree, std::cout);
+  raft::print_host_vector("graph_sample",
+                          reinterpret_cast<Index_t*>(graph_.h_graph),
+                          nrow_ * graph_.node_degree,
+                          std::cout);
 
   auto update_and_sample = [&](bool update_graph) {
     if (update_graph) {
