@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include "cagra/device_common.hpp"
-
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -28,7 +26,7 @@
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/matrix/init.cuh>
+#include <raft/neighbors/detail/cagra/device_common.hpp>
 #include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -1169,11 +1167,15 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
 {
   static_assert(NUM_SAMPLES <= 32);
 
-  raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
-  auto graph_buffer_view = raft::make_device_matrix_view<Index_t, int64_t>(
-    reinterpret_cast<Index_t*>(graph_buffer_.data_handle()), nrow_, DEGREE_ON_DEVICE);
-  raft::matrix::fill(res, graph_buffer_view, std::numeric_limits<Index_t>::max());
-  raft::matrix::fill(res, d_locks_.view(), 0);
+  thrust::fill(thrust::device,
+               dists_buffer_.data_handle(),
+               dists_buffer_.data_handle() + dists_buffer_.size(),
+               std::numeric_limits<float>::max());
+  thrust::fill(thrust::device,
+               reinterpret_cast<Index_t*>(graph_buffer_.data_handle()),
+               reinterpret_cast<Index_t*>(graph_buffer_.data_handle()) + graph_buffer_.size(),
+               std::numeric_limits<Index_t>::max());
+  thrust::fill(thrust::device, d_locks_.data_handle(), d_locks_.data_handle() + d_locks_.size(), 0);
 };
 
 template <typename Data_t, typename Index_t>
@@ -1352,7 +1354,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data, const Index_t nrow, Index_t* out
         graph_shrink_buffer[i * build_config_.node_degree + j] = id;
       } else {
         graph_shrink_buffer[i * build_config_.node_degree + j] =
-          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+          raft::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
       }
     }
   }
