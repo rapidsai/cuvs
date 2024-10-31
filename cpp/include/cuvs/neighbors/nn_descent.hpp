@@ -55,7 +55,7 @@ struct index_params : cuvs::neighbors::index_params {
   size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
   size_t max_iterations            = 20;      // Number of nn-descent iterations.
   float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
-  bool return_distances            = false;   // return distances if true
+  bool return_distances            = true;    // return distances if true
   size_t n_clusters                = 1;       // defaults to not using any batching
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
