@@ -34,7 +34,7 @@
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/sample_rows.cuh>
 
-#include <cub/cub.cuh>
+#include <thrust/copy.h>
 
 #include <vector_types.h>
 
@@ -207,10 +207,8 @@ void get_inverted_indices(raft::resources const& res,
   max_cluster_size = 0;
   min_cluster_size = std::numeric_limits<size_t>::max();
 
-  thrust::fill(
-    thrust::host, cluster_size.data_handle(), cluster_size.data_handle() + n_clusters, 0);
-  thrust::fill(
-    thrust::host, local_offset.data_handle(), local_offset.data_handle() + n_clusters, 0);
+  std::fill(cluster_size.data_handle(), cluster_size.data_handle() + n_clusters, 0);
+  std::fill(local_offset.data_handle(), local_offset.data_handle() + n_clusters, 0);
 
   // TODO: this part isn't really a bottleneck but maybe worth trying omp parallel
   // for with atomic add
@@ -657,14 +655,12 @@ void batch_build(raft::resources const& res,
   auto global_indices_h   = raft::make_managed_matrix<IdxT, int64_t>(res, num_rows, graph_degree);
   auto global_distances_h = raft::make_managed_matrix<float, int64_t>(res, num_rows, graph_degree);
 
-  thrust::fill(thrust::host,
-               global_indices_h.data_handle(),
-               global_indices_h.data_handle() + num_rows * graph_degree,
-               std::numeric_limits<IdxT>::max());
-  thrust::fill(thrust::host,
-               global_distances_h.data_handle(),
-               global_distances_h.data_handle() + num_rows * graph_degree,
-               std::numeric_limits<float>::max());
+  std::fill(global_indices_h.data_handle(),
+            global_indices_h.data_handle() + num_rows * graph_degree,
+            std::numeric_limits<IdxT>::max());
+  std::fill(global_distances_h.data_handle(),
+            global_distances_h.data_handle() + num_rows * graph_degree,
+            std::numeric_limits<float>::max());
 
   auto batch_indices_h =
     raft::make_host_matrix<IdxT, int64_t, row_major>(max_cluster_size, graph_degree);
