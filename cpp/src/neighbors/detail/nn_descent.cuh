@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include "ann_utils.cuh"
+#include "detail/cagra/device_common.hpp"
+
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -29,7 +32,6 @@
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/slice.cuh>
 #include <raft/neighbors/detail/cagra/device_common.hpp>
-#include <raft/spatial/knn/detail/ann_utils.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
@@ -153,7 +155,7 @@ using align32 = raft::Pow2<32>;
 template <typename T>
 int get_batch_size(const int it_now, const T nrow, const int batch_size)
 {
-  int it_total = ceildiv(nrow, batch_size);
+  int it_total = raft::ceildiv(nrow, batch_size);
   return (it_now == it_total - 1) ? nrow - it_now * batch_size : batch_size;
 }
 
@@ -163,7 +165,7 @@ constexpr __host__ __device__ __forceinline__ int skew_dim(int ndim)
 {
   // all "4"s are for alignment
   if constexpr (std::is_same<T, float>::value) {
-    ndim = ceildiv(ndim, 4) * 4;
+    ndim = raft::ceildiv(ndim, 4) * 4;
     return ndim + (ndim % 32 == 0) * 4;
   }
 }
@@ -422,7 +424,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
   if constexpr (std::is_same_v<Data_t, float> or std::is_same_v<Data_t, uint8_t> or
                 std::is_same_v<Data_t, int8_t>) {
     constexpr int num_load_elems_per_warp = raft::warp_size();
-    for (int step = 0; step < ceildiv(padding_dims, num_load_elems_per_warp); step++) {
+    for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
       int idx = step * num_load_elems_per_warp + lane_id;
       if (idx < load_dims) {
         vec_buffer[idx] = d_vec[idx];
@@ -436,7 +438,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
         load_dims % 4 == 0 && padding_dims % 4 == 0) {
       constexpr int num_load_elems_per_warp = raft::warp_size() * 4;
 #pragma unroll
-      for (int step = 0; step < ceildiv(padding_dims, num_load_elems_per_warp); step++) {
+      for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
         int idx_in_vec = step * num_load_elems_per_warp + lane_id * 4;
         if (idx_in_vec + 4 <= load_dims) {
           *(float2*)(vec_buffer + idx_in_vec) = *(float2*)(d_vec + idx_in_vec);
@@ -446,7 +448,7 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
       }
     } else {
       constexpr int num_load_elems_per_warp = raft::warp_size();
-      for (int step = 0; step < ceildiv(padding_dims, num_load_elems_per_warp); step++) {
+      for (int step = 0; step < raft::ceildiv(padding_dims, num_load_elems_per_warp); step++) {
         int idx = step * num_load_elems_per_warp + lane_id;
         if (idx < load_dims) {
           vec_buffer[idx] = d_vec[idx];
@@ -476,7 +478,7 @@ RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
   int lane_id = threadIdx.x % raft::warp_size();
-  for (int step = 0; step < ceildiv(dim, raft::warp_size()); step++) {
+  for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
     int idx         = step * raft::warp_size() + lane_id;
     float part_dist = 0;
     if (idx < dim) {
@@ -491,7 +493,7 @@ RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
     __syncwarp();
   }
 
-  for (int step = 0; step < ceildiv(dim, raft::warp_size()); step++) {
+  for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
     int idx = step * raft::warp_size() + threadIdx.x;
     if (idx < dim) {
       if (l2_norms == nullptr) {
@@ -540,7 +542,7 @@ __device__ void insert_to_global_graph(ResultItem<Index_t> elem,
   size_t global_idx_base = list_id * node_degree;
   if (elem.id() == list_id) return;
 
-  const int num_segments = ceildiv(node_degree, raft::warp_size());
+  const int num_segments = raft::ceildiv(node_degree, raft::warp_size());
 
   int loop_flag = 0;
   do {
@@ -1246,7 +1248,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));
   size_t batch_size = (data_ptr_attr.devicePointer == nullptr) ? 100000 : nrow_;
 
-  raft::spatial::knn::detail::utils::batch_load_iterator vec_batches{
+  cuvs::spatial::knn::detail::utils::batch_load_iterator vec_batches{
     data, static_cast<size_t>(nrow_), build_config_.dataset_dim, batch_size, stream};
   for (auto const& batch : vec_batches) {
     preprocess_data_kernel<<<
@@ -1392,7 +1394,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
         graph_shrink_buffer[i * build_config_.node_degree + j] = id;
       } else {
         graph_shrink_buffer[i * build_config_.node_degree + j] =
-          raft::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
       }
     }
   }
@@ -1408,12 +1410,12 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 }
 
 template <typename T,
-          typename IdxT = uint32_t,
-          typename Accessor =
-            host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
 void build(raft::resources const& res,
            const index_params& params,
-           mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
+           raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
            index<IdxT>& idx)
 {
   RAFT_EXPECTS(dataset.extent(0) < std::numeric_limits<int>::max() - 1,
@@ -1482,12 +1484,13 @@ void build(raft::resources const& res,
 }
 
 template <typename T,
-          typename IdxT = uint32_t,
-          typename Accessor =
-            host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
-index<IdxT> build(raft::resources const& res,
-                  const index_params& params,
-                  mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset)
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+index<IdxT> build(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
