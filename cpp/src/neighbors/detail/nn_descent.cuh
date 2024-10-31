@@ -17,7 +17,7 @@
 #pragma once
 
 #include "ann_utils.cuh"
-#include "detail/cagra/device_common.hpp"
+#include "cagra/device_common.hpp"
 
 #include <cuvs/neighbors/nn_descent.hpp>
 
