@@ -181,8 +181,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     const IndexT smem_parent_id = parent_indices[i / knn_k];
     IndexT child_id             = invalid_index;
     if (smem_parent_id != invalid_index) {
-      // NOTE: BUG internal_topk_list contains out-of-range values (but not `invalid_index`) in rare
-      // cases this doesn't fail, indicating that parent_indices buffer is OK
+      // NOTE: BUG internal_topk_list contains out-of-range values (but not `invalid_index`)
+      // The following assert doesn't fail, indicating that parent_indices buffer is OK
       // assert(smem_parent_id < IndexT(result_child_indices_ptr - internal_topk_list));
       const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
       // NOTE: Find the root cause for the incorrect value?
