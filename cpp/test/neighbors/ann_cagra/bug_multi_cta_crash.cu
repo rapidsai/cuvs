@@ -22,7 +22,6 @@
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/random/make_blobs.cuh>
 
 #include <cstdint>
 
@@ -73,7 +72,7 @@ class AnnCagraBugMultiCTACrash : public ::testing::TestWithParam<cagra::search_a
     // NOTE: when initializing queries with "normal" data, the bug is NOT reproducible
     raft::linalg::map(
       res, queries->view(), raft::const_op<data_type>{raft::upper_bound<data_type>()});
-    // InitDataset(res, queries->data_handle(), n_samples, n_dim, metric, r);
+    // InitDataset(res, queries->data_handle(), n_queries, n_dim, metric, r);
     raft::resource::sync_stream(res);
   }
 

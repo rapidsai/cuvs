@@ -181,8 +181,20 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     const IndexT smem_parent_id = parent_indices[i / knn_k];
     IndexT child_id             = invalid_index;
     if (smem_parent_id != invalid_index) {
+      // NOTE: BUG internal_topk_list contains out-of-range values (but not `invalid_index`) in rare
+      // cases this doesn't fail, indicating that parent_indices buffer is OK
+      // assert(smem_parent_id < IndexT(result_child_indices_ptr - internal_topk_list));
       const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
-      child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
+      // NOTE: Find the root cause for the incorrect value?
+      // This condition fails, indicating the internal_topk_list content is NOT OK
+      // if (parent_id < dataset_desc.size) {
+      child_id = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
+      // } else {
+      //   printf("parent_id = %u / in hex = %p / as fp32 = %f\n",
+      //          uint32_t(parent_id),
+      //          (void*)(parent_id),
+      //          reinterpret_cast<const float&>(parent_id));
+      // }
     }
     if (child_id != invalid_index) {
       if (hashmap::insert(visited_hashmap_ptr, hash_bitlen, child_id) == 0) {
