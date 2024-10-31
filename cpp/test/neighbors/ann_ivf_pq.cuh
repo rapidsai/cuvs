@@ -18,10 +18,10 @@
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
+#include <cuvs/core/bitset.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
-#include <raft/core/bitset.cuh>
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
@@ -282,6 +282,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                             uint32_t n_take,
                             uint32_t n_skip)
   {
+    // the original data cannot be reconstructed since the dataset was normalized
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
     auto& rec_list = index.lists()[label];
     auto dim       = index.dim();
     n_take         = std::min<uint32_t>(n_take, rec_list->size.load());
@@ -313,6 +315,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto old_list = index->lists()[label];
     auto n_rows   = old_list->size.load();
     if (n_rows == 0) { return; }
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
 
     auto vectors_1 = raft::make_device_matrix<EvalT>(handle_, n_rows, index->dim());
     auto indices   = raft::make_device_vector<IdxT>(handle_, n_rows);
@@ -374,7 +377,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                   cuvs::Compare<uint8_t>{}));
 
     // Pack a few vectors back to the list.
-    int row_offset = 9;
+    int row_offset = 5;
     int n_vec      = 3;
     ASSERT_TRUE(row_offset + n_vec < n_rows);
     size_t offset      = row_offset * index->pq_dim();
@@ -629,14 +632,10 @@ class ivf_pq_filter_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
     cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
       handle_, removed_indices.view(), ps.num_db_vecs);
-    cuvs::neighbors::ivf_pq::search_with_filtering(
-      handle_,
-      ps.search_params,
-      index,
-      query_view,
-      inds_view,
-      dists_view,
-      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view()));
+    auto bitset_filter_obj =
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
+    cuvs::neighbors::ivf_pq::search(
+      handle_, ps.search_params, index, query_view, inds_view, dists_view, bitset_filter_obj);
 
     raft::update_host(distances_ivf_pq.data(), distances_ivf_pq_dev.data(), queries_size, stream_);
     raft::update_host(indices_ivf_pq.data(), indices_ivf_pq_dev.data(), queries_size, stream_);
@@ -884,6 +883,25 @@ inline auto enum_variety_l2sqrt() -> test_cases_t
   return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
     ivf_pq_inputs y(x);
     y.index_params.metric = distance::DistanceType::L2SqrtExpanded;
+    return y;
+  });
+}
+
+inline auto enum_variety_cosine() -> test_cases_t
+{
+  return map<ivf_pq_inputs>(enum_variety(), [](const ivf_pq_inputs& x) {
+    ivf_pq_inputs y(x);
+    if (y.min_recall.has_value()) {
+      if (y.search_params.lut_dtype == CUDA_R_8U) {
+        // TODO: Increase this recall threshold for 8 bit lut
+        // (https://github.com/rapidsai/cuvs/issues/390)
+        y.min_recall = y.min_recall.value() * 0.70;
+      } else {
+        // In other cases it seems to perform a little bit better, still worse than L2
+        y.min_recall = y.min_recall.value() * 0.94;
+      }
+    }
+    y.index_params.metric = distance::DistanceType::CosineExpanded;
     return y;
   });
 }

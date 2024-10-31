@@ -19,7 +19,7 @@
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"
-#include "../sample_filter.cuh"  // none_ivf_sample_filter
+#include "../sample_filter.cuh"  // none_sample_filter
 #include "ivf_pq_compute_similarity.cuh"
 #include "ivf_pq_fp_8bit.cuh"
 
@@ -37,6 +37,9 @@
 #include <raft/core/resources.hpp>
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/detail/select_warpsort.cuh>
 #include <raft/util/cache.hpp>
@@ -105,11 +108,20 @@ void select_clusters(raft::resources const& handle,
       This is a negative inner-product distance. We minimize it to find the similar clusters.
 
       NB: qc_distances is NOT used further in ivfpq_search.
+
+    Cosine distance:
+      `qc_distances[i, j] = - (queries[i], cluster_centers[j])`
+
+      This is a negative inner-product distance. The queries and cluster centers are row normalized.
+      We minimize it to find the similar clusters.
+
+      NB: qc_distances is NOT used further in ivfpq_search.
  */
   float norm_factor;
   switch (metric) {
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded: norm_factor = 1.0 / -2.0; break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: norm_factor = 0.0; break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
@@ -133,6 +145,7 @@ void select_clusters(raft::resources const& handle,
       gemm_k = dim + 1;
       RAFT_EXPECTS(gemm_k <= dim_ext, "unexpected gemm_k or dim_ext");
     } break;
+    case cuvs::distance::DistanceType::CosineExpanded:
     case cuvs::distance::DistanceType::InnerProduct: {
       alpha = -1.0;
       beta  = 0.0;
@@ -363,8 +376,9 @@ void ivfpq_search_worker(raft::resources const& handle,
       // stores basediff (query[i] - center[i])
       precomp_data_count = index.rot_dim();
     } break;
+    case distance::DistanceType::CosineExpanded:
     case distance::DistanceType::InnerProduct: {
-      // stores two components (query[i] * center[i], query[i] * center[i])
+      // stores two components (query[i], query[i] * center[i])
       precomp_data_count = index.rot_dim() * 2;
     } break;
     default: {
@@ -457,8 +471,14 @@ void ivfpq_search_worker(raft::resources const& handle,
     num_samples_vector);
 
   // Postprocessing
-  ivf::detail::postprocess_distances(
-    distances, topk_dists.data(), index.metric(), n_queries, topK, scaling_factor, true, stream);
+  ivf::detail::postprocess_distances(distances,
+                                     topk_dists.data(),
+                                     index.metric(),
+                                     n_queries,
+                                     topK,
+                                     scaling_factor,
+                                     index.metric() != distance::DistanceType::CosineExpanded,
+                                     stream);
   ivf::detail::postprocess_neighbors(neighbors,
                                      neighbors_uint32,
                                      index.inds_ptrs().data_handle(),
@@ -508,6 +528,7 @@ struct ivfpq_search {
   {
     bool signed_metric = false;
     switch (metric) {
+      case cuvs::distance::DistanceType::CosineExpanded: signed_metric = true; break;
       case cuvs::distance::DistanceType::InnerProduct: signed_metric = true; break;
       default: break;
     }
@@ -592,7 +613,7 @@ constexpr uint32_t kMaxQueries = 4096;
 /** See raft::spatial::knn::ivf_pq::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 inline void search(raft::resources const& handle,
                    const search_params& params,
                    const index<IdxT>& index,
@@ -606,6 +627,12 @@ inline void search(raft::resources const& handle,
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "Unsupported element type.");
+  if (index.metric() == distance::DistanceType::CosineExpanded) {
+    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+      RAFT_FAIL(
+        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
+        "type");
+  }
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,
@@ -698,7 +725,14 @@ inline void search(raft::resources const& handle,
                        rot_queries.data(),
                        index.rot_dim(),
                        stream);
-
+    if (index.metric() == distance::DistanceType::CosineExpanded) {
+      auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
+        rot_queries.data(), max_queries, index.rot_dim());
+      raft::linalg::row_normalize(handle,
+                                  raft::make_const_mdspan(rot_queries_view),
+                                  rot_queries_view,
+                                  raft::linalg::NormType::L2Norm);
+    }
     for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
       uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);
       /* The distance calculation is done in the rotated/transformed space;
@@ -789,14 +823,23 @@ void search(raft::resources const& handle,
             const index<IdxT>& idx,
             raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
             raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
-            raft::device_matrix_view<float, IdxT, raft::row_major> distances)
+            raft::device_matrix_view<float, IdxT, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
-  search_with_filtering(handle,
-                        params,
-                        idx,
-                        queries,
-                        neighbors,
-                        distances,
-                        cuvs::neighbors::filtering::none_ivf_sample_filter{});
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
+    return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
+        sample_filter_ref);
+    return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
+  } catch (const std::bad_cast&) {
+    RAFT_FAIL("Unsupported sample filter type");
+  }
 }
 }  // namespace cuvs::neighbors::ivf_pq::detail
