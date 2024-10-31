@@ -31,7 +31,6 @@
 #include <raft/core/resources.hpp>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/slice.cuh>
-#include <raft/neighbors/detail/cagra/device_common.hpp>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
 #include <raft/util/cuda_dev_essentials.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
