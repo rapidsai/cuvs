@@ -475,7 +475,7 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
  *                in device memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -508,7 +508,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -541,7 +541,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -574,7 +574,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -607,7 +607,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -640,7 +640,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -673,7 +673,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
@@ -706,7 +706,7 @@ void build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[out] index<IdxT> index containing all-neighbors knn graph in host memory
+ * @param[out] index index containing all-neighbors knn graph in host memory
  */
 void build(raft::resources const& res,
            index_params const& params,
