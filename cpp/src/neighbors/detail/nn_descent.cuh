@@ -494,7 +494,7 @@ RAFT_KERNEL preprocess_data_kernel(
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         // output_data[list_id * dim + idx] =
         //   (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
-        output_data[list_id * dim + idx] = (float)input_data[(size_t)blockIdx.x * dim + idx];
+        output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
       } else {
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
@@ -1034,28 +1034,45 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
-  for (size_t seg_idx = 0; seg_idx < static_cast<size_t>(num_segments); seg_idx++) {
-    // random sequence (range: 0~nrow)
-    // segment_x stores neighbors which id % num_segments == x
-    std::vector<Index_t> rand_seq(nrow / num_segments);
-    std::iota(rand_seq.begin(), rand_seq.end(), 0);
-    auto gen = std::default_random_engine{seg_idx};
-    std::shuffle(rand_seq.begin(), rand_seq.end(), gen);
+  //   for (size_t seg_idx = 0; seg_idx < static_cast<size_t>(num_segments); seg_idx++) {
+  //     // random sequence (range: 0~nrow)
+  //     // segment_x stores neighbors which id % num_segments == x
+  //     std::vector<Index_t> rand_seq(nrow / num_segments);
+  //     std::iota(rand_seq.begin(), rand_seq.end(), 0);
+  //     auto gen = std::default_random_engine{seg_idx};
+  //     std::shuffle(rand_seq.begin(), rand_seq.end(), gen);
+
+  // #pragma omp parallel for
+  //     for (size_t i = 0; i < nrow; i++) {
+  //       size_t base_idx      = i * node_degree + seg_idx * segment_size;
+  //       auto h_neighbor_list = h_graph + base_idx;
+  //       auto h_dist_list     = h_dists.data_handle() + base_idx;
+  //       for (size_t j = 0; j < static_cast<size_t>(segment_size); j++) {
+  //         size_t idx = base_idx + j;
+  //         Index_t id = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
+  //         if ((size_t)id == i) {
+  //           id = rand_seq[(idx + segment_size) % rand_seq.size()] * num_segments + seg_idx;
+  //         }
+  //         h_neighbor_list[j].id_with_flag() = id;
+  //         h_dist_list[j]                    = std::numeric_limits<DistData_t>::max();
+  //       }
+  //     }
+  //   }
+  std::vector<Index_t> rand_seq(nrow);
+  std::iota(rand_seq.begin(), rand_seq.end(), 0);
+  auto gen = std::default_random_engine{0};
+  std::shuffle(rand_seq.begin(), rand_seq.end(), gen);
 
 #pragma omp parallel for
-    for (size_t i = 0; i < nrow; i++) {
-      size_t base_idx      = i * node_degree + seg_idx * segment_size;
-      auto h_neighbor_list = h_graph + base_idx;
-      auto h_dist_list     = h_dists.data_handle() + base_idx;
-      for (size_t j = 0; j < static_cast<size_t>(segment_size); j++) {
-        size_t idx = base_idx + j;
-        Index_t id = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
-        if ((size_t)id == i) {
-          id = rand_seq[(idx + segment_size) % rand_seq.size()] * num_segments + seg_idx;
-        }
-        h_neighbor_list[j].id_with_flag() = id;
-        h_dist_list[j]                    = std::numeric_limits<DistData_t>::max();
-      }
+  for (size_t i = 0; i < nrow; i++) {
+    for (size_t j = 0; j < node_degree; j++) {
+      size_t idx = i * node_degree + j;
+      Index_t id = rand_seq[idx % nrow];
+      if ((size_t)id == i) { id = rand_seq[(idx + node_degree) % nrow]; }
+      h_graph[i * node_degree + j].id_with_flag() = id;
+    }
+    for (size_t j = 0; j < node_degree; j++) {
+      h_dists.data_handle()[i * node_degree + j] = 1e10;
     }
   }
 }
@@ -1276,6 +1293,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                 batch.offset(),
                 build_config_.metric);
   }
+  raft::print_device_vector("half_data", d_data_.data_handle() + 995 * ndim_, 5 * ndim_, std::cout);
 
   graph_.clear();
   graph_.init_random_graph();
@@ -1514,8 +1532,11 @@ index<IdxT> build(
     graph_degree = intermediate_degree;
   }
 
-  index<IdxT> idx{
-    res, dataset.extent(0), static_cast<int64_t>(graph_degree), params.return_distances, params.metric};
+  index<IdxT> idx{res,
+                  dataset.extent(0),
+                  static_cast<int64_t>(graph_degree),
+                  params.return_distances,
+                  params.metric};
 
   build(res, params, dataset, idx);
 

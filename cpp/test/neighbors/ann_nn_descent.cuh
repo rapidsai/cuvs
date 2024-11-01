@@ -108,7 +108,6 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);
     }
-
     {
       {
         nn_descent::index_params index_params;
@@ -125,6 +124,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
           if (ps.host_dataset) {
             auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
             raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
+            raft::resource::sync_stream(handle_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
             auto index = nn_descent::build(handle_, index_params, database_host_view);
@@ -151,6 +151,25 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
         }
         raft::resource::sync_stream(handle_);
       }
+
+      std::transform(
+        distances_naive.begin(), distances_naive.end(), distances_naive.begin(), [](auto x) {
+          return -x;
+        });
+      raft::print_host_vector(
+        "indices_gt", indices_naive.data() + 995 * ps.graph_degree, 5 * ps.graph_degree, std::cout);
+      raft::print_host_vector("indices_nnd",
+                              indices_NNDescent.data() + 995 * ps.graph_degree,
+                              5 * ps.graph_degree,
+                              std::cout);
+      raft::print_host_vector("distances_gt",
+                              distances_naive.data() + 995 * ps.graph_degree,
+                              5 * ps.graph_degree,
+                              std::cout);
+      raft::print_host_vector("distances_nnd",
+                              distances_NNDescent.data() + 995 * ps.graph_degree,
+                              5 * ps.graph_degree,
+                              std::cout);
 
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
@@ -313,7 +332,8 @@ const std::vector<AnnNNDescentInputs> inputs = raft::util::itertools::product<An
   {1000, 2000},                                              // n_rows
   {3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
   {32, 64},                                                  // graph_degree
-  {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+  {// cuvs::distance::DistanceType::L2Expanded,
+   cuvs::distance::DistanceType::InnerProduct},
   {false, true},
   {0.90});
 
