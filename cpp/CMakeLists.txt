@@ -604,6 +604,9 @@ SECTIONS
     # This enables NVTX within the project with no option to disable it downstream.
     target_link_libraries(cuvs PUBLIC CUDA::nvtx3)
     target_compile_definitions(cuvs PUBLIC NVTX_ENABLED)
+
+    target_link_libraries(cuvs-cagra-search PUBLIC CUDA::nvtx3)
+    target_compile_definitions(cuvs-cagra-search PUBLIC NVTX_ENABLED)
   else()
     # Allow enable NVTX downstream if not set here. This creates a new option at build/install time,
     # which is set by default to OFF, but can be enabled in the dependent project.
