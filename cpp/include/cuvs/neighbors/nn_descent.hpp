@@ -101,10 +101,13 @@ struct index : cuvs::neighbors::index {
    * @param n_rows number of rows in knn-graph
    * @param n_cols number of cols in knn-graph
    * @param return_distances whether to return distances
-    * @param metric distance metric to use
+   * @param metric distance metric to use
    */
-  index(raft::resources const& res, int64_t n_rows, int64_t n_cols, bool return_distances = false,
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+  index(raft::resources const& res,
+        int64_t n_rows,
+        int64_t n_cols,
+        bool return_distances               = false,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
       metric_{metric},
@@ -130,13 +133,13 @@ struct index : cuvs::neighbors::index {
    * @param distances_view optional raft::device_matrix_view<float, int64_t, row_major> for storing
    * distances
    * @param return_distances whether to return distances
-    * @param metric distance metric to use
+   * @param metric distance metric to use
    */
   index(raft::resources const& res,
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view,
         std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances_view =
           std::nullopt,
-        bool return_distances = false,
+        bool return_distances               = false,
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},

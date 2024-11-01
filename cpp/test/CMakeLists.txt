@@ -242,7 +242,6 @@ if(TARGET cuvs::c_api)
     target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
-
   add_executable(cuvs_c_test core/c_api.c)
   target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
 
