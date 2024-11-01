@@ -319,10 +319,10 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
 };
 
 const std::vector<AnnNNDescentInputs> inputs =
-  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},                      // n_rows
-                                                     {4, 16, 64, 128, 256, 512, 1024},  // dim
-                                                     {32, 64},  // graph_degree
-                                                     {// cuvs::distance::DistanceType::L2Expanded,
+  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},            // n_rows
+                                                     {4, 16, 64, 256, 1024},  // dim
+                                                     {32, 64},                // graph_degree
+                                                     {cuvs::distance::DistanceType::L2Expanded,
                                                       cuvs::distance::DistanceType::InnerProduct,
                                                       cuvs::distance::DistanceType::CosineExpanded},
                                                      {false, true},
