@@ -64,10 +64,11 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     AllocatorType graph_mem   = AllocatorType::kDevice;
     AllocatorType dataset_mem = AllocatorType::kDevice;
     [[nodiscard]] auto needs_dataset() const -> bool override { return true; }
+    /* Dynamic batching */
     bool dynamic_batching = false;
     int64_t dynamic_batching_k;
-    int64_t dynamic_batching_max_batch_size  = 100;
-    double dynamic_batching_soft_deadline_ms = 1.0;
+    int64_t dynamic_batching_max_batch_size  = 16;
+    double dynamic_batching_soft_deadline_ms = 0.05;
     size_t dynamic_batching_n_queues         = 3;
   };
 
