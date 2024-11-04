@@ -81,7 +81,7 @@ def run_hnsw_build_search_test(
 @pytest.mark.parametrize("k", [10, 20])
 @pytest.mark.parametrize("ef", [30, 40])
 @pytest.mark.parametrize("num_threads", [2, 4])
-@pytest.mark.parametrize("metric", ["sqeuclidean"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 def test_hnsw(dtype, k, ef, num_threads, metric, build_algo):
     # Note that inner_product tests use normalized input which we cannot
