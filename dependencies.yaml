@@ -74,14 +74,14 @@ files:
       - rapids_build
       - cuda
       - rust
-  py_build_py_cuvs:
+  py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
       table: build-system
     includes:
       - build
-  py_rapids_build_py_cuvs:
+  py_rapids_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -90,7 +90,7 @@ files:
     includes:
       - rapids_build
       - build_py_cuvs
-  py_run_py_cuvs:
+  py_run_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -99,7 +99,7 @@ files:
       - cuda_wheels
       - run_py_cuvs
       - depends_on_pylibraft
-  py_test_py_cuvs:
+  py_test_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -116,7 +116,7 @@ files:
       table: build-system
     includes:
       - rapids_build_setuptools
-  py_rapids_build_py_cuvs_bench:
+  py_rapids_build_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
     extras:
@@ -159,6 +159,7 @@ dependencies:
         packages:
           - c-compiler
           - cxx-compiler
+          - nccl>=2.19
     specific:
       - output_types: conda
         matrices:

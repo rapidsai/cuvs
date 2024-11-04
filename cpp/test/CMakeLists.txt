@@ -22,7 +22,7 @@ rapids_test_init()
 function(ConfigureTest)
 
   set(options OPTIONAL NOCUDA C_LIB)
-  set(oneValueArgs NAME GPUS PERCENT)
+  set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -56,6 +56,7 @@ function(ConfigureTest)
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
             $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
+            ${_CUVS_TEST_ADDITIONAL_DEP}
   )
   set_target_properties(
     ${TEST_NAME}
@@ -136,6 +137,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
+    neighbors/ann_cagra/bug_multi_cta_crash.cu
     neighbors/ann_cagra/test_float_uint32_t.cu
     neighbors/ann_cagra/test_half_uint32_t.cu
     neighbors/ann_cagra/test_int8_t_uint32_t.cu
@@ -159,7 +161,7 @@ if(BUILD_TESTS)
     100
   )
 
- ConfigureTest(
+  ConfigureTest(
     NAME
     NEIGHBORS_ANN_VAMANA_TEST
     PATH
@@ -174,6 +176,14 @@ if(BUILD_TESTS)
 
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
+    target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+  endif()
+
+  if(BUILD_MG_ALGOS)
+    ConfigureTest(
+      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP nccl
+    )
   endif()
 
   ConfigureTest(
@@ -206,7 +216,9 @@ if(BUILD_TESTS)
   )
 endif()
 
-if(BUILD_C_TESTS)
+if(TARGET cuvs::c_api)
+  enable_language(C)
+
   ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu C_LIB)
   ConfigureTest(
     NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
@@ -227,20 +239,39 @@ if(BUILD_C_TESTS)
 
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
+    target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
-endif()
-
-# ##################################################################################################
-# Install tests ####################################################################################
-# ##################################################################################################
-rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
-
-if(BUILD_C_TESTS)
-  enable_language(C)
 
   add_executable(cuvs_c_test core/c_api.c)
   target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
 
   add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
   target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
+
+  set_target_properties(
+    cuvs_c_test cuvs_c_neighbors_test
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_BINARY_DIR}/gtests>"
+               INSTALL_RPATH "\$ORIGIN/../../../lib"
+  )
+
+  rapids_test_add(
+    NAME cuvs_c_test
+    COMMAND cuvs_c_test
+    GPUS 1
+    PERCENT 100
+    INSTALL_COMPONENT_SET testing
+  )
+  rapids_test_add(
+    NAME cuvs_c_neighbors_test
+    COMMAND cuvs_c_neighbors_test
+    GPUS 1
+    PERCENT 100
+    INSTALL_COMPONENT_SET testing
+  )
 endif()
+
+# ##################################################################################################
+# Install tests ####################################################################################
+# ##################################################################################################
+rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
