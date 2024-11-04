@@ -1438,6 +1438,11 @@ void build(raft::resources const& res,
   RAFT_EXPECTS(dataset.extent(0) < std::numeric_limits<int>::max() - 1,
                "The dataset size for GNND should be less than %d",
                std::numeric_limits<int>::max() - 1);
+  auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                         params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+                         params.metric == cuvs::distance::DistanceType::InnerProduct;
+  RAFT_EXPECTS(allowed_metrics && idx.metric() == params.metric,
+               "The metric for NN Descent should be L2Expanded, CosineExpanded or InnerProduct");
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
 

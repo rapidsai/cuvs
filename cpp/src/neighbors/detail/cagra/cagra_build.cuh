@@ -438,8 +438,7 @@ index<T, IdxT> build(
   auto knn_build_params = params.graph_build_params;
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     // Heuristic to decide default build algo and its params.
-    if (params.metric == cuvs::distance::DistanceType::L2Expanded &&
-        cuvs::neighbors::nn_descent::has_enough_device_memory(
+    if (cuvs::neighbors::nn_descent::has_enough_device_memory(
           res, dataset.extents(), sizeof(IdxT))) {
       RAFT_LOG_DEBUG("NN descent solver");
       knn_build_params =
