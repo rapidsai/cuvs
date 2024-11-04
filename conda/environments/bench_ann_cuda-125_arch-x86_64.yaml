@@ -30,14 +30,14 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==24.10.*,>=0.0.0a0
+- librmm==24.12.*,>=0.0.0a0
 - matplotlib
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2
 - openblas
 - pandas
-- pylibraft==24.10.*,>=0.0.0a0
+- pylibraft==24.12.*,>=0.0.0a0
 - pyyaml
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
 - setuptools

@@ -10,7 +10,7 @@
 {% set date_string = environ['RAPIDS_DATE_STRING'] %}
 
 package:
-  name: cuvs_bench
+  name: cuvs-bench
   version: {{ version }}
   script: build.sh
 
@@ -82,6 +82,7 @@ requirements:
 
   run:
     - benchmark
+    - click
     - {{ pin_compatible('cuda-version', max_pin='x', min_pin='x') }}
     {% if cuda_major == "11" %}
     - cudatoolkit
