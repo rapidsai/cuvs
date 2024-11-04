@@ -120,7 +120,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
 
-    IndexT best_index_team_local;
+    IndexT best_index_team_local    = raft::upper_bound<IndexT>();
     DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
@@ -145,7 +145,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 
     const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
     if (valid_i && lane_id == 0) {
-      if (hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
+      if (best_index_team_local != raft::upper_bound<IndexT>() &&
+          hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
         result_distances_ptr[i] = best_norm2_team_local;
         result_indices_ptr[i]   = best_index_team_local;
       } else {
@@ -181,15 +182,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     const IndexT smem_parent_id = parent_indices[i / knn_k];
     IndexT child_id             = invalid_index;
     if (smem_parent_id != invalid_index) {
-      // TODO: BUG internal_topk_list contains out-of-range values (but not `invalid_index`) in rare
-      // cases this doesn't fail, indicating that parent_indices buffer is OK // itopk_size
-      // assert(smem_parent_id < IndexT(result_child_indices_ptr - internal_topk_list));
       const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
-      // TODO: Find the root cause for the incorrect value?
-      // This condition fails, indicating the internal_topk_list content is NOT OK
-      if (parent_id < dataset_desc.size) {
-        child_id = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
-      }
+      child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
     }
     if (child_id != invalid_index) {
       if (hashmap::insert(visited_hashmap_ptr, hash_bitlen, child_id) == 0) {
