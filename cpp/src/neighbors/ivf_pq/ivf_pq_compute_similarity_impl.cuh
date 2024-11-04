@@ -17,7 +17,7 @@
 #pragma once
 
 #include "../ivf_common.cuh"                       // dummy_block_sort_t
-#include "../sample_filter.cuh"                    // none_ivf_sample_filter
+#include "../sample_filter.cuh"                    // none_sample_filter
 #include <cuvs/distance/distance.hpp>              // cuvs::distance::DistanceType
 #include <cuvs/neighbors/ivf_pq.hpp>               // codebook_gen
 #include <raft/matrix/detail/select_warpsort.cuh>  // matrix::detail::select::warpsort::warp_sort_distributed
@@ -247,7 +247,7 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
  *   query_kths keep the current state of the filtering - atomically updated distances to the
  *   k-th closest neighbors for each query [n_queries].
  * @param sample_filter
- *   A filter that selects samples for a given query. Use an instance of none_ivf_sample_filter to
+ *   A filter that selects samples for a given query. Use an instance of none_sample_filter to
  *   provide a green light for every sample.
  * @param lut_scores
  *   The device pointer for storing the lookup table globally [gridDim.x, pq_dim << PqBits].
@@ -369,6 +369,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
             reinterpret_cast<float*>(lut_end)[i] = query[i] - cluster_center[i];
           }
         } break;
+        case distance::DistanceType::CosineExpanded:
         case distance::DistanceType::InnerProduct: {
           float2 pvals;
           for (uint32_t i = threadIdx.x; i < dim; i += blockDim.x) {
@@ -408,6 +409,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
               diff -= pq_c;
               score += diff * diff;
             } break;
+            case distance::DistanceType::CosineExpanded:
             case distance::DistanceType::InnerProduct: {
               // NB: we negate the scores as we hardcoded select-topk to always compute the minimum
               float q;
@@ -485,6 +487,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
           reinterpret_cast<const vec_t::io_t*>(pq_thread_data),
           lut_scores,
           early_stop_limit);
+        if (metric == distance::DistanceType::CosineExpanded) { score = OutT(1) + score; }
       }
       if constexpr (kManageLocalTopK) {
         block_topk.add(score, sample_offset + i);
@@ -513,7 +516,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
 // The signature of the kernel defined by a minimal set of template parameters
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 using compute_similarity_kernel_t =
   decltype(&compute_similarity_kernel<OutT, LutT, IvfSampleFilterT, 8, 0, true, true>);
 
@@ -522,7 +525,7 @@ template <typename OutT,
           typename LutT,
           bool PrecompBaseDiff,
           bool EnableSMemLut,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 struct compute_similarity_kernel_config {
  public:
   static auto get(uint32_t pq_bits, uint32_t k_max)
@@ -572,7 +575,7 @@ template <typename OutT,
           typename LutT,
           bool PrecompBaseDiff,
           bool EnableSMemLut,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 auto get_compute_similarity_kernel(uint32_t pq_bits, uint32_t k_max)
   -> compute_similarity_kernel_t<OutT, LutT, IvfSampleFilterT>
 {
@@ -617,7 +620,7 @@ struct selected {
 
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                             rmm::cuda_stream_view stream,
                             uint32_t dim,
@@ -682,7 +685,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
  */
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                bool manage_local_topk,
                                int locality_hint,

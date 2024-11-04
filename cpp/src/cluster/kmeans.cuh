@@ -17,10 +17,12 @@
 
 #include "detail/kmeans.cuh"
 #include "detail/kmeans_auto_find_k.cuh"
+#include "kmeans_mg.hpp"
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <optional>
@@ -94,8 +96,13 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
+  if (raft::resource::comms_initialized(handle)) {
+    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
+  } else {
+    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  }
 }
 
 /**

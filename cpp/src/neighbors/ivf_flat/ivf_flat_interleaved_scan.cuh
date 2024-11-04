@@ -1205,9 +1205,9 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IvfSampleFilterT,
                            inner_prod_dist<Veclen, T, AccT>>(
         {},
-        raft::compose_op(raft::mul_const_op<float>{-1.0f}, raft::add_const_op<float>{1.0f}),
-        std::forward<Args>(args)...);
-    // NB: update the description of `knn::ivf_flat::build` when adding here a new metric.
+        raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
+        std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
+                                       // adding here a new metric.
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }
@@ -1304,7 +1304,7 @@ struct select_interleaved_scan_kernel {
  *               (one block processes one or more probes, hence: 1 <= grid_dim_x <= n_probes)
  * @param stream
  * @param sample_filter
- *   A filter that selects samples for a given query. Use an instance of none_ivf_sample_filter to
+ *   A filter that selects samples for a given query. Use an instance of none_sample_filter to
  *   provide a green light for every sample.
  */
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>

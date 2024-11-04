@@ -75,3 +75,10 @@ Index extend
     :members:
     :content-only:
 
+Index serialize
+---------------
+
+.. doxygengroup:: cagra_cpp_serialize
+    :project: cuvs
+    :members:
+    :content-only:
