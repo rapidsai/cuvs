@@ -74,14 +74,14 @@ files:
       - rapids_build
       - cuda
       - rust
-  py_build_py_cuvs:
+  py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
       table: build-system
     includes:
       - build
-  py_rapids_build_py_cuvs:
+  py_rapids_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -90,7 +90,7 @@ files:
     includes:
       - rapids_build
       - build_py_cuvs
-  py_run_py_cuvs:
+  py_run_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -99,7 +99,7 @@ files:
       - cuda_wheels
       - run_py_cuvs
       - depends_on_pylibraft
-  py_test_py_cuvs:
+  py_test_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
     extras:
@@ -116,7 +116,7 @@ files:
       table: build-system
     includes:
       - rapids_build_setuptools
-  py_rapids_build_py_cuvs_bench:
+  py_rapids_build_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
     extras:
@@ -488,7 +488,7 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - &librmm_unsuffixed librmm==24.10.*,>=0.0.0a0
+          - &librmm_unsuffixed librmm==24.12.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -501,18 +501,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu12==24.10.*,>=0.0.0a0
+              - librmm-cu12==24.12.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu11==24.10.*,>=0.0.0a0
+              - librmm-cu11==24.12.*,>=0.0.0a0
           - {matrix: null, packages: [*librmm_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda
         packages:
-          - &pylibraft_unsuffixed pylibraft==24.10.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==24.12.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -525,10 +525,10 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu12==24.10.*,>=0.0.0a0
+              - pylibraft-cu12==24.12.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu11==24.10.*,>=0.0.0a0
+              - pylibraft-cu11==24.12.*,>=0.0.0a0
           - {matrix: null, packages: [*pylibraft_unsuffixed]}
