@@ -12,10 +12,7 @@ import (
 	"runtime"
 )
 
-type CuvsMemoryCommand struct {
-	cmd  int
-	done chan struct{} // Response channel
-}
+type CuvsMemoryCommand int
 
 const (
 	CuvsMemoryNew = iota
@@ -40,14 +37,13 @@ func (m *CuvsPoolMemory) start() {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		for command := range m.ch {
-			switch command.cmd {
+			switch command {
 			case CuvsMemoryNew:
 				CheckCuvs(CuvsError(C.cuvsRMMPoolMemoryResourceEnable(C.int(m.initial_pool_size_percent), C.int(m.max_pool_size_percent), C._Bool(m.managed))))
 			case CuvsMemoryRelease:
 				CheckCuvs(CuvsError(C.cuvsRMMMemoryResourceReset()))
 			}
 
-			close(command.done)
 		}
 	}()
 }
@@ -55,20 +51,14 @@ func (m *CuvsPoolMemory) Close() {
 	close(m.ch)
 }
 func (m *CuvsPoolMemory) Instantiate() {
-	done := make(chan struct{})
-	m.ch <- CuvsMemoryCommand{
-		cmd:  CuvsMemoryNew,
-		done: done,
-	}
-	<-done // Wait for completion
+
+	m.ch <- CuvsMemoryNew
+
 }
 
 func (m *CuvsPoolMemory) Release() *CuvsPoolMemory {
-	done := make(chan struct{})
-	m.ch <- CuvsMemoryCommand{
-		cmd:  CuvsMemoryRelease,
-		done: done,
-	}
-	<-done // Wait for completion
+
+	m.ch <- CuvsMemoryRelease
+
 	return m
 }
