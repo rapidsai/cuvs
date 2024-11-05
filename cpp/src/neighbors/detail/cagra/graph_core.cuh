@@ -73,12 +73,12 @@ __device__ inline bool swap_if_needed(K& key1, K& key2, V& val1, V& val2, bool a
 }
 
 template <class DATA_T, class IdxT, int numElementsPerThread>
-RAFT_KERNEL kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, dataset_dim]
-                      const IdxT dataset_size,
-                      const uint32_t dataset_dim,
-                      IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
-                      const uint32_t graph_size,
-                      const uint32_t graph_degree)
+__global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, dataset_dim]
+                          const IdxT dataset_size,
+                          const uint32_t dataset_dim,
+                          IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
+                          const uint32_t graph_size,
+                          const uint32_t graph_degree)
 {
   const IdxT srcNode = (blockDim.x * blockIdx.x + threadIdx.x) / raft::WarpSize;
   if (srcNode >= graph_size) { return; }
@@ -129,15 +129,15 @@ RAFT_KERNEL kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, data
 }
 
 template <int MAX_DEGREE, class IdxT>
-RAFT_KERNEL kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
-                       const uint32_t graph_size,
-                       const uint32_t graph_degree,
-                       const uint32_t degree,
-                       const uint32_t batch_size,
-                       const uint32_t batch_id,
-                       uint8_t* const detour_count,          // [graph_chunk_size, graph_degree]
-                       uint32_t* const num_no_detour_edges,  // [graph_size]
-                       uint64_t* const stats)
+__global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
+                           const uint32_t graph_size,
+                           const uint32_t graph_degree,
+                           const uint32_t degree,
+                           const uint32_t batch_size,
+                           const uint32_t batch_id,
+                           uint8_t* const detour_count,          // [graph_chunk_size, graph_degree]
+                           uint32_t* const num_no_detour_edges,  // [graph_size]
+                           uint64_t* const stats)
 {
   __shared__ uint32_t smem_num_detour[MAX_DEGREE];
   uint64_t* const num_retain = stats;
@@ -192,11 +192,11 @@ RAFT_KERNEL kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, graph
 }
 
 template <class IdxT>
-RAFT_KERNEL kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_size]
-                                IdxT* const rev_graph,            // [size, degree]
-                                uint32_t* const rev_graph_count,  // [graph_size]
-                                const uint32_t graph_size,
-                                const uint32_t degree)
+__global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_size]
+                                    IdxT* const rev_graph,            // [size, degree]
+                                    uint32_t* const rev_graph_count,  // [graph_size]
+                                    const uint32_t graph_size,
+                                    const uint32_t degree)
 {
   const uint32_t tid  = threadIdx.x + (blockDim.x * blockIdx.x);
   const uint32_t tnum = blockDim.x * gridDim.x;
@@ -221,16 +221,16 @@ __device__ __host__ LabelT get_root_label(IdxT i, const LabelT* label)
 }
 
 template <class IdxT>
-RAFT_KERNEL kern_mst_opt_update_graph(IdxT* mst_graph,                 // [graph_size, graph_degree]
-                                      const IdxT* candidate_edges,     // [graph_size]
-                                      IdxT* outgoing_num_edges,        // [graph_size]
-                                      IdxT* incoming_num_edges,        // [graph_size]
-                                      const IdxT* outgoing_max_edges,  // [graph_size]
-                                      const IdxT* incoming_max_edges,  // [graph_size]
-                                      const IdxT* label,               // [graph_size]
-                                      const uint32_t graph_size,
-                                      const uint32_t graph_degree,
-                                      uint64_t* stats)
+__global__ void kern_mst_opt_update_graph(IdxT* mst_graph,  // [graph_size, graph_degree]
+                                          const IdxT* candidate_edges,     // [graph_size]
+                                          IdxT* outgoing_num_edges,        // [graph_size]
+                                          IdxT* incoming_num_edges,        // [graph_size]
+                                          const IdxT* outgoing_max_edges,  // [graph_size]
+                                          const IdxT* incoming_max_edges,  // [graph_size]
+                                          const IdxT* label,               // [graph_size]
+                                          const uint32_t graph_size,
+                                          const uint32_t graph_degree,
+                                          uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
   if (i >= graph_size) return;
@@ -310,11 +310,11 @@ RAFT_KERNEL kern_mst_opt_update_graph(IdxT* mst_graph,                 // [graph
 }
 
 template <class IdxT>
-RAFT_KERNEL kern_mst_opt_labeling(IdxT* label,            // [graph_size]
-                                  const IdxT* mst_graph,  // [graph_size, graph_degree]
-                                  const uint32_t graph_size,
-                                  const uint32_t graph_degree,
-                                  uint64_t* stats)
+__global__ void kern_mst_opt_labeling(IdxT* label,            // [graph_size]
+                                      const IdxT* mst_graph,  // [graph_size, graph_degree]
+                                      const uint32_t graph_size,
+                                      const uint32_t graph_degree,
+                                      uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
   if (i >= graph_size) return;
@@ -348,10 +348,10 @@ RAFT_KERNEL kern_mst_opt_labeling(IdxT* label,            // [graph_size]
 }
 
 template <class IdxT>
-RAFT_KERNEL kern_mst_opt_cluster_size(IdxT* cluster_size,  // [graph_size]
-                                      const IdxT* label,   // [graph_size]
-                                      const uint32_t graph_size,
-                                      uint64_t* stats)
+__global__ void kern_mst_opt_cluster_size(IdxT* cluster_size,  // [graph_size]
+                                          const IdxT* label,   // [graph_size]
+                                          const uint32_t graph_size,
+                                          uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
   if (i >= graph_size) return;
@@ -375,14 +375,14 @@ RAFT_KERNEL kern_mst_opt_cluster_size(IdxT* cluster_size,  // [graph_size]
 }
 
 template <class IdxT>
-RAFT_KERNEL kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph_size]
-                                        IdxT* incoming_num_edges,  // [graph_size]
-                                        IdxT* outgoing_max_edges,  // [graph_size]
-                                        IdxT* incoming_max_edges,  // [graph_size]
-                                        const IdxT* cluster_size,  // [graph_size]
-                                        const uint32_t graph_size,
-                                        const uint32_t graph_degree,
-                                        uint64_t* stats)
+__global__ void kern_mst_opt_postprocessing(IdxT* outgoing_num_edges,  // [graph_size]
+                                            IdxT* incoming_num_edges,  // [graph_size]
+                                            IdxT* outgoing_max_edges,  // [graph_size]
+                                            IdxT* incoming_max_edges,  // [graph_size]
+                                            const IdxT* cluster_size,  // [graph_size]
+                                            const uint32_t graph_size,
+                                            const uint32_t graph_degree,
+                                            uint64_t* stats)
 {
   const uint64_t i = threadIdx.x + (blockDim.x * blockIdx.x);
   if (i >= graph_size) return;
@@ -475,12 +475,12 @@ void sort_knn_graph(
 {
   RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                "dataset size is expected to have the same number of graph index size");
-  const uint32_t dataset_size = dataset.extent(0);
-  const uint32_t dataset_dim  = dataset.extent(1);
+  const uint64_t dataset_size = dataset.extent(0);
+  const uint64_t dataset_dim  = dataset.extent(1);
   const DataT* dataset_ptr    = dataset.data_handle();
 
   const IdxT graph_size             = dataset_size;
-  const uint32_t input_graph_degree = knn_graph.extent(1);
+  const uint64_t input_graph_degree = knn_graph.extent(1);
   IdxT* const input_graph_ptr       = knn_graph.data_handle();
 
   auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
@@ -528,7 +528,7 @@ void sort_knn_graph(
     kernel_sort                        = kern_sort<DataT, IdxT, numElementsPerThread>;
   } else {
     RAFT_FAIL(
-      "The degree of input knn graph is too large (%u). "
+      "The degree of input knn graph is too large (%lu). "
       "It must be equal to or smaller than %d.",
       input_graph_degree,
       1024);
@@ -1076,11 +1076,11 @@ void optimize(
                "Each input array is expected to have the same number of rows");
   RAFT_EXPECTS(new_graph.extent(1) <= knn_graph.extent(1),
                "output graph cannot have more columns than input graph");
-  const uint32_t input_graph_degree  = knn_graph.extent(1);
-  const uint32_t output_graph_degree = new_graph.extent(1);
+  const uint64_t input_graph_degree  = knn_graph.extent(1);
+  const uint64_t output_graph_degree = new_graph.extent(1);
+  const uint64_t graph_size          = new_graph.extent(0);
   auto input_graph_ptr               = knn_graph.data_handle();
   auto output_graph_ptr              = new_graph.data_handle();
-  const IdxT graph_size              = new_graph.extent(0);
 
   // MST optimization
   auto mst_graph_num_edges     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
@@ -1148,7 +1148,7 @@ void optimize(
     constexpr int MAX_DEGREE = 1024;
     if (input_graph_degree > MAX_DEGREE) {
       RAFT_FAIL(
-        "The degree of input knn graph is too large (%u). "
+        "The degree of input knn graph is too large (%zu). "
         "It must be equal to or smaller than %d.",
         input_graph_degree,
         1024);
@@ -1217,11 +1217,12 @@ void optimize(
         assert(next_num_detour != std::numeric_limits<uint32_t>::max());
         num_detour = next_num_detour;
       }
-      RAFT_EXPECTS(pk == output_graph_degree,
-                   "Couldn't find the output_graph_degree (%u) smallest detourable count nodes for "
-                   "node %lu in the rank-based node reranking process",
-                   output_graph_degree,
-                   static_cast<uint64_t>(i));
+      RAFT_EXPECTS(
+        pk == output_graph_degree,
+        "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+        "node %lu in the rank-based node reranking process",
+        output_graph_degree,
+        i);
     }
 
     const double time_prune_end = cur_time();
@@ -1317,7 +1318,7 @@ void optimize(
       uint32_t kf       = 0;
       uint32_t k        = mst_graph_num_edges_ptr[i];
 
-      const uint64_t num_protected_edges = max(k, output_graph_degree / 2);
+      const auto num_protected_edges = std::max<uint64_t>(k, output_graph_degree / 2);
       assert(num_protected_edges <= output_graph_degree);
       if (num_protected_edges == output_graph_degree) continue;
 
@@ -1342,7 +1343,7 @@ void optimize(
       assert(kf <= output_graph_degree);
 
       // Replace some edges of the output graph with edges of the reverse graph.
-      uint32_t kr = std::min(rev_graph_count.data_handle()[i], output_graph_degree);
+      auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
       while (kr) {
         kr -= 1;
         if (my_rev_graph[kr] < graph_size) {

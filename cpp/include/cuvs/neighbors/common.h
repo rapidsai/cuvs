@@ -44,7 +44,7 @@ enum cuvsFilterType {
 };
 
 /**
- * @brief Struct to hold address of cuvs::neighbor::prefilter and its type
+ * @brief Struct to hold address of cuvs::neighbors::prefilter and its type
  *
  */
 typedef struct {
