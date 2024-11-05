@@ -388,7 +388,8 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
  * @param[in] additional_dataset DLManagedTensor* additional dataset
- * @param[out] index cuvsCagraIndex_t Extended CAGRA index
+ * @param[out] return_dataset DLManagedTensor* extended dataset
+ * @param[out] index cuvsCagraIndex_t extended CAGRA index
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraExtend(cuvsResources_t res,
