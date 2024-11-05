@@ -29,6 +29,8 @@
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
 
+#include <thrust/sequence.h>
+
 namespace {
 
 template <typename T>
@@ -89,7 +91,8 @@ void _search(cuvsResources_t res,
              cuvsCagraIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
-             DLManagedTensor* distances_tensor)
+             DLManagedTensor* distances_tensor,
+             std::optional<DLManagedTensor*> removed_indices_tensor = std::nullopt)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
@@ -115,8 +118,26 @@ void _search(cuvsResources_t res,
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
   auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
-  cuvs::neighbors::cagra::search(
-    *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+
+  if (removed_indices_tensor.has_value()) {
+    using filter_mdspan_type = raft::device_vector_view<int64_t, int64_t, raft::row_major>;
+    auto removed_indices =
+      cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor.value());
+    cuvs::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+      *res_ptr, removed_indices, index_ptr->dataset().extent(0));
+    auto bitset_filter_obj =
+      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
+    cuvs::neighbors::cagra::search(*res_ptr,
+                                   search_params,
+                                   *index_ptr,
+                                   queries_mds,
+                                   neighbors_mds,
+                                   distances_mds,
+                                   bitset_filter_obj);
+  } else {
+    cuvs::neighbors::cagra::search(
+      *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+  }
 }
 
 template <typename T>
@@ -239,6 +260,56 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
       _search<int8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
       _search<uint8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+    } else {
+      RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
+                queries.dtype.code,
+                queries.dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraFilteredSearch(cuvsResources_t res,
+                                               cuvsCagraSearchParams_t params,
+                                               cuvsCagraIndex_t index_c_ptr,
+                                               DLManagedTensor* queries_tensor,
+                                               DLManagedTensor* neighbors_tensor,
+                                               DLManagedTensor* distances_tensor,
+                                               DLManagedTensor* filter_tensor)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto queries   = queries_tensor->dl_tensor;
+    auto neighbors = neighbors_tensor->dl_tensor;
+    auto distances = distances_tensor->dl_tensor;
+    auto filter    = filter_tensor->dl_tensor;
+
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(queries),
+                 "queries should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(neighbors),
+                 "neighbors should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(distances),
+                 "distances should have device compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(filter),
+                 "filter should have device compatible memory");
+
+    RAFT_EXPECTS(neighbors.dtype.code == kDLUInt && neighbors.dtype.bits == 32,
+                 "neighbors should be of type uint32_t");
+    RAFT_EXPECTS(distances.dtype.code == kDLFloat && neighbors.dtype.bits == 32,
+                 "distances should be of type float32");
+    RAFT_EXPECTS(filter.dtype.code == kDLInt && filter.dtype.bits == 64,
+                 "filter should be of type int64_t");
+
+    auto index = *index_c_ptr;
+    RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
+
+    if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
+      _search<float>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter_tensor);
+    } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
+      _search<int8_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter_tensor);
+    } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
+      _search<uint8_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter_tensor);
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
