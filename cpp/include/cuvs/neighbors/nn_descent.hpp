@@ -129,20 +129,18 @@ struct index : cuvs::neighbors::index {
    * @param graph_view raft::host_matrix_view<IdxT, int64_t, raft::row_major> for storing knn-graph
    * @param distances_view optional raft::device_matrix_view<float, int64_t, row_major> for storing
    * distances
-   * @param return_distances whether to return distances
    */
   index(raft::resources const& res,
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view,
         std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances_view =
-          std::nullopt,
-        bool return_distances = false)
+          std::nullopt)
     : cuvs::neighbors::index(),
       res_{res},
       metric_{cuvs::distance::DistanceType::L2Expanded},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},
       graph_view_{graph_view},
       distances_view_{distances_view},
-      return_distances_{return_distances}
+      return_distances_{distances_view.has_value()}
   {
   }
 
