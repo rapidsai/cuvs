@@ -72,32 +72,6 @@ class cuda_event {
   std::unique_ptr<cudaEvent_t, std::function<void(cudaEvent_t*)>> event_;
 };
 
-template <typename T>
-class cuda_pinned_array {
- public:
-  cuda_pinned_array(cuda_pinned_array&&)            = default;
-  cuda_pinned_array& operator=(cuda_pinned_array&&) = default;
-  ~cuda_pinned_array()                              = default;
-  cuda_pinned_array(cuda_pinned_array const&) = delete;  // Copying disallowed: one array one owner
-  cuda_pinned_array& operator=(cuda_pinned_array&) = delete;
-
-  cuda_pinned_array(size_t size)
-    : value_{[size]() {
-               T* p = nullptr;
-               RAFT_CUDA_TRY(cudaMallocHost(&p, size * sizeof(T)));
-               return p;
-             }(),
-             [](T* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeHost(p)); }}
-  {
-  }
-
-  inline auto operator()(size_t i) const noexcept -> const T& { return value_.get()[i]; }
-  inline auto operator()(size_t i) noexcept -> T& { return value_.get()[i]; }
-
- private:
-  std::unique_ptr<T, std::function<void(T*)>> value_;
-};
-
 template <typename MdSpanOrArray>
 struct get_accessor_type_t {
   using type = typename MdSpanOrArray::accessor_type;
@@ -224,7 +198,13 @@ struct batch_queue_t {
   };
 
   explicit batch_queue_t(const raft::resources& res, uint32_t capacity = Size) noexcept
-    : tokens_(kSize), rem_time_us_(kSize), dispatch_sequence_id_(kSize), capacity_{capacity}
+    : tokens_{raft::make_pinned_vector<cuda::atomic<batch_token, cuda::thread_scope_system>,
+                                       uint32_t>(res, kSize)},
+      rem_time_us_{
+        raft::make_pinned_vector<cuda::atomic<int32_t, cuda::thread_scope_system>, uint32_t>(
+          res, kSize)},
+      dispatch_sequence_id_(kSize),
+      capacity_{capacity}
   {
     tail_.store(0, kMemOrder);
     head_.store(0, kMemOrder);
@@ -338,8 +318,8 @@ struct batch_queue_t {
   alignas(kCacheLineBytes) cuda::std::atomic<uint32_t> head_{};
 
   alignas(kCacheLineBytes)
-    cuda_pinned_array<cuda::atomic<batch_token, cuda::thread_scope_system>> tokens_;
-  cuda_pinned_array<cuda::atomic<int32_t, cuda::thread_scope_system>> rem_time_us_;
+    raft::pinned_vector<cuda::atomic<batch_token, cuda::thread_scope_system>, uint32_t> tokens_;
+  raft::pinned_vector<cuda::atomic<int32_t, cuda::thread_scope_system>, uint32_t> rem_time_us_;
   std::vector<cuda::std::atomic<uint32_t>> dispatch_sequence_id_;
   uint32_t capacity_;
 
