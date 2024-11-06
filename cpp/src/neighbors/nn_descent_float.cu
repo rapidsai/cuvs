@@ -34,6 +34,21 @@ namespace cuvs::neighbors::nn_descent {
     ->cuvs::neighbors::nn_descent::index<IdxT>                                    \
   {                                                                               \
     return cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset);  \
+  };                                                                              \
+                                                                                  \
+  void build(raft::resources const& handle,                                       \
+             const cuvs::neighbors::nn_descent::index_params& params,             \
+             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset, \
+             cuvs::neighbors::nn_descent::index<IdxT>& idx)                       \
+  {                                                                               \
+    cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset, idx);    \
+  };                                                                              \
+  void build(raft::resources const& handle,                                       \
+             const cuvs::neighbors::nn_descent::index_params& params,             \
+             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,   \
+             cuvs::neighbors::nn_descent::index<IdxT>& idx)                       \
+  {                                                                               \
+    cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset, idx);    \
   };
 
 CUVS_INST_NN_DESCENT_BUILD(float, uint32_t);
