@@ -33,7 +33,7 @@ namespace cuvs::neighbors::mg {
     const mg::index_params<ivf_pq::index_params>& index_params,                                    \
     raft::host_matrix_view<const T, int64_t, row_major> index_dataset)                             \
   {                                                                                                \
-    const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);              \
+    const raft::core::nccl_clique& clique = raft::resource::get_nccl_clique(handle);               \
     index<ivf_pq::index<IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);               \
     cuvs::neighbors::mg::detail::build(                                                            \
       handle,                                                                                      \
@@ -88,7 +88,7 @@ namespace cuvs::neighbors::mg {
   index<ivf_pq::index<IdxT>, T, IdxT> distribute_pq<T, IdxT>(const raft::device_resources& handle, \
                                                              const std::string& filename)          \
   {                                                                                                \
-    const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);              \
+    const raft::core::nccl_clique& clique = raft::resource::get_nccl_clique(handle);               \
     auto idx = index<ivf_pq::index<IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                 \
     cuvs::neighbors::mg::detail::deserialize_and_distribute(handle, idx, filename);                \
     return idx;                                                                                    \

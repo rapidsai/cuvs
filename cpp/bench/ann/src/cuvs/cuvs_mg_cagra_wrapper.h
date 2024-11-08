@@ -47,7 +47,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
     index_params_.ivf_pq_build_params->metric = parse_metric_type(metric);
 
     // init nccl clique outside as to not affect benchmark
-    const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle_);
+    const raft::core::nccl_clique& clique = raft::resource::get_nccl_clique(handle_);
   }
 
   void build(const T* dataset, size_t nrow) final;
