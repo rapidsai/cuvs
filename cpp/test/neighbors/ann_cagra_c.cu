@@ -230,10 +230,6 @@ TEST(CagraC, BuildSearchFiltered)
                                    &distances_tensor,
                                    &filter_tensor);
 
-  // if (e != cuvsError_t::CUVS_SUCCESS) {
-  //   std::cout << "Error: " << cuvsGetLastErrorText() << std::endl;
-  // }
-
   // verify output
   ASSERT_TRUE(cuvs::devArrMatchHost(
     neighbors_exp_filtered, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));

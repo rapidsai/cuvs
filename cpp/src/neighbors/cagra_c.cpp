@@ -29,8 +29,6 @@
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
 
-#include <thrust/sequence.h>
-
 namespace {
 
 template <typename T>
