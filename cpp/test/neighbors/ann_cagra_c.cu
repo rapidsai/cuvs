@@ -39,6 +39,9 @@ int64_t filter[2] = {1, 2};
 uint32_t neighbors_exp[4] = {3, 0, 3, 1};
 float distances_exp[4]    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
 
+uint32_t neighbors_exp_filtered[4] = {3, 0, 3, 0};
+float distances_exp_filtered[4]    = {0.03878258, 0.12472608, 0.04776672, 0.59063464};
+
 TEST(CagraC, BuildSearch)
 {
   // create cuvsResources_t
@@ -178,7 +181,7 @@ TEST(CagraC, BuildSearchFiltered)
   raft::copy(filter_d.data(), (int64_t*)filter, 2, stream);
 
   DLManagedTensor filter_tensor;
-  filter_tensor.dl_tensor.data               = queries_d.data();
+  filter_tensor.dl_tensor.data               = filter_d.data();
   filter_tensor.dl_tensor.device.device_type = kDLCUDA;
   filter_tensor.dl_tensor.ndim               = 1;
   filter_tensor.dl_tensor.dtype.code         = kDLInt;
@@ -232,10 +235,10 @@ TEST(CagraC, BuildSearchFiltered)
   // }
 
   // verify output
-  ASSERT_TRUE(
-    cuvs::devArrMatchHost(neighbors_exp, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
   ASSERT_TRUE(cuvs::devArrMatchHost(
-    distances_exp, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
+    neighbors_exp_filtered, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
+  ASSERT_TRUE(cuvs::devArrMatchHost(
+    distances_exp_filtered, distances_d.data(), 4, cuvs::CompareApprox<float>(0.001f)));
 
   // de-allocate index and res
   cuvsCagraSearchParamsDestroy(search_params);
