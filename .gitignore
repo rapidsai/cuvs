@@ -1,5 +1,6 @@
 ## common
 __pycache__
+.gitignore
 *.pyc
 *~
 \#*
@@ -82,3 +83,8 @@ ivf_pq_index
 # cuvs_bench
 datasets/
 /*.json
+
+# java
+.classpath
+
+
