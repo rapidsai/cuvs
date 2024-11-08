@@ -32,6 +32,7 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ${BUILD_MG_ALGOS})
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
@@ -55,6 +56,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB OFF)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
   set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_MG OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -66,6 +68,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
+   OR CUVS_ANN_BENCH_USE_CUVS_MG
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -85,21 +88,6 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS)
   include(cmake/thirdparty/get_faiss)
-endif()
-
-# ##################################################################################################
-# * Enable NVTX if available
-
-# Note: ANN_BENCH wrappers have extra NVTX code not related to raft::nvtx.They track gbench
-# benchmark cases and iterations. This is to make limited NVTX available to all algos, not just
-# raft/cuVS.
-if(TARGET CUDA::nvtx3)
-  set(_CMAKE_REQUIRED_INCLUDES_ORIG ${CMAKE_REQUIRED_INCLUDES})
-  get_target_property(CMAKE_REQUIRED_INCLUDES CUDA::nvtx3 INTERFACE_INCLUDE_DIRECTORIES)
-  unset(NVTX3_HEADERS_FOUND CACHE)
-  # Check the headers explicitly to make sure the cpu-only build succeeds
-  CHECK_INCLUDE_FILE_CXX(nvtx3/nvToolsExt.h NVTX3_HEADERS_FOUND)
-  set(CMAKE_REQUIRED_INCLUDES ${_CMAKE_REQUIRED_INCLUDES_ORIG})
 endif()
 
 # ##################################################################################################
@@ -127,12 +115,9 @@ function(ConfigureAnnBench)
     add_dependencies(${BENCH_NAME} ANN_BENCH)
   else()
     add_executable(${BENCH_NAME} ${ConfigureAnnBench_PATH})
-    target_compile_definitions(
-      ${BENCH_NAME} PRIVATE ANN_BENCH_BUILD_MAIN
-                            $<$<BOOL:${NVTX3_HEADERS_FOUND}>:ANN_BENCH_NVTX3_HEADERS_FOUND>
-    )
+    target_compile_definitions(${BENCH_NAME} PRIVATE ANN_BENCH_BUILD_MAIN>)
     target_link_libraries(
-      ${BENCH_NAME} PRIVATE benchmark::benchmark $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
+      ${BENCH_NAME} PRIVATE benchmark::benchmark $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
     )
   endif()
 
@@ -245,6 +230,21 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_CUVS_MG)
+  ConfigureAnnBench(
+    NAME
+    CUVS_MG
+    PATH
+    src/cuvs/cuvs_benchmark.cu
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_ivf_flat.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_ivf_pq.cu>
+    $<$<BOOL:${CUVS_ANN_BENCH_USE_CUVS_MG}>:src/cuvs/cuvs_mg_cagra.cu>
+    LINKS
+    cuvs
+    nccl
+  )
+endif()
+
 message("CUVS_FAISS_TARGETS: ${CUVS_FAISS_TARGETS}")
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
 if(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT)
@@ -300,7 +300,7 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   target_link_libraries(
     ANN_BENCH
     PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl fmt::fmt-header-only
-            spdlog::spdlog_header_only $<$<BOOL:${NVTX3_HEADERS_FOUND}>:CUDA::nvtx3>
+            spdlog::spdlog_header_only $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
   )
   set_target_properties(
     ANN_BENCH
@@ -318,7 +318,6 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
     ANN_BENCH
     PRIVATE
       $<$<BOOL:${CUDAToolkit_FOUND}>:ANN_BENCH_LINK_CUDART="libcudart.so.${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}.${CUDAToolkit_VERSION_PATCH}">
-      $<$<BOOL:${NVTX3_HEADERS_FOUND}>:ANN_BENCH_NVTX3_HEADERS_FOUND>
   )
 
   target_link_options(ANN_BENCH PRIVATE -export-dynamic)

@@ -31,7 +31,7 @@
 #include <cuvs/neighbors/hnsw.hpp>
 
 namespace {
-template <typename T, typename QueriesT>
+template <typename T>
 void _search(cuvsResources_t res,
              cuvsHnswSearchParams params,
              cuvsHnswIndex index,
@@ -46,7 +46,7 @@ void _search(cuvsResources_t res,
   search_params.ef          = params.ef;
   search_params.num_threads = params.numThreads;
 
-  using queries_mdspan_type   = raft::host_matrix_view<QueriesT const, int64_t, raft::row_major>;
+  using queries_mdspan_type   = raft::host_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::host_matrix_view<uint64_t, int64_t, raft::row_major>;
   using distances_mdspan_type = raft::host_matrix_view<float, int64_t, raft::row_major>;
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
@@ -127,16 +127,13 @@ extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 
     auto index = *index_c_ptr;
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
-    RAFT_EXPECTS(queries.dtype.bits == 32, "number of bits in queries dtype should be 32");
 
     if (index.dtype.code == kDLFloat) {
-      _search<float, float>(
-        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<float>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (index.dtype.code == kDLUInt) {
-      _search<uint8_t, int>(
-        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<uint8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (index.dtype.code == kDLInt) {
-      _search<int8_t, int>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<int8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", queries.dtype.code, queries.dtype.bits);
     }
@@ -152,13 +149,10 @@ extern "C" cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       index->addr = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename, dim, metric));
-      index->dtype.code = kDLFloat;
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_deserialize<uint8_t>(res, filename, dim, metric));
-      index->dtype.code = kDLInt;
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename, dim, metric));
-      index->dtype.code = kDLUInt;
     } else {
       RAFT_FAIL("Unsupported dtype in file %s", filename);
     }

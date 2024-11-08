@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -37,10 +37,13 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    -n                          - no install step
    --uninstall                 - uninstall files for specified targets which were built and installed prior
    --compile-static-lib        - compile static library for all components
+   --cpu-only                  - build CPU only components without CUDA. Currently only applies to bench-ann.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
+   --no-mg                     - disable multi-GPU support
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
+   --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
    --build-metrics             - filename for generating build metrics report for libcuvs
    --incl-cache-stats          - include cache statistics in build metrics report
@@ -65,11 +68,13 @@ CMAKE_LOG_LEVEL=""
 VERBOSE_FLAG=""
 BUILD_ALL_GPU_ARCH=0
 BUILD_TESTS=ON
+BUILD_MG_ALGOS=ON
 BUILD_TYPE=Release
 COMPILE_LIBRARY=OFF
 INSTALL_TARGET=install
 BUILD_REPORT_METRICS=""
 BUILD_REPORT_INCL_CACHE_STATS=OFF
+BUILD_SHARED_LIBS=ON
 
 TEST_TARGETS="NEIGHBORS_ANN_CAGRA_TEST"
 ANN_BENCH_TARGETS="CUVS_ANN_BENCH_ALL"
@@ -261,6 +266,10 @@ if hasArg --allgpuarch; then
     BUILD_ALL_GPU_ARCH=1
 fi
 
+if hasArg --no-mg; then
+    BUILD_MG_ALGOS=OFF
+fi
+
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
     CMAKE_TARGET="${CMAKE_TARGET};${TEST_TARGETS}"
@@ -276,7 +285,20 @@ fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
     BUILD_CUVS_BENCH=ON
+    if ! hasArg tests; then
+        BUILD_TESTS=OFF
+    fi
+    COMPILE_LIBRARY=OFF
     CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
+    if hasArg --cpu-only; then
+        BUILD_CPU_ONLY=ON
+        BUILD_SHARED_LIBS=OFF
+        NVTX=OFF
+    fi
+fi
+
+if hasArg --no-shared-libs; then
+    BUILD_SHARED_LIBS=OFF
 fi
 
 if hasArg --no-nvtx; then
@@ -323,7 +345,11 @@ fi
 # Configure for building all C++ targets
 if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
-    CMAKE_TARGET="${CMAKE_TARGET};cuvs"
+    if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
+        CMAKE_TARGET="${CMAKE_TARGET};"
+    else
+        CMAKE_TARGET="${CMAKE_TARGET};cuvs"
+    fi
 
     if (( ${BUILD_ALL_GPU_ARCH} == 0 )); then
         CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
@@ -353,7 +379,9 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           -DBUILD_C_TESTS=${BUILD_TESTS} \
           -DBUILD_CUVS_BENCH=${BUILD_CUVS_BENCH} \
           -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
+          -DBUILD_MG_ALGOS=${BUILD_MG_ALGOS} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \
+          -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
           ${CACHE_ARGS} \
           ${EXTRA_CMAKE_ARGS}
 
@@ -382,14 +410,14 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           if [[ ${CACHE_TOOL} == "sccache" && -x "$(command -v sccache)" ]]; then
               COMPILE_REQUESTS=$(sccache -s | grep "Compile requests \+ [0-9]\+$" | awk '{ print $NF }')
               CACHE_HITS=$(sccache -s | grep "Cache hits \+ [0-9]\+$" | awk '{ print $NF }')
-              HIT_RATE=$(echo - | awk "{printf \"%.2f\n\", $CACHE_HITS / $COMPILE_REQUESTS * 100}")
+              HIT_RATE=$(COMPILE_REQUESTS="${COMPILE_REQUESTS}" CACHE_HITS="${CACHE_HITS}" python3 -c "import os; print(f'{int(os.getenv(\"CACHE_HITS\")) / int(os.getenv(\"COMPILE_REQUESTS\")):.2f}' if int(os.getenv(\"COMPILE_REQUESTS\")) else 'nan')")
               MSG="${MSG}<br/>cache hit rate ${HIT_RATE} %"
           elif [[ ${CACHE_TOOL} == "ccache" && -x "$(command -v ccache)" ]]; then
               CACHE_STATS_LINE=$(ccache -s | grep "Hits: \+ [0-9]\+ / [0-9]\+" | tail -n1)
               if [[ ! -z "$CACHE_STATS_LINE" ]]; then
                   CACHE_HITS=$(echo "$CACHE_STATS_LINE" - | awk '{ print $2 }')
                   COMPILE_REQUESTS=$(echo "$CACHE_STATS_LINE" - | awk '{ print $4 }')
-                  HIT_RATE=$(echo - | awk "{printf \"%.2f\n\", $CACHE_HITS / $COMPILE_REQUESTS * 100}")
+                  HIT_RATE=$(COMPILE_REQUESTS="${COMPILE_REQUESTS}" CACHE_HITS="${CACHE_HITS}" python3 -c "import os; print(f'{int(os.getenv(\"CACHE_HITS\")) / int(os.getenv(\"COMPILE_REQUESTS\")):.2f}' if int(os.getenv(\"COMPILE_REQUESTS\")) else 'nan')")
                   MSG="${MSG}<br/>cache hit rate ${HIT_RATE} %"
               fi
           fi
@@ -419,7 +447,7 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
         python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs
 fi
 
-# Build and (optionally) install the cuvs_bench Python package
+# Build and (optionally) install the cuvs-bench Python package
 if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
     python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi
