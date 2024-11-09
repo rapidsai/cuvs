@@ -18,17 +18,12 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.UUID;
 
-public class CuVSIndex {
+public class CagraIndex {
 
-  private IndexParams indexParams;
+  private CagraIndexParams indexParams;
   private final float[][] dataset;
   private final CuVSResources res;
   private CagraIndexReference ref;
-  private ANNAlgorithms algo;
-
-  public enum ANNAlgorithms {
-    BRUTEFORCE, CAGRA, IVF_PQ, IVF_FLAT
-  }
 
   Linker linker;
   Arena arena;
@@ -48,14 +43,12 @@ public class CuVSIndex {
    * @param res
    * @throws Throwable
    */
-  private CuVSIndex(IndexParams indexParams, float[][] dataset, CuVSResources res, ANNAlgorithms algo)
-      throws Throwable {
+  private CagraIndex(CagraIndexParams indexParams, float[][] dataset, CuVSResources res) throws Throwable {
     this.indexParams = indexParams;
     this.dataset = dataset;
     this.init();
     this.res = res;
     this.ref = build();
-    this.algo = algo;
   }
 
   /**
@@ -64,7 +57,7 @@ public class CuVSIndex {
    * @param res
    * @throws Throwable
    */
-  private CuVSIndex(InputStream in, CuVSResources res) throws Throwable {
+  private CagraIndex(InputStream in, CuVSResources res) throws Throwable {
     this.indexParams = null;
     this.dataset = null;
     this.res = res;
@@ -81,7 +74,7 @@ public class CuVSIndex {
     arena = Arena.ofConfined();
 
     File wd = new File(System.getProperty("user.dir"));
-    bridge = SymbolLookup.libraryLookup(wd.getParent() + "/api-sys/build/libcuvs_wrapper.so", arena);
+    bridge = SymbolLookup.libraryLookup(wd.getParent() + "/internal/libcuvs_java.so", arena);
 
     indexMH = linker.downcallHandle(bridge.findOrThrow("build_index"),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("long"),
@@ -154,9 +147,7 @@ public class CuVSIndex {
     MemorySegment rvMS = arena.allocate(rvML);
 
     ref = new CagraIndexReference((MemorySegment) indexMH.invokeExact(getMemorySegment(dataset), rows, cols,
-        res.resource, rvMS, indexParams.indexParamsMS));
-
-    System.out.println("Build call return value: " + rvMS.get(ValueLayout.JAVA_INT, 0));
+        res.getResource(), rvMS, indexParams.cagraIndexParamsMS));
 
     return ref;
   }
@@ -177,12 +168,33 @@ public class CuVSIndex {
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
 
-    searchMH.invokeExact(ref.indexMemorySegment, getMemorySegment(query.queryVectors), 2, 4L, 2L, res.resource,
-        neighborsMS, distancesMS, rvMS, query.searchParams.searchParamsMS);
-
-    System.out.println("Search call return value: " + rvMS.get(ValueLayout.JAVA_INT, 0));
+    searchMH.invokeExact(ref.indexMemorySegment, getMemorySegment(query.queryVectors), 2, 4L, 2L, res.getResource(),
+        neighborsMS, distancesMS, rvMS, query.searchParams.cagraSearchParamsMS);
 
     return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, 2, query.mapping);
+  }
+
+  /**
+   * 
+   * @param out
+   * @param tmpFilePath
+   * @throws Throwable
+   */
+  public void serialize(OutputStream out) throws Throwable {
+    MemoryLayout rvML = linker.canonicalLayouts().get("int");
+    MemorySegment rvMS = arena.allocate(rvML);
+    String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
+    serializeMH.invokeExact(res.getResource(), ref.indexMemorySegment, rvMS,
+        getStringSegment(new StringBuilder(tmpIndexFile)));
+    File tempFile = new File(tmpIndexFile);
+    FileInputStream is = new FileInputStream(tempFile);
+    byte[] chunk = new byte[1024];
+    int chunkLen = 0;
+    while ((chunkLen = is.read(chunk)) != -1) {
+      out.write(chunk, 0, chunkLen);
+    }
+    is.close();
+    tempFile.delete();
   }
 
   /**
@@ -194,10 +206,8 @@ public class CuVSIndex {
   public void serialize(OutputStream out, String tmpFilePath) throws Throwable {
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
-    serializeMH.invokeExact(res.resource, ref.indexMemorySegment, rvMS,
+    serializeMH.invokeExact(res.getResource(), ref.indexMemorySegment, rvMS,
         getStringSegment(new StringBuilder(tmpFilePath)));
-    System.out.println("Serialize call return value: " + rvMS.get(ValueLayout.JAVA_INT, 0));
-
     File tempFile = new File(tmpFilePath);
     FileInputStream is = new FileInputStream(tempFile);
     byte[] chunk = new byte[1024];
@@ -228,7 +238,7 @@ public class CuVSIndex {
     while ((chunkLen = in.read(chunk)) != -1) {
       out.write(chunk, 0, chunkLen);
     }
-    deserializeMH.invokeExact(res.resource, ref.indexMemorySegment, rvMS,
+    deserializeMH.invokeExact(res.getResource(), ref.indexMemorySegment, rvMS,
         getStringSegment(new StringBuilder(tmpIndexFile)));
 
     in.close();
@@ -242,7 +252,7 @@ public class CuVSIndex {
    * 
    * @return
    */
-  public IndexParams getParams() {
+  public CagraIndexParams getParams() {
     return indexParams;
   }
 
@@ -263,10 +273,9 @@ public class CuVSIndex {
   }
 
   public static class Builder {
-    private IndexParams indexParams;
+    private CagraIndexParams indexParams;
     float[][] dataset;
     CuVSResources res;
-    ANNAlgorithms algo = ANNAlgorithms.CAGRA;
 
     InputStream in;
 
@@ -303,18 +312,8 @@ public class CuVSIndex {
      * @param params
      * @return
      */
-    public Builder withIndexParams(IndexParams indexParams) {
+    public Builder withIndexParams(CagraIndexParams indexParams) {
       this.indexParams = indexParams;
-      return this;
-    }
-
-    /**
-     * 
-     * @param params
-     * @return
-     */
-    public Builder withANNAlgorithm(ANNAlgorithms algo) {
-      this.algo = algo;
       return this;
     }
 
@@ -323,11 +322,11 @@ public class CuVSIndex {
      * @return
      * @throws Throwable
      */
-    public CuVSIndex build() throws Throwable {
+    public CagraIndex build() throws Throwable {
       if (in != null) {
-        return new CuVSIndex(in, res);
+        return new CagraIndex(in, res);
       } else {
-        return new CuVSIndex(indexParams, dataset, res, algo);
+        return new CagraIndex(indexParams, dataset, res);
       }
     }
   }

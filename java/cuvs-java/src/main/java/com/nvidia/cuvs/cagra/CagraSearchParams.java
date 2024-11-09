@@ -22,7 +22,7 @@ import com.nvidia.cuvs.panama.cuvsCagraSearchParams;
 *     uint64_t rand_xor_mask;
 * }
 */
-public class CagraSearchParams extends SearchParams {
+public class CagraSearchParams {
 
   Arena arena;
   int maxQueries;
@@ -38,6 +38,7 @@ public class CagraSearchParams extends SearchParams {
   float hashmapMaxFillRate;
   int numRandomSamplings;
   long randXorMask;
+  public MemorySegment cagraSearchParamsMS;
 
   enum CuvsCagraSearchAlgo {
     SINGLE_CTA(0), MULTI_CTA(1), MULTI_KERNEL(2), AUTO(3);
@@ -82,20 +83,20 @@ public class CagraSearchParams extends SearchParams {
   }
 
   public void set() {
-    searchParamsMS = cuvsCagraSearchParams.allocate(arena);
-    cuvsCagraSearchParams.max_queries(searchParamsMS, maxQueries);
-    cuvsCagraSearchParams.itopk_size(searchParamsMS, itopkSize);
-    cuvsCagraSearchParams.max_iterations(searchParamsMS, maxIterations);
-    cuvsCagraSearchParams.algo(searchParamsMS, algo.label);
-    cuvsCagraSearchParams.team_size(searchParamsMS, teamSize);
-    cuvsCagraSearchParams.search_width(searchParamsMS, searchWidth);
-    cuvsCagraSearchParams.min_iterations(searchParamsMS, minIterations);
-    cuvsCagraSearchParams.thread_block_size(searchParamsMS, threadBlockSize);
-    cuvsCagraSearchParams.hashmap_mode(searchParamsMS, hashmapMode.label);
-    cuvsCagraSearchParams.hashmap_min_bitlen(searchParamsMS, hashmapMinBitlen);
-    cuvsCagraSearchParams.hashmap_max_fill_rate(searchParamsMS, hashmapMaxFillRate);
-    cuvsCagraSearchParams.num_random_samplings(searchParamsMS, numRandomSamplings);
-    cuvsCagraSearchParams.rand_xor_mask(searchParamsMS, randXorMask);
+    cagraSearchParamsMS = cuvsCagraSearchParams.allocate(arena);
+    cuvsCagraSearchParams.max_queries(cagraSearchParamsMS, maxQueries);
+    cuvsCagraSearchParams.itopk_size(cagraSearchParamsMS, itopkSize);
+    cuvsCagraSearchParams.max_iterations(cagraSearchParamsMS, maxIterations);
+    cuvsCagraSearchParams.algo(cagraSearchParamsMS, algo.label);
+    cuvsCagraSearchParams.team_size(cagraSearchParamsMS, teamSize);
+    cuvsCagraSearchParams.search_width(cagraSearchParamsMS, searchWidth);
+    cuvsCagraSearchParams.min_iterations(cagraSearchParamsMS, minIterations);
+    cuvsCagraSearchParams.thread_block_size(cagraSearchParamsMS, threadBlockSize);
+    cuvsCagraSearchParams.hashmap_mode(cagraSearchParamsMS, hashmapMode.label);
+    cuvsCagraSearchParams.hashmap_min_bitlen(cagraSearchParamsMS, hashmapMinBitlen);
+    cuvsCagraSearchParams.hashmap_max_fill_rate(cagraSearchParamsMS, hashmapMaxFillRate);
+    cuvsCagraSearchParams.num_random_samplings(cagraSearchParamsMS, numRandomSamplings);
+    cuvsCagraSearchParams.rand_xor_mask(cagraSearchParamsMS, randXorMask);
   }
 
   public int getMax_queries() {
@@ -155,9 +156,8 @@ public class CagraSearchParams extends SearchParams {
     return "CagraSearchParams [max_queries=" + maxQueries + ", itopk_size=" + itopkSize + ", max_iterations="
         + maxIterations + ", algo=" + algo + ", team_size=" + teamSize + ", search_width=" + searchWidth
         + ", min_iterations=" + minIterations + ", thread_block_size=" + threadBlockSize + ", hashmap_mode="
-        + hashmapMode + ", hashmap_min_bitlen=" + hashmapMinBitlen + ", hashmap_max_fill_rate="
-        + hashmapMaxFillRate + ", num_random_samplings=" + numRandomSamplings + ", rand_xor_mask=" + randXorMask
-        + "]";
+        + hashmapMode + ", hashmap_min_bitlen=" + hashmapMinBitlen + ", hashmap_max_fill_rate=" + hashmapMaxFillRate
+        + ", num_random_samplings=" + numRandomSamplings + ", rand_xor_mask=" + randXorMask + "]";
   }
 
   public static class Builder {
@@ -248,8 +248,8 @@ public class CagraSearchParams extends SearchParams {
 
     public CagraSearchParams build() throws Throwable {
       return new CagraSearchParams(arena, maxQueries, itopkSize, maxIterations, algo, teamSize, searchWidth,
-          minIterations, threadBlockSize, hashmapMode, hashmapMinBitlen, hashmapMaxFillRate,
-          numRandomSamplings, randXorMask);
+          minIterations, threadBlockSize, hashmapMode, hashmapMinBitlen, hashmapMaxFillRate, numRandomSamplings,
+          randXorMask);
     }
 
   }

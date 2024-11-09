@@ -8,7 +8,7 @@ import com.nvidia.cuvs.panama.cuvsCagraIndex;
 public class CagraIndexReference {
 
   public MemorySegment indexMemorySegment;
-  
+
   /**
    * 
    */

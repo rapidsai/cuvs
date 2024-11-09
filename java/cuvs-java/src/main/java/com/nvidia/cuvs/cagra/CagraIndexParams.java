@@ -13,13 +13,14 @@ import com.nvidia.cuvs.panama.cuvsCagraIndexParams;
 *     size_t nn_descent_niter;
 * }
 */
-public class CagraIndexParams extends IndexParams {
+public class CagraIndexParams {
 
   Arena arena;
   int intermediateGraphDegree;
   int graphDegree;
   CuvsCagraGraphBuildAlgo buildAlgo;
   int nnDescentNiter;
+  public MemorySegment cagraIndexParamsMS;
 
   public enum CuvsCagraGraphBuildAlgo {
     AUTO_SELECT(0), IVF_PQ(1), NN_DESCENT(2);
@@ -31,8 +32,8 @@ public class CagraIndexParams extends IndexParams {
     }
   }
 
-  public CagraIndexParams(Arena arena, int intermediateGraphDegree, int graphDegree,
-      CuvsCagraGraphBuildAlgo buildAlgo, int nnDescentNiter) {
+  public CagraIndexParams(Arena arena, int intermediateGraphDegree, int graphDegree, CuvsCagraGraphBuildAlgo buildAlgo,
+      int nnDescentNiter) {
     this.arena = arena;
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
@@ -42,11 +43,11 @@ public class CagraIndexParams extends IndexParams {
   }
 
   private void set() {
-    indexParamsMS = cuvsCagraIndexParams.allocate(arena);
-    cuvsCagraIndexParams.intermediate_graph_degree(indexParamsMS, intermediateGraphDegree);
-    cuvsCagraIndexParams.graph_degree(indexParamsMS, graphDegree);
-    cuvsCagraIndexParams.build_algo(indexParamsMS, buildAlgo.label);
-    cuvsCagraIndexParams.nn_descent_niter(indexParamsMS, nnDescentNiter);
+    cagraIndexParamsMS = cuvsCagraIndexParams.allocate(arena);
+    cuvsCagraIndexParams.intermediate_graph_degree(cagraIndexParamsMS, intermediateGraphDegree);
+    cuvsCagraIndexParams.graph_degree(cagraIndexParamsMS, graphDegree);
+    cuvsCagraIndexParams.build_algo(cagraIndexParamsMS, buildAlgo.label);
+    cuvsCagraIndexParams.nn_descent_niter(cagraIndexParamsMS, nnDescentNiter);
   }
 
   public int getIntermediate_graph_degree() {
@@ -103,7 +104,7 @@ public class CagraIndexParams extends IndexParams {
       this.nnDescentNiter = nnDescentNiter;
       return this;
     }
-    
+
     public Builder withWriterThreads(int writerThreads) {
       this.writerThreads = writerThreads;
       return this;

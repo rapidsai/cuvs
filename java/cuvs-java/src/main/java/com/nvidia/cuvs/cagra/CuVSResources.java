@@ -16,7 +16,7 @@ public class CuVSResources {
   private Arena arena;
   private MethodHandle cresMH;
   private SymbolLookup bridge;
-  public MemorySegment resource;
+  private MemorySegment resource;
 
   /**
    * 
@@ -27,17 +27,19 @@ public class CuVSResources {
     arena = Arena.ofConfined();
 
     File wd = new File(System.getProperty("user.dir"));
-    bridge = SymbolLookup.libraryLookup(wd.getParent() + "/api-sys/build/libcuvs_wrapper.so", arena);
+    bridge = SymbolLookup.libraryLookup(wd.getParent() + "/internal/libcuvs_java.so", arena);
 
-    cresMH = linker.downcallHandle(bridge.findOrThrow("create_resource"), FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-    
+    cresMH = linker.downcallHandle(bridge.findOrThrow("create_resource"),
+        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
-    
+
     resource = (MemorySegment) cresMH.invokeExact(rvMS);
-    
-    System.out.println("Create resource call return value: " + rvMS.get(ValueLayout.JAVA_INT, 0));
-    
+  }
+
+  public MemorySegment getResource() {
+    return resource;
   }
 
 }
