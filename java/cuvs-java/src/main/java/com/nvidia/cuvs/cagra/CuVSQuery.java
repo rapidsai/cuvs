@@ -3,24 +3,20 @@ package com.nvidia.cuvs.cagra;
 import java.util.Arrays;
 import java.util.Map;
 
-import com.nvidia.cuvs.cagra.CuVSIndex.ANNAlgorithms;
-
 public class CuVSQuery {
 
-  SearchParams searchParams;
+  CagraSearchParams searchParams;
   PreFilter preFilter;
   float[][] queryVectors;
   public Map<Integer, Integer> mapping;
-  ANNAlgorithms algo;
-  
-  public CuVSQuery(SearchParams searchParams, PreFilter preFilter, float[][] queryVectors,
-      Map<Integer, Integer> mapping, ANNAlgorithms algo) {
+
+  public CuVSQuery(CagraSearchParams searchParams, PreFilter preFilter, float[][] queryVectors,
+      Map<Integer, Integer> mapping) {
     super();
     this.searchParams = searchParams;
     this.preFilter = preFilter;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
-    this.algo = algo;
   }
 
   @Override
@@ -29,7 +25,7 @@ public class CuVSQuery {
         + Arrays.toString(queryVectors) + "]";
   }
 
-  public SearchParams getSearchParams() {
+  public CagraSearchParams getSearchParams() {
     return searchParams;
   }
 
@@ -42,11 +38,10 @@ public class CuVSQuery {
   }
 
   public static class Builder {
-    SearchParams searchParams;
+    CagraSearchParams searchParams;
     PreFilter preFilter;
     float[][] queryVectors;
     Map<Integer, Integer> mapping;
-    ANNAlgorithms algo = ANNAlgorithms.CAGRA;
 
     /**
      * 
@@ -60,7 +55,7 @@ public class CuVSQuery {
      * @param dataset
      * @return
      */
-    public Builder withSearchParams(SearchParams searchParams) {
+    public Builder withSearchParams(CagraSearchParams searchParams) {
       this.searchParams = searchParams;
       return this;
     }
@@ -97,21 +92,11 @@ public class CuVSQuery {
 
     /**
      * 
-     * @param params
-     * @return
-     */
-    public Builder withANNAlgorithm(ANNAlgorithms algo) {
-      this.algo = algo;
-      return this;
-    }
-
-    /**
-     * 
      * @return
      * @throws Throwable
      */
     public CuVSQuery build() throws Throwable {
-      return new CuVSQuery(searchParams, preFilter, queryVectors, mapping, algo);
+      return new CuVSQuery(searchParams, preFilter, queryVectors, mapping);
     }
   }
 

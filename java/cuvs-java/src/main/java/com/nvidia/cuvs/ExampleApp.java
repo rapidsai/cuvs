@@ -6,8 +6,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.Map;
 
-import com.nvidia.cuvs.cagra.CuVSIndex;
-import com.nvidia.cuvs.cagra.CuVSIndex.ANNAlgorithms;
+import com.nvidia.cuvs.cagra.CagraIndex;
 import com.nvidia.cuvs.cagra.CagraIndexParams;
 import com.nvidia.cuvs.cagra.CagraIndexParams.CuvsCagraGraphBuildAlgo;
 import com.nvidia.cuvs.cagra.CagraSearchParams;
@@ -39,24 +38,22 @@ public class ExampleApp {
         .build();
 
     // Creating a new index
-    CuVSIndex index = new CuVSIndex.Builder(res)
+    CagraIndex index = new CagraIndex.Builder(res)
         .withDataset(dataset)
-        .withANNAlgorithm(ANNAlgorithms.CAGRA)
         .withIndexParams(cagraIndexParams)
         .build();
 
     // Saving the index on to the disk.
-    index.serialize(new FileOutputStream("abc.cag"), "/tmp/index.cag");
+    index.serialize(new FileOutputStream("abc.cag"));
 
     // Loading a cagra index from disk.
     InputStream fin = new FileInputStream(new File("abc.cag"));
-    CuVSIndex index2 = new CuVSIndex.Builder(res)
+    CagraIndex index2 = new CagraIndex.Builder(res)
         .from(fin)
         .build();
 
     // Query
     CuVSQuery query = new CuVSQuery.Builder()
-        .withANNAlgorithm(ANNAlgorithms.CAGRA)
         .withSearchParams(cagraSearchParams)
         .withQueryVectors(queries)
         .withMapping(map)
@@ -64,11 +61,11 @@ public class ExampleApp {
 
     // Search
     SearchResult rslt = index.search(query);
-    System.out.println(rslt.results);
+    System.out.println(rslt.getResults());
 
     // Search from de-serialized index
     SearchResult rslt2 = index2.search(query);
-    System.out.println(rslt2.results);
+    System.out.println(rslt2.getResults());
 
   }
 }
