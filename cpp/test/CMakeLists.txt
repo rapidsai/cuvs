@@ -205,6 +205,7 @@ if(BUILD_TESTS)
     distance/dist_lp_unexp.cu
     distance/dist_russell_rao.cu
     distance/masked_nn.cu
+    sparse/neighbors/brute_force.cu
     sparse/neighbors/cross_component_nn.cu
     GPUS
     1
