@@ -486,8 +486,10 @@ index<T, IdxT> build(
 
   // Construct an index from dataset and optimized knn graph.
   if (params.compression.has_value()) {
-    RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
-                 "VPQ compression is only supported with L2Expanded distance mertric");
+    RAFT_EXPECTS(
+      params.metric == cuvs::distance::DistanceType::L2Expanded ||
+        params.metric == cuvs::distance::DistanceType::InnerProduct,
+      "VPQ compression is only supported with L2Expanded and InnerProduct distance mertric");
     index<T, IdxT> idx(res, params.metric);
     idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
     idx.update_dataset(
