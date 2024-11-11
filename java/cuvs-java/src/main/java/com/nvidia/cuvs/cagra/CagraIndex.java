@@ -168,10 +168,10 @@ public class CagraIndex {
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
 
-    searchMH.invokeExact(ref.indexMemorySegment, getMemorySegment(query.queryVectors), 2, 4L, 2L, res.getResource(),
-        neighborsMS, distancesMS, rvMS, query.searchParams.cagraSearchParamsMS);
+    searchMH.invokeExact(ref.indexMemorySegment, getMemorySegment(query.getQueries()), query.getTopK(), 4L, 2L, res.getResource(),
+        neighborsMS, distancesMS, rvMS, query.getSearchParams().cagraSearchParamsMS);
 
-    return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, 2, query.mapping);
+    return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, query.getTopK(), query.getMapping());
   }
 
   /**
