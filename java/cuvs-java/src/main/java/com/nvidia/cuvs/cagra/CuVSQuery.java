@@ -9,14 +9,16 @@ public class CuVSQuery {
   PreFilter preFilter;
   float[][] queryVectors;
   public Map<Integer, Integer> mapping;
+  int topK;
 
   public CuVSQuery(CagraSearchParams searchParams, PreFilter preFilter, float[][] queryVectors,
-      Map<Integer, Integer> mapping) {
+      Map<Integer, Integer> mapping, int topK) {
     super();
     this.searchParams = searchParams;
     this.preFilter = preFilter;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
+    this.topK = topK;
   }
 
   @Override
@@ -37,11 +39,20 @@ public class CuVSQuery {
     return queryVectors;
   }
 
+  public Map<Integer, Integer> getMapping() {
+    return mapping;
+  }
+
+  public int getTopK() {
+    return topK;
+  }
+
   public static class Builder {
     CagraSearchParams searchParams;
     PreFilter preFilter;
     float[][] queryVectors;
     Map<Integer, Integer> mapping;
+    int topK = 2;
 
     /**
      * 
@@ -89,6 +100,16 @@ public class CuVSQuery {
       this.mapping = mapping;
       return this;
     }
+    
+    /**
+     * 
+     * @param topK
+     * @return
+     */
+    public Builder withTopK(int topK) {
+      this.topK = topK;
+      return this;
+    }
 
     /**
      * 
@@ -96,7 +117,7 @@ public class CuVSQuery {
      * @throws Throwable
      */
     public CuVSQuery build() throws Throwable {
-      return new CuVSQuery(searchParams, preFilter, queryVectors, mapping);
+      return new CuVSQuery(searchParams, preFilter, queryVectors, mapping, topK);
     }
   }
 
