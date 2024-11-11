@@ -404,7 +404,6 @@ void search(raft::resources const& handle,
  * @param[in] index brute force index
  * @param[in] include_dataset whether to include the dataset in the serialized
  * output
- *
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
@@ -440,6 +439,61 @@ void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::brute_force::index<float, float>& index,
                bool include_dataset = true);
+
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/brute_force.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::brute_force::build(...);`
+ * cuvs::neighbors::brute_force::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index brute force index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               std::ostream& os,
+               const cuvs::neighbors::brute_force::index<half, float>& index,
+               bool include_dataset = true);
+
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/brute_force.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::brute_force::build(...);`
+ * cuvs::neighbors::brute_force::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index brute force index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               std::ostream& os,
+               const cuvs::neighbors::brute_force::index<float, float>& index,
+               bool include_dataset = true);
+
 /**
  * Load index from file.
  *
@@ -473,7 +527,7 @@ void deserialize(raft::resources const& handle,
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
- * #include <raft/neighbors/brute_force_serialize.cuh>
+ * #include <cuvs/neighbors/brute_force.hpp>
  *
  * raft::resources handle;
  *
@@ -492,11 +546,58 @@ void deserialize(raft::resources const& handle,
 void deserialize(raft::resources const& handle,
                  const std::string& filename,
                  cuvs::neighbors::brute_force::index<float, float>* index);
-
-/**@}*/
-
-}  // namespace raft::neighbors::brute_force
-
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/brute_force.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * using T    = half; // data element type
+ * brute_force::index<T, float> index(handle);
+ * cuvs::neighbors::brute_force::deserialize(handle, is, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index brute force index
+ *
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::brute_force::index<half, float>* index);
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/brute_force.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * using T    = float; // data element type
+ * brute_force::index<T, float> index(handle);
+ * cuvs::neighbors::brute_force::deserialize(handle, is, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index brute force index
+ *
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::brute_force::index<float, float>* index);
 /**
  * @}
  */

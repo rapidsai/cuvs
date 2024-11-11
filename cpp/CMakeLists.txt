@@ -370,6 +370,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/neighbors/brute_force.cu
+    src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
     src/neighbors/cagra_build_int8.cu
