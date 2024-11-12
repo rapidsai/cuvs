@@ -28,6 +28,14 @@
 namespace cuvs::neighbors::cagra::detail {
 
 using namespace cuvs::distance;
-template struct vpq_descriptor_spec<DistanceType::InnerProduct, 16, 256, 8, 2, half, float, uint32_t, float>;
+template struct vpq_descriptor_spec<DistanceType::InnerProduct,
+                                    16,
+                                    256,
+                                    8,
+                                    2,
+                                    half,
+                                    float,
+                                    uint32_t,
+                                    float>;
 
 }  // namespace cuvs::neighbors::cagra::detail

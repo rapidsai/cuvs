@@ -492,7 +492,7 @@ index<T, IdxT> build(
       "VPQ compression is only supported with L2Expanded and InnerProduct distance mertric");
     index<T, IdxT> idx(res, params.metric);
     idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
-    auto compression_params = *params.compression;
+    auto compression_params   = *params.compression;
     compression_params.metric = params.metric;
     idx.update_dataset(
       res,

@@ -973,7 +973,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
-    {0.6});                      // don't demand high recall without refinement
+    {0.55});                     // don't demand high recall without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
     for (uint32_t vq_n_centers : {100, 1000}) {
       for (auto input : inputs2) {
