@@ -355,10 +355,8 @@ void build_knn_graph(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances_view = std::nullopt;
-  auto nn_descent_idx = cuvs::neighbors::nn_descent::index<IdxT>(
-    res, knn_graph, distances_view, false, build_params.metric);
-  cuvs::neighbors::nn_descent::build(res, build_params, dataset, nn_descent_idx);
+  std::optional<raft::host_matrix_view<IdxT, int64_t, row_major>> graph_view = knn_graph;
+  auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
