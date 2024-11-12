@@ -473,7 +473,8 @@ RAFT_KERNEL preprocess_data_kernel(
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
 
-  if (metric != cuvs::distance::DistanceType::InnerProduct) {
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::CosineExpanded) {
     int lane_id = threadIdx.x % raft::warp_size();
     for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
       int idx         = step * raft::warp_size() + lane_id;
