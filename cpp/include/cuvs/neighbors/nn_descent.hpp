@@ -61,6 +61,7 @@ struct index_params : cuvs::neighbors::index_params {
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
    * @param graph_degree output graph degree
+   * @param metric distance metric to use
    */
   index_params(size_t graph_degree                 = 64,
                cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
