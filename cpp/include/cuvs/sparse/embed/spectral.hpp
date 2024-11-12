@@ -34,20 +34,9 @@ namespace cuvs::sparse::cluster::spectral {
  * @param n_components the number of components to project the X into
  * @param out output array for embedding (size n*n_comonents)
  */
-void embed(const raft::handle_t& handle,
-           raft::device_coo_matrix_view<float, int, int, int> knn_graph,
-           int n_components,
-           raft::device_matrix_view<float, int> out,
-           unsigned long long seed = 0L);
-{
-  cuvs::sparse::spectral::fit_embedding(handle,
-                                        knn_graph.structure_view().get_rows().data(),
-                                        knn_graph.structure_view().get_cols().data(),
-                                        knn_graph.get_elements().data(),
-                                        knn_graph.structure_view().get_nnz(),
-                                        knn_graph.structure_view().get_n_rows(),
-                                        n_components,
-                                        out.data_handle(),
-                                        seed);
-}
+void fit(const raft::resources& handle,
+         raft::device_coo_matrix_view<float, int, int, int> knn_graph,
+         int n_components,
+         raft::device_matrix_view<float, int> out,
+         unsigned long long seed = 0L);
 };  // namespace cuvs::sparse::cluster::spectral

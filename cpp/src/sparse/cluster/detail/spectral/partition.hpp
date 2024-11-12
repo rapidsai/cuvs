@@ -23,8 +23,8 @@
 
 #include "../../cluster_solvers.cuh"
 #include "../../eigen_solvers.cuh"
-#include "../../matrix_wrappers.hpp"
 #include "spectral_util.cuh"
+#include <raft/spectral/matrix_wrappers.hpp>
 
 #include <cuda.h>
 #include <thrust/fill.h>
@@ -69,7 +69,7 @@ namespace detail {
 template <typename vertex_t, typename weight_t, typename EigenSolver, typename ClusterSolver>
 std::tuple<vertex_t, weight_t, vertex_t> partition(
   raft::resources const& handle,
-  spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
+  raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
   EigenSolver const& eigen_solver,
   ClusterSolver const& cluster_solver,
   vertex_t* __restrict__ clusters,
@@ -80,8 +80,8 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
   RAFT_EXPECTS(eigVals != nullptr, "Null eigVals buffer.");
   RAFT_EXPECTS(eigVecs != nullptr, "Null eigVecs buffer.");
 
-  auto stream   = resource::get_cuda_stream(handle);
-  auto cublas_h = resource::get_cublas_handle(handle);
+  auto stream   = raft::resource::get_cuda_stream(handle);
+  auto cublas_h = raft::resource::get_cublas_handle(handle);
 
   std::tuple<vertex_t, weight_t, vertex_t>
     stats;  //{iters_eig_solver,residual_cluster,iters_cluster_solver} // # iters eigen solver,
@@ -97,7 +97,7 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
 
   // Initialize Laplacian
   /// sparse_matrix_t<vertex_t, weight_t> A{handle, graph};
-  spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> L{handle, csr_m};
+  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> L{handle, csr_m};
 
   auto eigen_config = eigen_solver.get_config();
   auto nEigVecs     = eigen_config.n_eigVecs;
@@ -137,7 +137,7 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
  */
 template <typename vertex_t, typename weight_t>
 void analyzePartition(raft::resources const& handle,
-                      spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
+                      raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
                       vertex_t nClusters,
                       const vertex_t* __restrict__ clusters,
                       weight_t& edgeCut,
@@ -148,14 +148,14 @@ void analyzePartition(raft::resources const& handle,
   vertex_t i;
   vertex_t n = csr_m.nrows_;
 
-  auto stream   = resource::get_cuda_stream(handle);
-  auto cublas_h = resource::get_cublas_handle(handle);
+  auto stream   = raft::resource::get_cuda_stream(handle);
+  auto cublas_h = raft::resource::get_cublas_handle(handle);
 
   weight_t partEdgesCut, clustersize;
 
   // Device memory
-  spectral::matrix::vector_t<weight_t> part_i(handle, n);
-  spectral::matrix::vector_t<weight_t> Lx(handle, n);
+  raft::spectral::matrix::vector_t<weight_t> part_i(handle, n);
+  raft::spectral::matrix::vector_t<weight_t> Lx(handle, n);
 
   // Initialize cuBLAS
   RAFT_CUBLAS_TRY(
@@ -163,7 +163,7 @@ void analyzePartition(raft::resources const& handle,
 
   // Initialize Laplacian
   /// sparse_matrix_t<vertex_t, weight_t> A{handle, graph};
-  spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> L{handle, csr_m};
+  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> L{handle, csr_m};
 
   // Initialize output
   cost    = 0;

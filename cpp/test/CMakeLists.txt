@@ -211,6 +211,11 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+
+  ConfigureTest(
+    NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
+    sparse/cluster/spectral.cu GPUS 1 PERCENT 100
+  )
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )

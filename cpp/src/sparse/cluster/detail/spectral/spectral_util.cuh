@@ -22,8 +22,8 @@
 #include <raft/core/resources.hpp>
 
 // TODO: Expose needed wrappers in RAFT's public API so we don't need to call detail APIs in cuVS
-#include "../../matrix_wrappers.hpp"
 #include <raft/linalg/detail/cublas_wrappers.hpp>
+#include <raft/spectral/matrix_wrappers.hpp>
 
 #include <raft/util/cudart_utils.hpp>
 
@@ -48,9 +48,9 @@ void transform_eigen_matrix(raft::resources const& handle,
                             vertex_t nEigVecs,
                             weight_t* eigVecs)
 {
-  auto stream             = resource::get_cuda_stream(handle);
-  auto cublas_h           = resource::get_cublas_handle(handle);
-  auto thrust_exec_policy = resource::get_thrust_policy(handle);
+  auto stream             = raft::resource::get_cuda_stream(handle);
+  auto cublas_h           = raft::resource::get_cublas_handle(handle);
+  auto thrust_exec_policy = raft::resource::get_thrust_policy(handle);
 
   const weight_t zero{0.0};
   const weight_t one{1.0};
@@ -90,7 +90,7 @@ void transform_eigen_matrix(raft::resources const& handle,
   // Transpose eigenvector matrix
   //   TODO: in-place transpose
   {
-    cuvs::spectral::matrix::vector_t<weight_t> work(handle, nEigVecs * n);
+    raft::spectral::matrix::vector_t<weight_t> work(handle, nEigVecs * n);
     // TODO: Call from public API when ready
     RAFT_CUBLAS_TRY(
       raft::linalg::detail::cublassetpointermode(cublas_h, CUBLAS_POINTER_MODE_HOST, stream));
@@ -143,13 +143,13 @@ bool construct_indicator(raft::resources const& handle,
                          weight_t& clustersize,
                          weight_t& partStats,
                          vertex_t const* __restrict__ clusters,
-                         cuvs::spectral::matrix::vector_t<weight_t>& part_i,
-                         cuvs::spectral::matrix::vector_t<weight_t>& Bx,
-                         cuvs::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> const& B)
+                         raft::spectral::matrix::vector_t<weight_t>& part_i,
+                         raft::spectral::matrix::vector_t<weight_t>& Bx,
+                         raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> const& B)
 {
-  auto stream             = resource::get_cuda_stream(handle);
-  auto cublas_h           = resource::get_cublas_handle(handle);
-  auto thrust_exec_policy = resource::get_thrust_policy(handle);
+  auto stream             = raft::resource::get_cuda_stream(handle);
+  auto cublas_h           = raft::resource::get_cublas_handle(handle);
+  auto thrust_exec_policy = raft::resource::get_thrust_policy(handle);
 
   thrust::for_each(
     thrust_exec_policy,

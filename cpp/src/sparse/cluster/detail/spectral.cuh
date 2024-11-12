@@ -38,18 +38,18 @@ void fit_embedding(raft::resources const& handle,
                    T* out,
                    unsigned long long seed = 1234567)
 {
-  auto stream = resource::get_cuda_stream(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
   rmm::device_uvector<int> src_offsets(n + 1, stream);
   rmm::device_uvector<int> dst_cols(nnz, stream);
   rmm::device_uvector<T> dst_vals(nnz, stream);
-  convert::coo_to_csr(
+  raft::sparse::convert::coo_to_csr(
     handle, rows, cols, vals, nnz, n, src_offsets.data(), dst_cols.data(), dst_vals.data());
 
   rmm::device_uvector<T> eigVals(n_components + 1, stream);
   rmm::device_uvector<T> eigVecs(n * (n_components + 1), stream);
   rmm::device_uvector<int> labels(n, stream);
 
-  resource::sync_stream(handle, stream);
+  raft::resource::sync_stream(handle, stream);
 
   /**
    * Raft spectral clustering
@@ -61,7 +61,7 @@ void fit_embedding(raft::resources const& handle,
   index_type* ci = dst_cols.data();
   value_type* vs = dst_vals.data();
 
-  cuvs::spectral::matrix::sparse_matrix_t<index_type, value_type> const r_csr_m{
+  raft::spectral::matrix::sparse_matrix_t<index_type, value_type> const r_csr_m{
     handle, ro, ci, vs, n, nnz};
 
   index_type neigvs       = n_components + 1;
@@ -74,7 +74,7 @@ void fit_embedding(raft::resources const& handle,
 
   cfg.seed = seed;
 
-  raft::spectral::lanczos_solver_t<index_type, value_type> eig_solver{cfg};
+  cuvs::spectral::lanczos_solver_t<index_type, value_type> eig_solver{cfg};
 
   // cluster computation here is irrelevant,
   // hence define a no-op such solver to

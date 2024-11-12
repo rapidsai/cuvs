@@ -18,6 +18,8 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <optional>
+
+// #include <raft/core/host_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
@@ -121,4 +123,23 @@ void single_linkage(
 /**
  * @}
  */
+
+// namespace helpers {
+//
+////    void dendrogram(raft::resources const& handle,
+////                    raft::host_coo_matrix_view<const float, const int, const int, int> rows,
+////                    int* children,
+////                    float* out_delta,
+////                    int* out_size);
+////
+////    void mst(raft::resources const& handle,
+////             raft::device_matrix_view<const float, int> X,
+////             raft::device_coo_matrix_view<const float, const int, const int, int> knn_graph,
+////             raft::device_sparsity_owning_coo_matrix_view<float, int, int, int> mst
+////             raft::device_vector_view<int> color,
+////             red_op reduction_op,
+////             cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
+////             int max_iter                        = 10);
+//}
+
 };  // end namespace  cuvs::cluster::agglomerative

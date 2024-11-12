@@ -22,10 +22,10 @@
 // TODO: Expose needed wrappers in RAFT's public API so we don't need to call detail APIs in cuVS
 #include "../../cluster_solvers.cuh"
 #include "../../eigen_solvers.cuh"
-#include "../../matrix_wrappers.hpp"
 #include "spectral_util.cuh"
 #include <raft/linalg/detail/cublas_wrappers.hpp>
 #include <raft/linalg/normalize.cuh>
+#include <raft/spectral/matrix_wrappers.hpp>
 
 #include <cuda.h>
 #include <thrust/fill.h>
@@ -69,7 +69,7 @@ namespace detail {
 template <typename vertex_t, typename weight_t, typename EigenSolver, typename ClusterSolver>
 std::tuple<vertex_t, weight_t, vertex_t> modularity_maximization(
   raft::resources const& handle,
-  cuvs::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
+  raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
   EigenSolver const& eigen_solver,
   ClusterSolver const& cluster_solver,
   vertex_t* __restrict__ clusters,
@@ -80,8 +80,8 @@ std::tuple<vertex_t, weight_t, vertex_t> modularity_maximization(
   RAFT_EXPECTS(eigVals != nullptr, "Null eigVals buffer.");
   RAFT_EXPECTS(eigVecs != nullptr, "Null eigVecs buffer.");
 
-  auto stream   = resource::get_cuda_stream(handle);
-  auto cublas_h = resource::get_cublas_handle(handle);
+  auto stream   = raft::resource::get_cuda_stream(handle);
+  auto cublas_h = raft::resource::get_cublas_handle(handle);
 
   std::tuple<vertex_t, weight_t, vertex_t>
     stats;  // # iters eigen solver, cluster solver residual, # iters cluster solver
@@ -91,7 +91,7 @@ std::tuple<vertex_t, weight_t, vertex_t> modularity_maximization(
   // Compute eigenvectors of Modularity Matrix
 
   // Initialize Modularity Matrix
-  cuvs::spectral::matrix::modularity_matrix_t<vertex_t, weight_t> B{handle, csr_m};
+  raft::spectral::matrix::modularity_matrix_t<vertex_t, weight_t> B{handle, csr_m};
 
   auto eigen_config = eigen_solver.get_config();
   auto nEigVecs     = eigen_config.n_eigVecs;
@@ -129,7 +129,7 @@ std::tuple<vertex_t, weight_t, vertex_t> modularity_maximization(
  */
 template <typename vertex_t, typename weight_t>
 void analyzeModularity(raft::resources const& handle,
-                       cuvs::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
+                       raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
                        vertex_t nClusters,
                        vertex_t const* __restrict__ clusters,
                        weight_t& modularity)
@@ -140,18 +140,19 @@ void analyzeModularity(raft::resources const& handle,
   vertex_t n = csr_m.nrows_;
   weight_t partModularity, clustersize;
 
-  auto cublas_h = resource::get_cublas_handle(handle);
-  auto stream   = resource::get_cuda_stream(handle);
+  auto cublas_h = raft::resource::get_cublas_handle(handle);
+  auto stream   = raft::resource::get_cuda_stream(handle);
 
   // Device memory
-  cuvs::spectral::matrix::vector_t<weight_t> part_i(handle, n);
-  cuvs::spectral::matrix::vector_t<weight_t> Bx(handle, n);
+  raft::spectral::matrix::vector_t<weight_t> part_i(handle, n);
+  raft::spectral::matrix::vector_t<weight_t> Bx(handle, n);
 
   // Initialize cuBLAS
-  RAFT_CUBLAS_TRY(linalg::detail::cublassetpointermode(cublas_h, CUBLAS_POINTER_MODE_HOST, stream));
+  RAFT_CUBLAS_TRY(
+    raft::linalg::detail::cublassetpointermode(cublas_h, CUBLAS_POINTER_MODE_HOST, stream));
 
   // Initialize Modularity
-  cuvs::spectral::matrix::modularity_matrix_t<vertex_t, weight_t> B{handle, csr_m};
+  raft::spectral::matrix::modularity_matrix_t<vertex_t, weight_t> B{handle, csr_m};
 
   // Initialize output
   modularity = 0;
