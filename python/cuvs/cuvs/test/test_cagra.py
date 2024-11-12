@@ -184,5 +184,5 @@ def test_cagra_vpq_compression(metric):
     run_cagra_build_search_test(
         n_cols=dim,
         metric=metric,
-        compression=cagra.CompressionParams(pq_dim=dim / pq_len)
+        compression=cagra.CompressionParams(pq_dim=dim / pq_len),
     )
