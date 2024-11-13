@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,16 @@
 
 #pragma once
 
-#include "detail/kernels/gram_matrix.hpp"
-#include "detail/kernels/kernel_factory.hpp"
+#include "gram_matrix.hpp"
+#include "kernel_matrices.hpp"
 
-namespace cuvs::distance::kernels {
+namespace cuvs::distance::kernels::detail {
 
-// TODO: Need to expose formal APIs for this that are more consistent w/ other APIs in cuVS
-using cuvs::distance::kernels::detail::GramMatrixBase;
-using cuvs::distance::kernels::detail::KernelFactory;
+template <typename math_t>
+class KernelFactory {
+ public:
+  static GramMatrixBase<math_t>* create(KernelParams params);
+  [[deprecated]] static GramMatrixBase<math_t>* create(KernelParams params, cublasHandle_t handle);
+};
 
-};  // end namespace cuvs::distance::kernels
+};  // end namespace cuvs::distance::kernels::detail
