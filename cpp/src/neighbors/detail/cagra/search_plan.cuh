@@ -151,7 +151,7 @@ struct search_plan_impl : public search_plan_impl_base {
   lightweight_uvector<INDEX_T> hashmap;
   lightweight_uvector<uint32_t> num_executed_iterations;  // device or managed?
   lightweight_uvector<INDEX_T> dev_seed;
-  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc;
+  dataset_descriptor_host<DataT, IndexT, DistanceT> dataset_desc;
 
   search_plan_impl(raft::resources const& res,
                    search_params params,
