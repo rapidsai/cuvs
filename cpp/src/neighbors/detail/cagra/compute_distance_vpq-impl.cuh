@@ -17,8 +17,8 @@
 #pragma once
 
 #include "compute_distance_vpq.hpp"
+#include "distance_op.cuh"
 
-#include "compute_distance_standard-impl.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
