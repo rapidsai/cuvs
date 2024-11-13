@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "cagra.h"
+
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <dlpack/dlpack.h>
@@ -89,6 +91,23 @@ cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
  * @param[in] index cuvsHnswIndex_t to de-allocate
  */
 cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
+
+/**
+ * @defgroup hnsw_c_index_load Load CAGRA index as hnswlib index
+ * @{
+ */
+
+/**
+ * @brief Hierarchy for HNSW index when converting from CAGRA index
+ *
+ * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
+ */
+enum cuvsHnswHierarchy { NONE, CPU };
+
+cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+                              cuvsCagraIndex_t cagra_index,
+                              cuvsHnswHierarchy hierarchy,
+                              cuvsHnswIndex_t hnsw_index);
 
 /**
  * @}

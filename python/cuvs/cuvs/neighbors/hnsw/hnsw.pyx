@@ -224,7 +224,8 @@ def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
 
 
 @auto_sync_resources
-def from_cagra(cagra.Index index, temporary_index_path=None, resources=None):
+def from_cagra(cagra.Index cagra_index, temporary_index_path=None,
+               hierarchy="none", resources=None):
     """
     Returns an hnsw base-layer-only index from a CAGRA index.
 
@@ -248,6 +249,10 @@ def from_cagra(cagra.Index index, temporary_index_path=None, resources=None):
     temporary_index_path : string, default = None
         Path to save the temporary index file. If None, the temporary file
         will be saved in `/tmp/<random_number>.bin`.
+    hierarchy : string, default = "none" (optional)
+        The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
+        - "none": No hierarchy is built.
+        - "cpu": Hierarchy is built using CPU.
     {resources_docstring}
 
     Examples
@@ -264,13 +269,26 @@ def from_cagra(cagra.Index index, temporary_index_path=None, resources=None):
     >>> # Serialize the CAGRA index to hnswlib base layer only index format
     >>> hnsw_index = hnsw.from_cagra(index)
     """
-    uuid_num = uuid.uuid4()
-    filename = temporary_index_path if temporary_index_path else \
-        f"/tmp/{uuid_num}.bin"
-    save(filename, index, resources=resources)
-    hnsw_index = load(filename, index.dim, np.dtype(index.active_index_type),
-                      "sqeuclidean", resources=resources)
-    os.remove(filename)
+
+    cdef cuvsHnswHierarchy c_hierarchy
+    if hierarchy == "none":
+        c_hierarchy = NONE
+    elif hierarchy == "cpu":
+        c_hierarchy = CPU
+    else:
+        raise ValueError("Invalid hierarchy type."
+                         " Valid values are 'none' and 'cpu'.")
+
+    cdef Index hnsw_index = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsHnswFromCagra(
+        res,
+        cagra_index.index,
+        c_hierarchy,
+        hnsw_index.index
+    ))
+
+    hnsw_index.trained = True
     return hnsw_index
 
 

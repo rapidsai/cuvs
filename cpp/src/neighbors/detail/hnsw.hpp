@@ -93,9 +93,9 @@ struct index_impl : index<T> {
   std::unique_ptr<hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>> space_;
 };
 
-template <typename T>
-std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
-                                     const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
+template <typename T, HnswHiearchy hierarchy>
+std::enable_if_t<hierarchy == HnswHiearchy::NONE, std::unique_ptr<index<T>>> from_cagra(
+  raft::resources const& res, const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
 {
   std::random_device dev;
   std::mt19937 rng(dev());
@@ -108,6 +108,18 @@ std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
     res, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
   std::filesystem::remove(filepath);
   return std::unique_ptr<index<T>>(hnsw_index);
+}
+
+template <typename T>
+std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
+                                     const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+                                     HnswHiearchy hierarchy)
+{
+  if (hierarchy == HnswHiearchy::NONE) {
+    return from_cagra<T, HnswHiearchy::NONE>(res, cagra_index);
+  } else {
+    RAFT_FAIL("Unsupported hierarchy type");
+  }
 }
 
 template <typename T>

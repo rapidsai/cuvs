@@ -21,11 +21,13 @@
 
 namespace cuvs::neighbors::hnsw {
 
-#define CUVS_INST_HNSW_FROM_CAGRA(T)                                                           \
-  std::unique_ptr<index<T>> from_cagra(                                                        \
-    raft::resources const& res, const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index) \
-  {                                                                                            \
-    return detail::from_cagra<T>(res, cagra_index);                                            \
+#define CUVS_INST_HNSW_FROM_CAGRA(T)                               \
+  std::unique_ptr<index<T>> from_cagra(                            \
+    raft::resources const& res,                                    \
+    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index, \
+    HnswHiearchy hierarchy)                                        \
+  {                                                                \
+    return detail::from_cagra<T>(res, cagra_index, hierarchy);     \
   }
 
 CUVS_INST_HNSW_FROM_CAGRA(float);

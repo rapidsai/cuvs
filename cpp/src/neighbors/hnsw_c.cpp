@@ -31,6 +31,21 @@
 #include <cuvs/neighbors/hnsw.hpp>
 
 namespace {
+
+template <typename T>
+void _from_cagra(cuvsResources_t res,
+                 cuvsCagraIndex_t cagra_index,
+                 cuvsHnswHierarchy hierarchy,
+                 cuvsHnswIndex_t hnsw_index)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto index   = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(cagra_index->addr);
+
+  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::from_cagra(*res_ptr, *index, hierarchy);
+  auto hnsw_index_ptr        = hnsw_index_unique_ptr.release();
+  hnsw_index->addr           = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
+}
+
 template <typename T>
 void _search(cuvsResources_t res,
              cuvsHnswSearchParams params,
@@ -98,6 +113,26 @@ extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
       delete index_ptr;
     }
     delete index_c_ptr;
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+                                         cuvsCagraIndex_t cagra_index,
+                                         cuvsHnswHierarchy hierarchy,
+                                         cuvsHnswIndex_t hnsw_index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index        = *cagra_index;
+    hnsw_index->dtype = index.dtype;
+    if (index.dtype.code == kDLFloat) {
+      _from_cagra<float>(res, cagra_index, hierarchy, hnsw_index);
+    } else if (index.dtype.code == kDLUInt) {
+      _from_cagra<uint8_t>(res, cagra_index, hierarchy, hnsw_index);
+    } else if (index.dtype.code == kDLInt) {
+      _from_cagra<int8_t>(res, cagra_index, hierarchy, hnsw_index);
+    } else {
+      RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
+    }
   });
 }
 

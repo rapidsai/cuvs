@@ -23,6 +23,7 @@
 #include <cuvs/distance/distance.hpp>
 
 #include "cagra.hpp"
+#include "hnsw.h"
 #include <raft/core/host_mdspan.hpp>
 
 #include <sys/types.h>
@@ -94,6 +95,13 @@ struct index : cuvs::neighbors::index {
  */
 
 /**
+ * @brief Hierarchy for HNSW index when converting from CAGRA index
+ *
+ * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
+ */
+using HnswHiearchy = cuvsHnswHierarchy;
+
+/**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
  * NOTE: This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
  * before reading it as an hnswlib index, then deleting the temporary file. The returned index
@@ -117,7 +125,9 @@ struct index : cuvs::neighbors::index {
  * @endcode
  */
 std::unique_ptr<index<float>> from_cagra(
-  raft::resources const& res, const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index);
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
+  HnswHiearchy hierarchy = HnswHiearchy::NONE);
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -143,7 +153,9 @@ std::unique_ptr<index<float>> from_cagra(
  * @endcode
  */
 std::unique_ptr<index<uint8_t>> from_cagra(
-  raft::resources const& res, const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index);
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
+  HnswHiearchy hierarchy = HnswHiearchy::NONE);
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -169,7 +181,9 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  * @endcode
  */
 std::unique_ptr<index<int8_t>> from_cagra(
-  raft::resources const& res, const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index);
+  raft::resources const& res,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
+  HnswHiearchy hierarchy = HnswHiearchy::NONE);
 
 /**@}*/
 

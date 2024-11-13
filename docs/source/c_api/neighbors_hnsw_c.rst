@@ -26,10 +26,17 @@ Index
     :members:
     :content-only:
 
+Index load
+----------
+.. doxygengroup:: hnsw_c_index_load
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index search
 ------------
 
-.. doxygengroup:: cagra_c_index_search
+.. doxygengroup:: hnsw_c_index_search
     :project: cuvs
     :members:
     :content-only:

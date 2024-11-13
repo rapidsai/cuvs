@@ -43,7 +43,7 @@ index bef0017..2ef85d9 100644
  
              bool epDeleted = isMarkedDeleted(enterpoint_copy);
 -            for (int level = std::min(curlevel, maxlevelcopy); level >= 0; level--) {
-+            for (int level = std::min(curlevel, maxlevelcopy); level >= !base_level_init; level--) {
++            for (int level = std::min(curlevel, maxlevelcopy); level >= !base_layer_init; level--) {
                  if (level > maxlevelcopy || level < 0)  // possible?
                      throw std::runtime_error("Level error");
  

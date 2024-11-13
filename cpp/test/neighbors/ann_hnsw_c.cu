@@ -66,7 +66,7 @@ TEST(CagraHnswC, BuildSearch)
   cuvsCagraIndexParams_t build_params;
   cuvsCagraIndexParamsCreate(&build_params);
   cuvsCagraBuild(res, build_params, &dataset_tensor, index);
-  cuvsCagraSerializeToHnswlib(res, "/tmp/cagra_hnswlib.index", index);
+  // cuvsCagraSerializeToHnswlib(res, "/tmp/cagra_hnswlib.index", index);
 
   DLManagedTensor queries_tensor;
   queries_tensor.dl_tensor.data               = queries;
@@ -111,7 +111,8 @@ TEST(CagraHnswC, BuildSearch)
   cuvsHnswIndex_t hnsw_index;
   cuvsHnswIndexCreate(&hnsw_index);
   hnsw_index->dtype = index->dtype;
-  cuvsHnswDeserialize(res, "/tmp/cagra_hnswlib.index", 2, L2Expanded, hnsw_index);
+  // cuvsHnswDeserialize(res, "/tmp/cagra_hnswlib.index", 2, L2Expanded, hnsw_index);
+  cuvsHnswFromCagra(res, index, NONE, hnsw_index);
 
   // search index
   cuvsHnswSearchParams_t search_params;

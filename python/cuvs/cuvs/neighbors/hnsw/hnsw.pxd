@@ -20,6 +20,7 @@ from libc.stdint cimport int32_t, uintptr_t
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
+from cuvs.neighbors.cagra.cagra cimport cuvsCagraIndex_t
 
 
 cdef extern from "cuvs/neighbors/hnsw.h" nogil:
@@ -38,6 +39,15 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
     cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index)
 
     cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
+
+    ctypedef enum cuvsHnswHierarchy:
+        NONE
+        CPU
+
+    cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+                                  cuvsCagraIndex_t cagra_index,
+                                  cuvsHnswHierarchy hierarchy,
+                                  cuvsHnswIndex_t hnsw_index)
 
     cuvsError_t cuvsHnswSearch(cuvsResources_t res,
                                cuvsHnswSearchParams* params,
