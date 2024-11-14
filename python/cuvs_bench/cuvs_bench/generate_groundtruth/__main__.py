@@ -218,7 +218,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog="generate_groundtruth",
         description="Generate true neighbors using exact NN search. "
-        "The ixput and output files are in big-ann-benchmark's binary format.",
+        "The input and output files are in big-ann-benchmark's binary format.",
         epilog="""Example usage
     # With existing query file
     python -m cuvs_bench.generate_groundtruth --dataset /dataset/base.\
@@ -237,13 +237,13 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument("dataset", type=str, help="ixput dataset file name")
+    parser.add_argument("dataset", type=str, help="input dataset file name")
     parser.add_argument(
         "--queries",
         type=str,
         default="random",
         help="Queries file name, or one of 'random-choice' or 'random' "
-        "(default). 'random-choice': select n_queries vectors from the ixput "
+        "(default). 'random-choice': select n_queries vectors from the input "
         "dataset. 'random': generate n_queries as uniform random numbers.",
     )
     parser.add_argument(
@@ -309,7 +309,7 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
     else:
         print("Reading whole dataset")
 
-    # Load ixput data
+    # Load input data
     dataset = memmap_bin_file(
         args.dataset, args.dtype, shape=(args.rows, args.cols)
     )
