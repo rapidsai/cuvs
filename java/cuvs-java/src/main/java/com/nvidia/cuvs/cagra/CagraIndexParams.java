@@ -15,12 +15,12 @@ import com.nvidia.cuvs.panama.cuvsCagraIndexParams;
 */
 public class CagraIndexParams {
 
-  Arena arena;
-  int intermediateGraphDegree;
-  int graphDegree;
-  CuvsCagraGraphBuildAlgo buildAlgo;
-  int nnDescentNiter;
-  public MemorySegment cagraIndexParamsMS;
+  private Arena arena;
+  private int intermediateGraphDegree;
+  private int graphDegree;
+  private CuvsCagraGraphBuildAlgo buildAlgo;
+  private int nnDescentNiter;
+  private MemorySegment cagraIndexParamsMS;
 
   public enum CuvsCagraGraphBuildAlgo {
     AUTO_SELECT(0), IVF_PQ(1), NN_DESCENT(2);
@@ -64,6 +64,10 @@ public class CagraIndexParams {
 
   public int getNn_descent_niter() {
     return nnDescentNiter;
+  }
+
+  public MemorySegment getCagraIndexParamsMS() {
+    return cagraIndexParamsMS;
   }
 
   @Override

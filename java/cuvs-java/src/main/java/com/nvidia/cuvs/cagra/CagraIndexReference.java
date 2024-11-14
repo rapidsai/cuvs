@@ -7,7 +7,7 @@ import com.nvidia.cuvs.panama.cuvsCagraIndex;
 
 public class CagraIndexReference {
 
-  public MemorySegment indexMemorySegment;
+  private MemorySegment indexMemorySegment;
 
   /**
    * 
@@ -23,6 +23,10 @@ public class CagraIndexReference {
    */
   public CagraIndexReference(MemorySegment indexMemorySegment) {
     this.indexMemorySegment = indexMemorySegment;
+  }
+
+  public MemorySegment getIndexMemorySegment() {
+    return indexMemorySegment;
   }
 
 }

@@ -20,20 +20,17 @@ import java.util.UUID;
 
 public class CagraIndex {
 
+  private Arena arena;
   private CagraIndexParams indexParams;
   private final float[][] dataset;
   private final CuVSResources res;
   private CagraIndexReference ref;
-
-  Linker linker;
-  Arena arena;
-  MethodHandle cresMH;
-  MethodHandle indexMH;
-  MethodHandle searchMH;
-  MethodHandle serializeMH;
-  MethodHandle deserializeMH;
-  MemorySegment dataMS;
-  SymbolLookup bridge;
+  private Linker linker;
+  private MethodHandle indexMH;
+  private MethodHandle searchMH;
+  private MethodHandle serializeMH;
+  private MethodHandle deserializeMH;
+  private SymbolLookup bridge;
 
   /**
    * 
@@ -76,19 +73,19 @@ public class CagraIndex {
     File wd = new File(System.getProperty("user.dir"));
     bridge = SymbolLookup.libraryLookup(wd.getParent() + "/internal/libcuvs_java.so", arena);
 
-    indexMH = linker.downcallHandle(bridge.findOrThrow("build_index"),
+    indexMH = linker.downcallHandle(bridge.find("build_index").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("long"),
             linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    searchMH = linker.downcallHandle(bridge.findOrThrow("search_index"),
+    searchMH = linker.downcallHandle(bridge.find("search_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("int"),
             linker.canonicalLayouts().get("long"), linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    serializeMH = linker.downcallHandle(bridge.findOrThrow("serialize_index"),
+    serializeMH = linker.downcallHandle(bridge.find("serialize_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    deserializeMH = linker.downcallHandle(bridge.findOrThrow("deserialize_index"),
+    deserializeMH = linker.downcallHandle(bridge.find("deserialize_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
   }
@@ -147,7 +144,7 @@ public class CagraIndex {
     MemorySegment rvMS = arena.allocate(rvML);
 
     ref = new CagraIndexReference((MemorySegment) indexMH.invokeExact(getMemorySegment(dataset), rows, cols,
-        res.getResource(), rvMS, indexParams.cagraIndexParamsMS));
+        res.getResource(), rvMS, indexParams.getCagraIndexParamsMS()));
 
     return ref;
   }
@@ -168,10 +165,10 @@ public class CagraIndex {
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
 
-    searchMH.invokeExact(ref.indexMemorySegment, getMemorySegment(query.getQueries()), query.getTopK(), 4L, 2L, res.getResource(),
-        neighborsMS, distancesMS, rvMS, query.getSearchParams().cagraSearchParamsMS);
+    searchMH.invokeExact(ref.getIndexMemorySegment(), getMemorySegment(query.getQueries()), query.getTopK(), 4L, 2L,
+        res.getResource(), neighborsMS, distancesMS, rvMS, query.getSearchParams().getCagraSearchParamsMS());
 
-    return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, query.getTopK(), query.getMapping());
+    return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, query.getTopK(), query.getMapping(), query.getQueries().length);
   }
 
   /**
@@ -184,7 +181,7 @@ public class CagraIndex {
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
-    serializeMH.invokeExact(res.getResource(), ref.indexMemorySegment, rvMS,
+    serializeMH.invokeExact(res.getResource(), ref.getIndexMemorySegment(), rvMS,
         getStringSegment(new StringBuilder(tmpIndexFile)));
     File tempFile = new File(tmpIndexFile);
     FileInputStream is = new FileInputStream(tempFile);
@@ -206,7 +203,7 @@ public class CagraIndex {
   public void serialize(OutputStream out, String tmpFilePath) throws Throwable {
     MemoryLayout rvML = linker.canonicalLayouts().get("int");
     MemorySegment rvMS = arena.allocate(rvML);
-    serializeMH.invokeExact(res.getResource(), ref.indexMemorySegment, rvMS,
+    serializeMH.invokeExact(res.getResource(), ref.getIndexMemorySegment(), rvMS,
         getStringSegment(new StringBuilder(tmpFilePath)));
     File tempFile = new File(tmpFilePath);
     FileInputStream is = new FileInputStream(tempFile);
@@ -238,7 +235,7 @@ public class CagraIndex {
     while ((chunkLen = in.read(chunk)) != -1) {
       out.write(chunk, 0, chunkLen);
     }
-    deserializeMH.invokeExact(res.getResource(), ref.indexMemorySegment, rvMS,
+    deserializeMH.invokeExact(res.getResource(), ref.getIndexMemorySegment(), rvMS,
         getStringSegment(new StringBuilder(tmpIndexFile)));
 
     in.close();
