@@ -125,7 +125,8 @@ void search_main_core(raft::resources const& res,
  *
  * @param[in] handle
  * @param[in] params configure the search
- * @param[in] idx ivf-pq constructed index
+ * @param[in] strided_dataset CAGRA strided dataset
+ * @param[in] metric distance type
  * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
  * [n_queries, k]
@@ -146,7 +147,8 @@ template <typename T,
 bool search_using_brute_force(
   raft::resources const& res,
   const search_params& params,
-  const index<T, IdxT>& index,
+  const strided_dataset<T, IdxT>& strided_dataset,
+  cuvs::distance::DistanceType metric,
   raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
   raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
   raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
@@ -155,27 +157,14 @@ bool search_using_brute_force(
 {
   bool is_applied = false;
   auto n_queries  = queries.extent(0);
-  auto n_dataset  = index.size();
+  auto n_dataset  = strided_dataset.n_rows();
 
   auto bitset_filter_view = sample_filter.bitset_view_;
-  // auto dataset_view       = index.contiguous_dataset();
-  auto dataset_view = [&index]()
-    -> std::variant<raft::device_matrix_view<const T, int64_t, raft::row_major>, std::monostate> {
-    using ds_idx_type = decltype(index.data().n_rows());
-    if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
-        strided_dset != nullptr) {
-      return raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-        strided_dset->view().data_handle(), strided_dset->n_rows(), strided_dset->stride());
-    } else {
-      return std::monostate{};
-    }
-  }();
-  auto sparsity = bitset_filter_view.sparsity(res);
+  auto sparsity           = bitset_filter_view.sparsity(res);
 
   // TODO: Support host dataset in `brute_force::build`
-  if (sparsity >= threshold_to_bf &&
-      std::holds_alternative<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
-        dataset_view)) {
+  if (sparsity >= threshold_to_bf) {
+    RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%d", sparsity);
     using bitmap_view_t = cuvs::core::bitmap_view<const uint32_t, int64_t>;
 
     auto stream            = raft::resource::get_cuda_stream(res);
@@ -190,38 +179,45 @@ bool search_using_brute_force(
 
     auto brute_force_neighbors = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
       raw_neighbors.data(), neighbors.extent(0), neighbors.extent(1));
-    auto brute_force_dataset =
-      std::get_if<raft::device_matrix_view<const T, int64_t, raft::row_major>>(&dataset_view);
+    auto brute_force_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      strided_dataset.view().data_handle(), strided_dataset.n_rows(), strided_dataset.stride());
 
-    if (brute_force_dataset) {
-      RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%d", sparsity);
-      auto brute_force_idx =
-        cuvs::neighbors::brute_force::build(res, *brute_force_dataset, index.metric());
+    auto brute_force_idx = cuvs::neighbors::brute_force::build(res, brute_force_dataset, metric);
 
-      auto brute_force_queries = queries;
-      auto padding_queries     = raft::make_device_matrix<T, int64_t>(res, 0, 0);
+    auto brute_force_queries = queries;
+    auto padding_queries     = raft::make_device_matrix<T, int64_t>(res, 0, 0);
 
-      // Happens when the original dataset is a strided matrix.
-      if (brute_force_dataset->extent(1) != queries.extent(1)) {
-        cuvs::neighbors::cagra::detail::copy_with_padding(
-          res, padding_queries, queries, raft::resource::get_workspace_resource(res));
-        brute_force_queries = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-          padding_queries.data_handle(), padding_queries.extent(0), padding_queries.extent(1));
-      }
-      cuvs::neighbors::brute_force::search(
+    // Happens when the original dataset is a strided matrix.
+    if (brute_force_dataset.extent(1) != queries.extent(1)) {
+      padding_queries = raft::make_device_mdarray<T, int64_t>(
         res,
-        brute_force_idx,
-        brute_force_queries,
-        brute_force_neighbors,
-        distances,
-        cuvs::neighbors::filtering::bitmap_filter(brute_force_filter));
-      raft::linalg::unaryOp(neighbors.data_handle(),
-                            brute_force_neighbors.data_handle(),
-                            neighbors.size(),
-                            raft::cast_op<InternalIdxT>(),
-                            raft::resource::get_cuda_stream(res));
-      is_applied = true;
+        raft::resource::get_workspace_resource(res),
+        raft::make_extents<int64_t>(n_queries, brute_force_dataset.extent(1)));
+      // Copy the queries and fill the padded elements with zeros
+      raft::linalg::map_offset(
+        res,
+        padding_queries.view(),
+        [queries, stride = brute_force_dataset.extent(1)] __device__(int64_t i) {
+          auto row_ix = i / stride;
+          auto el_ix  = i % stride;
+          return el_ix < queries.extent(1) ? queries(row_ix, el_ix) : T{0};
+        });
+      brute_force_queries = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+        padding_queries.data_handle(), padding_queries.extent(0), padding_queries.extent(1));
     }
+    cuvs::neighbors::brute_force::search(
+      res,
+      brute_force_idx,
+      brute_force_queries,
+      brute_force_neighbors,
+      distances,
+      cuvs::neighbors::filtering::bitmap_filter(brute_force_filter));
+    raft::linalg::unaryOp(neighbors.data_handle(),
+                          brute_force_neighbors.data_handle(),
+                          neighbors.size(),
+                          raft::cast_op<InternalIdxT>(),
+                          raft::resource::get_cuda_stream(res));
+    is_applied = true;
   }
   return is_applied;
 }
@@ -259,14 +255,6 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
-  if constexpr (!std::is_same_v<CagraSampleFilterT,
-                                cuvs::neighbors::filtering::none_sample_filter> &&
-                (std::is_same_v<T, float> || std::is_same_v<T, half>)) {
-    bool bf_search_done =
-      search_using_brute_force(res, params, index, queries, neighbors, distances, sample_filter);
-    if (bf_search_done) return;
-  }
-
   auto stream         = raft::resource::get_cuda_stream(res);
   const auto& graph   = index.graph();
   auto graph_internal = raft::make_device_matrix_view<const InternalIdxT, int64_t, raft::row_major>(
@@ -277,6 +265,14 @@ void search_main(raft::resources const& res,
   // Dispatch search parameters based on the dataset kind.
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
+    if constexpr (!std::is_same_v<CagraSampleFilterT,
+                                  cuvs::neighbors::filtering::none_sample_filter> &&
+                  (std::is_same_v<T, float> || std::is_same_v<T, half>)) {
+      bool bf_search_done = search_using_brute_force(
+        res, params, *strided_dset, index.metric(), queries, neighbors, distances, sample_filter);
+      if (bf_search_done) return;
+    }
+
     // Search using a plain (strided) row-major dataset
     auto desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
       res, params, *strided_dset, index.metric());
