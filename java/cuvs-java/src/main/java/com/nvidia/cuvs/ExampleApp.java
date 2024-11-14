@@ -6,6 +6,9 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.nvidia.cuvs.cagra.CagraIndex;
 import com.nvidia.cuvs.cagra.CagraIndexParams;
 import com.nvidia.cuvs.cagra.CagraIndexParams.CuvsCagraGraphBuildAlgo;
@@ -15,6 +18,9 @@ import com.nvidia.cuvs.cagra.CuVSResources;
 import com.nvidia.cuvs.cagra.SearchResult;
 
 public class ExampleApp {
+  
+  private static Logger LOGGER = LoggerFactory.getLogger(ExampleApp.class);
+
   public static void main(String[] args) throws Throwable {
 
     // Sample data and query
@@ -28,7 +34,7 @@ public class ExampleApp {
 
     CagraIndexParams cagraIndexParams = new CagraIndexParams.Builder()
         .withIntermediateGraphDegree(10)
-        .withBuildAlgo(CuvsCagraGraphBuildAlgo.IVF_PQ)
+        .withBuildAlgo(CuvsCagraGraphBuildAlgo.NN_DESCENT)
         .build();
 
     CagraSearchParams cagraSearchParams = new CagraSearchParams
@@ -60,11 +66,10 @@ public class ExampleApp {
 
     // Search
     SearchResult rslt = index.search(query);
-    System.out.println(rslt.getResults());
+    LOGGER.info(rslt.getResults().toString());
 
     // Search from de-serialized index
     SearchResult rslt2 = index2.search(query);
-    System.out.println(rslt2.getResults());
-
+    LOGGER.info(rslt2.getResults().toString());
   }
 }
