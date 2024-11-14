@@ -144,15 +144,17 @@ using function_search_type = void(raft::resources const&,
 /** State of the batch token slot. */
 enum struct slot_state : int32_t {
   /** The slot is empty, cleared-up in this round (hence the head should be past it). */
-  kEmptyPast = 3,
+  kEmptyPast = 1025,
   /** The slot is empty, cleared-up in previous round. */
-  kEmpty = 2,
+  kEmpty = 1024,
   /** The slot is empty, cleared-up two round ago and cannot be used yet (due to be filled). */
-  kEmptyBusy = 1,
+  kEmptyBusy = 1023,
+  /** The current thread has been sleeping for too long and is way behind the others. */
+  kFullPast = 1,
   /** The slot is full, filled-in in this round. */
   kFull = 0,
   /** This state is considered full, filled-in in previous round.  */
-  kBusy = -1
+  kFullBusy = -1
   /** The rest of the values are impossible states indicating an error in the algo. */
 };
 
@@ -226,7 +228,9 @@ struct batch_queue_t {
     for (uint32_t i = 0; i < kSize; i++) {
       rem_time_us_(i).store(std::numeric_limits<int32_t>::max(), kMemOrder);
       dispatch_sequence_id_[i].store(uint32_t(-1), kMemOrder);
-      tokens_(i).store(batch_token{2 * kSize + kCounterLocMask}, kMemOrder);
+      tokens_(i).store(
+        batch_token{static_cast<uint32_t>(slot_state::kEmpty) * kSize + kCounterLocMask},
+        kMemOrder);
     }
   }
 
@@ -242,7 +246,7 @@ struct batch_queue_t {
     seq_order_id seq_id{tail_.fetch_add(1, kMemOrder)};
     auto& loc = token(seq_id);
     auto ss   = batch_status(loc.load(kMemOrder), seq_id);
-    while (ss == slot_state::kFull || ss == slot_state::kBusy || ss == slot_state::kEmptyBusy) {
+    while (ss == slot_state::kFull || ss == slot_state::kFullBusy || ss == slot_state::kEmptyBusy) {
       // Wait till the slot becomes empty (doesn't matter future or past).
       // The batch id is only ever updated in the scatter/gather kernels, which are the only source
       // of truth whether a batch buffer is currently used by the GPU.
@@ -330,8 +334,11 @@ struct batch_queue_t {
   {
     auto v =
       static_cast<int32_t>(seq_round(token) - seq_round(seq_id)) / static_cast<int32_t>(kSize);
-    if (v > 3 || v < -1) { RAFT_FAIL("Invalid batch state %d", v); }
-    return static_cast<slot_state>(v);
+    if (v < static_cast<int32_t>(slot_state::kFullBusy)) { RAFT_FAIL("Invalid batch state %d", v); }
+    if (v < static_cast<int32_t>(slot_state::kEmptyBusy)) {
+      return static_cast<slot_state>(std::min(v, static_cast<int32_t>(slot_state::kFullPast)));
+    }
+    return static_cast<slot_state>(std::min(v, static_cast<int32_t>(slot_state::kEmptyPast)));
   }
 
  private:
@@ -689,14 +696,23 @@ class batch_runner {
     int64_t local_io_offset = 0;
     batch_token batch_token_observed{0};
     while (true) {
-      const auto seq_id            = batch_queue_.head();
-      const auto commit_result     = try_commit(seq_id, n_queries);
-      const auto queries_committed = std::get<uint32_t>(commit_result);
-      if (queries_committed == 0) {
+      const auto seq_id        = batch_queue_.head();
+      const auto commit_result = try_commit(seq_id, n_queries);
+      // The bool (busy or not) returned if no queries were committed:
+      if (std::holds_alternative<bool>(commit_result)) {
+        // Pause if the system is busy
+        if (std::get<bool>(commit_result)) {
+          std::this_thread::sleep_for(std::chrono::nanoseconds(
+            size_t(params.soft_deadline_ms * 1e5))  // 1/10 of deadline time
+          );
+        } else {
+          std::this_thread::yield();
+        }
         // try to get a new batch
         continue;
       }
-      batch_token_observed           = std::get<batch_token>(commit_result);
+      batch_token_observed           = std::get<batch_token>(std::get<0>(commit_result));
+      const auto queries_committed   = std::get<uint32_t>(std::get<0>(commit_result));
       const auto batch_offset        = batch_token_observed.size_committed();
       auto& batch_token_ref          = batch_queue_.token(seq_id);
       auto& rem_time_us_ref          = batch_queue_.rem_time_us(seq_id);
@@ -739,6 +755,8 @@ class batch_runner {
 
       if (is_dispatcher) {
         // Conservatively initialize the remaining time
+        // TODO (achirkin): this initialization may happen after the other requesters update the
+        //                  time and thus erase their deadlines.
         rem_time_us_ref.store(static_cast<int32_t>(params.soft_deadline_ms * 1000),
                               cuda::std::memory_order_relaxed);
         // run the gather kernel before submitting the data to reduce the latency
@@ -747,8 +765,9 @@ class batch_runner {
           request_ptrs,
           &rem_time_us_ref,
           &batch_token_ref,
-          // Round +3 indicates the empty token slot, which can only be used in the following round
-          batch_token{batch_queue_.seq_round(seq_id) + 4 * batch_queue_.kSize - 1},
+          // This indicates the empty token slot, which can only be used in the following round
+          batch_token{batch_queue_.seq_round(seq_id) +
+                      (static_cast<uint32_t>(slot_state::kEmptyPast) + 1) * batch_queue_.kSize - 1},
           kernel_progress_counters_.data_handle() + batch_id);
       }
 
@@ -834,11 +853,11 @@ class batch_runner {
 
   /**
    * Try to commit n_queries at most; returns the last observed batch_token (where `size_committed`
-   * represents offset at which new queries are committed if successful) and the number of committed
-   * queries.
+   * represents offset at which new queries are committed if successful), the number of committed
+   * queries, or whether the ring buffer appears to be busy (on unsuccessful commit).
    */
   auto try_commit(batch_queue_t<kMaxNumQueues>::seq_order_id seq_id, uint32_t n_queries) const
-    -> std::tuple<batch_token, uint32_t>
+    -> std::variant<std::tuple<batch_token, uint32_t>, bool>
   {
     auto& batch_token_ref            = batch_queue_.token(seq_id);
     batch_token batch_token_observed = batch_token_ref.load();
@@ -851,15 +870,15 @@ class batch_runner {
       token_status = batch_queue_.batch_status(batch_token_observed, seq_id);
       // Busy status means the current thread is a whole ring buffer ahead of the token.
       // The thread should wait for the rest of the system.
-      if (token_status == slot_state::kBusy || token_status == slot_state::kEmptyBusy) {
-        return std::make_tuple(batch_token_observed, 0);
+      if (token_status == slot_state::kFullBusy || token_status == slot_state::kEmptyBusy) {
+        return true;
       }
       // This branch checks if the token was recently filled or dispatched.
       // This means the head counter of the ring buffer is slightly outdated.
-      if (token_status == slot_state::kEmptyPast ||
+      if (token_status == slot_state::kEmptyPast || token_status == slot_state::kFullPast ||
           batch_token_observed.size_committed() >= max_batch_size_) {
         batch_queue_.pop(seq_id);
-        return std::make_tuple(batch_token_observed, 0);
+        return false;
       }
       batch_token_updated = batch_token_observed;
       batch_token_updated.size_committed() =
