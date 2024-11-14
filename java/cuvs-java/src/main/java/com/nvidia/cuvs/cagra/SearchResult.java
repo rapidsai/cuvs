@@ -5,9 +5,11 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.lang.invoke.VarHandle;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class SearchResult {
 
@@ -38,7 +40,7 @@ public class SearchResult {
     VarHandle neighboursVH = neighboursSL.varHandle(PathElement.sequenceElement());
     VarHandle distancesVH = distancesSL.varHandle(PathElement.sequenceElement());
 
-    Map<Integer, Float> irm = new HashMap<Integer, Float>();
+    Map<Integer, Float> irm = new LinkedHashMap<Integer, Float>();
     int count = 0;
     for (long i = 0; i < topK * numQueries; i++) {
       int id = (int) neighboursVH.get(neighboursMS, 0L, i);
@@ -47,7 +49,7 @@ public class SearchResult {
       count += 1;
       if (count == topK) {
         results.add(irm);
-        irm = new HashMap<Integer, Float>();
+        irm = new LinkedHashMap<Integer, Float>();
         count = 0;
       }
     }
