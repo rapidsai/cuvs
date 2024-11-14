@@ -12,11 +12,11 @@ import java.lang.invoke.MethodHandle;
 
 public class CuVSResources {
 
-  private Linker linker;
   private Arena arena;
+  private Linker linker;
   private MethodHandle cresMH;
-  private SymbolLookup bridge;
   private MemorySegment resource;
+  private SymbolLookup bridge;
 
   /**
    * 
@@ -29,7 +29,7 @@ public class CuVSResources {
     File wd = new File(System.getProperty("user.dir"));
     bridge = SymbolLookup.libraryLookup(wd.getParent() + "/internal/libcuvs_java.so", arena);
 
-    cresMH = linker.downcallHandle(bridge.findOrThrow("create_resource"),
+    cresMH = linker.downcallHandle(bridge.find("create_resource").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
     MemoryLayout rvML = linker.canonicalLayouts().get("int");

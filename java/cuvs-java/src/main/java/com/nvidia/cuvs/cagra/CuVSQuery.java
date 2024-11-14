@@ -5,11 +5,11 @@ import java.util.Map;
 
 public class CuVSQuery {
 
-  CagraSearchParams searchParams;
-  PreFilter preFilter;
-  float[][] queryVectors;
-  public Map<Integer, Integer> mapping;
-  int topK;
+  private CagraSearchParams searchParams;
+  private PreFilter preFilter;
+  private float[][] queryVectors;
+  private Map<Integer, Integer> mapping;
+  private int topK;
 
   public CuVSQuery(CagraSearchParams searchParams, PreFilter preFilter, float[][] queryVectors,
       Map<Integer, Integer> mapping, int topK) {
@@ -100,7 +100,7 @@ public class CuVSQuery {
       this.mapping = mapping;
       return this;
     }
-    
+
     /**
      * 
      * @param topK

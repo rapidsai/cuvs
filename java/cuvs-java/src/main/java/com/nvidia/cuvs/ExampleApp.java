@@ -29,15 +29,13 @@ public class ExampleApp {
     CagraIndexParams cagraIndexParams = new CagraIndexParams.Builder()
         .withIntermediateGraphDegree(10)
         .withBuildAlgo(CuvsCagraGraphBuildAlgo.IVF_PQ)
-        .withWriterThreads(1)
         .build();
 
     CagraSearchParams cagraSearchParams = new CagraSearchParams
         .Builder()
-        .withMaxQueries(15)
         .build();
 
-    // Creating a new index
+    // Creating a new CAGRA index
     CagraIndex index = new CagraIndex.Builder(res)
         .withDataset(dataset)
         .withIndexParams(cagraIndexParams)
@@ -46,7 +44,7 @@ public class ExampleApp {
     // Saving the index on to the disk.
     index.serialize(new FileOutputStream("abc.cag"));
 
-    // Loading a cagra index from disk.
+    // Loading a CAGRA index from disk.
     InputStream fin = new FileInputStream(new File("abc.cag"));
     CagraIndex index2 = new CagraIndex.Builder(res)
         .from(fin)

@@ -24,21 +24,21 @@ import com.nvidia.cuvs.panama.cuvsCagraSearchParams;
 */
 public class CagraSearchParams {
 
-  Arena arena;
-  int maxQueries;
-  int itopkSize;
-  int maxIterations;
-  CuvsCagraSearchAlgo algo;
-  int teamSize;
-  int searchWidth;
-  int minIterations;
-  int threadBlockSize;
-  CuvsCagraHashMode hashmapMode;
-  int hashmapMinBitlen;
-  float hashmapMaxFillRate;
-  int numRandomSamplings;
-  long randXorMask;
-  public MemorySegment cagraSearchParamsMS;
+  private Arena arena;
+  private int maxQueries;
+  private int itopkSize;
+  private int maxIterations;
+  private CuvsCagraSearchAlgo algo;
+  private int teamSize;
+  private int searchWidth;
+  private int minIterations;
+  private int threadBlockSize;
+  private CuvsCagraHashMode hashmapMode;
+  private int hashmapMinBitlen;
+  private float hashmapMaxFillRate;
+  private int numRandomSamplings;
+  private long randXorMask;
+  private MemorySegment cagraSearchParamsMS;
 
   enum CuvsCagraSearchAlgo {
     SINGLE_CTA(0), MULTI_CTA(1), MULTI_KERNEL(2), AUTO(3);
@@ -149,6 +149,10 @@ public class CagraSearchParams {
 
   public long getRand_xor_mask() {
     return randXorMask;
+  }
+
+  public MemorySegment getCagraSearchParamsMS() {
+    return cagraSearchParamsMS;
   }
 
   @Override
