@@ -58,7 +58,7 @@ index bef0017..2ef85d9 100644
 -                unsigned int *data;
 +        if (base_layer_only) {
 +            // You can increase the number of seeds when testing large-scale dataset, num_seeds = 48 for 100M-scale
-+            for (int i = 0; i < num_seeds; i) {
++            for (int i = 0; i < num_seeds; i++) {
 +                tableint obj = i * (max_elements_ / num_seeds);
 +                dist_t dist = fstdistfunc_(query_data, getDataByInternalId(obj), dist_func_param_);
 +                if (dist < curdist) {
