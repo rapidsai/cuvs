@@ -23,7 +23,6 @@
 #include <cuvs/distance/distance.hpp>
 
 #include "cagra.hpp"
-#include "hnsw.h"
 #include <raft/core/host_mdspan.hpp>
 
 #include <sys/types.h>
@@ -99,7 +98,10 @@ struct index : cuvs::neighbors::index {
  *
  * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
  */
-using HnswHiearchy = cuvsHnswHierarchy;
+enum class HnswHiearchy {
+  NONE,  // base-layer-only index
+  CPU    // full index with CPU-built hierarchy
+};
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index

@@ -41,9 +41,10 @@ void _from_cagra(cuvsResources_t res,
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(cagra_index->addr);
 
-  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::from_cagra(*res_ptr, *index, hierarchy);
-  auto hnsw_index_ptr        = hnsw_index_unique_ptr.release();
-  hnsw_index->addr           = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
+  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::from_cagra(
+    *res_ptr, *index, static_cast<cuvs::neighbors::hnsw::HnswHiearchy>(hierarchy));
+  auto hnsw_index_ptr = hnsw_index_unique_ptr.release();
+  hnsw_index->addr    = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
 }
 
 template <typename T>
