@@ -74,6 +74,7 @@ if rmm is not None:
     from pylibraft.common import DeviceResources
     from rmm.allocators.cupy import rmm_cupy_allocator
 else:
+    gpu_system = False
     warnings.warn(
         "Consider using a GPU-based system to greatly accelerate "
         " generating groundtruths using cuVS."
