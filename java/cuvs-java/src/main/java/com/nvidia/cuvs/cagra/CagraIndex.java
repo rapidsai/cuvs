@@ -168,7 +168,8 @@ public class CagraIndex {
     searchMH.invokeExact(ref.getIndexMemorySegment(), getMemorySegment(query.getQueries()), query.getTopK(), 4L, 2L,
         res.getResource(), neighborsMS, distancesMS, rvMS, query.getSearchParams().getCagraSearchParamsMS());
 
-    return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, query.getTopK(), query.getMapping(), query.getQueries().length);
+    return new SearchResult(neighborsSL, distancesSL, neighborsMS, distancesMS, query.getTopK(), query.getMapping(),
+        query.getQueries().length);
   }
 
   /**
