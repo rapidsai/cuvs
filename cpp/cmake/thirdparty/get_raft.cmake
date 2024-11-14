@@ -53,6 +53,7 @@ function(find_and_configure_raft)
               "BUILD_ANN_BENCH OFF"
               "RAFT_NVTX ${PKG_ENABLE_NVTX}"
               "RAFT_COMPILE_LIBRARY OFF"
+              "BUILD_CAGRA_HNSWLIB OFF"
             )
 endfunction()
 
