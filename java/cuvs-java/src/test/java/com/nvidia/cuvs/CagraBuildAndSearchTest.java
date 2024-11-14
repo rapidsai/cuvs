@@ -2,11 +2,18 @@ package com.nvidia.cuvs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.nvidia.cuvs.cagra.CagraIndex;
 import com.nvidia.cuvs.cagra.CagraIndexParams;
@@ -16,6 +23,8 @@ import com.nvidia.cuvs.cagra.CuVSResources;
 import com.nvidia.cuvs.cagra.SearchResult;
 
 public class CagraBuildAndSearchTest {
+  
+  private static Logger LOGGER = LoggerFactory.getLogger(CagraBuildAndSearchTest.class);
 
   /**
    * A basic test that checks the whole flow - from indexing to search.
@@ -30,7 +39,7 @@ public class CagraBuildAndSearchTest {
     Map<Integer, Integer> map = Map.of(0, 0, 1, 1, 2, 2, 3, 3);
     float[][] queries = {{ 0.48216683f, 0.0428398f }, { 0.5084142f, 0.6545497f }, { 0.51260436f, 0.2643005f }, { 0.05198065f, 0.5789965f }};
     
-    // Expected search result
+    // Expected search results
     List<Map<Integer, Float>> expectedQueryResults = Arrays.asList(
         Map.of(3, 0.038782578f, 2, 0.3590463f, 0, 0.83774555f),
         Map.of(0, 0.12472608f, 2, 0.21700792f, 1, 0.31918612f), 
@@ -43,7 +52,7 @@ public class CagraBuildAndSearchTest {
     // Configure index parameters
     CagraIndexParams cagraIndexParams = new CagraIndexParams
         .Builder()
-        .withBuildAlgo(CagraIndexParams.CuvsCagraGraphBuildAlgo.IVF_PQ)
+        .withBuildAlgo(CagraIndexParams.CuvsCagraGraphBuildAlgo.NN_DESCENT)
         .build();
 
     // Create the index with the dataset
@@ -53,6 +62,17 @@ public class CagraBuildAndSearchTest {
         .withIndexParams(cagraIndexParams)
         .build();
 
+    // Saving the index on to the disk.
+    String fileName = UUID.randomUUID().toString() + ".cag";
+    index.serialize(new FileOutputStream(fileName));
+
+    // Loading a CAGRA index from disk.
+    File testSerializedIndexFile = new File(fileName);
+    InputStream fin = new FileInputStream(testSerializedIndexFile);
+    CagraIndex index2 = new CagraIndex.Builder(res)
+        .from(fin)
+        .build();
+    
     // Configure search parameters
     CagraSearchParams cagraSearchParams = new CagraSearchParams
         .Builder()
@@ -71,6 +91,19 @@ public class CagraBuildAndSearchTest {
     SearchResult searchResults = index.search(query);
     
     // Check results
+    LOGGER.info(searchResults.getResults().toString());
     assertEquals(expectedQueryResults, searchResults.getResults(), "Results different than expected");
+
+    // Search from de-serialized index
+    SearchResult searchResults2 = index2.search(query);
+    
+    // Check results
+    LOGGER.info(searchResults.getResults().toString());
+    assertEquals(expectedQueryResults, searchResults2.getResults(), "Results different than expected");
+
+    // Cleanup
+    if (testSerializedIndexFile.exists()) {
+      testSerializedIndexFile.delete();
+    }
   }
 }
