@@ -53,28 +53,33 @@ namespace cuvs::neighbors::dynamic_batching::detail {
  * (e.g. waiting on multiple things or waiting on GPU volatile stores).
  */
 struct local_waiter {
-  explicit local_waiter(std::chrono::nanoseconds base_sleep_time) noexcept
-    : base_sleep_time_{base_sleep_time}
+  static constexpr inline int64_t kNonSleepIterations = 10;
+
+  explicit local_waiter(std::chrono::nanoseconds base_sleep_time,
+                        int64_t start_iteration = 0) noexcept
+    : base_sleep_time_{base_sleep_time}, iteration_{start_iteration}
   {
   }
 
   inline void wait() noexcept
   {
     if (iteration_ < 2) {
-      // Don't wait and try get the value asap
-    } else if (iteration_ < 10) {
+      // Don't wait for the first few iterations:
+      // maybe there's a weak CAS op in the loop, or something else that could return quickly
+    } else if (iteration_ < kNonSleepIterations) {
       std::this_thread::yield();
     } else {
-      std::this_thread::sleep_for(base_sleep_time_ * (iteration_ / 10));
+      auto k = iteration_ + 1 - kNonSleepIterations;
+      std::this_thread::sleep_for(base_sleep_time_ * k);
     }
     ++iteration_;
   }
 
-  inline void reset() noexcept { iteration_ = 0; }
+  inline void reset(int64_t start_iteration = 0) noexcept { iteration_ = start_iteration; }
 
  private:
   std::chrono::nanoseconds base_sleep_time_;
-  int64_t iteration_ = 0;
+  int64_t iteration_;
 };
 
 class cuda_event {
@@ -278,7 +283,15 @@ struct batch_queue_t {
     seq_order_id seq_id{tail_.fetch_add(1, kMemOrder)};
     auto& loc = token(seq_id);
     auto ss   = batch_status(loc.load(kMemOrder), seq_id);
-    local_waiter till_empty{std::chrono::nanoseconds{10000}};
+    /* [Note: very small waiting time]
+
+    Only a few (dispatcher) threads are going to call this function at the same time as opposed to
+    potentially any number of threads waiting on new batches to arrive.
+    This is a performance-critical code path.
+
+    Hence the small base sleep time.
+    */
+    local_waiter till_empty{std::chrono::nanoseconds{1000}};
     while (ss == slot_state::kFull || ss == slot_state::kFullBusy || ss == slot_state::kEmptyBusy) {
       // Wait till the slot becomes empty (doesn't matter future or past).
       // The batch id is only ever updated in the scatter/gather kernels, which are the only source
@@ -289,14 +302,26 @@ struct batch_queue_t {
     return seq_id;
   }
 
+  /**
+   * Return the offset of the given w.r.t. the tail of the queue.
+   * Negative value means the given slot is in the body of the queue and should be dispatched soon.
+   * Positive value means the given slot is ahead of the queue and should wait longer.
+   *
+   * That is the lower the value the higher the priority.
+   */
+  [[nodiscard]] inline auto niceness(seq_order_id id) const noexcept -> int32_t
+  {
+    return static_cast<int32_t>(id.value - tail_.load(kMemOrder));
+  }
+
   /** Get the reference to the first element in the queue. */
   inline auto head() noexcept -> seq_order_id
   {
     auto h = head_.load(kMemOrder);
     // The head cannot go ahead of the tail by more than the queue buffer size.
     // If the head is ahead by not more than kSize elements though, everything is fine;
-    // The slots too far ahead are protected by loop_invalid_token().
-    local_waiter for_tail{std::chrono::nanoseconds{10000}};
+    // the slots too far ahead are protected by busy tokens.
+    local_waiter for_tail(std::chrono::nanoseconds{100000});
     while (static_cast<int32_t>(h - tail_.load(kMemOrder)) >= static_cast<int32_t>(kSize)) {
       for_tail.wait();
       h = head_.load(kMemOrder);
@@ -729,7 +754,8 @@ class batch_runner {
 
     int64_t local_io_offset = 0;
     batch_token batch_token_observed{0};
-    local_waiter to_commit{std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 3e5))};
+    local_waiter to_commit{std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 3e5)),
+                           local_waiter::kNonSleepIterations};
     while (true) {
       const auto seq_id        = batch_queue_.head();
       const auto commit_result = try_commit(seq_id, n_queries);
@@ -748,7 +774,8 @@ class batch_runner {
       auto& dispatch_sequence_id_ref = batch_queue_.dispatch_sequence_id(seq_id);
       // sleep for 1/10 of deadline time or more
       //   (if couldn't get the value in the first few iterations).
-      local_waiter till_full{std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1e5))};
+      local_waiter till_full{std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1e5)),
+                             batch_queue_.niceness(seq_id)};
       while (batch_queue_.batch_status(batch_token_observed, seq_id) != slot_state::kFull) {
         /* Note: waiting for batch IO buffers
         The CPU threads can commit to the incoming batches in the queue in advance (this happens in
@@ -846,7 +873,8 @@ class batch_runner {
       // TODO: it could potentially be more efficient to first commit everything and only then
       //        submit the work/wait for the event
       local_io_offset += queries_committed;
-      to_commit.reset();  // reset the waiter for the next iteration.
+      to_commit.reset(
+        local_waiter::kNonSleepIterations);  // reset the waiter for the next iteration.
     }
   }
 
@@ -882,7 +910,7 @@ class batch_runner {
     -> std::variant<std::tuple<batch_token, uint32_t>, bool>
   {
     auto& batch_token_ref            = batch_queue_.token(seq_id);
-    batch_token batch_token_observed = batch_token_ref.load();
+    batch_token batch_token_observed = batch_token_ref.load(cuda::std::memory_order_relaxed);
     batch_token batch_token_updated;
     slot_state token_status;
     do {
