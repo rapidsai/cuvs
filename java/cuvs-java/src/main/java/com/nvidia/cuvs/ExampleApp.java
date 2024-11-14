@@ -52,7 +52,7 @@ public class ExampleApp {
 
     // Query
     CuVSQuery query = new CuVSQuery.Builder()
-        .withTopK(1)
+        .withTopK(3)
         .withSearchParams(cagraSearchParams)
         .withQueryVectors(queries)
         .withMapping(map)
