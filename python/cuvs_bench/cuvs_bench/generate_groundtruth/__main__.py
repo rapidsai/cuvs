@@ -15,35 +15,41 @@
 # limitations under the License.
 #
 import argparse
+import importlib
 import os
 import sys
+import warnings
+
+from .utils import memmap_bin_file, suffix_from_dtype, write_bin
 
 
 def import_with_fallback(primary_lib, secondary_lib=None, alias=None):
     """
-    Attempt to import a primary library, with an optional fallback to a secondary library.
+    Attempt to import a primary library, with an optional fallback to a
+    secondary library.
     Optionally assigns the imported module to a global alias.
+
     Parameters
     ----------
     primary_lib : str
         Name of the primary library to import.
     secondary_lib : str, optional
-        Name of the secondary library to use as a fallback. If `None`, no fallback is attempted.
+        Name of the secondary library to use as a fallback. If `None`,
+        no fallback is attempted.
     alias : str, optional
         Alias to assign the imported module globally.
+
     Returns
     -------
     module or None
         The imported module if successful; otherwise, `None`.
+
     Examples
     --------
-    Import `cupy` with a fallback to `numpy`:
     >>> xp = import_with_fallback('cupy', 'numpy')
-    Attempt to import a nonexistent library without a fallback:
     >>> mod = import_with_fallback('nonexistent_lib')
     >>> if mod is None:
     ...     print("Library not found.")
-    Library not found.
     """
     try:
         module = importlib.import_module(primary_lib)
@@ -60,20 +66,18 @@ def import_with_fallback(primary_lib, secondary_lib=None, alias=None):
     return module
 
 
-xp = import_with_fallback('cupy', 'numpy')
-rmm = import_with_fallback('rmm')
+xp = import_with_fallback("cupy", "numpy")
+rmm = import_with_fallback("rmm")
 
-if rmm is not None: 
+if rmm is not None:
     gpu_system = True
     from pylibraft.common import DeviceResources
     from rmm.allocators.cupy import rmm_cupy_allocator
 else:
-    warnings.warn("Consider using a GPU-based system to greatly accelerate "
-                  " generating groundtruths using cuVS.")
-    
-# from cuvs.neighbors.brute_force import build, search
-
-from .utils import memmap_bin_file, suffix_from_dtype, write_bin
+    warnings.warn(
+        "Consider using a GPU-based system to greatly accelerate "
+        " generating groundtruths using cuVS."
+    )
 
 
 def generate_random_queries(n_queries, n_features, dtype=xp.float32):
@@ -95,57 +99,67 @@ def choose_random_queries(dataset, n_queries):
     return dataset[query_idx, :]
 
 
-def cpu_search(dataset, queries, k, metric='squeclidean'):
+def cpu_search(dataset, queries, k, metric="squeclidean"):
     """
-    Find the k nearest neighbors for each query point in the dataset using the specified metric.
+    Find the k nearest neighbors for each query point in the dataset using the
+    specified metric.
+
     Parameters
     ----------
     dataset : numpy.ndarray
         An array of shape (n_samples, n_features) representing the dataset.
     queries : numpy.ndarray
-        An array of shape (n_queries, n_features) representing the query points.
+        An array of shape (n_queries, n_features) representing the query
+        points.
     k : int
         The number of nearest neighbors to find.
     metric : str, optional
         The distance metric to use. Can be 'squeclidean' or 'inner_product'.
         Default is 'squeclidean'.
+
     Returns
     -------
     distances : numpy.ndarray
-        An array of shape (n_queries, k) containing the distances (for 'squeclidean') or similarities
+        An array of shape (n_queries, k) containing the distances
+        (for 'squeclidean') or similarities
         (for 'inner_product') to the k nearest neighbors for each query.
     indices : numpy.ndarray
-        An array of shape (n_queries, k) containing the indices of the k nearest neighbors
-        in the dataset for each query.
+        An array of shape (n_queries, k) containing the indices of the
+        k nearest neighbors in the dataset for each query.
 
     """
-    if metric == 'squeclidean':
+    if metric == "squeclidean":
         diff = queries[:, xp.newaxis, :] - dataset[xp.newaxis, :, :]
-        dist_sq = xp.sum(diff ** 2, axis=2)  # Shape: (n_queries, n_samples)
+        dist_sq = xp.sum(diff**2, axis=2)  # Shape: (n_queries, n_samples)
 
-        indices = xp.argpartition(dist_sq, kth=k-1, axis=1)[:, :k]
+        indices = xp.argpartition(dist_sq, kth=k - 1, axis=1)[:, :k]
         distances = xp.take_along_axis(dist_sq, indices, axis=1)
 
         sorted_idx = xp.argsort(distances, axis=1)
         distances = xp.take_along_axis(distances, sorted_idx, axis=1)
         indices = xp.take_along_axis(indices, sorted_idx, axis=1)
 
-    elif metric == 'inner_product':
-        similarities = xp.dot(queries, dataset.T)  # Shape: (n_queries, n_samples)
+    elif metric == "inner_product":
+        similarities = xp.dot(
+            queries, dataset.T
+        )  # Shape: (n_queries, n_samples)
 
         neg_similarities = -similarities
-        indices = xp.argpartition(neg_similarities, kth=k-1, axis=1)[:, :k]
+        indices = xp.argpartition(neg_similarities, kth=k - 1, axis=1)[:, :k]
         distances = xp.take_along_axis(similarities, indices, axis=1)
 
         sorted_idx = xp.argsort(-distances, axis=1)
 
+    else:
+        raise ValueError(
+            "Unsupported metric in cuvs-bench-cpu. "
+            "Use 'squeclidean' or 'inner_product' or use the GPU package"
+            "to use any distance supported by cuVS."
+        )
+
     distances = xp.take_along_axis(distances, sorted_idx, axis=1)
     indices = xp.take_along_axis(indices, sorted_idx, axis=1)
 
-    else:
-        raise ValueError("Unsupported metric in cuvs-bench-cpu. "
-                         "Use 'squeclidean' or 'inner_product' or use the GPU package
-                         "to use any distance supported by cuVS.")
     return distances, indices
 
 
@@ -158,6 +172,8 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
     queries = xp.asarray(queries, dtype=xp.float32)
 
     if gpu_system:
+        from cuvs.neighbors.brute_force import build, search
+
         resources = DeviceResources()
 
     while i < n_samples:
