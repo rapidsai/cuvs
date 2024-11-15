@@ -18,7 +18,7 @@
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_cagra_wrapper.h"
 #include <cuvs/neighbors/mg.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
+#include <raft/core/device_resources_snmg.hpp>
 
 namespace cuvs::bench {
 using namespace cuvs::neighbors;
@@ -41,13 +41,10 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   };
 
   cuvs_mg_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
-    : algo<T>(metric, dim), index_params_(param)
+    : algo<T>(metric, dim), index_params_(param), clique_()
   {
     index_params_.cagra_params.metric         = parse_metric_type(metric);
     index_params_.ivf_pq_build_params->metric = parse_metric_type(metric);
-
-    // init nccl clique outside as to not affect benchmark
-    const raft::core::nccl_clique& clique = raft::resource::get_nccl_clique(handle_);
   }
 
   void build(const T* dataset, size_t nrow) final;
@@ -88,6 +85,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
 
  private:
   raft::device_resources handle_;
+  raft::device_resources_snmg clique_;
   float refine_ratio_;
   build_param index_params_;
   cuvs::neighbors::mg::search_params<cagra::search_params> search_params_;
@@ -105,7 +103,7 @@ void cuvs_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, nrow, dim_);
-  auto idx = cuvs::neighbors::mg::build(handle_, build_params, dataset_view);
+  auto idx = cuvs::neighbors::mg::build(clique_, build_params, dataset_view);
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
       std::move(idx));
@@ -132,7 +130,7 @@ void cuvs_mg_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_mg_cagra<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::mg::serialize(handle_, *index_, file);
+  cuvs::neighbors::mg::serialize(clique_, *index_, file);
 }
 
 template <typename T, typename IdxT>
@@ -140,7 +138,7 @@ void cuvs_mg_cagra<T, IdxT>::load(const std::string& file)
 {
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
-      std::move(cuvs::neighbors::mg::deserialize_cagra<T, IdxT>(handle_, file)));
+      std::move(cuvs::neighbors::mg::deserialize_cagra<T, IdxT>(clique_, file)));
 }
 
 template <typename T, typename IdxT>
@@ -164,7 +162,7 @@ void cuvs_mg_cagra<T, IdxT>::search_base(
     raft::make_host_matrix_view<float, int64_t, raft::row_major>(distances, batch_size, k);
 
   cuvs::neighbors::mg::search(
-    handle_, *index_, search_params_, queries_view, neighbors_view, distances_view);
+    clique_, *index_, search_params_, queries_view, neighbors_view, distances_view);
 }
 
 template <typename T, typename IdxT>
