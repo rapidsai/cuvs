@@ -488,7 +488,7 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - &librmm_unsuffixed librmm==24.12.*,>=0.0.0a0
+          - &librmm_unsuffixed librmm==25.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -501,18 +501,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu12==24.12.*,>=0.0.0a0
+              - librmm-cu12==25.2.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu11==24.12.*,>=0.0.0a0
+              - librmm-cu11==25.2.*,>=0.0.0a0
           - {matrix: null, packages: [*librmm_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda
         packages:
-          - &pylibraft_unsuffixed pylibraft==24.12.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==25.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -525,10 +525,10 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu12==24.12.*,>=0.0.0a0
+              - pylibraft-cu12==25.2.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu11==24.12.*,>=0.0.0a0
+              - pylibraft-cu11==25.2.*,>=0.0.0a0
           - {matrix: null, packages: [*pylibraft_unsuffixed]}
