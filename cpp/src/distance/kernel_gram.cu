@@ -18,11 +18,10 @@
 
 namespace cuvs::distance::kernels {
 
- template  class KernelFactory<float>
-  template class KernelFactory<double>
+template class KernelFactory<float>;
+template class KernelFactory<double>;
 
-          template class GramMatrixBase<float>
-          template class GramMatrixBase<double>
-
+template class GramMatrixBase<float>;
+template class GramMatrixBase<double>;
 
 };  // end namespace cuvs::distance::kernels
