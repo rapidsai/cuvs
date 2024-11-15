@@ -75,6 +75,23 @@ struct index {
  * @{
  */
 
+/*
+ * @brief Build the Sparse index from the dataset
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // create and fill the index from a CSR dataset
+ *   auto index = brute_force::build(handle, dataset, metric);
+ * @endcode
+ *
+ * @param[in] handle
+ * @param[in] dataset A sparse CSR matrix in device memory to search against
+ * @param[in] metric cuvs::distance::DistanceType
+ * @param[in] metric_arg metric argument
+ *
+ * @return the constructed Sparse brute-force index
+ */
 auto build(raft::resources const& handle,
            raft::device_csr_matrix_view<const float, int, int, int> dataset,
            cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Unexpanded,
@@ -93,6 +110,16 @@ struct search_params {
   int batch_size_query = 2 << 14;
 };
 
+/*
+ * @brief Search the sparse bruteforce index for nearest neighbors
+ *
+ * @param[in] handle
+ * @param[in] index Sparse brute-force constructed index
+ * @param[in] queries a sparse CSR matrix on the device to query
+ * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
+ */
 void search(raft::resources const& handle,
             const cuvs::sparse::neighbors::brute_force::search_params& params,
             const cuvs::sparse::neighbors::brute_force::index<float, int>& index,

@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include "../../../neighbors/detail/knn_merge_parts.cuh"
 #include "../../distance/distance.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -22,9 +23,6 @@
 #include <raft/linalg/unary_op.cuh>
 
 #include <cuvs/selection/select_k.hpp>
-
-// TODO: move to cuvs
-#include <raft/spatial/knn/knn.cuh>  // knn_merge_parts
 
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/csr.hpp>
@@ -341,15 +339,15 @@ class sparse_knn_t {
       trans.data(), id_ranges.data(), id_ranges.size(), raft::resource::get_cuda_stream(handle));
 
     // combine merge buffers only if there's more than 1 partition to combine
-    raft::spatial::knn::knn_merge_parts(merge_buffer_dists,
-                                        merge_buffer_indices,
-                                        out_dists,
-                                        out_indices,
-                                        query_batcher.batch_rows(),
-                                        2,
-                                        k,
-                                        raft::resource::get_cuda_stream(handle),
-                                        trans.data());
+    cuvs::neighbors::detail::knn_merge_parts(merge_buffer_dists,
+                                             merge_buffer_indices,
+                                             out_dists,
+                                             out_indices,
+                                             query_batcher.batch_rows(),
+                                             2,
+                                             k,
+                                             raft::resource::get_cuda_stream(handle),
+                                             trans.data());
   }
 
   void perform_k_selection(csr_batcher_t<value_idx, value_t> idx_batcher,
