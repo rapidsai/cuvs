@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.nvidia.cuvs;
 
 import java.io.File;
@@ -19,7 +35,7 @@ import com.nvidia.cuvs.cagra.SearchResult;
 
 public class ExampleApp {
   
-  private static Logger LOGGER = LoggerFactory.getLogger(ExampleApp.class);
+  private static Logger logger = LoggerFactory.getLogger(ExampleApp.class);
 
   public static void main(String[] args) throws Throwable {
 
@@ -30,46 +46,56 @@ public class ExampleApp {
     float[][] queries = { { 0.48216683f, 0.0428398f }, { 0.5084142f, 0.6545497f }, { 0.51260436f, 0.2643005f },
         { 0.05198065f, 0.5789965f } };
 
-    CuVSResources res = new CuVSResources();
+    CuVSResources cuvsResources = new CuVSResources();
 
-    CagraIndexParams cagraIndexParams = new CagraIndexParams.Builder()
-        .withIntermediateGraphDegree(10)
-        .withBuildAlgo(CuvsCagraGraphBuildAlgo.NN_DESCENT)
-        .build();
-
-    CagraSearchParams cagraSearchParams = new CagraSearchParams
+    CagraIndexParams cagraIndexParameters = new CagraIndexParams
         .Builder()
+        .withIntermediateGraphDegree(10)
+        .withCuvsCagraGraphBuildAlgo(CuvsCagraGraphBuildAlgo.NN_DESCENT)
         .build();
 
     // Creating a new CAGRA index
-    CagraIndex index = new CagraIndex.Builder(res)
+    CagraIndex cagraIndex = new CagraIndex
+        .Builder(cuvsResources)
         .withDataset(dataset)
-        .withIndexParams(cagraIndexParams)
+        .withIndexParams(cagraIndexParameters)
         .build();
 
-    // Saving the index on to the disk.
-    index.serialize(new FileOutputStream("abc.cag"));
+    // Saving the CAGRA index on to the disk.
+    File indexFile = new File("sample_index.cag");
+    cagraIndex.serialize(new FileOutputStream(indexFile));
 
     // Loading a CAGRA index from disk.
-    InputStream fin = new FileInputStream(new File("abc.cag"));
-    CagraIndex index2 = new CagraIndex.Builder(res)
-        .from(fin)
+    InputStream fileInputStream = new FileInputStream(indexFile);
+    CagraIndex deserializedIndex = new CagraIndex
+        .Builder(cuvsResources)
+        .from(fileInputStream)
+        .build();
+
+    CagraSearchParams cagraSearchParameters = new CagraSearchParams
+        .Builder()
         .build();
 
     // Query
-    CuVSQuery query = new CuVSQuery.Builder()
+    CuVSQuery cuvsQuery = new CuVSQuery
+        .Builder()
         .withTopK(3)
-        .withSearchParams(cagraSearchParams)
+        .withSearchParams(cagraSearchParameters)
         .withQueryVectors(queries)
         .withMapping(map)
         .build();
 
     // Search
-    SearchResult rslt = index.search(query);
-    LOGGER.info(rslt.getResults().toString());
+    SearchResult searchResult = cagraIndex.search(cuvsQuery);
+    logger.info(searchResult.getResults().toString());
 
-    // Search from de-serialized index
-    SearchResult rslt2 = index2.search(query);
-    LOGGER.info(rslt2.getResults().toString());
+    // Search from deserialized index
+    SearchResult searchResultFromDeserializedIndex = deserializedIndex.search(cuvsQuery);
+    logger.info(searchResultFromDeserializedIndex.getResults().toString());
+    
+    // Cleanup
+    if (indexFile.exists()) {
+      indexFile.delete();
+    }
   }
 }

@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/cagra.h>
 #include <dlpack/dlpack.h>
@@ -5,10 +21,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-cuvsResources_t create_resource(int *rv) {
-  cuvsResources_t res;
-  *rv = cuvsResourcesCreate(&res);
-  return res;
+cuvsResources_t create_resource(int *returnValue) {
+  cuvsResources_t cuvsResources;
+  *returnValue = cuvsResourcesCreate(&cuvsResources);
+  return cuvsResources;
 }
 
 DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code, long dimensions) {
@@ -26,35 +42,35 @@ DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code,
   return tensor;
 }
 
-cuvsCagraIndex_t build_index(float *dataset, long rows, long dimensions, cuvsResources_t res, int *rv,
+cuvsCagraIndex_t build_index(float *dataset, long rows, long dimensions, cuvsResources_t cuvsResources, int *returnValue,
     cuvsCagraIndexParams_t index_params) {
-  
+
   int64_t dataset_shape[2] = {rows, dimensions};
   DLManagedTensor dataset_tensor = prepare_tensor(dataset, dataset_shape, kDLFloat, dimensions);
 
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
 
-  *rv = cuvsCagraBuild(res, index_params, &dataset_tensor, index);
+  *returnValue = cuvsCagraBuild(cuvsResources, index_params, &dataset_tensor, index);
   return index;
 }
 
-void serialize_index(cuvsResources_t res, cuvsCagraIndex_t index, int *rv, char* filename) {
-  *rv = cuvsCagraSerialize(res, filename, index, true);
+void serialize_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *returnValue, char* filename) {
+  *returnValue = cuvsCagraSerialize(cuvsResources, filename, index, true);
 }
 
-void deserialize_index(cuvsResources_t res, cuvsCagraIndex_t index, int *rv, char* filename) {
-  *rv = cuvsCagraDeserialize(res, filename, index);
+void deserialize_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *rv, char* filename) {
+  *rv = cuvsCagraDeserialize(cuvsResources, filename, index);
 }
 
 void search_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, long dimensions, 
-    cuvsResources_t res, int *neighbors_h, float *distances_h, int *rv, cuvsCagraSearchParams_t search_params) {
-        
+    cuvsResources_t cuvsResources, int *neighbors_h, float *distances_h, int *returnValue, cuvsCagraSearchParams_t search_params) {
+
   uint32_t *neighbors;
   float *distances, *queries_d;
-  cuvsRMMAlloc(res, (void**) &queries_d, sizeof(float) * n_queries * dimensions);
-  cuvsRMMAlloc(res, (void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
-  cuvsRMMAlloc(res, (void**) &distances, sizeof(float) * n_queries * topk);
+  cuvsRMMAlloc(cuvsResources, (void**) &queries_d, sizeof(float) * n_queries * dimensions);
+  cuvsRMMAlloc(cuvsResources, (void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
+  cuvsRMMAlloc(cuvsResources, (void**) &distances, sizeof(float) * n_queries * topk);
 
   cudaMemcpy(queries_d, queries, sizeof(float) * n_queries * dimensions, cudaMemcpyDefault);
 
@@ -69,7 +85,7 @@ void search_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queri
 
   cuvsCagraSearchParamsCreate(&search_params);
 
-  *rv = cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
+  *returnValue = cuvsCagraSearch(cuvsResources, search_params, index, &queries_tensor, &neighbors_tensor,
                   &distances_tensor);
 
   cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk, cudaMemcpyDefault);
