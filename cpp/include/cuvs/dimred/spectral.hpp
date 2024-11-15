@@ -17,7 +17,7 @@
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::sparse::cluster::spectral {
+namespace cuvs::dimred::spectral {
 
 /**
  * Given a COO formatted (symmetric) knn graph, this function computes the spectral embeddings
@@ -39,4 +39,4 @@ void fit(const raft::resources& handle,
          int n_components,
          raft::device_matrix_view<float, int> out,
          unsigned long long seed = 0L);
-};  // namespace cuvs::sparse::cluster::spectral
+};  // namespace cuvs::dimred::spectral

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "../cluster/detail/spectral.cuh"
+#include "../sparse/cluster/detail/spectral.cuh"
 #include <cuvs/sparse/embed/spectral.hpp>
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::sparse::embed::spectral {
+namespace cuvs::dimred::spectral {
 
 /**
  * Given a COO formatted (symmetric) knn graph, this function computes the spectral embeddings
@@ -50,4 +50,4 @@ void fit(const raft::resources& handle,
     out.data_handle(),
     seed);
 }
-};  // namespace cuvs::sparse::embed::spectral
+};  // namespace cuvs::dimred::spectral

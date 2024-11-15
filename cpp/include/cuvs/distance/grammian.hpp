@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cublas_v2.h>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/mdspan.hpp>

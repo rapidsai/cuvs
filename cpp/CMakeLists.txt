@@ -373,6 +373,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/distance.cu
     src/distance/kernel_gram.cu
     src/distance/pairwise_distance.cu
+    src/dimred/spectral.cu
     src/neighbors/brute_force.cu
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
@@ -462,7 +463,6 @@ if(BUILD_SHARED_LIBS)
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
     src/selection/select_k_half_uint32_t.cu
-    src/sparse/embed/spectral.cu
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
