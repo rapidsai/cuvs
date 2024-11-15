@@ -155,71 +155,69 @@ bool search_using_brute_force(
   CagraSampleFilterT& sample_filter,
   double threshold_to_bf = 0.9)
 {
-  bool is_applied = false;
-  auto n_queries  = queries.extent(0);
-  auto n_dataset  = strided_dataset.n_rows();
+  auto n_queries = queries.extent(0);
+  auto n_dataset = strided_dataset.n_rows();
 
   auto bitset_filter_view = sample_filter.bitset_view_;
   auto sparsity           = bitset_filter_view.sparsity(res);
 
+  if (sparsity < threshold_to_bf) { return false; }
+
   // TODO: Support host dataset in `brute_force::build`
-  if (sparsity >= threshold_to_bf) {
-    RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%d", sparsity);
-    using bitmap_view_t = cuvs::core::bitmap_view<const uint32_t, int64_t>;
+  RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%f", sparsity);
+  using bitmap_view_t = cuvs::core::bitmap_view<const uint32_t, int64_t>;
 
-    auto stream            = raft::resource::get_cuda_stream(res);
-    auto bitmap_n_elements = bitmap_view_t::eval_n_elements(bitset_filter_view.size() * n_queries);
+  auto stream            = raft::resource::get_cuda_stream(res);
+  auto bitmap_n_elements = bitmap_view_t::eval_n_elements(bitset_filter_view.size() * n_queries);
 
-    rmm::device_uvector<uint32_t> raw_bitmap(bitmap_n_elements, stream);
-    rmm::device_uvector<int64_t> raw_neighbors(neighbors.size(), stream);
+  rmm::device_uvector<uint32_t> raw_bitmap(bitmap_n_elements, stream);
+  rmm::device_uvector<int64_t> raw_neighbors(neighbors.size(), stream);
 
-    bitset_filter_view.repeat(res, n_queries, raw_bitmap.data());
+  bitset_filter_view.repeat(res, n_queries, raw_bitmap.data());
 
-    auto brute_force_filter = bitmap_view_t(raw_bitmap.data(), n_queries, n_dataset);
+  auto brute_force_filter = bitmap_view_t(raw_bitmap.data(), n_queries, n_dataset);
 
-    auto brute_force_neighbors = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
-      raw_neighbors.data(), neighbors.extent(0), neighbors.extent(1));
-    auto brute_force_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-      strided_dataset.view().data_handle(), strided_dataset.n_rows(), strided_dataset.stride());
+  auto brute_force_neighbors = raft::make_device_matrix_view<int64_t, int64_t, raft::row_major>(
+    raw_neighbors.data(), neighbors.extent(0), neighbors.extent(1));
+  auto brute_force_dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+    strided_dataset.view().data_handle(), strided_dataset.n_rows(), strided_dataset.stride());
 
-    auto brute_force_idx = cuvs::neighbors::brute_force::build(res, brute_force_dataset, metric);
+  auto brute_force_idx = cuvs::neighbors::brute_force::build(res, brute_force_dataset, metric);
 
-    auto brute_force_queries = queries;
-    auto padding_queries     = raft::make_device_matrix<T, int64_t>(res, 0, 0);
+  auto brute_force_queries = queries;
+  auto padding_queries     = raft::make_device_matrix<T, int64_t>(res, 0, 0);
 
-    // Happens when the original dataset is a strided matrix.
-    if (brute_force_dataset.extent(1) != queries.extent(1)) {
-      padding_queries = raft::make_device_mdarray<T, int64_t>(
-        res,
-        raft::resource::get_workspace_resource(res),
-        raft::make_extents<int64_t>(n_queries, brute_force_dataset.extent(1)));
-      // Copy the queries and fill the padded elements with zeros
-      raft::linalg::map_offset(
-        res,
-        padding_queries.view(),
-        [queries, stride = brute_force_dataset.extent(1)] __device__(int64_t i) {
-          auto row_ix = i / stride;
-          auto el_ix  = i % stride;
-          return el_ix < queries.extent(1) ? queries(row_ix, el_ix) : T{0};
-        });
-      brute_force_queries = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-        padding_queries.data_handle(), padding_queries.extent(0), padding_queries.extent(1));
-    }
-    cuvs::neighbors::brute_force::search(
+  // Happens when the original dataset is a strided matrix.
+  if (brute_force_dataset.extent(1) != queries.extent(1)) {
+    padding_queries = raft::make_device_mdarray<T, int64_t>(
       res,
-      brute_force_idx,
-      brute_force_queries,
-      brute_force_neighbors,
-      distances,
-      cuvs::neighbors::filtering::bitmap_filter(brute_force_filter));
-    raft::linalg::unaryOp(neighbors.data_handle(),
-                          brute_force_neighbors.data_handle(),
-                          neighbors.size(),
-                          raft::cast_op<InternalIdxT>(),
-                          raft::resource::get_cuda_stream(res));
-    is_applied = true;
+      raft::resource::get_workspace_resource(res),
+      raft::make_extents<int64_t>(n_queries, brute_force_dataset.extent(1)));
+    // Copy the queries and fill the padded elements with zeros
+    raft::linalg::map_offset(
+      res,
+      padding_queries.view(),
+      [queries, stride = brute_force_dataset.extent(1)] __device__(int64_t i) {
+        auto row_ix = i / stride;
+        auto el_ix  = i % stride;
+        return el_ix < queries.extent(1) ? queries(row_ix, el_ix) : T{0};
+      });
+    brute_force_queries = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+      padding_queries.data_handle(), padding_queries.extent(0), padding_queries.extent(1));
   }
-  return is_applied;
+  cuvs::neighbors::brute_force::search(
+    res,
+    brute_force_idx,
+    brute_force_queries,
+    brute_force_neighbors,
+    distances,
+    cuvs::neighbors::filtering::bitmap_filter(brute_force_filter));
+  raft::linalg::unaryOp(neighbors.data_handle(),
+                        brute_force_neighbors.data_handle(),
+                        neighbors.size(),
+                        raft::cast_op<InternalIdxT>(),
+                        raft::resource::get_cuda_stream(res));
+  return true;
 }
 
 /**
