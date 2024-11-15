@@ -54,6 +54,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       h_index_dataset(0),
       h_queries(0)
   {
+    clique_.set_memory_pool(80);
   }
 
   void testAnnMG()

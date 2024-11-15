@@ -45,6 +45,8 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   {
     index_params_.cagra_params.metric         = parse_metric_type(metric);
     index_params_.ivf_pq_build_params->metric = parse_metric_type(metric);
+
+    clique_.set_memory_pool(80);
   }
 
   void build(const T* dataset, size_t nrow) final;

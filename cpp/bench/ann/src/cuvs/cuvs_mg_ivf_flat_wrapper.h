@@ -40,6 +40,8 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
     : algo<T>(metric, dim), index_params_(param), clique_()
   {
     index_params_.metric = parse_metric_type(metric);
+
+    clique_.set_memory_pool(80);
   }
 
   void build(const T* dataset, size_t nrow) final;

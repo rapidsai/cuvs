@@ -57,7 +57,7 @@ flat_macro = """
                                                  const mg::index_params<ivf_flat::index_params>& index_params,              \\
                                                  raft::host_matrix_view<const T, int64_t, row_major> index_dataset)         \\
   {                                                                                                                         \\
-    index<ivf_flat::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);                                   \\
+    index<ivf_flat::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.get_num_ranks());                              \\
     cuvs::neighbors::mg::detail::build(clique, index,                                                                       \\
                                        static_cast<const cuvs::neighbors::index_params*>(&index_params),                    \\
                                        index_dataset);                                                                      \\
@@ -104,7 +104,7 @@ flat_macro = """
   index<ivf_flat::index<T, IdxT>, T, IdxT> distribute_flat<T, IdxT>(const raft::device_resources_snmg& clique,              \\
                                                                     const std::string& filename)                            \\
   {                                                                                                                         \\
-    auto idx = index<ivf_flat::index<T, IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                                     \\
+    auto idx = index<ivf_flat::index<T, IdxT>, T, IdxT>(REPLICATED, clique.get_num_ranks());                                \\
     cuvs::neighbors::mg::detail::deserialize_and_distribute(clique, idx, filename);                                         \\
     return idx;                                                                                                             \\
   }
@@ -116,7 +116,7 @@ pq_macro = """
                                             const mg::index_params<ivf_pq::index_params>& index_params,                   \\
                                             raft::host_matrix_view<const T, int64_t, row_major> index_dataset)            \\
   {                                                                                                                       \\
-    index<ivf_pq::index<IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);                                      \\
+    index<ivf_pq::index<IdxT>, T, IdxT> index(index_params.mode, clique.get_num_ranks());                                 \\
     cuvs::neighbors::mg::detail::build(clique, index,                                                                     \\
                                        static_cast<const cuvs::neighbors::index_params*>(&index_params),                  \\
                                        index_dataset);                                                                    \\
@@ -163,7 +163,7 @@ pq_macro = """
   index<ivf_pq::index<IdxT>, T, IdxT> distribute_pq<T, IdxT>(const raft::device_resources_snmg& clique,                   \\
                                                              const std::string& filename)                                 \\
   {                                                                                                                       \\
-    auto idx = index<ivf_pq::index<IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                                        \\
+    auto idx = index<ivf_pq::index<IdxT>, T, IdxT>(REPLICATED, clique.get_num_ranks());                                   \\
     cuvs::neighbors::mg::detail::deserialize_and_distribute(clique, idx, filename);                                       \\
     return idx;                                                                                                           \\
   }
@@ -175,7 +175,7 @@ cagra_macro = """
                                               const mg::index_params<cagra::index_params>& index_params,                  \\
                                               raft::host_matrix_view<const T, int64_t, row_major> index_dataset)          \\
   {                                                                                                                       \\
-    index<cagra::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.num_ranks_);                                    \\
+    index<cagra::index<T, IdxT>, T, IdxT> index(index_params.mode, clique.get_num_ranks());                               \\
     cuvs::neighbors::mg::detail::build(clique, index,                                                                     \\
                                        static_cast<const cuvs::neighbors::index_params*>(&index_params),                  \\
                                        index_dataset);                                                                    \\
@@ -214,7 +214,7 @@ cagra_macro = """
   index<cagra::index<T, IdxT>, T, IdxT> distribute_cagra<T, IdxT>(const raft::device_resources_snmg& clique,              \\
                                                                   const std::string& filename)                            \\
   {                                                                                                                       \\
-    auto idx = index<cagra::index<T, IdxT>, T, IdxT>(REPLICATED, clique.num_ranks_);                                      \\
+    auto idx = index<cagra::index<T, IdxT>, T, IdxT>(REPLICATED, clique.get_num_ranks());                                 \\
     cuvs::neighbors::mg::detail::deserialize_and_distribute(clique, idx, filename);                                       \\
     return idx;                                                                                                           \\
   }
