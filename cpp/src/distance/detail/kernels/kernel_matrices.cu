@@ -15,8 +15,8 @@
  */
 
 #include "../../../distance/distance.cuh"
-#include "gram_matrix.hpp"
-#include "kernel_matrices.hpp"
+#include <cuvs/distance/grammian.hpp>
+
 #include "rbf_fin_op.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/gemm.cuh>
@@ -24,7 +24,7 @@
 #include <raft/sparse/linalg/norm.cuh>
 #include <raft/util/cuda_utils.cuh>
 
-namespace cuvs::distance::kernels::detail {
+namespace cuvs::distance::kernels {
 
 /** Epiloge function for polynomial kernel without padding.
  * Calculates output = (gain*in + offset)^exponent
@@ -716,4 +716,4 @@ template <typename math_t>
                                     is_row_major);
 }
 
-};  // end namespace cuvs::distance::kernels::detail
+};  // end namespace cuvs::distance::kernels

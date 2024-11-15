@@ -15,8 +15,8 @@
  */
 
 #include "../../distance.cuh"
-#include "gram_matrix.hpp"
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/distance/grammian.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
@@ -25,7 +25,7 @@
 #include <raft/sparse/distance/distance.cuh>
 #include <raft/sparse/linalg/spmm.hpp>
 
-namespace cuvs::distance::kernels::detail {
+namespace cuvs::distance::kernels {
 
 /**
  * Base class for general Gram matrices
@@ -475,4 +475,4 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
   }
 }
 
-};  // end namespace cuvs::distance::kernels::detail
+};  // namespace cuvs::distance::kernels

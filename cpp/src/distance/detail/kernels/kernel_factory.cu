@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-#include "gram_matrix.hpp"
-#include "kernel_factory.hpp"
+#include <cuvs/distance/grammian.hpp>
 
-namespace cuvs::distance::kernels::detail {
+namespace cuvs::distance::kernels {
 
 template <typename math_t>
 GramMatrixBase<math_t>* KernelFactory<math_t>::create(KernelParams params)
@@ -56,4 +55,4 @@ template <typename math_t>
   return res;
 }
 
-};  // end namespace cuvs::distance::kernels::detail
+};  // end namespace cuvs::distance::kernels

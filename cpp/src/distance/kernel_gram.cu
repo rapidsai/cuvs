@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include "detail/kernels/gram_matrix.hpp"
-#include "detail/kernels/kernel_factory.hpp"
+#include <cuvs/distance/grammian.hpp>
 
 namespace cuvs::distance::kernels {
 
-// TODO: Need to expose formal APIs for this that are more consistent w/ other APIs in cuVS
-using cuvs::distance::kernels::detail::GramMatrixBase;
-using cuvs::distance::kernels::detail::KernelFactory;
+ template  class KernelFactory<float>
+  template class KernelFactory<double>
+
+          template class GramMatrixBase<float>
+          template class GramMatrixBase<double>
+
 
 };  // end namespace cuvs::distance::kernels

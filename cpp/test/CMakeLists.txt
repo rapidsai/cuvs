@@ -204,6 +204,7 @@ if(BUILD_TESTS)
     distance/dist_l_inf.cu
     distance/dist_lp_unexp.cu
     distance/dist_russell_rao.cu
+    distance/gram.cu
     distance/masked_nn.cu
     sparse/neighbors/cross_component_nn.cu
     GPUS
@@ -214,7 +215,7 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
-    sparse/cluster/spectral.cu GPUS 1 PERCENT 100
+    sparse/gram.cu sparse/cluster/spectral.cu GPUS 1 PERCENT 100
   )
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
