@@ -95,7 +95,7 @@ void build(const raft::device_resources_snmg& clique,
 {
   if (index.mode_ == REPLICATED) {
     int64_t n_rows = index_dataset.extent(0);
-    RAFT_LOG_INFO("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
+    RAFT_LOG_DEBUG("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
 
     index.ann_interfaces_.resize(index.num_ranks_);
 #pragma omp parallel for
@@ -110,7 +110,7 @@ void build(const raft::device_resources_snmg& clique,
     int64_t n_cols           = index_dataset.extent(1);
     int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
 
-    RAFT_LOG_INFO("SHARDED BUILD: %d*%drows", index.num_ranks_, n_rows_per_shard);
+    RAFT_LOG_DEBUG("SHARDED BUILD: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
     index.ann_interfaces_.resize(index.num_ranks_);
 #pragma omp parallel for
@@ -136,7 +136,7 @@ void extend(const raft::device_resources_snmg& clique,
 {
   int64_t n_rows = new_vectors.extent(0);
   if (index.mode_ == REPLICATED) {
-    RAFT_LOG_INFO("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
+    RAFT_LOG_DEBUG("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
 
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
@@ -149,7 +149,7 @@ void extend(const raft::device_resources_snmg& clique,
     int64_t n_cols           = new_vectors.extent(1);
     int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
 
-    RAFT_LOG_INFO("SHARDED EXTEND: %d*%drows", index.num_ranks_, n_rows_per_shard);
+    RAFT_LOG_DEBUG("SHARDED EXTEND: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
@@ -515,7 +515,7 @@ void search(const raft::device_resources_snmg& clique,
       int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
       if (n_batches <= 1) n_rows_per_batch = n_rows;
 
-      RAFT_LOG_INFO(
+      RAFT_LOG_DEBUG(
         "REPLICATED SEARCH IN LOAD BALANCER MODE: %d*%drows", n_batches, n_rows_per_batch);
 
 #pragma omp parallel for
@@ -540,7 +540,7 @@ void search(const raft::device_resources_snmg& clique,
                          n_neighbors);
       }
     } else if (search_mode == ROUND_ROBIN) {
-      RAFT_LOG_INFO("REPLICATED SEARCH IN ROUND ROBIN MODE: %d*%drows", 1, n_rows);
+      RAFT_LOG_DEBUG("REPLICATED SEARCH IN ROUND ROBIN MODE: %d*%drows", 1, n_rows);
 
       ASSERT(n_rows <= n_rows_per_batch,
              "In round-robin mode, n_rows must lower or equal to n_rows_per_batch");
@@ -584,9 +584,9 @@ void search(const raft::device_resources_snmg& clique,
     if (n_batches <= 1) n_rows_per_batch = n_rows;
 
     if (merge_mode == MERGE_ON_ROOT_RANK) {
-      RAFT_LOG_INFO("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
-                    n_batches,
-                    n_rows_per_batch);
+      RAFT_LOG_DEBUG("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
+                     n_batches,
+                     n_rows_per_batch);
       sharded_search_with_direct_merge(clique,
                                        index,
                                        search_params,
@@ -599,7 +599,7 @@ void search(const raft::device_resources_snmg& clique,
                                        n_neighbors,
                                        n_batches);
     } else if (merge_mode == TREE_MERGE) {
-      RAFT_LOG_INFO(
+      RAFT_LOG_DEBUG(
         "SHARDED SEARCH WITH TREE_MERGE MERGE MODE %d*%drows", n_batches, n_rows_per_batch);
       sharded_search_with_tree_merge(clique,
                                      index,
