@@ -53,11 +53,32 @@ struct index_params : cuvs::neighbors::index_params {
    * throughput.
    */
   size_t n_queues = 3;
+  /**
+   * By default (`conservative_dispatch = false`) the first CPU thread to commit a query to a batch
+   * dispatches the upstream search function as soon as possible (before the batch is full). In that
+   * case, it does not know the final batch size at the time of calling the upstream search and thus
+   * runs the upstream search with the maximum batch size every time, even if only one valid query
+   * is present in the batch. This reduces the latency at the cost of wasted GPU resources.
+   *
+   * The alternative behavaior (`conservative_dispatch = true`) is more conservative: the dispatcher
+   * thread starts the kernel that gathers input queries, but waits till the batch is full or the
+   * waiting time is exceeded. Only then it acquires the actual batch size and launches the upstream
+   * search. As a result, no GPU resources are wasted at the cost of exposed upstream search
+   * latency.
+   *
+   * Rule of Thumb:
+   *    for a large `max_batch_size` set `conservative_dispatch = true`, otherwise keep it disabled.
+   */
+  bool conservative_dispatch = false;
 };
 
 struct search_params : cuvs::neighbors::search_params {
-  /** How long a request can stay in the queue (milliseconds). */
-  double soft_deadline_ms = 1.0;
+  /**
+   * How long a request can stay in the queue (milliseconds).
+   * Note, this only affects the dispatch time and does not reflect full request latency;
+   * the latter depends on the upstream search parameters and the batch size.
+   */
+  double dispatch_timeout_ms = 1.0;
 };
 
 /**

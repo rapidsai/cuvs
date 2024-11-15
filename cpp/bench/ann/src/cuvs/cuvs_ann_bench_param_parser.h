@@ -64,8 +64,10 @@ void parse_dynamic_batching_params(const nlohmann::json& conf, ParamT& param)
   if (conf.contains("dynamic_batching_max_batch_size")) {
     param.dynamic_batching_max_batch_size = conf.at("dynamic_batching_max_batch_size");
   }
-  if (conf.contains("dynamic_batching_soft_deadline_ms")) {
-    param.dynamic_batching_soft_deadline_ms = conf.at("dynamic_batching_soft_deadline_ms");
+  param.dynamic_batching_conservative_dispatch =
+    conf.value("dynamic_batching_conservative_dispatch", false);
+  if (conf.contains("dynamic_batching_dispatch_timeout_ms")) {
+    param.dynamic_batching_dispatch_timeout_ms = conf.at("dynamic_batching_dispatch_timeout_ms");
   }
   if (conf.contains("dynamic_batching_n_queues")) {
     param.dynamic_batching_n_queues = conf.at("dynamic_batching_n_queues");

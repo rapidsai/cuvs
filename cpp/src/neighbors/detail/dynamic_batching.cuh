@@ -125,14 +125,17 @@ template <typename MdSpanOrArray>
 using get_accessor_type = typename get_accessor_type_t<MdSpanOrArray>::type;
 
 template <typename Source3DT>
-constexpr inline auto slice_3d(typename Source3DT::index_type i, const Source3DT& source3d)
+constexpr inline auto slice_3d(typename Source3DT::index_type i,
+                               const Source3DT& source3d,
+                               typename Source3DT::index_type n_rows = 0)
 {
   using element_type  = typename Source3DT::element_type;
   using index_type    = typename Source3DT::index_type;
   using layout_type   = typename Source3DT::layout_type;
   using accessor_type = get_accessor_type<Source3DT>;
-  auto extent2d       = raft::make_extents<index_type>(source3d.extent(1), source3d.extent(2));
-  auto stride         = uint64_t(extent2d.extent(0)) * uint64_t(extent2d.extent(1));
+  auto extent2d =
+    raft::make_extents<index_type>(n_rows == 0 ? source3d.extent(1) : n_rows, source3d.extent(2));
+  auto stride = uint64_t(source3d.extent(1)) * uint64_t(source3d.extent(2));
   return raft::mdspan<element_type, decltype(extent2d), layout_type, accessor_type>{
     const_cast<element_type*>(source3d.data_handle()) + stride * i, extent2d};
 }
@@ -251,28 +254,31 @@ struct batch_queue_t {
     uint32_t value;
   };
 
-  explicit batch_queue_t(const raft::resources& res, uint32_t capacity = Size) noexcept
+  explicit batch_queue_t(const raft::resources& res, bool use_batch_sizes) noexcept
     : tokens_{raft::make_pinned_vector<cuda::atomic<batch_token, cuda::thread_scope_system>,
                                        uint32_t>(res, kSize)},
       rem_time_us_{
         raft::make_pinned_vector<cuda::atomic<int32_t, cuda::thread_scope_system>, uint32_t>(
           res, kSize)},
       dispatch_sequence_id_(kSize),
-      capacity_{capacity}
+      batch_sizes_{
+        use_batch_sizes
+          ? std::make_optional(
+              raft::make_pinned_vector<cuda::atomic<uint32_t, cuda::thread_scope_system>, uint32_t>(
+                res, kSize))
+          : std::nullopt}
   {
     tail_.store(0, kMemOrder);
     head_.store(0, kMemOrder);
     for (uint32_t i = 0; i < kSize; i++) {
       rem_time_us_(i).store(std::numeric_limits<int32_t>::max(), kMemOrder);
+      if (batch_sizes_.has_value()) { batch_sizes_.value()(i).store(0, kMemOrder); }
       dispatch_sequence_id_[i].store(uint32_t(-1), kMemOrder);
       tokens_(i).store(
         batch_token{static_cast<uint32_t>(slot_state::kEmpty) * kSize + kCounterLocMask},
         kMemOrder);
     }
   }
-
-  /** Nominal capacity of the queue. */
-  [[nodiscard]] auto capacity() const { return capacity_; }
 
   /**
    * Advance the tail position, ensure the slot is empty, and return the reference to the new slot.
@@ -351,6 +357,17 @@ struct batch_queue_t {
   }
 
   /**
+   * The actual batch size - the final number of committed queries.
+   * This is only used if `conservative_dispatch = true`.
+   */
+  inline auto batch_size(seq_order_id id) noexcept
+    -> cuda::atomic<uint32_t, cuda::thread_scope_system>*
+  {
+    if (batch_sizes_.has_value()) { return &batch_sizes_.value()(cache_friendly_idx(id.value)); }
+    return nullptr;
+  }
+
+  /**
    * This value is updated by the host thread after it submits the job completion event to indicate
    * to other threads can wait on the event to get the results back.
    * Other threads get the value from the batch queue and compare that value against this atomic.
@@ -408,7 +425,8 @@ struct batch_queue_t {
     raft::pinned_vector<cuda::atomic<batch_token, cuda::thread_scope_system>, uint32_t> tokens_;
   raft::pinned_vector<cuda::atomic<int32_t, cuda::thread_scope_system>, uint32_t> rem_time_us_;
   std::vector<cuda::std::atomic<uint32_t>> dispatch_sequence_id_;
-  uint32_t capacity_;
+  std::optional<raft::pinned_vector<cuda::atomic<uint32_t, cuda::thread_scope_system>, uint32_t>>
+    batch_sizes_;
 
   /* [Note: cache-friendly indexing]
      To avoid false sharing, the queue pushes and pops values not sequentially, but with an
@@ -522,6 +540,7 @@ RAFT_KERNEL gather_inputs(
   cuda::atomic<int32_t, cuda::thread_scope_system>* remaining_time_us,
   /* The token contains the current number of queries committed and is cleared in this kernel. */
   cuda::atomic<batch_token, cuda::thread_scope_system>* batch_token_ptr,
+  cuda::atomic<uint32_t, cuda::thread_scope_system>* batch_size_out,
   /**
    * The token value considered empty depends on the round over the ring buffer
    * (which is defined by the seq_order_id)
@@ -595,8 +614,13 @@ RAFT_KERNEL gather_inputs(
                    : "=r"(committed_count)
                    : "l"(bs_committed)
                    : "memory");
+      committed_count &= 0x00ffffff;  // Clear the timeout bit
+      if (batch_size_out != nullptr) {
+        // Inform the dispatcher about the final batch size if `conservative_dispatch` is enabled
+        batch_size_out->store(committed_count, cuda::std::memory_order_relaxed);
+      }
       // store the batch size in the progress counter, so we can read it in the scatter kernel
-      kernel_progress_counter->store(committed_count & 0x00ffffff, cuda::std::memory_order_relaxed);
+      kernel_progress_counter->store(committed_count, cuda::std::memory_order_relaxed);
       // Clear the batch token slot, so it can be re-used by others
       asm volatile("st.volatile.global.u64 [%0], %1;"
                    :
@@ -698,7 +722,7 @@ class batch_runner {
       dim_{uint32_t(params.dim)},
       max_batch_size_{uint32_t(params.max_batch_size)},
       n_queues_{uint32_t(params.n_queues)},
-      batch_queue_{res_, n_queues_},
+      batch_queue_{res_, params.conservative_dispatch},
       completion_events_(n_queues_),
       input_extents_{n_queues_, max_batch_size_, dim_},
       output_extents_{n_queues_, max_batch_size_, k_},
@@ -750,11 +774,11 @@ class batch_runner {
     }
 
     auto deadline = std::chrono::system_clock::now() +
-                    std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1000000.0));
+                    std::chrono::nanoseconds(size_t(params.dispatch_timeout_ms * 1000000.0));
 
     int64_t local_io_offset = 0;
     batch_token batch_token_observed{0};
-    local_waiter to_commit{std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 3e5)),
+    local_waiter to_commit{std::chrono::nanoseconds(size_t(params.dispatch_timeout_ms * 3e5)),
                            local_waiter::kNonSleepIterations};
     while (true) {
       const auto seq_id        = batch_queue_.head();
@@ -772,9 +796,10 @@ class batch_runner {
       auto& batch_token_ref          = batch_queue_.token(seq_id);
       auto& rem_time_us_ref          = batch_queue_.rem_time_us(seq_id);
       auto& dispatch_sequence_id_ref = batch_queue_.dispatch_sequence_id(seq_id);
+      auto* batch_size_ptr           = batch_queue_.batch_size(seq_id);
       // sleep for 1/10 of deadline time or more
       //   (if couldn't get the value in the first few iterations).
-      local_waiter till_full{std::chrono::nanoseconds(size_t(params.soft_deadline_ms * 1e5)),
+      local_waiter till_full{std::chrono::nanoseconds(size_t(params.dispatch_timeout_ms * 1e5)),
                              batch_queue_.niceness(seq_id)};
       while (batch_queue_.batch_status(batch_token_observed, seq_id) != slot_state::kFull) {
         /* Note: waiting for batch IO buffers
@@ -805,7 +830,7 @@ class batch_runner {
         // Conservatively initialize the remaining time
         // TODO (achirkin): this initialization may happen after the other requesters update the
         //                  time and thus erase their deadlines.
-        rem_time_us_ref.store(static_cast<int32_t>(params.soft_deadline_ms * 1000),
+        rem_time_us_ref.store(static_cast<int32_t>(params.dispatch_timeout_ms * 1000),
                               cuda::std::memory_order_relaxed);
         // run the gather kernel before submitting the data to reduce the latency
         gather_inputs<T, IdxT><<<max_batch_size_, 32, 0, stream>>>(
@@ -813,6 +838,7 @@ class batch_runner {
           request_ptrs,
           &rem_time_us_ref,
           &batch_token_ref,
+          batch_size_ptr,
           // This indicates the empty token slot, which can only be used in the following round
           batch_token{batch_queue_.seq_round(seq_id) +
                       (static_cast<uint32_t>(slot_state::kEmptyPast) + 1) * batch_queue_.kSize - 1},
@@ -836,9 +862,22 @@ class batch_runner {
       }
 
       if (is_dispatcher) {
-        auto batch_neighbors = slice_3d(batch_id, neighbors_);
-        auto batch_distances = slice_3d(batch_id, distances_);
-        upstream_search_(res, slice_3d(batch_id, queries_), batch_neighbors, batch_distances);
+        uint32_t batch_size = max_batch_size_;
+        if (batch_size_ptr != nullptr) {
+          // Block until the real batch size is available if conservative dispatch is used.
+          local_waiter for_dispatch{
+            std::chrono::nanoseconds(size_t(params.dispatch_timeout_ms * 1e5))};
+          batch_size = batch_size_ptr->load(cuda::std::memory_order_relaxed);
+          while (batch_size == 0) {
+            for_dispatch.wait();
+            batch_size = batch_size_ptr->load(cuda::std::memory_order_relaxed);
+          }
+          batch_size_ptr->store(0, cuda::std::memory_order_relaxed);
+        }
+        auto batch_neighbors = slice_3d(batch_id, neighbors_, batch_size);
+        auto batch_distances = slice_3d(batch_id, distances_, batch_size);
+        upstream_search_(
+          res, slice_3d(batch_id, queries_, batch_size), batch_neighbors, batch_distances);
         auto next_seq_id     = batch_queue_.push();
         auto& next_token_ref = batch_queue_.token(next_seq_id);
         // next_batch_token);

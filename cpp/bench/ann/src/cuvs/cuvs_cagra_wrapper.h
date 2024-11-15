@@ -67,9 +67,10 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     /* Dynamic batching */
     bool dynamic_batching = false;
     int64_t dynamic_batching_k;
-    int64_t dynamic_batching_max_batch_size  = 16;
-    double dynamic_batching_soft_deadline_ms = 0.05;
-    size_t dynamic_batching_n_queues         = 3;
+    int64_t dynamic_batching_max_batch_size     = 4;
+    double dynamic_batching_dispatch_timeout_ms = 0.01;
+    size_t dynamic_batching_n_queues            = 8;
+    bool dynamic_batching_conservative_dispatch = false;
   };
 
   struct build_param {
@@ -182,6 +183,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   cuvs::neighbors::dynamic_batching::search_params dynamic_batcher_sp_{};
   int64_t dynamic_batching_max_batch_size_;
   size_t dynamic_batching_n_queues_;
+  bool dynamic_batching_conservative_dispatch_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
@@ -229,11 +231,13 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
   auto sp = dynamic_cast<const search_param&>(param);
   bool needs_dynamic_batcher_update =
     (dynamic_batching_max_batch_size_ != sp.dynamic_batching_max_batch_size) ||
-    (dynamic_batching_n_queues_ != sp.dynamic_batching_n_queues);
-  dynamic_batching_max_batch_size_ = sp.dynamic_batching_max_batch_size;
-  dynamic_batching_n_queues_       = sp.dynamic_batching_n_queues;
-  search_params_                   = sp.p;
-  refine_ratio_                    = sp.refine_ratio;
+    (dynamic_batching_n_queues_ != sp.dynamic_batching_n_queues) ||
+    (dynamic_batching_conservative_dispatch_ != sp.dynamic_batching_conservative_dispatch);
+  dynamic_batching_max_batch_size_        = sp.dynamic_batching_max_batch_size;
+  dynamic_batching_n_queues_              = sp.dynamic_batching_n_queues;
+  dynamic_batching_conservative_dispatch_ = sp.dynamic_batching_conservative_dispatch;
+  search_params_                          = sp.p;
+  refine_ratio_                           = sp.refine_ratio;
   if (sp.graph_mem != graph_mem_) {
     // Move graph to correct memory space
     graph_mem_ = sp.graph_mem;
@@ -289,9 +293,10 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
           sp.dynamic_batching_k,
           int64_t(this->dim_),
           sp.dynamic_batching_max_batch_size,
-          sp.dynamic_batching_n_queues});
+          sp.dynamic_batching_n_queues,
+          sp.dynamic_batching_conservative_dispatch});
     }
-    dynamic_batcher_sp_.soft_deadline_ms = sp.dynamic_batching_soft_deadline_ms;
+    dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
   } else {
     if (dynamic_batcher_) { dynamic_batcher_.reset(); }
   }

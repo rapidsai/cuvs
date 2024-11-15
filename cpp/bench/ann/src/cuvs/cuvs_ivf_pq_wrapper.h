@@ -51,9 +51,10 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
     /* Dynamic batching */
     bool dynamic_batching = false;
     int64_t dynamic_batching_k;
-    int64_t dynamic_batching_max_batch_size  = 8;
-    double dynamic_batching_soft_deadline_ms = 0.05;
-    size_t dynamic_batching_n_queues         = 3;
+    int64_t dynamic_batching_max_batch_size     = 128;
+    double dynamic_batching_dispatch_timeout_ms = 0.01;
+    size_t dynamic_batching_n_queues            = 3;
+    bool dynamic_batching_conservative_dispatch = true;
   };
 
   using build_param = cuvs::neighbors::ivf_pq::index_params;
@@ -162,8 +163,9 @@ void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
         sp.dynamic_batching_k,
         int64_t(this->dim_),
         sp.dynamic_batching_max_batch_size,
-        sp.dynamic_batching_n_queues});
-    dynamic_batcher_sp_.soft_deadline_ms = sp.dynamic_batching_soft_deadline_ms;
+        sp.dynamic_batching_n_queues,
+        sp.dynamic_batching_conservative_dispatch});
+    dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
   } else {
     dynamic_batcher_.reset();
   }
