@@ -24,6 +24,8 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/mg.hpp>
 
+#include <fstream>
+
 namespace cuvs::neighbors {
 using namespace raft;
 
