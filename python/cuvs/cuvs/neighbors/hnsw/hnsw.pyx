@@ -39,41 +39,42 @@ from pylibraft.common.interruptible import cuda_interruptible
 from pylibraft.neighbors.common import _check_input_array
 
 
-cdef class SearchParams:
+cdef class IndexParams:
     """
-    HNSW search parameters
+    Parameters to build index for HNSW nearest neighbor search
 
     Parameters
     ----------
-    ef: int, default = 200
-        Maximum number of candidate list size used during search.
-    num_threads: int, default = 0
-        Number of CPU threads used to increase search parallelism.
-        When set to 0, the number of threads is automatically determined
-        using OpenMP's `omp_get_max_threads()`.
+    hierarchy : string, default = "none" (optional)
+        The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
+        - "none": No hierarchy is built.
+        - "cpu": Hierarchy is built using CPU.
     """
 
-    cdef cuvsHnswSearchParams params
+    cdef cuvsHnswIndexParams* params
+
+    def __cinit__(self):
+        check_cuvs(cuvsHnswIndexParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsHnswIndexParamsDestroy(self.params))
 
     def __init__(self, *,
-                 ef=200,
-                 num_threads=0):
-        self.params.ef = ef
-        self.params.numThreads = num_threads
-
-    def __repr__(self):
-        attr_str = [attr + "=" + str(getattr(self, attr))
-                    for attr in [
-                        "ef", "num_threads"]]
-        return "SearchParams(type=HNSW, " + (", ".join(attr_str)) + ")"
+                 hierarchy="none"):
+        if hierarchy == "none":
+            self.params.hierarchy = cuvsHnswHierarchy.NONE
+        elif hierarchy == "cpu":
+            self.params.hierarchy = cuvsHnswHierarchy.CPU
+        else:
+            raise ValueError("Invalid hierarchy type."
+                             " Valid values are 'none' and 'cpu'.")
 
     @property
-    def ef(self):
-        return self.params.ef
-
-    @property
-    def num_threads(self):
-        return self.params.numThreads
+    def hierarchy(self):
+        if self.params.hierarchy == cuvsHnswHierarchy.NONE:
+            return "none"
+        elif self.params.hierarchy == cuvsHnswHierarchy.CPU:
+            return "cpu"
 
 
 cdef class Index:
@@ -143,7 +144,8 @@ def save(filename, cagra.Index index, resources=None):
 
 
 @auto_sync_resources
-def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
+def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
+         resources=None):
     """
     Loads base-layer-only hnswlib index from file, which was originally
     saved as a built CAGRA index. The loaded index is immutable and can only
@@ -214,6 +216,7 @@ def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
 
     check_cuvs(cuvsHnswDeserialize(
         res,
+        index_params.params,
         c_filename.c_str(),
         dim,
         distance_type,
@@ -224,8 +227,8 @@ def load(filename, dim, dtype, metric="sqeuclidean", resources=None):
 
 
 @auto_sync_resources
-def from_cagra(cagra.Index cagra_index, temporary_index_path=None,
-               hierarchy="none", resources=None):
+def from_cagra(IndexParams index_params, cagra.Index cagra_index,
+               temporary_index_path=None, resources=None):
     """
     Returns an hnsw base-layer-only index from a CAGRA index.
 
@@ -249,10 +252,6 @@ def from_cagra(cagra.Index cagra_index, temporary_index_path=None,
     temporary_index_path : string, default = None
         Path to save the temporary index file. If None, the temporary file
         will be saved in `/tmp/<random_number>.bin`.
-    hierarchy : string, default = "none" (optional)
-        The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
-        - "none": No hierarchy is built.
-        - "cpu": Hierarchy is built using CPU.
     {resources_docstring}
 
     Examples
@@ -267,29 +266,57 @@ def from_cagra(cagra.Index cagra_index, temporary_index_path=None,
     >>> # Build index
     >>> index = cagra.build(cagra.IndexParams(), dataset)
     >>> # Serialize the CAGRA index to hnswlib base layer only index format
-    >>> hnsw_index = hnsw.from_cagra(index)
+    >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(), index)
     """
-
-    cdef cuvsHnswHierarchy c_hierarchy
-    if hierarchy == "none":
-        c_hierarchy = NONE
-    elif hierarchy == "cpu":
-        c_hierarchy = CPU
-    else:
-        raise ValueError("Invalid hierarchy type."
-                         " Valid values are 'none' and 'cpu'.")
 
     cdef Index hnsw_index = Index()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
     check_cuvs(cuvsHnswFromCagra(
         res,
+        index_params.params,
         cagra_index.index,
-        c_hierarchy,
         hnsw_index.index
     ))
 
     hnsw_index.trained = True
     return hnsw_index
+
+
+cdef class SearchParams:
+    """
+    HNSW search parameters
+
+    Parameters
+    ----------
+    ef: int, default = 200
+        Maximum number of candidate list size used during search.
+    num_threads: int, default = 0
+        Number of CPU threads used to increase search parallelism.
+        When set to 0, the number of threads is automatically determined
+        using OpenMP's `omp_get_max_threads()`.
+    """
+
+    cdef cuvsHnswSearchParams params
+
+    def __init__(self, *,
+                 ef=200,
+                 num_threads=0):
+        self.params.ef = ef
+        self.params.numThreads = num_threads
+
+    def __repr__(self):
+        attr_str = [attr + "=" + str(getattr(self, attr))
+                    for attr in [
+                        "ef", "num_threads"]]
+        return "SearchParams(type=HNSW, " + (", ".join(attr_str)) + ")"
+
+    @property
+    def ef(self):
+        return self.params.ef
+
+    @property
+    def num_threads(self):
+        return self.params.numThreads
 
 
 @auto_sync_resources

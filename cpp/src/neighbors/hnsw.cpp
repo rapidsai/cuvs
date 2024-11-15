@@ -24,10 +24,10 @@ namespace cuvs::neighbors::hnsw {
 #define CUVS_INST_HNSW_FROM_CAGRA(T)                               \
   std::unique_ptr<index<T>> from_cagra(                            \
     raft::resources const& res,                                    \
-    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index, \
-    HnswHiearchy hierarchy)                                        \
+    const index_params& params,                                    \
+    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index) \
   {                                                                \
-    return detail::from_cagra<T>(res, cagra_index, hierarchy);     \
+    return detail::from_cagra<T>(res, params, cagra_index);        \
   }
 
 CUVS_INST_HNSW_FROM_CAGRA(float);
@@ -53,14 +53,15 @@ CUVS_INST_HNSW_SEARCH(int8_t);
 
 #undef CUVS_INST_HNSW_SEARCH
 
-#define CUVS_INST_HNSW_DESERIALIZE(T)                        \
-  void deserialize(raft::resources const& res,               \
-                   const std::string& filename,              \
-                   int dim,                                  \
-                   cuvs::distance::DistanceType metric,      \
-                   index<T>** idx)                           \
-  {                                                          \
-    detail::deserialize<T>(res, filename, dim, metric, idx); \
+#define CUVS_INST_HNSW_DESERIALIZE(T)                                \
+  void deserialize(raft::resources const& res,                       \
+                   const index_params& params,                       \
+                   const std::string& filename,                      \
+                   int dim,                                          \
+                   cuvs::distance::DistanceType metric,              \
+                   index<T>** idx)                                   \
+  {                                                                  \
+    detail::deserialize<T>(res, params, filename, dim, metric, idx); \
   }
 
 CUVS_INST_HNSW_DESERIALIZE(float);

@@ -24,11 +24,19 @@ from cuvs.neighbors.cagra.cagra cimport cuvsCagraIndex_t
 
 
 cdef extern from "cuvs/neighbors/hnsw.h" nogil:
-    ctypedef struct cuvsHnswSearchParams:
-        int32_t ef
-        int32_t numThreads
 
-    ctypedef cuvsHnswSearchParams* cuvsHnswSearchParams_t
+    ctypedef enum cuvsHnswHierarchy:
+        NONE
+        CPU
+
+    ctypedef struct cuvsHnswIndexParams:
+        cuvsHnswHierarchy hierarchy
+
+    ctypedef cuvsHnswIndexParams* cuvsHnswIndexParams_t
+
+    cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
+
+    cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params)
 
     ctypedef struct cuvsHnswIndex:
         uintptr_t addr
@@ -40,14 +48,16 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
 
     cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
 
-    ctypedef enum cuvsHnswHierarchy:
-        NONE
-        CPU
-
     cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+                                  cuvsHnswIndexParams_t params,
                                   cuvsCagraIndex_t cagra_index,
-                                  cuvsHnswHierarchy hierarchy,
                                   cuvsHnswIndex_t hnsw_index)
+
+    ctypedef struct cuvsHnswSearchParams:
+        int32_t ef
+        int32_t numThreads
+
+    ctypedef cuvsHnswSearchParams* cuvsHnswSearchParams_t
 
     cuvsError_t cuvsHnswSearch(cuvsResources_t res,
                                cuvsHnswSearchParams* params,
@@ -57,6 +67,7 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
                                DLManagedTensor* distances) except +
 
     cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
+                                    cuvsHnswIndexParams_t params,
                                     const char * filename,
                                     int32_t dim,
                                     cuvsDistanceType metric,

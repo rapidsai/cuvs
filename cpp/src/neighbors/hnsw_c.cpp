@@ -34,17 +34,18 @@ namespace {
 
 template <typename T>
 void _from_cagra(cuvsResources_t res,
+                 cuvsHnswIndexParams_t params,
                  cuvsCagraIndex_t cagra_index,
-                 cuvsHnswHierarchy hierarchy,
                  cuvsHnswIndex_t hnsw_index)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(cagra_index->addr);
+  auto cpp_params      = cuvs::neighbors::hnsw::index_params();
+  cpp_params.hierarchy = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
 
-  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::from_cagra(
-    *res_ptr, *index, static_cast<cuvs::neighbors::hnsw::HnswHiearchy>(hierarchy));
-  auto hnsw_index_ptr = hnsw_index_unique_ptr.release();
-  hnsw_index->addr    = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
+  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::from_cagra(*res_ptr, cpp_params, *index);
+  auto hnsw_index_ptr        = hnsw_index_unique_ptr.release();
+  hnsw_index->addr           = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
 }
 
 template <typename T>
@@ -73,26 +74,32 @@ void _search(cuvsResources_t res,
 }
 
 template <typename T>
-void* _deserialize(cuvsResources_t res, const char* filename, int dim, cuvsDistanceType metric)
+void* _deserialize(cuvsResources_t res,
+                   cuvsHnswIndexParams_t params,
+                   const char* filename,
+                   int dim,
+                   cuvsDistanceType metric)
 {
   auto res_ptr                           = reinterpret_cast<raft::resources*>(res);
   cuvs::neighbors::hnsw::index<T>* index = nullptr;
-  cuvs::neighbors::hnsw::deserialize(*res_ptr, std::string(filename), dim, metric, &index);
+  auto cpp_params                        = cuvs::neighbors::hnsw::index_params();
+  cpp_params.hierarchy = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  cuvs::neighbors::hnsw::deserialize(
+    *res_ptr, cpp_params, std::string(filename), dim, metric, &index);
   return index;
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params)
+extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions(
-    [=] { *params = new cuvsHnswSearchParams{.ef = 200, .numThreads = 0}; });
+    [=] { *params = new cuvsHnswIndexParams{.hierarchy = cuvsHnswHierarchy::NONE}; });
 }
 
-extern "C" cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
+extern "C" cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
-
 extern "C" cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index)
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsHnswIndex{}; });
@@ -118,23 +125,34 @@ extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
 }
 
 extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+                                         cuvsHnswIndexParams_t params,
                                          cuvsCagraIndex_t cagra_index,
-                                         cuvsHnswHierarchy hierarchy,
                                          cuvsHnswIndex_t hnsw_index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index        = *cagra_index;
     hnsw_index->dtype = index.dtype;
     if (index.dtype.code == kDLFloat) {
-      _from_cagra<float>(res, cagra_index, hierarchy, hnsw_index);
+      _from_cagra<float>(res, params, cagra_index, hnsw_index);
     } else if (index.dtype.code == kDLUInt) {
-      _from_cagra<uint8_t>(res, cagra_index, hierarchy, hnsw_index);
+      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index);
     } else if (index.dtype.code == kDLInt) {
-      _from_cagra<int8_t>(res, cagra_index, hierarchy, hnsw_index);
+      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index);
     } else {
       RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
     }
   });
+}
+
+extern "C" cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { *params = new cuvsHnswSearchParams{.ef = 200, .numThreads = 0}; });
+}
+
+extern "C" cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
 extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
@@ -177,6 +195,7 @@ extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 }
 
 extern "C" cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
+                                           cuvsHnswIndexParams_t params,
                                            const char* filename,
                                            int dim,
                                            cuvsDistanceType metric,
@@ -184,11 +203,14 @@ extern "C" cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-      index->addr = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename, dim, metric));
+      index->addr =
+        reinterpret_cast<uintptr_t>(_deserialize<float>(res, params, filename, dim, metric));
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_deserialize<uint8_t>(res, filename, dim, metric));
+      index->addr =
+        reinterpret_cast<uintptr_t>(_deserialize<uint8_t>(res, params, filename, dim, metric));
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename, dim, metric));
+      index->addr =
+        reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, params, filename, dim, metric));
     } else {
       RAFT_FAIL("Unsupported dtype in file %s", filename);
     }

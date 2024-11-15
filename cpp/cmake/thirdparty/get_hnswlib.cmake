@@ -15,6 +15,7 @@
 #=============================================================================
 
 function(find_and_configure_hnswlib)
+  message(STATUS "Finding or building hnswlib")
   set(oneValueArgs)
 
   include(${rapids-cmake-dir}/cpm/package_override.cmake)
@@ -48,6 +49,10 @@ function(find_and_configure_hnswlib)
      "$<BUILD_INTERFACE:${hnswlib_SOURCE_DIR}>"
      "$<INSTALL_INTERFACE:include>")
   endif()
+
+  message(STATUS "hnswlib found at ${hnswlib_SOURCE_DIR}")
+  message(STATUS "hnswlib version: ${version}")
+  message(STATUS "hnswlib added: ${hnswlib_ADDED}")
 
   if(hnswlib_ADDED)
     # write build export rules

@@ -34,14 +34,22 @@
 namespace cuvs::neighbors::hnsw {
 
 /**
- * @defgroup hnsw_cpp_search_params Build CAGRA index and search with hnswlib
+ * @defgroup hnsw_cpp_index_params hnswlib index wrapper params
  * @{
  */
 
-struct search_params : cuvs::neighbors::search_params {
-  int ef;               // size of the candidate list
-  int num_threads = 0;  // number of host threads to use for concurrent searches. Value of 0
-                        // automatically maximizes parallelism
+/**
+ * @brief Hierarchy for HNSW index when converting from CAGRA index
+ *
+ * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
+ */
+enum class HnswHierarchy {
+  NONE,  // base-layer-only index
+  CPU    // full index with CPU-built hierarchy
+};
+
+struct index_params : cuvs::neighbors::index_params {
+  HnswHierarchy hierarchy = HnswHierarchy::NONE;
 };
 
 /**@}*/
@@ -62,8 +70,12 @@ struct index : cuvs::neighbors::index {
    *
    * @param[in] dim dimensions of the training dataset
    * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
+   * @param[in] hierarchy hierarchy used for upper HNSW layers
    */
-  index(int dim, cuvs::distance::DistanceType metric) : dim_{dim}, metric_{metric} {}
+  index(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy = HnswHierarchy::NONE)
+    : dim_{dim}, metric_{metric}, hierarchy_{hierarchy}
+  {
+  }
 
   virtual ~index() {}
 
@@ -76,6 +88,8 @@ struct index : cuvs::neighbors::index {
 
   auto metric() const -> cuvs::distance::DistanceType { return metric_; }
 
+  auto hierarchy() const -> HnswHierarchy { return hierarchy_; }
+
   /**
   @brief Set ef for search
   */
@@ -84,6 +98,7 @@ struct index : cuvs::neighbors::index {
  private:
   int dim_;
   cuvs::distance::DistanceType metric_;
+  HnswHierarchy hierarchy_;
 };
 
 /**@}*/
@@ -92,16 +107,6 @@ struct index : cuvs::neighbors::index {
  * @defgroup hnsw_cpp_index_load Load CAGRA index as hnswlib index
  * @{
  */
-
-/**
- * @brief Hierarchy for HNSW index when converting from CAGRA index
- *
- * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
- */
-enum class HnswHiearchy {
-  NONE,  // base-layer-only index
-  CPU    // full index with CPU-built hierarchy
-};
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -128,8 +133,8 @@ enum class HnswHiearchy {
  */
 std::unique_ptr<index<float>> from_cagra(
   raft::resources const& res,
-  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
-  HnswHiearchy hierarchy = HnswHiearchy::NONE);
+  const index_params& params,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index);
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -156,8 +161,8 @@ std::unique_ptr<index<float>> from_cagra(
  */
 std::unique_ptr<index<uint8_t>> from_cagra(
   raft::resources const& res,
-  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
-  HnswHiearchy hierarchy = HnswHiearchy::NONE);
+  const index_params& params,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index);
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -184,8 +189,21 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  */
 std::unique_ptr<index<int8_t>> from_cagra(
   raft::resources const& res,
-  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
-  HnswHiearchy hierarchy = HnswHiearchy::NONE);
+  const index_params& params,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index);
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_search_params Build CAGRA index and search with hnswlib
+ * @{
+ */
+
+struct search_params : cuvs::neighbors::search_params {
+  int ef;               // size of the candidate list
+  int num_threads = 0;  // number of host threads to use for concurrent searches. Value of 0
+                        // automatically maximizes parallelism
+};
 
 /**@}*/
 
@@ -363,6 +381,7 @@ void search(raft::resources const& res,
  * @endcode
  */
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
@@ -399,6 +418,7 @@ void deserialize(raft::resources const& res,
  * @endcode
  */
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
@@ -435,6 +455,7 @@ void deserialize(raft::resources const& res,
  * @endcode
  */
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,

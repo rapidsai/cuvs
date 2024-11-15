@@ -170,6 +170,10 @@ include(cmake/modules/ConfigureCUDA.cmake)
 # add third party dependencies using CPM
 rapids_cpm_init()
 
+if(BUILD_CAGRA_HNSWLIB)
+  include(cmake/thirdparty/get_hnswlib.cmake)
+endif()
+
 if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
@@ -187,10 +191,6 @@ endif()
 if(BUILD_CUVS_BENCH)
   include(${rapids-cmake-dir}/cpm/gbench.cmake)
   rapids_cpm_gbench(BUILD_STATIC)
-endif()
-
-if(BUILD_CAGRA_HNSWLIB)
-  include(cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
 # ##################################################################################################

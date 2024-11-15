@@ -55,7 +55,8 @@ def run_hnsw_build_search_test(
 
     assert index.trained
 
-    hnsw_index = hnsw.from_cagra(index)
+    hnsw_params = hnsw.IndexParams()
+    hnsw_index = hnsw.from_cagra(hnsw_params, index)
 
     queries = generate_data((n_queries, n_cols), dtype)
 

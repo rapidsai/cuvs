@@ -29,32 +29,44 @@ extern "C" {
 #endif
 
 /**
- * @defgroup hnsw_c_search_params C API for hnswlib wrapper search params
+ * @defgroup cagra_c_index_params C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
 
-struct cuvsHnswSearchParams {
-  int32_t ef;
-  int32_t numThreads;
+/**
+ * @brief Hierarchy for HNSW index when converting from CAGRA index
+ *
+ * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
+ */
+enum cuvsHnswHierarchy {
+  /* Flat hierarchy, search is base-layer only */
+  NONE,
+  /* Full hierarchy is built using the CPU */
+  CPU
 };
 
-typedef struct cuvsHnswSearchParams* cuvsHnswSearchParams_t;
+struct cuvsHnswIndexParams {
+  /* hierarchy of the hnsw index */
+  cuvsHnswHierarchy hierarchy;
+};
+
+typedef struct cuvsHnswIndexParams* cuvsHnswIndexParams_t;
 
 /**
- * @brief Allocate HNSW search params, and populate with default values
+ * @brief Allocate HNSW Index params, and populate with default values
  *
- * @param[in] params cuvsHnswSearchParams_t to allocate
+ * @param[in] params cuvsHnswIndexParams_t to allocate
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
+cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params);
 
 /**
- * @brief De-allocate HNSW search params
+ * @brief De-allocate HNSW Index params
  *
- * @param[in] params cuvsHnswSearchParams_t to de-allocate
+ * @param[in] params
  * @return cuvsError_t
  */
-cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
+cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params);
 
 /**
  * @}
@@ -97,17 +109,42 @@ cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
  * @{
  */
 
-/**
- * @brief Hierarchy for HNSW index when converting from CAGRA index
- *
- * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
- */
-enum cuvsHnswHierarchy { NONE, CPU };
-
 cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
+                              cuvsHnswIndexParams_t params,
                               cuvsCagraIndex_t cagra_index,
-                              cuvsHnswHierarchy hierarchy,
                               cuvsHnswIndex_t hnsw_index);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup hnsw_c_search_params C API for hnswlib wrapper search params
+ * @{
+ */
+
+struct cuvsHnswSearchParams {
+  int32_t ef;
+  int32_t numThreads;
+};
+
+typedef struct cuvsHnswSearchParams* cuvsHnswSearchParams_t;
+
+/**
+ * @brief Allocate HNSW search params, and populate with default values
+ *
+ * @param[in] params cuvsHnswSearchParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params);
+
+/**
+ * @brief De-allocate HNSW search params
+ *
+ * @param[in] params cuvsHnswSearchParams_t to de-allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
 
 /**
  * @}
@@ -215,6 +252,7 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  * @param[out] index HNSW index loaded disk
  */
 cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
+                                cuvsHnswIndexParams_t params,
                                 const char* filename,
                                 int dim,
                                 cuvsDistanceType metric,

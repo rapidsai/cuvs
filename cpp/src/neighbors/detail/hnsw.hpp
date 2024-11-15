@@ -54,9 +54,10 @@ struct index_impl : index<T> {
    * @param[in] filepath path to the index
    * @param[in] dim dimensions of the training dataset
    * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
+   * @param[in] hierarchy hierarchy used for upper HNSW layers
    */
-  index_impl(const std::string& filepath, int dim, cuvs::distance::DistanceType metric)
-    : index<T>{dim, metric}
+  index_impl(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy)
+    : index<T>{dim, metric, hierarchy}
   {
     if constexpr (std::is_same_v<T, float>) {
       if (metric == cuvs::distance::DistanceType::L2Expanded) {
@@ -72,10 +73,8 @@ struct index_impl : index<T> {
 
     RAFT_EXPECTS(space_ != nullptr, "Unsupported metric type was used");
 
-    appr_alg_ = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-      space_.get(), filepath);
-
-    appr_alg_->base_layer_only = true;
+    // appr_alg_ = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+    //   space_.get(), filepath);
   }
 
   /**
@@ -88,13 +87,29 @@ struct index_impl : index<T> {
   */
   void set_ef(int ef) const override { appr_alg_->ef_ = ef; }
 
+  /**
+  @brief Set index
+   */
+  void set_index(std::unique_ptr<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>&& index)
+  {
+    appr_alg_ = std::move(index);
+  }
+
+  /**
+  @brief Get space
+   */
+  auto get_space() const -> hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>*
+  {
+    return space_.get();
+  }
+
  private:
   std::unique_ptr<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>> appr_alg_;
   std::unique_ptr<hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>> space_;
 };
 
-template <typename T, HnswHiearchy hierarchy>
-std::enable_if_t<hierarchy == HnswHiearchy::NONE, std::unique_ptr<index<T>>> from_cagra(
+template <typename T, HnswHierarchy hierarchy>
+std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res, const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
 {
   std::random_device dev;
@@ -103,21 +118,34 @@ std::enable_if_t<hierarchy == HnswHiearchy::NONE, std::unique_ptr<index<T>>> fro
   auto uuid            = std::to_string(dist(rng));
   std::string filepath = "/tmp/" + uuid + ".bin";
   cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index);
+
   index<T>* hnsw_index = nullptr;
+  index_params params;
+  params.hierarchy = hierarchy;
   cuvs::neighbors::hnsw::deserialize(
-    res, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
+    res, params, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
   std::filesystem::remove(filepath);
   return std::unique_ptr<index<T>>(hnsw_index);
 }
 
+template <typename T, HnswHierarchy hierarchy>
+std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> from_cagra(
+  raft::resources const& res, const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
+{
+  return std::unique_ptr<index<T>>(nullptr);
+}
+
 template <typename T>
 std::unique_ptr<index<T>> from_cagra(raft::resources const& res,
-                                     const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
-                                     HnswHiearchy hierarchy)
+                                     const index_params& params,
+                                     const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
 {
-  if (hierarchy == HnswHiearchy::NONE) {
-    return from_cagra<T, HnswHiearchy::NONE>(res, cagra_index);
-  } else {
+  if (params.hierarchy == HnswHierarchy::NONE) {
+    return from_cagra<T, HnswHierarchy::NONE>(res, cagra_index);
+  } else if (params.hierarchy == HnswHierarchy::CPU) {
+    return from_cagra<T, HnswHierarchy::CPU>(res, cagra_index);
+  }
+  {
     RAFT_FAIL("Unsupported hierarchy type");
   }
 }
@@ -185,12 +213,18 @@ void search(raft::resources const& res,
 
 template <typename T>
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
                  index<T>** idx)
 {
-  *idx = new detail::index_impl<T>(filename, dim, metric);
+  auto hnsw_index = std::make_unique<index_impl<T>>(dim, metric, params.hierarchy);
+  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+    hnsw_index->get_space(), filename);
+  if (params.hierarchy == HnswHierarchy::NONE) { appr_algo->base_layer_only = true; }
+  hnsw_index->set_index(std::move(appr_algo));
+  *idx = hnsw_index.release();
 }
 
 }  // namespace cuvs::neighbors::hnsw::detail
