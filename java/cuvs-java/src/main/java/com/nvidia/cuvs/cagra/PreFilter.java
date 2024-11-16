@@ -17,8 +17,16 @@
 package com.nvidia.cuvs.cagra;
 
 /**
- * TODO: Pending implementation
+ * Pending Implementation
+ * 
+ * @since 24.12
  */
 public class PreFilter {
+
+  /**
+   * Default constructor
+   */
+  public PreFilter() {
+  }
 
 }

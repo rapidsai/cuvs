@@ -42,7 +42,7 @@ DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code,
   return tensor;
 }
 
-cuvsCagraIndex_t build_index(float *dataset, long rows, long dimensions, cuvsResources_t cuvsResources, int *returnValue,
+cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, cuvsResources_t cuvsResources, int *returnValue,
     cuvsCagraIndexParams_t index_params) {
 
   int64_t dataset_shape[2] = {rows, dimensions};
@@ -55,15 +55,15 @@ cuvsCagraIndex_t build_index(float *dataset, long rows, long dimensions, cuvsRes
   return index;
 }
 
-void serialize_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *returnValue, char* filename) {
+void serialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *returnValue, char* filename) {
   *returnValue = cuvsCagraSerialize(cuvsResources, filename, index, true);
 }
 
-void deserialize_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *rv, char* filename) {
+void deserialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *rv, char* filename) {
   *rv = cuvsCagraDeserialize(cuvsResources, filename, index);
 }
 
-void search_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, long dimensions, 
+void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, long dimensions, 
     cuvsResources_t cuvsResources, int *neighbors_h, float *distances_h, int *returnValue, cuvsCagraSearchParams_t search_params) {
 
   uint32_t *neighbors;
