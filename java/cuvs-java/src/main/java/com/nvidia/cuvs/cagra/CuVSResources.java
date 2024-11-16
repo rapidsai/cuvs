@@ -26,14 +26,26 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 
+/**
+ * CuVSResources has the logic to initialize and hold the reference to CuVS
+ * Resources instance.
+ * 
+ * @since 24.12
+ */
 public class CuVSResources {
 
   private Arena arena;
   private Linker linker;
-  private MethodHandle createResourcesMemoryHandler;
-  private MemorySegment cuvsResourcesMemorySegment;
   private SymbolLookup symbolLookup;
+  private MethodHandle createResourcesMethodHandle;
+  private MemorySegment cuvsResourcesMemorySegment;
 
+  /**
+   * Constructor for CuVSResources that initializes MethodHandle and invokes the
+   * native create_resource function via Panama API.
+   * 
+   * @throws Throwable exception thrown when native function is invoked
+   */
   public CuVSResources() throws Throwable {
     linker = Linker.nativeLinker();
     arena = Arena.ofConfined();
@@ -41,15 +53,20 @@ public class CuVSResources {
     File workingDirectory = new File(System.getProperty("user.dir"));
     symbolLookup = SymbolLookup.libraryLookup(workingDirectory.getParent() + "/internal/libcuvs_java.so", arena);
 
-    createResourcesMemoryHandler = linker.downcallHandle(symbolLookup.find("create_resource").get(),
+    createResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("create_resource").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
 
-    cuvsResourcesMemorySegment = (MemorySegment) createResourcesMemoryHandler.invokeExact(returnValueMemorySegment);
+    cuvsResourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValueMemorySegment);
   }
 
+  /**
+   * Gets the reference to the cuvsResources MemorySegment.
+   * 
+   * @return cuvsResources MemorySegment
+   */
   public MemorySegment getCuvsResourcesMemorySegment() {
     return cuvsResourcesMemorySegment;
   }

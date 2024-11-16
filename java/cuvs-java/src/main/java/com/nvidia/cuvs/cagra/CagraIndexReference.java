@@ -21,19 +21,39 @@ import java.lang.foreign.MemorySegment;
 
 import com.nvidia.cuvs.panama.cuvsCagraIndex;
 
+/**
+ * Holds the reference to the index using MemorySegment.
+ * 
+ * @since 24.12
+ */
 public class CagraIndexReference {
 
   private MemorySegment indexMemorySegment;
 
+  /**
+   * Constructs CagraIndexReference and allocate the MemorySegment.
+   */
   public CagraIndexReference() {
     Arena arena = Arena.ofConfined();
     indexMemorySegment = cuvsCagraIndex.allocate(arena);
   }
 
+  /**
+   * Constructs CagraIndexReference with an instance of MemorySegment passed as a
+   * parameter.
+   * 
+   * @param indexMemorySegment the MemorySegment instance to use for containing
+   *                           index reference
+   */
   public CagraIndexReference(MemorySegment indexMemorySegment) {
     this.indexMemorySegment = indexMemorySegment;
   }
 
+  /**
+   * Gets the instance of index MemorySegment.
+   * 
+   * @return index MemorySegment
+   */
   public MemorySegment getIndexMemorySegment() {
     return indexMemorySegment;
   }

@@ -25,6 +25,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * SearchResult encapsulates the logic for reading and holding search results.
+ * 
+ * @since 24.12
+ */
 public class SearchResult {
 
   private List<Map<Integer, Float>> results;
@@ -36,6 +41,22 @@ public class SearchResult {
   private int topK;
   private int numberOfQueries;
 
+  /**
+   * Constructor that initializes SearchResult with neighboursSequenceLayout,
+   * distancesSequenceLayout, neighboursMemorySegment, distancesMemorySegment,
+   * topK, mapping, and numberOfQueries.
+   * 
+   * @param neighboursSequenceLayout neighbor SequenceLayout instance
+   * @param distancesSequenceLayout  distance SequenceLayout instance
+   * @param neighboursMemorySegment  neighbor MemorySegment instance
+   * @param distancesMemorySegment   distance MemorySegment instance
+   * @param topK                     an integer denoting the topK value
+   * @param mapping                  id mapping
+   * @param numberOfQueries          number of queries that were initially
+   *                                 submitted
+   * @see SequenceLayout
+   * @see MemorySegment
+   */
   public SearchResult(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
       MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK,
       Map<Integer, Integer> mapping, int numberOfQueries) {
@@ -48,18 +69,25 @@ public class SearchResult {
     this.distancesMemorySegment = distancesMemorySegment;
     this.mapping = mapping;
     results = new LinkedList<Map<Integer, Float>>();
-    this.load();
+    this.readResultMemorySegments();
   }
 
-  private void load() {
-    VarHandle neighboursVH = neighboursSequenceLayout.varHandle(PathElement.sequenceElement());
-    VarHandle distancesVH = distancesSequenceLayout.varHandle(PathElement.sequenceElement());
+  /**
+   * Reads neighbors and distances MemorySegments and load values in a List of
+   * Maps.
+   * 
+   * @see MemorySegment
+   * @see VarHandle
+   */
+  private void readResultMemorySegments() {
+    VarHandle neighboursVarHandle = neighboursSequenceLayout.varHandle(PathElement.sequenceElement());
+    VarHandle distancesVarHandle = distancesSequenceLayout.varHandle(PathElement.sequenceElement());
 
     Map<Integer, Float> intermediateResultMap = new LinkedHashMap<Integer, Float>();
     int count = 0;
     for (long i = 0; i < topK * numberOfQueries; i++) {
-      int id = (int) neighboursVH.get(neighboursMemorySegment, 0L, i);
-      float dst = (float) distancesVH.get(distancesMemorySegment, 0L, i);
+      int id = (int) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
+      float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
       intermediateResultMap.put(mapping != null ? mapping.get(id) : id, dst);
       count += 1;
       if (count == topK) {
@@ -70,6 +98,11 @@ public class SearchResult {
     }
   }
 
+  /**
+   * Gets a list of maps containing topK ID and distances.
+   * 
+   * @return a list of maps
+   */
   public List<Map<Integer, Float>> getResults() {
     return results;
   }
