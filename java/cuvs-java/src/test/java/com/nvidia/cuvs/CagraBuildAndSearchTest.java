@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -33,14 +34,14 @@ import org.slf4j.LoggerFactory;
 
 import com.nvidia.cuvs.cagra.CagraIndex;
 import com.nvidia.cuvs.cagra.CagraIndexParams;
+import com.nvidia.cuvs.cagra.CagraQuery;
 import com.nvidia.cuvs.cagra.CagraSearchParams;
-import com.nvidia.cuvs.cagra.CuVSQuery;
-import com.nvidia.cuvs.cagra.CuVSResources;
-import com.nvidia.cuvs.cagra.SearchResult;
+import com.nvidia.cuvs.common.CuVSResources;
+import com.nvidia.cuvs.common.SearchResults;
 
 public class CagraBuildAndSearchTest {
   
-  private static Logger logger = LoggerFactory.getLogger(CagraBuildAndSearchTest.class);
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * A basic test that checks the whole flow - from indexing to search.
@@ -63,30 +64,27 @@ public class CagraBuildAndSearchTest {
         Map.of(1, 0.15224178f, 0, 0.59063464f, 3, 0.5986642f));
 
     // Create resource
-    CuVSResources cuvsResources = new CuVSResources();
+    CuVSResources resources = new CuVSResources();
 
     // Configure index parameters
-    CagraIndexParams cagraIndexParameters = new CagraIndexParams
-        .Builder()
-        .withCuvsCagraGraphBuildAlgo(CagraIndexParams.CuvsCagraGraphBuildAlgo.NN_DESCENT)
+    CagraIndexParams indexParams = new CagraIndexParams.Builder()
+        .withCagraGraphBuildAlgo(CagraIndexParams.CagraGraphBuildAlgo.NN_DESCENT)
         .build();
 
     // Create the index with the dataset
-    CagraIndex cagraIndex = new CagraIndex
-        .Builder(cuvsResources)
+    CagraIndex index = new CagraIndex.Builder(resources)
         .withDataset(dataset)
-        .withIndexParams(cagraIndexParameters)
+        .withIndexParams(indexParams)
         .build();
 
     // Saving the index on to the disk.
     String indexFileName = UUID.randomUUID().toString() + ".cag";
-    cagraIndex.serialize(new FileOutputStream(indexFileName));
+    index.serialize(new FileOutputStream(indexFileName));
 
     // Loading a CAGRA index from disk.
     File testSerializedIndexFile = new File(indexFileName);
     InputStream inputStream = new FileInputStream(testSerializedIndexFile);
-    CagraIndex deserializedCagraIndex = new CagraIndex
-        .Builder(cuvsResources)
+    CagraIndex loadedIndex = new CagraIndex.Builder(resources)
         .from(inputStream)
         .build();
     
@@ -96,7 +94,7 @@ public class CagraBuildAndSearchTest {
         .build();
 
     // Create a query object with the query vectors
-    CuVSQuery cuvsQuery = new CuVSQuery
+    CagraQuery cuvsQuery = new CagraQuery
         .Builder()
         .withTopK(3)
         .withSearchParams(cagraSearchParameters)
@@ -105,18 +103,18 @@ public class CagraBuildAndSearchTest {
         .build();
 
     // Perform the search
-    SearchResult searchResults = cagraIndex.search(cuvsQuery);
+    SearchResults results = index.search(cuvsQuery);
     
     // Check results
-    logger.info(searchResults.getResults().toString());
-    assertEquals(expectedQueryResults, searchResults.getResults(), "Results different than expected");
+    log.info(results.getResults().toString());
+    assertEquals(expectedQueryResults, results.getResults(), "Results different than expected");
 
     // Search from deserialized index
-    SearchResult searchResultsFromDeserializedCagraIndex = deserializedCagraIndex.search(cuvsQuery);
+    results = loadedIndex.search(cuvsQuery);
     
     // Check results
-    logger.info(searchResults.getResults().toString());
-    assertEquals(expectedQueryResults, searchResultsFromDeserializedCagraIndex.getResults(), "Results different than expected");
+    log.info(results.getResults().toString());
+    assertEquals(expectedQueryResults, results.getResults(), "Results different than expected");
 
     // Cleanup
     if (testSerializedIndexFile.exists()) {

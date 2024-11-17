@@ -30,7 +30,7 @@ import com.nvidia.cuvs.panama.cuvsCagraSearchParams;
 public class CagraSearchParams {
 
   private int maxQueries;
-  private int itopkSize;
+  private int iTopKSize;
   private int maxIterations;
   private int teamSize;
   private int searchWidth;
@@ -38,17 +38,17 @@ public class CagraSearchParams {
   private int threadBlockSize;
   private int hashmapMinBitlen;
   private int numRandomSamplings;
-  private float hashmapMaxFillRate;
-  private long randXorMask;
+  private float hashMapMaxFillRate;
+  private long randXORMask;
   private Arena arena;
-  private MemorySegment cagraSearchParamsMemorySegment;
-  private CuvsCagraSearchAlgo cuvsCagraSearchAlgo;
-  private CuvsCagraHashMapMode cuvsCagraHashMapMode;
+  private MemorySegment memorySegment;
+  private SearchAlgo searchAlgo;
+  private HashMapMode hashMapMode;
 
   /**
    * Enum to denote algorithm used to search CAGRA Index.
    */
-  public enum CuvsCagraSearchAlgo {
+  public enum SearchAlgo {
     /**
      * for large batch sizes
      */
@@ -71,7 +71,7 @@ public class CagraSearchParams {
      */
     public final int value;
 
-    private CuvsCagraSearchAlgo(int value) {
+    private SearchAlgo(int value) {
       this.value = value;
     }
   }
@@ -79,7 +79,7 @@ public class CagraSearchParams {
   /**
    * Enum to denote Hash Mode used while searching CAGRA index.
    */
-  public enum CuvsCagraHashMapMode {
+  public enum HashMapMode {
     /**
      * HASH
      */
@@ -98,7 +98,7 @@ public class CagraSearchParams {
      */
     public final int value;
 
-    private CuvsCagraHashMapMode(int value) {
+    private HashMapMode(int value) {
       this.value = value;
     }
   }
@@ -109,64 +109,65 @@ public class CagraSearchParams {
    * @param arena               the Arena instance to use
    * @param maxQueries          the maximum number of queries to search at the
    *                            same time (batch size)
-   * @param itopkSize           the number of intermediate search results retained
+   * @param iTopKSize           the number of intermediate search results retained
    *                            during the search
    * @param maxIterations       the upper limit of search iterations
-   * @param cuvsCagraSearchAlgo the search implementation is configured
+   * @param searchAlgo the search implementation is configured
    * @param teamSize            the number of threads used to calculate a single
    *                            distance
    * @param searchWidth         the number of graph nodes to select as the
    *                            starting point for the search in each iteration
    * @param minIterations       the lower limit of search iterations
    * @param threadBlockSize     the thread block size
-   * @param hashmapMode         the hashmap type configured
-   * @param hashmapMinBitlen    the lower limit of hashmap bit length
-   * @param hashmapMaxFillRate  the upper limit of hashmap fill rate
+   * @param hashmapMode         the hash map type configured
+   * @param hashmapMinBitlen    the lower limit of hash map bit length
+   * @param hashmapMaxFillRate  the upper limit of hash map fill rate
    * @param numRandomSamplings  the number of iterations of initial random seed
    *                            node selection
-   * @param randXorMask         the bit mask used for initial random seed node
+   * @param randXORMask         the bit mask used for initial random seed node
    *                            selection
    */
-  public CagraSearchParams(Arena arena, int maxQueries, int itopkSize, int maxIterations,
-      CuvsCagraSearchAlgo cuvsCagraSearchAlgo, int teamSize, int searchWidth, int minIterations, int threadBlockSize,
-      CuvsCagraHashMapMode hashmapMode, int hashmapMinBitlen, float hashmapMaxFillRate, int numRandomSamplings,
-      long randXorMask) {
-    super();
+  private CagraSearchParams(Arena arena, int maxQueries, int iTopKSize, int maxIterations,
+      SearchAlgo searchAlgo, int teamSize, int searchWidth, int minIterations, int threadBlockSize,
+      HashMapMode hashmapMode, int hashmapMinBitlen, float hashmapMaxFillRate, int numRandomSamplings,
+      long randXORMask) {
     this.arena = arena;
     this.maxQueries = maxQueries;
-    this.itopkSize = itopkSize;
+    this.iTopKSize = iTopKSize;
     this.maxIterations = maxIterations;
-    this.cuvsCagraSearchAlgo = cuvsCagraSearchAlgo;
+    this.searchAlgo = searchAlgo;
     this.teamSize = teamSize;
     this.searchWidth = searchWidth;
     this.minIterations = minIterations;
     this.threadBlockSize = threadBlockSize;
-    this.cuvsCagraHashMapMode = hashmapMode;
+    this.hashMapMode = hashmapMode;
     this.hashmapMinBitlen = hashmapMinBitlen;
-    this.hashmapMaxFillRate = hashmapMaxFillRate;
+    this.hashMapMaxFillRate = hashmapMaxFillRate;
     this.numRandomSamplings = numRandomSamplings;
-    this.randXorMask = randXorMask;
-    this.setSearchParametersInTheStubMemorySegment();
+    this.randXORMask = randXORMask;
+    
+    this.memorySegment = allocateMemorySegment();
   }
 
   /**
-   * Sets the configured search parameters in the MemorySegment.
+   * Allocates the configured search parameters in the MemorySegment.
    */
-  public void setSearchParametersInTheStubMemorySegment() {
-    cagraSearchParamsMemorySegment = cuvsCagraSearchParams.allocate(arena);
-    cuvsCagraSearchParams.max_queries(cagraSearchParamsMemorySegment, maxQueries);
-    cuvsCagraSearchParams.itopk_size(cagraSearchParamsMemorySegment, itopkSize);
-    cuvsCagraSearchParams.max_iterations(cagraSearchParamsMemorySegment, maxIterations);
-    cuvsCagraSearchParams.algo(cagraSearchParamsMemorySegment, cuvsCagraSearchAlgo.value);
-    cuvsCagraSearchParams.team_size(cagraSearchParamsMemorySegment, teamSize);
-    cuvsCagraSearchParams.search_width(cagraSearchParamsMemorySegment, searchWidth);
-    cuvsCagraSearchParams.min_iterations(cagraSearchParamsMemorySegment, minIterations);
-    cuvsCagraSearchParams.thread_block_size(cagraSearchParamsMemorySegment, threadBlockSize);
-    cuvsCagraSearchParams.hashmap_mode(cagraSearchParamsMemorySegment, cuvsCagraHashMapMode.value);
-    cuvsCagraSearchParams.hashmap_min_bitlen(cagraSearchParamsMemorySegment, hashmapMinBitlen);
-    cuvsCagraSearchParams.hashmap_max_fill_rate(cagraSearchParamsMemorySegment, hashmapMaxFillRate);
-    cuvsCagraSearchParams.num_random_samplings(cagraSearchParamsMemorySegment, numRandomSamplings);
-    cuvsCagraSearchParams.rand_xor_mask(cagraSearchParamsMemorySegment, randXorMask);
+  private MemorySegment allocateMemorySegment() {
+    MemorySegment memorySegment = cuvsCagraSearchParams.allocate(arena);
+    cuvsCagraSearchParams.max_queries(memorySegment, maxQueries);
+    cuvsCagraSearchParams.itopk_size(memorySegment, iTopKSize);
+    cuvsCagraSearchParams.max_iterations(memorySegment, maxIterations);
+    cuvsCagraSearchParams.algo(memorySegment, searchAlgo.value);
+    cuvsCagraSearchParams.team_size(memorySegment, teamSize);
+    cuvsCagraSearchParams.search_width(memorySegment, searchWidth);
+    cuvsCagraSearchParams.min_iterations(memorySegment, minIterations);
+    cuvsCagraSearchParams.thread_block_size(memorySegment, threadBlockSize);
+    cuvsCagraSearchParams.hashmap_mode(memorySegment, hashMapMode.value);
+    cuvsCagraSearchParams.hashmap_min_bitlen(memorySegment, hashmapMinBitlen);
+    cuvsCagraSearchParams.hashmap_max_fill_rate(memorySegment, hashMapMaxFillRate);
+    cuvsCagraSearchParams.num_random_samplings(memorySegment, numRandomSamplings);
+    cuvsCagraSearchParams.rand_xor_mask(memorySegment, randXORMask);
+    return memorySegment;
   }
 
   /**
@@ -183,8 +184,8 @@ public class CagraSearchParams {
    * 
    * @return the number of intermediate search results
    */
-  public int getItopkSize() {
-    return itopkSize;
+  public int getITopKSize() {
+    return iTopKSize;
   }
 
   /**
@@ -234,7 +235,7 @@ public class CagraSearchParams {
   }
 
   /**
-   * Gets the lower limit of hashmap bit length.
+   * Gets the lower limit of hash map bit length.
    * 
    * @return the lower limit value
    */
@@ -252,12 +253,12 @@ public class CagraSearchParams {
   }
 
   /**
-   * Gets the upper limit of hashmap fill rate.
+   * Gets the upper limit of hash map fill rate.
    * 
-   * @return the upper limit of hashmap fill rate
+   * @return the upper limit of hash map fill rate
    */
-  public float getHashmapMaxFillRate() {
-    return hashmapMaxFillRate;
+  public float getHashMapMaxFillRate() {
+    return hashMapMaxFillRate;
   }
 
   /**
@@ -265,8 +266,8 @@ public class CagraSearchParams {
    * 
    * @return the bit mask value
    */
-  public long getRandXorMask() {
-    return randXorMask;
+  public long getRandXORMask() {
+    return randXORMask;
   }
 
   /**
@@ -274,38 +275,36 @@ public class CagraSearchParams {
    * 
    * @return the MemorySegment holding CagraSearchParams
    */
-  public MemorySegment getCagraSearchParamsMemorySegment() {
-    return cagraSearchParamsMemorySegment;
+  protected MemorySegment getMemorySegment() {
+    return memorySegment;
   }
 
   /**
    * Gets which search implementation is configured.
    * 
-   * @return the search implementation configured
-   * @see CuvsCagraSearchAlgo
+   * @return the configured {@link SearchAlgo}
    */
-  public CuvsCagraSearchAlgo getCuvsCagraSearchAlgo() {
-    return cuvsCagraSearchAlgo;
+  public SearchAlgo getCagraSearchAlgo() {
+    return searchAlgo;
   }
 
   /**
-   * Gets the hashmap type configured.
+   * Gets the hash map mode configured.
    * 
-   * @return the hashmap type configured
-   * @see CuvsCagraHashMapMode
+   * @return the configured {@link HashMapMode}
    */
-  public CuvsCagraHashMapMode getCuvsCagraHashMapMode() {
-    return cuvsCagraHashMapMode;
+  public HashMapMode getHashMapMode() {
+    return hashMapMode;
   }
 
   @Override
   public String toString() {
-    return "CagraSearchParams [arena=" + arena + ", maxQueries=" + maxQueries + ", itopkSize=" + itopkSize
-        + ", maxIterations=" + maxIterations + ", cuvsCagraSearchAlgo=" + cuvsCagraSearchAlgo + ", teamSize=" + teamSize
+    return "CagraSearchParams [arena=" + arena + ", maxQueries=" + maxQueries + ", itopkSize=" + iTopKSize
+        + ", maxIterations=" + maxIterations + ", cuvsCagraSearchAlgo=" + searchAlgo + ", teamSize=" + teamSize
         + ", searchWidth=" + searchWidth + ", minIterations=" + minIterations + ", threadBlockSize=" + threadBlockSize
-        + ", cuvsCagraHashMapMode=" + cuvsCagraHashMapMode + ", hashmapMinBitlen=" + hashmapMinBitlen
-        + ", hashmapMaxFillRate=" + hashmapMaxFillRate + ", numRandomSamplings=" + numRandomSamplings + ", randXorMask="
-        + randXorMask + ", cagraSearchParamsMemorySegment=" + cagraSearchParamsMemorySegment + "]";
+        + ", hashMapMode=" + hashMapMode + ", hashMapMinBitlen=" + hashmapMinBitlen
+        + ", hashMapMaxFillRate=" + hashMapMaxFillRate + ", numRandomSamplings=" + numRandomSamplings + ", randXORMask="
+        + randXORMask + ", memorySegment=" + memorySegment + "]";
   }
 
   /**
@@ -315,18 +314,18 @@ public class CagraSearchParams {
 
     private Arena arena;
     private int maxQueries = 1;
-    private int itopkSize = 2;
+    private int iTopKSize = 2;
     private int maxIterations = 3;
     private int teamSize = 4;
     private int searchWidth = 5;
     private int minIterations = 6;
     private int threadBlockSize = 7;
-    private int hashmapMinBitlen = 8;
+    private int hashMapMinBitlen = 8;
     private int numRandomSamplings = 10;
-    private float hashmapMaxFillRate = 9.0f;
-    private long randXorMask = 11L;
-    private CuvsCagraSearchAlgo cuvsCagraSearchAlgo = CuvsCagraSearchAlgo.MULTI_KERNEL;
-    private CuvsCagraHashMapMode cuvsCagraHashMode = CuvsCagraHashMapMode.AUTO_HASH;
+    private float hashMapMaxFillRate = 9.0f;
+    private long randXORMask = 11L;
+    private SearchAlgo searchAlgo = SearchAlgo.MULTI_KERNEL;
+    private HashMapMode hashMapMode = HashMapMode.AUTO_HASH;
 
     /**
      * Constructs this Builder with an instance of Arena.
@@ -352,11 +351,11 @@ public class CagraSearchParams {
      * This is the main knob to adjust trade off between accuracy and search speed.
      * Higher values improve the search accuracy.
      * 
-     * @param itopkSize the number of intermediate search results
+     * @param iTopKSize the number of intermediate search results
      * @return an instance of this Builder
      */
-    public Builder withItopkSize(int itopkSize) {
-      this.itopkSize = itopkSize;
+    public Builder withItopkSize(int iTopKSize) {
+      this.iTopKSize = iTopKSize;
       return this;
     }
 
@@ -374,12 +373,11 @@ public class CagraSearchParams {
     /**
      * Sets which search implementation to use.
      * 
-     * @param cuvsCagraSearchAlgo the search implementation to use
+     * @param cuvsCagraSearchAlgo the {@link SearchAlgo} to use
      * @return an instance of this Builder
-     * @see CuvsCagraSearchAlgo
      */
-    public Builder withAlgo(CuvsCagraSearchAlgo cuvsCagraSearchAlgo) {
-      this.cuvsCagraSearchAlgo = cuvsCagraSearchAlgo;
+    public Builder withAlgo(SearchAlgo cuvsCagraSearchAlgo) {
+      this.searchAlgo = cuvsCagraSearchAlgo;
       return this;
     }
 
@@ -431,36 +429,35 @@ public class CagraSearchParams {
     }
 
     /**
-     * Sets the hashmap type. Auto selection when AUTO.
+     * Sets the hash map type. Auto selection when AUTO.
      * 
-     * @param cuvsCagraHashMode the hashmap type
+     * @param hashMapMode the {@link HashMapMode}
      * @return an instance of this Builder
-     * @see CuvsCagraHashMapMode
      */
-    public Builder withHashmapMode(CuvsCagraHashMapMode cuvsCagraHashMode) {
-      this.cuvsCagraHashMode = cuvsCagraHashMode;
+    public Builder withHashMapMode(HashMapMode hashMapMode) {
+      this.hashMapMode = hashMapMode;
       return this;
     }
 
     /**
-     * Sets the lower limit of hashmap bit length. More than 8.
+     * Sets the lower limit of hash map bit length. More than 8.
      * 
-     * @param hashmapMinBitlen the lower limit of hashmap bit length
+     * @param hashMapMinBitlen the lower limit of hash map bit length
      * @return an instance of this Builder
      */
-    public Builder withHashmapMinBitlen(int hashmapMinBitlen) {
-      this.hashmapMinBitlen = hashmapMinBitlen;
+    public Builder withHashMapMinBitlen(int hashMapMinBitlen) {
+      this.hashMapMinBitlen = hashMapMinBitlen;
       return this;
     }
 
     /**
-     * Sets the upper limit of hashmap fill rate. More than 0.1, less than 0.9.
+     * Sets the upper limit of hash map fill rate. More than 0.1, less than 0.9.
      * 
-     * @param hashmapMaxFillRate the upper limit of hashmap fill rate
+     * @param hashMapMaxFillRate the upper limit of hash map fill rate
      * @return an instance of this Builder
      */
-    public Builder withHashmapMaxFillRate(float hashmapMaxFillRate) {
-      this.hashmapMaxFillRate = hashmapMaxFillRate;
+    public Builder withHashMapMaxFillRate(float hashMapMaxFillRate) {
+      this.hashMapMaxFillRate = hashMapMaxFillRate;
       return this;
     }
 
@@ -480,23 +477,23 @@ public class CagraSearchParams {
     /**
      * Sets the bit mask used for initial random seed node selection.
      * 
-     * @param randXorMask the bit mask used for initial random seed node selection
+     * @param randXORMask the bit mask used for initial random seed node selection
      * @return an instance of this Builder
      */
-    public Builder withRandXorMask(long randXorMask) {
-      this.randXorMask = randXorMask;
+    public Builder withRandXorMask(long randXORMask) {
+      this.randXORMask = randXORMask;
       return this;
     }
 
     /**
-     * Builds an instance of CagraSearchParams with passed search parameters.
+     * Builds an instance of {@link CagraSearchParams} with passed search parameters.
      * 
      * @return an instance of CagraSearchParams
      */
     public CagraSearchParams build() {
-      return new CagraSearchParams(arena, maxQueries, itopkSize, maxIterations, cuvsCagraSearchAlgo, teamSize,
-          searchWidth, minIterations, threadBlockSize, cuvsCagraHashMode, hashmapMinBitlen, hashmapMaxFillRate,
-          numRandomSamplings, randXorMask);
+      return new CagraSearchParams(arena, maxQueries, iTopKSize, maxIterations, searchAlgo, teamSize,
+          searchWidth, minIterations, threadBlockSize, hashMapMode, hashMapMinBitlen, hashMapMaxFillRate,
+          numRandomSamplings, randXORMask);
     }
   }
 }

@@ -25,30 +25,28 @@ import java.util.Map;
  * 
  * @since 24.12
  */
-public class CuVSQuery {
+public class CagraQuery {
 
   private CagraSearchParams cagraSearchParameters;
-  private PreFilter preFilter;
   private Map<Integer, Integer> mapping;
   private float[][] queryVectors;
   private int topK;
 
   /**
-   * Constructs an instance of CuVSQuery using cagraSearchParameters, preFilter,
+   * Constructs an instance of {@link CagraQuery} using cagraSearchParameters, preFilter,
    * queryVectors, mapping, and topK.
    * 
-   * @param cagraSearchParameters an instance of CagraSearchParams holding the
+   * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding the
    *                              search parameters
    * @param preFilter             an instance of PreFilter
    * @param queryVectors          2D float query vector array
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
    */
-  public CuVSQuery(CagraSearchParams cagraSearchParameters, PreFilter preFilter, float[][] queryVectors,
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors,
       Map<Integer, Integer> mapping, int topK) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
-    this.preFilter = preFilter;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
@@ -61,15 +59,6 @@ public class CuVSQuery {
    */
   public CagraSearchParams getCagraSearchParameters() {
     return cagraSearchParameters;
-  }
-
-  /**
-   * Gets the instance of PreFilter initially set.
-   * 
-   * @return an instance of PreFilter
-   */
-  public PreFilter getPreFilter() {
-    return preFilter;
   }
 
   /**
@@ -101,7 +90,7 @@ public class CuVSQuery {
 
   @Override
   public String toString() {
-    return "CuVSQuery [cagraSearchParameters=" + cagraSearchParameters + ", preFilter=" + preFilter + ", queryVectors="
+    return "CuVSQuery [cagraSearchParameters=" + cagraSearchParameters + ", queryVectors="
         + Arrays.toString(queryVectors) + ", mapping=" + mapping + ", topK=" + topK + "]";
   }
 
@@ -111,7 +100,6 @@ public class CuVSQuery {
   public static class Builder {
 
     private CagraSearchParams cagraSearchParams;
-    private PreFilter preFilter;
     private float[][] queryVectors;
     private Map<Integer, Integer> mapping;
     private int topK = 2;
@@ -146,17 +134,6 @@ public class CuVSQuery {
     }
 
     /**
-     * Sets the PreFilter to be used with CuVSQuery.
-     * 
-     * @param preFilter the PreFilter instance to be configured
-     * @return an instance of this Builder
-     */
-    public Builder withPreFilter(PreFilter preFilter) {
-      this.preFilter = preFilter;
-      return this;
-    }
-
-    /**
      * Sets the instance of mapping to be used for ID mapping.
      * 
      * @param mapping the ID mapping instance
@@ -183,8 +160,8 @@ public class CuVSQuery {
      * 
      * @return an instance of CuVSQuery
      */
-    public CuVSQuery build() {
-      return new CuVSQuery(cagraSearchParams, preFilter, queryVectors, mapping, topK);
+    public CagraQuery build() {
+      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK);
     }
   }
 }

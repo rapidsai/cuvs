@@ -25,18 +25,18 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.VarHandle;
 import java.util.UUID;
 
+import com.nvidia.cuvs.common.CuVSResources;
+import com.nvidia.cuvs.panama.cuvsCagraIndex;
+
 /**
- * CagraIndex encapsulates the implementation of crucial methods for interacting
- * with the CAGRA index.
+ * {@link CagraIndex} encapsulates a CAGRA index, along with methods to interact with it.
  * <p>
  * CAGRA is a graph-based nearest neighbors algorithm that was built from the
  * ground up for GPU acceleration. CAGRA demonstrates state-of-the art index
@@ -58,18 +58,10 @@ public class CagraIndex {
   private MethodHandle deserializeMethodHandle;
   private SymbolLookup symbolLookup;
   private CagraIndexParams cagraIndexParameters;
-  private CagraIndexReference cagraIndesReference;
+  private IndexReference cagraIndexReference;
 
-  /**
-   * Constructor that initializes CagraIndex with an instance of CagraIndexParams,
-   * dataset, and an instance of CuVSResources
-   * 
-   * @param indexParameters index parameters
-   * @param dataset         2D float dataset array
-   * @param cuvsResources   cuVS resources instance
-   * @throws Throwable exception thrown when native function is invoked
-   * @see CagraIndexParams
-   * @see CuVSResources
+  /*
+   *  Constructor for building the index using specified dataset
    */
   private CagraIndex(CagraIndexParams indexParameters, float[][] dataset, CuVSResources cuvsResources)
       throws Throwable {
@@ -77,30 +69,22 @@ public class CagraIndex {
     this.dataset = dataset;
     this.initializeMethodHandles();
     this.cuvsResources = cuvsResources;
-    this.cagraIndesReference = build();
+    this.cagraIndexReference = build();
   }
 
   /**
-   * Constructs an instance of CagraIndex with an instance of InputStream and
-   * CuVSResources
-   * 
-   * @param inputStream   an instance of InputStream (eg. FileInputStream) to read
-   *                      a persisted CAGRA index.
-   * @param cuvsResources an instance of CuVSResources.
-   * @throws Throwable exception thrown when native function is invoked
+   * Constructor for loading the index from an {@link InputStream}
    */
   private CagraIndex(InputStream inputStream, CuVSResources cuvsResources) throws Throwable {
     this.cagraIndexParameters = null;
     this.dataset = null;
     this.cuvsResources = cuvsResources;
     this.initializeMethodHandles();
-    this.cagraIndesReference = deserialize(inputStream);
+    this.cagraIndexReference = deserialize(inputStream);
   }
 
   /**
-   * Initializes the MethodHandles for invoking native methods.
-   * 
-   * @see MethodHandle
+   * Initializes the {@link MethodHandles} for invoking native methods.
    */
   private void initializeMethodHandles() {
     linker = Linker.nativeLinker();
@@ -127,90 +111,33 @@ public class CagraIndex {
   }
 
   /**
-   * A utility method for getting an instance of MemorySegment for a String.
+   * Invokes the native build_index function via the Panama API to build the {@link CagraIndex}
    * 
-   * @param string the string for the expected MemorySegment
-   * @return an instance of MemorySegment
-   * @see MemoryLayout
-   * @see MemorySegment
-   * @see StringBuilder
-   */
-  public MemorySegment getStringMemorySegment(StringBuilder string) {
-    string.append('\0');
-    MemoryLayout stringMemoryLayout = MemoryLayout.sequenceLayout(string.length(),
-        linker.canonicalLayouts().get("char"));
-    MemorySegment stringMemorySegment = arena.allocate(stringMemoryLayout);
-
-    for (int i = 0; i < string.length(); i++) {
-      VarHandle varHandle = stringMemoryLayout.varHandle(PathElement.sequenceElement(i));
-      varHandle.set(stringMemorySegment, 0L, (byte) string.charAt(i));
-    }
-    return stringMemorySegment;
-  }
-
-  /**
-   * A utility method for getting an instance of MemorySegment for a 2D float
-   * array.
-   * 
-   * @param data The 2D float array for which the MemorySegment is needed
-   * @return an instance of MemorySegment
-   * @see MemoryLayout
-   * @see MemorySegment
-   */
-  private MemorySegment getMemorySegment(float[][] data) {
-    long rows = data.length;
-    long cols = data[0].length;
-
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows,
-        MemoryLayout.sequenceLayout(cols, linker.canonicalLayouts().get("float")));
-    MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
-
-    for (int r = 0; r < rows; r++) {
-      for (int c = 0; c < cols; c++) {
-        VarHandle element = dataMemoryLayout.arrayElementVarHandle(PathElement.sequenceElement(r),
-            PathElement.sequenceElement(c));
-        element.set(dataMemorySegment, 0, 0, data[r][c]);
-      }
-    }
-
-    return dataMemorySegment;
-  }
-
-  /**
-   * Invokes the native build_index function via the Panama API to build the CAGRA
-   * index.
-   * 
-   * @return an instance of CagraIndexReference that holds the pointer to the
+   * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
-   * @throws Throwable exception thrown when native function is invoked
-   * @see CagraIndexReference
    */
-  private CagraIndexReference build() throws Throwable {
+  private IndexReference build() throws Throwable {
     long rows = dataset.length;
     long cols = dataset[0].length;
-    MemoryLayout returnvalueMemoryLayout = linker.canonicalLayouts().get("int");
-    MemorySegment returnvalueMemorySegment = arena.allocate(returnvalueMemoryLayout);
+    MemoryLayout layout = linker.canonicalLayouts().get("int");
+    MemorySegment segment = arena.allocate(layout);
 
-    cagraIndesReference = new CagraIndexReference((MemorySegment) indexMethodHandle.invokeExact(
-        getMemorySegment(dataset), rows, cols, cuvsResources.getCuvsResourcesMemorySegment(), returnvalueMemorySegment,
-        cagraIndexParameters.getCagraIndexParamsMemorySegment()));
+    cagraIndexReference = new IndexReference((MemorySegment) indexMethodHandle.invokeExact(
+        Util.buildMemorySegment(linker, arena, dataset), rows, cols, cuvsResources.getMemorySegment(), segment,
+        cagraIndexParameters.getMemorySegment()));
 
-    return cagraIndesReference;
+    return cagraIndexReference;
   }
 
   /**
    * Invokes the native search_index via the Panama API for searching a CAGRA
    * index.
    * 
-   * @param cuvsQuery an instance of CuVSQuery holding the query and its
+   * @param query an instance of {@link CagraQuery} holding the query vectors and other
    *                  parameters
-   * @return an instance of SearchResult containing the results
-   * @throws Throwable exception thrown when native function is invoked
-   * @see CuVSQuery
-   * @see SearchResult
+   * @return an instance of {@link CagraSearchResults} containing the results
    */
-  public SearchResult search(CuVSQuery cuvsQuery) throws Throwable {
-
+  public CagraSearchResults search(CagraQuery query) throws Throwable {
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(50, linker.canonicalLayouts().get("int"));
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(50, linker.canonicalLayouts().get("float"));
     MemorySegment neighborsMemorySegment = arena.allocate(neighborsSequenceLayout);
@@ -218,59 +145,40 @@ public class CagraIndex {
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
 
-    searchMethodHandle.invokeExact(cagraIndesReference.getIndexMemorySegment(),
-        getMemorySegment(cuvsQuery.getQueryVectors()), cuvsQuery.getTopK(), 4L, 2L,
-        cuvsResources.getCuvsResourcesMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
-        returnValueMemorySegment, cuvsQuery.getCagraSearchParameters().getCagraSearchParamsMemorySegment());
+    searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
+        Util.buildMemorySegment(linker, arena, query.getQueryVectors()), query.getTopK(), 4L, 2L,
+        cuvsResources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
+        returnValueMemorySegment, query.getCagraSearchParameters().getMemorySegment());
 
-    return new SearchResult(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
-        distancesMemorySegment, cuvsQuery.getTopK(), cuvsQuery.getMapping(), cuvsQuery.getQueryVectors().length);
+    return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
+        distancesMemorySegment, query.getTopK(), query.getMapping(), query.getQueryVectors().length);
   }
 
   /**
-   * A method to persist a CAGRA index using an instance of OutputStream for
+   * A method to persist a CAGRA index using an instance of {@link OutputStream} for
    * writing index bytes.
    * 
-   * @param outputStream an instance of OutputStream to write the index bytes into
-   * @throws Throwable exception thrown when native function is invoked
-   * @see OutputStream
+   * @param outputStream an instance of {@link OutputStream} to write the index bytes into
    */
   public void serialize(OutputStream outputStream) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-    String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
-    serializeMethodHandle.invokeExact(cuvsResources.getCuvsResourcesMemorySegment(),
-        cagraIndesReference.getIndexMemorySegment(), returnValueMemorySegment,
-        getStringMemorySegment(new StringBuilder(tmpIndexFile)));
-    File tempFile = new File(tmpIndexFile);
-    FileInputStream fileInputStream = new FileInputStream(tempFile);
-    byte[] chunk = new byte[1024];
-    int chunkLength = 0;
-    while ((chunkLength = fileInputStream.read(chunk)) != -1) {
-      outputStream.write(chunk, 0, chunkLength);
-    }
-    fileInputStream.close();
-    tempFile.delete();
+	  serialize(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".cag"));
   }
 
   /**
-   * A method to persist a CAGRA index using an instance of OutputStream and path
+   * A method to persist a CAGRA index using an instance of {@link OutputStream} and path
    * to the intermediate temporary file.
    * 
-   * @param outputStream an instance of OutputStream to write the index bytes to
-   * @param tmpFilePath  path to a temporary file where CAGRA index is written
-   * @throws Throwable exception thrown when native function is invoked
-   * @see OutputStream
+   * @param outputStream an instance of {@link OutputStream} to write the index bytes to
+   * @param tmpFilePath an intermediate {@link File} where CAGRA index is written temporarily
    */
-  public void serialize(OutputStream outputStream, String tmpFilePath) throws Throwable {
+  public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-    serializeMethodHandle.invokeExact(cuvsResources.getCuvsResourcesMemorySegment(),
-        cagraIndesReference.getIndexMemorySegment(), returnValueMemorySegment,
-        getStringMemorySegment(new StringBuilder(tmpFilePath)));
-    File tempFile = new File(tmpFilePath);
+    serializeMethodHandle.invokeExact(cuvsResources.getMemorySegment(),
+        cagraIndexReference.getMemorySegment(), returnValueMemorySegment,
+        Util.buildMemorySegment(linker, arena, tempFile.getAbsolutePath()));
     FileInputStream fileInputStream = new FileInputStream(tempFile);
-    byte[] chunk = new byte[1024];
+    byte[] chunk = new byte[1024]; // TODO: Make this configurable
     int chunkLength = 0;
     while ((chunkLength = fileInputStream.read(chunk)) != -1) {
       outputStream.write(chunk, 0, chunkLength);
@@ -280,21 +188,17 @@ public class CagraIndex {
   }
 
   /**
-   * Gets an instance of CagraIndexReference by deserializing a CAGRA index using
-   * an input stream.
+   * Gets an instance of {@link IndexReference} by deserializing a CAGRA index using
+   * an {@link InputStream}.
    * 
-   * @param inputStream an instance of InputStream (eg. FileInputStream when
-   *                    reading an index file).
-   * @return an instance of CagraIndexReference.
-   * @throws Throwable exception thrown when native function is invoked
-   * @see CagraIndexReference
-   * @see InputStream
+   * @param inputStream an instance of {@link InputStream}
+   * @return an instance of {@link IndexReference}.
    */
-  private CagraIndexReference deserialize(InputStream inputStream) throws Throwable {
+  private IndexReference deserialize(InputStream inputStream) throws Throwable {
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
-    CagraIndexReference cagraIndexReference = new CagraIndexReference();
+    IndexReference indexReference = new IndexReference();
 
     File tempFile = new File(tmpIndexFile);
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
@@ -303,39 +207,37 @@ public class CagraIndex {
     while ((chunkLength = inputStream.read(chunk)) != -1) {
       fileOutputStream.write(chunk, 0, chunkLength);
     }
-    deserializeMethodHandle.invokeExact(cuvsResources.getCuvsResourcesMemorySegment(),
-        cagraIndexReference.getIndexMemorySegment(), returnValueMemorySegment,
-        getStringMemorySegment(new StringBuilder(tmpIndexFile)));
+    deserializeMethodHandle.invokeExact(cuvsResources.getMemorySegment(),
+        indexReference.getMemorySegment(), returnValueMemorySegment,
+        Util.buildMemorySegment(linker, arena, tmpIndexFile));
 
     inputStream.close();
     fileOutputStream.close();
     tempFile.delete();
 
-    return cagraIndexReference;
+    return indexReference;
   }
 
   /**
-   * Gets an instance of CagraIndexParams.
+   * Gets an instance of {@link CagraIndexParams}
    * 
-   * @return an instance of CagraIndexParams
-   * @see CagraIndexParams
+   * @return an instance of {@link CagraIndexParams}
    */
   public CagraIndexParams getCagraIndexParameters() {
     return cagraIndexParameters;
   }
 
   /**
-   * Gets an instance of CuVSResources.
+   * Gets an instance of {@link CuVSResources}
    * 
-   * @return an instance of CuVSResources
-   * @see CuVSResources
+   * @return an instance of {@link CuVSResources}
    */
   public CuVSResources getCuVSResources() {
     return cuvsResources;
   }
 
   /**
-   * Builder helps configure and create an instance of CagraIndex.
+   * Builder helps configure and create an instance of {@link CagraIndex}.
    */
   public static class Builder {
 
@@ -345,10 +247,9 @@ public class CagraIndex {
     private InputStream inputStream;
 
     /**
-     * Constructs this Builder with an instance of CuVSResources.
+     * Constructs this Builder with an instance of {@link CuVSResources}.
      * 
-     * @param cuvsResources an instance of CuVSResources
-     * @see CuVSResources
+     * @param cuvsResources an instance of {@link CuVSResources}
      */
     public Builder(CuVSResources cuvsResources) {
       this.cuvsResources = cuvsResources;
@@ -358,9 +259,8 @@ public class CagraIndex {
      * Sets an instance of InputStream typically used when index deserialization is
      * needed.
      * 
-     * @param inputStream an instance of InputStream
+     * @param inputStream an instance of {@link InputStream}
      * @return an instance of this Builder
-     * @see InputStream
      */
     public Builder from(InputStream inputStream) {
       this.inputStream = inputStream;
@@ -368,7 +268,7 @@ public class CagraIndex {
     }
 
     /**
-     * Sets the dataset for building the CAGRA index.
+     * Sets the dataset for building the {@link CagraIndex}.
      * 
      * @param dataset a two-dimensional float array
      * @return an instance of this Builder
@@ -379,11 +279,10 @@ public class CagraIndex {
     }
 
     /**
-     * Registers an instance of configured CagraIndexParams with this Builder.
+     * Registers an instance of configured {@link CagraIndexParams} with this Builder.
      * 
      * @param cagraIndexParameters An instance of CagraIndexParams.
      * @return An instance of this Builder.
-     * @see CagraIndexParams
      */
     public Builder withIndexParams(CagraIndexParams cagraIndexParameters) {
       this.cagraIndexParams = cagraIndexParameters;
@@ -394,7 +293,6 @@ public class CagraIndex {
      * Builds and returns an instance of CagraIndex.
      * 
      * @return an instance of CagraIndex
-     * @throws Throwable exception thrown when native function is invoked
      */
     public CagraIndex build() throws Throwable {
       if (inputStream != null) {
@@ -404,4 +302,41 @@ public class CagraIndex {
       }
     }
   }
+  
+  /**
+   * Holds the memory reference to an index.
+   */
+  protected static class IndexReference {
+
+    private MemorySegment memorySegment;
+
+    /**
+     * Constructs CagraIndexReference and allocate the MemorySegment.
+     */
+    protected IndexReference() {
+      Arena arena = Arena.ofConfined();
+      memorySegment = cuvsCagraIndex.allocate(arena);
+    }
+
+    /**
+     * Constructs CagraIndexReference with an instance of MemorySegment passed as a
+     * parameter.
+     * 
+     * @param indexMemorySegment the MemorySegment instance to use for containing
+     *                           index reference
+     */
+    protected IndexReference(MemorySegment indexMemorySegment) {
+      this.memorySegment = indexMemorySegment;
+    }
+
+    /**
+     * Gets the instance of index MemorySegment.
+     * 
+     * @return index MemorySegment
+     */
+    protected MemorySegment getMemorySegment() {
+      return memorySegment;
+    }
+  }
+
 }

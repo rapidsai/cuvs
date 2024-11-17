@@ -25,39 +25,25 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.nvidia.cuvs.common.SearchResults;
+
 /**
  * SearchResult encapsulates the logic for reading and holding search results.
  * 
  * @since 24.12
  */
-public class SearchResult {
+public class CagraSearchResults implements SearchResults {
 
-  private List<Map<Integer, Float>> results;
-  private Map<Integer, Integer> mapping;
-  private SequenceLayout neighboursSequenceLayout;
-  private SequenceLayout distancesSequenceLayout;
-  private MemorySegment neighboursMemorySegment;
-  private MemorySegment distancesMemorySegment;
-  private int topK;
-  private int numberOfQueries;
+  private final List<Map<Integer, Float>> results;
+  private final Map<Integer, Integer> mapping; // TODO: Is this performant in a user application?
+  private final SequenceLayout neighboursSequenceLayout;
+  private final SequenceLayout distancesSequenceLayout;
+  private final MemorySegment neighboursMemorySegment;
+  private final MemorySegment distancesMemorySegment;
+  private final int topK;
+  private final int numberOfQueries;
 
-  /**
-   * Constructor that initializes SearchResult with neighboursSequenceLayout,
-   * distancesSequenceLayout, neighboursMemorySegment, distancesMemorySegment,
-   * topK, mapping, and numberOfQueries.
-   * 
-   * @param neighboursSequenceLayout neighbor SequenceLayout instance
-   * @param distancesSequenceLayout  distance SequenceLayout instance
-   * @param neighboursMemorySegment  neighbor MemorySegment instance
-   * @param distancesMemorySegment   distance MemorySegment instance
-   * @param topK                     an integer denoting the topK value
-   * @param mapping                  id mapping
-   * @param numberOfQueries          number of queries that were initially
-   *                                 submitted
-   * @see SequenceLayout
-   * @see MemorySegment
-   */
-  public SearchResult(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
+  protected CagraSearchResults(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
       MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK,
       Map<Integer, Integer> mapping, int numberOfQueries) {
     super();
@@ -69,15 +55,12 @@ public class SearchResult {
     this.distancesMemorySegment = distancesMemorySegment;
     this.mapping = mapping;
     results = new LinkedList<Map<Integer, Float>>();
-    this.readResultMemorySegments();
+    
+    readResultMemorySegments();
   }
 
   /**
-   * Reads neighbors and distances MemorySegments and load values in a List of
-   * Maps.
-   * 
-   * @see MemorySegment
-   * @see VarHandle
+   * Reads neighbors and distances {@link MemorySegment} and loads the values internally
    */
   private void readResultMemorySegments() {
     VarHandle neighboursVarHandle = neighboursSequenceLayout.varHandle(PathElement.sequenceElement());
@@ -99,10 +82,11 @@ public class SearchResult {
   }
 
   /**
-   * Gets a list of maps containing topK ID and distances.
+   * Gets a list results as a map of neighbor IDs to distances.
    * 
-   * @return a list of maps
+   * @return a list of results for each query as a map of neighbor IDs to distance
    */
+  @Override
   public List<Map<Integer, Float>> getResults() {
     return results;
   }
