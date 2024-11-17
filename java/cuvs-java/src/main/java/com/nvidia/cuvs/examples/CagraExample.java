@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs;
+package com.nvidia.cuvs.examples;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -25,13 +25,13 @@ import java.lang.invoke.MethodHandles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.nvidia.cuvs.cagra.CagraIndex;
-import com.nvidia.cuvs.cagra.CagraIndexParams;
-import com.nvidia.cuvs.cagra.CagraIndexParams.CagraGraphBuildAlgo;
+import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CagraIndexParams;
+import com.nvidia.cuvs.CagraQuery;
+import com.nvidia.cuvs.CagraSearchParams;
+import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.common.CuVSResources;
 import com.nvidia.cuvs.common.SearchResults;
-import com.nvidia.cuvs.cagra.CagraSearchParams;
-import com.nvidia.cuvs.cagra.CagraQuery;
 
 public class CagraExample {
   

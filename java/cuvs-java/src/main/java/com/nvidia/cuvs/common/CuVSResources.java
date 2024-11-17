@@ -66,7 +66,8 @@ public class CuVSResources {
    * @return cuvsResources MemorySegment
    */
   public MemorySegment getMemorySegment() {
-	// TODO: Is there a way to not letting a memory segment leak into the public API?
+    // TODO: Is there a way to not letting a memory segment leak into the public
+    // API?
     return memorySegment;
   }
 
@@ -74,6 +75,6 @@ public class CuVSResources {
    * Returns the loaded libcuvs_java.so as a {@link SymbolLookup}
    */
   public SymbolLookup getLibcuvsNativeLibrary() {
-	  return libcuvsNativeLibrary;
+    return libcuvsNativeLibrary;
   }
 }

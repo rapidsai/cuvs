@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs.cagra;
+package com.nvidia.cuvs;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -33,18 +33,18 @@ public class CagraQuery {
   private int topK;
 
   /**
-   * Constructs an instance of {@link CagraQuery} using cagraSearchParameters, preFilter,
-   * queryVectors, mapping, and topK.
+   * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
+   * preFilter, queryVectors, mapping, and topK.
    * 
-   * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding the
-   *                              search parameters
+   * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
+   *                              the search parameters
    * @param preFilter             an instance of PreFilter
    * @param queryVectors          2D float query vector array
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors,
-      Map<Integer, Integer> mapping, int topK) {
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, Map<Integer, Integer> mapping,
+      int topK) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
