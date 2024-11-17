@@ -19,6 +19,7 @@ package com.nvidia.cuvs.cagra;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.foreign.Arena;
@@ -33,6 +34,7 @@ import java.lang.invoke.MethodHandle;
 import java.util.UUID;
 
 import com.nvidia.cuvs.common.CuVSResources;
+import com.nvidia.cuvs.common.Util;
 import com.nvidia.cuvs.panama.cuvsCagraIndex;
 
 /**
@@ -49,65 +51,63 @@ import com.nvidia.cuvs.panama.cuvsCagraIndex;
 public class CagraIndex {
 
   private final float[][] dataset;
-  private final CuVSResources cuvsResources;
+  private final CuVSResources resources;
   private Arena arena;
   private Linker linker;
   private MethodHandle indexMethodHandle;
   private MethodHandle searchMethodHandle;
   private MethodHandle serializeMethodHandle;
   private MethodHandle deserializeMethodHandle;
-  private SymbolLookup symbolLookup;
   private CagraIndexParams cagraIndexParameters;
   private IndexReference cagraIndexReference;
 
   /*
    *  Constructor for building the index using specified dataset
    */
-  private CagraIndex(CagraIndexParams indexParameters, float[][] dataset, CuVSResources cuvsResources)
+  private CagraIndex(CagraIndexParams indexParameters, float[][] dataset, CuVSResources resources)
       throws Throwable {
     this.cagraIndexParameters = indexParameters;
     this.dataset = dataset;
-    this.initializeMethodHandles();
-    this.cuvsResources = cuvsResources;
+    this.resources = resources;
+
+    initializeMethodHandles();
     this.cagraIndexReference = build();
   }
 
   /**
    * Constructor for loading the index from an {@link InputStream}
    */
-  private CagraIndex(InputStream inputStream, CuVSResources cuvsResources) throws Throwable {
+  private CagraIndex(InputStream inputStream, CuVSResources resources) throws Throwable {
     this.cagraIndexParameters = null;
     this.dataset = null;
-    this.cuvsResources = cuvsResources;
-    this.initializeMethodHandles();
+    this.resources = resources;
+    
+    initializeMethodHandles();
     this.cagraIndexReference = deserialize(inputStream);
   }
 
   /**
    * Initializes the {@link MethodHandles} for invoking native methods.
+   * @throws IOException @{@link IOException} is unable to load the native library 
    */
-  private void initializeMethodHandles() {
+  private void initializeMethodHandles() throws IOException {
     linker = Linker.nativeLinker();
     arena = Arena.ofConfined();
 
-    File workingDirectory = new File(System.getProperty("user.dir"));
-    symbolLookup = SymbolLookup.libraryLookup(workingDirectory.getParent() + "/internal/libcuvs_java.so", arena);
-
-    indexMethodHandle = linker.downcallHandle(symbolLookup.find("build_cagra_index").get(),
+    indexMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("build_cagra_index").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("long"),
             linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    searchMethodHandle = linker.downcallHandle(symbolLookup.find("search_cagra_index").get(),
+    searchMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("search_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("int"),
             linker.canonicalLayouts().get("long"), linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    serializeMethodHandle = linker.downcallHandle(symbolLookup.find("serialize_cagra_index").get(),
+    serializeMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("serialize_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    deserializeMethodHandle = linker.downcallHandle(symbolLookup.find("deserialize_cagra_index").get(),
+    deserializeMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("deserialize_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
   }
 
   /**
@@ -123,7 +123,7 @@ public class CagraIndex {
     MemorySegment segment = arena.allocate(layout);
 
     cagraIndexReference = new IndexReference((MemorySegment) indexMethodHandle.invokeExact(
-        Util.buildMemorySegment(linker, arena, dataset), rows, cols, cuvsResources.getMemorySegment(), segment,
+        Util.buildMemorySegment(linker, arena, dataset), rows, cols, resources.getMemorySegment(), segment,
         cagraIndexParameters.getMemorySegment()));
 
     return cagraIndexReference;
@@ -147,7 +147,7 @@ public class CagraIndex {
 
     searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
         Util.buildMemorySegment(linker, arena, query.getQueryVectors()), query.getTopK(), 4L, 2L,
-        cuvsResources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
+        resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
         returnValueMemorySegment, query.getCagraSearchParameters().getMemorySegment());
 
     return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
@@ -174,7 +174,7 @@ public class CagraIndex {
   public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-    serializeMethodHandle.invokeExact(cuvsResources.getMemorySegment(),
+    serializeMethodHandle.invokeExact(resources.getMemorySegment(),
         cagraIndexReference.getMemorySegment(), returnValueMemorySegment,
         Util.buildMemorySegment(linker, arena, tempFile.getAbsolutePath()));
     FileInputStream fileInputStream = new FileInputStream(tempFile);
@@ -207,7 +207,7 @@ public class CagraIndex {
     while ((chunkLength = inputStream.read(chunk)) != -1) {
       fileOutputStream.write(chunk, 0, chunkLength);
     }
-    deserializeMethodHandle.invokeExact(cuvsResources.getMemorySegment(),
+    deserializeMethodHandle.invokeExact(resources.getMemorySegment(),
         indexReference.getMemorySegment(), returnValueMemorySegment,
         Util.buildMemorySegment(linker, arena, tmpIndexFile));
 
@@ -233,7 +233,7 @@ public class CagraIndex {
    * @return an instance of {@link CuVSResources}
    */
   public CuVSResources getCuVSResources() {
-    return cuvsResources;
+    return resources;
   }
 
   /**
@@ -308,7 +308,7 @@ public class CagraIndex {
    */
   protected static class IndexReference {
 
-    private MemorySegment memorySegment;
+    private final MemorySegment memorySegment;
 
     /**
      * Constructs CagraIndexReference and allocate the MemorySegment.
