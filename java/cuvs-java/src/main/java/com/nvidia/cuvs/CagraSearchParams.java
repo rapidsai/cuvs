@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs.cagra;
+package com.nvidia.cuvs;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;

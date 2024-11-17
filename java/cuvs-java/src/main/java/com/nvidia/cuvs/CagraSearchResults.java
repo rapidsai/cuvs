@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs.cagra;
+package com.nvidia.cuvs;
 
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
@@ -55,12 +55,13 @@ public class CagraSearchResults implements SearchResults {
     this.distancesMemorySegment = distancesMemorySegment;
     this.mapping = mapping;
     results = new LinkedList<Map<Integer, Float>>();
-    
+
     readResultMemorySegments();
   }
 
   /**
-   * Reads neighbors and distances {@link MemorySegment} and loads the values internally
+   * Reads neighbors and distances {@link MemorySegment} and loads the values
+   * internally
    */
   private void readResultMemorySegments() {
     VarHandle neighboursVarHandle = neighboursSequenceLayout.varHandle(PathElement.sequenceElement());

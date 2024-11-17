@@ -32,10 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.nvidia.cuvs.cagra.CagraIndex;
-import com.nvidia.cuvs.cagra.CagraIndexParams;
-import com.nvidia.cuvs.cagra.CagraQuery;
-import com.nvidia.cuvs.cagra.CagraSearchParams;
 import com.nvidia.cuvs.common.CuVSResources;
 import com.nvidia.cuvs.common.SearchResults;
 
@@ -57,7 +53,7 @@ public class CagraBuildAndSearchTest {
     float[][] queries = {{ 0.48216683f, 0.0428398f }, { 0.5084142f, 0.6545497f }, { 0.51260436f, 0.2643005f }, { 0.05198065f, 0.5789965f }};
     
     // Expected search results
-    List<Map<Integer, Float>> expectedQueryResults = Arrays.asList(
+    List<Map<Integer, Float>> expectedResults = Arrays.asList(
         Map.of(3, 0.038782578f, 2, 0.3590463f, 0, 0.83774555f),
         Map.of(0, 0.12472608f, 2, 0.21700792f, 1, 0.31918612f), 
         Map.of(3, 0.047766715f, 2, 0.20332818f, 0, 0.48305473f), 
@@ -82,22 +78,20 @@ public class CagraBuildAndSearchTest {
     index.serialize(new FileOutputStream(indexFileName));
 
     // Loading a CAGRA index from disk.
-    File testSerializedIndexFile = new File(indexFileName);
-    InputStream inputStream = new FileInputStream(testSerializedIndexFile);
+    File indexFile = new File(indexFileName);
+    InputStream inputStream = new FileInputStream(indexFile);
     CagraIndex loadedIndex = new CagraIndex.Builder(resources)
         .from(inputStream)
         .build();
     
     // Configure search parameters
-    CagraSearchParams cagraSearchParameters = new CagraSearchParams
-        .Builder()
+    CagraSearchParams searchParams = new CagraSearchParams.Builder()
         .build();
 
     // Create a query object with the query vectors
-    CagraQuery cuvsQuery = new CagraQuery
-        .Builder()
+    CagraQuery cuvsQuery = new CagraQuery.Builder()
         .withTopK(3)
-        .withSearchParams(cagraSearchParameters)
+        .withSearchParams(searchParams)
         .withQueryVectors(queries)
         .withMapping(map)
         .build();
@@ -107,18 +101,18 @@ public class CagraBuildAndSearchTest {
     
     // Check results
     log.info(results.getResults().toString());
-    assertEquals(expectedQueryResults, results.getResults(), "Results different than expected");
+    assertEquals(expectedResults, results.getResults(), "Results different than expected");
 
     // Search from deserialized index
     results = loadedIndex.search(cuvsQuery);
     
     // Check results
     log.info(results.getResults().toString());
-    assertEquals(expectedQueryResults, results.getResults(), "Results different than expected");
+    assertEquals(expectedResults, results.getResults(), "Results different than expected");
 
     // Cleanup
-    if (testSerializedIndexFile.exists()) {
-      testSerializedIndexFile.delete();
+    if (indexFile.exists()) {
+      indexFile.delete();
     }
   }
 }
