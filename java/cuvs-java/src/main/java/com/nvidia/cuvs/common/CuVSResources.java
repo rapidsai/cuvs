@@ -35,7 +35,7 @@ public class CuVSResources {
 
   private final Arena arena;
   private final Linker linker;
-  private final SymbolLookup symbolLookup;
+  private final SymbolLookup libcuvsNativeLibrary;
   private final MethodHandle createResourceMethodHandle;
   private final MemorySegment memorySegment;
 
@@ -48,11 +48,10 @@ public class CuVSResources {
     linker = Linker.nativeLinker();
     arena = Arena.ofConfined();
 
-    File workingDirectory = new File(System.getProperty("user.dir"));
-    // TODO Remove hardcoding, also load from .jar
-    symbolLookup = SymbolLookup.libraryLookup(workingDirectory.getParent() + "/internal/libcuvs_java.so", arena);
+    File nativeLibrary = Util.loadLibraryFromJar("/libcuvs_java.so");
+    libcuvsNativeLibrary = SymbolLookup.libraryLookup(nativeLibrary.getAbsolutePath(), arena);
 
-    createResourceMethodHandle = linker.downcallHandle(symbolLookup.find("create_resource").get(),
+    createResourceMethodHandle = linker.downcallHandle(libcuvsNativeLibrary.find("create_resource").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
@@ -69,5 +68,12 @@ public class CuVSResources {
   public MemorySegment getMemorySegment() {
 	// TODO: Is there a way to not letting a memory segment leak into the public API?
     return memorySegment;
+  }
+
+  /**
+   * Returns the loaded libcuvs_java.so as a {@link SymbolLookup}
+   */
+  public SymbolLookup getLibcuvsNativeLibrary() {
+	  return libcuvsNativeLibrary;
   }
 }

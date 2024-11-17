@@ -14,14 +14,25 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs.cagra;
+package com.nvidia.cuvs.common;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.invoke.VarHandle;
+import java.nio.file.FileSystemNotFoundException;
+import java.nio.file.FileSystems;
+import java.nio.file.ProviderNotFoundException;
+
+import org.apache.commons.io.IOUtils;
 
 public class Util {
 	/**
@@ -30,7 +41,7 @@ public class Util {
 	 * @param str the string for the expected {@link MemorySegment}
 	 * @return an instance of {@link MemorySegment}
 	 */
-	protected static MemorySegment buildMemorySegment(Linker linker, Arena arena, String str) {
+	public static MemorySegment buildMemorySegment(Linker linker, Arena arena, String str) {
 		StringBuilder sb = new StringBuilder(str).append('\0');
 		MemoryLayout stringMemoryLayout = MemoryLayout.sequenceLayout(sb.length(),
 				linker.canonicalLayouts().get("char"));
@@ -49,7 +60,7 @@ public class Util {
 	 * @param data The 2D float array for which the {@link MemorySegment} is needed
 	 * @return an instance of {@link MemorySegment}
 	 */
-	protected static MemorySegment buildMemorySegment(Linker linker, Arena arena, float[][] data) {
+	public static MemorySegment buildMemorySegment(Linker linker, Arena arena, float[][] data) {
 		long rows = data.length;
 		long cols = data[0].length;
 
@@ -66,6 +77,32 @@ public class Util {
 		}
 
 		return dataMemorySegment;
+	}
+
+	/**
+	 * Load a file from the classpath to a temporary file. Suitable for loading .so files from the jar.
+	 */
+	public static File loadLibraryFromJar(String path) throws IOException {
+		if (!path.startsWith("/")) {
+			throw new IllegalArgumentException("The path has to be absolute (start with '/').");
+		}
+		// Obtain filename from path
+		String[] parts = path.split("/");
+		String filename = (parts.length > 1) ? parts[parts.length - 1] : null;
+
+		// Split filename to prefix and suffix (extension)
+		String prefix = "";
+		String suffix = null;
+		if (filename != null) {
+			parts = filename.split("\\.", 2);
+			prefix = parts[0];
+			suffix = (parts.length > 1) ? "." + parts[parts.length - 1] : null;
+		}
+		// Prepare temporary file
+		File temp = File.createTempFile(prefix, suffix);
+		IOUtils.copy(Util.class.getResourceAsStream(path), new FileOutputStream(temp));
+
+		return temp;
 	}
 
 
