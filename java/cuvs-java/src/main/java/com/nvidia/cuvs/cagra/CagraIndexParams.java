@@ -19,7 +19,7 @@ package com.nvidia.cuvs.cagra;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
-import com.nvidia.cuvs.panama.cuvsCagraIndexParams;
+import com.nvidia.cuvs.panama.CuVSCagraIndexParams;
 
 /**
  * Supplemental parameters to build CAGRA Index.
@@ -28,17 +28,18 @@ import com.nvidia.cuvs.panama.cuvsCagraIndexParams;
  */
 public class CagraIndexParams {
 
-  private CuvsCagraGraphBuildAlgo cuvsCagraGraphBuildAlgo;
-  private MemorySegment cagraIndexParamsMemorySegment;
-  private Arena arena;
-  private int intermediateGraphDegree;
-  private int graphDegree;
-  private int nnDescentNiter;
+  private final CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo;
+  private final MemorySegment memorySegment;
+  private final Arena arena;
+  private final int intermediateGraphDegree;
+  private final int graphDegree;
+  private final int nnDescentNiter;
+  private final int numWriterThreads;
 
   /**
    * Enum that denotes which ANN algorithm is used to build CAGRA graph.
    */
-  public enum CuvsCagraGraphBuildAlgo {
+  public enum CagraGraphBuildAlgo {
     /**
      * AUTO_SELECT
      */
@@ -57,44 +58,30 @@ public class CagraIndexParams {
      */
     public final int label;
 
-    private CuvsCagraGraphBuildAlgo(int label) {
+    private CagraGraphBuildAlgo(int label) {
       this.label = label;
     }
   }
 
-  /**
-   * Constructor that initializes CagraIndexParams with an instance of Arena,
-   * intermediateGraphDegree, graphDegree, CuvsCagraGraphBuildAlgo, and
-   * nnDescentNiter.
-   * 
-   * @param arena                   the Arena instance to use
-   * @param intermediateGraphDegree the degree of input graph for pruning
-   * @param graphDegree             the degree of output graph
-   * @param CuvsCagraGraphBuildAlgo the CuvsCagraGraphBuildAlgo
-   * @param nnDescentNiter          the number of Iterations to run if building
-   *                                with NN_DESCENT
-   */
-  public CagraIndexParams(Arena arena, int intermediateGraphDegree, int graphDegree,
-      CuvsCagraGraphBuildAlgo CuvsCagraGraphBuildAlgo, int nnDescentNiter) {
+  private CagraIndexParams(Arena arena, int intermediateGraphDegree, int graphDegree,
+      CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo, int nnDescentNiter, int writerThreads) {
     this.arena = arena;
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
     this.cuvsCagraGraphBuildAlgo = CuvsCagraGraphBuildAlgo;
     this.nnDescentNiter = nnDescentNiter;
-    this.setCagraIndexParamsStubValues();
+    this.numWriterThreads = writerThreads;
+
+    this.memorySegment = initMemorySegment();
   }
 
-  /**
-   * Sets the parameter values in the stub's MemorySegment.
-   * 
-   * @see MemorySegment
-   */
-  private void setCagraIndexParamsStubValues() {
-    cagraIndexParamsMemorySegment = cuvsCagraIndexParams.allocate(arena);
-    cuvsCagraIndexParams.intermediate_graph_degree(cagraIndexParamsMemorySegment, intermediateGraphDegree);
-    cuvsCagraIndexParams.graph_degree(cagraIndexParamsMemorySegment, graphDegree);
-    cuvsCagraIndexParams.build_algo(cagraIndexParamsMemorySegment, cuvsCagraGraphBuildAlgo.label);
-    cuvsCagraIndexParams.nn_descent_niter(cagraIndexParamsMemorySegment, nnDescentNiter);
+  private MemorySegment initMemorySegment() {
+    MemorySegment memorySegment = CuVSCagraIndexParams.allocate(arena);
+    CuVSCagraIndexParams.intermediate_graph_degree(memorySegment, intermediateGraphDegree);
+    CuVSCagraIndexParams.graph_degree(memorySegment, graphDegree);
+    CuVSCagraIndexParams.build_algo(memorySegment, cuvsCagraGraphBuildAlgo.label);
+    CuVSCagraIndexParams.nn_descent_niter(memorySegment, nnDescentNiter);
+    return memorySegment;
   }
 
   /**
@@ -116,58 +103,51 @@ public class CagraIndexParams {
   }
 
   /**
-   * Gets the CuvsCagraGraphBuildAlgo.
-   * 
-   * @return CuvsCagraGraphBuildAlgo selected
+   * Gets the {@link CagraGraphBuildAlgo} used to build the index.
    */
-  public CuvsCagraGraphBuildAlgo getCuvsCagraGraphBuildAlgo() {
+  public CagraGraphBuildAlgo getCagraGraphBuildAlgo() {
     return cuvsCagraGraphBuildAlgo;
   }
 
   /**
-   * Gets the number of Iterations to run if building with NN_DESCENT.
-   * 
-   * @return the number of Iterations
+   * Gets the number of iterations to run if building with {@link CagraGraphBuildAlgo#NN_DESCENT}
    */
-  public int getNNDescentNiter() {
+  public int getNNDescentNumIterations() {
     return nnDescentNiter;
   }
 
-  /**
-   * Gets the cagraIndexParams MemorySegment.
-   * 
-   * @return an instance of MemorySegment
-   */
-  public MemorySegment getCagraIndexParamsMemorySegment() {
-    return cagraIndexParamsMemorySegment;
+  protected MemorySegment getMemorySegment() {
+    return memorySegment;
   }
 
   @Override
   public String toString() {
     return "CagraIndexParams [arena=" + arena + ", intermediateGraphDegree=" + intermediateGraphDegree
         + ", graphDegree=" + graphDegree + ", cuvsCagraGraphBuildAlgo=" + cuvsCagraGraphBuildAlgo + ", nnDescentNiter="
-        + nnDescentNiter + ", cagraIndexParamsMemorySegment=" + cagraIndexParamsMemorySegment + "]";
+        + nnDescentNiter + ", cagraIndexParamsMemorySegment=" + memorySegment + "]";
   }
 
   /**
-   * Builder configures and creates an instance of CagraIndexParams.
+   * Gets the number of threads used to build the index.
+   */
+  public int getNumWriterThreads() {
+	return numWriterThreads;
+}
+
+  /**
+   * Builder configures and creates an instance of {@link CagraIndexParams}.
    */
   public static class Builder {
 
-    private CuvsCagraGraphBuildAlgo cuvsCagraGraphBuildAlgo = CuvsCagraGraphBuildAlgo.NN_DESCENT;
+    private CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo = CagraGraphBuildAlgo.NN_DESCENT;
     private Arena arena;
     private int intermediateGraphDegree = 128;
     private int graphDegree = 64;
-    private int nnDescentNiter = 20;
-    private int writerThreads = 1;
+    private int nnDescentNumIterations = 20;
+    private int numWriterThreads = 1;
 
-    /**
-     * Constructor for builder for initializing and instance of Arena.
-     * 
-     * @see Arena
-     */
     public Builder() {
-      this.arena = Arena.ofConfined();
+    	
     }
 
     /**
@@ -198,41 +178,41 @@ public class CagraIndexParams {
      * @param cuvsCagraGraphBuildAlgo the CuvsCagraGraphBuildAlgo to use
      * @return an instance of Builder
      */
-    public Builder withCuvsCagraGraphBuildAlgo(CuvsCagraGraphBuildAlgo cuvsCagraGraphBuildAlgo) {
+    public Builder withCagraGraphBuildAlgo(CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo) {
       this.cuvsCagraGraphBuildAlgo = cuvsCagraGraphBuildAlgo;
       return this;
     }
 
     /**
-     * Sets the Number of Iterations to run if building with NN_DESCENT.
+     * Sets the Number of Iterations to run if building with {@link CagraGraphBuildAlgo#NN_DESCENT}.
      * 
-     * @param nnDescentNiter number of Iterations to run if building with NN_DESCENT
+     * @param nnDescentNiter number of Iterations to run if building with {@link CagraGraphBuildAlgo#NN_DESCENT}
      * @return an instance of Builder
      */
-    public Builder withNNDescentNiter(int nnDescentNiter) {
-      this.nnDescentNiter = nnDescentNiter;
+    public Builder withNNDescentNumIterations(int nnDescentNiter) {
+      this.nnDescentNumIterations = nnDescentNiter;
       return this;
     }
 
     /**
-     * Registers the number of writer threads to use for indexing.
+     * Sets the number of writer threads to use for indexing.
      * 
-     * @param writerThreads number of writer threads to use
+     * @param numWriterThreads number of writer threads to use
      * @return an instance of Builder
      */
-    public Builder withWriterThreads(int writerThreads) {
-      this.writerThreads = writerThreads;
+    public Builder withNumWriterThreads(int numWriterThreads) {
+      this.numWriterThreads = numWriterThreads;
       return this;
     }
 
     /**
-     * Builds an instance of CagraIndexParams.
+     * Builds an instance of {@link CagraIndexParams}.
      * 
-     * @return an instance of CagraIndexParams
-     * @see CagraIndexParams
+     * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {
-      return new CagraIndexParams(arena, intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo, nnDescentNiter);
+      this.arena = Arena.ofConfined();
+      return new CagraIndexParams(arena, intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo, nnDescentNumIterations, numWriterThreads);
     }
   }
 }

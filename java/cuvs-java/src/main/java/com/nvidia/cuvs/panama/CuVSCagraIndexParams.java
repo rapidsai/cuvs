@@ -37,9 +37,9 @@ import java.util.function.Consumer;
  * }
  * }
  */
-public class cuvsCagraIndexParams {
+public class CuVSCagraIndexParams {
 
-    cuvsCagraIndexParams() {
+    CuVSCagraIndexParams() {
         // Should not be called directly
     }
 

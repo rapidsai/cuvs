@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs.cagra;
+package com.nvidia.cuvs.common;
 
 import java.io.File;
 import java.lang.foreign.Arena;
@@ -27,22 +27,20 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 
 /**
- * CuVSResources has the logic to initialize and hold the reference to CuVS
- * Resources instance.
+ * Used for allocating resources for cuVS
  * 
  * @since 24.12
  */
 public class CuVSResources {
 
-  private Arena arena;
-  private Linker linker;
-  private SymbolLookup symbolLookup;
-  private MethodHandle createResourcesMethodHandle;
-  private MemorySegment cuvsResourcesMemorySegment;
+  private final Arena arena;
+  private final Linker linker;
+  private final SymbolLookup symbolLookup;
+  private final MethodHandle createResourceMethodHandle;
+  private final MemorySegment memorySegment;
 
   /**
-   * Constructor for CuVSResources that initializes MethodHandle and invokes the
-   * native create_resource function via Panama API.
+   * Constructor that allocates the resources needed for cuVS
    * 
    * @throws Throwable exception thrown when native function is invoked
    */
@@ -51,15 +49,16 @@ public class CuVSResources {
     arena = Arena.ofConfined();
 
     File workingDirectory = new File(System.getProperty("user.dir"));
+    // TODO Remove hardcoding, also load from .jar
     symbolLookup = SymbolLookup.libraryLookup(workingDirectory.getParent() + "/internal/libcuvs_java.so", arena);
 
-    createResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("create_resource").get(),
+    createResourceMethodHandle = linker.downcallHandle(symbolLookup.find("create_resource").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
 
-    cuvsResourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValueMemorySegment);
+    memorySegment = (MemorySegment) createResourceMethodHandle.invokeExact(returnValueMemorySegment);
   }
 
   /**
@@ -67,7 +66,8 @@ public class CuVSResources {
    * 
    * @return cuvsResources MemorySegment
    */
-  public MemorySegment getCuvsResourcesMemorySegment() {
-    return cuvsResourcesMemorySegment;
+  public MemorySegment getMemorySegment() {
+	// TODO: Is there a way to not letting a memory segment leak into the public API?
+    return memorySegment;
   }
 }
