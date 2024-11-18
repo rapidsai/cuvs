@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <dlpack/dlpack.h>
+#include <fstream>
 
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
