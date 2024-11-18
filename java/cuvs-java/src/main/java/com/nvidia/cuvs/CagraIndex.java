@@ -180,7 +180,7 @@ public class CagraIndex {
    * 
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
-   * @param tmpFilePath  an intermediate {@link File} where CAGRA index is written
+   * @param tempFile  an intermediate {@link File} where CAGRA index is written
    *                     temporarily
    */
   public void serialize(OutputStream outputStream, File tempFile) throws Throwable {

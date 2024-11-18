@@ -154,7 +154,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.6.2</version>
                 <configuration>
-                    <excludePackageNames>com.nvidia.cuvs,com.nvidia.cuvs.panama</excludePackageNames>
+                    <excludePackageNames>com.nvidia.cuvs.examples,com.nvidia.cuvs.panama</excludePackageNames>
                     <reportOutputDirectory>${project.build.directory}</reportOutputDirectory>
                 </configuration>
             </plugin>
