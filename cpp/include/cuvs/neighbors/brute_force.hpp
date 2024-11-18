@@ -379,7 +379,14 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
+/**
+ * @}
+ */
 
+/**
+ * @defgroup bruteforce_cpp_index_serialize Bruteforce index serialize functions
+ * @{
+ */
 /**
  * Save the index to file.
  *
