@@ -21,6 +21,7 @@ from libcpp.string cimport string
 
 from cuvs.common.exceptions import check_cuvs
 from cuvs.common.resources import auto_sync_resources
+from cuvs.neighbors.common import check_input_array
 
 from cuvs.common cimport cydlpack
 
@@ -36,7 +37,6 @@ import uuid
 from pylibraft.common import auto_convert_output
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
 
 
 cdef class SearchParams:
