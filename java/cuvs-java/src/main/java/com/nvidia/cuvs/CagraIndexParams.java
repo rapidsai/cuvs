@@ -41,25 +41,25 @@ public class CagraIndexParams {
    */
   public enum CagraGraphBuildAlgo {
     /**
-     * AUTO_SELECT
+     * Select build algorithm automatically
      */
     AUTO_SELECT(0),
     /**
-     * IVF_PQ
+     * Use IVF-PQ to build all-neighbors knn graph
      */
     IVF_PQ(1),
     /**
-     * NN_DESCENT
+     * Experimental, use NN-Descent to build all-neighbors knn graph
      */
     NN_DESCENT(2);
 
     /**
      * The value for the enum choice.
      */
-    public final int label;
+    public final int value;
 
-    private CagraGraphBuildAlgo(int label) {
-      this.label = label;
+    private CagraGraphBuildAlgo(int value) {
+      this.value = value;
     }
   }
 
@@ -79,7 +79,7 @@ public class CagraIndexParams {
     MemorySegment memorySegment = CuVSCagraIndexParams.allocate(arena);
     CuVSCagraIndexParams.intermediate_graph_degree(memorySegment, intermediateGraphDegree);
     CuVSCagraIndexParams.graph_degree(memorySegment, graphDegree);
-    CuVSCagraIndexParams.build_algo(memorySegment, cuvsCagraGraphBuildAlgo.label);
+    CuVSCagraIndexParams.build_algo(memorySegment, cuvsCagraGraphBuildAlgo.value);
     CuVSCagraIndexParams.nn_descent_niter(memorySegment, nnDescentNiter);
     return memorySegment;
   }

@@ -33,7 +33,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
-import com.nvidia.cuvs.common.CuVSResources;
 import com.nvidia.cuvs.common.Util;
 import com.nvidia.cuvs.panama.cuvsCagraIndex;
 
