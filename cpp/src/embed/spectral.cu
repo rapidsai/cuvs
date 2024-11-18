@@ -15,7 +15,7 @@
  */
 
 #include "../sparse/cluster/detail/spectral.cuh"
-#include <cuvs/dimred/spectral.hpp>
+#include <cuvs/embed/spectral.hpp>
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/resources.hpp>
 
