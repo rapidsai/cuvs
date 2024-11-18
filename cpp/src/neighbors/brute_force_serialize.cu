@@ -20,6 +20,8 @@
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 
+#include <fstream>
+
 namespace cuvs::neighbors::brute_force {
 
 int constexpr serialization_version = 0;
