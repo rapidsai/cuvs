@@ -63,7 +63,7 @@ void deserialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t ind
   *rv = cuvsCagraDeserialize(cuvsResources, filename, index);
 }
 
-void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, long dimensions, 
+void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, int dimensions, 
     cuvsResources_t cuvsResources, int *neighbors_h, float *distances_h, int *returnValue, cuvsCagraSearchParams_t search_params) {
 
   uint32_t *neighbors;

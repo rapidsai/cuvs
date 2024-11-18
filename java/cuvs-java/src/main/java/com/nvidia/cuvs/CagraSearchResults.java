@@ -41,11 +41,11 @@ public class CagraSearchResults implements SearchResults {
   private final MemorySegment neighboursMemorySegment;
   private final MemorySegment distancesMemorySegment;
   private final int topK;
-  private final int numberOfQueries;
+  private final long numberOfQueries;
 
   protected CagraSearchResults(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
       MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK,
-      Map<Integer, Integer> mapping, int numberOfQueries) {
+      Map<Integer, Integer> mapping, long numberOfQueries) {
     super();
     this.topK = topK;
     this.numberOfQueries = numberOfQueries;
