@@ -19,6 +19,7 @@
 #include "ann_utils.cuh"
 #include "cagra/device_common.hpp"
 
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -216,6 +217,7 @@ struct BuildConfig {
   size_t max_iterations{50};
   float termination_threshold{0.0001};
   size_t output_graph_degree{32};
+  cuvs::distance::DistanceType metric{cuvs::distance::DistanceType::L2Expanded};
 };
 
 template <typename Index_t>
@@ -454,11 +456,13 @@ __device__ __forceinline__ void load_vec(Data_t* vec_buffer,
 // TODO: Replace with RAFT utilities https://github.com/rapidsai/raft/issues/1827
 /** Calculate L2 norm, and cast data to __half */
 template <typename Data_t>
-RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
-                                   __half* output_data,
-                                   int dim,
-                                   DistData_t* l2_norms,
-                                   size_t list_offset = 0)
+RAFT_KERNEL preprocess_data_kernel(
+  const Data_t* input_data,
+  __half* output_data,
+  int dim,
+  DistData_t* l2_norms,
+  size_t list_offset                  = 0,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 {
   extern __shared__ char buffer[];
   __shared__ float l2_norm;
@@ -468,26 +472,32 @@ RAFT_KERNEL preprocess_data_kernel(const Data_t* input_data,
   load_vec(s_vec, input_data + blockIdx.x * dim, dim, dim, threadIdx.x % raft::warp_size());
   if (threadIdx.x == 0) { l2_norm = 0; }
   __syncthreads();
-  int lane_id = threadIdx.x % raft::warp_size();
-  for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
-    int idx         = step * raft::warp_size() + lane_id;
-    float part_dist = 0;
-    if (idx < dim) {
-      part_dist = s_vec[idx];
-      part_dist = part_dist * part_dist;
+
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::CosineExpanded) {
+    int lane_id = threadIdx.x % raft::warp_size();
+    for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
+      int idx         = step * raft::warp_size() + lane_id;
+      float part_dist = 0;
+      if (idx < dim) {
+        part_dist = s_vec[idx];
+        part_dist = part_dist * part_dist;
+      }
+      __syncwarp();
+      for (int offset = raft::warp_size() >> 1; offset >= 1; offset >>= 1) {
+        part_dist += __shfl_down_sync(raft::warp_full_mask(), part_dist, offset);
+      }
+      if (lane_id == 0) { l2_norm += part_dist; }
+      __syncwarp();
     }
-    __syncwarp();
-    for (int offset = raft::warp_size() >> 1; offset >= 1; offset >>= 1) {
-      part_dist += __shfl_down_sync(raft::warp_full_mask(), part_dist, offset);
-    }
-    if (lane_id == 0) { l2_norm += part_dist; }
-    __syncwarp();
   }
 
   for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
     int idx = step * raft::warp_size() + threadIdx.x;
     if (idx < dim) {
-      if (l2_norms == nullptr) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct) {
+        output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
+      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         output_data[list_id * dim + idx] =
           (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
       } else {
@@ -715,7 +725,8 @@ __launch_bounds__(BLOCK_SIZE, 4)
                     DistData_t* dists,
                     int graph_width,
                     int* locks,
-                    DistData_t* l2_norms)
+                    DistData_t* l2_norms,
+                    cuvs::distance::DistanceType metric)
 {
 #if (__CUDA_ARCH__ >= 700)
   using namespace nvcuda;
@@ -827,8 +838,10 @@ __launch_bounds__(BLOCK_SIZE, 4)
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
     if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_new_size &&
         i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
-      if (l2_norms == nullptr) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
+      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+        s_distances[i] = 1.0 - s_distances[i];
       } else {
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
@@ -906,8 +919,10 @@ __launch_bounds__(BLOCK_SIZE, 4)
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
     if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_old_size &&
         i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
-      if (l2_norms == nullptr) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
+      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+        s_distances[i] = 1.0 - s_distances[i];
       } else {
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
@@ -1161,7 +1176,7 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
     ndim_(build_config.dataset_dim),
     d_data_{raft::make_device_matrix<__half, size_t, raft::row_major>(
       res, nrow_, build_config.dataset_dim)},
-    l2_norms_{raft::make_device_vector<DistData_t, size_t>(res, nrow_)},
+    l2_norms_{raft::make_device_vector<DistData_t, size_t>(res, 0)},
     graph_buffer_{
       raft::make_device_matrix<ID_t, size_t, raft::row_major>(res, nrow_, DEGREE_ON_DEVICE)},
     dists_buffer_{
@@ -1181,11 +1196,16 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
     d_list_sizes_old_{raft::make_device_vector<int2, size_t>(res, nrow_)}
 {
   static_assert(NUM_SAMPLES <= 32);
+
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   auto graph_buffer_view = raft::make_device_matrix_view<Index_t, int64_t>(
     reinterpret_cast<Index_t*>(graph_buffer_.data_handle()), nrow_, DEGREE_ON_DEVICE);
   raft::matrix::fill(res, graph_buffer_view, std::numeric_limits<Index_t>::max());
   raft::matrix::fill(res, d_locks_.view(), 0);
+
+  if (build_config.metric == cuvs::distance::DistanceType::L2Expanded) {
+    l2_norms_ = raft::make_device_vector<DistData_t, size_t>(res, nrow_);
+  }
 };
 
 template <typename Data_t, typename Index_t>
@@ -1228,7 +1248,8 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
                                                       dists_buffer_.data_handle(),
                                                       DEGREE_ON_DEVICE,
                                                       d_locks_.data_handle(),
-                                                      l2_norms_.data_handle());
+                                                      l2_norms_.data_handle(),
+                                                      build_config_.metric);
 }
 
 template <typename Data_t, typename Index_t>
@@ -1261,7 +1282,8 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                 d_data_.data_handle(),
                 build_config_.dataset_dim,
                 l2_norms_.data_handle(),
-                batch.offset());
+                batch.offset(),
+                build_config_.metric);
   }
 
   graph_.clear();
@@ -1417,6 +1439,11 @@ void build(raft::resources const& res,
   RAFT_EXPECTS(dataset.extent(0) < std::numeric_limits<int>::max() - 1,
                "The dataset size for GNND should be less than %d",
                std::numeric_limits<int>::max() - 1);
+  auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                         params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+                         params.metric == cuvs::distance::DistanceType::InnerProduct;
+  RAFT_EXPECTS(allowed_metrics && idx.metric() == params.metric,
+               "The metric for NN Descent should be L2Expanded, CosineExpanded or InnerProduct");
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
 
@@ -1452,7 +1479,8 @@ void build(raft::resources const& res,
                            .internal_node_degree  = extended_intermediate_degree,
                            .max_iterations        = params.max_iterations,
                            .termination_threshold = params.termination_threshold,
-                           .output_graph_degree   = params.graph_degree};
+                           .output_graph_degree   = params.graph_degree,
+                           .metric                = params.metric};
 
   GNND<const T, int> nnd(res, build_config);
 
@@ -1500,8 +1528,11 @@ index<IdxT> build(
     graph_degree = intermediate_degree;
   }
 
-  index<IdxT> idx{
-    res, dataset.extent(0), static_cast<int64_t>(graph_degree), params.return_distances};
+  index<IdxT> idx{res,
+                  dataset.extent(0),
+                  static_cast<int64_t>(graph_degree),
+                  params.return_distances,
+                  params.metric};
 
   build(res, params, dataset, idx);
 
