@@ -302,7 +302,6 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param)
   {  // create bitset filter in advance.
     auto stream_             = raft::resource::get_cuda_stream(handle_);
     size_t filter_n_elements = size_t((input_dataset_v_->extent(0) + 31) / 32);
-    std::cout << "input_dataset_v_->extent(0): " << input_dataset_v_->extent(0) << std::endl;
     bitset_filter_->resize(handle_, input_dataset_v_->extent(0), false);
     std::vector<std::uint32_t> bitset_cpu(filter_n_elements);
     create_sparse_bitset(input_dataset_v_->extent(0), sparsity, bitset_cpu);
