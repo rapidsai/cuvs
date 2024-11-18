@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 /**
- * CuVSQuery holds the CagraSearchParams and the query vectors to be used while
+ * CagraQuery holds the CagraSearchParams and the query vectors to be used while
  * invoking search.
  * 
  * @since 24.12

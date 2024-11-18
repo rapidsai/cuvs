@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.nvidia.cuvs.common;
+package com.nvidia.cuvs;
 
 import java.io.File;
 import java.lang.foreign.Arena;
@@ -25,6 +25,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+
+import com.nvidia.cuvs.common.Util;
 
 /**
  * Used for allocating resources for cuVS
@@ -65,7 +67,7 @@ public class CuVSResources {
    * 
    * @return cuvsResources MemorySegment
    */
-  public MemorySegment getMemorySegment() {
+  protected MemorySegment getMemorySegment() {
     // TODO: Is there a way to not letting a memory segment leak into the public
     // API?
     return memorySegment;
@@ -74,7 +76,7 @@ public class CuVSResources {
   /**
    * Returns the loaded libcuvs_java.so as a {@link SymbolLookup}
    */
-  public SymbolLookup getLibcuvsNativeLibrary() {
+  protected SymbolLookup getLibcuvsNativeLibrary() {
     return libcuvsNativeLibrary;
   }
 }

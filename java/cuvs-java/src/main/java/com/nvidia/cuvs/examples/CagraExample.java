@@ -29,8 +29,8 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
+import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
-import com.nvidia.cuvs.common.CuVSResources;
 import com.nvidia.cuvs.common.SearchResults;
 
 public class CagraExample {
