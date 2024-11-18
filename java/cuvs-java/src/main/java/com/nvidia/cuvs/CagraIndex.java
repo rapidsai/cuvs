@@ -100,7 +100,7 @@ public class CagraIndex {
 
     searchMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("search_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("int"),
-            linker.canonicalLayouts().get("long"), linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS,
+            linker.canonicalLayouts().get("long"), linker.canonicalLayouts().get("int"), ValueLayout.ADDRESS,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
     serializeMethodHandle = linker.downcallHandle(
@@ -141,20 +141,26 @@ public class CagraIndex {
    * @return an instance of {@link CagraSearchResults} containing the results
    */
   public CagraSearchResults search(CagraQuery query) throws Throwable {
-    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(50, linker.canonicalLayouts().get("int"));
-    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(50, linker.canonicalLayouts().get("float"));
+    long numQueries = query.getQueryVectors().length;
+    long numBlocks = query.getTopK() * numQueries;
+    int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
+
+    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks,
+        linker.canonicalLayouts().get("int"));
+    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks,
+        linker.canonicalLayouts().get("float"));
     MemorySegment neighborsMemorySegment = arena.allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
 
     searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
-        Util.buildMemorySegment(linker, arena, query.getQueryVectors()), query.getTopK(), 4L, 2L,
+        Util.buildMemorySegment(linker, arena, query.getQueryVectors()), query.getTopK(), numQueries, vectorDimension,
         resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment, returnValueMemorySegment,
         query.getCagraSearchParameters().getMemorySegment());
 
     return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
-        distancesMemorySegment, query.getTopK(), query.getMapping(), query.getQueryVectors().length);
+        distancesMemorySegment, query.getTopK(), query.getMapping(), numQueries);
   }
 
   /**
@@ -343,5 +349,4 @@ public class CagraIndex {
       return memorySegment;
     }
   }
-
 }

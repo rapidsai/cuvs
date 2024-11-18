@@ -68,8 +68,6 @@ public class CuVSResources {
    * @return cuvsResources MemorySegment
    */
   protected MemorySegment getMemorySegment() {
-    // TODO: Is there a way to not letting a memory segment leak into the public
-    // API?
     return memorySegment;
   }
 
