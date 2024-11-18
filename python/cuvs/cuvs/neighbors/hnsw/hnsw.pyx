@@ -21,7 +21,7 @@ from libcpp.string cimport string
 
 from cuvs.common.exceptions import check_cuvs
 from cuvs.common.resources import auto_sync_resources
-from cuvs.neighbors.common import check_input_array
+from cuvs.neighbors.common import _check_input_array
 
 from cuvs.common cimport cydlpack
 

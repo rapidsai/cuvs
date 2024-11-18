@@ -20,7 +20,7 @@ import numpy as np
 from libc.stdint cimport uintptr_t
 
 from cuvs.common cimport cydlpack
-from cuvs.neighbors.common import check_input_array
+from cuvs.neighbors.common import _check_input_array
 
 from .filters cimport BITMAP, NO_FILTER, cuvsFilter
 

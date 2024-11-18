@@ -33,7 +33,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.neighbors.common import check_input_array
+from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
     int8_t,

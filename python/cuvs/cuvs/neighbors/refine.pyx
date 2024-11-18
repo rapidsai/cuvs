@@ -37,7 +37,7 @@ from cuvs.distance import DISTANCE_TYPES
 from cuvs.common.c_api cimport cuvsResources_t
 
 from cuvs.common.exceptions import check_cuvs
-from cuvs.neighbors.common import check_input_array
+from cuvs.neighbors.common import _check_input_array
 
 
 @auto_sync_resources

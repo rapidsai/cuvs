@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-def check_input_array(cai, exp_dt, exp_rows=None, exp_cols=None):
+def _check_input_array(cai, exp_dt, exp_rows=None, exp_cols=None):
     if cai.dtype not in exp_dt:
         raise TypeError("dtype %s not supported" % cai.dtype)
 

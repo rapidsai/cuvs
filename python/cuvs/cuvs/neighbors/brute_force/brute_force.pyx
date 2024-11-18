@@ -33,7 +33,7 @@ from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
 from cuvs.distance import DISTANCE_TYPES
-from cuvs.neighbors.common import check_input_array
+from cuvs.neighbors.common import _check_input_array
 
 from cuvs.common.c_api cimport cuvsResources_t
 
