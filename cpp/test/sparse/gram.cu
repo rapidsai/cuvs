@@ -35,7 +35,7 @@
 #include <iostream>
 #include <memory>
 
-namespace cuvs::distance::kernels {
+namespace cuvs::distance::kernels::sparse {
 
 /**
  * Structure to describe structure of the input matrices:
@@ -127,7 +127,7 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
  protected:
   GramMatrixTest()
     : params(GetParam()),
-      stream(resource::get_cuda_stream(handle)),
+      stream(raft::resource::get_cuda_stream(handle)),
       x1(0, stream),
       x2(0, stream),
       x1_csr_indptr(0, stream),
@@ -173,7 +173,7 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
 
     std::vector<math_t> dense_host(dense_size);
     raft::update_host(dense_host.data(), dense, dense_size, stream);
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
 
     std::vector<int> indptr_host(n_rows + 1);
     std::vector<int> indices_host(n_rows * n_cols);
@@ -205,7 +205,7 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
     raft::update_device(indptr, indptr_host.data(), n_rows + 1, stream);
     raft::update_device(indices, indices_host.data(), nnz, stream);
     raft::update_device(data, data_host.data(), nnz, stream);
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
     return nnz;
   }
 
@@ -290,10 +290,10 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
                           params.kernel,
                           stream,
                           handle);
-    resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle, stream);
 
-    ASSERT_TRUE(raft::devArrMatchHost(
-      gram_host.data(), gram.data(), gram.size(), raft::CompareApprox<math_t>(1e-6f), stream));
+    ASSERT_TRUE(cuvs::devArrMatchHost(
+      gram_host.data(), gram.data(), gram.size(), cuvs::CompareApprox<math_t>(1e-6f), stream));
   }
 
   raft::resources handle;
@@ -327,4 +327,4 @@ INSTANTIATE_TEST_SUITE_P(GramMatrixTests, GramMatrixTestFloatLd, ::testing::Valu
 INSTANTIATE_TEST_SUITE_P(GramMatrixTests,
                          GramMatrixTestFloatLdCsr,
                          ::testing::ValuesIn(inputs_ld_csr));
-};  // namespace cuvs::distance::kernels
+};  // namespace cuvs::distance::kernels::sparse

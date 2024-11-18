@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#pragma once
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/distance/grammian.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -25,7 +26,7 @@
 #include <iostream>
 #include <memory>
 
-namespace raft {
+namespace cuvs {
 namespace distance {
 namespace kernels {
 
@@ -55,7 +56,7 @@ void naiveGramMatrixKernel(int n1,
   raft::update_host(x1_host.data(), x1.data(), x1.size(), stream);
   std::vector<math_t> x2_host(x2.size());
   raft::update_host(x2_host.data(), x2.data(), x2.size(), stream);
-  resource::sync_stream(handle, stream);
+  raft::resource::sync_stream(handle, stream);
 
   for (int i = 0; i < n1; i++) {
     for (int j = 0; j < n2; j++) {
@@ -87,4 +88,4 @@ void naiveGramMatrixKernel(int n1,
 
 }  // namespace kernels
 }  // namespace distance
-}  // namespace raft
+}  // namespace cuvs

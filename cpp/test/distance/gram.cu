@@ -81,12 +81,12 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
   GramMatrixTest()
     : params(GetParam()),
       handle(),
-      x1(0, resource::get_cuda_stream(handle)),
-      x2(0, resource::get_cuda_stream(handle)),
-      gram(0, resource::get_cuda_stream(handle)),
+      x1(0, raft::resource::get_cuda_stream(handle)),
+      x2(0, raft::resource::get_cuda_stream(handle)),
+      gram(0, raft::resource::get_cuda_stream(handle)),
       gram_host(0)
   {
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
 
     if (params.ld1 == 0) { params.ld1 = params.is_row_major ? params.n_cols : params.n1; }
     if (params.ld2 == 0) { params.ld2 = params.is_row_major ? params.n_cols : params.n2; }
@@ -136,7 +136,7 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
 
     (*kernel)(handle, x1_span, x2_span, out_span);
 
-    auto stream = resource::get_cuda_stream(handle);
+    auto stream = raft::resource::get_cuda_stream(handle);
     naiveGramMatrixKernel(params.n1,
                           params.n2,
                           params.n_cols,
@@ -151,8 +151,8 @@ class GramMatrixTest : public ::testing::TestWithParam<GramMatrixInputs> {
                           stream,
                           handle);
 
-    ASSERT_TRUE(raft::devArrMatchHost(
-      gram_host.data(), gram.data(), gram.size(), raft::CompareApprox<math_t>(1e-6f), stream));
+    ASSERT_TRUE(cuvs::devArrMatchHost(
+      gram_host.data(), gram.data(), gram.size(), cuvs::CompareApprox<math_t>(1e-6f), stream));
   }
 
   GramMatrixInputs params;
