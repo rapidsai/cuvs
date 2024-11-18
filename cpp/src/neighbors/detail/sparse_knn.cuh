@@ -15,8 +15,8 @@
  */
 
 #pragma once
-#include "../../../neighbors/detail/knn_merge_parts.cuh"
-#include "../../distance/distance.cuh"
+#include "../../sparse/distance/distance.cuh"
+#include "knn_merge_parts.cuh"
 #include <cuvs/distance/distance.hpp>
 
 #include <raft/core/resource/cuda_stream.hpp>
@@ -35,7 +35,7 @@
 
 #include <algorithm>
 
-namespace cuvs::sparse::neighbors::detail {
+namespace cuvs::neighbors::detail {
 
 template <typename value_idx, typename value_t>
 struct csr_batcher_t {
@@ -438,4 +438,4 @@ class sparse_knn_t {
   raft::resources const& handle;
 };
 
-};  // namespace cuvs::sparse::neighbors::detail
+};  // namespace cuvs::neighbors::detail

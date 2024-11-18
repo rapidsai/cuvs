@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include "../../test_utils.cuh"
+#include "../test_utils.cuh"
 
-#include <cuvs/sparse/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cudart_utils.hpp>
 
@@ -24,7 +24,6 @@
 #include <gtest/gtest.h>
 
 namespace cuvs {
-namespace sparse {
 namespace neighbors {
 
 using namespace raft;
@@ -84,13 +83,13 @@ class SparseKNNTest : public ::testing::TestWithParam<SparseKNNInputs<value_idx,
         indptr.data(), indices.data(), n_rows, params.n_cols, nnz);
     auto index_csr = raft::make_device_csr_matrix_view<const value_t>(data.data(), index_structure);
 
-    auto index = cuvs::sparse::neighbors::brute_force::build(handle, index_csr, params.metric);
+    auto index = cuvs::neighbors::brute_force::build(handle, index_csr, params.metric);
 
-    cuvs::sparse::neighbors::brute_force::search_params search_params;
+    cuvs::neighbors::brute_force::sparse_search_params search_params;
     search_params.batch_size_index = params.batch_size_index;
     search_params.batch_size_query = params.batch_size_query;
 
-    cuvs::sparse::neighbors::brute_force::search(
+    cuvs::neighbors::brute_force::search(
       handle,
       search_params,
       index,
@@ -173,5 +172,4 @@ TEST_P(SparseKNNTestF, Result) { compare(); }
 INSTANTIATE_TEST_CASE_P(SparseKNNTest, SparseKNNTestF, ::testing::ValuesIn(inputs_i32_f));
 
 };  // end namespace neighbors
-};  // end namespace sparse
 };  // end namespace cuvs

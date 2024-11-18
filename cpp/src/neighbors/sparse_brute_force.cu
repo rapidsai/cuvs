@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include <cuvs/sparse/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 
-#include "detail/knn.cuh"
+#include "detail/sparse_knn.cuh"
 
-namespace cuvs::sparse::neighbors::brute_force {
+namespace cuvs::neighbors::brute_force {
 template <typename T, typename IdxT>
-index<T, IdxT>::index(raft::resources const& res,
-                      raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT> dataset,
-                      cuvs::distance::DistanceType metric,
-                      T metric_arg)
+sparse_index<T, IdxT>::sparse_index(raft::resources const& res,
+                                    raft::device_csr_matrix_view<const T, IdxT, IdxT, IdxT> dataset,
+                                    cuvs::distance::DistanceType metric,
+                                    T metric_arg)
   : dataset_(dataset), metric_(metric), metric_arg_(metric_arg)
 {
 }
@@ -31,14 +31,14 @@ index<T, IdxT>::index(raft::resources const& res,
 auto build(raft::resources const& handle,
            raft::device_csr_matrix_view<const float, int, int, int> dataset,
            cuvs::distance::DistanceType metric,
-           float metric_arg) -> cuvs::sparse::neighbors::brute_force::index<float, int>
+           float metric_arg) -> cuvs::neighbors::brute_force::sparse_index<float, int>
 {
-  return index<float, int>(handle, dataset, metric, metric_arg);
+  return sparse_index<float, int>(handle, dataset, metric, metric_arg);
 }
 
 void search(raft::resources const& handle,
-            const cuvs::sparse::neighbors::brute_force::search_params& params,
-            const cuvs::sparse::neighbors::brute_force::index<float, int>& index,
+            const sparse_search_params& params,
+            const sparse_index<float, int>& index,
             raft::device_csr_matrix_view<const float, int, int, int> query,
             raft::device_matrix_view<int, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances)
@@ -69,4 +69,4 @@ void search(raft::resources const& handle,
                                    index.metric_arg())
     .run();
 }
-}  // namespace cuvs::sparse::neighbors::brute_force
+}  // namespace cuvs::neighbors::brute_force

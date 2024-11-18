@@ -448,6 +448,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
     src/neighbors/sample_filter.cu
+    src/neighbors/sparse_brute_force.cu
     src/neighbors/vamana_build_float.cu
     src/neighbors/vamana_build_uint8.cu
     src/neighbors/vamana_build_int8.cu
@@ -458,7 +459,6 @@ if(BUILD_SHARED_LIBS)
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
     src/selection/select_k_half_uint32_t.cu
-    src/sparse/neighbors/brute_force.cu
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
