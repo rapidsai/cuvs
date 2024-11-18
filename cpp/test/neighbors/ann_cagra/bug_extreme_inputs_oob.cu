@@ -16,12 +16,11 @@
 
 #include <gtest/gtest.h>
 
-#include "../../test_utils.cuh"
-
 #include <cuvs/neighbors/cagra.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
+#include <raft/random/rng.cuh>
 
 #include <cstdint>
 
