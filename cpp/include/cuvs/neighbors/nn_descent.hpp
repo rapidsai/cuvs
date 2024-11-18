@@ -61,11 +61,10 @@ struct index_params : cuvs::neighbors::index_params {
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
    * @param graph_degree output graph degree
+   * @param metric distance metric to use
    */
-  index_params(size_t graph_degree = 64)
-    : graph_degree(graph_degree), intermediate_graph_degree(1.5 * graph_degree)
-  {
-  }
+  index_params(size_t graph_degree                 = 64,
+               cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
 /**
@@ -103,11 +102,16 @@ struct index : cuvs::neighbors::index {
    * @param n_rows number of rows in knn-graph
    * @param n_cols number of cols in knn-graph
    * @param return_distances whether to return distances
+   * @param metric distance metric to use
    */
-  index(raft::resources const& res, int64_t n_rows, int64_t n_cols, bool return_distances = false)
+  index(raft::resources const& res,
+        int64_t n_rows,
+        int64_t n_cols,
+        bool return_distances               = false,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{cuvs::distance::DistanceType::L2Expanded},
+      metric_{metric},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(n_rows, n_cols)},
       graph_view_{graph_.view()},
       return_distances_{return_distances}
@@ -129,14 +133,16 @@ struct index : cuvs::neighbors::index {
    * @param graph_view raft::host_matrix_view<IdxT, int64_t, raft::row_major> for storing knn-graph
    * @param distances_view optional raft::device_matrix_view<float, int64_t, row_major> for storing
    * distances
+   * @param metric distance metric to use
    */
   index(raft::resources const& res,
         raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view,
         std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances_view =
-          std::nullopt)
+          std::nullopt,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{cuvs::distance::DistanceType::L2Expanded},
+      metric_{metric},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},
       graph_view_{graph_view},
       distances_view_{distances_view},
@@ -472,8 +478,6 @@ auto build(raft::resources const& res,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
            std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
              std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
-
-/** @} */
 
 /**
  * @brief Test if we have enough GPU memory to run NN descent algorithm.
