@@ -38,7 +38,6 @@ public class CagraQuery {
    * 
    * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
    *                              the search parameters
-   * @param preFilter             an instance of PreFilter
    * @param queryVectors          2D float query vector array
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
