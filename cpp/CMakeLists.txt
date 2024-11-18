@@ -436,6 +436,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
     src/neighbors/nn_descent_half.cu
+    src/neighbors/nn_descent_index.cpp
     src/neighbors/nn_descent_int8.cu
     src/neighbors/nn_descent_uint8.cu
     src/neighbors/reachability.cu

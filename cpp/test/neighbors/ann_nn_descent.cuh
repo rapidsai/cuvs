@@ -27,6 +27,7 @@
 #include <rmm/device_uvector.hpp>
 
 #include "naive_knn.cuh"
+#include <cuvs/distance/distance.hpp>
 
 #include <gtest/gtest.h>
 
@@ -107,7 +108,6 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);
     }
-
     {
       {
         nn_descent::index_params index_params;
@@ -124,6 +124,7 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
           if (ps.host_dataset) {
             auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
             raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
+            raft::resource::sync_stream(handle_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
             auto index = nn_descent::build(handle_, index_params, database_host_view);
@@ -151,6 +152,13 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
         raft::resource::sync_stream(handle_);
       }
 
+      if (ps.metric == cuvs::distance::DistanceType::InnerProduct) {
+        std::transform(
+          distances_naive.begin(), distances_naive.end(), distances_naive.begin(), [](auto x) {
+            return -x;
+          });
+      }
+
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_NNDescent,
@@ -169,9 +177,11 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
     raft::random::RngState r(1234ULL);
     if constexpr (std::is_same<DataT, float>{}) {
       raft::random::normal(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
-    } else {
+    } else if constexpr (std::is_same<DataT, int8_t>{}) {
       raft::random::uniformInt(
-        handle_, r, database.data(), ps.n_rows * ps.dim, DataT(1), DataT(20));
+        handle_, r, database.data(), ps.n_rows * ps.dim, DataT(-5), DataT(5));
+    } else {
+      raft::random::uniformInt(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0), DataT(5));
     }
     raft::resource::sync_stream(handle_);
   }
@@ -308,13 +318,15 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
   rmm::device_uvector<DataT> database;
 };
 
-const std::vector<AnnNNDescentInputs> inputs = raft::util::itertools::product<AnnNNDescentInputs>(
-  {1000, 2000},                                              // n_rows
-  {3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
-  {32, 64},                                                  // graph_degree
-  {cuvs::distance::DistanceType::L2Expanded},
-  {false, true},
-  {0.90});
+const std::vector<AnnNNDescentInputs> inputs =
+  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},            // n_rows
+                                                     {4, 16, 64, 256, 1024},  // dim
+                                                     {32, 64},                // graph_degree
+                                                     {cuvs::distance::DistanceType::L2Expanded,
+                                                      cuvs::distance::DistanceType::InnerProduct,
+                                                      cuvs::distance::DistanceType::CosineExpanded},
+                                                     {false, true},
+                                                     {0.90});
 
 // TODO : Investigate why this test is failing Reference issue https
 // :  // github.com/rapidsai/raft/issues/2450
