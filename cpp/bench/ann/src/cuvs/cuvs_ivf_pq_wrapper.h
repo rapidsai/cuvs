@@ -154,17 +154,13 @@ void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
   if (sp.dynamic_batching) {
     dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
       handle_,
-      cuvs::neighbors::dynamic_batching::index_params<cuvs::neighbors::ivf_pq::index<IdxT>>{
-        index_params_.metric,
-        index_params_.metric_arg,
-        *index_,
-        search_params_,
-        nullptr,
-        sp.dynamic_batching_k,
-        int64_t(this->dim_),
-        sp.dynamic_batching_max_batch_size,
-        sp.dynamic_batching_n_queues,
-        sp.dynamic_batching_conservative_dispatch});
+      cuvs::neighbors::dynamic_batching::index_params{{},
+                                                      sp.dynamic_batching_k,
+                                                      sp.dynamic_batching_max_batch_size,
+                                                      sp.dynamic_batching_n_queues,
+                                                      sp.dynamic_batching_conservative_dispatch},
+      *index_,
+      search_params_);
     dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
   } else {
     dynamic_batcher_.reset();

@@ -26,14 +26,18 @@ namespace cuvs::neighbors::dynamic_batching {
 // NB: the (template) index parameter should be the last; it may contain the spaces and so split
 //       into multiple preprocessor token. Then it is consumed as __VA_ARGS__
 //
-#define CUVS_INST_DYNAMIC_BATCHING_INDEX(T, IdxT, Namespace, ...)                           \
-  template <>                                                                               \
-  template <>                                                                               \
-  index<T, IdxT>::index<Namespace ::__VA_ARGS__>(                                           \
-    const raft::resources& res,                                                             \
-    cuvs::neighbors::dynamic_batching::index_params<Namespace ::__VA_ARGS__> const& params) \
-    : runner{new detail::batch_runner<T, IdxT>(res, params, Namespace ::search)}            \
-  {                                                                                         \
+#define CUVS_INST_DYNAMIC_BATCHING_INDEX(T, IdxT, Namespace, ...)                         \
+  template <>                                                                             \
+  template <>                                                                             \
+  index<T, IdxT>::index<Namespace ::__VA_ARGS__>(                                         \
+    const raft::resources& res,                                                           \
+    const cuvs::neighbors::dynamic_batching::index_params& params,                        \
+    const Namespace ::__VA_ARGS__& upstream_index,                                        \
+    const typename Namespace ::__VA_ARGS__::search_params_type& upstream_params,          \
+    const cuvs::neighbors::filtering::base_filter* sample_filter)                         \
+    : runner{new detail::batch_runner<T, IdxT>(                                           \
+        res, params, upstream_index, upstream_params, Namespace ::search, sample_filter)} \
+  {                                                                                       \
   }
 
 #define CUVS_INST_DYNAMIC_BATCHING_SEARCH(T, IdxT)                                 \

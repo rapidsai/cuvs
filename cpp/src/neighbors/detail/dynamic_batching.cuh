@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#pragma once
+
+#include "../sample_filter.cuh"
+
 #include <cuvs/neighbors/dynamic_batching.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -692,34 +696,47 @@ class batch_runner {
   // Save the parameters and the upstream batched search function to invoke
   template <typename Upstream>
   batch_runner(const raft::resources& res,
-               const dynamic_batching::index_params<Upstream>& params,
-               upstream_search_type_const<Upstream, T, IdxT>* upstream_search)
+               const dynamic_batching::index_params& params,
+               const Upstream& upstream_index,
+               const typename Upstream::search_params_type& upstream_params,
+               upstream_search_type_const<Upstream, T, IdxT>* upstream_search,
+               const cuvs::neighbors::filtering::base_filter* sample_filter)
     : res_{res},
-      upstream_search_{[&ix = params.upstream,
-                        &ps = params.upstream_params,
-                        upstream_search,
-                        sample_filter = params.sample_filter](
+      upstream_search_{[&upstream_index, upstream_search, upstream_params, sample_filter](
                          raft::resources const& res,
                          raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                          raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
                          raft::device_matrix_view<float, int64_t, raft::row_major> distances) {
+        /* Note: passing sample_filter by pointer
+
+        Ideally, dynamic batching would capture the filter by value. Unfortunately, one cannot use
+        the copy constructor of the `base_filter` (it would erase the actual filter type).
+        Therefore, we can only pass the filter by pointer or reference and require the user to keep
+        the filter alive for the lifetime of the dynamic batching index.
+        This, however, may lead to a segfault when the user doesn't provide the filter argument and
+        the argument is passed by reference: the lifetime of the none_sample_filter default argument
+        is limited to the search function call, so it is destroyed while the dynamic batching index
+        is still alive.
+        Hence the solution is to pass the filter by pointer and default it to nullptr.
+        */
         if (sample_filter == nullptr) {
           using base_filter_type = cuvs::neighbors::filtering::base_filter;
           const auto none_filter = cuvs::neighbors::filtering::none_sample_filter{};
           return upstream_search(res,
-                                 ps,
-                                 ix,
+                                 upstream_params,
+                                 upstream_index,
                                  queries,
                                  neighbors,
                                  distances,
                                  static_cast<const base_filter_type&>(none_filter));
 
         } else {
-          return upstream_search(res, ps, ix, queries, neighbors, distances, *sample_filter);
+          return upstream_search(
+            res, upstream_params, upstream_index, queries, neighbors, distances, *sample_filter);
         }
       }},
       k_{uint32_t(params.k)},
-      dim_{uint32_t(params.dim)},
+      dim_{uint32_t(upstream_index.dim())},
       max_batch_size_{uint32_t(params.max_batch_size)},
       n_queues_{uint32_t(params.n_queues)},
       batch_queue_{res_, params.conservative_dispatch},
@@ -753,12 +770,18 @@ class batch_runner {
   // A workaround for algos, which have non-const `index` type in their arguments
   template <typename Upstream>
   batch_runner(const raft::resources& res,
-               const dynamic_batching::index_params<Upstream>& params,
-               upstream_search_type<Upstream, T, IdxT>* upstream_search)
+               const dynamic_batching::index_params& params,
+               const Upstream& upstream_index,
+               const typename Upstream::search_params_type& upstream_params,
+               upstream_search_type<Upstream, T, IdxT>* upstream_search,
+               const cuvs::neighbors::filtering::base_filter* sample_filter)
     : batch_runner{
         res,
         params,
-        reinterpret_cast<upstream_search_type_const<Upstream, T, IdxT>*>(upstream_search)}
+        upstream_index,
+        upstream_params,
+        reinterpret_cast<upstream_search_type_const<Upstream, T, IdxT>*>(upstream_search),
+        sample_filter}
   {
   }
 

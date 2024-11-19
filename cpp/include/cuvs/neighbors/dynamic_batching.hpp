@@ -29,18 +29,9 @@ template <typename T, typename IdxT>
 class batch_runner;
 }
 
-template <typename Upstream>
 struct index_params : cuvs::neighbors::index_params {
-  /** The index, to which the dynamic batches are dispatched. */
-  Upstream& upstream;
-  /** Search paramerets for all requests within a batch. */
-  typename Upstream::search_params_type& upstream_params;
-  /** Filtering function, if any, must be the same for all requests in a batch. */
-  cuvs::neighbors::filtering::base_filter* sample_filter = nullptr;
   /** The number of neighbors to search is fixed at construction time. */
   int64_t k;
-  /** Input data (queries) dimensionality. */
-  int64_t dim;
   /** Maximum size of the batch to submit to the upstream index. */
   int64_t max_batch_size = 100;
   /**
@@ -92,8 +83,26 @@ template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index {
   std::shared_ptr<detail::batch_runner<T, IdxT>> runner;
 
+  /**
+   * @brief Construct a dynamic batching index by wrapping the upstream index.
+   *
+   * @param[in] res raft resources
+   * @param[in] params dynamic batching parameters
+   * @param[in] upstream_index the original index to perform the search
+   *     (the reference must be alive for the lifetime of the dynamic batching index)
+   * @param[in] upstream_params the original index search parameters for all queries in a batch
+   *     (the parameters are captured by value for the lifetime of the dynamic batching index)
+   * @param[in] sample_filter
+   *     filtering function, if any, must be the same for all requests in a batch
+   *     (the pointer must be alive for the lifetime of the dynamic batching index)
+   * @return the dynamic batching index
+   */
   template <typename Upstream>
-  index(const raft::resources& res, const dynamic_batching::index_params<Upstream>& params);
+  index(const raft::resources& res,
+        const cuvs::neighbors::dynamic_batching::index_params& params,
+        const Upstream& upstream_index,
+        const typename Upstream::search_params_type& upstream_params,
+        const cuvs::neighbors::filtering::base_filter* sample_filter = nullptr);
 };
 
 void search(raft::resources const& res,

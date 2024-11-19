@@ -142,18 +142,21 @@ void dynamic_batching_example(
   orig_search_params.itopk_size = 512;
   orig_search_params.algo = cagra::search_algo::SINGLE_CTA;
 
-  // Dynamic batching index takes the upstream index as a build parameter
-  // ("building" dynamic_batching::index means just wrapping the upstream and
-  // preparing IO buffers)
-  dynamic_batching::index_params<decltype(orig_index)> dynb_index_params{
-      cuvs::distance::DistanceType::L2Expanded, 2.0, orig_index,
-      /* We need to know the search parameters in advance for batching */
-      orig_search_params, nullptr, topk, queries.extent(1),
+  // Set up dynamic batching parameters
+  dynamic_batching::index_params dynb_index_params{
+      /* default-initializing the parent `neighbors::index_params`
+         (not used anyway) */
+      {},
+      /* Set the K in advance (the batcher needs to allocate buffers) */
+      topk,
       /* Configure the number and the size of IO buffers */
-      64, kNumWorkerStreams};
+      64,
+      kNumWorkerStreams};
 
-  // "build" the index
-  dynamic_batching::index<float, uint32_t> dynb_index(res, dynb_index_params);
+  // "build" the index (it's a low-cost index wrapping),
+  //  that is we need to pass the original index and its search params here
+  dynamic_batching::index<float, uint32_t> dynb_index(
+      res, dynb_index_params, orig_index, orig_search_params);
 
   // You can implement job priorities by varying the deadlines of individual
   // requests
