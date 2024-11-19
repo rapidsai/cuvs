@@ -162,7 +162,6 @@ auto predict_vq(const raft::resources& res,
                 cuvs::distance::DistanceType metric)
   -> raft::device_vector<LabelT, typename DatasetT::index_type>
 {
-  RAFT_LOG_INFO("metric %d", metric);
   using kmeans_data_type = typename DatasetT::value_type;
   using kmeans_math_type = typename VqCentersT::value_type;
   using index_type       = typename DatasetT::index_type;
