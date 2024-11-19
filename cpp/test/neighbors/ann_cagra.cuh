@@ -309,6 +309,7 @@ struct AnnCagraInputs {
   bool include_serialized_dataset;
   // std::optional<double>
   double min_recall;  // = std::nullopt;
+  double threshold_to_bf                          = 0.9;
   uint32_t filter_offset                          = 300;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
   std::optional<vpq_params> compression           = std::nullopt;
@@ -847,7 +848,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
                       search_queries_view,
                       indices_out_view,
                       dists_out_view,
-                      bitset_filter_obj);
+                      bitset_filter_obj,
+                      ps.threshold_to_bf);
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
@@ -1047,6 +1049,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {false, true},
                                                    {false},
                                                    {0.99},
+                                                   {0.9},
                                                    {uint32_t(300)},
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
@@ -1092,9 +1095,11 @@ inline std::vector<AnnCagraInputs> generate_bf_inputs()
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
-    {1.0});
+    {1.0},
+    {0.1, 0.4, 0.91});
   for (auto input : inputs_original) {
-    input.filter_offset = 0.90 * input.n_rows;
+    input.filter_offset = 0.5 * input.n_rows;
+    input.min_recall    = input.threshold_to_bf <= 0.5 ? 1.0 : 0.6;
     inputs_for_brute_force.push_back(input);
   }
 

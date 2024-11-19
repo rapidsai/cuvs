@@ -293,6 +293,9 @@ index<T, IdxT> build(
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
  * @param[in] sample_filter a device filter function that greenlights samples for a given query
+ * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
+ * threshold, in the range [0, 1]
+ *
  */
 template <typename T, typename IdxT, typename CagraSampleFilterT>
 void search_with_filtering(raft::resources const& res,
@@ -301,7 +304,8 @@ void search_with_filtering(raft::resources const& res,
                            raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                            raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
                            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-                           CagraSampleFilterT sample_filter = CagraSampleFilterT())
+                           CagraSampleFilterT sample_filter = CagraSampleFilterT(),
+                           double threshold_to_bf           = 0.9)
 {
   RAFT_EXPECTS(
     queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
@@ -322,8 +326,14 @@ void search_with_filtering(raft::resources const& res,
   auto distances_internal = raft::make_device_matrix_view<float, int64_t, raft::row_major>(
     distances.data_handle(), distances.extent(0), distances.extent(1));
 
-  return cagra::detail::search_main<T, internal_IdxT, CagraSampleFilterT, IdxT>(
-    res, params, idx, queries_internal, neighbors_internal, distances_internal, sample_filter);
+  return cagra::detail::search_main<T, internal_IdxT, CagraSampleFilterT, IdxT>(res,
+                                                                                params,
+                                                                                idx,
+                                                                                queries_internal,
+                                                                                neighbors_internal,
+                                                                                distances_internal,
+                                                                                sample_filter,
+                                                                                threshold_to_bf);
 }
 
 template <typename T, typename IdxT>
@@ -333,14 +343,15 @@ void search(raft::resources const& res,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
             raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
-            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref,
+            double threshold_to_bf = 0.9)
 {
   try {
     using none_filter_type  = cuvs::neighbors::filtering::none_sample_filter;
     auto& sample_filter     = dynamic_cast<const none_filter_type&>(sample_filter_ref);
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, none_filter_type>(
-      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+      res, params, idx, queries, neighbors, distances, sample_filter_copy, threshold_to_bf);
     return;
   } catch (const std::bad_cast&) {
   }
@@ -351,7 +362,7 @@ void search(raft::resources const& res,
         sample_filter_ref);
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, decltype(sample_filter_copy)>(
-      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+      res, params, idx, queries, neighbors, distances, sample_filter_copy, threshold_to_bf);
   } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type");
   }
