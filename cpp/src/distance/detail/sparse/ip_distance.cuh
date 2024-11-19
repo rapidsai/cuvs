@@ -36,9 +36,9 @@
 #include <nvfunctional>
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 
 template <typename value_idx, typename value_t>
 class ip_distances_t : public distances_t<value_t> {
@@ -83,7 +83,7 @@ class ip_distances_t : public distances_t<value_t> {
   rmm::device_uvector<value_idx> coo_rows_b;
 };
 
-};  // END namespace detail
-};  // END namespace distance
-};  // END namespace sparse
-};  // END namespace cuvs
+}  // END namespace sparse
+}  // END namespace detail
+}  // END namespace distance
+}  // END namespace cuvs

@@ -22,9 +22,9 @@
 #include <cub/cub.cuh>
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 __device__ __inline__ unsigned int get_lowest_peer(unsigned int peer_group)
 {
   return __ffs(peer_group) - 1;
@@ -223,7 +223,7 @@ RAFT_KERNEL balanced_coo_generalized_spmv_kernel(strategy_t strategy,
   }
 }
 
+}  // namespace sparse
 }  // namespace detail
 }  // namespace distance
-}  // namespace sparse
 }  // namespace cuvs

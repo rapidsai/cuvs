@@ -15,7 +15,7 @@
  */
 
 #pragma once
-#include "../../sparse/distance/distance.cuh"
+#include "../../distance/sparse_distance.cuh"
 #include "knn_merge_parts.cuh"
 #include <cuvs/distance/distance.hpp>
 
@@ -398,7 +398,7 @@ class sparse_knn_t {
     /**
      * Compute distances
      */
-    cuvs::sparse::distance::detail::distances_config_t<value_idx, value_t> dist_config(handle);
+    cuvs::distance::detail::sparse::distances_config_t<value_idx, value_t> dist_config(handle);
     dist_config.b_nrows = idx_batcher.batch_rows();
     dist_config.b_ncols = n_idx_cols;
     dist_config.b_nnz   = idx_batch_nnz;
@@ -415,11 +415,7 @@ class sparse_knn_t {
     dist_config.a_indices = query_batch_indices;
     dist_config.a_data    = query_batch_data;
 
-    if (cuvs::sparse::distance::supportedDistance.find(metric) ==
-        cuvs::sparse::distance::supportedDistance.end())
-      THROW("DistanceType not supported: %d", metric);
-
-    cuvs::sparse::distance::pairwiseDistance(batch_dists, dist_config, metric, metricArg);
+    cuvs::distance::pairwiseDistance(batch_dists, dist_config, metric, metricArg);
   }
 
   const value_idx *idxIndptr, *idxIndices, *queryIndptr, *queryIndices;

@@ -21,9 +21,9 @@
 #include <raft/util/cuda_dev_essentials.cuh>  // raft::ceildiv
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 
 template <typename value_idx, typename value_t, int tpb>
 class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
@@ -115,7 +115,7 @@ class dense_smem_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   __device__ inline value_t find(find_type cache, const value_idx& key) { return cache[key]; }
 };
 
+}  // namespace sparse
 }  // namespace detail
 }  // namespace distance
-}  // namespace sparse
 }  // namespace cuvs

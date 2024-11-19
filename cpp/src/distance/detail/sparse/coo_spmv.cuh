@@ -33,9 +33,9 @@
 #include <nvfunctional>
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 
 template <typename value_idx,
           typename value_t,
@@ -205,7 +205,7 @@ inline void balanced_coo_pairwise_generalized_spmv_rev(
   }
 };
 
+}  // namespace sparse
 }  // namespace detail
 }  // namespace distance
-}  // namespace sparse
-};  // namespace cuvs
+}  // namespace cuvs

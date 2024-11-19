@@ -27,9 +27,9 @@
 #include <thrust/transform.h>
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 
 template <typename value_idx>
 class mask_row_it {
@@ -228,7 +228,7 @@ class chunked_mask_row_it : public mask_row_it<value_idx> {
   }
 };
 
+}  // namespace sparse
 }  // namespace detail
 }  // namespace distance
-}  // namespace sparse
 }  // namespace cuvs

@@ -369,6 +369,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/fused_distance_nn.cu
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
+    src/distance/sparse_distance.cu
     src/neighbors/brute_force.cu
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu

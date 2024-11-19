@@ -23,9 +23,9 @@
 #include <cuda_pipeline.h>
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 
 /**
  * Computes the maximum number of columns that can be stored
@@ -165,7 +165,7 @@ void faster_dot_on_csr(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
+}  // namespace sparse
 }  // namespace detail
 }  // namespace distance
-}  // namespace sparse
 }  // namespace cuvs

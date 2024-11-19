@@ -36,9 +36,9 @@ CUCO_DECLARE_BITWISE_COMPARABLE(float);
 CUCO_DECLARE_BITWISE_COMPARABLE(double);
 
 namespace cuvs {
-namespace sparse {
 namespace distance {
 namespace detail {
+namespace sparse {
 
 template <typename value_idx, typename value_t, int tpb>
 class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
@@ -290,7 +290,7 @@ class hash_strategy : public coo_spmv_strategy<value_idx, value_t, tpb> {
   int map_size;
 };
 
+}  // namespace sparse
 }  // namespace detail
 }  // namespace distance
-}  // namespace sparse
 }  // namespace cuvs
