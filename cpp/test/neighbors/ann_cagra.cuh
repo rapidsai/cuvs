@@ -792,6 +792,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
         search_params.team_size   = ps.team_size;
+        search_params.team_size   = ps.threshold_to_bf;
 
         // TODO: setting search_params.itopk_size here breaks the filter tests, but is required for
         // k>1024 skip these tests until fixed
@@ -848,8 +849,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
                       search_queries_view,
                       indices_out_view,
                       dists_out_view,
-                      bitset_filter_obj,
-                      ps.threshold_to_bf);
+                      bitset_filter_obj);
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
@@ -1096,7 +1096,7 @@ inline std::vector<AnnCagraInputs> generate_bf_inputs()
     {false},
     {true},
     {1.0},
-    {0.1, 0.4, 0.91});
+    {0.1, 0.4, 0.8});
   for (auto input : inputs_original) {
     input.filter_offset = 0.5 * input.n_rows;
     input.min_recall    = input.threshold_to_bf <= 0.5 ? 1.0 : 0.6;

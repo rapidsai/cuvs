@@ -229,6 +229,10 @@ struct search_params : cuvs::neighbors::search_params {
    * impact on the throughput.
    */
   float persistent_device_usage = 1.0;
+
+  /** A sparsity threshold; brute force is used when sparsity exceeds this threshold, in the range
+   * [0, 1] */
+  double threshold_to_bf = 0.9;
 };
 
 /**
@@ -1057,8 +1061,6 @@ void extend(
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
  * for a given query. (none_sample_filter for no filtering)
- * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
- * threshold, in the range [0, 1]
  */
 
 void search(raft::resources const& res,
@@ -1068,8 +1070,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
-              cuvs::neighbors::filtering::none_sample_filter{},
-            double threshold_to_bf = 0.9f);
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1086,8 +1087,6 @@ void search(raft::resources const& res,
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
  * for a given query. (none_sample_filter for no filtering)
- * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
- * threshold, in the range [0, 1]
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -1096,8 +1095,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
-              cuvs::neighbors::filtering::none_sample_filter{},
-            double threshold_to_bf = 0.9f);
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1114,8 +1112,6 @@ void search(raft::resources const& res,
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
  * for a given query. (none_sample_filter for no filtering)
- * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
- * threshold, in the range [0, 1]
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -1124,8 +1120,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
-              cuvs::neighbors::filtering::none_sample_filter{},
-            double threshold_to_bf = 0.9f);
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
@@ -1142,8 +1137,6 @@ void search(raft::resources const& res,
  * k]
  * @param[in] sample_filter an optional device filter function object that greenlights samples
  * for a given query. (none_sample_filter for no filtering)
- * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
- * threshold, in the range [0, 1]
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
@@ -1152,8 +1145,7 @@ void search(raft::resources const& res,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
-              cuvs::neighbors::filtering::none_sample_filter{},
-            double threshold_to_bf = 0.9f);
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @}

@@ -116,7 +116,7 @@ void search_main_core(raft::resources const& res,
  *
  * This function switches to a brute force search approach to improve recall rate when the
  * `sample_filter` function filters out a high proportion of samples, resulting in a sparsity level
- * (proportion of unfiltered samples) exceeding the specified `threshold_to_bf`.
+ * (proportion of unfiltered samples) exceeding the specified `params.threshold_to_bf`.
  *
  * @tparam T data element type
  * @tparam IdxT type of database vector indices
@@ -133,8 +133,6 @@ void search_main_core(raft::resources const& res,
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
  * @param[in] sample_filter a device filter function that greenlights samples for a given query
- * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
- * threshold, in the range [0, 1]
  *
  * @return true If the brute force search was applied successfully.
  * @return false If the brute force search was not applied.
@@ -152,8 +150,7 @@ bool search_using_brute_force(
   raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
   raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
   raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
-  CagraSampleFilterT& sample_filter,
-  double threshold_to_bf = 0.9)
+  CagraSampleFilterT& sample_filter)
 {
   auto n_queries = queries.extent(0);
   auto n_dataset = strided_dataset.n_rows();
@@ -161,7 +158,7 @@ bool search_using_brute_force(
   auto bitset_filter_view = sample_filter.bitset_view_;
   auto sparsity           = bitset_filter_view.sparsity(res);
 
-  if (sparsity < threshold_to_bf) { return false; }
+  if (sparsity < params.threshold_to_bf) { return false; }
 
   // TODO: Support host dataset in `brute_force::build`
   RAFT_LOG_DEBUG("CAGRA is switching to brute force with sparsity:%f", sparsity);
@@ -239,9 +236,6 @@ bool search_using_brute_force(
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
  * @param[in] sample_filter a device filter function that greenlights samples for a given query
- * @param[in] threshold_to_bf A sparsity threshold; brute force is used when sparsity exceeds this
- * threshold, in the range [0, 1]
- *
  */
 template <typename T,
           typename InternalIdxT,
@@ -254,8 +248,7 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
                  raft::device_matrix_view<InternalIdxT, int64_t, raft::row_major> neighbors,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
-                 CagraSampleFilterT sample_filter = CagraSampleFilterT(),
-                 double threshold_to_bf           = 0.9)
+                 CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
   auto stream         = raft::resource::get_cuda_stream(res);
   const auto& graph   = index.graph();
@@ -270,15 +263,8 @@ void search_main(raft::resources const& res,
     if constexpr (!std::is_same_v<CagraSampleFilterT,
                                   cuvs::neighbors::filtering::none_sample_filter> &&
                   (std::is_same_v<T, float> || std::is_same_v<T, half>)) {
-      bool bf_search_done = search_using_brute_force(res,
-                                                     params,
-                                                     *strided_dset,
-                                                     index.metric(),
-                                                     queries,
-                                                     neighbors,
-                                                     distances,
-                                                     sample_filter,
-                                                     threshold_to_bf);
+      bool bf_search_done = search_using_brute_force(
+        res, params, *strided_dset, index.metric(), queries, neighbors, distances, sample_filter);
       if (bf_search_done) return;
     }
 
