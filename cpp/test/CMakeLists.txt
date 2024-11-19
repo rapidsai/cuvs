@@ -137,6 +137,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
+    neighbors/ann_cagra/bug_extreme_inputs_oob.cu
     neighbors/ann_cagra/bug_multi_cta_crash.cu
     neighbors/ann_cagra/test_float_uint32_t.cu
     neighbors/ann_cagra/test_half_uint32_t.cu
