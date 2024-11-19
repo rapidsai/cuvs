@@ -327,12 +327,12 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
             const std::uint32_t d1 = m + (PQ_LEN * v);
             const std::uint32_t d  = d1 + (PQ_LEN * k);
             // if (d >= dataset_dim) break;
-            DISTANCE_T diff;
-            device::lds(diff, query_ptr + sizeof(QUERY_T) * d);
-            diff -= static_cast<DISTANCE_T>(pq_vals[m]);
-            diff -=
+            DISTANCE_T q;
+            device::lds(q, query_ptr + sizeof(QUERY_T) * d);
+            DISTANCE_T c = static_cast<DISTANCE_T>(pq_vals[m]);
+            c +=
               static_cast<DISTANCE_T>(reinterpret_cast<CODE_BOOK_T(&)[PQ_LEN * vlen]>(vq_vals)[d1]);
-            norm += diff * diff;
+            norm += dist_op<DISTANCE_T>(q, c);
           }
           pq_code >>= 8;
         }
