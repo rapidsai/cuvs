@@ -152,6 +152,8 @@ bool search_using_brute_force(
   raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
   CagraSampleFilterT& sample_filter)
 {
+  if (params.threshold_to_bf >= 1.0) { return false; };
+
   auto n_queries = queries.extent(0);
   auto n_dataset = strided_dataset.n_rows();
 
