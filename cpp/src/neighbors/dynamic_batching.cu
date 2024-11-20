@@ -58,10 +58,21 @@ CUVS_INST_DYNAMIC_BATCHING_INDEX(uint8_t,
                                  uint32_t,
                                  cuvs::neighbors::cagra,
                                  index<uint8_t, uint32_t>);
+
 CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(half, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(int8_t, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(uint8_t, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
+
+CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::ivf_flat, index<float, int64_t>);
+CUVS_INST_DYNAMIC_BATCHING_INDEX(int8_t,
+                                 int64_t,
+                                 cuvs::neighbors::ivf_flat,
+                                 index<int8_t, int64_t>);
+CUVS_INST_DYNAMIC_BATCHING_INDEX(uint8_t,
+                                 int64_t,
+                                 cuvs::neighbors::ivf_flat,
+                                 index<uint8_t, int64_t>);
 
 CUVS_INST_DYNAMIC_BATCHING_SEARCH(float, int64_t);
 CUVS_INST_DYNAMIC_BATCHING_SEARCH(half, int64_t);
