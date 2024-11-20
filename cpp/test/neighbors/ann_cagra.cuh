@@ -789,10 +789,10 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         index_params.compression = ps.compression;
         cagra::search_params search_params;
-        search_params.algo        = ps.algo;
-        search_params.max_queries = ps.max_queries;
-        search_params.team_size   = ps.team_size;
-        search_params.team_size   = ps.threshold_to_bf;
+        search_params.algo            = ps.algo;
+        search_params.max_queries     = ps.max_queries;
+        search_params.team_size       = ps.team_size;
+        search_params.threshold_to_bf = ps.threshold_to_bf;
 
         // TODO: setting search_params.itopk_size here breaks the filter tests, but is required for
         // k>1024 skip these tests until fixed

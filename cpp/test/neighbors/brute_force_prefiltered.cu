@@ -76,6 +76,21 @@ struct CompareApproxWithInf {
   T eps;
 };
 
+bool isCuSparseVersionGreaterThan_12_0_1()
+{
+  int version;
+  cusparseHandle_t handle;
+  cusparseCreate(&handle);
+  cusparseGetVersion(handle, &version);
+
+  int major = version / 1000;
+  int minor = (version % 1000) / 100;
+  int patch = version % 100;
+
+  cusparseDestroy(handle);
+
+  return (major > 12) || (major == 12 && minor > 0) || (major == 12 && minor == 0 && patch >= 2);
+}
 template <typename OutT, typename InT>
 RAFT_KERNEL normalize_kernel(
   OutT* theta, const InT* in_vals, size_t max_scale, size_t r_scale, size_t c_scale)
@@ -352,6 +367,9 @@ class PrefilteredBruteForceTest
 
   void SetUp() override
   {
+    if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
+      GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
+    }
     index_t element =
       raft::ceildiv(params.n_queries * params.n_dataset, index_t(sizeof(bitmap_t) * 8));
     std::vector<bitmap_t> filter_h(element);
