@@ -264,30 +264,31 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     """
     Saves the index to a file.
 
-    Saving / loading the index is experimental. The serialization format is
-    subject to change.
+    The serialization format can be subject to changes, therefore loading
+    an index saved with a previous version of cuvs is not guaranteed
+    to work.
 
     Parameters
     ----------
     filename : string
         Name of the file.
     index : Index
-        Trained IVF-PQ index.
+        Trained Brute Force index.
     {resources_docstring}
 
     Examples
     --------
     >>> import cupy as cp
-    >>> from cuvs.neighbors import ivf_pq
+    >>> from cuvs.neighbors import brute_force
     >>> n_samples = 50000
     >>> n_features = 50
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = ivf_pq.build(ivf_pq.IndexParams(), dataset)
-    >>> # Serialize and deserialize the ivf_pq index built
-    >>> ivf_pq.save("my_index.bin", index)
-    >>> index_loaded = ivf_pq.load("my_index.bin")
+    >>> index = brute_force.build(dataset)
+    >>> # Serialize and deserialize the brute_force index built
+    >>> brute_force.save("my_index.bin", index)
+    >>> index_loaded = brute_force.load("my_index.bin")
     """
     cdef string c_filename = filename.encode('utf-8')
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
@@ -301,9 +302,10 @@ def load(filename, resources=None):
     """
     Loads index from file.
 
-    Saving / loading the index is experimental. The serialization format is
-    subject to change, therefore loading an index saved with a previous
-    version of cuvs is not guaranteed to work.
+    The serialization format can be subject to changes, therefore loading
+    an index saved with a previous version of cuvs is not guaranteed
+    to work.
+
 
     Parameters
     ----------
@@ -315,6 +317,12 @@ def load(filename, resources=None):
     -------
     index : Index
 
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force
+    >>> # Load an index previously built
+    >>> index = brute_force.load("my_index.bin")
     """
     cdef Index idx = Index()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()

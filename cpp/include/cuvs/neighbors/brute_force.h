@@ -172,8 +172,9 @@ cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
  */
 /**
  * Save the index to file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.c}
  * #include <cuvs/neighbors/brute_force.h>
@@ -183,7 +184,7 @@ cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
  * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
  *
  * // create an index with `cuvsBruteforceBuild`
- * cuvsBruteForceSerialize(res, "/path/to/index", index, true);
+ * cuvsBruteForceSerialize(res, "/path/to/index", index);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
@@ -197,8 +198,22 @@ cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
 
 /**
  * Load index from file.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
- * Experimental, both the API and the serialization format are subject to change.
+ * @code{.c}
+ * #include <cuvs/neighbors/brute_force.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // Deserialize an index previously built with `cuvsBruteforceBuild`
+ * cuvsBruteForceIndex_t index;
+ * cuvsBruteForceIndexCreate(&index);
+ * cuvsBruteForceDeserialize(res, "/path/to/index", index);
+ * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file that stores the index

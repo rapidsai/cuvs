@@ -389,8 +389,9 @@ void search(raft::resources const& handle,
  */
 /**
  * Save the index to file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -418,8 +419,9 @@ void serialize(raft::resources const& handle,
                bool include_dataset = true);
 /**
  * Save the index to file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -449,8 +451,9 @@ void serialize(raft::resources const& handle,
 
 /**
  * Write the index to an output stream
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -476,8 +479,9 @@ void serialize(raft::resources const& handle,
 
 /**
  * Write the index to an output stream
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -503,8 +507,9 @@ void serialize(raft::resources const& handle,
 
 /**
  * Load index from file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -529,8 +534,9 @@ void deserialize(raft::resources const& handle,
                  cuvs::neighbors::brute_force::index<half, float>* index);
 /**
  * Load index from file.
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -555,8 +561,9 @@ void deserialize(raft::resources const& handle,
                  cuvs::neighbors::brute_force::index<float, float>* index);
 /**
  * Load index from input stream
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -581,8 +588,9 @@ void deserialize(raft::resources const& handle,
                  cuvs::neighbors::brute_force::index<half, float>* index);
 /**
  * Load index from input stream
- *
- * Experimental, both the API and the serialization format are subject to change.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
