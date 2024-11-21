@@ -8,6 +8,7 @@ package ivf_pq
 // #include <cuvs/neighbors/cagra.h>
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
 	"unsafe"
@@ -56,7 +57,6 @@ var CInternalDistanceDtypes = map[internalDistanceDtype]int{
 }
 
 func CreateSearchParams() (*searchParams, error) {
-
 	size := unsafe.Sizeof(C.struct_cuvsIvfPqSearchParams{})
 
 	params := (C.cuvsIvfPqSearchParams_t)(C.malloc(C.size_t(size)))
@@ -66,7 +66,6 @@ func CreateSearchParams() (*searchParams, error) {
 	}
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearchParamsCreate(&params)))
-
 	if err != nil {
 		return nil, err
 	}

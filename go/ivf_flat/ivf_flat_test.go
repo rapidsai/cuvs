@@ -2,15 +2,13 @@ package ivf_flat
 
 import (
 	"math/rand"
-
-	cuvs "github.com/rapidsai/cuvs/go"
-
 	"testing"
 	"time"
+
+	cuvs "github.com/rapidsai/cuvs/go"
 )
 
 func TestIvfFlat(t *testing.T) {
-
 	resource, _ := cuvs.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
@@ -26,7 +24,7 @@ func TestIvfFlat(t *testing.T) {
 		}
 	}
 
-	dataset, _ := cuvs.NewTensor(true, TestDataset)
+	dataset, _ := cuvs.NewTensor(TestDataset)
 
 	IndexParams, _ := CreateIndexParams()
 
@@ -39,7 +37,7 @@ func TestIvfFlat(t *testing.T) {
 
 	NQueries := 4
 	K := 4
-	queries, _ := cuvs.NewTensor(true, TestDataset[:NQueries])
+	queries, _ := cuvs.NewTensor(TestDataset[:NQueries])
 	NeighborsDataset := make([][]int64, NQueries)
 	for i := range NeighborsDataset {
 		NeighborsDataset[i] = make([]int64, K)
@@ -48,8 +46,8 @@ func TestIvfFlat(t *testing.T) {
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, K)
 	}
-	neighbors, _ := cuvs.NewTensor(true, NeighborsDataset)
-	distances, _ := cuvs.NewTensor(true, DistancesDataset)
+	neighbors, _ := cuvs.NewTensor(NeighborsDataset)
+	distances, _ := cuvs.NewTensor(DistancesDataset)
 
 	_, todeviceerr := neighbors.ToDevice(&resource)
 	if todeviceerr != nil {
@@ -79,7 +77,7 @@ func TestIvfFlat(t *testing.T) {
 	resource.Sync()
 
 	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
-	arr, _ := neighbors.GetArray()
+	arr, _ := neighbors.Slice()
 	for i := range arr {
 		println(arr[i][0])
 		if arr[i][0] != int64(i) {
@@ -87,11 +85,10 @@ func TestIvfFlat(t *testing.T) {
 		}
 	}
 
-	arr_dist, _ := distances.GetArray()
+	arr_dist, _ := distances.Slice()
 	for i := range arr_dist {
 		if arr_dist[i][0] >= float32(0.001) || arr_dist[i][0] <= float32(-0.001) {
 			t.Error("wrong distance, expected", float32(i), "got", arr_dist[i][0])
 		}
 	}
-
 }

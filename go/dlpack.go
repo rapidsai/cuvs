@@ -1,226 +1,172 @@
 package cuvs
 
-// #include <stdio.h>
 // #include <stdlib.h>
-// #include <dlpack/dlpack.h>  // Replace with the actual header file containing DLManagedTensor
-// void delete_tensor(DLManagedTensor *tensor){
-//     free(tensor->dl_tensor.shape);
-//     tensor->manager_ctx = NULL;
-//     free(tensor);
-// }
+// #include <dlpack/dlpack.h>
 // #include <cuvs/core/c_api.h>
-// #include <cuvs/distance/pairwise_distance.h>
-// #include <cuvs/neighbors/brute_force.h>
-// #include <cuvs/neighbors/ivf_flat.h>
-// #include <cuvs/neighbors/cagra.h>
-// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
 	"strconv"
-
-	// "github.com/rapidsai/cuvs/go"
-	// "rapidsai/cuvs/ivf_flat"
 	"unsafe"
 )
+
+type TensorNumberType interface {
+	int64 | uint32 | float32
+}
 
 type Tensor[T any] struct {
 	C_tensor *C.DLManagedTensor
 	shape    []int64
 }
 
-// func NewTensor[T any](from_cai bool, shape []int, data []T, use_int64 bool) (Tensor, error) {
-func NewTensor[T any](from_cai bool, data [][]T) (Tensor[T], error) {
-
-	shape := make([]int64, 2)
-	shape[0] = int64(len(data))
-	shape[1] = int64(len(data[0]))
-
-	data_flat := make([]T, len(data)*len(data[0]))
-	for i := range data {
-		for j := range data[i] {
-			data_flat[i*len(data[0])+j] = data[i][j]
+func getDLDataType[T TensorNumberType]() C.DLDataType {
+	var zero T
+	switch any(zero).(type) {
+	case int64:
+		return C.DLDataType{
+			bits:  C.uchar(64),
+			lanes: C.ushort(1),
+			code:  C.kDLInt,
+		}
+	case uint32:
+		return C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLUInt,
+		}
+	case float32:
+		return C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLFloat,
 		}
 	}
+	panic("unreachable") // Go compiler ensures this is unreachable
+}
 
-	if len(shape) < 2 {
-		return Tensor[T]{}, errors.New("shape must be atleast 2")
+func flattenData[T TensorNumberType](data [][]T, dest []T) {
+	cols := len(data[0])
+	for i, row := range data {
+		copy(dest[i*cols:], row)
+	}
+}
+
+func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
+	if len(data) == 0 || len(data[0]) == 0 {
+		return Tensor[T]{}, errors.New("empty data")
 	}
 
-	// println("shape: ", shape[1])
+	dtype := getDLDataType[T]()
 
-	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
+	totalElements := len(data) * len(data[0])
 
-	if dlm == nil {
-		return Tensor[T]{}, errors.New("memory allocation failed")
+	dataPtr := C.malloc(C.size_t(totalElements * int(unsafe.Sizeof(T(0)))))
+	if dataPtr == nil {
+		return Tensor[T]{}, errors.New("data memory allocation failed")
 	}
 
-	device := C.DLDevice{
+	dataSlice := unsafe.Slice((*T)(dataPtr), totalElements)
+	flattenData(data, dataSlice)
+
+	shapePtr := C.malloc(C.size_t(2 * int(unsafe.Sizeof(C.int64_t(0)))))
+	if shapePtr == nil {
+		C.free(dataPtr)
+		return Tensor[T]{}, errors.New("shape memory allocation failed")
+	}
+
+	shapeSlice := unsafe.Slice((*C.int64_t)(shapePtr), 2)
+	shapeSlice[0] = C.int64_t(len(data))
+	shapeSlice[1] = C.int64_t(len(data[0]))
+
+	// Create DLManagedTensor
+	dlm := new(C.DLManagedTensor)
+
+	dlm.dl_tensor.data = dataPtr
+	dlm.dl_tensor.device = C.DLDevice{
 		device_type: C.DLDeviceType(C.kDLCPU),
 		device_id:   0,
 	}
-
-	var dtype C.DLDataType
-	switch any(data[0][0]).(type) {
-	case int64:
-		dtype = C.DLDataType{
-			bits:  C.uchar(64),
-			lanes: C.ushort(1),
-			code:  C.kDLInt,
-		}
-	case uint32:
-		dtype = C.DLDataType{
-			bits:  C.uchar(32),
-			lanes: C.ushort(1),
-			code:  C.kDLUInt,
-		}
-	case float32:
-		dtype = C.DLDataType{
-			bits:  C.uchar(32),
-			lanes: C.ushort(1),
-			code:  C.kDLFloat,
-		}
-	default:
-		return Tensor[T]{}, errors.New("unsupported data type")
-	}
-
-	dlm.dl_tensor.data = unsafe.Pointer(&data_flat[0])
-
-	dlm.dl_tensor.device = device
-
 	dlm.dl_tensor.dtype = dtype
-	dlm.dl_tensor.ndim = C.int(len(shape))
-	dlm.dl_tensor.shape = (*C.long)(unsafe.Pointer(&shape[0]))
+	dlm.dl_tensor.ndim = 2
+	dlm.dl_tensor.shape = (*C.int64_t)(shapePtr)
 	dlm.dl_tensor.strides = nil
 	dlm.dl_tensor.byte_offset = 0
-
 	dlm.manager_ctx = nil
 	dlm.deleter = nil
 
-	return Tensor[T]{C_tensor: dlm, shape: shape}, nil
-
+	return Tensor[T]{
+		C_tensor: dlm,
+		shape:    []int64{int64(len(data)), int64(len(data[0]))},
+	}, nil
 }
 
-func NewTensorOnDevice[T any](res *Resource, shape []int64) (Tensor[T], error) {
-
+func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor[T], error) {
 	if len(shape) < 2 {
 		return Tensor[T]{}, errors.New("shape must be atleast 2")
 	}
 
-	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
-
-	if dlm == nil {
-		return Tensor[T]{}, errors.New("memory allocation failed")
+	shapePtr := C.malloc(C.size_t(len(shape) * int(unsafe.Sizeof(C.int64_t(0)))))
+	if shapePtr == nil {
+		return Tensor[T]{}, errors.New("shape memory allocation failed")
 	}
 
-	device := C.DLDevice{
-		device_type: C.DLDeviceType(C.kDLCUDA),
-		device_id:   0,
+	shapeSlice := unsafe.Slice((*C.int64_t)(shapePtr), len(shape))
+	for i, dim := range shape {
+		shapeSlice[i] = C.int64_t(dim)
 	}
 
-	var zero T
+	dlm := new(C.DLManagedTensor)
+	dtype := getDLDataType[T]()
 
-	var dtype C.DLDataType
-	switch any(zero).(type) {
-	case int64:
-		dtype = C.DLDataType{
-			bits:  C.uchar(64),
-			lanes: C.ushort(1),
-			code:  C.kDLInt,
-		}
-	case uint32:
-		dtype = C.DLDataType{
-			bits:  C.uchar(32),
-			lanes: C.ushort(1),
-			code:  C.kDLUInt,
-		}
-	case float32:
-		dtype = C.DLDataType{
-			bits:  C.uchar(32),
-			lanes: C.ushort(1),
-			code:  C.kDLFloat,
-		}
-	default:
-		return Tensor[T]{}, errors.New("unsupported data type")
-	}
-
-	var DeviceDataPointer unsafe.Pointer
-
-	bytes := GetBytesFromShape(shape, dtype)
-
-	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes))))
+	var deviceDataPtr unsafe.Pointer
+	bytes := calculateBytes(shape, dtype)
+	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &deviceDataPtr, C.size_t(bytes))))
 	if err != nil {
-		//	panic(err)
+		C.free(unsafe.Pointer(shapePtr))
 		return Tensor[T]{}, err
 	}
 
-	dlm.dl_tensor.data = unsafe.Pointer(DeviceDataPointer)
-
-	dlm.dl_tensor.device = device
-
+	dlm.dl_tensor.data = deviceDataPtr
+	dlm.dl_tensor.device = C.DLDevice{
+		device_type: C.DLDeviceType(C.kDLCUDA),
+		device_id:   0,
+	}
 	dlm.dl_tensor.dtype = dtype
 	dlm.dl_tensor.ndim = C.int(len(shape))
-	dlm.dl_tensor.shape = (*C.long)(unsafe.Pointer(&shape[0]))
+	dlm.dl_tensor.shape = (*C.int64_t)(shapePtr)
 	dlm.dl_tensor.strides = nil
 	dlm.dl_tensor.byte_offset = 0
-
 	dlm.manager_ctx = nil
 	dlm.deleter = nil
 
-	return Tensor[T]{C_tensor: dlm, shape: shape}, nil
+	shapeCopy := make([]int64, len(shape))
+	copy(shapeCopy, shape)
 
+	return Tensor[T]{
+		C_tensor: dlm,
+		shape:    shapeCopy,
+	}, nil
 }
 
-func (t *Tensor[T]) GetBytes() int {
-	bytes := 1
-
-	// for dim := 0; dim < int(t.C_tensor.dl_tensor.ndim); dim++ {
-	// 	offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.C_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.C_tensor.dl_tensor.shape))
-
-	// 	// Convert the pointer to the correct type and dereference it to get the value
-	// 	dimSize := *(*C.long)(offset)
-
-	// 	bytes *= int(dimSize)
-	// }
-
-	for dim := range t.shape {
-		bytes *= int(t.shape[dim])
-	}
-
-	bytes *= int(t.C_tensor.dl_tensor.dtype.bits) / 8
-
-	// println("bytes: " + strconv.Itoa(bytes))
-
-	return bytes
+func (t *Tensor[T]) sizeInBytes() int64 {
+	return calculateBytes(t.shape, t.C_tensor.dl_tensor.dtype)
 }
 
-func GetBytesFromShape(shape []int64, dtype C.DLDataType) int {
-	bytes := 1
-
-	// for dim := 0; dim < int(t.C_tensor.dl_tensor.ndim); dim++ {
-	// 	offset := unsafe.Pointer(uintptr(unsafe.Pointer(t.C_tensor.dl_tensor.shape)) + uintptr(dim)*unsafe.Sizeof(*t.C_tensor.dl_tensor.shape))
-
-	// 	// Convert the pointer to the correct type and dereference it to get the value
-	// 	dimSize := *(*C.long)(offset)
-
-	// 	bytes *= int(dimSize)
-	// }
-
+func calculateBytes(shape []int64, dtype C.DLDataType) int64 {
+	bytes := int64(1)
 	for dim := range shape {
-		bytes *= int(shape[dim])
+		bytes *= (shape[dim])
 	}
 
-	bytes *= int(dtype.bits) / 8
-
-	// println("bytes: " + strconv.Itoa(bytes))
+	bytes *= int64(dtype.bits) / 8
 
 	return bytes
 }
 
 func (t *Tensor[T]) Close() error {
-	// TODO: free memory
 	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
-		bytes := t.GetBytes()
+		bytes := t.sizeInBytes()
 		res, err := NewResource(nil)
 		if err != nil {
 			return err
@@ -228,41 +174,31 @@ func (t *Tensor[T]) Close() error {
 		err = CheckCuvs(CuvsError(C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
 
 		return err
-
-		// C.run_callback(t.c_tensor.deleter, t.c_tensor)
+	} else if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
+		if t.C_tensor.dl_tensor.data != nil {
+			C.free(t.C_tensor.dl_tensor.data)
+			t.C_tensor.dl_tensor.data = nil
+		}
 	}
-	return nil
 
+	if t.C_tensor.dl_tensor.shape != nil {
+		C.free(unsafe.Pointer(t.C_tensor.dl_tensor.shape))
+		t.C_tensor.dl_tensor.shape = nil
+	}
+
+	t.C_tensor = nil
+	return nil
 }
 
 func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
-	bytes := t.GetBytes()
-
-	// device_data := &C.void{}
+	bytes := t.sizeInBytes()
 
 	var DeviceDataPointer unsafe.Pointer
-	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
-	// var deviceData *C.void = nil
-	// println("host data location:")
-	// println(t.C_tensor.dl_tensor.data)
-	// println("device data pointer:")
-	// println(DeviceDataPointer)
-	// println("host data location:")
-	// println(t.C_tensor.dl_tensor.data)
 
 	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &DeviceDataPointer, C.size_t(bytes))))
 	if err != nil {
-		//	panic(err)
 		return nil, err
 	}
-	// CheckCuda(C.cudaMalloc(&DeviceDataPointer, C.size_t(bytes)))
-
-	// println("device data pointer (after allocation):")
-	// println(DeviceDataPointer)
-	// println(&DeviceDataPointer)
-	// println("bytes:")
-	// println(bytes)
-	// bytes = 0
 
 	err = CheckCuda(
 		C.cudaMemcpy(
@@ -271,95 +207,47 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 			C.size_t(bytes),
 			C.cudaMemcpyHostToDevice,
 		))
-
 	if err != nil {
 		return nil, err
 	}
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
 	t.C_tensor.dl_tensor.data = DeviceDataPointer
-	// println("normal transfer done")
 
 	return t, nil
-
 }
 
-func (t *Tensor[T]) GetShape() []int64 {
-	// return unsafe.Slice((*int64)(unsafe.Pointer(t.C_tensor.dl_tensor.shape)), 2)
+func (t *Tensor[T]) Shape() []int64 {
 	return t.shape
 }
 
 func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
-
-	if t.C_tensor.dl_tensor.device.device_type == C.kDLCPU {
+	if t.C_tensor.dl_tensor.device.device_type != C.kDLCUDA {
 		return &Tensor[T]{}, errors.New("Tensor must be on GPU")
 	}
 
-	new_shape := make([]int64, 2)
-	new_shape[0] = int64(len(newData))
-	new_shape[1] = int64(len(newData[0]))
+	newShape := []int64{int64(len(newData)), int64(len(newData[0]))}
 
-	data_flat := make([]T, len(newData)*len(newData[0]))
+	flatData := make([]T, len(newData)*len(newData[0]))
 	for i := range newData {
 		for j := range newData[i] {
-			data_flat[i*len(newData[0])+j] = newData[i][j]
+			flatData[i*len(newData[0])+j] = newData[i][j]
 		}
 	}
 
 	old_shape := unsafe.Slice((*int64)(unsafe.Pointer(t.C_tensor.dl_tensor.shape)), 2)
 
-	if old_shape[1] != new_shape[1] {
-		return &Tensor[T]{}, errors.New("new shape must be same as old shape, old shapee: " + strconv.Itoa(int(old_shape[1])) + ", new shape: " + strconv.Itoa(int(new_shape[1])))
+	if old_shape[1] != newShape[1] {
+		return &Tensor[T]{}, errors.New("new shape must be same as old shape, old shape: " + strconv.Itoa(int(old_shape[1])) + ", new shape: " + strconv.Itoa(int(newShape[1])))
 	}
 
-	if len(new_shape) < 2 {
-		return &Tensor[T]{}, errors.New("shape must be atleast 2")
-	}
+	newDataSize := newShape[0] * newShape[1] * int64(t.C_tensor.dl_tensor.dtype.bits) / 8
 
-	newDataSize := 0
-
-	switch any(newData[0][0]).(type) {
-	case int64:
-		// dtype = C.DLDataType{
-		// 	bits:  C.uchar(64),
-		// 	lanes: C.ushort(1),
-		// 	code:  C.kDLInt,
-		// }
-		newDataSize = len(newData) * len(newData[0]) * 8
-	case uint32:
-		// dtype = C.DLDataType{
-		// 	bits:  C.uchar(32),
-		// 	lanes: C.ushort(1),
-		// 	code:  C.kDLUInt,
-		// }
-		newDataSize = len(newData) * len(newData[0]) * 4
-	case float32:
-		// dtype = C.DLDataType{
-		// 	bits:  C.uchar(32),
-		// 	lanes: C.ushort(1),
-		// 	code:  C.kDLFloat,
-		// }
-		newDataSize = len(newData) * len(newData[0]) * 4
-	default:
-		return &Tensor[T]{}, errors.New("unsupported data type")
-	}
-
-	bytes := t.GetBytes()
+	bytes := t.sizeInBytes()
 
 	var NewDeviceDataPointer unsafe.Pointer
-	// var DeviceDataPointerPointer *unsafe.Pointer = &DeviceDataPointer
-	// var deviceData *C.void = nil
-	// println("host data location:")
-	// println(t.C_tensor.dl_tensor.data)
-	// println("device data pointer:")
-	// println(NewDeviceDataPointer)
-	// println("host data location:")
-	// println(t.C_tensor.dl_tensor.data)
-
-	// println("new alloc:" + strconv.Itoa(int(bytes+newDataSize)))
 
 	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &NewDeviceDataPointer, C.size_t(bytes+newDataSize))))
 	if err != nil {
-		//	panic(err)
 		return nil, err
 	}
 
@@ -370,7 +258,6 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 			C.size_t(bytes),
 			C.cudaMemcpyDeviceToDevice,
 		))
-
 	if err != nil {
 		return nil, err
 	}
@@ -378,18 +265,16 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 	err = CheckCuda(
 		C.cudaMemcpy(
 			unsafe.Pointer(uintptr(NewDeviceDataPointer)+uintptr(bytes)),
-			unsafe.Pointer(&data_flat[0]),
+			unsafe.Pointer(&flatData[0]),
 			C.size_t(newDataSize),
 			C.cudaMemcpyHostToDevice,
 		))
-
 	if err != nil {
 		return nil, err
 	}
 
 	err = CheckCuvs(CuvsError(
 		C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
-
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +282,7 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 	shape := make([]int64, 2)
 	shape[0] = int64(*t.C_tensor.dl_tensor.shape) + int64(len(newData))
 
-	shape[1] = new_shape[1]
+	shape[1] = newShape[1]
 
 	t.shape = shape
 
@@ -408,30 +293,26 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 }
 
 func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
-	bytes := t.GetBytes()
-
-	// println("to host bytes: " + strconv.Itoa(bytes))
+	bytes := t.sizeInBytes()
 
 	addr := (C.malloc(C.size_t(bytes)))
+	if addr == nil {
+		return nil, errors.New("memory allocation failed")
+	}
 
 	err := CheckCuda(
 		C.cudaMemcpy(
-
 			addr,
-
 			t.C_tensor.dl_tensor.data,
-
 			C.size_t(bytes),
 			C.cudaMemcpyDeviceToHost,
 		))
-
 	if err != nil {
 		return nil, err
 	}
 
 	err = CheckCuvs(CuvsError(
 		C.cuvsRMMFree(res.Resource, t.C_tensor.dl_tensor.data, C.size_t(bytes))))
-
 	if err != nil {
 		return nil, err
 	}
@@ -442,23 +323,20 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	return t, nil
 }
 
-func (t *Tensor[T]) GetArray() ([][]T, error) {
+func (t *Tensor[T]) Slice() ([][]T, error) {
 	if t.C_tensor.dl_tensor.device.device_type != C.kDLCPU {
 		return nil, errors.New("Tensor must be on CPU")
 	}
 
-	// shape := unsafe.Slice((*int64)(t.C_tensor.dl_tensor.shape), 2)
+	flatData := unsafe.Slice((*T)(t.C_tensor.dl_tensor.data), t.shape[0]*t.shape[1])
 
-	data_flat := unsafe.Slice((*T)(t.C_tensor.dl_tensor.data), t.shape[0]*t.shape[1])
-	// println("got flat data")
 	data := make([][]T, t.shape[0])
 	for i := range data {
 		data[i] = make([]T, t.shape[1])
 		for j := range data[i] {
-			data[i][j] = data_flat[i*int(t.shape[1])+j]
+			data[i][j] = flatData[i*int(t.shape[1])+j]
 		}
 	}
 
 	return data, nil
-
 }

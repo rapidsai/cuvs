@@ -1,16 +1,8 @@
 package cuvs
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <dlpack/dlpack.h>
-// #include <cuda_runtime_api.h>
-// #include <cuvs/core/c_api.h>
 // #include <cuvs/distance/pairwise_distance.h>
-// #include <cuvs/neighbors/brute_force.h>
-// #include <cuvs/neighbors/ivf_flat.h>
-// #include <cuvs/neighbors/cagra.h>
-// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
 	"unsafe"
@@ -65,7 +57,6 @@ var CDistances = map[Distance]int{
 }
 
 func PairwiseDistance[T any](Resources Resource, x *Tensor[T], y *Tensor[T], distances *Tensor[float32], metric Distance, metric_arg float32) error {
-
 	CMetric, exists := CDistances[metric]
 
 	if !exists {
@@ -73,5 +64,4 @@ func PairwiseDistance[T any](Resources Resource, x *Tensor[T], y *Tensor[T], dis
 	}
 
 	return CheckCuvs(CuvsError(C.cuvsPairwiseDistance(C.cuvsResources_t(Resources.Resource), (*C.DLManagedTensor)(unsafe.Pointer(x.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(y.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), C.cuvsDistanceType(CMetric), C.float(metric_arg))))
-
 }

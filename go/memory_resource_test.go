@@ -1,36 +1,19 @@
-package cuvs
+package cuvs_test
 
 import (
-	"os/exec"
 	"testing"
+
+	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-func CheckGpuMemory() error {
-	cmd := exec.Command("nvidia-smi")
-	out, err := cmd.Output()
-	println("nvidia-smi output (CheckGpuMemory()): ", string(out))
-	return err
-}
-
 func TestMemoryResource(t *testing.T) {
-	t.Log("Starting memory resource test")
-
-	mem := NewCuvsPoolMemory(60, 100, false)
-	defer mem.Close()
-
-	t.Log("Instantiating memory pool...")
-	mem.Instantiate()
-
-	if err := CheckGpuMemory(); err != nil {
-		t.Fatal("GPU memory check failed after instantiation:", err)
+	mem, err := cuvs.NewCuvsPoolMemory(60, 100, false)
+	if err != nil {
+		t.Fatal("Failed to create memory resource:", err)
 	}
 
-	t.Log("Releasing memory pool...")
-	mem.Release()
-
-	if err := CheckGpuMemory(); err != nil {
-		t.Fatal("GPU memory check failed after release:", err)
+	err = mem.Close()
+	if err != nil {
+		t.Fatal("Failed to close memory resource:", err)
 	}
-
-	t.Log("Memory resource test completed")
 }

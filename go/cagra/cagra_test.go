@@ -9,7 +9,6 @@ import (
 )
 
 func TestCagra(t *testing.T) {
-
 	resource, _ := cuvs.NewResource(nil)
 
 	rand.Seed(time.Now().UnixNano())
@@ -42,21 +41,19 @@ func TestCagra(t *testing.T) {
 		// }
 	}
 
-	dataset, _ := cuvs.NewTensor(true, TestDataset)
+	dataset, _ := cuvs.NewTensor(TestDataset)
 	defer dataset.Close()
 
-	extend_dataset, _ := cuvs.NewTensor(true, ExtendDataset)
+	extend_dataset, _ := cuvs.NewTensor(ExtendDataset)
 	defer extend_dataset.Close()
 
-	extend_return_dataset, _ := cuvs.NewTensor(true, ExtendReturnEmptyDataset)
+	extend_return_dataset, _ := cuvs.NewTensor(ExtendReturnEmptyDataset)
 	defer extend_return_dataset.Close()
 
 	// CompressionParams, _ := CreateCompressionParams()
 
 	IndexParams, err := CreateIndexParams()
-
 	// IndexParams.SetCompression(CompressionParams)
-
 	if err != nil {
 		panic(err)
 	}
@@ -68,7 +65,7 @@ func TestCagra(t *testing.T) {
 
 	NQueries := 4
 	K := 10
-	queries, _ := cuvs.NewTensor(true, TestDataset[:NQueries])
+	queries, _ := cuvs.NewTensor(TestDataset[:NQueries])
 	NeighborsDataset := make([][]uint32, NQueries)
 	for i := range NeighborsDataset {
 		NeighborsDataset[i] = make([]uint32, K)
@@ -77,8 +74,8 @@ func TestCagra(t *testing.T) {
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, K)
 	}
-	neighbors, _ := cuvs.NewTensor(true, NeighborsDataset)
-	distances, _ := cuvs.NewTensor(true, DistancesDataset)
+	neighbors, _ := cuvs.NewTensor(NeighborsDataset)
+	distances, _ := cuvs.NewTensor(DistancesDataset)
 	println("hello")
 
 	_, todeviceerr := neighbors.ToDevice(&resource)
@@ -111,7 +108,6 @@ func TestCagra(t *testing.T) {
 	queries.ToDevice(&resource)
 
 	SearchParams, err := CreateSearchParams()
-
 	if err != nil {
 		panic(err)
 	}
@@ -130,7 +126,7 @@ func TestCagra(t *testing.T) {
 	// arr_extend_return_dataset, _ := extend_return_dataset.GetArray()
 
 	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
-	arr, _ := neighbors.GetArray()
+	arr, _ := neighbors.Slice()
 	for i := range arr {
 		println(arr[i][0])
 		if arr[i][0] != uint32(i) {
@@ -144,5 +140,4 @@ func TestCagra(t *testing.T) {
 	// 		t.Error("wrong distance, expected", float32(i), "got", arr_dist[i][0])
 	// 	}
 	// }
-
 }

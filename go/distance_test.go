@@ -24,14 +24,14 @@ func TestDistance(t *testing.T) {
 		}
 	}
 
-	dataset, _ := cuvs.NewTensor(true, TestDataset)
+	dataset, _ := cuvs.NewTensor(TestDataset)
 
 	DistancesDataset := make([][]float32, NDataPoints)
 	for i := range DistancesDataset {
 		DistancesDataset[i] = make([]float32, NDataPoints)
 	}
 
-	distances, _ := cuvs.NewTensor(true, DistancesDataset)
+	distances, _ := cuvs.NewTensor(DistancesDataset)
 
 	distances.ToDevice(&resource)
 	dataset.ToDevice(&resource)
@@ -42,9 +42,8 @@ func TestDistance(t *testing.T) {
 
 	resource.Sync()
 
-	arr, _ := distances.GetArray()
+	arr, _ := distances.Slice()
 	if arr[0][0] != 0.0 {
 		t.Error("wrong distance, expected", 0.0, "got", arr[0][0])
 	}
-
 }
