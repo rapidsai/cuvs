@@ -23,7 +23,7 @@ from cuvs.test.ann_utils import calc_recall, generate_data
 
 
 def run_hnsw_build_search_test(
-    n_rows=1000,
+    n_rows=10000,
     n_cols=10,
     n_queries=100,
     k=10,
@@ -41,8 +41,6 @@ def run_hnsw_build_search_test(
             pytest.skip(
                 "inner_product metric is not supported for int8/uint8 data"
             )
-        if build_algo == "nn_descent":
-            pytest.skip("inner_product metric is not supported for nn_descent")
 
     build_params = cagra.IndexParams(
         metric=metric,
@@ -83,7 +81,7 @@ def run_hnsw_build_search_test(
 @pytest.mark.parametrize("k", [10, 20])
 @pytest.mark.parametrize("ef", [30, 40])
 @pytest.mark.parametrize("num_threads", [2, 4])
-@pytest.mark.parametrize("metric", ["sqeuclidean"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 def test_hnsw(dtype, k, ef, num_threads, metric, build_algo):
     # Note that inner_product tests use normalized input which we cannot

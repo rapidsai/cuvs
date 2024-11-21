@@ -93,10 +93,10 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
   using base_type::num_seeds;
 
   uint32_t num_cta_per_query;
-  rmm::device_uvector<INDEX_T> intermediate_indices;
-  rmm::device_uvector<float> intermediate_distances;
+  lightweight_uvector<INDEX_T> intermediate_indices;
+  lightweight_uvector<float> intermediate_distances;
   size_t topk_workspace_size;
-  rmm::device_uvector<uint32_t> topk_workspace;
+  lightweight_uvector<uint32_t> topk_workspace;
 
   search(raft::resources const& res,
          search_params params,
@@ -105,9 +105,9 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
          int64_t graph_degree,
          uint32_t topk)
     : base_type(res, params, dataset_desc, dim, graph_degree, topk),
-      intermediate_indices(0, raft::resource::get_cuda_stream(res)),
-      intermediate_distances(0, raft::resource::get_cuda_stream(res)),
-      topk_workspace(0, raft::resource::get_cuda_stream(res))
+      intermediate_indices(res),
+      intermediate_distances(res),
+      topk_workspace(res)
 
   {
     set_params(res, params);

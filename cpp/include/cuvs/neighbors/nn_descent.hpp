@@ -55,15 +55,16 @@ struct index_params : cuvs::neighbors::index_params {
   size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
   size_t max_iterations            = 20;      // Number of nn-descent iterations.
   float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
+  bool return_distances            = true;    // return distances if true
+  size_t n_clusters                = 1;       // defaults to not using any batching
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
    * @param graph_degree output graph degree
+   * @param metric distance metric to use
    */
-  index_params(size_t graph_degree = 64)
-    : graph_degree(graph_degree), intermediate_graph_degree(1.5 * graph_degree)
-  {
-  }
+  index_params(size_t graph_degree                 = 64,
+               cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
 /**
@@ -100,14 +101,25 @@ struct index : cuvs::neighbors::index {
    * @param res raft::resources is an object mangaging resources
    * @param n_rows number of rows in knn-graph
    * @param n_cols number of cols in knn-graph
+   * @param return_distances whether to return distances
+   * @param metric distance metric to use
    */
-  index(raft::resources const& res, int64_t n_rows, int64_t n_cols)
+  index(raft::resources const& res,
+        int64_t n_rows,
+        int64_t n_cols,
+        bool return_distances               = false,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{cuvs::distance::DistanceType::L2Expanded},
+      metric_{metric},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(n_rows, n_cols)},
-      graph_view_{graph_.view()}
+      graph_view_{graph_.view()},
+      return_distances_{return_distances}
   {
+    if (return_distances) {
+      distances_      = raft::make_device_matrix<float, int64_t>(res_, n_rows, n_cols);
+      distances_view_ = distances_.value().view();
+    }
   }
 
   /**
@@ -119,14 +131,22 @@ struct index : cuvs::neighbors::index {
    *
    * @param res raft::resources is an object mangaging resources
    * @param graph_view raft::host_matrix_view<IdxT, int64_t, raft::row_major> for storing knn-graph
+   * @param distances_view optional raft::device_matrix_view<float, int64_t, row_major> for storing
+   * distances
+   * @param metric distance metric to use
    */
   index(raft::resources const& res,
-        raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view)
+        raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph_view,
+        std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances_view =
+          std::nullopt,
+        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{cuvs::distance::DistanceType::L2Expanded},
+      metric_{metric},
       graph_{raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0)},
-      graph_view_{graph_view}
+      graph_view_{graph_view},
+      distances_view_{distances_view},
+      return_distances_{distances_view.has_value()}
   {
   }
 
@@ -155,6 +175,13 @@ struct index : cuvs::neighbors::index {
     return graph_view_;
   }
 
+  /** neighborhood graph distances [size, graph-degree] */
+  [[nodiscard]] inline auto distances() noexcept
+    -> std::optional<device_matrix_view<float, int64_t, row_major>>
+  {
+    return distances_view_;
+  }
+
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
   index(index&&)                         = default;
@@ -166,8 +193,11 @@ struct index : cuvs::neighbors::index {
   raft::resources const& res_;
   cuvs::distance::DistanceType metric_;
   raft::host_matrix<IdxT, int64_t, raft::row_major> graph_;  // graph to return for non-int IdxT
+  std::optional<raft::device_matrix<float, int64_t, row_major>> distances_;
   raft::host_matrix_view<IdxT, int64_t, raft::row_major>
     graph_view_;  // view of graph for user provided matrix
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances_view_;
+  bool return_distances_;
 };
 
 /** @} */
@@ -200,12 +230,15 @@ struct index : cuvs::neighbors::index {
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
  *                in device memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in host memory
@@ -232,12 +265,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in device memory
@@ -262,12 +298,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
  *                in device memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in host memory
@@ -294,12 +333,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in device memory
@@ -324,12 +366,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
  *                in device memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in host memory
@@ -356,12 +401,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in device memory
@@ -386,14 +434,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::device_matrix_view input dataset expected to be located
  *                in device memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
-
-/** @} */
+           raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Build nn-descent Index with dataset in host memory
@@ -420,12 +469,15 @@ auto build(raft::resources const& res,
  *               to run the nn-descent algorithm
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
+ * @param[in] graph optional raft::host_matrix_view<uint32_t, int64_t, raft::row_major> for owning
+ * the output graph
  * @return index<IdxT> index containing all-neighbors knn graph in host memory
  */
 auto build(raft::resources const& res,
            index_params const& params,
-           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::nn_descent::index<uint32_t>;
+           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+           std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
+             std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
 /**
  * @brief Test if we have enough GPU memory to run NN descent algorithm.

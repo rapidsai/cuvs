@@ -20,11 +20,11 @@ import numpy as np
 from libc.stdint cimport uintptr_t
 
 from cuvs.common cimport cydlpack
+from cuvs.neighbors.common import _check_input_array
 
 from .filters cimport BITMAP, NO_FILTER, cuvsFilter
 
 from pylibraft.common.cai_wrapper import wrap_array
-from pylibraft.neighbors.common import _check_input_array
 
 
 cdef class Prefilter:

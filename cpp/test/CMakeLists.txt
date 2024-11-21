@@ -94,7 +94,7 @@ endfunction()
 if(BUILD_TESTS)
   ConfigureTest(
     NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
-    neighbors/refine.cu GPUS 1 PERCENT 100
+    neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -137,6 +137,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
+    neighbors/ann_cagra/bug_extreme_inputs_oob.cu
     neighbors/ann_cagra/bug_multi_cta_crash.cu
     neighbors/ann_cagra/test_float_uint32_t.cu
     neighbors/ann_cagra/test_half_uint32_t.cu
@@ -205,6 +206,7 @@ if(BUILD_TESTS)
     distance/dist_lp_unexp.cu
     distance/dist_russell_rao.cu
     distance/masked_nn.cu
+    distance/sparse_distance.cu
     sparse/neighbors/cross_component_nn.cu
     GPUS
     1
