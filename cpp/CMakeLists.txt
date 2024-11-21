@@ -369,6 +369,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/fused_distance_nn.cu
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
+    src/distance/sparse_distance.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
@@ -450,6 +451,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
     src/neighbors/sample_filter.cu
+    src/neighbors/sparse_brute_force.cu
     src/neighbors/vamana_build_float.cu
     src/neighbors/vamana_build_uint8.cu
     src/neighbors/vamana_build_int8.cu
