@@ -149,10 +149,11 @@ TEST(CagraC, BuildExtendSearch)
 
   raft::resources handle;
 
-  int32_t dimensions           = 16;
-  int32_t main_data_size       = 1024;
-  int32_t additional_data_size = 64;
-  int32_t num_queries          = 4;
+  const int32_t dimensions = 16;
+  // main_data_size needs to be >= 128 (see issue #486)
+  const int32_t main_data_size       = 128;
+  const int32_t additional_data_size = 64;
+  const int32_t num_queries          = 4;
 
   // create random data for datasets and queries
   rmm::device_uvector<float> random_data_d(
@@ -173,7 +174,7 @@ TEST(CagraC, BuildExtendSearch)
   DLManagedTensor dataset_tensor;
   dataset_tensor.dl_tensor.data               = main_d.data();
   dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
-  dataset_tensor.dl_tensor.ndim               = dimensions;
+  dataset_tensor.dl_tensor.ndim               = 2;
   dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
   dataset_tensor.dl_tensor.dtype.bits         = 32;
   dataset_tensor.dl_tensor.dtype.lanes        = 1;
@@ -283,7 +284,7 @@ TEST(CagraC, BuildExtendSearch)
 
   raft::matrix::argmin(handle, distances_const_view, min_cols.view());
 
-  float min_cols_distances[4];
+  float min_cols_distances[num_queries];
 
   for (uint32_t i = 0; i < min_cols.extent(0); i++) {
     uint32_t mc           = min_cols(i);
@@ -300,7 +301,7 @@ TEST(CagraC, BuildExtendSearch)
   neighbors_tensor.dl_tensor.dtype.code         = kDLUInt;
   neighbors_tensor.dl_tensor.dtype.bits         = 32;
   neighbors_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t neighbors_shape[2]                    = {4, 1};
+  int64_t neighbors_shape[2]                    = {num_queries, 1};
   neighbors_tensor.dl_tensor.shape              = neighbors_shape;
   neighbors_tensor.dl_tensor.strides            = nullptr;
 
@@ -316,7 +317,7 @@ TEST(CagraC, BuildExtendSearch)
   distances_tensor.dl_tensor.dtype.code         = kDLFloat;
   distances_tensor.dl_tensor.dtype.bits         = 32;
   distances_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t distances_shape[2]                    = {4, 1};
+  int64_t distances_shape[2]                    = {num_queries, 1};
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = nullptr;
 
