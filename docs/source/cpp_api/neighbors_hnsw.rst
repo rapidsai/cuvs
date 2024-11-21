@@ -43,10 +43,10 @@ Index search
     :members:
     :content-only:
 
-Index deserialize
+Index serialize
 ---------------
 
-.. doxygengroup:: hnsw_cpp_index_deserialize
+.. doxygengroup:: hnsw_cpp_index_serialize
     :project: cuvs
     :members:
     :content-only:

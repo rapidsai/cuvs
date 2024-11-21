@@ -42,7 +42,7 @@ Index search
     :content-only:
 
 Index serialize
-------------
+---------------
 
 .. doxygengroup:: hnsw_c_index_serialize
     :project: cuvs
