@@ -49,6 +49,12 @@ cdef class IndexParams:
         The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
         - "none": No hierarchy is built.
         - "cpu": Hierarchy is built using CPU.
+    ef_construction : int, default = 200 (optional)
+        Maximum number of candidate list size used during construction
+        when hierarchy is `cpu`.
+    num_threads : int, default = 2 (optional)
+        Number of CPU threads used to increase construction parallelism
+        when hierarchy is `cpu`.
     """
 
     cdef cuvsHnswIndexParams* params
@@ -60,7 +66,9 @@ cdef class IndexParams:
         check_cuvs(cuvsHnswIndexParamsDestroy(self.params))
 
     def __init__(self, *,
-                 hierarchy="none"):
+                 hierarchy="none",
+                 ef_construction=200,
+                 num_threads=2):
         if hierarchy == "none":
             self.params.hierarchy = cuvsHnswHierarchy.NONE
         elif hierarchy == "cpu":
@@ -68,6 +76,8 @@ cdef class IndexParams:
         else:
             raise ValueError("Invalid hierarchy type."
                              " Valid values are 'none' and 'cpu'.")
+        self.params.ef_construction = ef_construction
+        self.params.num_threads = num_threads
 
     @property
     def hierarchy(self):
@@ -75,6 +85,14 @@ cdef class IndexParams:
             return "none"
         elif self.params.hierarchy == cuvsHnswHierarchy.CPU:
             return "cpu"
+
+    @property
+    def ef_construction(self):
+        return self.params.ef_construction
+
+    @property
+    def num_threads(self):
+        return self.params.num_threads
 
 
 cdef class Index:
@@ -105,7 +123,7 @@ cdef class Index:
 
 
 @auto_sync_resources
-def save(filename, cagra.Index index, resources=None):
+def save(filename, Index index, resources=None):
     """
     Saves the CAGRA index to a file as an hnswlib index.
     The saved index is immutable and can only be searched by the hnswlib
@@ -120,7 +138,7 @@ def save(filename, cagra.Index index, resources=None):
     filename : string
         Name of the file.
     index : Index
-        Trained CAGRA index.
+        Trained HNSW index.
     {resources_docstring}
 
     Examples
@@ -132,15 +150,16 @@ def save(filename, cagra.Index index, resources=None):
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> # Build index
-    >>> index = cagra.build(cagra.IndexParams(), dataset)
+    >>> cagra_index = cagra.build(cagra.IndexParams(), dataset)
     >>> # Serialize and deserialize the cagra index built
-    >>> hnsw.save("my_index.bin", index)
+    >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(), cagra_index)
+    >>> hnsw.save("my_index.bin", hnsw_index)
     """
     cdef string c_filename = filename.encode('utf-8')
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
-    check_cuvs(cagra.cuvsCagraSerializeToHnswlib(res,
-                                                 c_filename.c_str(),
-                                                 index.index))
+    check_cuvs(cuvsHnswSerialize(res,
+                                 c_filename.c_str(),
+                                 index.index))
 
 
 @auto_sync_resources
@@ -302,7 +321,7 @@ cdef class SearchParams:
                  ef=200,
                  num_threads=0):
         self.params.ef = ef
-        self.params.numThreads = num_threads
+        self.params.num_threads = num_threads
 
     def __repr__(self):
         attr_str = [attr + "=" + str(getattr(self, attr))
@@ -316,7 +335,7 @@ cdef class SearchParams:
 
     @property
     def num_threads(self):
-        return self.params.numThreads
+        return self.params.num_threads
 
 
 @auto_sync_resources

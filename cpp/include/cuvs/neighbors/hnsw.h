@@ -48,6 +48,10 @@ enum cuvsHnswHierarchy {
 struct cuvsHnswIndexParams {
   /* hierarchy of the hnsw index */
   cuvsHnswHierarchy hierarchy;
+  /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
+  int ef_construction;
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` */
+  int num_threads;
 };
 
 typedef struct cuvsHnswIndexParams* cuvsHnswIndexParams_t;
@@ -125,7 +129,7 @@ cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
 
 struct cuvsHnswSearchParams {
   int32_t ef;
-  int32_t numThreads;
+  int32_t num_threads;
 };
 
 typedef struct cuvsHnswSearchParams* cuvsHnswSearchParams_t;
@@ -218,6 +222,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  * @defgroup hnsw_c_serialize HNSW C-API serialize functions
  * @{
  */
+
+cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHnswIndex_t index);
 
 /**
  * Load hnswlib index from file which was serialized from a HNSW index.

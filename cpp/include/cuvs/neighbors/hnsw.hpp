@@ -49,7 +49,12 @@ enum class HnswHierarchy {
 };
 
 struct index_params : cuvs::neighbors::index_params {
+  /** Hierarchy build type for HNSW index when converting from CAGRA index */
   HnswHierarchy hierarchy = HnswHierarchy::NONE;
+  /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
+  int ef_construction = 200;
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` */
+  int num_threads = 2;
 };
 
 /**@}*/
@@ -134,7 +139,9 @@ struct index : cuvs::neighbors::index {
 std::unique_ptr<index<float>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index);
+  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -162,7 +169,9 @@ std::unique_ptr<index<float>> from_cagra(
 std::unique_ptr<index<uint8_t>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index);
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * @brief Construct an immutable hnswlib base-layer-only index from a CAGRA index
@@ -190,7 +199,9 @@ std::unique_ptr<index<uint8_t>> from_cagra(
 std::unique_ptr<index<int8_t>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index);
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**@}*/
 
@@ -346,9 +357,15 @@ void search(raft::resources const& res,
 /**@}*/
 
 /**
- * @defgroup hnsw_cpp_index_deserialize Deserialize CAGRA index as hnswlib index
+ * @defgroup hnsw_cpp_index_serialize Deserialize CAGRA index as hnswlib index
  * @{
  */
+
+void serialize(raft::resources const& res, const std::string& filename, const index<float>& idx);
+
+void serialize(raft::resources const& res, const std::string& filename, const index<uint8_t>& idx);
+
+void serialize(raft::resources const& res, const std::string& filename, const index<int8_t>& idx);
 
 /**
  * @brief De-serialize a CAGRA index saved to a file as an hnswlib index

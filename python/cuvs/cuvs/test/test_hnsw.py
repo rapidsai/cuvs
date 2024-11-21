@@ -32,6 +32,7 @@ def run_hnsw_build_search_test(
     build_algo="ivf_pq",
     intermediate_graph_degree=128,
     graph_degree=64,
+    hierarchy="none",
     search_params={},
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
@@ -55,7 +56,7 @@ def run_hnsw_build_search_test(
 
     assert index.trained
 
-    hnsw_params = hnsw.IndexParams()
+    hnsw_params = hnsw.IndexParams(hierarchy=hierarchy, num_threads=1)
     hnsw_index = hnsw.from_cagra(hnsw_params, index)
 
     queries = generate_data((n_queries, n_cols), dtype)
@@ -86,7 +87,8 @@ def run_hnsw_build_search_test(
 @pytest.mark.parametrize("num_threads", [2, 4])
 @pytest.mark.parametrize("metric", ["sqeuclidean"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-def test_hnsw(dtype, k, ef, num_threads, metric, build_algo):
+@pytest.mark.parametrize("hierarchy", ["none", "cpu"])
+def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_hnsw_build_search_test(
@@ -94,5 +96,6 @@ def test_hnsw(dtype, k, ef, num_threads, metric, build_algo):
         k=k,
         metric=metric,
         build_algo=build_algo,
+        hierarchy=hierarchy,
         search_params={"ef": ef, "num_threads": num_threads},
     )

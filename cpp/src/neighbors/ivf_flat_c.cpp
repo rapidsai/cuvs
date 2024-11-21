@@ -29,6 +29,8 @@
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
+#include <fstream>
+
 namespace {
 
 template <typename T, typename IdxT>

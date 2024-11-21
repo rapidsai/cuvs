@@ -21,13 +21,14 @@
 
 namespace cuvs::neighbors::hnsw {
 
-#define CUVS_INST_HNSW_FROM_CAGRA(T)                               \
-  std::unique_ptr<index<T>> from_cagra(                            \
-    raft::resources const& res,                                    \
-    const index_params& params,                                    \
-    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index) \
-  {                                                                \
-    return detail::from_cagra<T>(res, params, cagra_index);        \
+#define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \
+  std::unique_ptr<index<T>> from_cagra(                                               \
+    raft::resources const& res,                                                       \
+    const index_params& params,                                                       \
+    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,                    \
+    std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset) \
+  {                                                                                   \
+    return detail::from_cagra<T>(res, params, cagra_index, dataset);                  \
   }
 
 CUVS_INST_HNSW_FROM_CAGRA(float);
@@ -53,21 +54,25 @@ CUVS_INST_HNSW_SEARCH(int8_t);
 
 #undef CUVS_INST_HNSW_SEARCH
 
-#define CUVS_INST_HNSW_DESERIALIZE(T)                                \
-  void deserialize(raft::resources const& res,                       \
-                   const index_params& params,                       \
-                   const std::string& filename,                      \
-                   int dim,                                          \
-                   cuvs::distance::DistanceType metric,              \
-                   index<T>** idx)                                   \
-  {                                                                  \
-    detail::deserialize<T>(res, params, filename, dim, metric, idx); \
+#define CUVS_INST_HNSW_SERIALIZE(T)                                                            \
+  void serialize(raft::resources const& res, const std::string& filename, const index<T>& idx) \
+  {                                                                                            \
+    detail::serialize<T>(res, filename, idx);                                                  \
+  }                                                                                            \
+  void deserialize(raft::resources const& res,                                                 \
+                   const index_params& params,                                                 \
+                   const std::string& filename,                                                \
+                   int dim,                                                                    \
+                   cuvs::distance::DistanceType metric,                                        \
+                   index<T>** idx)                                                             \
+  {                                                                                            \
+    detail::deserialize<T>(res, params, filename, dim, metric, idx);                           \
   }
 
-CUVS_INST_HNSW_DESERIALIZE(float);
-CUVS_INST_HNSW_DESERIALIZE(uint8_t);
-CUVS_INST_HNSW_DESERIALIZE(int8_t);
+CUVS_INST_HNSW_SERIALIZE(float);
+CUVS_INST_HNSW_SERIALIZE(uint8_t);
+CUVS_INST_HNSW_SERIALIZE(int8_t);
 
-#undef CUVS_INST_HNSW_DESERIALIZE
+#undef CUVS_INST_HNSW_SERIALIZE
 
 }  // namespace cuvs::neighbors::hnsw

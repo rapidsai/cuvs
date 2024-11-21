@@ -31,6 +31,8 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
 
     ctypedef struct cuvsHnswIndexParams:
         cuvsHnswHierarchy hierarchy
+        int32_t ef_construction
+        int32_t num_threads
 
     ctypedef cuvsHnswIndexParams* cuvsHnswIndexParams_t
 
@@ -55,7 +57,7 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
 
     ctypedef struct cuvsHnswSearchParams:
         int32_t ef
-        int32_t numThreads
+        int32_t num_threads
 
     ctypedef cuvsHnswSearchParams* cuvsHnswSearchParams_t
 
@@ -65,6 +67,10 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
                                DLManagedTensor* queries,
                                DLManagedTensor* neighbors,
                                DLManagedTensor* distances) except +
+
+    cuvsError_t cuvsHnswSerialize(cuvsResources_t res,
+                                  const char * filename,
+                                  cuvsHnswIndex_t index) except +
 
     cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
                                     cuvsHnswIndexParams_t params,

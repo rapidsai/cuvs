@@ -40,12 +40,16 @@ void _from_cagra(cuvsResources_t res,
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(cagra_index->addr);
-  auto cpp_params      = cuvs::neighbors::hnsw::index_params();
-  cpp_params.hierarchy = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  auto cpp_params            = cuvs::neighbors::hnsw::index_params();
+  cpp_params.hierarchy       = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  cpp_params.ef_construction = params->ef_construction;
+  cpp_params.num_threads     = params->num_threads;
+  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset = std::nullopt;
 
-  auto hnsw_index_unique_ptr = cuvs::neighbors::hnsw::from_cagra(*res_ptr, cpp_params, *index);
-  auto hnsw_index_ptr        = hnsw_index_unique_ptr.release();
-  hnsw_index->addr           = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
+  auto hnsw_index_unique_ptr =
+    cuvs::neighbors::hnsw::from_cagra(*res_ptr, cpp_params, *index, dataset);
+  auto hnsw_index_ptr = hnsw_index_unique_ptr.release();
+  hnsw_index->addr    = reinterpret_cast<uintptr_t>(hnsw_index_ptr);
 }
 
 template <typename T>
@@ -61,7 +65,7 @@ void _search(cuvsResources_t res,
 
   auto search_params        = cuvs::neighbors::hnsw::search_params();
   search_params.ef          = params.ef;
-  search_params.num_threads = params.numThreads;
+  search_params.num_threads = params.num_threads;
 
   using queries_mdspan_type   = raft::host_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::host_matrix_view<uint64_t, int64_t, raft::row_major>;
@@ -71,6 +75,14 @@ void _search(cuvsResources_t res,
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
   cuvs::neighbors::hnsw::search(
     *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+}
+
+template <typename T>
+void _serialize(cuvsResources_t res, const char* filename, cuvsHnswIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<T>*>(index.addr);
+  cuvs::neighbors::hnsw::serialize(*res_ptr, std::string(filename), *index_ptr);
 }
 
 template <typename T>
@@ -92,8 +104,10 @@ void* _deserialize(cuvsResources_t res,
 
 extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
 {
-  return cuvs::core::translate_exceptions(
-    [=] { *params = new cuvsHnswIndexParams{.hierarchy = cuvsHnswHierarchy::NONE}; });
+  return cuvs::core::translate_exceptions([=] {
+    *params = new cuvsHnswIndexParams{
+      .hierarchy = cuvsHnswHierarchy::NONE, .ef_construction = 200, .num_threads = 2};
+  });
 }
 
 extern "C" cuvsError_t cuvsHnswIndexParamsDestroy(cuvsHnswIndexParams_t params)
@@ -147,7 +161,7 @@ extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
 extern "C" cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t* params)
 {
   return cuvs::core::translate_exceptions(
-    [=] { *params = new cuvsHnswSearchParams{.ef = 200, .numThreads = 0}; });
+    [=] { *params = new cuvsHnswSearchParams{.ef = 200, .num_threads = 0}; });
 }
 
 extern "C" cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
@@ -190,6 +204,23 @@ extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
       _search<int8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", queries.dtype.code, queries.dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswSerialize(cuvsResources_t res,
+                                         const char* filename,
+                                         cuvsHnswIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat) {
+      _serialize<float>(res, filename, *index);
+    } else if (index->dtype.code == kDLInt) {
+      _serialize<int8_t>(res, filename, *index);
+    } else if (index->dtype.code == kDLUInt) {
+      _serialize<uint8_t>(res, filename, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
   });
 }

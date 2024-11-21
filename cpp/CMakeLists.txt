@@ -573,6 +573,7 @@ if(BUILD_SHARED_LIBS)
 
   if(BUILD_CAGRA_HNSWLIB)
     target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
