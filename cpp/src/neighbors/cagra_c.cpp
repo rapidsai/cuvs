@@ -97,6 +97,7 @@ void _extend(cuvsResources_t res,
   auto index_ptr        = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
   auto res_ptr          = reinterpret_cast<raft::resources*>(res);
 
+  // TODO: use C struct here (see issue #487)
   auto extend_params           = cuvs::neighbors::cagra::extend_params();
   extend_params.max_chunk_size = params.max_chunk_size;
 
