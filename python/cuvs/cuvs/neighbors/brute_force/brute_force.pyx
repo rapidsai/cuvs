@@ -321,8 +321,15 @@ def load(filename, resources=None):
     --------
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force
-    >>> # Load an index previously built
-    >>> index = brute_force.load("my_index.bin")
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset)
+    >>> # Serialize and deserialize the brute_force index built
+    >>> brute_force.save("my_index.bin", index)
+    >>> index_loaded = brute_force.load("my_index.bin")
     """
     cdef Index idx = Index()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
