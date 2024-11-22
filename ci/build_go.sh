@@ -6,8 +6,14 @@ set -euo pipefail
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
 
+RAPIDS_VERSION="$(rapids-version)"
 
-rapids-mamba-retry env create --yes -n go
+rapids-dependency-file-generator \
+  --output conda \
+  --file-key go \
+  --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" | tee env.yaml
+
+rapids-mamba-retry env create --yes -f env.yaml -n go
 
 # seeing failures on activating the environment here on unbound locals
 # apply workaround from https://github.com/conda/conda/issues/8186#issuecomment-532874667
@@ -17,8 +23,8 @@ set -eu
 
 rapids-print-env
 
-export CGO_CFLAGS="-I$CONDA_PREFIX/include -I/usr/local/cuda/include  -I/usr/local/include"
-export CGO_LDFLAGS="-L$CONDA_PREFIX/lib -L/usr/local/cuda/lib64  -lcuvs_c -lcudart     -Wl,-rpath,$CONDA_PREFIX/lib-Wl,-rpath,/usr/local/cuda/lib64"
+export CGO_CFLAGS="-I/usr/local/cuda/include -I/home/ajit/miniforge3/envs/cuvs/include"
+export CGO_LDFLAGS="-L/usr/local/cuda/lib64 -L/home/ajit/miniforge3/envs/cuvs/lib -lcudart -lcuvs -lcuvs_c"
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
