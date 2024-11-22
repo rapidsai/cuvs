@@ -15,9 +15,8 @@
  */
 #pragma once
 
-#include <cuvs/neighbors/hnsw.hpp>
-// #include "../hnswlib/hnswlib_wrapper.h"
 #include "cuvs_cagra_wrapper.h"
+#include <cuvs/neighbors/hnsw.hpp>
 
 #include <memory>
 
@@ -27,15 +26,12 @@ template <typename T, typename IdxT>
 class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
-  // using build_param       = typename cuvs_cagra<T, IdxT>::build_param;
+
   struct build_param {
     typename cuvs_cagra<T, IdxT>::build_param cagra_build_param;
-    // cuvs::neighbors::hnsw::HnswHierarchy hierarchy = HnswHierarchy::NONE;
-    // int ef_construction = 200;
-    // int num_threads = 10;
     cuvs::neighbors::hnsw::index_params hnsw_index_params;
   };
-  // using search_param      = typename hnsw_lib<T>::search_param;
+
   struct search_param : public search_param_base {
     cuvs::neighbors::hnsw::search_params hnsw_search_param;
   };
@@ -44,8 +40,6 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
     : algo<T>(metric, dim),
       build_param_{param},
       cagra_build_{metric, dim, param.cagra_build_param, concurrent_searches}
-  // hnsw_lib param values don't matter since we don't build with hnsw_lib
-  // hnswlib_search_{metric, dim, typename hnsw_lib<T>::build_param{50, 100}}
   {
   }
 
@@ -85,7 +79,6 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
   build_param build_param_;
   search_param search_param_;
   cuvs_cagra<T, IdxT> cagra_build_;
-  // hnsw_lib<T> hnswlib_search_;
   std::shared_ptr<cuvs::neighbors::hnsw::index<T>> hnsw_index_;
 };
 
@@ -104,24 +97,18 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_)
 {
-  // hnswlib_search_.set_search_param(param_);
   search_param_ = dynamic_cast<const search_param&>(param_);
-  // search_param_.hnsw_search_param.ef = param.ef;
-  // search_param_.hnsw_search_param.num_threads = param.num_threads;
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::save(const std::string& file) const
 {
-  // cagra_build_.save_to_hnswlib(file);
   cuvs::neighbors::hnsw::serialize(handle_, file, *(hnsw_index_.get()));
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::load(const std::string& file)
 {
-  // hnswlib_search_.load(file);
-  // hnswlib_search_.set_base_layer_only();
   cuvs::neighbors::hnsw::index<T>* idx = nullptr;
   cuvs::neighbors::hnsw::deserialize(handle_,
                                      build_param_.hnsw_index_params,
@@ -136,7 +123,6 @@ template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  // hnswlib_search_.search(queries, batch_size, k, neighbors, distances);
   // Only Latency mode is supported for now
   auto queries_view =
     raft::make_host_matrix_view<const T, int64_t>(queries, batch_size, this->dim_);
