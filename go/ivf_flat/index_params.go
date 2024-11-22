@@ -1,12 +1,6 @@
 package ivf_flat
 
-// #include <cuda_runtime_api.h>
-// #include <cuvs/core/c_api.h>
-// #include <cuvs/distance/pairwise_distance.h>
-// #include <cuvs/neighbors/brute_force.h>
 // #include <cuvs/neighbors/ivf_flat.h>
-// #include <cuvs/neighbors/cagra.h>
-// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
 
 import (
