@@ -1,143 +1,122 @@
 package cagra
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"testing"
-	"time"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
 func TestCagra(t *testing.T) {
+	const (
+		nDataPoints = 1024
+		nFeatures   = 16
+		nQueries    = 4
+		k           = 4
+		epsilon     = 0.001
+	)
+
 	resource, _ := cuvs.NewResource(nil)
+	defer resource.Close()
 
-	rand.Seed(time.Now().UnixNano())
-
-	NDataPoints := 1024
-	NFeatures := 16
-
-	TestDataset := make([][]float32, NDataPoints)
-	for i := range TestDataset {
-		TestDataset[i] = make([]float32, NFeatures)
-		for j := range TestDataset[i] {
-			TestDataset[i][j] = rand.Float32()
+	testDataset := make([][]float32, nDataPoints)
+	for i := range testDataset {
+		testDataset[i] = make([]float32, nFeatures)
+		for j := range testDataset[i] {
+			testDataset[i][j] = rand.Float32()
 		}
 	}
 
-	ExtendDataPoints := 64
-	ExtendDataset := make([][]float32, ExtendDataPoints)
-	for i := range ExtendDataset {
-		ExtendDataset[i] = make([]float32, NFeatures)
-		for j := range ExtendDataset[i] {
-			ExtendDataset[i][j] = rand.Float32()
-		}
+	dataset, err := cuvs.NewTensor(testDataset)
+	if err != nil {
+		t.Fatalf("error creating dataset tensor: %v", err)
 	}
-
-	ExtendReturnEmptyDataset := make([][]float32, NDataPoints+ExtendDataPoints)
-	for i := range ExtendReturnEmptyDataset {
-		ExtendReturnEmptyDataset[i] = make([]float32, NFeatures)
-		// for j := range ExtendReturnEmptyDataset[i] {
-		// 	ExtendReturnEmptyDataset[i][j] = rand.Float32()
-		// }
-	}
-
-	dataset, _ := cuvs.NewTensor(TestDataset)
 	defer dataset.Close()
 
-	extend_dataset, _ := cuvs.NewTensor(ExtendDataset)
-	defer extend_dataset.Close()
-
-	extend_return_dataset, _ := cuvs.NewTensor(ExtendReturnEmptyDataset)
-	defer extend_return_dataset.Close()
-
-	// CompressionParams, _ := CreateCompressionParams()
-
-	IndexParams, err := CreateIndexParams()
-	// IndexParams.SetCompression(CompressionParams)
+	indexParams, err := CreateIndexParams()
 	if err != nil {
-		panic(err)
+		t.Fatalf("error creating index params: %v", err)
 	}
+	defer indexParams.Close()
 
 	index, _ := CreateIndex()
 	defer index.Close()
+
 	// use the first 4 points from the dataset as queries : will test that we get them back
 	// as their own nearest neighbor
+	queries, _ := cuvs.NewTensor(testDataset[:nQueries])
+	defer queries.Close()
 
-	NQueries := 4
-	K := 10
-	queries, _ := cuvs.NewTensor(TestDataset[:NQueries])
-	NeighborsDataset := make([][]uint32, NQueries)
-	for i := range NeighborsDataset {
-		NeighborsDataset[i] = make([]uint32, K)
-	}
-	DistancesDataset := make([][]float32, NQueries)
-	for i := range DistancesDataset {
-		DistancesDataset[i] = make([]float32, K)
-	}
-	neighbors, _ := cuvs.NewTensor(NeighborsDataset)
-	distances, _ := cuvs.NewTensor(DistancesDataset)
-	println("hello")
-
-	_, todeviceerr := neighbors.ToDevice(&resource)
-	if todeviceerr != nil {
-		println(todeviceerr)
-	}
-	distances.ToDevice(&resource)
-	dataset.ToDevice(&resource)
-	extend_dataset.ToDevice(&resource)
-	extend_return_dataset.ToDevice(&resource)
-
-	err = BuildIndex(resource, IndexParams, &dataset, index)
+	neighbors, err := cuvs.NewTensorOnDevice[uint32](&resource, []int64{int64(nQueries), int64(k)})
 	if err != nil {
-		// println(err.Error())
-		panic(err)
+		t.Fatalf("error creating neighbors tensor: %v", err)
 	}
-	resource.Sync()
-	ExtendParams, err := CreateExtendParams()
+	defer neighbors.Close()
+
+	distances, err := cuvs.NewTensorOnDevice[float32](&resource, []int64{int64(nQueries), int64(k)})
 	if err != nil {
-		panic(err)
+		t.Fatalf("error creating distances tensor: %v", err)
 	}
-	err = ExtendIndex(resource, ExtendParams, &extend_dataset, &extend_return_dataset, index)
-	if err != nil {
-		// println(err.Error())
-		panic(err)
+	defer distances.Close()
+
+	if _, err := dataset.ToDevice(&resource); err != nil {
+		t.Fatalf("error moving dataset to device: %v", err)
 	}
 
-	resource.Sync()
+	if err := BuildIndex(resource, indexParams, &dataset, index); err != nil {
+		t.Fatalf("error building index: %v", err)
+	}
 
-	queries.ToDevice(&resource)
+	if err := resource.Sync(); err != nil {
+		t.Fatalf("error syncing resource: %v", err)
+	}
+
+	if _, err := queries.ToDevice(&resource); err != nil {
+		t.Fatalf("error moving queries to device: %v", err)
+	}
 
 	SearchParams, err := CreateSearchParams()
 	if err != nil {
-		panic(err)
+		t.Fatalf("error creating search params: %v", err)
 	}
+	defer SearchParams.Close()
 
 	err = SearchIndex(resource, SearchParams, index, &queries, &neighbors, &distances)
 	if err != nil {
-		panic(err)
+		t.Fatalf("error searching index: %v", err)
 	}
 
-	neighbors.ToHost(&resource)
-	distances.ToHost(&resource)
+	if _, err := neighbors.ToHost(&resource); err != nil {
+		t.Fatalf("error moving neighbors to host: %v", err)
+	}
 
-	resource.Sync()
+	if _, err := distances.ToHost(&resource); err != nil {
+		t.Fatalf("error moving distances to host: %v", err)
+	}
 
-	extend_return_dataset.ToHost(&resource)
-	// arr_extend_return_dataset, _ := extend_return_dataset.GetArray()
+	if err := resource.Sync(); err != nil {
+		t.Fatalf("error syncing resource: %v", err)
+	}
 
-	// p := (*int64)(unsafe.Pointer(uintptr(neighbors.c_tensor.dl_tensor.data) + uintptr(K*8*3)))
-	arr, _ := neighbors.Slice()
-	for i := range arr {
-		println(arr[i][0])
-		if arr[i][0] != uint32(i) {
-			t.Error("wrong neighbor, expected", i, "got", arr[i][0])
+	neighborsSlice, err := neighbors.Slice()
+	if err != nil {
+		t.Fatalf("error getting neighbors slice: %v", err)
+	}
+
+	for i := range neighborsSlice {
+		if neighborsSlice[i][0] != uint32(i) {
+			t.Error("wrong neighbor, expected", i, "got", neighborsSlice[i][0])
 		}
 	}
 
-	// arr_dist, _ := distances.GetArray()
-	// for i := range arr_dist {
-	// 	if arr_dist[i][0] >= float32(0.001) || arr_dist[i][0] <= float32(-0.001) {
-	// 		t.Error("wrong distance, expected", float32(i), "got", arr_dist[i][0])
-	// 	}
-	// }
+	distancesSlice, err := distances.Slice()
+	if err != nil {
+		t.Fatalf("error getting distances slice: %v", err)
+	}
+
+	for i := range distancesSlice {
+		if distancesSlice[i][0] >= epsilon || distancesSlice[i][0] <= -epsilon {
+			t.Error("distance should be close to 0, got", distancesSlice[i][0])
+		}
+	}
 }

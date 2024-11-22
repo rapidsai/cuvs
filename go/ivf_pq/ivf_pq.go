@@ -1,16 +1,8 @@
 package ivf_pq
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <dlpack/dlpack.h>
-// #include <cuda_runtime_api.h>
-// #include <cuvs/core/c_api.h>
-// #include <cuvs/distance/pairwise_distance.h>
-// #include <cuvs/neighbors/brute_force.h>
-// #include <cuvs/neighbors/ivf_flat.h>
-// #include <cuvs/neighbors/cagra.h>
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
 	"unsafe"
@@ -24,8 +16,8 @@ type ivfPqIndex struct {
 }
 
 func CreateIndex(params *indexParams, dataset *cuvs.Tensor[float32]) (*ivfPqIndex, error) {
+	var index C.cuvsIvfPqIndex_t
 
-	index := (C.cuvsIvfPqIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsIvfPqIndex{}))))
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexCreate(&index)))
 	if err != nil {
 		return nil, err
@@ -48,16 +40,13 @@ func (index *ivfPqIndex) Close() error {
 	if err != nil {
 		return err
 	}
-	// TODO free memory
 	return nil
 }
 
 func SearchIndex[T any](Resources cuvs.Resource, params *searchParams, index *ivfPqIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
-
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
 
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)))))
-
 }

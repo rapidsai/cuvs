@@ -8,12 +8,11 @@ package ivf_pq
 // #include <cuvs/neighbors/cagra.h>
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
 
 	cuvs "github.com/rapidsai/cuvs/go"
-
-	"unsafe"
 )
 
 type indexParams struct {
@@ -33,17 +32,9 @@ var cCodebookKinds = map[codebookKind]int{
 }
 
 func CreateIndexParams() (*indexParams, error) {
-
-	size := unsafe.Sizeof(C.struct_cuvsIvfPqIndexParams{})
-
-	params := (C.cuvsIvfPqIndexParams_t)(C.malloc(C.size_t(size)))
-
-	if params == nil {
-		return nil, errors.New("memory allocation failed")
-	}
+	var params C.cuvsIvfPqIndexParams_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqIndexParamsCreate(&params)))
-
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +117,5 @@ func (p *indexParams) Close() error {
 	if err != nil {
 		return err
 	}
-	// TODO free memory
 	return nil
 }

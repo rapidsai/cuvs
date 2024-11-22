@@ -1,19 +1,13 @@
 package brute_force
 
-// #include <cuda_runtime_api.h>
-// #include <cuvs/core/c_api.h>
-// #include <cuvs/distance/pairwise_distance.h>
 // #include <cuvs/neighbors/brute_force.h>
-// #include <cuvs/neighbors/ivf_flat.h>
-// #include <cuvs/neighbors/cagra.h>
-// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
+	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
-
-	"unsafe"
 )
 
 type bruteForceIndex struct {
@@ -21,26 +15,15 @@ type bruteForceIndex struct {
 	trained bool
 }
 
-// func (index *Index) Close() {
-// 	// C.free(index.index)
-// }
-
 func CreateIndex() (*bruteForceIndex, error) {
-
-	index := (C.cuvsBruteForceIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsBruteForceIndex{}))))
-
-	if index == nil {
-		return nil, errors.New("memory allocation failed")
-	}
+	var index C.cuvsBruteForceIndex_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsBruteForceIndexCreate(&index)))
-
 	if err != nil {
 		return nil, err
 	}
 
 	return &bruteForceIndex{index: index, trained: false}, nil
-
 }
 
 func (index *bruteForceIndex) Close() error {
@@ -48,16 +31,10 @@ func (index *bruteForceIndex) Close() error {
 	if err != nil {
 		return err
 	}
-	// TODO free memory
 	return nil
 }
 
 func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric cuvs.Distance, metric_arg float32, index *bruteForceIndex) error {
-
-	// if Dataset.C_tensor.dl_tensor.device.device_type != C.kDLCUDA {
-	// 	return errors.New("dataset must be on GPU")
-	// }
-
 	CMetric, exists := cuvs.CDistances[metric]
 
 	if !exists {
@@ -70,14 +47,10 @@ func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric 
 	}
 	index.trained = true
 
-	println("build done")
-
 	return nil
-
 }
 
 func SearchIndex[T any](resources cuvs.Resource, index bruteForceIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
-
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
@@ -88,5 +61,4 @@ func SearchIndex[T any](resources cuvs.Resource, index bruteForceIndex, queries 
 	}
 
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsBruteForceSearch(C.ulong(resources.Resource), index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), prefilter)))
-
 }

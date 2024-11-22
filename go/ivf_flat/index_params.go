@@ -8,10 +8,9 @@ package ivf_flat
 // #include <cuvs/neighbors/cagra.h>
 // #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
-
-	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
@@ -21,17 +20,9 @@ type indexParams struct {
 }
 
 func CreateIndexParams() (*indexParams, error) {
-
-	size := unsafe.Sizeof(C.struct_cuvsIvfFlatIndexParams{})
-
-	params := (C.cuvsIvfFlatIndexParams_t)(C.malloc(C.size_t(size)))
-
-	if params == nil {
-		return nil, errors.New("memory allocation failed")
-	}
+	var params C.cuvsIvfFlatIndexParams_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsCreate(&params)))
-
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +75,5 @@ func (p *indexParams) Close() error {
 	if err != nil {
 		return err
 	}
-	// TODO free memory
 	return nil
 }

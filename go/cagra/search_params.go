@@ -1,16 +1,10 @@
 package cagra
 
-// #include <cuda_runtime_api.h>
-// #include <cuvs/core/c_api.h>
-// #include <cuvs/distance/pairwise_distance.h>
-// #include <cuvs/neighbors/brute_force.h>
-// #include <cuvs/neighbors/ivf_flat.h>
 // #include <cuvs/neighbors/cagra.h>
-// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
-	"unsafe"
 
 	cuvs "github.com/rapidsai/cuvs/go"
 )
@@ -37,17 +31,9 @@ const (
 )
 
 func CreateSearchParams() (*SearchParams, error) {
-
-	size := unsafe.Sizeof(C.struct_cuvsCagraSearchParams{})
-
-	params := (C.cuvsCagraSearchParams_t)(C.malloc(C.size_t(size)))
-
-	if params == nil {
-		return nil, errors.New("memory allocation failed")
-	}
+	var params C.cuvsCagraSearchParams_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraSearchParamsCreate(&params)))
-
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +141,5 @@ func (p *SearchParams) Close() error {
 	if err != nil {
 		return err
 	}
-	// TODO free memory
 	return nil
 }

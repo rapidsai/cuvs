@@ -1,16 +1,8 @@
 package cagra
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <dlpack/dlpack.h>
-// #include <cuda_runtime_api.h>
-// #include <cuvs/core/c_api.h>
-// #include <cuvs/distance/pairwise_distance.h>
-// #include <cuvs/neighbors/brute_force.h>
-// #include <cuvs/neighbors/ivf_flat.h>
 // #include <cuvs/neighbors/cagra.h>
-// #include <cuvs/neighbors/ivf_pq.h>
 import "C"
+
 import (
 	"errors"
 	"unsafe"
@@ -24,8 +16,7 @@ type CagraIndex struct {
 }
 
 func CreateIndex() (*CagraIndex, error) {
-
-	index := (C.cuvsCagraIndex_t)(C.malloc(C.size_t(unsafe.Sizeof(C.cuvsCagraIndex{}))))
+	var index C.cuvsCagraIndex_t
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraIndexCreate(&index)))
 	if err != nil {
 		return nil, err
@@ -59,16 +50,13 @@ func (index *CagraIndex) Close() error {
 	if err != nil {
 		return err
 	}
-	// TODO free memory
 	return nil
 }
 
 func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *CagraIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[uint32], distances *cuvs.Tensor[T]) error {
-
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
 
 	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)))))
-
 }
