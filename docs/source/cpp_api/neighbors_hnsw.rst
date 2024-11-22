@@ -27,10 +27,25 @@ Index
     :members:
     :content-only:
 
-Index load
-------------
+Index extend parameters
+-----------------------
 
-.. doxygengroup:: hnsw_cpp_index_search
+.. doxygengroup:: hnsw_cpp_extend_params
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index extend
+------------
+.. doxygengroup:: hnsw_cpp_index_extend
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index load
+----------
+
+.. doxygengroup:: hnsw_cpp_index_load
     :project: cuvs
     :members:
     :content-only:

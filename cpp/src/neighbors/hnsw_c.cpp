@@ -53,6 +53,23 @@ void _from_cagra(cuvsResources_t res,
 }
 
 template <typename T>
+void _extend(cuvsResources_t res,
+             cuvsHnswExtendParams_t params,
+             DLManagedTensor* additional_dataset,
+             cuvsHnswIndex index)
+{
+  auto res_ptr           = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr         = reinterpret_cast<cuvs::neighbors::hnsw::index<T>*>(index.addr);
+  auto cpp_params        = cuvs::neighbors::hnsw::extend_params();
+  cpp_params.num_threads = params->num_threads;
+
+  using additional_dataset_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+  auto additional_dataset_mds =
+    cuvs::core::from_dlpack<additional_dataset_mdspan_type>(additional_dataset);
+  cuvs::neighbors::hnsw::extend(*res_ptr, cpp_params, additional_dataset_mds, *index_ptr);
+}
+
+template <typename T>
 void _search(cuvsResources_t res,
              cuvsHnswSearchParams params,
              cuvsHnswIndex index,
@@ -138,6 +155,17 @@ extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
   });
 }
 
+extern "C" cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { *params = new cuvsHnswExtendParams{.num_threads = 0}; });
+}
+
+extern "C" cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
 extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
                                          cuvsHnswIndexParams_t params,
                                          cuvsCagraIndex_t cagra_index,
@@ -154,6 +182,24 @@ extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
       _from_cagra<int8_t>(res, params, cagra_index, hnsw_index);
     } else {
       RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswExtend(cuvsResources_t res,
+                                      cuvsHnswExtendParams_t params,
+                                      DLManagedTensor* additional_dataset,
+                                      cuvsHnswIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat) {
+      _extend<float>(res, params, additional_dataset, *index);
+    } else if (index->dtype.code == kDLUInt) {
+      _extend<uint8_t>(res, params, additional_dataset, *index);
+    } else if (index->dtype.code == kDLInt) {
+      _extend<int8_t>(res, params, additional_dataset, *index);
+    } else {
+      RAFT_FAIL("Unsupported dtype: %d", index->dtype.code);
     }
   });
 }

@@ -109,6 +109,41 @@ cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 
 /**
+ * @}
+ */
+
+/**
+ * @defgroup hnsw_c_extend_params Parameters for extending HNSW index
+ */
+
+struct cuvsHnswExtendParams {
+  int num_threads;
+};
+
+typedef struct cuvsHnswExtendParams* cuvsHnswExtendParams_t;
+
+/**
+ * @brief Allocate HNSW extend params, and populate with default values
+ *
+ * @param[in] params cuvsHnswExtendParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params);
+
+/**
+ * @brief De-allocate HNSW extend params
+ *
+ * @param[in] params cuvsHnswExtendParams_t to de-allocate
+ * @return cuvsError_t
+ */
+
+cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
+
+/**
+ * @}
+ */
+
+/**
  * @defgroup hnsw_c_index_load Load CAGRA index as hnswlib index
  * @{
  */
@@ -117,6 +152,20 @@ cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
                               cuvsHnswIndexParams_t params,
                               cuvsCagraIndex_t cagra_index,
                               cuvsHnswIndex_t hnsw_index);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup hnsw_c_index_extend Extend HNSW index with additional vectors
+ * @{
+ */
+
+cuvsError_t cuvsHnswExtend(cuvsResources_t res,
+                           cuvsHnswExtendParams_t params,
+                           DLManagedTensor* additional_dataset,
+                           cuvsHnswIndex_t index);
 
 /**
  * @}

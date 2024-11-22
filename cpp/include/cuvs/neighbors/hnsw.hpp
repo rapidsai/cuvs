@@ -109,6 +109,17 @@ struct index : cuvs::neighbors::index {
 /**@}*/
 
 /**
+ * @defgroup hnsw_cpp_extend_params HNSW index extend parameters
+ * @{
+ */
+
+struct extend_params {
+  /** Number of host threads to use to add additional vectors to the index.
+  Value of 0 automatically maximizes parallelism. */
+  int num_threads = 0;
+};
+
+/**
  * @defgroup hnsw_cpp_index_load Load CAGRA index as hnswlib index
  * @{
  */
@@ -204,6 +215,28 @@ std::unique_ptr<index<int8_t>> from_cagra(
     std::nullopt);
 
 /**@}*/
+
+/**
+ * @defgroup hnsw_cpp_index_extend Extend HNSW index with additional vectors
+ * @{
+ */
+
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
+            index<float>& idx);
+
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
+            index<uint8_t>& idx);
+
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
+            index<int8_t>& idx);
+
+/**@} */
 
 /**
  * @defgroup hnsw_cpp_search_params Build CAGRA index and search with hnswlib

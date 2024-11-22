@@ -122,6 +122,34 @@ cdef class Index:
         return "Index(type=HNSW, metric=L2" + (", ".join(attr_str)) + ")"
 
 
+cdef class ExtendParams:
+    """
+    Parameters to extend the HNSW index with new data
+
+    Parameters
+    ----------
+    num_threads : int, default = 0 (optional)
+        Number of CPU threads used to increase construction parallelism.
+        When set to 0, the number of threads is automatically determined.
+    """
+
+    cdef cuvsHnswExtendParams* params
+
+    def __cinit__(self):
+        check_cuvs(cuvsHnswExtendParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsHnswExtendParamsDestroy(self.params))
+
+    def __init__(self, *,
+                 num_threads=0):
+        self.params.num_threads = num_threads
+
+    @property
+    def num_threads(self):
+        return self.params.num_threads
+
+
 @auto_sync_resources
 def save(filename, Index index, resources=None):
     """
@@ -299,6 +327,54 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
 
     hnsw_index.trained = True
     return hnsw_index
+
+
+@auto_sync_resources
+def extend(ExtendParams extend_params, Index index, data, resources=None):
+    """
+    Extends the HNSW index with new data.
+
+    Parameters
+    ----------
+    extend_params : ExtendParams
+    index : Index
+        Trained HNSW index.
+    data : Host array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, int8, uint8]
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from cuvs.neighbors import hnsw, cagra
+    >>>
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = np.random.random_sample((n_samples, n_features))
+    >>>
+    >>> # Build index
+    >>> index = cagra.build(hnsw.IndexParams(), dataset)
+    >>> # Load index
+    >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(hierarchy="cpu"), index)
+    >>> # Extend the index with new data
+    >>> new_data = np.random.random_sample((n_samples, n_features))
+    >>> hnsw.extend(hnsw.ExtendParams(), hnsw_index, new_data)
+    """
+
+    data_ai = wrap_array(data)
+    _check_input_array(data_ai, [np.dtype('float32'),
+                                 np.dtype('uint8'),
+                                 np.dtype('int8')])
+
+    cdef cydlpack.DLManagedTensor* data_dlpack = cydlpack.dlpack_c(data_ai)
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    check_cuvs(cuvsHnswExtend(
+        res,
+        extend_params.params,
+        data_dlpack,
+        index.index
+    ))
 
 
 cdef class SearchParams:

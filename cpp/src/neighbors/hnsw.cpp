@@ -37,6 +37,21 @@ CUVS_INST_HNSW_FROM_CAGRA(int8_t);
 
 #undef CUVS_INST_HNSW_FROM_CAGRA
 
+#define CUVS_INST_HNSW_EXTEND(T)                                                            \
+  void extend(raft::resources const& res,                                                   \
+              const extend_params& params,                                                  \
+              raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset, \
+              index<T>& idx)                                                                \
+  {                                                                                         \
+    detail::extend<T>(res, params, additional_dataset, idx);                                \
+  }
+
+CUVS_INST_HNSW_EXTEND(float);
+CUVS_INST_HNSW_EXTEND(uint8_t);
+CUVS_INST_HNSW_EXTEND(int8_t);
+
+#undef CUVS_INST_HNSW_EXTEND
+
 #define CUVS_INST_HNSW_SEARCH(T)                                                    \
   void search(raft::resources const& res,                                           \
               const search_params& params,                                          \

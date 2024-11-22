@@ -99,3 +99,84 @@ def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
         hierarchy=hierarchy,
         search_params={"ef": ef, "num_threads": num_threads},
     )
+
+
+def run_hnsw_extend_test(
+    n_rows=10000,
+    add_rows=2000,
+    n_cols=10,
+    n_queries=100,
+    k=10,
+    dtype=np.float32,
+    metric="sqeuclidean",
+    build_algo="ivf_pq",
+    intermediate_graph_degree=128,
+    graph_degree=64,
+    search_params={},
+):
+    dataset = generate_data((n_rows, n_cols), dtype)
+    add_dataset = generate_data((add_rows, n_cols), dtype)
+    if metric == "inner_product":
+        dataset = normalize(dataset, norm="l2", axis=1)
+        add_dataset = normalize(add_dataset, norm="l2", axis=1)
+        if dtype in [np.int8, np.uint8]:
+            pytest.skip(
+                "inner_product metric is not supported for int8/uint8 data"
+            )
+        if build_algo == "nn_descent":
+            pytest.skip("inner_product metric is not supported for nn_descent")
+
+    build_params = cagra.IndexParams(
+        metric=metric,
+        intermediate_graph_degree=intermediate_graph_degree,
+        graph_degree=graph_degree,
+        build_algo=build_algo,
+    )
+
+    index = cagra.build(build_params, dataset)
+
+    assert index.trained
+
+    hnsw_params = hnsw.IndexParams(hierarchy="cpu", num_threads=1)
+    hnsw_index = hnsw.from_cagra(hnsw_params, index)
+    hnsw.extend(hnsw.ExtendParams(), hnsw_index, add_dataset)
+
+    queries = generate_data((n_queries, n_cols), dtype)
+
+    search_params = hnsw.SearchParams(**search_params)
+
+    out_dist, out_idx = hnsw.search(search_params, hnsw_index, queries, k)
+
+    # Calculate reference values with sklearn
+    skl_metric = {
+        "sqeuclidean": "sqeuclidean",
+        "inner_product": "cosine",
+        "euclidean": "euclidean",
+    }[metric]
+    nn_skl = NearestNeighbors(
+        n_neighbors=k, algorithm="brute", metric=skl_metric
+    )
+    nn_skl.fit(np.vstack([dataset, add_dataset]))
+    skl_dist, skl_idx = nn_skl.kneighbors(queries, return_distance=True)
+
+    recall = calc_recall(out_idx, skl_idx)
+    print(recall)
+    assert recall > 0.95
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.parametrize("k", [10, 20])
+@pytest.mark.parametrize("ef", [30, 40])
+@pytest.mark.parametrize("num_threads", [2, 4])
+@pytest.mark.parametrize("metric", ["sqeuclidean"])
+@pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
+def test_hnsw_extend(dtype, k, ef, num_threads, metric, build_algo):
+    # Note that inner_product tests use normalized input which we cannot
+    # represent in int8, therefore we test only sqeuclidean metric here.
+    run_hnsw_extend_test(
+        dtype=dtype,
+        k=k,
+        metric=metric,
+        build_algo=build_algo,
+        search_params={"ef": ef, "num_threads": num_threads},
+    )

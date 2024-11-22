@@ -50,10 +50,24 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
 
     cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
 
+    ctypedef struct cuvsHnswExtendParams:
+        int32_t num_threads
+
+    ctypedef cuvsHnswExtendParams* cuvsHnswExtendParams_t
+
+    cuvsError_t cuvsHnswExtendParamsCreate(cuvsHnswExtendParams_t* params)
+
+    cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params)
+
     cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
                                   cuvsHnswIndexParams_t params,
                                   cuvsCagraIndex_t cagra_index,
-                                  cuvsHnswIndex_t hnsw_index)
+                                  cuvsHnswIndex_t hnsw_index) except +
+
+    cuvsError_t cuvsHnswExtend(cuvsResources_t res,
+                               cuvsHnswExtendParams_t params,
+                               DLManagedTensor* data,
+                               cuvsHnswIndex_t index) except +
 
     ctypedef struct cuvsHnswSearchParams:
         int32_t ef

@@ -112,7 +112,6 @@ struct index_impl : index<T> {
   index_impl(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy)
     : index<T>{dim, metric, hierarchy}
   {
-    std::cout << "dim: " << dim << std::endl;
     if constexpr (std::is_same_v<T, float>) {
       if (metric == cuvs::distance::DistanceType::L2Expanded) {
         space_ = std::make_unique<hnswlib::L2Space>(dim);
@@ -191,7 +190,6 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset_view(
     host_dataset.data_handle(), host_dataset.extent(0), host_dataset.extent(1));
   if (dataset.has_value()) {
-    std::cout << "Using dataset provided by user" << std::endl;
     host_dataset_view = dataset.value();
   } else {
     // move dataset to host, remove padding
@@ -264,6 +262,31 @@ std::unique_ptr<index<T>> from_cagra(
   {
     RAFT_FAIL("Unsupported hierarchy type");
   }
+}
+
+template <typename T>
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
+            index<T>& idx)
+{
+  auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(
+    const_cast<void*>(idx.get_index()));
+  auto current_element_count = hnswlib_index->getCurrentElementCount();
+  auto new_element_count     = additional_dataset.extent(0);
+  auto num_threads           = params.num_threads == 0 ? std::thread::hardware_concurrency()
+                                                       : static_cast<size_t>(params.num_threads);
+
+  hnswlib_index->resizeIndex(current_element_count + new_element_count);
+  ParallelFor(current_element_count,
+              current_element_count + new_element_count,
+              num_threads,
+              [&](size_t i, size_t threadId) {
+                hnswlib_index->addPoint(
+                  (void*)(additional_dataset.data_handle() +
+                          (i - current_element_count) * additional_dataset.extent(1)),
+                  i);
+              });
 }
 
 template <typename T>
