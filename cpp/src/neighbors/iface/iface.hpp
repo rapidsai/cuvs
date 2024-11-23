@@ -1,4 +1,20 @@
-#include <mutex>
+/*
+ * Copyright (c) 2024, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
 
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -6,6 +22,9 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <fstream>
 #include <raft/core/device_resources.hpp>
+
+#include <fstream>
+#include <mutex>
 
 namespace cuvs::neighbors {
 
@@ -17,7 +36,7 @@ void build(const raft::device_resources& handle,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset)
 {
-  interface.mutex_->lock();
+  std::lock_guard(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx = cuvs::neighbors::ivf_flat::build(
@@ -33,8 +52,6 @@ void build(const raft::device_resources& handle,
     interface.index_.emplace(std::move(idx));
   }
   resource::sync_stream(handle);
-
-  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
@@ -45,7 +62,7 @@ void extend(
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices)
 {
-  interface.mutex_->lock();
+  std::lock_guard(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx =
@@ -59,8 +76,6 @@ void extend(
     RAFT_FAIL("CAGRA does not implement the extend method");
   }
   resource::sync_stream(handle);
-
-  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -71,7 +86,7 @@ void search(const raft::device_resources& handle,
             raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::device_matrix_view<float, int64_t, row_major> distances)
 {
-  // interface.mutex_->lock();
+  // std::lock_guard(*interface.mutex_);
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, int64_t>>::value) {
     cuvs::neighbors::ivf_flat::search(
       handle,
@@ -95,9 +110,7 @@ void search(const raft::device_resources& handle,
                                    neighbors,
                                    distances);
   }
-  resource::sync_stream(handle);
-
-  // interface.mutex_->unlock();
+  // resource::sync_stream(handle);
 }
 
 // for MG ANN only
@@ -109,7 +122,7 @@ void search(const raft::device_resources& handle,
             raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances)
 {
-  // interface.mutex_->lock();
+  // std::lock_guard(*interface.mutex_);
 
   int64_t n_rows = h_queries.extent(0);
   int64_t n_dims = h_queries.extent(1);
@@ -121,8 +134,6 @@ void search(const raft::device_resources& handle,
   auto d_query_view = raft::make_const_mdspan(d_queries.view());
 
   search(handle, interface, search_params, d_query_view, d_neighbors, d_distances);
-
-  // interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -130,7 +141,7 @@ void serialize(const raft::device_resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os)
 {
-  interface.mutex_->lock();
+  std::lock_guard(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::serialize(handle, os, interface.index_.value());
@@ -139,8 +150,6 @@ void serialize(const raft::device_resources& handle,
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::serialize(handle, os, interface.index_.value(), true);
   }
-
-  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -148,7 +157,7 @@ void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is)
 {
-  interface.mutex_->lock();
+  std::lock_guard(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
@@ -163,8 +172,6 @@ void deserialize(const raft::device_resources& handle,
     cagra::deserialize(handle, is, &idx);
     interface.index_.emplace(std::move(idx));
   }
-
-  interface.mutex_->unlock();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -172,7 +179,7 @@ void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename)
 {
-  interface.mutex_->lock();
+  std::lock_guard(*interface.mutex_);
 
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
@@ -192,8 +199,6 @@ void deserialize(const raft::device_resources& handle,
   }
 
   is.close();
-
-  interface.mutex_->unlock();
 }
 
 };  // namespace cuvs::neighbors

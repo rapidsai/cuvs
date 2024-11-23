@@ -42,8 +42,6 @@ def run_hnsw_build_search_test(
             pytest.skip(
                 "inner_product metric is not supported for int8/uint8 data"
             )
-        if build_algo == "nn_descent":
-            pytest.skip("inner_product metric is not supported for nn_descent")
 
     build_params = cagra.IndexParams(
         metric=metric,
@@ -85,7 +83,7 @@ def run_hnsw_build_search_test(
 @pytest.mark.parametrize("k", [10, 20])
 @pytest.mark.parametrize("ef", [30, 40])
 @pytest.mark.parametrize("num_threads", [2, 4])
-@pytest.mark.parametrize("metric", ["sqeuclidean"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 @pytest.mark.parametrize("hierarchy", ["none", "cpu"])
 def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
