@@ -154,9 +154,12 @@ cdef class ExtendParams:
 def save(filename, Index index, resources=None):
     """
     Saves the CAGRA index to a file as an hnswlib index.
-    The saved index is immutable and can only be searched by the hnswlib
-    wrapper in cuVS, as the format is not compatible with the original
-    hnswlib.
+    If the index was constructed with `hnsw.IndexParams(hierarchy="none")`,
+    then the saved index is immutable and can only be searched by the hnswlib
+    wrapper in cuVS, as the format is not compatible with the original hnswlib.
+    However, if the index was constructed with
+    `hnsw.IndexParams(hierarchy="cpu")`, then the saved index is mutable and
+    compatible with the original hnswlib.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change.
@@ -194,9 +197,12 @@ def save(filename, Index index, resources=None):
 def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
          resources=None):
     """
-    Loads base-layer-only hnswlib index from file, which was originally
-    saved as a built CAGRA index. The loaded index is immutable and can only
-    be searched by the hnswlib wrapper in cuVS, as the format is not
+    Loads an HNSW index.
+    If the index was constructed with `hnsw.IndexParams(hierarchy="none")`,
+    then the loaded index is immutable and can only be searched by the hnswlib
+    wrapper in cuVS, as the format is not compatible with the original hnswlib.
+    However, if the index was constructed with
+    `hnsw.IndexParams(hierarchy="cpu")`, then the loaded index is mutable and
     compatible with the original hnswlib.
 
     Saving / loading the index is experimental. The serialization format is
@@ -205,6 +211,8 @@ def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
 
     Parameters
     ----------
+    index_params : IndexParams
+        Parameters that were used to convert CAGRA index to HNSW index.
     filename : string
         Name of the file.
     dim : int
@@ -277,24 +285,27 @@ def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
 def from_cagra(IndexParams index_params, cagra.Index cagra_index,
                temporary_index_path=None, resources=None):
     """
-    Returns an hnsw base-layer-only index from a CAGRA index.
+    Returns an HNSW index from a CAGRA index.
 
-    NOTE: This method uses the filesystem to write the CAGRA index in
-          `/tmp/<random_number>.bin` or the parameter `temporary_index_path`
-          if not None before reading it as an hnsw index,
-          then deleting the temporary file. The returned index is immutable
-          and can only be searched by the hnsw wrapper in cuVS, as the
-          format is not compatible with the original hnswlib library.
-          By `base_layer_only`, we mean that the hnsw index is created
-          without the additional layers that are used for the hierarchical
-          search in hnswlib. Instead, the base layer is used for the search.
+    NOTE: When `index_params.hierarchy` is:
+          1. `NONE`: This method uses the filesystem to write the CAGRA index
+                     in `/tmp/<random_number>.bin` before reading it as an
+                     hnswlib index, then deleting the temporary file. The
+                     returned index is immutable and can only be searched by
+                     the hnswlib wrapper in cuVS, as the format is not
+                    compatible with the original hnswlib.
+          2. `CPU`: The returned index is mutable and can be extended with
+                    additional vectors. The serialized index is also compatible
+                    with the original hnswlib library.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change.
 
     Parameters
     ----------
-    index : Index
+    index_params : IndexParams
+        Parameters to convert the CAGRA index to HNSW index.
+    cagra_index : cagra.Index
         Trained CAGRA index.
     temporary_index_path : string, default = None
         Path to save the temporary index file. If None, the temporary file
@@ -430,15 +441,15 @@ def search(SearchParams search_params,
     ----------
     search_params : SearchParams
     index : Index
-        Trained CAGRA index.
-    queries : CUDA array interface compliant matrix shape (n_samples, dim)
+        Trained HNSW index.
+    queries : CPU array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float, int]
     k : int
         The number of neighbors.
-    neighbors : Optional CUDA array interface compliant matrix shape
+    neighbors : Optional CPU array interface compliant matrix shape
                 (n_queries, k), dtype uint64_t. If supplied, neighbor
                 indices will be written here in-place. (default None)
-    distances : Optional CUDA array interface compliant matrix shape
+    distances : Optional CPU array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
     {resources_docstring}
@@ -463,7 +474,7 @@ def search(SearchParams search_params,
     ...     num_threads=0
     ... )
     >>> # Convert CAGRA index to HNSW
-    >>> hnsw_index = hnsw.from_cagra(index)
+    >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(), index)
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
