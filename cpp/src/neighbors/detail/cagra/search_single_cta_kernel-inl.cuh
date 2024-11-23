@@ -491,7 +491,7 @@ RAFT_DEVICE_INLINE_FUNCTION void move_invalid_to_end_of_list(IdxT* const index_a
   }
   if (lane_id == 0) {
     index_array[array_length - 1]    = invalid_index;
-    distance_array[array_length - 1] = -1;
+    distance_array[array_length - 1] = utils::get_max_value<float>();
   }
 }
 
