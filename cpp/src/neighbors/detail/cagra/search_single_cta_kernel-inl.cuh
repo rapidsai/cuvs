@@ -453,6 +453,48 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(
                                             MULTI_WARPS_2);
 }
 
+// This function move the invalid index element to the end of the itopk list.
+// Require : array_length % 32 == 0 && The invalid entry is only one.
+template <class IdxT>
+RAFT_DEVICE_INLINE_FUNCTION void move_invalid_to_end_of_list(IdxT* const index_array,
+                                                             float* const distance_array,
+                                                             const std::uint32_t array_length)
+{
+  constexpr std::uint32_t warp_size     = 32;
+  constexpr std::uint32_t invalid_index = utils::get_max_value<IdxT>();
+  const std::uint32_t lane_id           = threadIdx.x % warp_size;
+
+  if (threadIdx.x >= warp_size) { return; }
+
+  bool found_invalid = false;
+  if (array_length % warp_size == 0) {
+    for (std::uint32_t i = lane_id; i < array_length; i += warp_size) {
+      const auto index    = index_array[i];
+      const auto distance = distance_array[i];
+
+      if (found_invalid) {
+        index_array[i - 1]    = index;
+        distance_array[i - 1] = distance;
+      } else {
+        // Check if the index is invalid
+        const auto I_found_invalid = (index == invalid_index);
+        const auto who_has_invalid = __ballot_sync(~0u, I_found_invalid);
+        // if a value that is loaded by a smaller lane id thread, shift the array
+        if (who_has_invalid << (warp_size - lane_id)) {
+          index_array[i - 1]    = index;
+          distance_array[i - 1] = distance;
+        }
+
+        found_invalid = who_has_invalid;
+      }
+    }
+  }
+  if (lane_id == 0) {
+    index_array[array_length - 1]    = invalid_index;
+    distance_array[array_length - 1] = -1;
+  }
+}
+
 template <class INDEX_T>
 RAFT_DEVICE_INLINE_FUNCTION void hashmap_restore(INDEX_T* const hashmap_ptr,
                                                  const size_t hashmap_bitlen,
@@ -627,28 +669,24 @@ __device__ void search_core(
 
       // topk with bitonic sort
       _CLK_START();
-      if (std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value ||
-          *filter_flag == 0) {
-        topk_by_bitonic_sort<MAX_ITOPK, MAX_CANDIDATES>(result_distances_buffer,
-                                                        result_indices_buffer,
-                                                        internal_topk,
-                                                        result_distances_buffer + internal_topk,
-                                                        result_indices_buffer + internal_topk,
-                                                        search_width * graph_degree,
-                                                        topk_ws,
-                                                        (iter == 0),
-                                                        multi_warps_1,
-                                                        multi_warps_2);
-        __syncthreads();
-      } else {
-        topk_by_bitonic_sort_1st<MAX_ITOPK + MAX_CANDIDATES>(
-          result_distances_buffer,
-          result_indices_buffer,
-          internal_topk + search_width * graph_degree,
-          internal_topk,
-          false);
+      if (!(std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value ||
+            *filter_flag == 0)) {
+        // Move the filtered out index to the end of the itopk list
+        move_invalid_to_end_of_list(result_indices_buffer, result_distances_buffer, internal_topk);
+
         if (threadIdx.x == 0) { *terminate_flag = 0; }
       }
+      topk_by_bitonic_sort<MAX_ITOPK, MAX_CANDIDATES>(result_distances_buffer,
+                                                      result_indices_buffer,
+                                                      internal_topk,
+                                                      result_distances_buffer + internal_topk,
+                                                      result_indices_buffer + internal_topk,
+                                                      search_width * graph_degree,
+                                                      topk_ws,
+                                                      (iter == 0),
+                                                      multi_warps_1,
+                                                      multi_warps_2);
+      __syncthreads();
       _CLK_REC(clk_topk);
     } else {
       _CLK_START();
@@ -755,12 +793,26 @@ __device__ void search_core(
     }
 
     __syncthreads();
-    topk_by_bitonic_sort_1st<MAX_ITOPK + MAX_CANDIDATES>(
-      result_distances_buffer,
-      result_indices_buffer,
-      internal_topk + search_width * graph_degree,
-      top_k,
-      false);
+    topk_by_bitonic_sort_1st<MAX_ITOPK>(
+      result_distances_buffer, result_indices_buffer, internal_topk, internal_topk, false);
+
+    // If the sufficient number of valid indexes are not in the internal topk, pick up from the
+    // candidate list.
+    if (result_indices_buffer[top_k - 1] == invalid_index) {
+      __syncthreads();
+      const unsigned multi_warps_1 = ((blockDim.x >= 64) && (MAX_CANDIDATES > 128)) ? 1 : 0;
+      const unsigned multi_warps_2 = ((blockDim.x >= 64) && (MAX_ITOPK > 256)) ? 1 : 0;
+      topk_by_bitonic_sort<MAX_ITOPK, MAX_CANDIDATES>(result_distances_buffer,
+                                                      result_indices_buffer,
+                                                      internal_topk,
+                                                      result_distances_buffer + internal_topk,
+                                                      result_indices_buffer + internal_topk,
+                                                      search_width * graph_degree,
+                                                      topk_ws,
+                                                      (iter == 0),
+                                                      multi_warps_1,
+                                                      multi_warps_2);
+    }
     __syncthreads();
   }
 
