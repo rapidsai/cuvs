@@ -53,19 +53,17 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
   QuantizationTest()
     : params_(::testing::TestWithParam<QuantizationInputs<T>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
-      input_(0, stream),
-      output_(0, stream)
+      input_(0, stream)
   {
   }
 
  protected:
   void testScalarQuantization()
   {
-    // auto quantization_params = params_.quantization_params;
+    auto quantization_params_copy = params_.quantization_params;
 
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(input_.data()), rows_, cols_);
-
     auto quantized_input =
       cuvs::neighbors::quantization::scalar_quantize(handle, params_.quantization_params, dataset);
 
@@ -99,14 +97,32 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
                         input_.data(),
                         input_.data() + input_.size(),
-                        quantized_input.data_handle());
-    std::vector<QuantI> quantized_input_host(input_.size());
+                        quantized_input2.data_handle());
+    std::vector<QuantI> quantized_input_sorted_host(input_.size());
     raft::update_host(
-      quantized_input_host.data(), quantized_input.data_handle(), input_.size(), stream);
+      quantized_input_sorted_host.data(), quantized_input2.data_handle(), input_.size(), stream);
     raft::resource::sync_stream(handle, stream);
 
     for (size_t i = 0; i < input_.size() - 1; ++i) {
-      ASSERT_TRUE(quantized_input_host[i] <= quantized_input_host[i + 1]);
+      ASSERT_TRUE(quantized_input_sorted_host[i] <= quantized_input_sorted_host[i + 1]);
+    }
+
+    // compare with host
+    auto dataset_h = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
+      (const T*)(host_input_.data()), rows_, cols_);
+    {
+      // note that this will utilize the scalar computed via the previous (device) call
+      auto quantized_input_host_1 = cuvs::neighbors::quantization::scalar_quantize(
+        handle, params_.quantization_params, dataset_h);
+      ASSERT_TRUE(devArrMatchHost(quantized_input_host_1.data_handle(),
+                                  quantized_input.data_handle(),
+                                  input_.size(),
+                                  cuvs::Compare<QuantI>(),
+                                  stream));
+
+      // re-evaluate scalar
+      auto quantized_input_host_2 =
+        cuvs::neighbors::quantization::scalar_quantize(handle, quantization_params_copy, dataset_h);
     }
   }
 
@@ -117,13 +133,14 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
 
     int n_elements = rows_ * cols_;
     input_.resize(n_elements, stream);
-
-    RAFT_CUDA_TRY(cudaMemsetAsync(input_.data(), 0, input_.size() * sizeof(T), stream));
+    host_input_.resize(n_elements);
 
     // random input
     unsigned long long int seed = 1234ULL;
     raft::random::RngState r(seed);
     uniform(handle, r, input_.data(), input_.size(), params_.min, params_.max);
+
+    raft::update_host(host_input_.data(), input_.data(), input_.size(), stream);
 
     raft::resource::sync_stream(handle, stream);
   }
@@ -136,8 +153,11 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
   int rows_;
   int cols_;
   rmm::device_uvector<T> input_;
-  rmm::device_uvector<QuantI> output_;
+  std::vector<T> host_input_;
 };
+
+// TODO -- host first or last?
+// can always test last but also need to run sampling ...
 
 template <typename T>
 const std::vector<QuantizationInputs<T>> inputs = {

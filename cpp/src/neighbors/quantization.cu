@@ -20,13 +20,19 @@
 
 namespace cuvs::neighbors::quantization {
 
-#define CUVS_INST_QUANTIZATION(T, QuantI)                                  \
-  auto scalar_quantize(raft::resources const& res,                         \
-                       params& params,                                     \
-                       raft::device_matrix_view<const T, int64_t> dataset) \
-    ->raft::device_matrix<QuantI, int64_t>                                 \
-  {                                                                        \
-    return detail::scalar_quantize<T, QuantI>(res, params, dataset);       \
+#define CUVS_INST_QUANTIZATION(T, QuantI)                                                         \
+  auto scalar_quantize(raft::resources const& res,                                                \
+                       params& params,                                                            \
+                       raft::device_matrix_view<const T, int64_t> dataset)                        \
+    ->raft::device_matrix<QuantI, int64_t>                                                        \
+  {                                                                                               \
+    return detail::scalar_quantize<T, QuantI>(res, params, dataset);                              \
+  }                                                                                               \
+  auto scalar_quantize(                                                                           \
+    raft::resources const& res, params& params, raft::host_matrix_view<const T, int64_t> dataset) \
+    ->raft::host_matrix<QuantI, int64_t>                                                          \
+  {                                                                                               \
+    return detail::scalar_quantize<T, QuantI>(res, params, dataset);                              \
   }
 
 CUVS_INST_QUANTIZATION(double, int8_t);
@@ -34,16 +40,5 @@ CUVS_INST_QUANTIZATION(float, int8_t);
 CUVS_INST_QUANTIZATION(half, int8_t);
 
 #undef CUVS_INST_QUANTIZATION
-
-/*
-  }                                                                                  \
-  auto scalar_quantize(raft::resources const& res,                                   \
-                       const params& params,                                         \
-                       raft::host_matrix_view<const T, int64_t> dataset)             \
-    ->raft::host_matrix<int8_t, int64_t>                                               \
-  {                                                                                  \
-    return detail::scalar_quantize<T>(res, params, dataset);                         \
-
-*/
 
 }  // namespace cuvs::neighbors::quantization

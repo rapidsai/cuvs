@@ -20,6 +20,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 
 namespace cuvs::neighbors::quantization {
@@ -47,9 +48,19 @@ raft::device_matrix<int8_t, int64_t> scalar_quantize(
   cuvs::neighbors::quantization::params& params,
   raft::device_matrix_view<const half, int64_t> dataset);
 
-/*raft::host_matrix<int8_t, int64_t>
- scalar_quantize(raft::resources const& res,
-           const cuvs::neighbors::quantization::params& params,
-           raft::host_matrix_view<const float, int64_t> dataset);*/
+raft::host_matrix<int8_t, int64_t> scalar_quantize(
+  raft::resources const& res,
+  cuvs::neighbors::quantization::params& params,
+  raft::host_matrix_view<const double, int64_t> dataset);
+
+raft::host_matrix<int8_t, int64_t> scalar_quantize(
+  raft::resources const& res,
+  cuvs::neighbors::quantization::params& params,
+  raft::host_matrix_view<const float, int64_t> dataset);
+
+raft::host_matrix<int8_t, int64_t> scalar_quantize(
+  raft::resources const& res,
+  cuvs::neighbors::quantization::params& params,
+  raft::host_matrix_view<const half, int64_t> dataset);
 
 }  // namespace cuvs::neighbors::quantization
