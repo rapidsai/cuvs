@@ -11,12 +11,11 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
-# Use this variable to update RAPIDS and RAFT versions
-
 set(rapids-cmake-repo bdice/rapids-cmake)
 set(rapids-cmake-branch cccl-2.7.0-rc2)
 
-set(RAPIDS_VERSION "24.12")
+# Use this variable to update RAPIDS and RAFT versions
+set(RAPIDS_VERSION "25.02")
 
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
     file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-${RAPIDS_VERSION}/RAPIDS.cmake

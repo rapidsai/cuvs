@@ -120,7 +120,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += (blockDim.x >> team_size_bits)) {
     const bool valid_i = (i < num_pickup);
 
-    IndexT best_index_team_local;
+    IndexT best_index_team_local    = raft::upper_bound<IndexT>();
     DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
@@ -145,7 +145,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
 
     const unsigned lane_id = threadIdx.x & ((1u << team_size_bits) - 1u);
     if (valid_i && lane_id == 0) {
-      if (hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
+      if (best_index_team_local != raft::upper_bound<IndexT>() &&
+          hashmap::insert(visited_hash_ptr, hash_bitlen, best_index_team_local)) {
         result_distances_ptr[i] = best_norm2_team_local;
         result_indices_ptr[i]   = best_index_team_local;
       } else {
