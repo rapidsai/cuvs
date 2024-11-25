@@ -11,7 +11,7 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
-# Use this variable to update RAPIDS and RAFT versions
+# Use this variable to update RAPIDS and cuVS versions
 set(RAPIDS_VERSION "25.02")
 
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/CUVS_RAPIDS.cmake)
