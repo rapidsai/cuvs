@@ -441,6 +441,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/nn_descent_int8.cu
     src/neighbors/nn_descent_uint8.cu
     src/neighbors/reachability.cu
+    src/neighbors/quantization.cu
     src/neighbors/refine/detail/refine_device_float_float.cu
     src/neighbors/refine/detail/refine_device_half_float.cu
     src/neighbors/refine/detail/refine_device_int8_t_float.cu
