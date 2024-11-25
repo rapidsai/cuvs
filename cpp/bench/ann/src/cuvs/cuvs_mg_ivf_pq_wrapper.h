@@ -62,7 +62,7 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
-    auto stream = raft::resource::get_cuda_stream(handle_);
+    auto stream = raft::resource::get_cuda_stream(clique_);
     return stream;
   }
 
@@ -73,7 +73,6 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  raft::device_resources handle_;
   raft::device_resources_snmg clique_;
   build_param index_params_;
   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params_;

@@ -46,8 +46,7 @@ template <typename T, typename DataT>
 class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
  public:
   AnnMGTest()
-    : stream_(resource::get_cuda_stream(handle_)),
-      clique_(),
+    : stream_(resource::get_cuda_stream(clique_)),
       ps(::testing::TestWithParam<AnnMGInputs>::GetParam()),
       d_index_dataset(0, stream_),
       d_queries(0, stream_),
@@ -82,7 +81,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                                     ps.metric);
       update_host(distances_ref.data(), distances_ref_dev.data(), queries_size, stream_);
       update_host(neighbors_ref.data(), neighbors_ref_dev.data(), queries_size, stream_);
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
     }
 
     int64_t n_rows_per_search_batch = 3000;  // [3000, 3000, 1000] == 7000 rows
@@ -132,7 +131,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(
         clique_, new_index, search_params, queries, neighbors, distances, n_rows_per_search_batch);
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
       ASSERT_TRUE(eval_neighbours(neighbors_ref,
@@ -191,7 +190,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(
         clique_, new_index, search_params, queries, neighbors, distances, n_rows_per_search_batch);
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
       ASSERT_TRUE(eval_neighbours(neighbors_ref,
@@ -244,7 +243,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         search_params.merge_mode = TREE_MERGE;
       cuvs::neighbors::mg::search(
         clique_, new_index, search_params, queries, neighbors, distances, n_rows_per_search_batch);
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
       ASSERT_TRUE(eval_neighbours(neighbors_ref_32bits,
@@ -297,7 +296,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   distances,
                                   n_rows_per_search_batch);
 
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
       ASSERT_TRUE(eval_neighbours(neighbors_ref,
@@ -349,7 +348,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   distances,
                                   n_rows_per_search_batch);
 
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
       ASSERT_TRUE(eval_neighbours(neighbors_ref,
@@ -397,7 +396,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                   distances,
                                   n_rows_per_search_batch);
 
-      resource::sync_stream(handle_);
+      resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
       ASSERT_TRUE(eval_neighbours(neighbors_ref_32bits,
@@ -622,16 +621,15 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     raft::copy(h_index_dataset.data(),
                d_index_dataset.data(),
                d_index_dataset.size(),
-               resource::get_cuda_stream(handle_));
+               resource::get_cuda_stream(clique_));
     raft::copy(
-      h_queries.data(), d_queries.data(), d_queries.size(), resource::get_cuda_stream(handle_));
-    resource::sync_stream(handle_);
+      h_queries.data(), d_queries.data(), d_queries.size(), resource::get_cuda_stream(clique_));
+    resource::sync_stream(clique_);
   }
 
   void TearDown() override {}
 
  private:
-  raft::device_resources handle_;
   rmm::cuda_stream_view stream_;
   raft::device_resources_snmg clique_;
   AnnMGInputs ps;

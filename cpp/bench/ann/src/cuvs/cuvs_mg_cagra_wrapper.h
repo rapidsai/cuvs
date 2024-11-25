@@ -68,7 +68,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
-    auto stream = raft::resource::get_cuda_stream(handle_);
+    auto stream = raft::resource::get_cuda_stream(clique_);
     return stream;
   }
 
@@ -86,7 +86,6 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  raft::device_resources handle_;
   raft::device_resources_snmg clique_;
   float refine_ratio_;
   build_param index_params_;
