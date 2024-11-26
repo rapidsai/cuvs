@@ -760,9 +760,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        // k>1024 skip these tests until fixed
-        if (ps.k >= 1024) { GTEST_SKIP(); }
-
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
