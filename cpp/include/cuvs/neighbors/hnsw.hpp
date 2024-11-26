@@ -53,7 +53,10 @@ struct index_params : cuvs::neighbors::index_params {
   HnswHierarchy hierarchy = HnswHierarchy::NONE;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction = 200;
-  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` */
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU`
+  NOTE: Constructing the hierarchy when converting from a CAGRA graph is highly sensitive
+  to parallelism, and increasing the number of threads can reduce the quality of the index.
+   */
   int num_threads = 2;
 };
 

@@ -55,6 +55,9 @@ cdef class IndexParams:
     num_threads : int, default = 2 (optional)
         Number of CPU threads used to increase construction parallelism
         when hierarchy is `cpu`.
+        NOTE: Constructing the hierarchy when converting from a CAGRA graph
+        is highly sensitive to parallelism, and increasing the number of
+        threads can reduce the quality of the index.
     """
 
     cdef cuvsHnswIndexParams* params

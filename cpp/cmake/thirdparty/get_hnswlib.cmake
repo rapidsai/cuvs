@@ -50,10 +50,6 @@ function(find_and_configure_hnswlib)
      "$<INSTALL_INTERFACE:include>")
   endif()
 
-  message(STATUS "hnswlib found at ${hnswlib_SOURCE_DIR}")
-  message(STATUS "hnswlib version: ${version}")
-  message(STATUS "hnswlib added: ${hnswlib_ADDED}")
-
   if(hnswlib_ADDED)
     # write build export rules
     install(TARGETS hnswlib EXPORT hnswlib-exports)

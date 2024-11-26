@@ -27,8 +27,9 @@
 namespace cuvs::neighbors::hnsw::detail {
 
 // Multithreaded executor
-// The helper function copied from python_bindings/bindings.cpp (and that itself is copied from
-// nmslib) An alternative is using #pragme omp parallel for or any other C++ threading
+// The helper function is copied from the hnswlib repository
+// as for some reason, adding vectors to the hnswlib index does not
+// work well with omp parallel for
 template <class Function>
 inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn)
 {

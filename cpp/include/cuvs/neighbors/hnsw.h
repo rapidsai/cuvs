@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /**
- * @defgroup cagra_c_index_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @defgroup hnsw_c_index_params C API for HNSW index params
  * @{
  */
 
@@ -50,7 +50,10 @@ struct cuvsHnswIndexParams {
   cuvsHnswHierarchy hierarchy;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction;
-  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` */
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU`
+  NOTE: Constructing the hierarchy when converting from a CAGRA graph is highly sensitive
+  to parallelism, and increasing the number of threads can reduce the quality of the index.
+   */
   int num_threads;
 };
 
