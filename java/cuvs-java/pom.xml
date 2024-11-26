@@ -21,7 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.nvidia.cuvs</groupId>
     <artifactId>cuvs-java</artifactId>
-    <version>0.1</version>
+    <version>24.12.1</version>
     <name>cuvs-java</name>
     <packaging>jar</packaging>
 
@@ -94,7 +94,7 @@
                                 <artifactItem>
                                     <groupId>com.nvidia.cuvs</groupId>
                                     <artifactId>cuvs-java-internal</artifactId>
-                                    <version>0.1</version>
+                                    <version>24.12</version>
                                     <type>so</type>
                                     <overWrite>false</overWrite>
                                     <outputDirectory>
@@ -118,12 +118,6 @@
                     <archiverConfig>
                         <duplicateBehavior>add</duplicateBehavior>
                     </archiverConfig>
-                    <archive>
-                        <manifest>
-                            <mainClass>
-                                com.nvidia.cuvs.examples.CagraExample</mainClass>
-                        </manifest>
-                    </archive>
                 </configuration>
                 <executions>
                     <execution>
