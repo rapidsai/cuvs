@@ -799,7 +799,7 @@ __device__ void search_core(
 
     constexpr std::uint32_t warp_size = 32;
     if (threadIdx.x < warp_size) {
-      std::uint32_t position_offset = 0;
+      std::uint32_t num_found_valid = 0;
       for (std::uint32_t buffer_offset = 0; buffer_offset < internal_topk;
            buffer_offset += warp_size) {
         // Calculate the new buffer index
@@ -809,20 +809,29 @@ __device__ void search_core(
         std::uint32_t new_position;
         scan_op_t(temp_storage).InclusiveSum(is_valid_index, new_position);
         if (is_valid_index) {
-          const auto dst_position               = position_offset + (new_position - 1);
+          const auto dst_position               = num_found_valid + (new_position - 1);
           result_indices_buffer[dst_position]   = result_indices_buffer[src_position];
           result_distances_buffer[dst_position] = result_distances_buffer[src_position];
         }
 
         // Calculate the largest valid position within a warp and bcast it for the next iteration
-        position_offset += new_position;
+        num_found_valid += new_position;
         for (std::uint32_t offset = (warp_size >> 1); offset > 0; offset >>= 1) {
-          const auto v = __shfl_xor_sync(~0u, position_offset, offset);
-          if ((threadIdx.x & offset) == 0) { position_offset = v; }
+          const auto v = __shfl_xor_sync(~0u, num_found_valid, offset);
+          if ((threadIdx.x & offset) == 0) { num_found_valid = v; }
         }
 
         // If the enough number of items are found, do early termination
-        if (position_offset >= top_k) { break; }
+        if (num_found_valid >= top_k) { break; }
+      }
+
+      if (num_found_valid < top_k) {
+        // Fill the remaining buffer with invalid values so that `topk_by_bitonic_sort` is usable in
+        // the next step
+        for (std::uint32_t i = num_found_valid + threadIdx.x; i < internal_topk; i += warp_size) {
+          result_indices_buffer[i]   = invalid_index;
+          result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+        }
       }
     }
 
