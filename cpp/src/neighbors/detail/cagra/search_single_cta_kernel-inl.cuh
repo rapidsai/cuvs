@@ -672,7 +672,10 @@ __device__ void search_core(
       if (!(std::is_same<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>::value ||
             *filter_flag == 0)) {
         // Move the filtered out index to the end of the itopk list
-        move_invalid_to_end_of_list(result_indices_buffer, result_distances_buffer, internal_topk);
+        for (unsigned i = 0; i < search_width; i++) {
+          move_invalid_to_end_of_list(
+            result_indices_buffer, result_distances_buffer, internal_topk);
+        }
 
         if (threadIdx.x == 0) { *terminate_flag = 0; }
       }
