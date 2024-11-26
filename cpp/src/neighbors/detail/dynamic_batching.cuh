@@ -219,11 +219,19 @@ struct batch_token {
   }
   /**
    * How many queries are promised by the participating CPU threads (requesters).
-   * Any actor (CPU or GPU thread) may atomically add (max_batch_size+1) to this value (multiple
-   * times even), which indicates that the actor cannot wait for more queries to come anymore.
-   * Hence, the actual number of committed queries is `size_committed % (max_batch_size+1)`.
+   *
+   * The CPU threads atomically increment this counter until its size reaches `max_batch_size`.
+   *
+   * Any (CPU or GPU thread) my atomically write to the highest byte of this value, which indicates
+   * that no one can commit to this batch anymore (e.g. the wait timeout is exceeded).
+   * Hence, the actual number of committed queries is `size_committed % 0x00ffffff`.
    *
    * The gather kernel cannot finish while `size_committed < max_batch_size`.
+   *
+   * NB: we use the trick of writing to the highest byte to allow GPU write atomically to the pinned
+   * host memory. This way, we don't need to use device RMW atomics on host memory, which are not
+   * available on a broad class of GPUs. If not this workaround, we could simply do atomic add/or
+   * with value 0x01000000.
    */
   RAFT_INLINE_FUNCTION auto size_committed() noexcept -> uint32_t&
   {
@@ -395,21 +403,43 @@ struct batch_queue_t {
            !head_.compare_exchange_weak(observed, desired, kMemOrder, kMemOrder)) {}
   }
 
-  static constexpr inline auto seq_round(seq_order_id id) noexcept -> uint32_t
-  {
-    return id.value & ~kCounterLocMask;
-  }
-
-  static constexpr inline auto seq_round(batch_token token) noexcept -> uint32_t
-  {
-    return token.id() & ~kCounterLocMask;
-  }
-
   static constexpr inline auto batch_id(batch_token token) noexcept -> uint32_t
   {
     return token.id() & kCounterLocMask;
   }
 
+  /**
+   * Construct a token that is interpreted as having been emptied in the current round
+   * (the round is derived from seq_id).
+   *
+   * NB: "round" is the number of times the queue counters went over the whole ring buffer.
+   *     It's used to avoid the ABA problem for atomic token updates.
+   */
+  static constexpr inline auto make_empty_token(seq_order_id seq_id) noexcept -> batch_token
+  {
+    return batch_token{seq_round(seq_id) +
+                       (static_cast<uint32_t>(slot_state::kEmptyPast) + 1) * kSize - 1};
+  }
+
+  /**
+   * Construct a sequential batch id by combining the current round and the real batch id.
+   *
+   * The "round" part gives a hint when the token slot was filled-in to avoid the ABA problem
+   *  (see above).
+   */
+  static constexpr inline auto make_seq_batch_id(seq_order_id seq_id, uint32_t batch_id) noexcept
+    -> uint32_t
+  {
+    return seq_round(seq_id) | batch_id;
+  }
+
+  /**
+   * Get the state of the batch slot w.r.t. the given seq_order_id counter.
+   * This gives the information whether the slot is emptied/filled by another thread and whether
+   * that thread is ahead or behind the current thread.
+   * By introducing these future/past flavours of states we solve the ABA problem for atomic updates
+   * of the ring buffer slots.
+   */
   static inline auto batch_status(batch_token token, seq_order_id seq_id) -> slot_state
   {
     auto v =
@@ -458,6 +488,18 @@ struct batch_queue_t {
   {
     return (source_idx * kCounterIncrement) & kCounterLocMask;
   }
+
+  /** The "round": the number of times the queue counter went over the whole ring buffer. */
+  static constexpr inline auto seq_round(seq_order_id id) noexcept -> uint32_t
+  {
+    return id.value & ~kCounterLocMask;
+  }
+
+  /** The "round": the number of times the queue counter went over the whole ring buffer. */
+  static constexpr inline auto seq_round(batch_token token) noexcept -> uint32_t
+  {
+    return token.id() & ~kCounterLocMask;
+  }
 };
 
 template <typename T, typename IdxT>
@@ -475,6 +517,13 @@ struct alignas(kCacheLineBytes) request_pointers {
   float* distances{nullptr};
 };
 
+/**
+ * Check the current timestamp at the moment of construction and repeatedly compare the elapsed time
+ * to the timeout value provided by the host (passed via an atomic).
+ *
+ * This is used in the gather inputs kernel to make it stop waiting for new queries in a batch
+ * once the deadline is reached.
+ */
 struct gpu_time_keeper {
   RAFT_DEVICE_INLINE_FUNCTION gpu_time_keeper(
     cuda::atomic<int32_t, cuda::thread_scope_system>* cpu_provided_remaining_time_us)
@@ -483,6 +532,11 @@ struct gpu_time_keeper {
     update_timestamp();
   }
 
+  /**
+   * Check whether the deadline is not reached yet:
+   * 1) Compare the internal clock against the last-read deadline value
+   * 2) Read the deadline value from the host-visible atomic and check the internal clock again.
+   */
   RAFT_DEVICE_INLINE_FUNCTION auto has_time() noexcept -> bool
   {
     if (timeout) { return false; }
@@ -544,6 +598,7 @@ RAFT_KERNEL gather_inputs(
   cuda::atomic<int32_t, cuda::thread_scope_system>* remaining_time_us,
   /* The token contains the current number of queries committed and is cleared in this kernel. */
   cuda::atomic<batch_token, cuda::thread_scope_system>* batch_token_ptr,
+  /* The host-visible batch size counter (used in `conservative_dispatch`). */
   cuda::atomic<uint32_t, cuda::thread_scope_system>* batch_size_out,
   /**
    * The token value considered empty depends on the round over the ring buffer
@@ -562,6 +617,11 @@ RAFT_KERNEL gather_inputs(
   if (threadIdx.x == 0) {
     query_ptr = nullptr;
 
+    // NB: we have to read/write to `batch_token_ptr`, `bs_committed`, and `batch_fully_committed`
+    // using volatile assembly ops, because otherwise the compiler seems to fail to understand that
+    // this is the same location in memory. The order of reads in writes here is extremely
+    // important, as it involves multiple host and device threads (the host threads do RMW atomic
+    // increments on the commit counter).
     volatile uint32_t* bs_committed =
       reinterpret_cast<volatile uint32_t*>(batch_token_ptr) + 1 - CUVS_SYSTEM_LITTLE_ENDIAN;
     volatile uint8_t* batch_fully_committed =
@@ -581,7 +641,6 @@ RAFT_KERNEL gather_inputs(
       // The query hasn't been submitted, but is already committed; other checks may be skipped
       if (committed) { continue; }
       // Check if the query is committed
-      // auto committed_count = batch_size_committed->load(cuda::std::memory_order_relaxed);
       uint32_t committed_count;
       asm volatile("ld.volatile.global.u32 %0, [%1];"
                    : "=r"(committed_count)
@@ -601,7 +660,6 @@ RAFT_KERNEL gather_inputs(
                    :
                    : "l"(batch_fully_committed), "r"(1)
                    : "memory");
-      // committed_count = batch_size_committed->load(cuda::std::memory_order_seq_cst);
       asm volatile("ld.volatile.global.u32 %0, [%1];"
                    : "=r"(committed_count)
                    : "l"(bs_committed)
@@ -686,12 +744,15 @@ RAFT_KERNEL scatter_outputs(
  * guaranteed to happen in one thread by the holding shared pointer.
  *
  * The search function must be thread-safe. We only have to pay attention to the `mutable` members
- * though, because the function marked const.
+ * though, because the function is marked const.
  */
 template <typename T, typename IdxT>
 class batch_runner {
  public:
   constexpr static uint32_t kMaxNumQueues = 256;
+
+  using batch_queue  = batch_queue_t<kMaxNumQueues>;
+  using seq_order_id = typename batch_queue::seq_order_id;
 
   // Save the parameters and the upstream batched search function to invoke
   template <typename Upstream>
@@ -824,7 +885,7 @@ class batch_runner {
       //   (if couldn't get the value in the first few iterations).
       local_waiter till_full{std::chrono::nanoseconds(size_t(params.dispatch_timeout_ms * 1e5)),
                              batch_queue_.niceness(seq_id)};
-      while (batch_queue_.batch_status(batch_token_observed, seq_id) != slot_state::kFull) {
+      while (batch_queue::batch_status(batch_token_observed, seq_id) != slot_state::kFull) {
         /* Note: waiting for batch IO buffers
         The CPU threads can commit to the incoming batches in the queue in advance (this happens in
         try_commit).
@@ -846,7 +907,7 @@ class batch_runner {
       // Whether this thread is responsible for dispatching the batch.
       bool is_dispatcher = batch_offset == 0;
       auto stream        = raft::resource::get_cuda_stream(res);
-      auto batch_id      = batch_queue_.batch_id(batch_token_observed);
+      auto batch_id      = batch_queue::batch_id(batch_token_observed);
       auto request_ptrs  = slice_2d(batch_id, request_ptrs_);
 
       if (is_dispatcher) {
@@ -863,8 +924,7 @@ class batch_runner {
           &batch_token_ref,
           batch_size_ptr,
           // This indicates the empty token slot, which can only be used in the following round
-          batch_token{batch_queue_.seq_round(seq_id) +
-                      (static_cast<uint32_t>(slot_state::kEmptyPast) + 1) * batch_queue_.kSize - 1},
+          batch_queue_.make_empty_token(seq_id),
           kernel_progress_counters_.data_handle() + batch_id);
       }
 
@@ -911,7 +971,7 @@ class batch_runner {
                                  batch_distances,
                                  kernel_progress_counters_.data_handle() + batch_id,
                                  &next_token_ref,
-                                 batch_queue_.seq_round(next_seq_id) | batch_id);
+                                 batch_queue::make_seq_batch_id(next_seq_id, batch_id));
         RAFT_CUDA_TRY(cudaEventRecord(completion_events_[batch_id].value(), stream));
         dispatch_sequence_id_ref.store(seq_id.value, cuda::std::memory_order_release);
         dispatch_sequence_id_ref.notify_all();
@@ -948,7 +1008,7 @@ class batch_runner {
   uint32_t max_batch_size_;
   uint32_t n_queues_;
 
-  mutable batch_queue_t<kMaxNumQueues> batch_queue_;
+  mutable batch_queue batch_queue_;
   std::vector<cuda_event> completion_events_;
 
   using batch_extents = raft::extent_3d<uint32_t>;
@@ -968,7 +1028,7 @@ class batch_runner {
    * represents offset at which new queries are committed if successful), the number of committed
    * queries, or whether the ring buffer appears to be busy (on unsuccessful commit).
    */
-  auto try_commit(batch_queue_t<kMaxNumQueues>::seq_order_id seq_id, uint32_t n_queries) const
+  auto try_commit(seq_order_id seq_id, uint32_t n_queries) const
     -> std::variant<std::tuple<batch_token, uint32_t>, bool>
   {
     auto& batch_token_ref            = batch_queue_.token(seq_id);
@@ -979,7 +1039,7 @@ class batch_runner {
       // The interpretation of the token status depends on the current seq_order_id and a similar
       // counter in the token. This is to prevent conflicts when too many parallel requests wrap
       // over the whole ring buffer (batch_queue_t).
-      token_status = batch_queue_.batch_status(batch_token_observed, seq_id);
+      token_status = batch_queue::batch_status(batch_token_observed, seq_id);
       // Busy status means the current thread is a whole ring buffer ahead of the token.
       // The thread should wait for the rest of the system.
       if (token_status == slot_state::kFullBusy || token_status == slot_state::kEmptyBusy) {

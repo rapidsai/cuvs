@@ -95,7 +95,6 @@ struct index : cuvs::neighbors::index {
    * @param[in] sample_filter
    *     filtering function, if any, must be the same for all requests in a batch
    *     (the pointer must be alive for the lifetime of the dynamic batching index)
-   * @return the dynamic batching index
    */
   template <typename Upstream>
   index(const raft::resources& res,
