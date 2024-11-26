@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
@@ -52,8 +50,6 @@ public class CagraIndex {
 
   private final float[][] dataset;
   private final CuVSResources resources;
-  private Arena arena;
-  private Linker linker;
   private MethodHandle indexMethodHandle;
   private MethodHandle searchMethodHandle;
   private MethodHandle serializeMethodHandle;
@@ -91,23 +87,21 @@ public class CagraIndex {
    * @throws IOException @{@link IOException} is unable to load the native library
    */
   private void initializeMethodHandles() throws IOException {
-    linker = Linker.nativeLinker();
-    arena = Arena.ofConfined();
 
-    indexMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("build_cagra_index").get(),
-        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("long"),
-            linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    indexMethodHandle = resources.linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("build_cagra_index").get(),
+        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, resources.linker.canonicalLayouts().get("long"),
+            resources.linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    searchMethodHandle = linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("search_cagra_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, linker.canonicalLayouts().get("int"),
-            linker.canonicalLayouts().get("long"), linker.canonicalLayouts().get("int"), ValueLayout.ADDRESS,
+    searchMethodHandle = resources.linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("search_cagra_index").get(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, resources.linker.canonicalLayouts().get("int"),
+            resources.linker.canonicalLayouts().get("long"), resources.linker.canonicalLayouts().get("int"), ValueLayout.ADDRESS,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    serializeMethodHandle = linker.downcallHandle(
+    serializeMethodHandle = resources.linker.downcallHandle(
         resources.getLibcuvsNativeLibrary().find("serialize_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    deserializeMethodHandle = linker.downcallHandle(
+    deserializeMethodHandle = resources.linker.downcallHandle(
         resources.getLibcuvsNativeLibrary().find("deserialize_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
   }
@@ -122,11 +116,11 @@ public class CagraIndex {
   private IndexReference build() throws Throwable {
     long rows = dataset.length;
     long cols = dataset[0].length;
-    MemoryLayout layout = linker.canonicalLayouts().get("int");
-    MemorySegment segment = arena.allocate(layout);
+    MemoryLayout layout = resources.linker.canonicalLayouts().get("int");
+    MemorySegment segment = resources.arena.allocate(layout);
 
     cagraIndexReference = new IndexReference(
-        (MemorySegment) indexMethodHandle.invokeExact(Util.buildMemorySegment(linker, arena, dataset), rows, cols,
+        (MemorySegment) indexMethodHandle.invokeExact(Util.buildMemorySegment(resources.linker, resources.arena, dataset), rows, cols,
             resources.getMemorySegment(), segment, cagraIndexParameters.getMemorySegment()));
 
     return cagraIndexReference;
@@ -146,16 +140,16 @@ public class CagraIndex {
     int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
 
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks,
-        linker.canonicalLayouts().get("int"));
+        resources.linker.canonicalLayouts().get("int"));
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks,
-        linker.canonicalLayouts().get("float"));
-    MemorySegment neighborsMemorySegment = arena.allocate(neighborsSequenceLayout);
-    MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
-    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-
+        resources.linker.canonicalLayouts().get("float"));
+    MemorySegment neighborsMemorySegment = resources.arena.allocate(neighborsSequenceLayout);
+    MemorySegment distancesMemorySegment = resources.arena.allocate(distancesSequenceLayout);
+    MemoryLayout returnValueMemoryLayout = resources.linker.canonicalLayouts().get("int");
+    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
+    
     searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
-        Util.buildMemorySegment(linker, arena, query.getQueryVectors()), query.getTopK(), numQueries, vectorDimension,
+        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), query.getTopK(), numQueries, vectorDimension,
         resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment, returnValueMemorySegment,
         query.getCagraSearchParameters().getMemorySegment());
 
@@ -184,10 +178,10 @@ public class CagraIndex {
    *                     temporarily
    */
   public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
+    MemoryLayout returnValueMemoryLayout = resources.linker.canonicalLayouts().get("int");
+    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     serializeMethodHandle.invokeExact(resources.getMemorySegment(), cagraIndexReference.getMemorySegment(),
-        returnValueMemorySegment, Util.buildMemorySegment(linker, arena, tempFile.getAbsolutePath()));
+        returnValueMemorySegment, Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
     FileInputStream fileInputStream = new FileInputStream(tempFile);
     byte[] chunk = new byte[1024]; // TODO: Make this configurable
     int chunkLength = 0;
@@ -206,10 +200,10 @@ public class CagraIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
+    MemoryLayout returnValueMemoryLayout = resources.linker.canonicalLayouts().get("int");
+    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
-    IndexReference indexReference = new IndexReference();
+    IndexReference indexReference = new IndexReference(resources);
 
     File tempFile = new File(tmpIndexFile);
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
@@ -219,7 +213,7 @@ public class CagraIndex {
       fileOutputStream.write(chunk, 0, chunkLength);
     }
     deserializeMethodHandle.invokeExact(resources.getMemorySegment(), indexReference.getMemorySegment(),
-        returnValueMemorySegment, Util.buildMemorySegment(linker, arena, tmpIndexFile));
+        returnValueMemorySegment, Util.buildMemorySegment(resources.linker, resources.arena, tmpIndexFile));
 
     inputStream.close();
     fileOutputStream.close();
@@ -324,9 +318,8 @@ public class CagraIndex {
     /**
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
-    protected IndexReference() {
-      Arena arena = Arena.ofConfined();
-      memorySegment = cuvsCagraIndex.allocate(arena);
+    protected IndexReference(CuVSResources resources) {
+      memorySegment = cuvsCagraIndex.allocate(resources.arena);
     }
 
     /**
