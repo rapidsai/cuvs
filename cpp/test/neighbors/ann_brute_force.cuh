@@ -114,12 +114,28 @@ class AnnBruteForceTest : public ::testing::TestWithParam<AnnBruteForceInputs<Id
                                                       0.001f,
                                                       stream_,
                                                       true));
+
+      brute_force::serialize(handle_, std::string{"brute_force_index"}, idx, true);
+      auto index_loaded = brute_force::index<DataT, T>(handle_);
+      brute_force::deserialize(handle_, std::string{"brute_force_index"}, &index_loaded);
+
       brute_force::search(handle_,
-                          idx,
+                          index_loaded,
                           search_queries_view,
                           indices_out_view,
                           dists_out_view,
                           cuvs::neighbors::filtering::none_sample_filter{});
+      raft::resource::sync_stream(handle_);
+
+      ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(indices_naive_dev.data(),
+                                                      indices_bruteforce_dev.data(),
+                                                      distances_naive_dev.data(),
+                                                      distances_bruteforce_dev.data(),
+                                                      ps.num_queries,
+                                                      ps.k,
+                                                      0.001f,
+                                                      stream_,
+                                                      true));
     }
   }
 
