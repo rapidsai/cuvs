@@ -793,12 +793,42 @@ __device__ void search_core(
     }
 
     __syncthreads();
-    topk_by_bitonic_sort_1st<MAX_ITOPK>(
-      result_distances_buffer, result_indices_buffer, internal_topk, internal_topk, false);
+    // Move invalid index items to the end of the buffer without sorting the entire buffer
+    using scan_op_t    = cub::WarpScan<unsigned>;
+    auto& temp_storage = *reinterpret_cast<typename scan_op_t::TempStorage*>(smem_work_ptr);
+
+    constexpr std::uint32_t warp_size = 32;
+    if (threadIdx.x < warp_size) {
+      std::uint32_t position_offset = 0;
+      for (std::uint32_t buffer_offset = 0; buffer_offset < internal_topk;
+           buffer_offset += warp_size) {
+        // Calculate the new buffer index
+        const auto src_position = buffer_offset + threadIdx.x;
+        const std::uint32_t is_valid_index =
+          (result_indices_buffer[src_position] & (~index_msb_1_mask)) == invalid_index ? 0 : 1;
+        std::uint32_t new_position;
+        scan_op_t(temp_storage).InclusiveSum(is_valid_index, new_position);
+        if (is_valid_index) {
+          const auto dst_position               = position_offset + (new_position - 1);
+          result_indices_buffer[dst_position]   = result_indices_buffer[src_position];
+          result_distances_buffer[dst_position] = result_distances_buffer[src_position];
+        }
+
+        // Calculate the largest valid position within a warp and bcast it for the next iteration
+        position_offset += new_position;
+        for (std::uint32_t offset = (warp_size >> 1); offset > 0; offset >>= 1) {
+          const auto v = __shfl_xor_sync(~0u, position_offset, offset);
+          if ((threadIdx.x & offset) == 0) { position_offset = v; }
+        }
+
+        // If the enough number of items are found, do early termination
+        if (position_offset >= top_k) { break; }
+      }
+    }
 
     // If the sufficient number of valid indexes are not in the internal topk, pick up from the
     // candidate list.
-    if (result_indices_buffer[top_k - 1] == invalid_index) {
+    if (top_k > internal_topk || result_indices_buffer[top_k - 1] == invalid_index) {
       __syncthreads();
       const unsigned multi_warps_1 = ((blockDim.x >= 64) && (MAX_CANDIDATES > 128)) ? 1 : 0;
       const unsigned multi_warps_2 = ((blockDim.x >= 64) && (MAX_ITOPK > 256)) ? 1 : 0;
