@@ -80,7 +80,10 @@ func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
 	shapeSlice[1] = C.int64_t(len(data[0]))
 
 	// Create DLManagedTensor
-	dlm := new(C.DLManagedTensor)
+	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
+	if dlm == nil {
+		return Tensor[T]{}, errors.New("tensor allocation failed")
+	}
 
 	dlm.dl_tensor.data = dataPtr
 	dlm.dl_tensor.device = C.DLDevice{
@@ -116,13 +119,17 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 		shapeSlice[i] = C.int64_t(dim)
 	}
 
-	dlm := new(C.DLManagedTensor)
+	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
+	if dlm == nil {
+		return Tensor[T]{}, errors.New("tensor allocation failed")
+	}
 	dtype := getDLDataType[T]()
 
 	var deviceDataPtr unsafe.Pointer
 	bytes := calculateBytes(shape, dtype)
 	err := CheckCuvs(CuvsError(C.cuvsRMMAlloc(res.Resource, &deviceDataPtr, C.size_t(bytes))))
 	if err != nil {
+		C.free(unsafe.Pointer(dlm))
 		C.free(unsafe.Pointer(shapePtr))
 		return Tensor[T]{}, err
 	}
@@ -186,6 +193,11 @@ func (t *Tensor[T]) Close() error {
 		t.C_tensor.dl_tensor.shape = nil
 	}
 
+	if t.C_tensor != nil {
+		C.free(unsafe.Pointer(t.C_tensor))
+		t.C_tensor = nil
+	}
+
 	t.C_tensor = nil
 	return nil
 }
@@ -208,6 +220,7 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 			C.cudaMemcpyHostToDevice,
 		))
 	if err != nil {
+		C.cuvsRMMFree(res.Resource, DeviceDataPointer, C.size_t(bytes))
 		return nil, err
 	}
 	t.C_tensor.dl_tensor.device.device_type = C.kDLCUDA
@@ -259,6 +272,7 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 			C.cudaMemcpyDeviceToDevice,
 		))
 	if err != nil {
+		C.cuvsRMMFree(res.Resource, NewDeviceDataPointer, C.size_t(bytes+newDataSize))
 		return nil, err
 	}
 
@@ -270,6 +284,7 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 			C.cudaMemcpyHostToDevice,
 		))
 	if err != nil {
+		C.cuvsRMMFree(res.Resource, NewDeviceDataPointer, C.size_t(bytes+newDataSize))
 		return nil, err
 	}
 
