@@ -33,17 +33,11 @@ struct QuantizationInputs {
   T max = T(1.0);
 };
 
-std::ostream& operator<<(std::ostream& os, const params& params)
-{
-  return os << "quantile:" << params.quantile << " is_computed:" << params.is_computed
-            << " min:" << params.min << " max:" << params.max << " scalar:" << params.scalar;
-}
-
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const QuantizationInputs<T>& inputs)
 {
-  return os << "quantization_params:<" << inputs.quantization_params << "> rows:" << inputs.rows
-            << " cols:" << inputs.cols << " min:" << (double)inputs.min
+  return os << "quantization_quantile:<" << inputs.quantization_params.quantile
+            << "> rows:" << inputs.rows << " cols:" << inputs.cols << " min:" << (double)inputs.min
             << " max:" << (double)inputs.max;
 }
 
@@ -60,69 +54,91 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
  protected:
   void testScalarQuantization()
   {
-    auto quantization_params_copy = params_.quantization_params;
-
+    // dataset identical on host / device
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(input_.data()), rows_, cols_);
-    auto quantized_input =
-      cuvs::neighbors::quantization::scalar_quantize(handle, params_.quantization_params, dataset);
-
-    // check quantization params
-    ASSERT_TRUE(params_.quantization_params.is_computed);
-    std::cerr << "Params " << params_ << std::endl;
-    if (input_.size() < 100) {
-      raft::print_device_vector("Input array: ", input_.data(), input_.size(), std::cerr);
-
-      rmm::device_uvector<int> quantization_for_print(input_.size(), stream);
-      raft::linalg::unaryOp(quantization_for_print.data(),
-                            quantized_input.data_handle(),
-                            input_.size(),
-                            raft::cast_op<int>{},
-                            stream);
-      raft::resource::sync_stream(handle, stream);
-      raft::print_device_vector(
-        "Quantized array: ", quantization_for_print.data(), input_.size(), std::cerr);
-    }
-
-    // check second run same result (no quantile computation)
-    auto quantized_input2 =
-      cuvs::neighbors::quantization::scalar_quantize(handle, params_.quantization_params, dataset);
-    ASSERT_TRUE(devArrMatch(quantized_input.data_handle(),
-                            quantized_input2.data_handle(),
-                            input_.size(),
-                            cuvs::Compare<QuantI>(),
-                            stream));
-
-    // sort_by_key (input, quantization) -- check <= on result
-    thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
-                        input_.data(),
-                        input_.data() + input_.size(),
-                        quantized_input2.data_handle());
-    std::vector<QuantI> quantized_input_sorted_host(input_.size());
-    raft::update_host(
-      quantized_input_sorted_host.data(), quantized_input2.data_handle(), input_.size(), stream);
-    raft::resource::sync_stream(handle, stream);
-
-    for (size_t i = 0; i < input_.size() - 1; ++i) {
-      ASSERT_TRUE(quantized_input_sorted_host[i] <= quantized_input_sorted_host[i + 1]);
-    }
-
-    // compare with host
     auto dataset_h = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(host_input_.data()), rows_, cols_);
+
+    // train quantizer_1 on device
+    cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI> quantizer_1;
+    quantizer_1.train(handle, params_.quantization_params, dataset);
+    std::cerr << "Q1: trained = " << quantizer_1.is_trained()
+              << ", min = " << (double)quantizer_1.min() << ", max = " << (double)quantizer_1.max()
+              << ", scalar = " << quantizer_1.scalar() << std::endl;
+
+    // test transform host/device equal
     {
-      // note that this will utilize the scalar computed via the previous (device) call
-      auto quantized_input_host_1 = cuvs::neighbors::quantization::scalar_quantize(
-        handle, params_.quantization_params, dataset_h);
-      ASSERT_TRUE(devArrMatchHost(quantized_input_host_1.data_handle(),
-                                  quantized_input.data_handle(),
+      auto quantized_input_d = quantizer_1.transform(handle, dataset);
+      auto quantized_input_h = quantizer_1.transform(handle, dataset_h);
+      ASSERT_TRUE(devArrMatchHost(quantized_input_h.data_handle(),
+                                  quantized_input_d.data_handle(),
                                   input_.size(),
                                   cuvs::Compare<QuantI>(),
                                   stream));
 
-      // re-evaluate scalar
-      auto quantized_input_host_2 =
-        cuvs::neighbors::quantization::scalar_quantize(handle, quantization_params_copy, dataset_h);
+      if (input_.size() < 100) {
+        raft::print_device_vector("Input array: ", input_.data(), input_.size(), std::cerr);
+
+        rmm::device_uvector<int> quantization_for_print(input_.size(), stream);
+        raft::linalg::unaryOp(quantization_for_print.data(),
+                              quantized_input_d.data_handle(),
+                              input_.size(),
+                              raft::cast_op<int>{},
+                              stream);
+        raft::resource::sync_stream(handle, stream);
+        raft::print_device_vector(
+          "Quantized array 1: ", quantization_for_print.data(), input_.size(), std::cerr);
+      }
+    }
+
+    // train quantizer_2 on host
+    cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI> quantizer_2;
+    quantizer_2.train(handle, params_.quantization_params, dataset_h);
+    std::cerr << "Q2: trained = " << quantizer_2.is_trained()
+              << ", min = " << (double)quantizer_2.min() << ", max = " << (double)quantizer_2.max()
+              << ", scalar = " << quantizer_2.scalar() << std::endl;
+    {
+      // test transform host/device equal
+      auto quantized_input_d = quantizer_2.transform(handle, dataset);
+      auto quantized_input_h = quantizer_2.transform(handle, dataset_h);
+
+      if (input_.size() < 100) {
+        raft::print_device_vector("Input array: ", input_.data(), input_.size(), std::cerr);
+
+        rmm::device_uvector<int> quantization_for_print(input_.size(), stream);
+        raft::linalg::unaryOp(quantization_for_print.data(),
+                              quantized_input_d.data_handle(),
+                              input_.size(),
+                              raft::cast_op<int>{},
+                              stream);
+        raft::resource::sync_stream(handle, stream);
+        raft::print_device_vector(
+          "Quantized array 2: ", quantization_for_print.data(), input_.size(), std::cerr);
+      }
+
+      ASSERT_TRUE(devArrMatchHost(quantized_input_h.data_handle(),
+                                  quantized_input_d.data_handle(),
+                                  input_.size(),
+                                  cuvs::Compare<QuantI>(),
+                                  stream));
+    }
+
+    // sort_by_key (input, quantization) -- check <= on result
+    {
+      auto quantized_input = quantizer_1.transform(handle, dataset);
+      thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
+                          input_.data(),
+                          input_.data() + input_.size(),
+                          quantized_input.data_handle());
+      std::vector<QuantI> quantized_input_sorted_host(input_.size());
+      raft::update_host(
+        quantized_input_sorted_host.data(), quantized_input.data_handle(), input_.size(), stream);
+      raft::resource::sync_stream(handle, stream);
+
+      for (size_t i = 0; i < input_.size() - 1; ++i) {
+        ASSERT_TRUE(quantized_input_sorted_host[i] <= quantized_input_sorted_host[i + 1]);
+      }
     }
   }
 
@@ -156,17 +172,16 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
   std::vector<T> host_input_;
 };
 
-// TODO -- host first or last?
-// can always test last but also need to run sampling ...
-
 template <typename T>
 const std::vector<QuantizationInputs<T>> inputs = {
+  {{1.0}, 5, 5, T(0.0), T(1.0)},
   {{0.99}, 10, 20, T(0.0), T(1.0)},
   {{0.95}, 100, 2000, T(-500.0), T(100.0)},
   {{0.59}, 100, 200},
   {{0.94}, 10, 20, T(-1.0), T(0.0)},
   {{0.95}, 10, 2, T(50.0), T(100.0)},
   {{0.95}, 10, 20, T(-500.0), T(-100.0)},
+  {{0.95}, 10, 20, T(5.0), T(5.0)},
 };
 
 typedef QuantizationTest<float, int8_t> QuantizationTest_float_int8t;

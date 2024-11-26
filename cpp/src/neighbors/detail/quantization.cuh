@@ -27,131 +27,127 @@
 
 namespace cuvs::neighbors::detail {
 
+template <typename T>
+std::tuple<T, T> quantile_min_max(raft::resources const& res,
+                                  raft::device_matrix_view<const T, int64_t> dataset,
+                                  double quantile)
+{
+  // settings for quantile approximation
+  constexpr size_t max_num_samples = 1000000;
+  constexpr int seed               = 137;
+
+  cudaStream_t stream = raft::resource::get_cuda_stream(res);
+
+  // select subsample
+  raft::random::RngState rng(seed);
+  size_t n_elements  = dataset.extent(0) * dataset.extent(1);
+  size_t subset_size = std::min(max_num_samples, n_elements);
+  auto subset        = raft::make_device_vector<T>(res, subset_size);
+  auto dataset_view  = raft::make_device_vector_view<const T>(dataset.data_handle(), n_elements);
+  raft::random::sample_without_replacement(
+    res, rng, dataset_view, std::nullopt, subset.view(), std::nullopt);
+
+  // quantile / sort and pick for now
+  thrust::sort(raft::resource::get_thrust_policy(res),
+               subset.data_handle(),
+               subset.data_handle() + subset_size);
+
+  double half_quantile_inv = 1.0 / (1.0 - (1.0 - quantile) / 2);
+  int pos_max              = raft::ceildiv((double)subset_size, half_quantile_inv) - 1;
+  int pos_min              = subset_size - pos_max - 1;
+
+  T minmax_h[2];
+  raft::update_host(&(minmax_h[0]), subset.data_handle() + pos_min, 1, stream);
+  raft::update_host(&(minmax_h[1]), subset.data_handle() + pos_max, 1, stream);
+  raft::resource::sync_stream(res);
+
+  return {minmax_h[0], minmax_h[1]};
+}
+
+template <typename T>
+std::tuple<T, T> quantile_min_max(raft::resources const& res,
+                                  raft::host_matrix_view<const T, int64_t> dataset,
+                                  double quantile)
+{
+  // settings for quantile approximation
+  constexpr size_t max_num_samples = 1000000;
+  constexpr int seed               = 137;
+
+  // select subsample
+  std::mt19937 rng(seed);
+  size_t n_elements  = dataset.extent(0) * dataset.extent(1);
+  size_t subset_size = std::min(max_num_samples, n_elements);
+  std::vector<T> subset;
+  std::sample(dataset.data_handle(),
+              dataset.data_handle() + n_elements,
+              std::back_inserter(subset),
+              subset_size,
+              rng);
+
+  // quantile / sort and pick for now
+  thrust::sort(thrust::omp::par, subset.data(), subset.data() + subset_size);
+
+  double half_quantile_inv = 1.0 / (1.0 - (1.0 - quantile) / 2);
+  int pos_max              = raft::ceildiv((double)subset_size, half_quantile_inv) - 1;
+  int pos_min              = subset_size - pos_max - 1;
+
+  return {subset[pos_min], subset[pos_max]};
+}
+
 template <typename T, typename QuantI = int8_t, typename TempT = double, typename TempI = int64_t>
-raft::device_matrix<QuantI, int64_t> scalar_quantize(
+raft::device_matrix<QuantI, int64_t> scalar_transform(
   raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::device_matrix_view<const T, int64_t> dataset)
+  raft::device_matrix_view<const T, int64_t> dataset,
+  double scalar,
+  T minimum)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  constexpr TempI q_type_min   = static_cast<TempI>(std::numeric_limits<QuantI>::min());
-  constexpr TempI q_type_max   = static_cast<TempI>(std::numeric_limits<QuantI>::max());
-  constexpr TempI range_q_type = q_type_max - q_type_min + TempI(1);
+  constexpr TempI q_type_min = static_cast<TempI>(std::numeric_limits<QuantI>::min());
+  constexpr TempI q_type_max = static_cast<TempI>(std::numeric_limits<QuantI>::max());
 
   size_t n_elements = dataset.extent(0) * dataset.extent(1);
-
-  // conditional: search for quantiles / min / max
-  if (!params.is_computed) {
-    ASSERT(params.quantile > 0.5 && params.quantile <= 1.0,
-           "quantile for scalar quantization needs to be within (.5, 1]");
-
-    double quantile_inv = 1.0 / params.quantile;
-
-    // select subsample
-    int seed                     = 137;
-    constexpr size_t num_samples = 10000;
-    raft::random::RngState rng(seed);
-    size_t subset_size = std::min(num_samples, n_elements);
-    auto subset        = raft::make_device_vector<T>(res, subset_size);
-    auto dataset_view  = raft::make_device_vector_view<const T>(dataset.data_handle(), n_elements);
-    raft::random::sample_without_replacement(
-      res, rng, dataset_view, std::nullopt, subset.view(), std::nullopt);
-
-    // quantile / sort and pick for now
-    thrust::sort(raft::resource::get_thrust_policy(res),
-                 subset.data_handle(),
-                 subset.data_handle() + subset_size);
-
-    int pos_max = raft::ceildiv((double)subset_size, quantile_inv) - 1;
-    int pos_min = subset_size - pos_max - 1;
-
-    T minmax_h[2];
-    raft::update_host(&(minmax_h[0]), subset.data_handle() + pos_min, 1, stream);
-    raft::update_host(&(minmax_h[1]), subset.data_handle() + pos_max, 1, stream);
-    raft::resource::sync_stream(res);
-
-    // persist settings in params
-    params.min         = double(minmax_h[0]);
-    params.max         = double(minmax_h[1]);
-    params.scalar      = double(range_q_type) / (params.max - params.min + 1.0);
-    params.is_computed = true;
-  }
 
   // allocate target
   auto out = raft::make_device_matrix<QuantI, int64_t>(res, dataset.extent(0), dataset.extent(1));
 
-  // raft unary op or raft::linalg::map?
-  // TempT / TempI as intermediate types
-  raft::linalg::unaryOp(out.data_handle(),
-                        dataset.data_handle(),
-                        n_elements,
-                        raft::compose_op(
-                          raft::cast_op<QuantI>{},
-                          raft::add_const_op<int>(q_type_min),
-                          [] __device__(TempI a) {
-                            return raft::max<TempI>(raft::min<TempI>(a, q_type_max - q_type_min),
-                                                    TempI(0));
-                          },
-                          raft::cast_op<TempI>{},
-                          raft::add_const_op<TempT>(0.5),  // for rounding
-                          raft::mul_const_op<TempT>(params.scalar),
-                          raft::sub_const_op<TempT>(params.min),
-                          raft::cast_op<TempT>{}),
-                        stream);
+  raft::linalg::map(res,
+                    out.view(),
+                    raft::compose_op(
+                      raft::cast_op<QuantI>{},
+                      raft::add_const_op<int>(q_type_min),
+                      [] __device__(TempI a) {
+                        return raft::max<TempI>(raft::min<TempI>(a, q_type_max - q_type_min),
+                                                TempI(0));
+                      },
+                      raft::cast_op<TempI>{},
+                      raft::add_const_op<TempT>(0.5),  // for rounding
+                      raft::mul_const_op<TempT>(scalar),
+                      raft::sub_const_op<TempT>(minimum),
+                      raft::cast_op<TempT>{}),
+                    dataset);
 
   return out;
 }
 
 template <typename T, typename QuantI = int8_t, typename TempT = double, typename TempI = int64_t>
-raft::host_matrix<QuantI, int64_t> scalar_quantize(raft::resources const& res,
-                                                   cuvs::neighbors::quantization::params& params,
-                                                   raft::host_matrix_view<const T, int64_t> dataset)
+raft::host_matrix<QuantI, int64_t> scalar_transform(
+  raft::resources const& res,
+  raft::host_matrix_view<const T, int64_t> dataset,
+  double scalar,
+  T minimum)
 {
-  constexpr TempI q_type_min   = static_cast<TempI>(std::numeric_limits<QuantI>::min());
-  constexpr TempI q_type_max   = static_cast<TempI>(std::numeric_limits<QuantI>::max());
-  constexpr TempI range_q_type = q_type_max - q_type_min + TempI(1);
+  constexpr TempI q_type_min = static_cast<TempI>(std::numeric_limits<QuantI>::min());
+  constexpr TempI q_type_max = static_cast<TempI>(std::numeric_limits<QuantI>::max());
 
   size_t n_elements = dataset.extent(0) * dataset.extent(1);
-
-  // conditional: search for quantiles / min / max
-  if (!params.is_computed) {
-    ASSERT(params.quantile > 0.5 && params.quantile <= 1.0,
-           "quantile for scalar quantization needs to be within (.5, 1]");
-
-    double quantile_inv = 1.0 / params.quantile;
-
-    // select subsample
-    int seed = 137;
-    std::mt19937 rng(seed);
-    constexpr size_t num_samples = 10000;
-    size_t subset_size           = std::min(num_samples, n_elements);
-    std::vector<T> subset(subset_size);
-    std::sample(dataset.data_handle(),
-                dataset.data_handle() + n_elements,
-                std::back_inserter(subset),
-                subset_size,
-                rng);
-
-    // quantile / sort and pick for now
-    thrust::sort(thrust::omp::par, subset.data(), subset.data() + subset_size);
-
-    int pos_max = raft::ceildiv((double)subset_size, quantile_inv) - 1;
-    int pos_min = subset_size - pos_max - 1;
-
-    // persist settings in params
-    params.min         = double(subset[pos_min]);
-    params.max         = double(subset[pos_max]);
-    params.scalar      = double(range_q_type) / (params.max - params.min + 1.0);
-    params.is_computed = true;
-  }
 
   // allocate target
   auto out = raft::make_host_matrix<QuantI, int64_t>(dataset.extent(0), dataset.extent(1));
 
 #pragma omp parallel for
   for (size_t i = 0; i < n_elements; ++i) {
-    TempT tmp_t = ((TempT)dataset.data_handle()[i] - params.min) * params.scalar + TempT(0.5);
+    TempT tmp_t = ((TempT)dataset.data_handle()[i] - TempT(minimum)) * scalar + TempT(0.5);
     TempI tmp_i =
       raft::max<TempI>(raft::min<TempI>(TempI(tmp_t), q_type_max - q_type_min), TempI(0)) +
       q_type_min;

@@ -25,42 +25,41 @@
 
 namespace cuvs::neighbors::quantization {
 struct params {
+  /*
+   * specifies how many outliers at top & bottom will be ignored
+   * needs to be within range of (0, 1]
+   */
   float quantile = 0.99;
-
-  bool is_computed = false;
-  double min;
-  double max;
-  double scalar;
 };
 
-raft::device_matrix<int8_t, int64_t> scalar_quantize(
-  raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::device_matrix_view<const double, int64_t> dataset);
+template <typename T, typename QuantI>
+class ScalarQuantizer {
+ public:
+  // derive [min, max] from quantization parameters and dataset
+  void train(raft::resources const& res,
+             params params,
+             raft::device_matrix_view<const T, int64_t> dataset);
+  void train(raft::resources const& res,
+             params params,
+             raft::host_matrix_view<const T, int64_t> dataset);
 
-raft::device_matrix<int8_t, int64_t> scalar_quantize(
-  raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::device_matrix_view<const float, int64_t> dataset);
+  // return quantized dataset
+  raft::device_matrix<QuantI, int64_t> transform(
+    raft::resources const& res, raft::device_matrix_view<const T, int64_t> dataset);
+  raft::host_matrix<QuantI, int64_t> transform(raft::resources const& res,
+                                               raft::host_matrix_view<const T, int64_t> dataset);
 
-raft::device_matrix<int8_t, int64_t> scalar_quantize(
-  raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::device_matrix_view<const half, int64_t> dataset);
+  bool is_trained() { return is_trained_; };
 
-raft::host_matrix<int8_t, int64_t> scalar_quantize(
-  raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::host_matrix_view<const double, int64_t> dataset);
+  T min() { return min_; };
+  T max() { return max_; };
+  double scalar() { return scalar_; };
 
-raft::host_matrix<int8_t, int64_t> scalar_quantize(
-  raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::host_matrix_view<const float, int64_t> dataset);
-
-raft::host_matrix<int8_t, int64_t> scalar_quantize(
-  raft::resources const& res,
-  cuvs::neighbors::quantization::params& params,
-  raft::host_matrix_view<const half, int64_t> dataset);
+ private:
+  bool is_trained_ = false;
+  T min_;
+  T max_;
+  double scalar_;
+};
 
 }  // namespace cuvs::neighbors::quantization
