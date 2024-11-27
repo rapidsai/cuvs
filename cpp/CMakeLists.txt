@@ -481,7 +481,8 @@ if(BUILD_SHARED_LIBS)
   )
   target_link_libraries(
     cuvs_objs PUBLIC raft::raft rmm::rmm rmm::rmm_logger ${CUVS_CTK_MATH_DEPENDENCIES}
-                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:rmm::rmm_logger_impl>
+                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              PRIVATE rmm::rmm_logger_impl
   )
 
   add_library(cuvs SHARED $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
