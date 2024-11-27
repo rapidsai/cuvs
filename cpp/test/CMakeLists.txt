@@ -49,6 +49,7 @@ function(ConfigureTest)
     PRIVATE cuvs
             cuvs::cuvs
             raft::raft
+            rmm::rmm_logger_impl
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
