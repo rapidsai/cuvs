@@ -328,6 +328,7 @@ public class CagraSearchParams {
 
     /**
      * Constructs this Builder with an instance of Arena.
+     * 
      * @param resources the {@link CuVSResources} instance to use
      */
     public Builder(CuVSResources resources) {

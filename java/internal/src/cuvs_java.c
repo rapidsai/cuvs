@@ -27,7 +27,7 @@ cuvsResources_t create_resource(int *returnValue) {
   return cuvsResources;
 }
 
-DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code, long dimensions) {
+DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code) {
   DLManagedTensor tensor;
 
   tensor.dl_tensor.data = data;
@@ -46,7 +46,7 @@ cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, c
     cuvsCagraIndexParams_t index_params) {
 
   int64_t dataset_shape[2] = {rows, dimensions};
-  DLManagedTensor dataset_tensor = prepare_tensor(dataset, dataset_shape, kDLFloat, dimensions);
+  DLManagedTensor dataset_tensor = prepare_tensor(dataset, dataset_shape, kDLFloat);
 
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
@@ -59,8 +59,8 @@ void serialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index
   *returnValue = cuvsCagraSerialize(cuvsResources, filename, index, true);
 }
 
-void deserialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *rv, char* filename) {
-  *rv = cuvsCagraDeserialize(cuvsResources, filename, index);
+void deserialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *returnValue, char* filename) {
+  *returnValue = cuvsCagraDeserialize(cuvsResources, filename, index);
 }
 
 void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, int dimensions, 
@@ -75,13 +75,13 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   cudaMemcpy(queries_d, queries, sizeof(float) * n_queries * dimensions, cudaMemcpyDefault);
 
   int64_t queries_shape[2] = {n_queries, dimensions};
-  DLManagedTensor queries_tensor = prepare_tensor(queries_d, queries_shape, kDLFloat, dimensions);
+  DLManagedTensor queries_tensor = prepare_tensor(queries_d, queries_shape, kDLFloat);
 
   int64_t neighbors_shape[2] = {n_queries, topk};
-  DLManagedTensor neighbors_tensor = prepare_tensor(neighbors, neighbors_shape, kDLUInt, dimensions);
+  DLManagedTensor neighbors_tensor = prepare_tensor(neighbors, neighbors_shape, kDLUInt);
 
   int64_t distances_shape[2] = {n_queries, topk};
-  DLManagedTensor distances_tensor = prepare_tensor(distances, distances_shape, kDLFloat, dimensions);
+  DLManagedTensor distances_tensor = prepare_tensor(distances, distances_shape, kDLFloat);
 
   cuvsCagraSearchParamsCreate(&search_params);
 
