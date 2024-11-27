@@ -19,6 +19,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
+#include <raft/stats/stddev.cuh>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
@@ -26,11 +27,12 @@ namespace cuvs::neighbors::quantization {
 
 template <typename T>
 struct QuantizationInputs {
-  cuvs::neighbors::quantization::params quantization_params;
+  cuvs::neighbors::quantization::sq_params quantization_params;
   int rows;
   int cols;
-  T min = T(-1.0);
-  T max = T(1.0);
+  T min            = T(-1.0);
+  T max            = T(1.0);
+  double threshold = 2e-2;
 };
 
 template <typename T>
@@ -51,6 +53,46 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
   {
   }
 
+  double getRelativeErrorStddev(const T* array_a, const T* array_b, size_t size, float quantile)
+  {
+    // relative error elementwise
+    rmm::device_uvector<double> relative_error(size, stream);
+    raft::linalg::binaryOp(
+      relative_error.data(),
+      array_a,
+      array_b,
+      size,
+      [] __device__(double a, double b) {
+        return a != b ? (raft::abs(a - b) / raft::max(raft::abs(a), raft::abs(b))) : 0;
+      },
+      stream);
+
+    // sort by size --> remove largest errors to account for quantile chosen
+    thrust::sort(raft::resource::get_thrust_policy(handle),
+                 relative_error.data(),
+                 relative_error.data() + size);
+    int elements_to_consider =
+      std::ceil(double(params_.quantization_params.quantile) * double(size));
+
+    rmm::device_uvector<double> mu(1, stream);
+    RAFT_CUDA_TRY(cudaMemsetAsync(mu.data(), 0, sizeof(double), stream));
+
+    rmm::device_uvector<double> error_stddev(1, stream);
+    raft::stats::stddev(error_stddev.data(),
+                        relative_error.data(),
+                        mu.data(),
+                        1,
+                        elements_to_consider,
+                        false,
+                        true,
+                        stream);
+
+    double error_stddev_h;
+    raft::update_host(&error_stddev_h, error_stddev.data(), 1, stream);
+    raft::resource::sync_stream(handle, stream);
+    return error_stddev_h;
+  }
+
  protected:
   void testScalarQuantization()
   {
@@ -60,6 +102,8 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     auto dataset_h = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(host_input_.data()), rows_, cols_);
 
+    size_t print_size = std::min(input_.size(), 20ul);
+
     // train quantizer_1 on device
     cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI> quantizer_1;
     quantizer_1.train(handle, params_.quantization_params, dataset);
@@ -67,28 +111,53 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
               << ", min = " << (double)quantizer_1.min() << ", max = " << (double)quantizer_1.max()
               << ", scalar = " << quantizer_1.scalar() << std::endl;
 
-    // test transform host/device equal
     {
       auto quantized_input_d = quantizer_1.transform(handle, dataset);
       auto quantized_input_h = quantizer_1.transform(handle, dataset_h);
+
+      {
+        raft::print_device_vector("Input array: ", input_.data(), print_size, std::cerr);
+
+        rmm::device_uvector<int> quantization_for_print(print_size, stream);
+        raft::linalg::unaryOp(quantization_for_print.data(),
+                              quantized_input_d.data_handle(),
+                              print_size,
+                              raft::cast_op<int>{},
+                              stream);
+        raft::resource::sync_stream(handle, stream);
+        raft::print_device_vector(
+          "Quantized array 1: ", quantization_for_print.data(), print_size, std::cerr);
+      }
+
+      // test (inverse) transform host/device equal
       ASSERT_TRUE(devArrMatchHost(quantized_input_h.data_handle(),
                                   quantized_input_d.data_handle(),
                                   input_.size(),
                                   cuvs::Compare<QuantI>(),
                                   stream));
 
-      if (input_.size() < 100) {
-        raft::print_device_vector("Input array: ", input_.data(), input_.size(), std::cerr);
+      auto quantized_input_d_const_view = raft::make_device_matrix_view<const QuantI, int64_t>(
+        quantized_input_d.data_handle(), rows_, cols_);
+      auto quantized_input_h_const_view = raft::make_host_matrix_view<const QuantI, int64_t>(
+        quantized_input_h.data_handle(), rows_, cols_);
 
-        rmm::device_uvector<int> quantization_for_print(input_.size(), stream);
-        raft::linalg::unaryOp(quantization_for_print.data(),
-                              quantized_input_d.data_handle(),
-                              input_.size(),
-                              raft::cast_op<int>{},
-                              stream);
-        raft::resource::sync_stream(handle, stream);
-        raft::print_device_vector(
-          "Quantized array 1: ", quantization_for_print.data(), input_.size(), std::cerr);
+      auto re_transformed_input_d =
+        quantizer_1.inverse_transform(handle, quantized_input_d_const_view);
+      auto re_transformed_input_h =
+        quantizer_1.inverse_transform(handle, quantized_input_h_const_view);
+
+      raft::print_device_vector(
+        "re-transformed array: ", re_transformed_input_d.data_handle(), print_size, std::cerr);
+
+      {
+        double l2_error = getRelativeErrorStddev(dataset.data_handle(),
+                                                 re_transformed_input_d.data_handle(),
+                                                 input_.size(),
+                                                 params_.quantization_params.quantile);
+        std::cerr << "error stddev = " << l2_error << ", threshold = " << params_.threshold
+                  << std::endl;
+        // test (inverse) transform close to original dataset
+        ASSERT_TRUE(l2_error < params_.threshold);
       }
     }
 
@@ -98,23 +167,25 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     std::cerr << "Q2: trained = " << quantizer_2.is_trained()
               << ", min = " << (double)quantizer_2.min() << ", max = " << (double)quantizer_2.max()
               << ", scalar = " << quantizer_2.scalar() << std::endl;
+
+    // check both quantizers are the same (valid if sampling is identical)
+    if (input_.size() <= 1000000) { ASSERT_TRUE(quantizer_1 == quantizer_2); }
+
     {
       // test transform host/device equal
       auto quantized_input_d = quantizer_2.transform(handle, dataset);
       auto quantized_input_h = quantizer_2.transform(handle, dataset_h);
 
-      if (input_.size() < 100) {
-        raft::print_device_vector("Input array: ", input_.data(), input_.size(), std::cerr);
-
-        rmm::device_uvector<int> quantization_for_print(input_.size(), stream);
+      {
+        rmm::device_uvector<int> quantization_for_print(print_size, stream);
         raft::linalg::unaryOp(quantization_for_print.data(),
                               quantized_input_d.data_handle(),
-                              input_.size(),
+                              print_size,
                               raft::cast_op<int>{},
                               stream);
         raft::resource::sync_stream(handle, stream);
         raft::print_device_vector(
-          "Quantized array 2: ", quantization_for_print.data(), input_.size(), std::cerr);
+          "Quantized array 2: ", quantization_for_print.data(), print_size, std::cerr);
       }
 
       ASSERT_TRUE(devArrMatchHost(quantized_input_h.data_handle(),
@@ -175,9 +246,11 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
 template <typename T>
 const std::vector<QuantizationInputs<T>> inputs = {
   {{1.0}, 5, 5, T(0.0), T(1.0)},
-  {{0.99}, 10, 20, T(0.0), T(1.0)},
-  {{0.95}, 100, 2000, T(-500.0), T(100.0)},
+  {{0.98}, 10, 20, T(0.0), T(1.0)},
+  {{0.90}, 1000, 1500, T(-500.0), T(100.0)},
   {{0.59}, 100, 200},
+  {{0.1}, 1, 1, T(0.0), T(1.0)},
+  {{0.01}, 50, 50, T(0.0), T(1.0)},
   {{0.94}, 10, 20, T(-1.0), T(0.0)},
   {{0.95}, 10, 2, T(50.0), T(100.0)},
   {{0.95}, 10, 20, T(-500.0), T(-100.0)},

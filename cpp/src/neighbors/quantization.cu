@@ -22,11 +22,12 @@ namespace cuvs::neighbors::quantization {
 
 template <typename T, typename QuantI>
 void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
-                                       params params,
+                                       sq_params params,
                                        raft::device_matrix_view<const T, int64_t> dataset)
 {
-  ASSERT(params.quantile > 0.0 && params.quantile <= 1.0,
-         "quantile for scalar quantization needs to be within (0, 1]");
+  RAFT_EXPECTS(params.quantile > 0.0 && params.quantile <= 1.0,
+               "quantile for scalar quantization needs to be within (0, 1] but is %f",
+               params.quantile);
 
   // conditional: search for quantiles / min / max
   if (!is_trained_) {
@@ -39,16 +40,19 @@ void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
     max_        = max;
     scalar_     = max_ > min ? double(range_q_type) / double(max_ - min_) : 1.0;
     is_trained_ = true;
+    RAFT_LOG_DEBUG(
+      "ScalarQuantizer train min=%lf max=%lf scalar=%lf.", double(min_), double(max_), scalar_);
   }
 }
 
 template <typename T, typename QuantI>
 void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
-                                       params params,
+                                       sq_params params,
                                        raft::host_matrix_view<const T, int64_t> dataset)
 {
-  ASSERT(params.quantile > 0.0 && params.quantile <= 1.0,
-         "quantile for scalar quantization needs to be within (0, 1]");
+  RAFT_EXPECTS(params.quantile > 0.0 && params.quantile <= 1.0,
+               "quantile for scalar quantization needs to be within (0, 1] but is %f",
+               params.quantile);
 
   // conditional: search for quantiles / min / max
   if (!is_trained_) {
@@ -61,6 +65,8 @@ void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
     max_        = max;
     scalar_     = max_ > min ? double(range_q_type) / double(max_ - min_) : 1.0;
     is_trained_ = true;
+    RAFT_LOG_DEBUG(
+      "ScalarQuantizer train min=%lf max=%lf scalar=%lf.", double(min_), double(max_), scalar_);
   }
 }
 
@@ -68,7 +74,7 @@ template <typename T, typename QuantI>
 raft::device_matrix<QuantI, int64_t> ScalarQuantizer<T, QuantI>::transform(
   raft::resources const& res, raft::device_matrix_view<const T, int64_t> dataset)
 {
-  ASSERT(is_trained_, "ScalarQuantizer needs to be trained first!");
+  RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
   return detail::scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
 }
 
@@ -76,8 +82,24 @@ template <typename T, typename QuantI>
 raft::host_matrix<QuantI, int64_t> ScalarQuantizer<T, QuantI>::transform(
   raft::resources const& res, raft::host_matrix_view<const T, int64_t> dataset)
 {
-  ASSERT(is_trained_, "ScalarQuantizer needs to be trained first!");
+  RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
   return detail::scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
+}
+
+template <typename T, typename QuantI>
+raft::device_matrix<T, int64_t> ScalarQuantizer<T, QuantI>::inverse_transform(
+  raft::resources const& res, raft::device_matrix_view<const QuantI, int64_t> dataset)
+{
+  RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
+  return detail::inverse_scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
+}
+
+template <typename T, typename QuantI>
+raft::host_matrix<T, int64_t> ScalarQuantizer<T, QuantI>::inverse_transform(
+  raft::resources const& res, raft::host_matrix_view<const QuantI, int64_t> dataset)
+{
+  RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
+  return detail::inverse_scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
 }
 
 #define CUVS_INST_QUANTIZATION(T, QuantI) \
