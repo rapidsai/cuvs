@@ -87,15 +87,18 @@ public class CagraIndex {
    * @throws IOException @{@link IOException} is unable to load the native library
    */
   private void initializeMethodHandles() throws IOException {
-
-    indexMethodHandle = resources.linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("build_cagra_index").get(),
+    indexMethodHandle = resources.linker.downcallHandle(
+        resources.getLibcuvsNativeLibrary().find("build_cagra_index").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, resources.linker.canonicalLayouts().get("long"),
-            resources.linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+            resources.linker.canonicalLayouts().get("long"), ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS));
 
-    searchMethodHandle = resources.linker.downcallHandle(resources.getLibcuvsNativeLibrary().find("search_cagra_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, resources.linker.canonicalLayouts().get("int"),
-            resources.linker.canonicalLayouts().get("long"), resources.linker.canonicalLayouts().get("int"), ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    searchMethodHandle = resources.linker.downcallHandle(
+        resources.getLibcuvsNativeLibrary().find("search_cagra_index").get(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+            resources.linker.canonicalLayouts().get("int"), resources.linker.canonicalLayouts().get("long"),
+            resources.linker.canonicalLayouts().get("int"), ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
     serializeMethodHandle = resources.linker.downcallHandle(
         resources.getLibcuvsNativeLibrary().find("serialize_cagra_index").get(),
@@ -119,9 +122,9 @@ public class CagraIndex {
     MemoryLayout layout = resources.linker.canonicalLayouts().get("int");
     MemorySegment segment = resources.arena.allocate(layout);
 
-    cagraIndexReference = new IndexReference(
-        (MemorySegment) indexMethodHandle.invokeExact(Util.buildMemorySegment(resources.linker, resources.arena, dataset), rows, cols,
-            resources.getMemorySegment(), segment, cagraIndexParameters.getMemorySegment()));
+    cagraIndexReference = new IndexReference((MemorySegment) indexMethodHandle.invokeExact(
+        Util.buildMemorySegment(resources.linker, resources.arena, dataset), rows, cols, resources.getMemorySegment(),
+        segment, cagraIndexParameters.getMemorySegment()));
 
     return cagraIndexReference;
   }
@@ -147,11 +150,11 @@ public class CagraIndex {
     MemorySegment distancesMemorySegment = resources.arena.allocate(distancesSequenceLayout);
     MemoryLayout returnValueMemoryLayout = resources.linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    
+
     searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
-        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), query.getTopK(), numQueries, vectorDimension,
-        resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment, returnValueMemorySegment,
-        query.getCagraSearchParameters().getMemorySegment());
+        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), query.getTopK(),
+        numQueries, vectorDimension, resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
+        returnValueMemorySegment, query.getCagraSearchParameters().getMemorySegment());
 
     return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
         distancesMemorySegment, query.getTopK(), query.getMapping(), numQueries);
@@ -174,14 +177,15 @@ public class CagraIndex {
    * 
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
-   * @param tempFile  an intermediate {@link File} where CAGRA index is written
+   * @param tempFile     an intermediate {@link File} where CAGRA index is written
    *                     temporarily
    */
   public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
     MemoryLayout returnValueMemoryLayout = resources.linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     serializeMethodHandle.invokeExact(resources.getMemorySegment(), cagraIndexReference.getMemorySegment(),
-        returnValueMemorySegment, Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
+        returnValueMemorySegment,
+        Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
     FileInputStream fileInputStream = new FileInputStream(tempFile);
     byte[] chunk = new byte[1024]; // TODO: Make this configurable
     int chunkLength = 0;

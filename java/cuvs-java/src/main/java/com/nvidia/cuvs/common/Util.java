@@ -24,6 +24,7 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
 
 import org.apache.commons.io.IOUtils;
@@ -56,18 +57,15 @@ public class Util {
    */
   public static MemorySegment buildMemorySegment(Linker linker, Arena arena, float[][] data) {
     long rows = data.length;
-    long cols = data[0].length;
+    long cols = rows > 0 ? data[0].length : 0;
 
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows,
-        MemoryLayout.sequenceLayout(cols, linker.canonicalLayouts().get("float")));
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, linker.canonicalLayouts().get("float"));
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+    long floatByteSize = linker.canonicalLayouts().get("float").byteSize();
 
     for (int r = 0; r < rows; r++) {
-      for (int c = 0; c < cols; c++) {
-        VarHandle element = dataMemoryLayout.arrayElementVarHandle(PathElement.sequenceElement(r),
-            PathElement.sequenceElement(c));
-        element.set(dataMemorySegment, 0, 0, data[r][c]);
-      }
+      MemorySegment.copy(data[r], 0, dataMemorySegment, (ValueLayout) linker.canonicalLayouts().get("float"),
+          (r * cols * floatByteSize), (int) cols);
     }
 
     return dataMemorySegment;
