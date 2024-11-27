@@ -114,10 +114,15 @@ TEST(CagraC, BuildSearch)
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = nullptr;
 
+  cuvsFilter prefilter;
+  prefilter.type = NO_FILTER;
+  prefilter.addr = (uintptr_t)NULL;
+
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsCagraSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, prefilter);
 
   // verify output
   ASSERT_TRUE(
@@ -176,21 +181,6 @@ TEST(CagraC, BuildSearchFiltered)
   queries_tensor.dl_tensor.shape              = queries_shape;
   queries_tensor.dl_tensor.strides            = nullptr;
 
-  // create filter DLTensor
-  rmm::device_uvector<int64_t> filter_d(2, stream);
-  raft::copy(filter_d.data(), (int64_t*)filter, 2, stream);
-
-  DLManagedTensor filter_tensor;
-  filter_tensor.dl_tensor.data               = filter_d.data();
-  filter_tensor.dl_tensor.device.device_type = kDLCUDA;
-  filter_tensor.dl_tensor.ndim               = 1;
-  filter_tensor.dl_tensor.dtype.code         = kDLInt;
-  filter_tensor.dl_tensor.dtype.bits         = 64;
-  filter_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t filter_shape[1]                    = {2};
-  filter_tensor.dl_tensor.shape              = filter_shape;
-  filter_tensor.dl_tensor.strides            = nullptr;
-
   // create neighbors DLTensor
   rmm::device_uvector<uint32_t> neighbors_d(4, stream);
 
@@ -219,16 +209,31 @@ TEST(CagraC, BuildSearchFiltered)
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = nullptr;
 
+  // create filter DLTensor
+  rmm::device_uvector<int64_t> filter_d(2, stream);
+  raft::copy(filter_d.data(), (int64_t*)filter, 2, stream);
+
+  cuvsFilter filter;
+
+  DLManagedTensor filter_tensor;
+  filter_tensor.dl_tensor.data               = filter_d.data();
+  filter_tensor.dl_tensor.device.device_type = kDLCUDA;
+  filter_tensor.dl_tensor.ndim               = 1;
+  filter_tensor.dl_tensor.dtype.code         = kDLInt;
+  filter_tensor.dl_tensor.dtype.bits         = 64;
+  filter_tensor.dl_tensor.dtype.lanes        = 1;
+  int64_t filter_shape[1]                    = {2};
+  filter_tensor.dl_tensor.shape              = filter_shape;
+  filter_tensor.dl_tensor.strides            = nullptr;
+
+  filter.type = BITSET;
+  filter.addr = (uintptr_t)&filter_tensor;
+
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  auto e = cuvsCagraFilteredSearch(res,
-                                   search_params,
-                                   index,
-                                   &queries_tensor,
-                                   &neighbors_tensor,
-                                   &distances_tensor,
-                                   &filter_tensor);
+  cuvsCagraSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // verify output
   ASSERT_TRUE(cuvs::devArrMatchHost(

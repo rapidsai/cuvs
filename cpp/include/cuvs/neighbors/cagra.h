@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -385,33 +386,16 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] prefilter cuvsFilter input prefilter that can be used
+              to filter queries and neighbors based on the given bitset.
  */
 cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsCagraSearchParams_t params,
                             cuvsCagraIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
-                            DLManagedTensor* distances);
-/*
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] params cuvsCagraSearchParams_t used to search CAGRA index
- * @param[in] index cuvsCagraIndex which has been returned by `cuvsCagraBuild`
- * @param[in] queries DLManagedTensor* queries dataset to search
- * @param[in] filter Filter
- * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
- * @param[out] distances DLManagedTensor* output `k` distances for queries
- */
-cuvsError_t cuvsCagraFilteredSearch(cuvsResources_t res,
-                                    cuvsCagraSearchParams_t params,
-                                    cuvsCagraIndex_t index,
-                                    DLManagedTensor* queries,
-                                    DLManagedTensor* neighbors,
-                                    DLManagedTensor* distances,
-                                    DLManagedTensor* filter);
-
-/**
- * @}
- */
+                            DLManagedTensor* distances,
+                            cuvsFilter filter);
 
 /**
  * @defgroup cagra_c_serialize CAGRA C-API serialize functions
