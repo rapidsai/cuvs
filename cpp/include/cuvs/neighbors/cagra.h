@@ -398,6 +398,10 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsFilter filter);
 
 /**
+ * @}
+ */
+
+/**
  * @defgroup cagra_c_serialize CAGRA C-API serialize functions
  * @{
  */
