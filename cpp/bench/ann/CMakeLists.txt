@@ -129,6 +129,7 @@ function(ConfigureAnnBench)
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
+            cuvs_bench_rmm_logger
   )
 
   set_target_properties(
@@ -173,6 +174,9 @@ function(ConfigureAnnBench)
 
   add_dependencies(CUVS_ANN_BENCH_ALL ${BENCH_NAME})
 endfunction()
+
+add_library(cuvs_bench_rmm_logger OBJECT)
+target_link_libraries(cuvs_bench_rmm_logger PRIVATE rmm::rmm_logger_impl)
 
 # ##################################################################################################
 # * Configure benchmark targets -------------------------------------------------------------
@@ -300,7 +304,7 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   target_link_libraries(
     ANN_BENCH
     PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl fmt::fmt-header-only
-            spdlog::spdlog_header_only $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
+            spdlog::spdlog_header_only $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3> rmm::rmm_logger_impl
   )
   set_target_properties(
     ANN_BENCH
