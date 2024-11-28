@@ -16,6 +16,7 @@ if [[ "$(arch)" == "aarch64" ]]; then
   for dir in $(ld --verbose | grep SEARCH_DIR | tr -s ' ;' \\012 | grep -o '=.*"' | sed 's/[="]//g'); do
       lib="${dir}/libgomp.so.1"
       if [[ -f "${lib}" ]]; then
+          echo "Preloading "${lib}" to work around OpenMP TLS issue on aarch64"
           export LD_PRELOAD="${lib}"
           break
       fi
