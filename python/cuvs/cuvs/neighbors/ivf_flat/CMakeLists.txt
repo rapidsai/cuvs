@@ -22,3 +22,7 @@ rapids_cython_create_modules(
   SOURCE_FILES "${cython_sources}"
   LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX neighbors_ivf_flat_
 )
+
+foreach(tgt IN LISTS RAPIDS_CYTHON_CREATED_TARGETS)
+  target_link_libraries(${tgt} PRIVATE rmm::rmm_logger_impl)
+endforeach()
