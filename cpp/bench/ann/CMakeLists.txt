@@ -129,7 +129,7 @@ function(ConfigureAnnBench)
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            cuvs_bench_rmm_logger
+            $<TARGET_NAME_IF_EXISTS:cuvs_bench_rmm_logger>
   )
 
   set_target_properties(
@@ -175,8 +175,10 @@ function(ConfigureAnnBench)
   add_dependencies(CUVS_ANN_BENCH_ALL ${BENCH_NAME})
 endfunction()
 
-add_library(cuvs_bench_rmm_logger OBJECT)
-target_link_libraries(cuvs_bench_rmm_logger PRIVATE rmm::rmm_logger_impl)
+if(CUVS_FAISS_ENABLE_GPU)
+  add_library(cuvs_bench_rmm_logger OBJECT)
+  target_link_libraries(cuvs_bench_rmm_logger PRIVATE rmm::rmm_logger_impl)
+endif()
 
 # ##################################################################################################
 # * Configure benchmark targets -------------------------------------------------------------
