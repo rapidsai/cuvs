@@ -115,6 +115,39 @@ void serialize(raft::resources const& res,
 
   index_of.close();
   if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
+
+  // try allocating a buffer for the dataset on host
+  try {
+    auto h_dataset = raft::make_host_matrix<T, int64_t>(index_.size(), index_.dim());
+    const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
+      dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
+        const_cast<cuvs::neighbors::dataset<int64_t>*>(&index_.data()));
+    if (strided_dataset == nullptr) {
+      RAFT_LOG_INFO("strided_dataset is null");
+    }
+    raft::copy(h_dataset.data_handle(),
+               strided_dataset->view().data_handle(),
+               strided_dataset->n_rows() * strided_dataset->dim(),
+               raft::resource::get_cuda_stream(res));
+    std::string dataset_file = file_name + ".data";
+    std::ofstream dataset_of(dataset_file, std::ios::out | std::ios::binary);
+    if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_file.c_str()); }
+    size_t dataset_file_offset = 0;
+    int size                   = static_cast<int>(index_.size());
+    int dim                    = static_cast<int>(index_.dim());
+    dataset_of.seekp(dataset_file_offset, dataset_of.beg);
+    dataset_of.write((char*)&size, sizeof(int));
+    dataset_of.write((char*)&dim, sizeof(int));
+    for (int i = 0; i < size; i++) {
+      dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)), dim * sizeof(T));
+    }
+    dataset_of.close();
+    if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_file.c_str()); }
+  } catch (std::bad_alloc& e) {
+    RAFT_LOG_DEBUG("Failed to serialize dataset");
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_DEBUG("Failed to serialize dataset");
+  }
 }
 
 }  // namespace cuvs::neighbors::experimental::vamana::detail
