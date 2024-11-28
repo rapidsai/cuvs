@@ -24,5 +24,5 @@ rapids_cython_create_modules(
 )
 
 foreach(tgt IN LISTS RAPIDS_CYTHON_CREATED_TARGETS)
-  target_link_libraries(${tgt} PRIVATE rmm::rmm_logger_impl)
+  target_link_libraries(${tgt} PRIVATE rmm_logger)
 endforeach()
