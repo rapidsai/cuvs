@@ -697,7 +697,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft
+      PRIVATE raft::raft rmm::rmm_logger_impl
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
