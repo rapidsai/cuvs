@@ -118,13 +118,14 @@ void serialize(raft::resources const& res,
 
   // try allocating a buffer for the dataset on host
   try {
-    auto h_dataset = raft::make_host_matrix<T, int64_t>(index_.size(), index_.dim());
     const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
       dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
         const_cast<cuvs::neighbors::dataset<int64_t>*>(&index_.data()));
     if (strided_dataset == nullptr) {
       RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
     } else {
+      auto h_dataset =
+        raft::make_host_matrix<T, int64_t>(strided_dataset->size(), strided_dataset->dim());
       raft::copy(h_dataset.data_handle(),
                  strided_dataset->view().data_handle(),
                  strided_dataset->n_rows() * strided_dataset->dim(),
