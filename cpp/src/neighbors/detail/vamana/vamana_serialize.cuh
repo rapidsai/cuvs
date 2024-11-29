@@ -139,7 +139,6 @@ void serialize(raft::resources const& res,
     dataset_of.write((char*)&size, sizeof(int));
     dataset_of.write((char*)&dim, sizeof(int));
     for (int i = 0; i < size; i++) {
-      std::cout << "now writing row " << i << std::endl;
       dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)), dim * sizeof(T));
     }
     dataset_of.close();
@@ -149,7 +148,6 @@ void serialize(raft::resources const& res,
   } catch (raft::logic_error& e) {
     RAFT_LOG_INFO("Failed to serialize dataset");
   }
-  std::cout << "done" << std::endl;
 }
 
 }  // namespace cuvs::neighbors::experimental::vamana::detail
