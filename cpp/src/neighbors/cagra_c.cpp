@@ -123,7 +123,7 @@ void _search(cuvsResources_t res,
     cuvs::neighbors::cagra::search(
       *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
   } else if (filter.type == BITSET) {
-    using filter_mdspan_type    = raft::device_vector_view<int64_t, int64_t, raft::row_major>;
+    using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
     auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
     auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
     cuvs::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
