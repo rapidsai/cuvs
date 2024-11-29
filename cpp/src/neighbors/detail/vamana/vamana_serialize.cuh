@@ -125,7 +125,7 @@ void serialize(raft::resources const& res,
       RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
     } else {
       auto h_dataset =
-        raft::make_host_matrix<T, int64_t>(strided_dataset->size(), strided_dataset->dim());
+        raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
       raft::copy(h_dataset.data_handle(),
                  strided_dataset->view().data_handle(),
                  strided_dataset->n_rows() * strided_dataset->dim(),
