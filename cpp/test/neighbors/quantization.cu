@@ -109,7 +109,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     quantizer_1.train(handle, params_.quantization_params, dataset);
     std::cerr << "Q1: trained = " << quantizer_1.is_trained()
               << ", min = " << (double)quantizer_1.min() << ", max = " << (double)quantizer_1.max()
-              << ", scalar = " << quantizer_1.scalar() << std::endl;
+              << std::endl;
 
     {
       auto quantized_input_d = quantizer_1.transform(handle, dataset);
@@ -166,7 +166,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     quantizer_2.train(handle, params_.quantization_params, dataset_h);
     std::cerr << "Q2: trained = " << quantizer_2.is_trained()
               << ", min = " << (double)quantizer_2.min() << ", max = " << (double)quantizer_2.max()
-              << ", scalar = " << quantizer_2.scalar() << std::endl;
+              << std::endl;
 
     // check both quantizers are the same (valid if sampling is identical)
     if (input_.size() <= 1000000) { ASSERT_TRUE(quantizer_1 == quantizer_2); }

@@ -50,7 +50,7 @@ template <typename T, typename QuantI>
 class ScalarQuantizer {
  public:
   /**
-   * @brief Derives scalar to cover dataset for min & max value of defined quantile
+   * @brief Computes the scaling factor to be used later for quantizing the dataset.
    *
    * Usage example:
    * @code{.cpp}
@@ -69,7 +69,7 @@ class ScalarQuantizer {
              raft::device_matrix_view<const T, int64_t> dataset);
 
   /**
-   * @brief Derives scalar to cover dataset for min & max value of defined quantile
+   * @brief Computes the scaling factor to be used later for quantizing the dataset.
    *
    * Usage example:
    * @code{.cpp}
@@ -179,8 +179,7 @@ class ScalarQuantizer {
   bool operator==(const ScalarQuantizer<T, QuantI>& other) const
   {
     return (!is_trained() && !other.is_trained()) ||
-           (is_trained() == other.is_trained() && min() == other.min() &&
-            scalar() == other.scalar());
+           (is_trained() == other.is_trained() && min() == other.min() && max() == other.max());
   }
 
   // the minimum value covered by the quantized datatype
@@ -189,14 +188,10 @@ class ScalarQuantizer {
   // the maximum value covered by the quantized datatype
   T max() const { return max_; };
 
-  // the scalar used for performing the quantization
-  double scalar() const { return scalar_; };
-
  private:
   bool is_trained_ = false;
   T min_;
   T max_;
-  double scalar_;
 };
 
 }  // namespace cuvs::neighbors::quantization

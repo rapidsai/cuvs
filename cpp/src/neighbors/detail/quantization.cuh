@@ -27,6 +27,41 @@
 
 namespace cuvs::neighbors::detail {
 
+template <typename T, typename QuantI, typename TempT = double>
+struct quantize_op {
+  const T min_;
+  const T max_;
+  const bool inverse_;
+  const QuantI q_type_min_ = std::numeric_limits<QuantI>::min();
+  const QuantI q_type_max_ = std::numeric_limits<QuantI>::max();
+  const TempT a_;
+  const TempT b_;
+
+  constexpr explicit quantize_op(T min, T max, bool inverse)
+    : min_(min),
+      max_(max),
+      inverse_(inverse),
+      a_(static_cast<TempT>(max_) > static_cast<TempT>(min_)
+           ? ((static_cast<TempT>(q_type_max_) - static_cast<TempT>(q_type_min_)) /
+              (static_cast<TempT>(max_) - static_cast<TempT>(min_)))
+           : static_cast<TempT>(1)),
+      b_(static_cast<TempT>(q_type_min_) - static_cast<TempT>(min_) * a_)
+  {
+  }
+
+  constexpr RAFT_INLINE_FUNCTION QuantI operator()(const T& x) const
+  {
+    if (x > max_) return q_type_max_;
+    if (x < min_) return q_type_min_;
+    return static_cast<QuantI>(lroundf(a_ * static_cast<TempT>(x) + b_));
+  }
+
+  constexpr RAFT_INLINE_FUNCTION T operator()(const QuantI& x) const
+  {
+    return static_cast<T>((static_cast<TempT>(x) - b_) / a_);
+  }
+};
+
 template <typename T>
 std::tuple<T, T> quantile_min_max(raft::resources const& res,
                                   raft::device_matrix_view<const T, int64_t> dataset,
@@ -93,113 +128,65 @@ std::tuple<T, T> quantile_min_max(raft::resources const& res,
   return {subset[pos_min], subset[pos_max]};
 }
 
-template <typename T, typename QuantI = int8_t, typename TempT = double, typename TempI = int64_t>
+template <typename T, typename QuantI = int8_t>
 raft::device_matrix<QuantI, int64_t> scalar_transform(
-  raft::resources const& res,
-  raft::device_matrix_view<const T, int64_t> dataset,
-  double scalar,
-  T minimum)
+  raft::resources const& res, raft::device_matrix_view<const T, int64_t> dataset, T min, T max)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
-
-  constexpr TempI q_type_min = static_cast<TempI>(std::numeric_limits<QuantI>::min());
-  constexpr TempI q_type_max = static_cast<TempI>(std::numeric_limits<QuantI>::max());
 
   // allocate target
   auto out = raft::make_device_matrix<QuantI, int64_t>(res, dataset.extent(0), dataset.extent(1));
 
-  raft::linalg::map(res,
-                    out.view(),
-                    raft::compose_op(
-                      raft::cast_op<QuantI>{},              // 8. cast to target int
-                      raft::add_const_op<int>(q_type_min),  // 7. shift to full range
-                      [] __device__(TempI a) {
-                        return raft::max<TempI>(raft::min<TempI>(a, q_type_max - q_type_min),
-                                                TempI(0));
-                      },                               // 6. cut off values exceeding target range
-                      raft::cast_op<TempI>{},          // 5. cast to intermediate int
-                      raft::add_const_op<TempT>(0.5),  // 4. add for rounding to nearest int
-                      raft::mul_const_op<TempT>(scalar),   // 3. apply scalar
-                      raft::sub_const_op<TempT>(minimum),  // 2. shift to positive
-                      raft::cast_op<TempT>{}),             // 1. cast to higher precision FP
-                    dataset);
+  raft::linalg::map(res, out.view(), quantize_op<T, QuantI>(min, max, false), dataset);
 
   return out;
 }
 
-template <typename T, typename QuantI = int8_t, typename TempT = double, typename TempI = int64_t>
+template <typename T, typename QuantI = int8_t>
 raft::host_matrix<QuantI, int64_t> scalar_transform(
-  raft::resources const& res,
-  raft::host_matrix_view<const T, int64_t> dataset,
-  double scalar,
-  T minimum)
+  raft::resources const& res, raft::host_matrix_view<const T, int64_t> dataset, T min, T max)
 {
-  constexpr TempI q_type_min = static_cast<TempI>(std::numeric_limits<QuantI>::min());
-  constexpr TempI q_type_max = static_cast<TempI>(std::numeric_limits<QuantI>::max());
-
-  size_t n_elements = dataset.extent(0) * dataset.extent(1);
-
   // allocate target
   auto out = raft::make_host_matrix<QuantI, int64_t>(dataset.extent(0), dataset.extent(1));
 
+  auto main_op      = quantize_op<T, QuantI>(min, max, false);
+  size_t n_elements = dataset.extent(0) * dataset.extent(1);
+
 #pragma omp parallel for
   for (size_t i = 0; i < n_elements; ++i) {
-    TempT tmp_t = ((TempT)dataset.data_handle()[i] - TempT(minimum)) * scalar + TempT(0.5);
-    TempI tmp_i =
-      raft::max<TempI>(raft::min<TempI>(TempI(tmp_t), q_type_max - q_type_min), TempI(0)) +
-      q_type_min;
-    out.data_handle()[i] = (QuantI)tmp_i;
+    out.data_handle()[i] = main_op(dataset.data_handle()[i]);
   }
 
   return out;
 }
 
-template <typename T, typename QuantI = int8_t, typename TempT = double, typename TempI = int64_t>
+template <typename T, typename QuantI = int8_t>
 raft::device_matrix<T, int64_t> inverse_scalar_transform(
-  raft::resources const& res,
-  raft::device_matrix_view<const QuantI, int64_t> dataset,
-  double scalar,
-  T minimum)
+  raft::resources const& res, raft::device_matrix_view<const QuantI, int64_t> dataset, T min, T max)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
-
-  constexpr TempI q_type_min = static_cast<TempI>(std::numeric_limits<QuantI>::min());
 
   // allocate target
   auto out = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
 
-  raft::linalg::map(res,
-                    out.view(),
-                    raft::compose_op(raft::cast_op<T>{},                  // 7. cast to final T
-                                     raft::add_const_op<TempT>(minimum),  // 6. shift to positive
-                                     raft::div_const_op<TempT>(scalar),   // 4. apply scalar (inv)
-                                     raft::cast_op<TempT>{},              // 3. cast to float
-                                     raft::sub_const_op<TempI>(q_type_min),  // 2. shift to positive
-                                     raft::cast_op<TempI>{}),                // 1. cast higher int
-                    dataset);
+  raft::linalg::map(res, out.view(), quantize_op<T, QuantI>(min, max, true), dataset);
 
   return out;
 }
 
-template <typename T, typename QuantI = int8_t, typename TempT = double, typename TempI = int64_t>
+template <typename T, typename QuantI = int8_t>
 raft::host_matrix<T, int64_t> inverse_scalar_transform(
-  raft::resources const& res,
-  raft::host_matrix_view<const QuantI, int64_t> dataset,
-  double scalar,
-  T minimum)
+  raft::resources const& res, raft::host_matrix_view<const QuantI, int64_t> dataset, T min, T max)
 {
-  constexpr TempI q_type_min = static_cast<TempI>(std::numeric_limits<QuantI>::min());
-
-  size_t n_elements = dataset.extent(0) * dataset.extent(1);
-
   // allocate target
   auto out = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
 
+  auto main_op      = quantize_op<T, QuantI>(min, max, true);
+  size_t n_elements = dataset.extent(0) * dataset.extent(1);
+
 #pragma omp parallel for
   for (size_t i = 0; i < n_elements; ++i) {
-    TempI tmp_i          = (TempI)dataset.data_handle()[i] - q_type_min;
-    TempT tmp_t          = TempT(tmp_i) / scalar + TempT(minimum);
-    out.data_handle()[i] = (T)tmp_t;
+    out.data_handle()[i] = main_op(dataset.data_handle()[i]);
   }
 
   return out;

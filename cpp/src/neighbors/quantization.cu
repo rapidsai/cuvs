@@ -38,10 +38,8 @@ void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
                                      static_cast<int64_t>(std::numeric_limits<QuantI>::min());
     min_        = min;
     max_        = max;
-    scalar_     = max_ > min ? double(range_q_type) / double(max_ - min_) : 1.0;
     is_trained_ = true;
-    RAFT_LOG_DEBUG(
-      "ScalarQuantizer train min=%lf max=%lf scalar=%lf.", double(min_), double(max_), scalar_);
+    RAFT_LOG_DEBUG("ScalarQuantizer train min=%lf max=%lf.", double(min_), double(max_));
   }
 }
 
@@ -63,10 +61,8 @@ void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
                                      static_cast<int64_t>(std::numeric_limits<QuantI>::min());
     min_        = min;
     max_        = max;
-    scalar_     = max_ > min ? double(range_q_type) / double(max_ - min_) : 1.0;
     is_trained_ = true;
-    RAFT_LOG_DEBUG(
-      "ScalarQuantizer train min=%lf max=%lf scalar=%lf.", double(min_), double(max_), scalar_);
+    RAFT_LOG_DEBUG("ScalarQuantizer train min=%lf max=%lf.", double(min_), double(max_));
   }
 }
 
@@ -75,7 +71,7 @@ raft::device_matrix<QuantI, int64_t> ScalarQuantizer<T, QuantI>::transform(
   raft::resources const& res, raft::device_matrix_view<const T, int64_t> dataset)
 {
   RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
-  return detail::scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
+  return detail::scalar_transform<T, QuantI>(res, dataset, min_, max_);
 }
 
 template <typename T, typename QuantI>
@@ -83,7 +79,7 @@ raft::host_matrix<QuantI, int64_t> ScalarQuantizer<T, QuantI>::transform(
   raft::resources const& res, raft::host_matrix_view<const T, int64_t> dataset)
 {
   RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
-  return detail::scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
+  return detail::scalar_transform<T, QuantI>(res, dataset, min_, max_);
 }
 
 template <typename T, typename QuantI>
@@ -91,7 +87,7 @@ raft::device_matrix<T, int64_t> ScalarQuantizer<T, QuantI>::inverse_transform(
   raft::resources const& res, raft::device_matrix_view<const QuantI, int64_t> dataset)
 {
   RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
-  return detail::inverse_scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
+  return detail::inverse_scalar_transform<T, QuantI>(res, dataset, min_, max_);
 }
 
 template <typename T, typename QuantI>
@@ -99,7 +95,7 @@ raft::host_matrix<T, int64_t> ScalarQuantizer<T, QuantI>::inverse_transform(
   raft::resources const& res, raft::host_matrix_view<const QuantI, int64_t> dataset)
 {
   RAFT_EXPECTS(is_trained_, "ScalarQuantizer needs to be trained first!");
-  return detail::inverse_scalar_transform<T, QuantI>(res, dataset, scalar_, min_);
+  return detail::inverse_scalar_transform<T, QuantI>(res, dataset, min_, max_);
 }
 
 #define CUVS_INST_QUANTIZATION(T, QuantI) \
