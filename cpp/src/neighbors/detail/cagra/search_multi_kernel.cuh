@@ -91,6 +91,15 @@ void get_value(T* const host_ptr, const T* const dev_ptr, cudaStream_t cuda_stre
   get_value_kernel<T><<<1, 1, 0, cuda_stream>>>(host_ptr, dev_ptr);
 }
 
+template <class T>
+auto get_value(const T* const dev_ptr, cudaStream_t stream) -> T
+{
+  T value;
+  RAFT_CUDA_TRY(cudaMemcpyAsync(&value, dev_ptr, sizeof(value), cudaMemcpyDefault, stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+  return value;
+}
+
 // MAX_DATASET_DIM : must equal to or greater than dataset_dim
 template <class DATASET_DESCRIPTOR_T>
 RAFT_KERNEL random_pickup_kernel(
@@ -609,18 +618,18 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
   using base_type::num_seeds;
 
   size_t result_buffer_allocation_size;
-  rmm::device_uvector<INDEX_T> result_indices;       // results_indices_buffer
-  rmm::device_uvector<DISTANCE_T> result_distances;  // result_distances_buffer
-  rmm::device_uvector<INDEX_T> parent_node_list;
-  rmm::device_uvector<uint32_t> topk_hint;
-  rmm::device_scalar<uint32_t> terminate_flag;  // dev_terminate_flag, host_terminate_flag.;
-  rmm::device_uvector<uint32_t> topk_workspace;
+  lightweight_uvector<INDEX_T> result_indices;       // results_indices_buffer
+  lightweight_uvector<DISTANCE_T> result_distances;  // result_distances_buffer
+  lightweight_uvector<INDEX_T> parent_node_list;
+  lightweight_uvector<uint32_t> topk_hint;
+  lightweight_uvector<uint32_t> terminate_flag;  // dev_terminate_flag, host_terminate_flag.;
+  lightweight_uvector<uint32_t> topk_workspace;
 
   // temporary storage for _find_topk
-  rmm::device_uvector<float> input_keys_storage;
-  rmm::device_uvector<float> output_keys_storage;
-  rmm::device_uvector<INDEX_T> input_values_storage;
-  rmm::device_uvector<INDEX_T> output_values_storage;
+  lightweight_uvector<float> input_keys_storage;
+  lightweight_uvector<float> output_keys_storage;
+  lightweight_uvector<INDEX_T> input_values_storage;
+  lightweight_uvector<INDEX_T> output_values_storage;
 
   search(raft::resources const& res,
          search_params params,
@@ -629,16 +638,16 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
          int64_t graph_degree,
          uint32_t topk)
     : base_type(res, params, dataset_desc, dim, graph_degree, topk),
-      result_indices(0, raft::resource::get_cuda_stream(res)),
-      result_distances(0, raft::resource::get_cuda_stream(res)),
-      parent_node_list(0, raft::resource::get_cuda_stream(res)),
-      topk_hint(0, raft::resource::get_cuda_stream(res)),
-      topk_workspace(0, raft::resource::get_cuda_stream(res)),
-      terminate_flag(raft::resource::get_cuda_stream(res)),
-      input_keys_storage(0, raft::resource::get_cuda_stream(res)),
-      output_keys_storage(0, raft::resource::get_cuda_stream(res)),
-      input_values_storage(0, raft::resource::get_cuda_stream(res)),
-      output_values_storage(0, raft::resource::get_cuda_stream(res))
+      result_indices(res),
+      result_distances(res),
+      parent_node_list(res),
+      topk_hint(res),
+      topk_workspace(res),
+      terminate_flag(res),
+      input_keys_storage(res),
+      output_keys_storage(res),
+      input_values_storage(res),
+      output_values_storage(res)
   {
     set_params(res);
   }
@@ -662,7 +671,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
       itopk_size, max_queries, result_buffer_size, utils::get_cuda_data_type<DATA_T>());
     RAFT_LOG_DEBUG("# topk_workspace_size: %lu", topk_workspace_size);
     topk_workspace.resize(topk_workspace_size, raft::resource::get_cuda_stream(res));
-
+    terminate_flag.resize(1, raft::resource::get_cuda_stream(res));
     hashmap.resize(hashmap_size, raft::resource::get_cuda_stream(res));
   }
 
@@ -847,7 +856,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
                           stream);
 
       // termination (2)
-      if (iter + 1 >= min_iterations && terminate_flag.value(stream)) {
+      if (iter + 1 >= min_iterations && get_value(terminate_flag.data(), stream)) {
         iter++;
         break;
       }

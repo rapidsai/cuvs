@@ -31,13 +31,13 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
 
 from cuvs.distance import DISTANCE_TYPES
 
 from cuvs.common.c_api cimport cuvsResources_t
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors.common import _check_input_array
 
 
 @auto_sync_resources

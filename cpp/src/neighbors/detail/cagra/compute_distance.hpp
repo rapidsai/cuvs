@@ -31,8 +31,10 @@
 #include <raft/util/device_loads_stores.cuh>
 #include <raft/util/vectorized.cuh>
 
+#include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 #include <variant>
 
@@ -232,52 +234,77 @@ struct alignas(device::LOAD_128BIT_T) dataset_descriptor_base_t {
  */
 template <typename DataT, typename IndexT, typename DistanceT>
 struct dataset_descriptor_host {
-  using dev_descriptor_t = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
-  using dd_ptr_t         = std::shared_ptr<dev_descriptor_t>;
-  using init_f =
-    std::tuple<std::function<void(dev_descriptor_t*, rmm::cuda_stream_view stream)>, size_t>;
+  using dev_descriptor_t         = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   uint32_t smem_ws_size_in_bytes = 0;
   uint32_t team_size             = 0;
 
+  struct state {
+    using ready_t = std::tuple<dev_descriptor_t*, rmm::cuda_stream_view>;
+    using init_f =
+      std::tuple<std::function<void(dev_descriptor_t*, rmm::cuda_stream_view)>, size_t>;
+
+    std::mutex mutex;
+    std::atomic<bool> ready;  // Not sure if std::holds_alternative is thread-safe
+    std::variant<ready_t, init_f> value;
+
+    template <typename InitF>
+    state(InitF init, size_t size) : ready{false}, value{std::make_tuple(init, size)}
+    {
+    }
+
+    ~state() noexcept
+    {
+      if (std::holds_alternative<ready_t>(value)) {
+        auto& [ptr, stream] = std::get<ready_t>(value);
+        RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(ptr, stream));
+      }
+    }
+
+    void eval(rmm::cuda_stream_view stream)
+    {
+      std::lock_guard<std::mutex> lock(mutex);
+      if (std::holds_alternative<init_f>(value)) {
+        auto& [fun, size]     = std::get<init_f>(value);
+        dev_descriptor_t* ptr = nullptr;
+        RAFT_CUDA_TRY(cudaMallocAsync(&ptr, size, stream));
+        fun(ptr, stream);
+        value = std::make_tuple(ptr, stream);
+        ready.store(true, std::memory_order_release);
+      }
+    }
+
+    auto get(rmm::cuda_stream_view stream) -> dev_descriptor_t*
+    {
+      if (!ready.load(std::memory_order_acquire)) { eval(stream); }
+      return std::get<0>(std::get<ready_t>(value));
+    }
+  };
+
   template <typename DescriptorImpl, typename InitF>
   dataset_descriptor_host(const DescriptorImpl& dd_host, InitF init)
-    : value_{std::make_tuple(init, sizeof(DescriptorImpl))},
+    : value_{std::make_shared<state>(init, sizeof(DescriptorImpl))},
       smem_ws_size_in_bytes{dd_host.smem_ws_size_in_bytes()},
       team_size{dd_host.team_size()}
   {
   }
+
+  dataset_descriptor_host() = default;
 
   /**
    * Return the device pointer, possibly evaluating it in the given thread.
    */
   [[nodiscard]] auto dev_ptr(rmm::cuda_stream_view stream) const -> const dev_descriptor_t*
   {
-    if (std::holds_alternative<init_f>(value_)) { value_ = eval(std::get<init_f>(value_), stream); }
-    return std::get<dd_ptr_t>(value_).get();
+    return value_->get(stream);
   }
+
   [[nodiscard]] auto dev_ptr(rmm::cuda_stream_view stream) -> dev_descriptor_t*
   {
-    if (std::holds_alternative<init_f>(value_)) { value_ = eval(std::get<init_f>(value_), stream); }
-    return std::get<dd_ptr_t>(value_).get();
+    return value_->get(stream);
   }
 
  private:
-  mutable std::variant<dd_ptr_t, init_f> value_;
-
-  static auto eval(init_f init, rmm::cuda_stream_view stream) -> dd_ptr_t
-  {
-    using raft::RAFT_NAME;
-    auto& [fun, size] = init;
-    dd_ptr_t dev_ptr{
-      [stream, s = size]() {
-        dev_descriptor_t* p;
-        RAFT_CUDA_TRY(cudaMallocAsync(&p, s, stream));
-        return p;
-      }(),
-      [stream](dev_descriptor_t* p) { RAFT_CUDA_TRY_NO_THROW(cudaFreeAsync(p, stream)); }};
-    fun(dev_ptr.get(), stream);
-    return dev_ptr;
-  }
+  mutable std::shared_ptr<state> value_;
 };
 
 /**

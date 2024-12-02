@@ -35,6 +35,7 @@ Finally, faster vector search enables interactions between dense vectors and gra
 
 Below are some common use-cases for vector search
 
+
 - ### Semantic search
   - Generative AI & Retrieval augmented generation (RAG)
   - Recommender systems
@@ -67,6 +68,14 @@ There are several benefits to using cuVS and GPUs for vector search, including
 7. Building blocks for composing new or accelerating existing algorithms
 
 In addition to the items above, cuVS takes on the burden of keeping non-trivial accelerated code up to date as new NVIDIA architectures and CUDA versions are released. This provides a deslightful development experimence, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale. 
+
+## cuVS Technology Stack
+
+cuVS is built on top of the RAPIDS RAFT library of high performance machine learning primitives and provides all the necessary routines for vector search and clustering on the GPU. 
+
+![cuVS is built on top of low-level CUDA libraries and provides many important routines that enable vector search and clustering on the GPU](img/tech_stack.png "cuVS Technology Stack")
+
+
 
 ## Installing cuVS
 
@@ -233,7 +242,7 @@ If you are interested in contributing to the cuVS library, please read our [Cont
 
 For the interested reader, many of the accelerated implementations in cuVS are also based on research papers which can provide a lot more background. We also ask you to please cite the corresponding algorithms by referencing them in your own research. 
 - [CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search](https://arxiv.org/abs/2308.15136)
-- [Top-K Algorithms on GPU: A Comprehensive Study and New Methods](https://dl.acm.org/doi/10.1145/3581784.3607062>)
+- [Top-K Algorithms on GPU: A Comprehensive Study and New Methods](https://dl.acm.org/doi/10.1145/3581784.3607062)
 - [Fast K-NN Graph Construction by GPU Based NN-Descent](https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>)
 - [cuSLINK: Single-linkage Agglomerative Clustering on the GPU](https://arxiv.org/abs/2306.16354)
 - [GPU Semiring Primitives for Sparse Neighborhood Methods](https://arxiv.org/abs/2104.06357)
