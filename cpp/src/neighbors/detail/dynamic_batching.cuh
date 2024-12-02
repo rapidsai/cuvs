@@ -49,6 +49,8 @@
 
 namespace cuvs::neighbors::dynamic_batching::detail {
 
+using raft::RAFT_NAME;  // TODO: a workaround for RAFT_LOG_XXX macros
+
 /**
  * A helper to make the requester threads more cooperative when busy-spinning.
  * It is used in the wait loops across this file to reduce the CPU usage.
@@ -854,6 +856,17 @@ class batch_runner {
   {
     uint32_t n_queries = queries.extent(0);
     if (n_queries >= max_batch_size_) {
+      return upstream_search_(res, queries, neighbors, distances);
+    }
+
+    if (neighbors.extent(1) != int64_t(k_)) {
+      // TODO: the check can be relaxed to `neighbors.extent(1) > int64_t(k_)`;
+      //       this, however, would require an extra bounds check per-query in the scatter kernel.
+      RAFT_LOG_WARN(
+        "The requested number of neighbors (%zd) doesn't match the configured "
+        "dynamic_batching::index_params::k (%u); dynamic batching is disabled for the request.",
+        neighbors.extent(1),
+        k_);
       return upstream_search_(res, queries, neighbors, distances);
     }
 
