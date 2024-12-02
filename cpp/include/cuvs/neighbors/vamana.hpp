@@ -258,15 +258,18 @@ auto build(raft::resources const& handle,
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<float, uint32_t>& index);
+               const cuvs::neighbors::experimental::vamana::index<float, uint32_t>& index,
+               bool include_dataset = true);
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>& index);
+               const cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>& index,
+               bool include_dataset = true);
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>& index);
+               const cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>& index,
+               bool include_dataset = true);
 
 /**
  * @}

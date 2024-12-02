@@ -44,13 +44,15 @@ namespace cuvs::neighbors::experimental::vamana::detail {
  * @param[in] res the raft resource handle
  * @param[in] file_name the path and name of the DiskAN index file generated
  * @param[in] index_ VAMANA index
+ * @param[in] include_dataset whether to include the dataset in the serialized output
  *
  */
 
 template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_name,
-               const index<T, IdxT>& index_)
+               const index<T, IdxT>& index_,
+               bool include_dataset)
 {
   // Write graph to first index file (format from MSFT DiskANN OSS)
   std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
