@@ -27,6 +27,18 @@
 
 namespace cuvs::neighbors::detail {
 
+template <class T>
+_RAFT_HOST_DEVICE bool fp_equals(const T& a, const T& b)
+{
+  return a == b;
+}
+
+template <>
+_RAFT_HOST_DEVICE bool fp_equals(const half& a, const half& b)
+{
+  return static_cast<float>(a) == static_cast<float>(b);
+}
+
 template <typename T, typename QuantI, typename TempT = double>
 struct quantize_op {
   const T min_;

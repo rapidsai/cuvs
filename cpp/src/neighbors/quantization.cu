@@ -98,6 +98,33 @@ raft::host_matrix<T, int64_t> ScalarQuantizer<T, QuantI>::inverse_transform(
   return detail::inverse_scalar_transform<T, QuantI>(res, dataset, min_, max_);
 }
 
+template <typename T, typename QuantI>
+_RAFT_HOST_DEVICE bool ScalarQuantizer<T, QuantI>::is_trained() const
+{
+  return is_trained_;
+}
+
+template <typename T, typename QuantI>
+_RAFT_HOST_DEVICE bool ScalarQuantizer<T, QuantI>::operator==(
+  const ScalarQuantizer<T, QuantI>& other) const
+{
+  return (!is_trained() && !other.is_trained()) ||
+         (is_trained() == other.is_trained() && detail::fp_equals(min(), other.min()) &&
+          detail::fp_equals(max(), other.max()));
+}
+
+template <typename T, typename QuantI>
+_RAFT_HOST_DEVICE T ScalarQuantizer<T, QuantI>::min() const
+{
+  return min_;
+}
+
+template <typename T, typename QuantI>
+_RAFT_HOST_DEVICE T ScalarQuantizer<T, QuantI>::max() const
+{
+  return max_;
+}
+
 #define CUVS_INST_QUANTIZATION(T, QuantI) \
   template struct cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI>;
 

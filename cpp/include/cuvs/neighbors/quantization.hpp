@@ -176,19 +176,15 @@ class ScalarQuantizer {
     raft::resources const& res, raft::host_matrix_view<const QuantI, int64_t> dataset);
 
   // returns whether the instance can be used for transform
-  RAFT_INLINE_FUNCTION bool is_trained() const { return is_trained_; };
+  _RAFT_HOST_DEVICE bool is_trained() const;
 
-  RAFT_INLINE_FUNCTION bool operator==(const ScalarQuantizer<T, QuantI>& other) const
-  {
-    return (!is_trained() && !other.is_trained()) ||
-           (is_trained() == other.is_trained() && min() == other.min() && max() == other.max());
-  };
+  _RAFT_HOST_DEVICE bool operator==(const ScalarQuantizer<T, QuantI>& other) const;
 
   // the minimum value covered by the quantized datatype
-  RAFT_INLINE_FUNCTION T min() const { return min_; };
+  _RAFT_HOST_DEVICE T min() const;
 
   // the maximum value covered by the quantized datatype
-  RAFT_INLINE_FUNCTION T max() const { return max_; };
+  _RAFT_HOST_DEVICE T max() const;
 
  private:
   bool is_trained_ = false;
