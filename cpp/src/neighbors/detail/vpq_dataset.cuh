@@ -418,6 +418,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
   // Use a heuristic to impute missing parameters.
   auto ps = fill_missing_params_heuristics(params, dataset);
 
+  RAFT_LOG_INFO("ps.metric %d", ps.metric);
+
   // Train codes
   auto vq_code_book = train_vq<MathT>(res, ps, dataset);
   auto pq_code_book =

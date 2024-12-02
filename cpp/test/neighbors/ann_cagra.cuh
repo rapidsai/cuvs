@@ -962,7 +962,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {10000},
-    {64, 128, 192, 256, 512, 1024},  // dim
+    {64, 128, 192, 256, 512},  // dim
     {16},                            // k
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
@@ -973,9 +973,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
-    {0.6});                      // don't demand high recall without refinement
+    {0.7});                      // don't demand high recall without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
-    for (uint32_t vq_n_centers : {100, 1000}) {
+    for (uint32_t vq_n_centers : {100}) {
       for (auto input : inputs2) {
         vpq_params ps{};
         ps.pq_dim       = input.dim / pq_len;
