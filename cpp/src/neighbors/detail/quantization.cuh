@@ -31,16 +31,14 @@ template <typename T, typename QuantI, typename TempT = double>
 struct quantize_op {
   const T min_;
   const T max_;
-  const bool inverse_;
   const QuantI q_type_min_ = std::numeric_limits<QuantI>::min();
   const QuantI q_type_max_ = std::numeric_limits<QuantI>::max();
   const TempT a_;
   const TempT b_;
 
-  constexpr explicit quantize_op(T min, T max, bool inverse)
+  constexpr explicit quantize_op(T min, T max)
     : min_(min),
       max_(max),
-      inverse_(inverse),
       a_(static_cast<TempT>(max_) > static_cast<TempT>(min_)
            ? ((static_cast<TempT>(q_type_max_) - static_cast<TempT>(q_type_min_)) /
               (static_cast<TempT>(max_) - static_cast<TempT>(min_)))
@@ -51,8 +49,8 @@ struct quantize_op {
 
   constexpr RAFT_INLINE_FUNCTION QuantI operator()(const T& x) const
   {
-    if (x > max_) return q_type_max_;
-    if (x < min_) return q_type_min_;
+    if (x <= min_) return q_type_min_;
+    if (x >= max_) return q_type_max_;
     return static_cast<QuantI>(lroundf(a_ * static_cast<TempT>(x) + b_));
   }
 
@@ -137,7 +135,7 @@ raft::device_matrix<QuantI, int64_t> scalar_transform(
   // allocate target
   auto out = raft::make_device_matrix<QuantI, int64_t>(res, dataset.extent(0), dataset.extent(1));
 
-  raft::linalg::map(res, out.view(), quantize_op<T, QuantI>(min, max, false), dataset);
+  raft::linalg::map(res, out.view(), quantize_op<T, QuantI>(min, max), dataset);
 
   return out;
 }
@@ -149,7 +147,7 @@ raft::host_matrix<QuantI, int64_t> scalar_transform(
   // allocate target
   auto out = raft::make_host_matrix<QuantI, int64_t>(dataset.extent(0), dataset.extent(1));
 
-  auto main_op      = quantize_op<T, QuantI>(min, max, false);
+  auto main_op      = quantize_op<T, QuantI>(min, max);
   size_t n_elements = dataset.extent(0) * dataset.extent(1);
 
 #pragma omp parallel for
@@ -169,7 +167,7 @@ raft::device_matrix<T, int64_t> inverse_scalar_transform(
   // allocate target
   auto out = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
 
-  raft::linalg::map(res, out.view(), quantize_op<T, QuantI>(min, max, true), dataset);
+  raft::linalg::map(res, out.view(), quantize_op<T, QuantI>(min, max), dataset);
 
   return out;
 }
@@ -181,7 +179,7 @@ raft::host_matrix<T, int64_t> inverse_scalar_transform(
   // allocate target
   auto out = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
 
-  auto main_op      = quantize_op<T, QuantI>(min, max, true);
+  auto main_op      = quantize_op<T, QuantI>(min, max);
   size_t n_elements = dataset.extent(0) * dataset.extent(1);
 
 #pragma omp parallel for
