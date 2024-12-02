@@ -224,7 +224,7 @@ struct batch_token {
    *
    * The CPU threads atomically increment this counter until its size reaches `max_batch_size`.
    *
-   * Any (CPU or GPU thread) my atomically write to the highest byte of this value, which indicates
+   * Any (CPU or GPU thread) may atomically write to the highest byte of this value, which indicates
    * that no one can commit to this batch anymore (e.g. the wait timeout is exceeded).
    * Hence, the actual number of committed queries is `size_committed % 0x00ffffff`.
    *
