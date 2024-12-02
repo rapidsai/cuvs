@@ -476,6 +476,18 @@ dependencies:
           - h5py>=3.8.0
           - benchmark>=1.8.2
           - openblas
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              arch: x86_64
+            packages:
+              - mkl-devel
+              - libaio
+              - libboost-devel
+          - matrix:
+              arch: aarch64
+            packages: null
   bench_python:
     common:
       - output_types: [conda, pyproject, requirements]

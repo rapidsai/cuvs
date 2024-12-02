@@ -1,0 +1,123 @@
+/*
+ * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#pragma once
+
+#include "../common/ann_types.hpp"
+#include "../diskann/diskann_wrapper.h"
+#include "cuvs_ann_bench_utils.h"
+#include <cuvs/neighbors/vamana.hpp>
+
+#include <memory>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/mdspan.hpp>
+
+namespace cuvs::bench {
+
+template <typename T, typename IdxT>
+class cuvs_vamana : public algo<T>, public algo_gpu {
+ public:
+  using build_param       = cuvs::neighbors::experimental::vamana::index_params;
+  using search_param_base = typename algo<T>::search_param;
+  using search_param      = typename diskann_memory<T>::search_param;
+
+  cuvs_vamana(Metric metric, int dim, const build_param& param);
+
+  void build(const T* dataset, size_t nrow) final;
+
+  void set_search_param(const search_param_base& param) override;
+
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override;
+
+  [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
+  {
+    return handle_.get_sync_stream();
+  }
+
+  // to enable dataset access from GPU memory
+  [[nodiscard]] auto get_preference() const -> algo_property override
+  {
+    algo_property property;
+    property.dataset_memory_type = MemoryType::kDevice;
+    property.query_memory_type   = MemoryType::kHost;
+    return property;
+  }
+
+  void save(const std::string& file) const override;
+  void load(const std::string&) override;
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<cuvs_vamana<T, IdxT>>(*this); }
+
+ private:
+  std::shared_ptr<cuvs::neighbors::experimental::vamana::index<T, IdxT>> vamana_index_;
+  std::shared_ptr<diskann_memory<T>> diskann_memory_search_;
+  configured_raft_resources handle_{};
+  build_param vamana_index_params_;
+};
+
+template <typename T, typename IdxT>
+cuvs_vamana<T, IdxT>::cuvs_vamana(Metric metric, int dim, const build_param& param)
+  : algo<T>(metric, dim)
+{
+  this->vamana_index_params_ = param;
+  diskann_memory_search_     = std::make_shared<cuvs::bench::diskann_memory<T>>(
+    metric, dim, typename diskann_memory<T>::build_param{param.graph_degree, param.visited_size});
+}
+
+template <typename T, typename IdxT>
+void cuvs_vamana<T, IdxT>::build(const T* dataset, size_t nrow)
+{
+  auto dataset_view_host = raft::make_mdspan<const T, int64_t, raft::row_major, true, false>(
+    dataset, raft::make_extents<int64_t>(nrow, this->dim_));
+  auto dataset_view_device = raft::make_mdspan<const T, int64_t, raft::row_major, true, false>(
+    dataset, raft::make_extents<int64_t>(nrow, this->dim_));
+  bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
+
+  vamana_index_ = std::make_shared<cuvs::neighbors::experimental::vamana::index<T, uint32_t>>(
+    std::move(dataset_is_on_host ? cuvs::neighbors::experimental::vamana::build(
+                                     handle_, vamana_index_params_, dataset_view_host)
+                                 : cuvs::neighbors::experimental::vamana::build(
+                                     handle_, vamana_index_params_, dataset_view_device)));
+}
+
+template <typename T, typename IdxT>
+void cuvs_vamana<T, IdxT>::set_search_param(const search_param_base& param_)
+{
+  diskann_memory_search_->set_search_param(param_);
+}
+
+template <typename T, typename IdxT>
+void cuvs_vamana<T, IdxT>::save(const std::string& file) const
+{
+  cuvs::neighbors::experimental::vamana::serialize(handle_, file, *vamana_index_);
+}
+
+template <typename T, typename IdxT>
+void cuvs_vamana<T, IdxT>::load(const std::string& file)
+{
+  diskann_memory_search_->load(file);
+}
+
+template <typename T, typename IdxT>
+void cuvs_vamana<T, IdxT>::search(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
+{
+  diskann_memory_search_->search(queries, batch_size, k, neighbors, distances);
+}
+
+}  // namespace cuvs::bench

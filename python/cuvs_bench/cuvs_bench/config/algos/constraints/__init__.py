@@ -99,3 +99,24 @@ def faiss_gpu_ivf_pq_search(params, build_params, k, batch_size):
 def hnswlib_search(params, build_params, k, batch_size):
     if "ef" in params:
         return params["ef"] >= k
+
+
+###############################################################################
+#                              DiskANN constraints                            #
+###############################################################################
+
+
+def diskann_memory_build(params, dim):
+    ret = True
+    if "R" in params and "L_build" in params:
+        ret = params["R"] <= params["L_build"]
+    return ret
+
+
+def diskann_ssd_build(params, dim):
+    ret = True
+    if "R" in params and "L_build" in params:
+        ret = params["R"] <= params["L_build"]
+    if "QD" in params:
+        ret = params["QD"] <= dim
+    return ret
