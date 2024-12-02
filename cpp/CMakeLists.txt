@@ -227,6 +227,30 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_uint8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_uint8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_uint8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_float_uint32_dim128_t8_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_float_uint32_dim128_t8_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_float_uint32_dim256_t16_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_float_uint32_dim256_t16_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_float_uint32_dim512_t32_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_float_uint32_dim512_t32_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_half_uint32_dim128_t8_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_half_uint32_dim128_t8_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_half_uint32_dim256_t16_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_half_uint32_dim256_t16_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_half_uint32_dim512_t32_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_half_uint32_dim512_t32_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_int8_uint32_dim128_t8_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_int8_uint32_dim128_t8_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_int8_uint32_dim256_t16_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_int8_uint32_dim256_t16_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_int8_uint32_dim512_t32_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_int8_uint32_dim512_t32_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_uint8_uint32_dim128_t8_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_uint8_uint32_dim128_t8_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_uint8_uint32_dim256_t16_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_uint8_uint32_dim256_t16_8pq_4subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_uint8_uint32_dim512_t32_8pq_2subd_half.cu
+    src/neighbors/detail/cagra/compute_distance_vpq_InnerProduct_uint8_uint32_dim512_t32_8pq_4subd_half.cu
     src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim128_t8_8pq_2subd_half.cu
     src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim128_t8_8pq_4subd_half.cu
     src/neighbors/detail/cagra/compute_distance_vpq_L2Expanded_float_uint32_dim256_t16_8pq_2subd_half.cu

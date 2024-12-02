@@ -40,8 +40,24 @@
 
 namespace cuvs::neighbors {
 
+/**
+ * @defgroup neighbors_index Approximate Nearest Neighbors Types
+ * @{
+ */
+
+/** The base for approximate KNN index structures. */
+struct index {};
+
+/** The base for KNN index parameters. */
+struct index_params {
+  /** Distance type. */
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
+  /** The argument used by some distance metrics. */
+  float metric_arg = 2.0f;
+};
+
 /** Parameters for VPQ compression. */
-struct vpq_params {
+struct vpq_params : index_params {
   /**
    * The bit length of the vector element after compression by PQ.
    *
@@ -75,22 +91,6 @@ struct vpq_params {
    * When zero, an optimal value is selected using a heuristic.
    */
   double pq_kmeans_trainset_fraction = 0;
-};
-
-/**
- * @defgroup neighbors_index Approximate Nearest Neighbors Types
- * @{
- */
-
-/** The base for approximate KNN index structures. */
-struct index {};
-
-/** The base for KNN index parameters. */
-struct index_params {
-  /** Distance type. */
-  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
-  /** The argument used by some distance metrics. */
-  float metric_arg = 2.0f;
 };
 
 struct search_params {};
