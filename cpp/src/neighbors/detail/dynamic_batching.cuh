@@ -187,7 +187,31 @@ using function_search_type = void(raft::resources const&,
                                   raft::device_matrix_view<IdxT, int64_t, raft::row_major>,
                                   raft::device_matrix_view<float, int64_t, raft::row_major>);
 
-/** State of the batch token slot. */
+/**
+ * State of the batch token slot.
+ *
+ * In a nutshell, there are only two batch slot states that matter: empty or full.
+ * Initially, all slots are empty. The host threads can commit (i.e. subscribe) to a batch slot even
+ * if it's empty (when they know it will be filled-in at some point in future). With this logic, we
+ * smooth out the bottleneck that occurs when many threads try to submit their work using a single
+ * atomic counter (the batch queue head).
+ *
+ * Once a GPU IO buffer is available, its owner returns the buffer to the queue by marking a slot as
+ * full. By that time, it may be partially or fully committed (i.e. several host threads are
+ * committed to submit a certain number of queries).
+ *
+ * If we had an infinite buffer, these two states would suffice. However, we have a finite ring
+ * buffer, so the used-up slots must be emptied again, so that they are usable in the following
+ * rounds through the ring buffer.
+ *
+ * The slot state depends not only on the value stored in it, but on the accessing thread as well
+ * (see `batch_queue_t::batch_status` below). The accessing thread may be ahead or behind the others
+ * (as defined by the sequential order id below). Depending on the accessor state, it may view the
+ * slot as being emptied/filled in the future, current, or previous rounds. This affects the
+ * decision whether the slot can be used and whether the thread has the right to advance tail or
+ * head counters of the batch queue.
+ *
+ */
 enum struct slot_state : int32_t {
   /** The slot is empty, cleared-up in this round (hence the head should be past it). */
   kEmptyPast = 1025,
@@ -207,6 +231,10 @@ enum struct slot_state : int32_t {
 /**
  * Identifies the batch and its job-commit state.
  * Should be in the pinned memory for fast shared access on CPU and GPU side.
+ *
+ * The batch token packs the IO buffer address (id) and a number of committed queries in a single
+ * 64-bit atomic. This is to allow conflict-free atomic updates of both values.
+ *
  */
 struct batch_token {
   uint64_t value = 0;
@@ -214,7 +242,20 @@ struct batch_token {
   constexpr inline batch_token() {}
   explicit constexpr inline batch_token(uint32_t buffer_id) { id() = buffer_id; }
 
-  /** Sequential id of the batch in the array of batches. */
+  /**
+   * Sequential id of the batch in the array of batches.
+   *
+   * The `id` field, in practice, stores not only the IO buffer address, but also an extra
+   * sequential "round" id. The latter identifies how many rounds through the batch ring buffer has
+   * already been done (computed from the the `seq_order_id` counter in the batch queue) and is used
+   * by `batch_queue_t::batch_status` below to compute the `slot_state`. This is to avoid the ABA
+   * atomic updates problem when using the ring buffer.
+   *
+   * There cannot be more IO buffers than the size of the ring buffer. The size of the ring buffer
+   * is always a power-of-two. Hence the IO buffer address needs only `log2(Size)` bits, and the
+   * rest is used for the ring buffer round id (see `batch_queue_t::make_seq_batch_id`).
+   *
+   */
   RAFT_INLINE_FUNCTION auto id() noexcept -> uint32_t&
   {
     return *(reinterpret_cast<uint32_t*>(&value) + kOffsetOfId);
@@ -249,6 +290,39 @@ struct batch_token {
 static_assert(sizeof(batch_token) == sizeof(uint64_t));
 static_assert(cuda::std::atomic<batch_token>::is_always_lock_free);
 
+/**
+ * The batch queue consists of several ring buffers and two counters determining where are the head
+ * and the tail of the queue in those buffers.
+ *
+ * There is an internal sequentially consistent order in the queue, defined by `seq_order_id`
+ * counter. The head and tail members define where the participants should look for full and
+ * empty slots in the queue respectively.
+ *
+ * The slots in the queue have their own states (see `slot_state` above). The states are updated
+ * concurrently in many threads, so the head and tail counters do not always accurately represent
+ * the actual compound state of the queue.
+ *
+ * `.head()` is where a host thread starts looking for a batch token. All slots earlier than
+ * returned by this method are not usable anymore (they batches are either "fully committed",
+ * dispatched, or emptied earlier). If a host thread determines that the current slot is not usable
+ * anymore, it increments the counter by calling `.pop()`.
+ *
+ * The tail is where a host thread reserves an empty slot to be filled-in by a GPU worker thread
+ * once it releases the owned IO buffer. There's no `.tail()` method, but `.push()` method returns
+ * the tail position (before advancing it). `.push()` blocks the host thread until it knows the slot
+ * isn't used by any other threads anymore (i.e. cleaned-up from the previous round).
+ *
+ * There's no strict relation between the head and the tail.
+ * Normally there is a single batch in the ring buffer being partially filled. It is followed by
+ * contiguous list of empty idle batches and reserved empty slots. The head and the tail loosely
+ * correspond to the beginning and the end of this sequence.
+ *
+ * Sometimes, the head can go further than the tail. This means all batches are busy and there are
+ * more threads committed to the slots that are not populated with the batches (and not even
+ * reserved for filling-in yet).
+ *
+ *
+ */
 template <uint32_t Size>
 struct batch_queue_t {
   static constexpr uint32_t kSize        = Size;
@@ -284,19 +358,21 @@ struct batch_queue_t {
   {
     tail_.store(0, kMemOrder);
     head_.store(0, kMemOrder);
+    auto past_seq_id = seq_order_id{static_cast<uint32_t>(-1)};
     for (uint32_t i = 0; i < kSize; i++) {
       rem_time_us_(i).store(std::numeric_limits<int32_t>::max(), kMemOrder);
       if (batch_sizes_.has_value()) { batch_sizes_.value()(i).store(0, kMemOrder); }
-      dispatch_sequence_id_[i].store(uint32_t(-1), kMemOrder);
-      tokens_(i).store(
-        batch_token{static_cast<uint32_t>(slot_state::kEmpty) * kSize + kCounterLocMask},
-        kMemOrder);
+      dispatch_sequence_id_[i].store(past_seq_id.value, kMemOrder);
+      tokens_(i).store(make_empty_token(past_seq_id), kMemOrder);
     }
   }
 
   /**
    * Advance the tail position, ensure the slot is empty, and return the reference to the new slot.
    * The calling side is responsible for filling-in the slot with an actual value at a later time.
+   *
+   * Conceptually, this method reserves a ring buffer slot on the host side, so that the GPU worker
+   * thread can return the IO buffer (filling the token slot) asynchronously.
    */
   inline auto push() -> seq_order_id
   {
@@ -419,8 +495,12 @@ struct batch_queue_t {
    */
   static constexpr inline auto make_empty_token(seq_order_id seq_id) noexcept -> batch_token
   {
-    return batch_token{seq_round(seq_id) +
-                       (static_cast<uint32_t>(slot_state::kEmptyPast) + 1) * kSize - 1};
+    // Modify the seq_id to identify that the token slot is empty
+    auto empty_round    = static_cast<uint32_t>(slot_state::kEmptyPast) * kSize;
+    auto empty_round_id = seq_order_id{seq_id.value + empty_round};
+    // Id of empty slot is ignored and can be anything
+    auto empty_id = kCounterLocMask;
+    return batch_token{make_seq_batch_id(empty_round_id, empty_id)};
   }
 
   /**
@@ -444,6 +524,13 @@ struct batch_queue_t {
    */
   static inline auto batch_status(batch_token token, seq_order_id seq_id) -> slot_state
   {
+    /*
+    The "round" part of the id is just a seq_id without the low bits.
+    Essentially, we comparing here seq_ids of two threads: the one that wrote to the slot in the
+    past and the one reads from it now.
+
+    `kSize` determines the number of bits we use for the IO buffer id and for the round id.
+      */
     auto v =
       static_cast<int32_t>(seq_round(token) - seq_round(seq_id)) / static_cast<int32_t>(kSize);
     if (v < static_cast<int32_t>(slot_state::kFullBusy)) { RAFT_FAIL("Invalid batch state %d", v); }
@@ -822,7 +909,8 @@ class batch_runner {
       raft::resource::get_cuda_stream(res_)));
     // Make sure to initialize the atomic values in the batch_state structs.
     for (uint32_t i = 0; i < n_queues_; i++) {
-      batch_queue_.token(batch_queue_.push()).store(batch_token{i});
+      auto seq_id = batch_queue_.push();
+      batch_queue_.token(seq_id).store(batch_token{batch_queue::make_seq_batch_id(seq_id, i)});
       // Make sure to initialize query pointers, because they are used for synchronization
       for (uint32_t j = 0; j < max_batch_size_; j++) {
         new (&request_ptrs_(i, j)) request_pointers<T, IdxT>{};
@@ -937,7 +1025,7 @@ class batch_runner {
           &batch_token_ref,
           batch_size_ptr,
           // This indicates the empty token slot, which can only be used in the following round
-          batch_queue_.make_empty_token(seq_id),
+          batch_queue::make_empty_token(seq_id),
           kernel_progress_counters_.data_handle() + batch_id);
       }
 
