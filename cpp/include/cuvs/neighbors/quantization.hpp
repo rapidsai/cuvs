@@ -23,6 +23,8 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 
+#include <cuda_fp16.h>
+
 namespace cuvs::neighbors::quantization {
 
 /**
