@@ -110,6 +110,9 @@ endif()
 
 rapids_cython_init()
 
+add_library(cuvs_rmm_logger OBJECT)
+target_link_libraries(cuvs_rmm_logger PRIVATE rmm::rmm_logger_impl)
+
 add_subdirectory(cuvs/common)
 add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
