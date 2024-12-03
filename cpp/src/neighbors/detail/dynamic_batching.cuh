@@ -37,6 +37,7 @@
 #include <chrono>
 #include <limits>
 #include <memory>
+#include <variant>
 #include <vector>
 
 #ifndef CUVS_SYSTEM_LITTLE_ENDIAN

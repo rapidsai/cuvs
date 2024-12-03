@@ -18,10 +18,6 @@
 
 #include <cuvs/neighbors/common.hpp>
 
-#include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/ivf_pq.hpp>
-
 namespace cuvs::neighbors::dynamic_batching {
 
 namespace detail {

@@ -18,6 +18,8 @@
 
 #include "../dynamic_batching.cuh"
 
+#include <cuvs/neighbors/ivf_flat.hpp>
+
 namespace cuvs::neighbors::dynamic_batching {
 
 using ivf_flat_i8 = dynamic_batching_test<uint8_t,

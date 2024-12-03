@@ -18,6 +18,8 @@
 
 #include "../dynamic_batching.cuh"
 
+#include <cuvs/neighbors/cagra.hpp>
+
 namespace cuvs::neighbors::dynamic_batching {
 
 using cagra_F32 = dynamic_batching_test<float,

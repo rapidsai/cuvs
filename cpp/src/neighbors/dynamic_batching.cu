@@ -16,7 +16,9 @@
 
 #include "detail/dynamic_batching.cuh"
 
-#include <cuvs/neighbors/dynamic_batching.hpp>
+#include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>

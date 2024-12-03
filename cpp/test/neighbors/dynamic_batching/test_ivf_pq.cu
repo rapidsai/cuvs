@@ -18,6 +18,8 @@
 
 #include "../dynamic_batching.cuh"
 
+#include <cuvs/neighbors/ivf_pq.hpp>
+
 namespace cuvs::neighbors::dynamic_batching {
 
 using ivf_pq_f16 =
