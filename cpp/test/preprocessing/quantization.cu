@@ -105,15 +105,16 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     size_t print_size = std::min(input_.size(), 20ul);
 
     // train quantizer_1 on device
-    cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI> quantizer_1;
-    quantizer_1.train(handle, params_.quantization_params, dataset);
-    std::cerr << "Q1: trained = " << quantizer_1.is_trained()
-              << ", min = " << (double)quantizer_1.min() << ", max = " << (double)quantizer_1.max()
+    auto quantizer_1 = cuvs::preprocessing::quantization::train_scalar<T, QuantI>(
+      handle, params_.quantization_params, dataset);
+    std::cerr << "Q1: min = " << (double)quantizer_1.min_ << ", max = " << (double)quantizer_1.max_
               << std::endl;
 
     {
-      auto quantized_input_d = quantizer_1.transform(handle, dataset);
-      auto quantized_input_h = quantizer_1.transform(handle, dataset_h);
+      auto quantized_input_d =
+        cuvs::preprocessing::quantization::transform(handle, quantizer_1, dataset);
+      auto quantized_input_h =
+        cuvs::preprocessing::quantization::transform(handle, quantizer_1, dataset_h);
 
       {
         raft::print_device_vector("Input array: ", input_.data(), print_size, std::cerr);
@@ -137,13 +138,13 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
                                   stream));
       auto quantized_input_h_const_view = raft::make_host_matrix_view<const QuantI, int64_t>(
         quantized_input_h.data_handle(), rows_, cols_);
-      auto re_transformed_input_h =
-        quantizer_1.inverse_transform(handle, quantized_input_h_const_view);
+      auto re_transformed_input_h = cuvs::preprocessing::quantization::inverse_transform(
+        handle, quantizer_1, quantized_input_h_const_view);
 
       auto quantized_input_d_const_view = raft::make_device_matrix_view<const QuantI, int64_t>(
         quantized_input_d.data_handle(), rows_, cols_);
-      auto re_transformed_input_d =
-        quantizer_1.inverse_transform(handle, quantized_input_d_const_view);
+      auto re_transformed_input_d = cuvs::preprocessing::quantization::inverse_transform(
+        handle, quantizer_1, quantized_input_d_const_view);
       raft::print_device_vector(
         "re-transformed array: ", re_transformed_input_d.data_handle(), print_size, std::cerr);
 
@@ -160,19 +161,23 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     }
 
     // train quantizer_2 on host
-    cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI> quantizer_2;
-    quantizer_2.train(handle, params_.quantization_params, dataset_h);
-    std::cerr << "Q2: trained = " << quantizer_2.is_trained()
-              << ", min = " << (double)quantizer_2.min() << ", max = " << (double)quantizer_2.max()
+    auto quantizer_2 = cuvs::preprocessing::quantization::train_scalar<T, QuantI>(
+      handle, params_.quantization_params, dataset_h);
+    std::cerr << "Q2: min = " << (double)quantizer_2.min_ << ", max = " << (double)quantizer_2.max_
               << std::endl;
 
     // check both quantizers are the same (valid if sampling is identical)
-    if (input_.size() <= 1000000) { ASSERT_TRUE(quantizer_1 == quantizer_2); }
+    if (input_.size() <= 1000000) {
+      ASSERT_TRUE((double)quantizer_1.min_ == (double)quantizer_2.min_);
+      ASSERT_TRUE((double)quantizer_1.max_ == (double)quantizer_2.max_);
+    }
 
     {
       // test transform host/device equal
-      auto quantized_input_d = quantizer_2.transform(handle, dataset);
-      auto quantized_input_h = quantizer_2.transform(handle, dataset_h);
+      auto quantized_input_d =
+        cuvs::preprocessing::quantization::transform(handle, quantizer_2, dataset);
+      auto quantized_input_h =
+        cuvs::preprocessing::quantization::transform(handle, quantizer_2, dataset_h);
 
       {
         rmm::device_uvector<int> quantization_for_print(print_size, stream);
@@ -195,7 +200,8 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
 
     // sort_by_key (input, quantization) -- check <= on result
     {
-      auto quantized_input = quantizer_1.transform(handle, dataset);
+      auto quantized_input =
+        cuvs::preprocessing::quantization::transform(handle, quantizer_1, dataset);
       thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
                           input_.data(),
                           input_.data() + input_.size(),

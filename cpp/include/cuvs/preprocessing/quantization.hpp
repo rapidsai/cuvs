@@ -48,147 +48,168 @@ struct sq_params {
  *
  */
 template <typename T, typename QuantI>
-class ScalarQuantizer {
- public:
-  /**
-   * @brief Computes the scaling factor to be used later for quantizing the dataset.
-   *
-   * Usage example:
-   * @code{.cpp}
-   * raft::handle_t handle;
-   * cuvs::neighbors::quantization::ScalarQuantizer<float, int8_t> quantizer;
-   * cuvs::neighbors::quantization::sq_params params;
-   * quantizer.train(handle, params, dataset);
-   * @endcode
-   *
-   * @param[in] res raft resource
-   * @param[in] params configure scalar quantizer, e.g. quantile
-   * @param[in] dataset a row-major matrix view on device
-   */
-  void train(raft::resources const& res,
-             sq_params params,
-             raft::device_matrix_view<const T, int64_t> dataset);
-
-  /**
-   * @brief Computes the scaling factor to be used later for quantizing the dataset.
-   *
-   * Usage example:
-   * @code{.cpp}
-   * raft::handle_t handle;
-   * cuvs::neighbors::quantization::ScalarQuantizer<float, int8_t> quantizer;
-   * cuvs::neighbors::quantization::sq_params params;
-   * quantizer.train(handle, params, dataset);
-   * @endcode
-   *
-   * @param[in] res raft resource
-   * @param[in] params configure scalar quantizer, e.g. quantile
-   * @param[in] dataset a row-major matrix view on host
-   */
-  void train(raft::resources const& res,
-             sq_params params,
-             raft::host_matrix_view<const T, int64_t> dataset);
-
-  /**
-   * @brief Applies quantization transform to given dataset
-   *
-   * Requires train step to be finished.
-   *
-   * Usage example:
-   * @code{.cpp}
-   * raft::handle_t handle;
-   * cuvs::neighbors::quantization::ScalarQuantizer<float, int8_t> quantizer;
-   * cuvs::neighbors::quantization::sq_params params;
-   * quantizer.train(handle, params, dataset);
-   * auto quantized_dataset = quantizer.transform(handle, dataset);
-   * @endcode
-   *
-   * @param[in] res raft resource
-   * @param[in] dataset a row-major matrix view on device
-   *
-   * @return device matrix with quantized dataset
-   */
-  raft::device_matrix<QuantI, int64_t> transform(
-    raft::resources const& res, raft::device_matrix_view<const T, int64_t> dataset);
-
-  /**
-   * @brief Applies quantization transform to given dataset
-   *
-   * Requires train step to be finished.
-   *
-   * Usage example:
-   * @code{.cpp}
-   * raft::handle_t handle;
-   * cuvs::neighbors::quantization::ScalarQuantizer<float, int8_t> quantizer;
-   * cuvs::neighbors::quantization::sq_params params;
-   * quantizer.train(handle, params, dataset);
-   * auto quantized_dataset = quantizer.transform(handle, dataset);
-   * @endcode
-   *
-   * @param[in] res raft resource
-   * @param[in] dataset a row-major matrix view on host
-   *
-   * @return host matrix with quantized dataset
-   */
-  raft::host_matrix<QuantI, int64_t> transform(raft::resources const& res,
-                                               raft::host_matrix_view<const T, int64_t> dataset);
-
-  /**
-   * @brief Perform inverse quantization step on previously quantized dataset
-   *
-   * Note that depending on the chosen data types train dataset the conversion is
-   * not lossless.
-   * Requires train step to be finished.
-   *
-   * Usage example:
-   * @code{.cpp}
-   * auto quantized_dataset = quantizer.transform(handle, dataset);
-   * auto dataset_revert = quantizer.inverse_transform(handle, quantized_dataset.view);
-   * @endcode
-   *
-   * @param[in] res raft resource
-   * @param[in] dataset a row-major matrix view on device
-   *
-   * @return device matrix with reverted quantization
-   */
-  raft::device_matrix<T, int64_t> inverse_transform(
-    raft::resources const& res, raft::device_matrix_view<const QuantI, int64_t> dataset);
-
-  /**
-   * @brief Perform inverse quantization step on previously quantized dataset
-   *
-   * Note that depending on the chosen data types train dataset the conversion is
-   * not lossless.
-   * Requires train step to be finished.
-   *
-   * Usage example:
-   * @code{.cpp}
-   * auto quantized_dataset = quantizer.transform(handle, dataset);
-   * auto dataset_revert = quantizer.inverse_transform(handle, quantized_dataset.view);
-   * @endcode
-   *
-   * @param[in] res raft resource
-   * @param[in] dataset a row-major matrix view on host
-   *
-   * @return host matrix with reverted quantization
-   */
-  raft::host_matrix<T, int64_t> inverse_transform(
-    raft::resources const& res, raft::host_matrix_view<const QuantI, int64_t> dataset);
-
-  // returns whether the instance can be used for transform
-  _RAFT_HOST_DEVICE bool is_trained() const;
-
-  _RAFT_HOST_DEVICE bool operator==(const ScalarQuantizer<T, QuantI>& other) const;
-
-  // the minimum value covered by the quantized datatype
-  _RAFT_HOST_DEVICE T min() const;
-
-  // the maximum value covered by the quantized datatype
-  _RAFT_HOST_DEVICE T max() const;
-
- private:
-  bool is_trained_ = false;
+struct ScalarQuantizer {
   T min_;
   T max_;
 };
+
+/**
+ * @brief Initializes a scalar quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantization::sq_params params;
+ * auto quantizer = cuvs::preprocessing::quantization::train_scalar<float, int8_t>(handle, params,
+ * dataset);
+ * @endcode
+ *
+ * @tparam T data element type
+ * @tparam QuantI quantized type of data after transform
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure scalar quantizer, e.g. quantile
+ * @param[in] dataset a row-major matrix view on device
+ *
+ * @return ScalarQuantizer
+ */
+template <typename T, typename QuantI>
+ScalarQuantizer<T, QuantI> train_scalar(raft::resources const& res,
+                                        const sq_params params,
+                                        raft::device_matrix_view<const T, int64_t> dataset);
+
+/**
+ * @brief Initializes a scalar quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantization::sq_params params;
+ * auto quantizer = cuvs::preprocessing::quantization::train_scalar<float, int8_t>(handle, params,
+ * dataset);
+ * @endcode
+ *
+ * @tparam T data element type
+ * @tparam QuantI quantized type of data after transform
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure scalar quantizer, e.g. quantile
+ * @param[in] dataset a row-major matrix view on host
+ *
+ * @return ScalarQuantizer
+ */
+template <typename T, typename QuantI>
+ScalarQuantizer<T, QuantI> train_scalar(raft::resources const& res,
+                                        const sq_params params,
+                                        raft::host_matrix_view<const T, int64_t> dataset);
+
+/**
+ * @brief Applies quantization transform to given dataset
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantization::sq_params params;
+ * auto quantizer = cuvs::preprocessing::quantization::train_scalar<float, int8_t>(handle, params,
+ * dataset); auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle,
+ * quantizer, dataset);
+ * @endcode
+ *
+ * @tparam T data element type
+ * @tparam QuantI quantized type of data after transform
+ *
+ * @param[in] res raft resource
+ * @param[in] quantizer a scalar quantizer
+ * @param[in] dataset a row-major matrix view on device
+ *
+ * @return device matrix with quantized dataset
+ */
+template <typename T, typename QuantI>
+raft::device_matrix<QuantI, int64_t> transform(
+  raft::resources const& res,
+  const ScalarQuantizer<T, QuantI>& quantizer,
+  const raft::device_matrix_view<const T, int64_t> dataset);
+
+/**
+ * @brief Applies quantization transform to given dataset
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantization::sq_params params;
+ * auto quantizer = cuvs::preprocessing::quantization::train_scalar<float, int8_t>(handle, params,
+ * dataset); auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle,
+ * quantizer, dataset);
+ * @endcode
+ *
+ * @tparam T data element type
+ * @tparam QuantI quantized type of data after transform
+ *
+ * @param[in] res raft resource
+ * @param[in] quantizer a scalar quantizer
+ * @param[in] dataset a row-major matrix view on host
+ *
+ * @return host matrix with quantized dataset
+ */
+template <typename T, typename QuantI>
+raft::host_matrix<QuantI, int64_t> transform(raft::resources const& res,
+                                             const ScalarQuantizer<T, QuantI>& quantizer,
+                                             raft::host_matrix_view<const T, int64_t> dataset);
+
+/**
+ * @brief Perform inverse quantization step on previously quantized dataset
+ *
+ * Note that depending on the chosen data types train dataset the conversion is
+ * not lossless.
+ * Requires train step to be finished.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle, quantizer,
+ * dataset); auto dataset_revert = cuvs::preprocessing::quantization::inverse_transform(handle,
+ * quantizer, quantized_dataset.view);
+ * @endcode
+ *
+ * @tparam T data element type
+ * @tparam QuantI quantized type of data after transform
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on device
+ *
+ * @return device matrix with reverted quantization
+ */
+template <typename T, typename QuantI>
+raft::device_matrix<T, int64_t> inverse_transform(
+  raft::resources const& res,
+  const ScalarQuantizer<T, QuantI>& quantizer,
+  raft::device_matrix_view<const QuantI, int64_t> dataset);
+
+/**
+ * @brief Perform inverse quantization step on previously quantized dataset
+ *
+ * Note that depending on the chosen data types train dataset the conversion is
+ * not lossless.
+ * Requires train step to be finished.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle, quantizer,
+ * dataset); auto dataset_revert = cuvs::preprocessing::quantization::inverse_transform(handle,
+ * quantizer, quantized_dataset.view);
+ * @endcode
+ *
+ * @tparam T data element type
+ * @tparam QuantI quantized type of data after transform
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on host
+ *
+ * @return host matrix with reverted quantization
+ */
+template <typename T, typename QuantI>
+raft::host_matrix<T, int64_t> inverse_transform(
+  raft::resources const& res,
+  const ScalarQuantizer<T, QuantI>& quantizer,
+  raft::host_matrix_view<const QuantI, int64_t> dataset);
 
 }  // namespace cuvs::preprocessing::quantization
