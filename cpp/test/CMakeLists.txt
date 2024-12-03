@@ -93,18 +93,8 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
-    NAME
-    NEIGHBORS_TEST
-    PATH
-    neighbors/brute_force.cu
-    neighbors/brute_force_prefiltered.cu
-    neighbors/sparse_brute_force.cu
-    neighbors/refine.cu
-    neighbors/quantization.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
+    neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -223,6 +213,9 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+
+  ConfigureTest(NAME PREPROCESSING_TEST PATH preprocessing/quantization.cu GPUS 1 PERCENT 100)
+
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )

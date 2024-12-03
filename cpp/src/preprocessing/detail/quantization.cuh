@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/neighbors/quantization.hpp>
+#include <cuvs/preprocessing/quantization.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/random/rng.cuh>
@@ -25,7 +25,7 @@
 #include <thrust/sort.h>
 #include <thrust/system/omp/execution_policy.h>
 
-namespace cuvs::neighbors::detail {
+namespace cuvs::preprocessing::detail {
 
 template <class T>
 _RAFT_HOST_DEVICE bool fp_equals(const T& a, const T& b)
@@ -214,4 +214,4 @@ raft::host_matrix<T, int64_t> inverse_scalar_transform(
   return out;
 }
 
-}  // namespace cuvs::neighbors::detail
+}  // namespace cuvs::preprocessing::detail

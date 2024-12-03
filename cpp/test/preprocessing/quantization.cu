@@ -15,7 +15,7 @@
  */
 
 #include "../test_utils.cuh"
-#include <cuvs/neighbors/quantization.hpp>
+#include <cuvs/preprocessing/quantization.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
@@ -23,11 +23,11 @@
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 
-namespace cuvs::neighbors::quantization {
+namespace cuvs::preprocessing::quantization {
 
 template <typename T>
 struct QuantizationInputs {
-  cuvs::neighbors::quantization::sq_params quantization_params;
+  cuvs::preprocessing::quantization::sq_params quantization_params;
   int rows;
   int cols;
   T min            = T(-1.0);
@@ -105,7 +105,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     size_t print_size = std::min(input_.size(), 20ul);
 
     // train quantizer_1 on device
-    cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI> quantizer_1;
+    cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI> quantizer_1;
     quantizer_1.train(handle, params_.quantization_params, dataset);
     std::cerr << "Q1: trained = " << quantizer_1.is_trained()
               << ", min = " << (double)quantizer_1.min() << ", max = " << (double)quantizer_1.max()
@@ -160,7 +160,7 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     }
 
     // train quantizer_2 on host
-    cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI> quantizer_2;
+    cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI> quantizer_2;
     quantizer_2.train(handle, params_.quantization_params, dataset_h);
     std::cerr << "Q2: trained = " << quantizer_2.is_trained()
               << ", min = " << (double)quantizer_2.min() << ", max = " << (double)quantizer_2.max()
@@ -274,4 +274,4 @@ INSTANTIATE_TEST_CASE_P(QuantizationTest,
                         QuantizationTest_half_int8t,
                         ::testing::ValuesIn(inputs<half>));
 
-}  // namespace cuvs::neighbors::quantization
+}  // namespace cuvs::preprocessing::quantization

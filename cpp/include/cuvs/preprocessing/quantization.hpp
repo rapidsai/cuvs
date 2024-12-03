@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
@@ -25,7 +24,7 @@
 
 #include <cuda_fp16.h>
 
-namespace cuvs::neighbors::quantization {
+namespace cuvs::preprocessing::quantization {
 
 /**
  * @brief ScalarQuantizer parameters.
@@ -192,4 +191,4 @@ class ScalarQuantizer {
   T max_;
 };
 
-}  // namespace cuvs::neighbors::quantization
+}  // namespace cuvs::preprocessing::quantization

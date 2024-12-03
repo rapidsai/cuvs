@@ -16,9 +16,9 @@
 
 #include "./detail/quantization.cuh"
 
-#include <cuvs/neighbors/quantization.hpp>
+#include <cuvs/preprocessing/quantization.hpp>
 
-namespace cuvs::neighbors::quantization {
+namespace cuvs::preprocessing::quantization {
 
 template <typename T, typename QuantI>
 void ScalarQuantizer<T, QuantI>::train(raft::resources const& res,
@@ -126,7 +126,7 @@ _RAFT_HOST_DEVICE T ScalarQuantizer<T, QuantI>::max() const
 }
 
 #define CUVS_INST_QUANTIZATION(T, QuantI) \
-  template struct cuvs::neighbors::quantization::ScalarQuantizer<T, QuantI>;
+  template struct cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>;
 
 CUVS_INST_QUANTIZATION(double, int8_t);
 CUVS_INST_QUANTIZATION(float, int8_t);
@@ -134,4 +134,4 @@ CUVS_INST_QUANTIZATION(half, int8_t);
 
 #undef CUVS_INST_QUANTIZATION
 
-}  // namespace cuvs::neighbors::quantization
+}  // namespace cuvs::preprocessing::quantization

@@ -441,7 +441,6 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/nn_descent_int8.cu
     src/neighbors/nn_descent_uint8.cu
     src/neighbors/reachability.cu
-    src/neighbors/quantization.cu
     src/neighbors/refine/detail/refine_device_float_float.cu
     src/neighbors/refine/detail/refine_device_half_float.cu
     src/neighbors/refine/detail/refine_device_int8_t_float.cu
@@ -458,6 +457,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
+    src/preprocessing/quantization.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
