@@ -478,7 +478,7 @@ RAFT_DEVICE_INLINE_FUNCTION void move_invalid_to_end_of_list(IdxT* const index_a
       } else {
         // Check if the index is invalid
         const auto I_found_invalid = (index == invalid_index);
-        const auto who_has_invalid = __ballot_sync(~0u, I_found_invalid);
+        const auto who_has_invalid = raft::ballot(I_found_invalid);
         // if a value that is loaded by a smaller lane id thread, shift the array
         if (who_has_invalid << (warp_size - lane_id)) {
           index_array[i - 1]    = index;
