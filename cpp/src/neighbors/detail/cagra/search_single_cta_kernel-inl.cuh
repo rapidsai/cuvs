@@ -111,7 +111,7 @@ RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parents(std::uint32_t* const termin
 }
 
 template <unsigned MAX_CANDIDATES, class IdxT = void>
-RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge_full(
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_full(
   float* candidate_distances,  // [num_candidates]
   IdxT* candidate_indices,     // [num_candidates]
   const std::uint32_t num_candidates,
@@ -215,7 +215,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge_full(
 }
 
 template <unsigned MAX_ITOPK, class IdxT = void>
-RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge_merge(
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge(
   float* itopk_distances,  // [num_itopk]
   IdxT* itopk_indices,     // [num_itopk]
   const std::uint32_t num_itopk,
@@ -437,20 +437,20 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge(
   const unsigned MULTI_WARPS_2)
 {
   // The results in candidate_distances/indices are sorted by bitonic sort.
-  topk_by_bitonic_sort_and_merge_full<MAX_CANDIDATES, IdxT>(
+  topk_by_bitonic_sort_and_full<MAX_CANDIDATES, IdxT>(
     candidate_distances, candidate_indices, num_candidates, num_itopk, MULTI_WARPS_1);
 
   // The results sorted above are merged with the internal intermediate top-k
   // results so far using bitonic merge.
-  topk_by_bitonic_sort_and_merge_merge<MAX_ITOPK, IdxT>(itopk_distances,
-                                                        itopk_indices,
-                                                        num_itopk,
-                                                        candidate_distances,
-                                                        candidate_indices,
-                                                        num_candidates,
-                                                        work_buf,
-                                                        first,
-                                                        MULTI_WARPS_2);
+  topk_by_bitonic_sort_and_merge<MAX_ITOPK, IdxT>(itopk_distances,
+                                                  itopk_indices,
+                                                  num_itopk,
+                                                  candidate_distances,
+                                                  candidate_indices,
+                                                  num_candidates,
+                                                  work_buf,
+                                                  first,
+                                                  MULTI_WARPS_2);
 }
 
 // This function move the invalid index element to the end of the itopk list.
