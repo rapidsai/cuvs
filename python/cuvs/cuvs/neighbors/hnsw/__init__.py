@@ -13,10 +13,23 @@
 # limitations under the License.
 
 
-from .hnsw import Index, SearchParams, from_cagra, load, save, search
+from .hnsw import (
+    ExtendParams,
+    Index,
+    IndexParams,
+    SearchParams,
+    extend,
+    from_cagra,
+    load,
+    save,
+    search,
+)
 
 __all__ = [
+    "IndexParams",
     "Index",
+    "ExtendParams",
+    "extend",
     "SearchParams",
     "load",
     "save",
