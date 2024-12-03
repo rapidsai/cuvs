@@ -15,6 +15,7 @@
 #=============================================================================
 
 function(find_and_configure_hnswlib)
+  message(STATUS "Finding or building hnswlib")
   set(oneValueArgs)
 
   include(${rapids-cmake-dir}/cpm/package_override.cmake)

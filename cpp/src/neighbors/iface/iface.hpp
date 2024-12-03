@@ -20,6 +20,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <fstream>
 #include <raft/core/device_resources.hpp>
 
 #include <fstream>

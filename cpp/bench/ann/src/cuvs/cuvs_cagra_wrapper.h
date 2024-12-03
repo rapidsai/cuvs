@@ -162,6 +162,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   void save_to_hnswlib(const std::string& file) const;
   std::unique_ptr<algo<T>> copy() override;
 
+  auto get_index() const -> const cuvs::neighbors::cagra::index<T, IdxT>* { return index_.get(); }
+
  private:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
   configured_raft_resources handle_{};
