@@ -111,7 +111,9 @@ TEST(CagraHnswC, BuildSearch)
   cuvsHnswIndex_t hnsw_index;
   cuvsHnswIndexCreate(&hnsw_index);
   hnsw_index->dtype = index->dtype;
-  cuvsHnswDeserialize(res, "/tmp/cagra_hnswlib.index", 2, L2Expanded, hnsw_index);
+  cuvsHnswIndexParams_t hnsw_params;
+  cuvsHnswIndexParamsCreate(&hnsw_params);
+  cuvsHnswDeserialize(res, hnsw_params, "/tmp/cagra_hnswlib.index", 2, L2Expanded, hnsw_index);
 
   // search index
   cuvsHnswSearchParams_t search_params;
