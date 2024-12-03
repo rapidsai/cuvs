@@ -55,4 +55,7 @@ template <typename math_t>
   return res;
 }
 
+template class KernelFactory<float>;
+template class KernelFactory<double>;
+
 };  // end namespace cuvs::distance::kernels

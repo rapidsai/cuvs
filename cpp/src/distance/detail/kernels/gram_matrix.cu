@@ -465,14 +465,19 @@ void GramMatrixBase<math_t>::linear(raft::resources const& handle,
   if (is_col_major_nopad) {
     auto out_row_major = raft::make_device_matrix_view<math_t, int, raft::row_major>(
       out.data_handle(), out.extent(1), out.extent(0));
+
+    // TODO: use PW distance from cuvs
     raft::sparse::distance::pairwise_distance(
-      handle, x2, x1, out_row_major, cuvs::distance::DistanceType::InnerProduct, 0.0);
+      handle, x2, x1, out_row_major, raft::distance::DistanceType::InnerProduct, 0.0);
   } else {
     auto out_row_major = raft::make_device_matrix_view<math_t, int, raft::row_major>(
       out.data_handle(), out.extent(0), out.extent(1));
     raft::sparse::distance::pairwise_distance(
-      handle, x1, x2, out_row_major, cuvs::distance::DistanceType::InnerProduct, 0.0);
+      handle, x1, x2, out_row_major, raft::distance::DistanceType::InnerProduct, 0.0);
   }
 }
+
+template class GramMatrixBase<float>;
+template class GramMatrixBase<double>;
 
 };  // namespace cuvs::distance::kernels
