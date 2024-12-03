@@ -133,7 +133,14 @@ build-backend = "scikit_build_core.build"
 dependencies-file = "../../dependencies.yaml"
 matrix-entry = "cuda_suffixed=true;use_cuda_wheels=true"
 
+[tool.pydistcheck]
+select = [
+    # NOTE: size threshold is managed via CLI args in CI scripts
+    "distro-too-large-compressed",
+]
+
 [tool.pytest.ini_options]
 filterwarnings = [
     "error",
+    "ignore:.*cuda..* module is deprecated.*:DeprecationWarning"
 ]

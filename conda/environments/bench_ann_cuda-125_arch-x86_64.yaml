@@ -17,7 +17,7 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-python>=12.0,<13.0a0
+- cuda-python>=12.0,<13.0a0,<=12.6.0
 - cuda-version=12.5
 - cxx-compiler
 - cython>=3.0.0
@@ -25,7 +25,6 @@ dependencies:
 - gcc_linux-64=11.*
 - glog>=0.6.0
 - h5py>=3.8.0
-- hnswlib=0.6.2
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev

@@ -28,3 +28,13 @@ Index search
 ############
 
 .. autofunction:: cuvs.neighbors.hnsw.search
+
+Index save
+##########
+
+.. autofunction:: cuvs.neighbors.hnsw.save
+
+Index load
+##########
+
+.. autofunction:: cuvs.neighbors.hnsw.load
