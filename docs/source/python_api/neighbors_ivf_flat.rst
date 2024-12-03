@@ -32,3 +32,13 @@ Index search
 ############
 
 .. autofunction:: cuvs.neighbors.ivf_flat.search
+
+Index save
+##########
+
+.. autofunction:: cuvs.neighbors.ivf_flat.save
+
+Index load
+##########
+
+.. autofunction:: cuvs.neighbors.ivf_flat.load
