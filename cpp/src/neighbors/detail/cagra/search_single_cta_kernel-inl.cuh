@@ -820,7 +820,7 @@ __device__ void search_core(
         // Calculate the largest valid position within a warp and bcast it for the next iteration
         num_found_valid += new_position;
         for (std::uint32_t offset = (warp_size >> 1); offset > 0; offset >>= 1) {
-          const auto v = raft::shfl_xor( num_found_valid, offset);
+          const auto v = raft::shfl_xor(num_found_valid, offset);
           if ((threadIdx.x & offset) == 0) { num_found_valid = v; }
         }
 
