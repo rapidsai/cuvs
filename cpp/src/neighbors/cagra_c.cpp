@@ -126,10 +126,9 @@ void _search(cuvsResources_t res,
     using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
     auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
     auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
-    cuvs::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
-      *res_ptr, removed_indices, index_ptr->dataset().extent(0));
-    auto bitset_filter_obj =
-      cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
+    cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(
+      removed_indices, index_ptr->dataset().extent(0));
+    auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
     cuvs::neighbors::cagra::search(*res_ptr,
                                    search_params,
                                    *index_ptr,
@@ -138,7 +137,7 @@ void _search(cuvsResources_t res,
                                    distances_mds,
                                    bitset_filter_obj);
   } else {
-    RAFT_FAIL("Unsupported prefilter type: BITMAP");
+    RAFT_FAIL("Unsupported filter type: BITMAP");
   }
 }
 

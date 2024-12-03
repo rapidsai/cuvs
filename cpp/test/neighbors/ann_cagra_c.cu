@@ -34,7 +34,7 @@ float queries[4][2] = {{0.48216683, 0.0428398},
                        {0.51260436, 0.2643005},
                        {0.05198065, 0.5789965}};
 
-int64_t filter[2] = {1, 2};
+uint32_t filter[1] = {0b1001};  // index 1 and 2 are removed
 
 uint32_t neighbors_exp[4] = {3, 0, 3, 1};
 float distances_exp[4]    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
@@ -114,15 +114,15 @@ TEST(CagraC, BuildSearch)
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = nullptr;
 
-  cuvsFilter prefilter;
-  prefilter.type = NO_FILTER;
-  prefilter.addr = (uintptr_t)NULL;
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
 
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
   cuvsCagraSearch(
-    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, prefilter);
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // verify output
   ASSERT_TRUE(
@@ -210,8 +210,8 @@ TEST(CagraC, BuildSearchFiltered)
   distances_tensor.dl_tensor.strides            = nullptr;
 
   // create filter DLTensor
-  rmm::device_uvector<int64_t> filter_d(2, stream);
-  raft::copy(filter_d.data(), (int64_t*)filter, 2, stream);
+  rmm::device_uvector<uint32_t> filter_d(1, stream);
+  raft::copy(filter_d.data(), filter, 1, stream);
 
   cuvsFilter filter;
 
@@ -219,10 +219,10 @@ TEST(CagraC, BuildSearchFiltered)
   filter_tensor.dl_tensor.data               = filter_d.data();
   filter_tensor.dl_tensor.device.device_type = kDLCUDA;
   filter_tensor.dl_tensor.ndim               = 1;
-  filter_tensor.dl_tensor.dtype.code         = kDLInt;
-  filter_tensor.dl_tensor.dtype.bits         = 64;
+  filter_tensor.dl_tensor.dtype.code         = kDLUInt;
+  filter_tensor.dl_tensor.dtype.bits         = 32;
   filter_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t filter_shape[1]                    = {2};
+  int64_t filter_shape[1]                    = {1};
   filter_tensor.dl_tensor.shape              = filter_shape;
   filter_tensor.dl_tensor.strides            = nullptr;
 
@@ -234,7 +234,6 @@ TEST(CagraC, BuildSearchFiltered)
   cuvsCagraSearchParamsCreate(&search_params);
   cuvsCagraSearch(
     res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
-
   // verify output
   ASSERT_TRUE(cuvs::devArrMatchHost(
     neighbors_exp_filtered, neighbors_d.data(), 4, cuvs::Compare<uint32_t>()));
