@@ -111,8 +111,9 @@ ScalarQuantizer<T, QuantI> train_scalar(raft::resources const& res,
  * raft::handle_t handle;
  * cuvs::preprocessing::quantization::sq_params params;
  * auto quantizer = cuvs::preprocessing::quantization::train_scalar<float, int8_t>(handle, params,
- * dataset); auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle,
- * quantizer, dataset);
+ * dataset); auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples,
+ * features); cuvs::preprocessing::quantization::transform(handle, quantizer, dataset,
+ * quantized_dataset.view());
  * @endcode
  *
  * @tparam T data element type
@@ -121,8 +122,8 @@ ScalarQuantizer<T, QuantI> train_scalar(raft::resources const& res,
  * @param[in] res raft resource
  * @param[in] quantizer a scalar quantizer
  * @param[in] dataset a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
  *
- * @return device matrix with quantized dataset
  */
 template <typename T, typename QuantI>
 void transform(raft::resources const& res,
@@ -138,8 +139,9 @@ void transform(raft::resources const& res,
  * raft::handle_t handle;
  * cuvs::preprocessing::quantization::sq_params params;
  * auto quantizer = cuvs::preprocessing::quantization::train_scalar<float, int8_t>(handle, params,
- * dataset); auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle,
- * quantizer, dataset);
+ * dataset); auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+ * cuvs::preprocessing::quantization::transform(handle, quantizer, dataset,
+ * quantized_dataset.view());
  * @endcode
  *
  * @tparam T data element type
@@ -148,8 +150,8 @@ void transform(raft::resources const& res,
  * @param[in] res raft resource
  * @param[in] quantizer a scalar quantizer
  * @param[in] dataset a row-major matrix view on host
+ * @param[out] out a row-major matrix view on host
  *
- * @return host matrix with quantized dataset
  */
 template <typename T, typename QuantI>
 void transform(raft::resources const& res,
@@ -162,22 +164,24 @@ void transform(raft::resources const& res,
  *
  * Note that depending on the chosen data types train dataset the conversion is
  * not lossless.
- * Requires train step to be finished.
  *
  * Usage example:
  * @code{.cpp}
- * auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle, quantizer,
- * dataset); auto dataset_revert = cuvs::preprocessing::quantization::inverse_transform(handle,
- * quantizer, quantized_dataset.view);
+ * auto quantized_dataset = raft::make_device_matrix<int8_t, int64_t>(handle, samples, features);
+ * cuvs::preprocessing::quantization::transform(handle, quantizer, dataset,
+ * quantized_dataset.view()); auto dataset_revert = raft::make_device_matrix<float, int64_t>(handle,
+ * samples, features); cuvs::preprocessing::quantization::inverse_transform(handle, quantizer,
+ * dataset_revert.view());
  * @endcode
  *
  * @tparam T data element type
  * @tparam QuantI quantized type of data after transform
  *
  * @param[in] res raft resource
+ * @param[in] quantizer a scalar quantizer
  * @param[in] dataset a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
  *
- * @return device matrix with reverted quantization
  */
 template <typename T, typename QuantI>
 void inverse_transform(raft::resources const& res,
@@ -190,22 +194,24 @@ void inverse_transform(raft::resources const& res,
  *
  * Note that depending on the chosen data types train dataset the conversion is
  * not lossless.
- * Requires train step to be finished.
  *
  * Usage example:
  * @code{.cpp}
- * auto quantized_dataset = cuvs::preprocessing::quantization::transform(handle, quantizer,
- * dataset); auto dataset_revert = cuvs::preprocessing::quantization::inverse_transform(handle,
- * quantizer, quantized_dataset.view);
+ * auto quantized_dataset = raft::make_host_matrix<int8_t, int64_t>(samples, features);
+ * cuvs::preprocessing::quantization::transform(handle, quantizer, dataset,
+ * quantized_dataset.view()); auto dataset_revert = raft::make_host_matrix<float, int64_t>(samples,
+ * features); cuvs::preprocessing::quantization::inverse_transform(handle, quantizer,
+ * dataset_revert.view());
  * @endcode
  *
  * @tparam T data element type
  * @tparam QuantI quantized type of data after transform
  *
  * @param[in] res raft resource
+ * @param[in] quantizer a scalar quantizer
  * @param[in] dataset a row-major matrix view on host
+ * @param[out] out a row-major matrix view on host
  *
- * @return host matrix with reverted quantization
  */
 template <typename T, typename QuantI>
 void inverse_transform(raft::resources const& res,
