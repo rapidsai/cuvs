@@ -135,17 +135,15 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
                                   input_.size(),
                                   cuvs::Compare<QuantI>(),
                                   stream));
-
-      auto quantized_input_d_const_view = raft::make_device_matrix_view<const QuantI, int64_t>(
-        quantized_input_d.data_handle(), rows_, cols_);
       auto quantized_input_h_const_view = raft::make_host_matrix_view<const QuantI, int64_t>(
         quantized_input_h.data_handle(), rows_, cols_);
-
-      auto re_transformed_input_d =
-        quantizer_1.inverse_transform(handle, quantized_input_d_const_view);
       auto re_transformed_input_h =
         quantizer_1.inverse_transform(handle, quantized_input_h_const_view);
 
+      auto quantized_input_d_const_view = raft::make_device_matrix_view<const QuantI, int64_t>(
+        quantized_input_d.data_handle(), rows_, cols_);
+      auto re_transformed_input_d =
+        quantizer_1.inverse_transform(handle, quantized_input_d_const_view);
       raft::print_device_vector(
         "re-transformed array: ", re_transformed_input_d.data_handle(), print_size, std::cerr);
 

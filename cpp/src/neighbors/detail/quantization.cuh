@@ -39,36 +39,48 @@ _RAFT_HOST_DEVICE bool fp_equals(const half& a, const half& b)
   return static_cast<float>(a) == static_cast<float>(b);
 }
 
+template <class T>
+_RAFT_HOST_DEVICE bool fp_lt(const T& a, const T& b)
+{
+  return a < b;
+}
+
+template <>
+_RAFT_HOST_DEVICE bool fp_lt(const half& a, const half& b)
+{
+  return static_cast<float>(a) < static_cast<float>(b);
+}
+
 template <typename T, typename QuantI, typename TempT = double>
 struct quantize_op {
   const T min_;
   const T max_;
   const QuantI q_type_min_ = std::numeric_limits<QuantI>::min();
   const QuantI q_type_max_ = std::numeric_limits<QuantI>::max();
-  const TempT a_;
-  const TempT b_;
+  const TempT scalar_;
+  const TempT offset_;
 
   constexpr explicit quantize_op(T min, T max)
     : min_(min),
       max_(max),
-      a_(static_cast<TempT>(max_) > static_cast<TempT>(min_)
-           ? ((static_cast<TempT>(q_type_max_) - static_cast<TempT>(q_type_min_)) /
-              (static_cast<TempT>(max_) - static_cast<TempT>(min_)))
-           : static_cast<TempT>(1)),
-      b_(static_cast<TempT>(q_type_min_) - static_cast<TempT>(min_) * a_)
+      scalar_(static_cast<TempT>(max_) > static_cast<TempT>(min_)
+                ? ((static_cast<TempT>(q_type_max_) - static_cast<TempT>(q_type_min_)) /
+                   (static_cast<TempT>(max_) - static_cast<TempT>(min_)))
+                : static_cast<TempT>(1)),
+      offset_(static_cast<TempT>(q_type_min_) - static_cast<TempT>(min_) * scalar_)
   {
   }
 
   constexpr RAFT_INLINE_FUNCTION QuantI operator()(const T& x) const
   {
-    if (x <= min_) return q_type_min_;
-    if (x >= max_) return q_type_max_;
-    return static_cast<QuantI>(lroundf(a_ * static_cast<TempT>(x) + b_));
+    if (!fp_lt(min_, x)) return q_type_min_;
+    if (!fp_lt(x, max_)) return q_type_max_;
+    return static_cast<QuantI>(lroundf(scalar_ * static_cast<TempT>(x) + offset_));
   }
 
   constexpr RAFT_INLINE_FUNCTION T operator()(const QuantI& x) const
   {
-    return static_cast<T>((static_cast<TempT>(x) - b_) / a_);
+    return static_cast<T>((static_cast<TempT>(x) - offset_) / scalar_);
   }
 };
 
@@ -130,7 +142,7 @@ std::tuple<T, T> quantile_min_max(raft::resources const& res,
               rng);
 
   // quantile / sort and pick for now
-  thrust::sort(thrust::omp::par, subset.data(), subset.data() + subset_size);
+  thrust::sort(thrust::omp::par, subset.data(), subset.data() + subset_size, fp_lt<T>);
   double half_quantile_pos = (0.5 + 0.5 * quantile) * subset_size;
   int pos_max              = std::ceil(half_quantile_pos) - 1;
   int pos_min              = subset_size - pos_max - 1;
