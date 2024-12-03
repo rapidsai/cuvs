@@ -173,31 +173,22 @@ cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI> train_scalar(
 }
 
 template <typename T, typename QuantI = int8_t>
-raft::device_matrix<QuantI, int64_t> transform(
-  raft::resources const& res,
-  const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer,
-  raft::device_matrix_view<const T, int64_t> dataset)
+void transform(raft::resources const& res,
+               const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer,
+               raft::device_matrix_view<const T, int64_t> dataset,
+               raft::device_matrix_view<QuantI, int64_t> out)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  // allocate target
-  auto out = raft::make_device_matrix<QuantI, int64_t>(res, dataset.extent(0), dataset.extent(1));
-
-  raft::linalg::map(
-    res, out.view(), quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
-
-  return out;
+  raft::linalg::map(res, out, quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
 }
 
 template <typename T, typename QuantI = int8_t>
-raft::host_matrix<QuantI, int64_t> transform(
-  raft::resources const& res,
-  const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer,
-  raft::host_matrix_view<const T, int64_t> dataset)
+void transform(raft::resources const& res,
+               const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer,
+               raft::host_matrix_view<const T, int64_t> dataset,
+               raft::host_matrix_view<QuantI, int64_t> out)
 {
-  // allocate target
-  auto out = raft::make_host_matrix<QuantI, int64_t>(dataset.extent(0), dataset.extent(1));
-
   auto main_op      = quantize_op<T, QuantI>(quantizer.min_, quantizer.max_);
   size_t n_elements = dataset.extent(0) * dataset.extent(1);
 
@@ -205,36 +196,27 @@ raft::host_matrix<QuantI, int64_t> transform(
   for (size_t i = 0; i < n_elements; ++i) {
     out.data_handle()[i] = main_op(dataset.data_handle()[i]);
   }
-
-  return out;
 }
 
 template <typename T, typename QuantI = int8_t>
-raft::device_matrix<T, int64_t> inverse_transform(
+void inverse_transform(
   raft::resources const& res,
   const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer,
-  raft::device_matrix_view<const QuantI, int64_t> dataset)
+  raft::device_matrix_view<const QuantI, int64_t> dataset,
+  raft::device_matrix_view<T, int64_t> out)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  // allocate target
-  auto out = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
-
-  raft::linalg::map(
-    res, out.view(), quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
-
-  return out;
+  raft::linalg::map(res, out, quantize_op<T, QuantI>(quantizer.min_, quantizer.max_), dataset);
 }
 
 template <typename T, typename QuantI = int8_t>
-raft::host_matrix<T, int64_t> inverse_transform(
+void inverse_transform(
   raft::resources const& res,
   const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer,
-  raft::host_matrix_view<const QuantI, int64_t> dataset)
+  raft::host_matrix_view<const QuantI, int64_t> dataset,
+  raft::host_matrix_view<T, int64_t> out)
 {
-  // allocate target
-  auto out = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
-
   auto main_op      = quantize_op<T, QuantI>(quantizer.min_, quantizer.max_);
   size_t n_elements = dataset.extent(0) * dataset.extent(1);
 
@@ -242,8 +224,6 @@ raft::host_matrix<T, int64_t> inverse_transform(
   for (size_t i = 0; i < n_elements; ++i) {
     out.data_handle()[i] = main_op(dataset.data_handle()[i]);
   }
-
-  return out;
 }
 
 }  // namespace cuvs::preprocessing::detail

@@ -40,40 +40,40 @@ namespace cuvs::preprocessing::quantization {
     return detail::train_scalar<T, QuantI>(res, params, dataset);                   \
   }                                                                                 \
   template <>                                                                       \
-  auto cuvs::preprocessing::quantization::transform(                                \
+  void cuvs::preprocessing::quantization::transform(                                \
     raft::resources const& res,                                                     \
     const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer, \
-    raft::device_matrix_view<const T, int64_t> dataset)                             \
-    ->raft::device_matrix<QuantI, int64_t>                                          \
+    raft::device_matrix_view<const T, int64_t> dataset,                             \
+    raft::device_matrix_view<QuantI, int64_t> out)                                  \
   {                                                                                 \
-    return detail::transform<T, QuantI>(res, quantizer, dataset);                   \
+    detail::transform<T, QuantI>(res, quantizer, dataset, out);                     \
   }                                                                                 \
   template <>                                                                       \
-  auto cuvs::preprocessing::quantization::transform(                                \
+  void cuvs::preprocessing::quantization::transform(                                \
     raft::resources const& res,                                                     \
     const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer, \
-    raft::host_matrix_view<const T, int64_t> dataset)                               \
-    ->raft::host_matrix<QuantI, int64_t>                                            \
+    raft::host_matrix_view<const T, int64_t> dataset,                               \
+    raft::host_matrix_view<QuantI, int64_t> out)                                    \
   {                                                                                 \
-    return detail::transform<T, QuantI>(res, quantizer, dataset);                   \
+    detail::transform<T, QuantI>(res, quantizer, dataset, out);                     \
   }                                                                                 \
   template <>                                                                       \
-  auto cuvs::preprocessing::quantization::inverse_transform(                        \
+  void cuvs::preprocessing::quantization::inverse_transform(                        \
     raft::resources const& res,                                                     \
     const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer, \
-    raft::device_matrix_view<const QuantI, int64_t> dataset)                        \
-    ->raft::device_matrix<T, int64_t>                                               \
+    raft::device_matrix_view<const QuantI, int64_t> dataset,                        \
+    raft::device_matrix_view<T, int64_t> out)                                       \
   {                                                                                 \
-    return detail::inverse_transform<T, QuantI>(res, quantizer, dataset);           \
+    detail::inverse_transform<T, QuantI>(res, quantizer, dataset, out);             \
   }                                                                                 \
   template <>                                                                       \
-  auto cuvs::preprocessing::quantization::inverse_transform(                        \
+  void cuvs::preprocessing::quantization::inverse_transform(                        \
     raft::resources const& res,                                                     \
     const cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>& quantizer, \
-    raft::host_matrix_view<const QuantI, int64_t> dataset)                          \
-    ->raft::host_matrix<T, int64_t>                                                 \
+    raft::host_matrix_view<const QuantI, int64_t> dataset,                          \
+    raft::host_matrix_view<T, int64_t> out)                                         \
   {                                                                                 \
-    return detail::inverse_transform<T, QuantI>(res, quantizer, dataset);           \
+    detail::inverse_transform<T, QuantI>(res, quantizer, dataset, out);             \
   }                                                                                 \
   template struct cuvs::preprocessing::quantization::ScalarQuantizer<T, QuantI>;
 

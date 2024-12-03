@@ -125,10 +125,10 @@ ScalarQuantizer<T, QuantI> train_scalar(raft::resources const& res,
  * @return device matrix with quantized dataset
  */
 template <typename T, typename QuantI>
-raft::device_matrix<QuantI, int64_t> transform(
-  raft::resources const& res,
-  const ScalarQuantizer<T, QuantI>& quantizer,
-  const raft::device_matrix_view<const T, int64_t> dataset);
+void transform(raft::resources const& res,
+               const ScalarQuantizer<T, QuantI>& quantizer,
+               const raft::device_matrix_view<const T, int64_t> dataset,
+               raft::device_matrix_view<QuantI, int64_t> out);
 
 /**
  * @brief Applies quantization transform to given dataset
@@ -152,9 +152,10 @@ raft::device_matrix<QuantI, int64_t> transform(
  * @return host matrix with quantized dataset
  */
 template <typename T, typename QuantI>
-raft::host_matrix<QuantI, int64_t> transform(raft::resources const& res,
-                                             const ScalarQuantizer<T, QuantI>& quantizer,
-                                             raft::host_matrix_view<const T, int64_t> dataset);
+void transform(raft::resources const& res,
+               const ScalarQuantizer<T, QuantI>& quantizer,
+               raft::host_matrix_view<const T, int64_t> dataset,
+               raft::host_matrix_view<QuantI, int64_t> out);
 
 /**
  * @brief Perform inverse quantization step on previously quantized dataset
@@ -179,10 +180,10 @@ raft::host_matrix<QuantI, int64_t> transform(raft::resources const& res,
  * @return device matrix with reverted quantization
  */
 template <typename T, typename QuantI>
-raft::device_matrix<T, int64_t> inverse_transform(
-  raft::resources const& res,
-  const ScalarQuantizer<T, QuantI>& quantizer,
-  raft::device_matrix_view<const QuantI, int64_t> dataset);
+void inverse_transform(raft::resources const& res,
+                       const ScalarQuantizer<T, QuantI>& quantizer,
+                       raft::device_matrix_view<const QuantI, int64_t> dataset,
+                       raft::device_matrix_view<T, int64_t> out);
 
 /**
  * @brief Perform inverse quantization step on previously quantized dataset
@@ -207,9 +208,9 @@ raft::device_matrix<T, int64_t> inverse_transform(
  * @return host matrix with reverted quantization
  */
 template <typename T, typename QuantI>
-raft::host_matrix<T, int64_t> inverse_transform(
-  raft::resources const& res,
-  const ScalarQuantizer<T, QuantI>& quantizer,
-  raft::host_matrix_view<const QuantI, int64_t> dataset);
+void inverse_transform(raft::resources const& res,
+                       const ScalarQuantizer<T, QuantI>& quantizer,
+                       raft::host_matrix_view<const QuantI, int64_t> dataset,
+                       raft::host_matrix_view<T, int64_t> out);
 
 }  // namespace cuvs::preprocessing::quantization

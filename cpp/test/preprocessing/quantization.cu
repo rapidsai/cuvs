@@ -111,10 +111,12 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
               << std::endl;
 
     {
-      auto quantized_input_d =
-        cuvs::preprocessing::quantization::transform(handle, quantizer_1, dataset);
-      auto quantized_input_h =
-        cuvs::preprocessing::quantization::transform(handle, quantizer_1, dataset_h);
+      auto quantized_input_h = raft::make_host_matrix<QuantI, int64_t>(rows_, cols_);
+      auto quantized_input_d = raft::make_device_matrix<QuantI, int64_t>(handle, rows_, cols_);
+      cuvs::preprocessing::quantization::transform(
+        handle, quantizer_1, dataset, quantized_input_d.view());
+      cuvs::preprocessing::quantization::transform(
+        handle, quantizer_1, dataset_h, quantized_input_h.view());
 
       {
         raft::print_device_vector("Input array: ", input_.data(), print_size, std::cerr);
@@ -136,15 +138,18 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
                                   input_.size(),
                                   cuvs::Compare<QuantI>(),
                                   stream));
+
       auto quantized_input_h_const_view = raft::make_host_matrix_view<const QuantI, int64_t>(
         quantized_input_h.data_handle(), rows_, cols_);
-      auto re_transformed_input_h = cuvs::preprocessing::quantization::inverse_transform(
-        handle, quantizer_1, quantized_input_h_const_view);
+      auto re_transformed_input_h = raft::make_host_matrix<T, int64_t>(rows_, cols_);
+      cuvs::preprocessing::quantization::inverse_transform(
+        handle, quantizer_1, quantized_input_h_const_view, re_transformed_input_h.view());
 
       auto quantized_input_d_const_view = raft::make_device_matrix_view<const QuantI, int64_t>(
         quantized_input_d.data_handle(), rows_, cols_);
-      auto re_transformed_input_d = cuvs::preprocessing::quantization::inverse_transform(
-        handle, quantizer_1, quantized_input_d_const_view);
+      auto re_transformed_input_d = raft::make_device_matrix<T, int64_t>(handle, rows_, cols_);
+      cuvs::preprocessing::quantization::inverse_transform(
+        handle, quantizer_1, quantized_input_d_const_view, re_transformed_input_d.view());
       raft::print_device_vector(
         "re-transformed array: ", re_transformed_input_d.data_handle(), print_size, std::cerr);
 
@@ -174,10 +179,12 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
 
     {
       // test transform host/device equal
-      auto quantized_input_d =
-        cuvs::preprocessing::quantization::transform(handle, quantizer_2, dataset);
-      auto quantized_input_h =
-        cuvs::preprocessing::quantization::transform(handle, quantizer_2, dataset_h);
+      auto quantized_input_h = raft::make_host_matrix<QuantI, int64_t>(rows_, cols_);
+      auto quantized_input_d = raft::make_device_matrix<QuantI, int64_t>(handle, rows_, cols_);
+      cuvs::preprocessing::quantization::transform(
+        handle, quantizer_2, dataset, quantized_input_d.view());
+      cuvs::preprocessing::quantization::transform(
+        handle, quantizer_2, dataset_h, quantized_input_h.view());
 
       {
         rmm::device_uvector<int> quantization_for_print(print_size, stream);
@@ -200,8 +207,9 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
 
     // sort_by_key (input, quantization) -- check <= on result
     {
-      auto quantized_input =
-        cuvs::preprocessing::quantization::transform(handle, quantizer_1, dataset);
+      auto quantized_input = raft::make_device_matrix<QuantI, int64_t>(handle, rows_, cols_);
+      cuvs::preprocessing::quantization::transform(
+        handle, quantizer_1, dataset, quantized_input.view());
       thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
                           input_.data(),
                           input_.data() + input_.size(),
