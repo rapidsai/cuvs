@@ -225,9 +225,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_CAGRA)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
-  ConfigureAnnBench(
-    NAME CUVS_CAGRA_HNSWLIB PATH src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs hnswlib::hnswlib
-  )
+  ConfigureAnnBench(NAME CUVS_CAGRA_HNSWLIB PATH src/cuvs/cuvs_cagra_hnswlib.cu LINKS cuvs)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_MG)
