@@ -25,14 +25,12 @@ namespace cuvs::embed::spectral {
  * algorithm does not compute a full laplacian eigenmap, as the laplacian eigenmap would embed each
  * connected component. Laplacian eigenmaps can be built from this algorithm by running it on the
  * vectors for each connected component.
- * @param rows source vertices of knn graph (size nnz)
- * @param cols destination vertices of knn graph (size nnz)
- * @param vals edge weights connecting vertices of knn graph (size nnz)
- * @param nnz size of rows/cols/vals
- * @param n number of samples in X
- * @param n_neighbors the number of neighbors to query for knn graph construction
- * @param n_components the number of components to project the X into
- * @param out output array for embedding (size n*n_comonents)
+
+ * @param[in] handle
+ * @param[in] knn_graph KNN Graph
+ * @param[in] n_components the number of components to project into
+ * @param[out] out output array for embedding (size n*n_comonents)
+ * @param[in] seed
  */
 void fit(const raft::resources& handle,
          raft::device_coo_matrix_view<float, int, int, int> knn_graph,
