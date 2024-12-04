@@ -469,9 +469,9 @@ void RBFKernel<math_t>::applyKernel(math_t* inout,
 }
 
 template <typename math_t>
-void matrixRowNormL2(raft::resources const& handle,
-                     dense_input_matrix_view_t<math_t> matrix,
-                     math_t* target)
+void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
+                                        dense_input_matrix_view_t<math_t> matrix,
+                                        math_t* target)
 {
   bool is_row_major = GramMatrixBase<math_t>::get_is_row_major(matrix);
   int minor         = is_row_major ? matrix.extent(1) : matrix.extent(0);
