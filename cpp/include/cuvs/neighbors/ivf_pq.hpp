@@ -319,6 +319,9 @@ using list_data = ivf::list<list_spec, SizeT, IdxT>;
  */
 template <typename IdxT>
 struct index : cuvs::neighbors::index {
+  using index_params_type  = ivf_pq::index_params;
+  using search_params_type = ivf_pq::search_params;
+  using index_type         = IdxT;
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
