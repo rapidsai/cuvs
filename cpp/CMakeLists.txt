@@ -371,7 +371,6 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
     src/distance/detail/fused_distance_nn.cu
     src/distance/distance.cu
-    src/distance/kernel_gram.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
