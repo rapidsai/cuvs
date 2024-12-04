@@ -21,10 +21,9 @@ import sys
 import cupy as cp
 import numpy as np
 import rmm
+from cuvs.neighbors.brute_force import build, search
 from pylibraft.common import DeviceResources
 from rmm.allocators.cupy import rmm_cupy_allocator
-
-from cuvs.neighbors.brute_force import build, search
 
 from .utils import memmap_bin_file, suffix_from_dtype, write_bin
 
