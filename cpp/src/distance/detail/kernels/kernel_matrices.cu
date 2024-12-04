@@ -716,4 +716,11 @@ template <typename math_t>
                                     is_row_major);
 }
 
+template class PolynomialKernel<float, int>;
+template class PolynomialKernel<double, int>;
+template class TanhKernel<float>;
+template class TanhKernel<double>;
+template class RBFKernel<float>;
+template class RBFKernel<double>;
+
 };  // end namespace cuvs::distance::kernels
