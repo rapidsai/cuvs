@@ -371,6 +371,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/neighbors/brute_force.cu
+    src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
     src/neighbors/cagra_build_int8.cu
@@ -576,6 +577,7 @@ if(BUILD_SHARED_LIBS)
 
   if(BUILD_CAGRA_HNSWLIB)
     target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
