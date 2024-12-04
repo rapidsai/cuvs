@@ -10,12 +10,14 @@ import (
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-type bruteForceIndex struct {
+// Brute Force KNN Index
+type BruteForceIndex struct {
 	index   C.cuvsBruteForceIndex_t
 	trained bool
 }
 
-func CreateIndex() (*bruteForceIndex, error) {
+// Creates a new empty Brute Force KNN Index
+func CreateIndex() (*BruteForceIndex, error) {
 	var index C.cuvsBruteForceIndex_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsBruteForceIndexCreate(&index)))
@@ -23,10 +25,11 @@ func CreateIndex() (*bruteForceIndex, error) {
 		return nil, err
 	}
 
-	return &bruteForceIndex{index: index, trained: false}, nil
+	return &BruteForceIndex{index: index, trained: false}, nil
 }
 
-func (index *bruteForceIndex) Close() error {
+// Destroys the Brute Force KNN Index
+func (index *BruteForceIndex) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsBruteForceIndexDestroy(index.index)))
 	if err != nil {
 		return err
@@ -34,7 +37,15 @@ func (index *bruteForceIndex) Close() error {
 	return nil
 }
 
-func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric cuvs.Distance, metric_arg float32, index *bruteForceIndex) error {
+// Builds a new Brute Force KNN Index from the dataset for efficient search.
+//
+// # Arguments
+//
+// * `Resources` - Resources to use
+// * `Dataset` - A row-major matrix on either the host or device to index
+// * `metric` - Distance type to use for building the index
+// * `metric_arg` - Value of `p` for Minkowski distances - set to 2.0 if not applicable
+func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric cuvs.Distance, metric_arg float32, index *BruteForceIndex) error {
 	CMetric, exists := cuvs.CDistances[metric]
 
 	if !exists {
@@ -50,7 +61,15 @@ func BuildIndex[T any](Resources cuvs.Resource, Dataset *cuvs.Tensor[T], metric 
 	return nil
 }
 
-func SearchIndex[T any](resources cuvs.Resource, index bruteForceIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
+// Perform a Nearest Neighbors search on the Index
+//
+// # Arguments
+//
+// * `Resources` - Resources to use
+// * `queries` - Tensor in device memory to query for
+// * `neighbors` - Tensor in device memory that receives the indices of the nearest neighbors
+// * `distances` - Tensor in device memory that receives the distances of the nearest neighbors
+func SearchIndex[T any](resources cuvs.Resource, index BruteForceIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[int64], distances *cuvs.Tensor[T]) error {
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}

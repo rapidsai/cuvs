@@ -9,11 +9,13 @@ import (
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-type indexParams struct {
+// Supplemental parameters to build IVF Flat Index
+type IndexParams struct {
 	params C.cuvsIvfFlatIndexParams_t
 }
 
-func CreateIndexParams() (*indexParams, error) {
+// Creates a new IndexParams
+func CreateIndexParams() (*IndexParams, error) {
 	var params C.cuvsIvfFlatIndexParams_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsCreate(&params)))
@@ -21,15 +23,17 @@ func CreateIndexParams() (*indexParams, error) {
 		return nil, err
 	}
 
-	return &indexParams{params: params}, nil
+	return &IndexParams{params: params}, nil
 }
 
-func (p *indexParams) SetNLists(n_lists uint32) (*indexParams, error) {
+// The number of clusters used in the coarse quantizer.
+func (p *IndexParams) SetNLists(n_lists uint32) (*IndexParams, error) {
 	p.params.n_lists = C.uint32_t(n_lists)
 	return p, nil
 }
 
-func (p *indexParams) SetMetric(metric cuvs.Distance) (*indexParams, error) {
+// Distance Type to use for building the index
+func (p *IndexParams) SetMetric(metric cuvs.Distance) (*IndexParams, error) {
 	CMetric, exists := cuvs.CDistances[metric]
 
 	if !exists {
@@ -40,22 +44,31 @@ func (p *indexParams) SetMetric(metric cuvs.Distance) (*indexParams, error) {
 	return p, nil
 }
 
-func (p *indexParams) SetMetricArg(metric_arg float32) (*indexParams, error) {
+// Metric argument for Minkowski distances - set to 2.0 if not applicable
+func (p *IndexParams) SetMetricArg(metric_arg float32) (*IndexParams, error) {
 	p.params.metric_arg = C.float(metric_arg)
 	return p, nil
 }
 
-func (p *indexParams) SetKMeansNIters(kmeans_n_iters uint32) (*indexParams, error) {
+// The number of iterations searching for kmeans centers during index building.
+func (p *IndexParams) SetKMeansNIters(kmeans_n_iters uint32) (*IndexParams, error) {
 	p.params.kmeans_n_iters = C.uint32_t(kmeans_n_iters)
 	return p, nil
 }
 
-func (p *indexParams) SetKMeansTrainsetFraction(kmeans_trainset_fraction float64) (*indexParams, error) {
+// If kmeans_trainset_fraction is less than 1, then the dataset is
+// subsampled, and only n_samples * kmeans_trainset_fraction rows
+// are used for training.
+func (p *IndexParams) SetKMeansTrainsetFraction(kmeans_trainset_fraction float64) (*IndexParams, error) {
 	p.params.kmeans_trainset_fraction = C.double(kmeans_trainset_fraction)
 	return p, nil
 }
 
-func (p *indexParams) SetAddDataOnBuild(add_data_on_build bool) (*indexParams, error) {
+// After training the coarse and fine quantizers, we will populate
+// the index with the dataset if add_data_on_build == true, otherwise
+// the index is left empty, and the extend method can be used
+// to add new vectors to the index.
+func (p *IndexParams) SetAddDataOnBuild(add_data_on_build bool) (*IndexParams, error) {
 	if add_data_on_build {
 		p.params.add_data_on_build = C._Bool(true)
 	} else {
@@ -64,7 +77,8 @@ func (p *indexParams) SetAddDataOnBuild(add_data_on_build bool) (*indexParams, e
 	return p, nil
 }
 
-func (p *indexParams) Close() error {
+// Destroys IndexParams
+func (p *IndexParams) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatIndexParamsDestroy(p.params)))
 	if err != nil {
 		return err

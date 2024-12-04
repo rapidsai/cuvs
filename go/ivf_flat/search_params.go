@@ -7,11 +7,12 @@ import (
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-type searchParams struct {
+type SearchParams struct {
 	params C.cuvsIvfFlatSearchParams_t
 }
 
-func CreateSearchParams() (*searchParams, error) {
+// Creates a new SearchParams
+func CreateSearchParams() (*SearchParams, error) {
 	var params C.cuvsIvfFlatSearchParams_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearchParamsCreate(&params)))
@@ -19,15 +20,17 @@ func CreateSearchParams() (*searchParams, error) {
 		return nil, err
 	}
 
-	return &searchParams{params: params}, nil
+	return &SearchParams{params: params}, nil
 }
 
-func (p *searchParams) SetNProbes(n_probes uint32) (*searchParams, error) {
+// The number of clusters to search.
+func (p *SearchParams) SetNProbes(n_probes uint32) (*SearchParams, error) {
 	p.params.n_probes = C.uint32_t(n_probes)
 	return p, nil
 }
 
-func (p *searchParams) Close() error {
+// Destroy SearchParams
+func (p *SearchParams) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfFlatSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err

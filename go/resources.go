@@ -5,10 +5,14 @@ import "C"
 
 type cuvsResource C.cuvsResources_t
 
+// Resources are objects that are shared between function calls,
+// and includes things like CUDA streams, cuBLAS handles and other
+// resources that are expensive to create.
 type Resource struct {
 	Resource C.cuvsResources_t
 }
 
+// Returns a new Resource object
 func NewResource(stream C.cudaStream_t) (Resource, error) {
 	res := C.cuvsResources_t(0)
 	err := CheckCuvs(CuvsError(C.cuvsResourcesCreate(&res)))
@@ -26,10 +30,12 @@ func NewResource(stream C.cudaStream_t) (Resource, error) {
 	return Resource{Resource: res}, nil
 }
 
+// Syncs the current cuda stream
 func (r Resource) Sync() error {
 	return CheckCuvs(CuvsError(C.cuvsStreamSync(r.Resource)))
 }
 
+// Gets the current cuda stream
 func (r Resource) GetCudaStream() (C.cudaStream_t, error) {
 	var stream C.cudaStream_t
 

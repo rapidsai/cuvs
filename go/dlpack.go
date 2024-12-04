@@ -15,43 +15,14 @@ type TensorNumberType interface {
 	int64 | uint32 | float32
 }
 
+// ManagedTensor is a wrapper around a dlpack DLManagedTensor object.
+// This lets you pass matrices in device or host memory into cuvs.
 type Tensor[T any] struct {
 	C_tensor *C.DLManagedTensor
 	shape    []int64
 }
 
-func getDLDataType[T TensorNumberType]() C.DLDataType {
-	var zero T
-	switch any(zero).(type) {
-	case int64:
-		return C.DLDataType{
-			bits:  C.uchar(64),
-			lanes: C.ushort(1),
-			code:  C.kDLInt,
-		}
-	case uint32:
-		return C.DLDataType{
-			bits:  C.uchar(32),
-			lanes: C.ushort(1),
-			code:  C.kDLUInt,
-		}
-	case float32:
-		return C.DLDataType{
-			bits:  C.uchar(32),
-			lanes: C.ushort(1),
-			code:  C.kDLFloat,
-		}
-	}
-	panic("unreachable") // Go compiler ensures this is unreachable
-}
-
-func flattenData[T TensorNumberType](data [][]T, dest []T) {
-	cols := len(data[0])
-	for i, row := range data {
-		copy(dest[i*cols:], row)
-	}
-}
-
+// Creates a new Tensor on the host and copies the data into it.
 func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
 	if len(data) == 0 || len(data[0]) == 0 {
 		return Tensor[T]{}, errors.New("empty data")
@@ -104,6 +75,7 @@ func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
 	}, nil
 }
 
+// Creates a new Tensor with uninitialized data on the current device.
 func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor[T], error) {
 	if len(shape) < 2 {
 		return Tensor[T]{}, errors.New("shape must be atleast 2")
@@ -156,21 +128,7 @@ func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor
 	}, nil
 }
 
-func (t *Tensor[T]) sizeInBytes() int64 {
-	return calculateBytes(t.shape, t.C_tensor.dl_tensor.dtype)
-}
-
-func calculateBytes(shape []int64, dtype C.DLDataType) int64 {
-	bytes := int64(1)
-	for dim := range shape {
-		bytes *= (shape[dim])
-	}
-
-	bytes *= int64(dtype.bits) / 8
-
-	return bytes
-}
-
+// Destroys Tensor, freeing the memory it was allocated on.
 func (t *Tensor[T]) Close() error {
 	if t.C_tensor.dl_tensor.device.device_type == C.kDLCUDA {
 		bytes := t.sizeInBytes()
@@ -202,6 +160,7 @@ func (t *Tensor[T]) Close() error {
 	return nil
 }
 
+// Transfers the data in the Tensor to the device.
 func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	bytes := t.sizeInBytes()
 
@@ -229,10 +188,13 @@ func (t *Tensor[T]) ToDevice(res *Resource) (*Tensor[T], error) {
 	return t, nil
 }
 
+// Returns the shape of the Tensor.
 func (t *Tensor[T]) Shape() []int64 {
 	return t.shape
 }
 
+// Expands the Tensor by adding newData to the end of the current data.
+// The Tensor must be on the device.
 func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 	if t.C_tensor.dl_tensor.device.device_type != C.kDLCUDA {
 		return &Tensor[T]{}, errors.New("Tensor must be on GPU")
@@ -307,6 +269,7 @@ func (t *Tensor[T]) Expand(res *Resource, newData [][]T) (*Tensor[T], error) {
 	return t, nil
 }
 
+// Transfers the data in the Tensor to the host.
 func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	bytes := t.sizeInBytes()
 
@@ -338,6 +301,8 @@ func (t *Tensor[T]) ToHost(res *Resource) (*Tensor[T], error) {
 	return t, nil
 }
 
+// Returns a slice of the data in the Tensor.
+// The Tensor must be on the host.
 func (t *Tensor[T]) Slice() ([][]T, error) {
 	if t.C_tensor.dl_tensor.device.device_type != C.kDLCPU {
 		return nil, errors.New("Tensor must be on CPU")
@@ -354,4 +319,51 @@ func (t *Tensor[T]) Slice() ([][]T, error) {
 	}
 
 	return data, nil
+}
+
+func getDLDataType[T TensorNumberType]() C.DLDataType {
+	var zero T
+	switch any(zero).(type) {
+	case int64:
+		return C.DLDataType{
+			bits:  C.uchar(64),
+			lanes: C.ushort(1),
+			code:  C.kDLInt,
+		}
+	case uint32:
+		return C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLUInt,
+		}
+	case float32:
+		return C.DLDataType{
+			bits:  C.uchar(32),
+			lanes: C.ushort(1),
+			code:  C.kDLFloat,
+		}
+	}
+	panic("unreachable") // Go compiler ensures this is unreachable
+}
+
+func flattenData[T TensorNumberType](data [][]T, dest []T) {
+	cols := len(data[0])
+	for i, row := range data {
+		copy(dest[i*cols:], row)
+	}
+}
+
+func (t *Tensor[T]) sizeInBytes() int64 {
+	return calculateBytes(t.shape, t.C_tensor.dl_tensor.dtype)
+}
+
+func calculateBytes(shape []int64, dtype C.DLDataType) int64 {
+	bytes := int64(1)
+	for dim := range shape {
+		bytes *= (shape[dim])
+	}
+
+	bytes *= int64(dtype.bits) / 8
+
+	return bytes
 }

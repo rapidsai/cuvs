@@ -9,7 +9,8 @@ import (
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-type searchParams struct {
+// Supplemental parameters to search IVF PQ Index
+type SearchParams struct {
 	params C.cuvsIvfPqSearchParams_t
 }
 
@@ -49,7 +50,8 @@ var CInternalDistanceDtypes = map[internalDistanceDtype]int{
 	InternalDistance_Float64: C.CUDA_R_64F,
 }
 
-func CreateSearchParams() (*searchParams, error) {
+// Creates a new SearchParams
+func CreateSearchParams() (*SearchParams, error) {
 	var params C.cuvsIvfPqSearchParams_t
 
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearchParamsCreate(&params)))
@@ -57,15 +59,22 @@ func CreateSearchParams() (*searchParams, error) {
 		return nil, err
 	}
 
-	return &searchParams{params: params}, nil
+	return &SearchParams{params: params}, nil
 }
 
-func (p *searchParams) SetNProbes(n_probes uint32) (*searchParams, error) {
+// The number of clusters to search.
+func (p *SearchParams) SetNProbes(n_probes uint32) (*SearchParams, error) {
 	p.params.n_probes = C.uint32_t(n_probes)
 	return p, nil
 }
 
-func (p *searchParams) SetLutDtype(lut_dtype lutDtype) (*searchParams, error) {
+// Data type of look up table to be created dynamically at search
+// time. The use of low-precision types reduces the amount of shared
+// memory required at search time, so fast shared memory kernels can
+// be used even for datasets with large dimansionality. Note that
+// the recall is slightly degraded when low-precision type is
+// selected.
+func (p *SearchParams) SetLutDtype(lut_dtype lutDtype) (*SearchParams, error) {
 	CLutDtype, exists := cLutDtypes[lutDtype(lut_dtype)]
 
 	if !exists {
@@ -76,7 +85,8 @@ func (p *searchParams) SetLutDtype(lut_dtype lutDtype) (*searchParams, error) {
 	return p, nil
 }
 
-func (p *searchParams) SetInternalDistanceDtype(internal_distance_dtype internalDistanceDtype) (*searchParams, error) {
+// Storage data type for distance/similarity computation.
+func (p *SearchParams) SetInternalDistanceDtype(internal_distance_dtype internalDistanceDtype) (*SearchParams, error) {
 	CInternalDistanceDtype, exists := CInternalDistanceDtypes[internalDistanceDtype(internal_distance_dtype)]
 
 	if !exists {
@@ -87,7 +97,8 @@ func (p *searchParams) SetInternalDistanceDtype(internal_distance_dtype internal
 	return p, nil
 }
 
-func (p *searchParams) Close() error {
+// Destroys SearchParams
+func (p *SearchParams) Close() error {
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsIvfPqSearchParamsDestroy(p.params)))
 	if err != nil {
 		return err

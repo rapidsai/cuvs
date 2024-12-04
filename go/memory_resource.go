@@ -22,6 +22,10 @@ type CuvsPoolMemory struct {
 	managed                   bool
 }
 
+// Creates new CuvsPoolMemory struct
+// initial_pool_size_percent is the initial size of the pool in percent of total available device memory
+// max_pool_size_percent is the maximum size of the pool in percent of total available device memory
+// managed is whether to use CUDA managed memory
 func NewCuvsPoolMemory(initial_pool_size_percent int, max_pool_size_percent int, managed bool) (*CuvsPoolMemory, error) {
 	c := CuvsPoolMemory{
 		ch:                        make(chan CuvsMemoryCommand),
@@ -41,6 +45,7 @@ func NewCuvsPoolMemory(initial_pool_size_percent int, max_pool_size_percent int,
 	return &c, nil
 }
 
+// Enables pool memory
 func (m *CuvsPoolMemory) start() {
 	go func() {
 		runtime.LockOSThread()
@@ -64,10 +69,25 @@ func (m *CuvsPoolMemory) start() {
 	}()
 }
 
+// Disables pool memory
 func (m *CuvsPoolMemory) Close() error {
 	m.ch <- CuvsMemoryRelease
 	err := <-m.errCh
 	close(m.ch)
 	close(m.errCh)
 	return err
+}
+
+func Example() error {
+	mem, err := NewCuvsPoolMemory(60, 100, false)
+	if err != nil {
+		return err
+	}
+
+	err = mem.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 
 type Distance int
 
+// Supported distance metrics
 const (
 	DistanceL2 Distance = iota
 	DistanceSQEuclidean
@@ -33,6 +34,7 @@ const (
 	DistanceDice
 )
 
+// Maps cuvs Go distances to C distances
 var CDistances = map[Distance]int{
 	DistanceL2:            C.L2SqrtExpanded,
 	DistanceSQEuclidean:   C.L2Expanded,
@@ -56,6 +58,7 @@ var CDistances = map[Distance]int{
 	DistanceDice:          C.DiceExpanded,
 }
 
+// Computes the pairwise distance between two vectors.
 func PairwiseDistance[T any](Resources Resource, x *Tensor[T], y *Tensor[T], distances *Tensor[float32], metric Distance, metric_arg float32) error {
 	CMetric, exists := CDistances[metric]
 
