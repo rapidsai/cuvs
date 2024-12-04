@@ -129,16 +129,26 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
       (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * result_buffer_size_32 +
       sizeof(INDEX_T) * hashmap::get_size(small_hash_bitlen) + sizeof(INDEX_T) * search_width +
       sizeof(std::uint32_t) * topk_ws_size + sizeof(std::uint32_t);
-    smem_size = base_smem_size;
+
+    std::uint32_t additional_smem_size = 0;
     if (num_itopk_candidates > 256) {
       // Tentatively calculate the required share memory size when radix
       // sort based topk is used, assuming the block size is the maximum.
       if (itopk_size <= 256) {
-        smem_size += topk_by_radix_sort<256, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        additional_smem_size += topk_by_radix_sort<256, INDEX_T>::smem_size * sizeof(std::uint32_t);
       } else {
-        smem_size += topk_by_radix_sort<512, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        additional_smem_size += topk_by_radix_sort<512, INDEX_T>::smem_size * sizeof(std::uint32_t);
       }
     }
+
+    if (!std::is_same_v<SAMPLE_FILTER_T, cuvs::neighbors::filtering::none_sample_filter>) {
+      // For filtering postprocess
+      using scan_op_t = cub::WarpScan<unsigned>;
+      additional_smem_size =
+        std::max<std::uint32_t>(additional_smem_size, sizeof(scan_op_t::TempStorage));
+    }
+
+    smem_size = base_smem_size + additional_smem_size;
 
     uint32_t block_size = thread_block_size;
     if (block_size == 0) {
