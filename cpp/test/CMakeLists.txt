@@ -214,7 +214,9 @@ if(BUILD_TESTS)
     100
   )
 
-  ConfigureTest(NAME PREPROCESSING_TEST PATH preprocessing/quantization.cu GPUS 1 PERCENT 100)
+  ConfigureTest(
+    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
+  )
 
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
