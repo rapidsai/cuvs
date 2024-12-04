@@ -18,13 +18,12 @@ function(find_and_configure_cutlass)
   set(multiValueArgs)
   cmake_parse_arguments(PKG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-  # if(RAFT_ENABLE_DIST_DEPENDENCIES OR RAFT_COMPILE_LIBRARIES)
   set(CUTLASS_ENABLE_HEADERS_ONLY
       ON
       CACHE BOOL "Enable only the header library"
   )
   set(CUTLASS_NAMESPACE
-      "raft_cutlass"
+      "cuvs_cutlass"
       CACHE STRING "Top level namespace of CUTLASS"
   )
   set(CUTLASS_ENABLE_CUBLAS
@@ -67,26 +66,25 @@ function(find_and_configure_cutlass)
       NAMESPACE nvidia::cutlass::
     )
   endif()
-  # endif()
 
   # We generate the cutlass-config files when we built cutlass locally, so always do
   # `find_dependency`
   rapids_export_package(
-          BUILD NvidiaCutlass raft-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
+          BUILD NvidiaCutlass cuvs-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
   )
   rapids_export_package(
-          INSTALL NvidiaCutlass raft-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
+          INSTALL NvidiaCutlass cuvs-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
   )
 
   # Tell cmake where it can find the generated NvidiaCutlass-config.cmake we wrote.
   include("${rapids-cmake-dir}/export/find_package_root.cmake")
   rapids_export_find_package_root(
           INSTALL NvidiaCutlass [=[${CMAKE_CURRENT_LIST_DIR}/../]=]
-          EXPORT_SET raft-exports
+          EXPORT_SET cuvs-exports
   )
   rapids_export_find_package_root(
           BUILD NvidiaCutlass [=[${CMAKE_CURRENT_LIST_DIR}]=]
-          EXPORT_SET raft-exports
+          EXPORT_SET cuvs-exports
   )
 endfunction()
 
