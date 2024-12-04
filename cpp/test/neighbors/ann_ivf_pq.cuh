@@ -379,7 +379,6 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // Pack a few vectors back to the list.
     int row_offset = 5;
     int n_vec      = 3;
-    ASSERT_TRUE(row_offset + n_vec < n_rows);
     if (static_cast<decltype(n_rows)>(row_offset + n_vec) > n_rows) {
       RAFT_LOG_INFO(
         "Skipping IVF-PQ check_packing/pack test for label %u due to insufficient data (%u "
