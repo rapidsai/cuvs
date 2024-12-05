@@ -57,15 +57,15 @@ class factory {
     if (plan.algo == search_algo::SINGLE_CTA) {
       return std::make_unique<
         single_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-          res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
+        res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else if (plan.algo == search_algo::MULTI_CTA) {
       return std::make_unique<
         multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-          res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
+        res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else {
       return std::make_unique<
         multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-          res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
+        res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     }
   }
 };

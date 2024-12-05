@@ -62,7 +62,7 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
   constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
-  const IdxT removed_key = key | utils::gen_index_msb_1_mask<IdxT>::value;
+  const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     const IdxT old = atomicCAS(&table[index], hashval_empty, key);
     if (old == hashval_empty) {
@@ -86,19 +86,19 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t insert(IdxT* const table,
 template <class IdxT, unsigned SUPPORT_REMOVE = 0>
 RAFT_DEVICE_INLINE_FUNCTION uint32_t search(IdxT* table, const uint32_t bitlen, const IdxT key)
 {
-    const uint32_t size = get_size(bitlen);
-    const uint32_t bit_mask = size - 1;
+  const uint32_t size     = get_size(bitlen);
+  const uint32_t bit_mask = size - 1;
 #ifdef HASHMAP_LINEAR_PROBING
-    // Linear probing
-    IdxT index = (key ^ (key >> bitlen)) & bit_mask;
-    constexpr uint32_t stride = 1;
+  // Linear probing
+  IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
+  constexpr uint32_t stride = 1;
 #else
-    // Double hashing
-    IdxT index = key & bit_mask;
-    const uint32_t stride = (key >> bitlen) * 2 + 1;
+  // Double hashing
+  IdxT index            = key & bit_mask;
+  const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
   constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
-  const IdxT removed_key = key | utils::gen_index_msb_1_mask<IdxT>::value;
+  const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     const IdxT val = table[index];
     if (val == key) {
@@ -107,9 +107,7 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t search(IdxT* table, const uint32_t bitlen, 
       return 0;
     } else if (SUPPORT_REMOVE) {
       // Check if this key has been removed.
-      if (val == removed_key) {
-        return 0;
-      }
+      if (val == removed_key) { return 0; }
     }
     index = (index + stride) & bit_mask;
   }
@@ -119,19 +117,19 @@ RAFT_DEVICE_INLINE_FUNCTION uint32_t search(IdxT* table, const uint32_t bitlen, 
 template <class IdxT>
 RAFT_DEVICE_INLINE_FUNCTION uint32_t remove(IdxT* table, const uint32_t bitlen, const IdxT key)
 {
-  const uint32_t size = get_size(bitlen);
+  const uint32_t size     = get_size(bitlen);
   const uint32_t bit_mask = size - 1;
 #ifdef HASHMAP_LINEAR_PROBING
   // Linear probing
-  IdxT index = (key ^ (key >> bitlen)) & bit_mask;
+  IdxT index                = (key ^ (key >> bitlen)) & bit_mask;
   constexpr uint32_t stride = 1;
 #else
   // Double hashing
-  IdxT index = key & bit_mask;
+  IdxT index            = key & bit_mask;
   const uint32_t stride = (key >> bitlen) * 2 + 1;
 #endif
   constexpr IdxT hashval_empty = ~static_cast<IdxT>(0);
-  const IdxT removed_key = key | utils::gen_index_msb_1_mask<IdxT>::value;
+  const IdxT removed_key       = key | utils::gen_index_msb_1_mask<IdxT>::value;
   for (unsigned i = 0; i < size; i++) {
     // To remove a key, set the MSB to 1.
     const uint32_t old = atomicCAS(&table[index], key, removed_key);

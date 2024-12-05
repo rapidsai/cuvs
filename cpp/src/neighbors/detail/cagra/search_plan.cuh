@@ -112,9 +112,13 @@ struct search_plan_impl_base : public search_params {
   int64_t dim;
   int64_t graph_degree;
   uint32_t topk;
-  search_plan_impl_base(search_params params, int64_t dim, int64_t dataset_size,
-                        int64_t graph_degree, uint32_t topk)
-    : search_params(params), dim(dim), dataset_size(dataset_size), graph_degree(graph_degree), topk(topk)
+  search_plan_impl_base(
+    search_params params, int64_t dim, int64_t dataset_size, int64_t graph_degree, uint32_t topk)
+    : search_params(params),
+      dim(dim),
+      dataset_size(dataset_size),
+      graph_degree(graph_degree),
+      topk(topk)
   {
     if (algo == search_algo::AUTO) {
       const size_t num_sm = raft::getMultiProcessorCount();
@@ -195,9 +199,9 @@ struct search_plan_impl : public search_plan_impl_base {
     uint32_t _max_iterations = max_iterations;
     if (max_iterations == 0) {
       if (algo == search_algo::MULTI_CTA) {
-        constexpr uint32_t mc_itopk_size = 32;
+        constexpr uint32_t mc_itopk_size   = 32;
         constexpr uint32_t mc_search_width = 1;
-        _max_iterations = mc_itopk_size / mc_search_width;
+        _max_iterations                    = mc_itopk_size / mc_search_width;
       } else {
         _max_iterations = itopk_size / search_width;
       }
@@ -246,7 +250,7 @@ struct search_plan_impl : public search_plan_impl_base {
       // shared among CTAs.
       //
       const uint32_t max_visited_nodes = mc_itopk_size + (graph_degree * max_iterations);
-      small_hash_bitlen = 11;  // 2K
+      small_hash_bitlen                = 11;  // 2K
       while (max_visited_nodes > hashmap::get_size(small_hash_bitlen) * max_fill_rate) {
         small_hash_bitlen += 1;
       }
@@ -257,7 +261,8 @@ struct search_plan_impl : public search_plan_impl_base {
       // in each iteration is managed in a separate hash table, which is shared
       // among the CTAs.
       //
-      const auto max_traversed_nodes = mc_num_cta_per_query * max((size_t)mc_itopk_size, max_iterations);
+      const auto max_traversed_nodes =
+        mc_num_cta_per_query * max((size_t)mc_itopk_size, max_iterations);
       unsigned min_bitlen = 11;  // 2K
       if (min_bitlen < hashmap_min_bitlen) { min_bitlen = hashmap_min_bitlen; }
       hash_bitlen = min_bitlen;
