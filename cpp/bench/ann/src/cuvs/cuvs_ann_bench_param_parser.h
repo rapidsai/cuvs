@@ -56,6 +56,26 @@ extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 #include "cuvs_mg_cagra_wrapper.h"
 #endif
 
+template <typename ParamT>
+void parse_dynamic_batching_params(const nlohmann::json& conf, ParamT& param)
+{
+  if (!conf.value("dynamic_batching", false)) { return; }
+  param.dynamic_batching = true;
+  if (conf.contains("dynamic_batching_max_batch_size")) {
+    param.dynamic_batching_max_batch_size = conf.at("dynamic_batching_max_batch_size");
+  }
+  param.dynamic_batching_conservative_dispatch =
+    conf.value("dynamic_batching_conservative_dispatch", false);
+  if (conf.contains("dynamic_batching_dispatch_timeout_ms")) {
+    param.dynamic_batching_dispatch_timeout_ms = conf.at("dynamic_batching_dispatch_timeout_ms");
+  }
+  if (conf.contains("dynamic_batching_n_queues")) {
+    param.dynamic_batching_n_queues = conf.at("dynamic_batching_n_queues");
+  }
+  param.dynamic_batching_k =
+    uint32_t(uint32_t(conf.at("k")) * float(conf.value("refine_ratio", 1.0f)));
+}
+
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
@@ -138,6 +158,9 @@ void parse_search_param(const nlohmann::json& conf,
     param.refine_ratio = conf.at("refine_ratio");
     if (param.refine_ratio < 1.0f) { throw std::runtime_error("refine_ratio should be >= 1.0"); }
   }
+
+  // enable dynamic batching
+  parse_dynamic_batching_params(conf, param);
 }
 #endif
 
@@ -291,5 +314,8 @@ void parse_search_param(const nlohmann::json& conf,
   }
   // Same ratio as in IVF-PQ
   param.refine_ratio = conf.value("refine_ratio", 1.0f);
+
+  // enable dynamic batching
+  parse_dynamic_batching_params(conf, param);
 }
 #endif
