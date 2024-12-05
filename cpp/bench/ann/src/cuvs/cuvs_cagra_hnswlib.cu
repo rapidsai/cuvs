@@ -25,11 +25,34 @@
 namespace cuvs::bench {
 
 template <typename T, typename IdxT>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param& param)
+{
+  if (conf.contains("hierarchy")) {
+    if (conf.at("hierarchy") == "none") {
+      param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;
+    } else if (conf.at("hierarchy") == "cpu") {
+      param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
+    } else {
+      THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
+    }
+  }
+  if (conf.contains("ef_construction")) {
+    param.hnsw_index_params.ef_construction = conf.at("ef_construction");
+  }
+  if (conf.contains("num_threads")) {
+    param.hnsw_index_params.num_threads = conf.at("num_threads");
+  }
+}
+
+template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::search_param& param)
 {
-  param.ef = conf.at("ef");
-  if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
+  param.hnsw_search_param.ef = conf.at("ef");
+  if (conf.contains("num_threads")) {
+    param.hnsw_search_param.num_threads = conf.at("num_threads");
+  }
 }
 
 template <typename T>
@@ -43,9 +66,10 @@ auto create_algo(const std::string& algo_name,
 
   if constexpr (std::is_same_v<T, float> or std::is_same_v<T, std::uint8_t>) {
     if (algo_name == "raft_cagra_hnswlib" || algo_name == "cuvs_cagra_hnswlib") {
-      typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::build_param param;
-      parse_build_param<T, uint32_t>(conf, param);
-      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, param);
+      typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::build_param bparam;
+      ::parse_build_param<T, uint32_t>(conf, bparam.cagra_build_param);
+      parse_build_param<T, uint32_t>(conf, bparam);
+      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, bparam);
     }
   }
 
