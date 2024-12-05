@@ -39,6 +39,7 @@ files:
       - bench
       - bench_python
       - rapids_build_setuptools
+      - cupy
   test_cpp:
     output: none
     includes:

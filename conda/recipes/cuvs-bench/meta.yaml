@@ -88,6 +88,7 @@ requirements:
     - cudatoolkit
     {% else %}
     - cuda-cudart
+    - cupy>=12.0.0
     - libcublas
     {% endif %}
     - glog {{ glog_version }}
