@@ -92,7 +92,7 @@ requirements:
     - libcublas
     {% endif %}
     - glog {{ glog_version }}
-    - libcuvs {{ version }}
+    - cuvs {{ version }}
     - h5py {{ h5py_version }}
     - matplotlib
     - pandas

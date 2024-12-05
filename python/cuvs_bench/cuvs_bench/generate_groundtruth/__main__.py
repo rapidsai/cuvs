@@ -68,17 +68,32 @@ def import_with_fallback(primary_lib, secondary_lib=None, alias=None):
 
 xp = import_with_fallback("cupy", "numpy")
 rmm = import_with_fallback("rmm")
+gpu_system = False
 
-if rmm is not None:
-    gpu_system = True
-    from pylibraft.common import DeviceResources
-    from rmm.allocators.cupy import rmm_cupy_allocator
-else:
+
+def force_fallback_to_numpy():
+    global xp, gpu_system
+    xp = import_with_fallback("numpy")
     gpu_system = False
     warnings.warn(
         "Consider using a GPU-based system to greatly accelerate "
         " generating groundtruths using cuVS."
     )
+
+
+if rmm is not None:
+    gpu_system = True
+    try:
+        from pylibraft.common import DeviceResources
+        from rmm.allocators.cupy import rmm_cupy_allocator
+
+        from cuvs.neighbors.brute_force import build, search
+    except ImportError:
+        # RMM is available, cupy is available, but cuVS is not
+        force_fallback_to_numpy()
+else:
+    # No RMM, no cuVS, but cupy is available
+    force_fallback_to_numpy()
 
 
 def generate_random_queries(n_queries, n_features, dtype=xp.float32):
@@ -173,8 +188,6 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
     queries = xp.asarray(queries, dtype=xp.float32)
 
     if gpu_system:
-        from cuvs.neighbors.brute_force import build, search
-
         resources = DeviceResources()
 
     while i < n_samples:
@@ -209,12 +222,15 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
 
 
 def main():
-    if gpu_system:
+    if gpu_system and xp.__name__ == "cupy":
         pool = rmm.mr.PoolMemoryResource(
             rmm.mr.CudaMemoryResource(), initial_pool_size=2**30
         )
         rmm.mr.set_current_device_resource(pool)
         xp.cuda.set_allocator(rmm_cupy_allocator)
+    else:
+        # RMM is available, but cupy is not
+        force_fallback_to_numpy()
 
     parser = argparse.ArgumentParser(
         prog="generate_groundtruth",
