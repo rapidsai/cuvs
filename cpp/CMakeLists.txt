@@ -324,6 +324,9 @@ if(BUILD_SHARED_LIBS)
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
     src/core/bitset.cu
+    src/distance/detail/kernels/gram_matrix.cu
+    src/distance/detail/kernels/kernel_factory.cu
+    src/distance/detail/kernels/kernel_matrices.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
@@ -370,6 +373,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
+    src/embed/spectral.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
