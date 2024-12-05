@@ -175,6 +175,19 @@ if(BUILD_TESTS)
     100
   )
 
+  ConfigureTest(
+    NAME
+    NEIGHBORS_DYNAMIC_BATCHING_TEST
+    PATH
+    neighbors/dynamic_batching/test_cagra.cu
+    neighbors/dynamic_batching/test_ivf_flat.cu
+    neighbors/dynamic_batching/test_ivf_pq.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
     target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
@@ -213,6 +226,11 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+
+  ConfigureTest(
+    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
+  )
+
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )

@@ -397,6 +397,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/cagra_build.cpp
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
+    src/neighbors/dynamic_batching.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
@@ -458,6 +459,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
+    src/preprocessing/quantize/scalar.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
