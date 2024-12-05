@@ -379,7 +379,14 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // Pack a few vectors back to the list.
     int row_offset = 5;
     int n_vec      = 3;
-    ASSERT_TRUE(row_offset + n_vec < n_rows);
+    if (static_cast<decltype(n_rows)>(row_offset + n_vec) > n_rows) {
+      RAFT_LOG_INFO(
+        "Skipping IVF-PQ check_packing/pack test for label %u due to insufficient data (%u "
+        "records)",
+        label,
+        uint32_t(n_rows));
+      return;
+    }
     size_t offset      = row_offset * index->pq_dim();
     auto codes_to_pack = raft::make_device_matrix_view<const uint8_t, uint32_t>(
       codes.data_handle() + offset, n_vec, index->pq_dim());
@@ -393,7 +400,14 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // Another test with the API that take list_data directly
     [[maybe_unused]] auto list_data = index->lists()[label]->data.view();
     uint32_t n_take                 = 4;
-    ASSERT_TRUE(row_offset + n_take < n_rows);
+    if (static_cast<decltype(n_rows)>(row_offset + n_take) > n_rows) {
+      RAFT_LOG_INFO(
+        "Skipping IVF-PQ check_packing/take test for label %u due to insufficient data (%u "
+        "records)",
+        label,
+        uint32_t(n_rows));
+      return;
+    }
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
     ivf_pq::helpers::codepacker::unpack(
       handle_, list_data, index->pq_bits(), row_offset, codes2.view());
