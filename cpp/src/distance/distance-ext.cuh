@@ -273,13 +273,13 @@ instantiate_cuvs_distance_distance_extra(cuvs::distance::DistanceType::L2Unexpan
                                          float,
                                          float,
                                          float,
-                                         cuvs::distance::kernels::detail::rbf_fin_op<float>,
+                                         cuvs::distance::kernels::rbf_fin_op<float>,
                                          int64_t);
 instantiate_cuvs_distance_distance_extra(cuvs::distance::DistanceType::L2Unexpanded,
                                          double,
                                          double,
                                          double,
-                                         cuvs::distance::kernels::detail::rbf_fin_op<double>,
+                                         cuvs::distance::kernels::rbf_fin_op<double>,
                                          int64_t);
 
 #undef instantiate_cuvs_distance_distance_extra

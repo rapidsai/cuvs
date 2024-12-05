@@ -222,6 +222,7 @@ if(BUILD_TESTS)
     distance/dist_l_inf.cu
     distance/dist_lp_unexp.cu
     distance/dist_russell_rao.cu
+    distance/gram.cu
     distance/masked_nn.cu
     distance/sparse_distance.cu
     sparse/neighbors/cross_component_nn.cu
@@ -231,6 +232,11 @@ if(BUILD_TESTS)
     100
   )
 
+  ConfigureTest(
+    NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
+    sparse/cluster/spectral.cu GPUS 1 PERCENT 100
+  )
+  
   ConfigureTest(
     NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
   )
