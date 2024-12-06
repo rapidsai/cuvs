@@ -160,9 +160,9 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::nn_descent::
 
 inline void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::vpq_params& param)
 {
-  if (conf.contains("pq_bits")) { param.pq_bits = conf.at("pq_bits"); std::cout << "setting pq_bits " << param.pq_bits << std::endl; }
-  if (conf.contains("pq_dim")) { param.pq_dim = conf.at("pq_dim"); std::cout << "setting pq_dim " << param.pq_dim << std::endl; }
-  if (conf.contains("vq_n_centers")) { param.vq_n_centers = conf.at("vq_n_centers"); std::cout << "setting vq_n_centers " << param.vq_n_centers << std::endl; }
+  if (conf.contains("pq_bits")) { param.pq_bits = conf.at("pq_bits"); }
+  if (conf.contains("pq_dim")) { param.pq_dim = conf.at("pq_dim"); }
+  if (conf.contains("vq_n_centers")) { param.vq_n_centers = conf.at("vq_n_centers"); }
   if (conf.contains("kmeans_n_iters")) { param.kmeans_n_iters = conf.at("kmeans_n_iters"); }
   if (conf.contains("vq_kmeans_trainset_fraction")) {
     param.vq_kmeans_trainset_fraction = conf.at("vq_kmeans_trainset_fraction");
@@ -230,13 +230,10 @@ void parse_build_param(const nlohmann::json& conf,
     param.nn_descent_params = nn_param;
   }
   nlohmann::json comp_search_conf = collect_conf_with_prefix(conf, "compression_");
-  std::cout << "now setting compression params" << std::endl;
   if (!comp_search_conf.empty()) {
-    std::cout << "acquired compression params" << std::endl;
     cuvs::neighbors::vpq_params vpq_pams;
     parse_build_param(comp_search_conf, vpq_pams);
     param.cagra_params.compression.emplace(vpq_pams);
-    std::cout << "finish setting compression params" << std::endl;
   }
 }
 
