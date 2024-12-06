@@ -19,6 +19,8 @@ dependencies:
 - cuda-profiler-api
 - cuda-python>=12.0,<13.0a0,<=12.6.0
 - cuda-version=12.5
+- cupy>=12.0.0
+- cuvs==24.12.*,>=0.0.0a0
 - cxx-compiler
 - cython>=3.0.0
 - dlpack>=0.8,<1.0
@@ -29,6 +31,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
+- libcuvs==24.12.*,>=0.0.0a0
 - librmm==24.12.*,>=0.0.0a0
 - matplotlib
 - nccl>=2.19
