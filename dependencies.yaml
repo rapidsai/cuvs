@@ -39,6 +39,7 @@ files:
       - bench
       - bench_python
       - rapids_build_setuptools
+      - cupy
   test_cpp:
     output: none
     includes:
@@ -475,11 +476,13 @@ dependencies:
           - h5py>=3.8.0
           - benchmark>=1.8.2
           - openblas
+          - libcuvs==24.12.*,>=0.0.0a0
   bench_python:
     common:
       - output_types: [conda, pyproject, requirements]
         packages:
           - click
+          - cuvs==24.12.*,>=0.0.0a0
           - matplotlib
           - pandas
           - pyyaml
