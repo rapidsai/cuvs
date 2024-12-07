@@ -18,8 +18,6 @@ dependencies:
 - cuda-python>=11.8.5,<12.0a0
 - cuda-version=11.8
 - cudatoolkit
-- cupy>=12.0.0
-- cuvs==24.12.*,>=0.0.0a0
 - cxx-compiler
 - cython>=3.0.0
 - dlpack>=0.8,<1.0
