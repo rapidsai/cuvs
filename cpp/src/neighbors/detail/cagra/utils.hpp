@@ -184,7 +184,7 @@ class device_matrix_view_from_host {
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
     device_ptr = reinterpret_cast<T*>(attr.devicePointer);
-    if (device_ptr == NULL) {
+    if (attr.type != cudaMemoryTypeDevice && attr.type != cudaMemoryTypeManaged) {
       // allocate memory and copy over
       // NB: We use the temporary "large" workspace resource here; this structure is supposed to
       // live on stack and not returned to a user.
