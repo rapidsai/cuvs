@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
 
-from cuvs.neighbors import cagra, ivf_flat, ivf_pq
+from cuvs.neighbors import brute_force, cagra, ivf_flat, ivf_pq
 from cuvs.test.ann_utils import generate_data
 
 
@@ -35,6 +35,10 @@ def test_save_load_ivf_pq():
     run_save_load(ivf_pq, np.float32)
 
 
+def test_save_load_brute_force():
+    run_save_load(brute_force, np.float32)
+
+
 def run_save_load(ann_module, dtype):
     n_rows = 10000
     n_cols = 50
@@ -43,8 +47,11 @@ def run_save_load(ann_module, dtype):
     dataset = generate_data((n_rows, n_cols), dtype)
     dataset_device = device_ndarray(dataset)
 
-    build_params = ann_module.IndexParams()
-    index = ann_module.build(build_params, dataset_device)
+    if ann_module == brute_force:
+        index = ann_module.build(dataset_device)
+    else:
+        build_params = ann_module.IndexParams()
+        index = ann_module.build(build_params, dataset_device)
 
     assert index.trained
     filename = "my_index.bin"
@@ -54,20 +61,29 @@ def run_save_load(ann_module, dtype):
     queries = generate_data((n_queries, n_cols), dtype)
 
     queries_device = device_ndarray(queries)
-    search_params = ann_module.SearchParams()
     k = 10
-
-    distance_dev, neighbors_dev = ann_module.search(
-        search_params, index, queries_device, k
-    )
+    if ann_module == brute_force:
+        distance_dev, neighbors_dev = ann_module.search(
+            index, queries_device, k
+        )
+    else:
+        search_params = ann_module.SearchParams()
+        distance_dev, neighbors_dev = ann_module.search(
+            search_params, index, queries_device, k
+        )
 
     neighbors = neighbors_dev.copy_to_host()
     dist = distance_dev.copy_to_host()
     del index
 
-    distance_dev, neighbors_dev = ann_module.search(
-        search_params, loaded_index, queries_device, k
-    )
+    if ann_module == brute_force:
+        distance_dev, neighbors_dev = ann_module.search(
+            loaded_index, queries_device, k
+        )
+    else:
+        distance_dev, neighbors_dev = ann_module.search(
+            search_params, loaded_index, queries_device, k
+        )
 
     neighbors2 = neighbors_dev.copy_to_host()
     dist2 = distance_dev.copy_to_host()

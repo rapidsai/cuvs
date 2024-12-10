@@ -24,6 +24,7 @@ from cuvs.common.resources import auto_sync_resources
 from cython.operator cimport dereference as deref
 from libc.stdint cimport uint32_t
 from libcpp cimport bool
+from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
 from cuvs.distance_type cimport cuvsDistanceType
@@ -31,9 +32,9 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
 
 from cuvs.distance import DISTANCE_TYPES
+from cuvs.neighbors.common import _check_input_array
 
 from cuvs.common.c_api cimport cuvsResources_t
 
@@ -256,3 +257,88 @@ def search(Index index,
         ))
 
     return (distances, neighbors)
+
+
+@auto_sync_resources
+def save(filename, Index index, bool include_dataset=True, resources=None):
+    """
+    Saves the index to a file.
+
+    The serialization format can be subject to changes, therefore loading
+    an index saved with a previous version of cuvs is not guaranteed
+    to work.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    index : Index
+        Trained Brute Force index.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset)
+    >>> # Serialize and deserialize the brute_force index built
+    >>> brute_force.save("my_index.bin", index)
+    >>> index_loaded = brute_force.load("my_index.bin")
+    """
+    cdef string c_filename = filename.encode('utf-8')
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsBruteForceSerialize(res,
+                                       c_filename.c_str(),
+                                       index.index))
+
+
+@auto_sync_resources
+def load(filename, resources=None):
+    """
+    Loads index from file.
+
+    The serialization format can be subject to changes, therefore loading
+    an index saved with a previous version of cuvs is not guaranteed
+    to work.
+
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset)
+    >>> # Serialize and deserialize the brute_force index built
+    >>> brute_force.save("my_index.bin", index)
+    >>> index_loaded = brute_force.load("my_index.bin")
+    """
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef string c_filename = filename.encode('utf-8')
+
+    check_cuvs(cuvsBruteForceDeserialize(
+        res,
+        c_filename.c_str(),
+        idx.index
+    ))
+    idx.trained = True
+    return idx

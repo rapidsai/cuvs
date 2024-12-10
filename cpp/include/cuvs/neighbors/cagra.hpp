@@ -272,6 +272,10 @@ static_assert(std::is_aggregate_v<search_params>);
  */
 template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index {
+  using index_params_type  = cagra::index_params;
+  using search_params_type = cagra::search_params;
+  using index_type         = IdxT;
+  using value_type         = T;
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
@@ -363,7 +367,7 @@ struct index : cuvs::neighbors::index {
    *   // search K nearest neighbours
    *   auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(res, n_queries, k);
    *   auto distances = raft::make_device_matrix<float, int64_t>(res, n_queries, k);
-   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
    * @endcode
    *   In the above example, we have passed a host dataset to build. The returned index will own a
    * device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a
@@ -530,7 +534,7 @@ struct index : cuvs::neighbors::index {
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -567,7 +571,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -604,7 +608,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -640,7 +644,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -676,7 +680,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -713,7 +717,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -750,7 +754,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -787,7 +791,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res

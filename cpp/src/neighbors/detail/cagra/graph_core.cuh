@@ -156,6 +156,7 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   // count number of detours (A->D->B)
   for (uint32_t kAD = 0; kAD < graph_degree - 1; kAD++) {
     const uint64_t iD = knn_graph[kAD + (graph_degree * iA)];
+    if (iD >= graph_size) { continue; }
     for (uint32_t kDB = threadIdx.x; kDB < graph_degree; kDB += blockDim.x) {
       const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)graph_degree * iD)];
       for (uint32_t kAB = kAD + 1; kAB < graph_degree; kAB++) {

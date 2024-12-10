@@ -108,7 +108,8 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
 
       cuvs::neighbors::hnsw::search_params search_params;
       search_params.ef = ps.ef;
-      auto hnsw_index  = cuvs::neighbors::hnsw::from_cagra(handle_, index);
+      cuvs::neighbors::hnsw::index_params hnsw_params;
+      auto hnsw_index = cuvs::neighbors::hnsw::from_cagra(handle_, hnsw_params, index);
       auto queries_HNSW_view =
         raft::make_host_matrix_view<DataT, int64_t>(queries_h.data(), ps.n_queries, ps.dim);
       auto indices_HNSW_view =
