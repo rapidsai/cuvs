@@ -49,6 +49,7 @@ function(ConfigureTest)
     PRIVATE cuvs
             cuvs::cuvs
             raft::raft
+            test_rmm_logger
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
@@ -86,6 +87,9 @@ function(ConfigureTest)
     INSTALL_COMPONENT_SET testing
   )
 endfunction()
+
+add_library(test_rmm_logger OBJECT)
+target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl)
 
 # ##################################################################################################
 # test sources ##################################################################################
@@ -218,6 +222,7 @@ if(BUILD_TESTS)
     distance/dist_l_inf.cu
     distance/dist_lp_unexp.cu
     distance/dist_russell_rao.cu
+    distance/gram.cu
     distance/masked_nn.cu
     distance/sparse_distance.cu
     sparse/neighbors/cross_component_nn.cu
@@ -226,6 +231,16 @@ if(BUILD_TESTS)
     PERCENT
     100
   )
+
+  ConfigureTest(
+    NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
+    sparse/cluster/spectral.cu GPUS 1 PERCENT 100
+  )
+  
+  ConfigureTest(
+    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
+  )
+
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )
