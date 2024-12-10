@@ -59,6 +59,7 @@ requirements:
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib
+    - numpy >=1.23,<3.0a0
     - pandas
     - pyyaml
     - python
