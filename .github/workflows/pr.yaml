@@ -21,6 +21,7 @@ jobs:
       - conda-python-tests
       - docs-build
       - rust-build
+      - go-build
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
@@ -44,6 +45,7 @@ jobs:
           - '!notebooks/**'
           - '!python/**'
           - '!rust/**'
+          - '!go/**'
           - '!thirdparty/LICENSES/**'
         test_notebooks:
           - '**'
@@ -51,6 +53,7 @@ jobs:
           - '!.pre-commit-config.yaml'
           - '!README.md'
           - '!rust/**'
+          - '!go/**'
           - '!thirdparty/LICENSES/**'
         test_python:
           - '**'
@@ -61,6 +64,7 @@ jobs:
           - '!img/**'
           - '!notebooks/**'
           - '!rust/**'
+          - '!go/**'
           - '!thirdparty/LICENSES/**'
   checks:
     secrets: inherit
@@ -122,6 +126,16 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_rust.sh"
+  go-build:
+    needs: conda-cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.12
+    with:
+      build_type: pull-request
+      node_type: "gpu-v100-latest-1"
+      arch: "amd64"
+      container_image: "rapidsai/ci-conda:latest"
+      run_script: "ci/build_go.sh"
   wheel-build-cuvs:
     needs: checks
     secrets: inherit
