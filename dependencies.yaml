@@ -23,7 +23,6 @@ files:
       - test_py_cuvs
       - cupy
       - rust
-      - go
   bench_ann:
     output: conda
     matrix:
@@ -69,13 +68,6 @@ files:
       - rapids_build
       - cuda
   rust:
-    output: none
-    includes:
-      - cuda_version
-      - rapids_build
-      - cuda
-      - rust
-  go:
     output: none
     includes:
       - cuda_version
@@ -416,15 +408,6 @@ dependencies:
         packages:
           - make
           - rust
-          # clang/liblclang only needed for bindgen support
-          - clang
-          - libclang
-  go:
-    common:
-      - output_types: [conda]
-        packages:
-          - make
-          - go
           # clang/liblclang only needed for bindgen support
           - clang
           - libclang
