@@ -399,7 +399,7 @@ dependencies:
           - graphviz
           - ipython
           - numpydoc
-          - pydata-sphinx-theme
+          - nvidia-sphinx-theme
           - recommonmark
           - sphinx-copybutton
           - sphinx-markdown-tables

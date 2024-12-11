@@ -38,9 +38,9 @@ dependencies:
 - ninja
 - numpy>=1.23,<3.0a0
 - numpydoc
+- nvidia-sphinx-theme
 - openblas
 - pre-commit
-- pydata-sphinx-theme
 - pylibraft==25.2.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
