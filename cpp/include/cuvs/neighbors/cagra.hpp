@@ -229,6 +229,13 @@ struct search_params : cuvs::neighbors::search_params {
    * impact on the throughput.
    */
   float persistent_device_usage = 1.0;
+
+  /**
+   * A parameter indicating the rate of nodes to be filtered-out, when filtering is used.
+   * The value must be equal to or greater than 0.0 and less than 1.0. Default value is
+   * negative, in which case the filtering rate is automatically set.
+   */
+  float filtering_rate = -1.0;
 };
 
 /**
