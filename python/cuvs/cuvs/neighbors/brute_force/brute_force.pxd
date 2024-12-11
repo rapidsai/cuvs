@@ -47,3 +47,11 @@ cdef extern from "cuvs/neighbors/brute_force.h" nogil:
                                      DLManagedTensor* neighbors,
                                      DLManagedTensor* distances,
                                      cuvsFilter filter) except +
+
+    cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
+                                        const char * filename,
+                                        cuvsBruteForceIndex_t index) except +
+
+    cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
+                                          const char * filename,
+                                          cuvsBruteForceIndex_t index) except +

@@ -29,6 +29,8 @@
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
 
+#include <fstream>
+
 namespace {
 
 template <typename T>

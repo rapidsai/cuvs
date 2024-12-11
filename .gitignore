@@ -75,6 +75,7 @@ compile_commands.json
 .clangd/
 
 # serialized ann indexes
+brute_force_index
 cagra_index
 ivf_flat_index
 ivf_pq_index

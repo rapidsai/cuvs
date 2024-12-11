@@ -15,8 +15,8 @@
  */
 #pragma once
 
-#include "../hnswlib/hnswlib_wrapper.h"
 #include "cuvs_cagra_wrapper.h"
+#include <cuvs/neighbors/hnsw.hpp>
 
 #include <memory>
 
@@ -26,14 +26,20 @@ template <typename T, typename IdxT>
 class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
-  using build_param       = typename cuvs_cagra<T, IdxT>::build_param;
-  using search_param      = typename hnsw_lib<T>::search_param;
+
+  struct build_param {
+    typename cuvs_cagra<T, IdxT>::build_param cagra_build_param;
+    cuvs::neighbors::hnsw::index_params hnsw_index_params;
+  };
+
+  struct search_param : public search_param_base {
+    cuvs::neighbors::hnsw::search_params hnsw_search_param;
+  };
 
   cuvs_cagra_hnswlib(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
     : algo<T>(metric, dim),
-      cagra_build_{metric, dim, param, concurrent_searches},
-      // hnsw_lib param values don't matter since we don't build with hnsw_lib
-      hnswlib_search_{metric, dim, typename hnsw_lib<T>::build_param{50, 100}}
+      build_param_{param},
+      cagra_build_{metric, dim, param.cagra_build_param, concurrent_searches}
   {
   }
 
@@ -69,40 +75,67 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
   }
 
  private:
+  raft::resources handle_{};
+  build_param build_param_;
+  search_param search_param_;
   cuvs_cagra<T, IdxT> cagra_build_;
-  hnsw_lib<T> hnswlib_search_;
+  std::shared_ptr<cuvs::neighbors::hnsw::index<T>> hnsw_index_;
 };
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   cagra_build_.build(dataset, nrow);
+  auto* cagra_index      = cagra_build_.get_index();
+  auto host_dataset_view = raft::make_host_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
+  auto opt_dataset_view =
+    std::optional<raft::host_matrix_view<const T, int64_t>>(std::move(host_dataset_view));
+  hnsw_index_ = cuvs::neighbors::hnsw::from_cagra(
+    handle_, build_param_.hnsw_index_params, *cagra_index, opt_dataset_view);
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_)
 {
-  hnswlib_search_.set_search_param(param_);
+  search_param_ = dynamic_cast<const search_param&>(param_);
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::save(const std::string& file) const
 {
-  cagra_build_.save_to_hnswlib(file);
+  cuvs::neighbors::hnsw::serialize(handle_, file, *(hnsw_index_.get()));
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::load(const std::string& file)
 {
-  hnswlib_search_.load(file);
-  hnswlib_search_.set_base_layer_only();
+  cuvs::neighbors::hnsw::index<T>* idx = nullptr;
+  cuvs::neighbors::hnsw::deserialize(handle_,
+                                     build_param_.hnsw_index_params,
+                                     file,
+                                     this->dim_,
+                                     parse_metric_type(this->metric_),
+                                     &idx);
+  hnsw_index_ = std::shared_ptr<cuvs::neighbors::hnsw::index<T>>(idx);
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  hnswlib_search_.search(queries, batch_size, k, neighbors, distances);
+  // Only Latency mode is supported for now
+  auto queries_view =
+    raft::make_host_matrix_view<const T, int64_t>(queries, batch_size, this->dim_);
+  auto neighbors_view = raft::make_host_matrix_view<uint64_t, int64_t>(
+    reinterpret_cast<uint64_t*>(neighbors), batch_size, k);
+  auto distances_view = raft::make_host_matrix_view<float, int64_t>(distances, batch_size, k);
+
+  cuvs::neighbors::hnsw::search(handle_,
+                                search_param_.hnsw_search_param,
+                                *(hnsw_index_.get()),
+                                queries_view,
+                                neighbors_view,
+                                distances_view);
 }
 
 }  // namespace cuvs::bench

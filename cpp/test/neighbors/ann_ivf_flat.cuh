@@ -24,6 +24,7 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/linalg/normalize.cuh>
 #include <raft/stats/mean.cuh>
+#include <thrust/reduce.h>
 #include <thrust/sequence.h>
 
 #include <raft/core/resource/cuda_stream_pool.hpp>

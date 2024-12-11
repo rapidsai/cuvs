@@ -361,8 +361,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                           // not used for knn_graph building.
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -370,8 +370,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             }
             break;
           case graph_build_algo::NN_DESCENT: {
-            index_params.graph_build_params =
-              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            index_params.graph_build_params = graph_build_params::nn_descent_params(
+              index_params.intermediate_graph_degree, index_params.metric);
             break;
           }
           case graph_build_algo::AUTO:
@@ -389,7 +389,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
         {
-          cagra::index<DataT, IdxT> index(handle_);
+          cagra::index<DataT, IdxT> index(handle_, index_params.metric);
           if (ps.host_dataset) {
             auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
             raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
@@ -758,11 +758,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
         search_params.team_size   = ps.team_size;
-
-        // TODO: setting search_params.itopk_size here breaks the filter tests, but is required for
-        // k>1024 skip these tests until fixed
-        if (ps.k >= 1024) { GTEST_SKIP(); }
-        // search_params.itopk_size   = ps.itopk_size;
+        search_params.itopk_size  = ps.itopk_size;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);

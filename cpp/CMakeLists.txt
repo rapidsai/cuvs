@@ -53,8 +53,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
-option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
-option(BUILD_C_TESTS "Build cuVS C API tests" OFF)
+option(BUILD_C_LIBRARY "Build cuVS C API library" ON)
 option(BUILD_CUVS_BENCH "Build cuVS ann benchmarks" OFF)
 option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
 option(BUILD_MG_ALGOS "Build with multi-GPU support" ON)
@@ -72,21 +71,12 @@ option(DISABLE_OPENMP "Disable OpenMP" OFF)
 option(CUVS_NVTX "Enable nvtx markers" OFF)
 option(CUVS_RAFT_CLONE_ON_PIN "Explicitly clone RAFT branch when pinned to non-feature branch" ON)
 
-if((BUILD_TESTS OR BUILD_C_LIBRARY) AND NOT BUILD_CPU_ONLY)
-
-endif()
-
 if(BUILD_CPU_ONLY)
   set(BUILD_SHARED_LIBS OFF)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
-endif()
-
-if(NOT BUILD_C_LIBRARY)
-  set(BUILD_C_TESTS OFF)
-endif()
-
-if(NOT BUILD_SHARED_LIBS)
+  set(BUILD_CAGRA_HNSWLIB OFF)
+elseif(NOT BUILD_SHARED_LIBS)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
   set(BUILD_CAGRA_HNSWLIB OFF)
@@ -334,6 +324,9 @@ if(BUILD_SHARED_LIBS)
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
     src/core/bitset.cu
+    src/distance/detail/kernels/gram_matrix.cu
+    src/distance/detail/kernels/kernel_factory.cu
+    src/distance/detail/kernels/kernel_matrices.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
@@ -379,7 +372,10 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/fused_distance_nn.cu
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
+    src/distance/sparse_distance.cu
+    src/embed/spectral.cu
     src/neighbors/brute_force.cu
+    src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
     src/neighbors/cagra_build_int8.cu
@@ -405,6 +401,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/cagra_build.cpp
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
+    src/neighbors/dynamic_batching.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
@@ -446,6 +443,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu
     src/neighbors/nn_descent_half.cu
+    src/neighbors/nn_descent_index.cpp
     src/neighbors/nn_descent_int8.cu
     src/neighbors/nn_descent_uint8.cu
     src/neighbors/reachability.cu
@@ -458,12 +456,14 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
     src/neighbors/sample_filter.cu
+    src/neighbors/sparse_brute_force.cu
     src/neighbors/vamana_build_float.cu
     src/neighbors/vamana_build_uint8.cu
     src/neighbors/vamana_build_int8.cu
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
+    src/preprocessing/quantize/scalar.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
@@ -583,6 +583,7 @@ if(BUILD_SHARED_LIBS)
 
   if(BUILD_CAGRA_HNSWLIB)
     target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
@@ -613,6 +614,9 @@ SECTIONS
     # This enables NVTX within the project with no option to disable it downstream.
     target_link_libraries(cuvs PUBLIC CUDA::nvtx3)
     target_compile_definitions(cuvs PUBLIC NVTX_ENABLED)
+
+    target_link_libraries(cuvs-cagra-search PUBLIC CUDA::nvtx3)
+    target_compile_definitions(cuvs-cagra-search PUBLIC NVTX_ENABLED)
   else()
     # Allow enable NVTX downstream if not set here. This creates a new option at build/install time,
     # which is set by default to OFF, but can be enabled in the dependent project.
@@ -771,7 +775,8 @@ endif()
 # ##################################################################################################
 # * build test executable ----------------------------------------------------
 
-if(BUILD_TESTS OR BUILD_C_TESTS)
+if(BUILD_TESTS)
+  enable_testing()
   add_subdirectory(internal)
   add_subdirectory(test)
 endif()
