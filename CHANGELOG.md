@@ -1,3 +1,67 @@
+# cuvs 24.12.00 (11 Dec 2024)
+
+## 🚨 Breaking Changes
+
+- HNSW CPU Hierarchy ([#465](https://github.com/rapidsai/cuvs/pull/465)) [@divyegala](https://github.com/divyegala)
+- Use dashes in cuvs-bench package name. ([#417](https://github.com/rapidsai/cuvs/pull/417)) [@bdice](https://github.com/bdice)
+
+## 🐛 Bug Fixes
+
+- Skip IVF-PQ packing test for lists with not enough data ([#512](https://github.com/rapidsai/cuvs/pull/512)) [@achirkin](https://github.com/achirkin)
+- [BUG] Fix CAGRA filter ([#489](https://github.com/rapidsai/cuvs/pull/489)) [@enp1s0](https://github.com/enp1s0)
+- Add `kIsSingleSource` to `PairwiseDistanceEpilogueElementwise` ([#485](https://github.com/rapidsai/cuvs/pull/485)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Fix include errors, header, and unsafe locks in iface.hpp ([#467](https://github.com/rapidsai/cuvs/pull/467)) [@achirkin](https://github.com/achirkin)
+- Fix an OOB error in device-side cuvs::neighbors::refine and CAGRA kern_prune ([#460](https://github.com/rapidsai/cuvs/pull/460)) [@achirkin](https://github.com/achirkin)
+- Put a ceiling on cuda-python ([#445](https://github.com/rapidsai/cuvs/pull/445)) [@bdice](https://github.com/bdice)
+- Enable NVTX in cuvs-cagra-search component ([#439](https://github.com/rapidsai/cuvs/pull/439)) [@achirkin](https://github.com/achirkin)
+- BUG: CAGRA multi-cta illegal access with bad queries ([#438](https://github.com/rapidsai/cuvs/pull/438)) [@achirkin](https://github.com/achirkin)
+- Fix index overflow in edge cases of CAGRA graph optimize ([#435](https://github.com/rapidsai/cuvs/pull/435)) [@achirkin](https://github.com/achirkin)
+- Fix correct call to brute force in generate groundtruth of cuvs-bench ([#427](https://github.com/rapidsai/cuvs/pull/427)) [@dantegd](https://github.com/dantegd)
+- Use Python for sccache hit rate computation. ([#420](https://github.com/rapidsai/cuvs/pull/420)) [@bdice](https://github.com/bdice)
+- Add `click` package to `cuvs-bench` conda recipe ([#408](https://github.com/rapidsai/cuvs/pull/408)) [@divyegala](https://github.com/divyegala)
+- Fix NVTX annotations ([#400](https://github.com/rapidsai/cuvs/pull/400)) [@achirkin](https://github.com/achirkin)
+
+## 📖 Documentation
+
+- [Doc] Fix CAGRA search sample code ([#484](https://github.com/rapidsai/cuvs/pull/484)) [@enp1s0](https://github.com/enp1s0)
+- Fix broken link in README.md references ([#473](https://github.com/rapidsai/cuvs/pull/473)) [@Azurethi](https://github.com/Azurethi)
+- Adding tech stack to docs ([#448](https://github.com/rapidsai/cuvs/pull/448)) [@cjnolet](https://github.com/cjnolet)
+- Fix Question Retrieval notebook ([#352](https://github.com/rapidsai/cuvs/pull/352)) [@lowener](https://github.com/lowener)
+
+## 🚀 New Features
+
+- Add C++ API scalar quantization ([#494](https://github.com/rapidsai/cuvs/pull/494)) [@mfoerste4](https://github.com/mfoerste4)
+- HNSW CPU Hierarchy ([#465](https://github.com/rapidsai/cuvs/pull/465)) [@divyegala](https://github.com/divyegala)
+- Add serialization API to brute-force ([#461](https://github.com/rapidsai/cuvs/pull/461)) [@lowener](https://github.com/lowener)
+- Add Question Retrieval notebook using Milvus ([#451](https://github.com/rapidsai/cuvs/pull/451)) [@lowener](https://github.com/lowener)
+- Migrate feature diff for NN Descent from RAFT to cuVS ([#421](https://github.com/rapidsai/cuvs/pull/421)) [@divyegala](https://github.com/divyegala)
+- Add --no-lap-sync cmd option to ann-bench ([#405](https://github.com/rapidsai/cuvs/pull/405)) [@achirkin](https://github.com/achirkin)
+- Add `InnerProduct` and `CosineExpanded` metric support in NN Descent ([#177](https://github.com/rapidsai/cuvs/pull/177)) [@divyegala](https://github.com/divyegala)
+
+## 🛠️ Improvements
+
+- Update cuvs to match raft&#39;s cutlass changes ([#516](https://github.com/rapidsai/cuvs/pull/516)) [@vyasr](https://github.com/vyasr)
+- add a README for wheels ([#504](https://github.com/rapidsai/cuvs/pull/504)) [@jameslamb](https://github.com/jameslamb)
+- Move check_input_array from pylibraft ([#474](https://github.com/rapidsai/cuvs/pull/474)) [@benfred](https://github.com/benfred)
+- use different wheel-size thresholds based on CUDA version ([#469](https://github.com/rapidsai/cuvs/pull/469)) [@jameslamb](https://github.com/jameslamb)
+- Modify cuvs-bench to be able to generate ground truth in CPU systems ([#466](https://github.com/rapidsai/cuvs/pull/466)) [@dantegd](https://github.com/dantegd)
+- enforce wheel size limits, README formatting in CI ([#464](https://github.com/rapidsai/cuvs/pull/464)) [@jameslamb](https://github.com/jameslamb)
+- Moving spectral embedding and kernel gramm APIs to cuVS ([#463](https://github.com/rapidsai/cuvs/pull/463)) [@cjnolet](https://github.com/cjnolet)
+- Migrate sparse knn and distances code from raft ([#457](https://github.com/rapidsai/cuvs/pull/457)) [@benfred](https://github.com/benfred)
+- Don&#39;t presume pointers location infers usability. ([#441](https://github.com/rapidsai/cuvs/pull/441)) [@robertmaynard](https://github.com/robertmaynard)
+- call `enable_testing` in root CMakeLists.txt ([#437](https://github.com/rapidsai/cuvs/pull/437)) [@robertmaynard](https://github.com/robertmaynard)
+- CAGRA tech debt: distance descriptor and workspace memory ([#436](https://github.com/rapidsai/cuvs/pull/436)) [@achirkin](https://github.com/achirkin)
+- Add ci run_ scripts needed for build infra ([#434](https://github.com/rapidsai/cuvs/pull/434)) [@robertmaynard](https://github.com/robertmaynard)
+- Use environment variables in cache hit rate computation. ([#422](https://github.com/rapidsai/cuvs/pull/422)) [@bdice](https://github.com/bdice)
+- Use dashes in cuvs-bench package name. ([#417](https://github.com/rapidsai/cuvs/pull/417)) [@bdice](https://github.com/bdice)
+- We need to enable the c_api by default ([#416](https://github.com/rapidsai/cuvs/pull/416)) [@robertmaynard](https://github.com/robertmaynard)
+- print sccache stats in builds ([#413](https://github.com/rapidsai/cuvs/pull/413)) [@jameslamb](https://github.com/jameslamb)
+- make conda installs in CI stricter ([#406](https://github.com/rapidsai/cuvs/pull/406)) [@jameslamb](https://github.com/jameslamb)
+- Ivf c example ([#404](https://github.com/rapidsai/cuvs/pull/404)) [@abner-ma](https://github.com/abner-ma)
+- Prune workflows based on changed files ([#392](https://github.com/rapidsai/cuvs/pull/392)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- [WIP] Add pinned memory resource to C API ([#311](https://github.com/rapidsai/cuvs/pull/311)) [@ajit283](https://github.com/ajit283)
+- Dynamic Batching ([#261](https://github.com/rapidsai/cuvs/pull/261)) [@achirkin](https://github.com/achirkin)
+
 # cuvs 24.10.00 (9 Oct 2024)
 
 ## 🐛 Bug Fixes
