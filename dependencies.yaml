@@ -399,17 +399,18 @@ dependencies:
           - graphviz
           - ipython
           - numpydoc
-          - nvidia-sphinx-theme
           - recommonmark
           - sphinx-copybutton
           - sphinx-markdown-tables
+          - pip:
+            - nvidia-sphinx-theme
   rust:
     common:
       - output_types: [conda]
         packages:
           - make
           - rust
-          # clang/liblclang only needed for bindgen support
+          # clang/libclang only needed for bindgen support
           - clang
           - libclang
   build_wheels:
