@@ -439,7 +439,7 @@ void extend_core(
       "index was built with index_param.attach_dataset_on_build = true, or if a dataset was "
       "attached after the build.");
   } else {
-    RAFT_FAIL("cagra::extend only supports uncompressed dataset");
+    RAFT_FAIL("cagra::extend only supports an uncompressed dataset index");
   }
 }
 }  // namespace cuvs::neighbors::cagra
