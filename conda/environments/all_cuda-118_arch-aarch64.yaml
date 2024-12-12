@@ -7,7 +7,7 @@ channels:
 - conda-forge
 - nvidia
 dependencies:
-- breathe
+- breathe>=4.35.0
 - c-compiler
 - clang
 - clang-tools=16.0.6
