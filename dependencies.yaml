@@ -400,6 +400,7 @@ dependencies:
           - ipython
           - numpydoc
           - recommonmark
+          - sphinx>=8.0.0
           - sphinx-copybutton
           - sphinx-markdown-tables
           - pip:

@@ -54,6 +54,7 @@ dependencies:
 - scikit-learn
 - sphinx-copybutton
 - sphinx-markdown-tables
+- sphinx>=8.0.0
 - sysroot_linux-64==2.17
 - pip:
   - nvidia-sphinx-theme
