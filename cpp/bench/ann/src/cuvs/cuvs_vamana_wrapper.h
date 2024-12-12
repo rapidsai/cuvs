@@ -17,9 +17,9 @@
 
 #include "../common/ann_types.hpp"
 #include "../diskann/diskann_wrapper.h"
-#include <utils.h>
 #include "cuvs_ann_bench_utils.h"
 #include <cuvs/neighbors/vamana.hpp>
+#include <utils.h>
 
 #include <memory>
 #include <raft/core/device_mdspan.hpp>

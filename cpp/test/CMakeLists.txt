@@ -236,7 +236,7 @@ if(BUILD_TESTS)
     NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
     sparse/cluster/spectral.cu GPUS 1 PERCENT 100
   )
-  
+
   ConfigureTest(
     NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
   )
