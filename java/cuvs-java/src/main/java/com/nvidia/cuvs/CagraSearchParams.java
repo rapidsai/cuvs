@@ -18,13 +18,13 @@ package com.nvidia.cuvs;
 
 import java.lang.foreign.MemorySegment;
 
-import com.nvidia.cuvs.panama.cuvsCagraSearchParams;
+import com.nvidia.cuvs.panama.CuvsCagraSearchParams;
 
 /**
  * CagraSearchParams encapsulates the logic for configuring and holding search
  * parameters.
  * 
- * @since 24.12
+ * @since 25.02
  */
 public class CagraSearchParams {
 
@@ -152,20 +152,24 @@ public class CagraSearchParams {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = cuvsCagraSearchParams.allocate(resources.arena);
-    cuvsCagraSearchParams.max_queries(memorySegment, maxQueries);
-    cuvsCagraSearchParams.itopk_size(memorySegment, iTopKSize);
-    cuvsCagraSearchParams.max_iterations(memorySegment, maxIterations);
-    cuvsCagraSearchParams.algo(memorySegment, searchAlgo.value);
-    cuvsCagraSearchParams.team_size(memorySegment, teamSize);
-    cuvsCagraSearchParams.search_width(memorySegment, searchWidth);
-    cuvsCagraSearchParams.min_iterations(memorySegment, minIterations);
-    cuvsCagraSearchParams.thread_block_size(memorySegment, threadBlockSize);
-    cuvsCagraSearchParams.hashmap_mode(memorySegment, hashMapMode.value);
-    cuvsCagraSearchParams.hashmap_min_bitlen(memorySegment, hashmapMinBitlen);
-    cuvsCagraSearchParams.hashmap_max_fill_rate(memorySegment, hashMapMaxFillRate);
-    cuvsCagraSearchParams.num_random_samplings(memorySegment, numRandomSamplings);
-    cuvsCagraSearchParams.rand_xor_mask(memorySegment, randXORMask);
+    MemorySegment memorySegment = CuvsCagraSearchParams.allocate(resources.arena);
+    CuvsCagraSearchParams.max_queries(memorySegment, maxQueries);
+    CuvsCagraSearchParams.itopk_size(memorySegment, iTopKSize);
+    CuvsCagraSearchParams.max_iterations(memorySegment, maxIterations);
+    if (searchAlgo != null) {
+      CuvsCagraSearchParams.algo(memorySegment, searchAlgo.value);
+    }
+    CuvsCagraSearchParams.team_size(memorySegment, teamSize);
+    CuvsCagraSearchParams.search_width(memorySegment, searchWidth);
+    CuvsCagraSearchParams.min_iterations(memorySegment, minIterations);
+    CuvsCagraSearchParams.thread_block_size(memorySegment, threadBlockSize);
+    if (hashMapMode != null) {
+      CuvsCagraSearchParams.hashmap_mode(memorySegment, hashMapMode.value);
+    }
+    CuvsCagraSearchParams.hashmap_min_bitlen(memorySegment, hashmapMinBitlen);
+    CuvsCagraSearchParams.hashmap_max_fill_rate(memorySegment, hashMapMaxFillRate);
+    CuvsCagraSearchParams.num_random_samplings(memorySegment, numRandomSamplings);
+    CuvsCagraSearchParams.rand_xor_mask(memorySegment, randXORMask);
     return memorySegment;
   }
 
@@ -312,19 +316,19 @@ public class CagraSearchParams {
   public static class Builder {
 
     private CuVSResources resources;
-    private int maxQueries = 1;
-    private int iTopKSize = 2;
-    private int maxIterations = 3;
-    private int teamSize = 4;
-    private int searchWidth = 5;
-    private int minIterations = 6;
-    private int threadBlockSize = 7;
-    private int hashMapMinBitlen = 8;
-    private int numRandomSamplings = 10;
-    private float hashMapMaxFillRate = 9.0f;
-    private long randXORMask = 11L;
-    private SearchAlgo searchAlgo = SearchAlgo.MULTI_KERNEL;
-    private HashMapMode hashMapMode = HashMapMode.AUTO_HASH;
+    private int maxQueries;
+    private int iTopKSize = 64;
+    private int maxIterations;
+    private int teamSize;
+    private int searchWidth = 1;
+    private int minIterations;
+    private int threadBlockSize;
+    private int hashMapMinBitlen;
+    private int numRandomSamplings = 1;
+    private float hashMapMaxFillRate = 0.5f;
+    private long randXORMask = 0x128394;
+    private SearchAlgo searchAlgo;
+    private HashMapMode hashMapMode;
 
     /**
      * Constructs this Builder with an instance of Arena.

@@ -23,7 +23,7 @@ import java.util.Map;
  * CagraQuery holds the CagraSearchParams and the query vectors to be used while
  * invoking search.
  * 
- * @since 24.12
+ * @since 25.02
  */
 public class CagraQuery {
 

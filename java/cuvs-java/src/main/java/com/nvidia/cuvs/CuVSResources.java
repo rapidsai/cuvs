@@ -31,16 +31,18 @@ import com.nvidia.cuvs.common.Util;
 /**
  * Used for allocating resources for cuVS
  * 
- * @since 24.12
+ * @since 25.02
  */
-public class CuVSResources {
+public class CuVSResources implements AutoCloseable {
 
   public final Arena arena;
   public final Linker linker;
   public final SymbolLookup libcuvsNativeLibrary;
+  protected File nativeLibrary;
 
-  private final MethodHandle createResourceMethodHandle;
-  private final MemorySegment memorySegment;
+  private final MethodHandle createResourcesMethodHandle;
+  private final MethodHandle destroyResourcesMethodHandle;
+  private MemorySegment resourcesMemorySegment;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -50,17 +52,38 @@ public class CuVSResources {
   public CuVSResources() throws Throwable {
     linker = Linker.nativeLinker();
     arena = Arena.ofShared();
-
-    File nativeLibrary = Util.loadLibraryFromJar("/libcuvs_java.so");
+    nativeLibrary = Util.loadLibraryFromJar("/libcuvs_java.so");
     libcuvsNativeLibrary = SymbolLookup.libraryLookup(nativeLibrary.getAbsolutePath(), arena);
 
-    createResourceMethodHandle = linker.downcallHandle(libcuvsNativeLibrary.find("create_resource").get(),
+    createResourcesMethodHandle = linker.downcallHandle(libcuvsNativeLibrary.find("create_resources").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
+    destroyResourcesMethodHandle = linker.downcallHandle(libcuvsNativeLibrary.find("destroy_resources").get(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    createResources();
+  }
+
+  /**
+   * Creates the resources used internally and returns its reference.
+   * 
+   * @throws Throwable exception thrown when native function is invoked
+   */
+  public void createResources() throws Throwable {
     MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
+    resourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValueMemorySegment);
+  }
 
-    memorySegment = (MemorySegment) createResourceMethodHandle.invokeExact(returnValueMemorySegment);
+  @Override
+  public void close() {
+    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
+    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
+    try {
+      destroyResourcesMethodHandle.invokeExact(resourcesMemorySegment, returnValueMemorySegment);
+    } catch (Throwable e) {
+      e.printStackTrace();
+    }
+    nativeLibrary.delete();
   }
 
   /**
@@ -69,7 +92,7 @@ public class CuVSResources {
    * @return cuvsResources MemorySegment
    */
   protected MemorySegment getMemorySegment() {
-    return memorySegment;
+    return resourcesMemorySegment;
   }
 
   /**
