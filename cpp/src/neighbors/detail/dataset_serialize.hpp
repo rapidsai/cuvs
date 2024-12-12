@@ -140,7 +140,7 @@ auto deserialize_strided(raft::resources const& res, std::istream& is)
   auto stride     = raft::deserialize_scalar<uint32_t>(res, is);
   auto host_array = raft::make_host_matrix<DataT, IdxT>(n_rows, dim);
   raft::deserialize_mdspan(res, is, host_array.view());
-  return make_strided_dataset(res, host_array, stride);
+  return make_strided_dataset(res, std::move(host_array), stride);
 }
 
 template <typename MathT, typename IdxT>
