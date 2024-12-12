@@ -298,7 +298,6 @@ if(BUILD_SHARED_LIBS)
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
         src/neighbors/mg/omp_checks.cpp
-        src/neighbors/mg/nccl_comm.cpp
     )
   endif()
 
