@@ -432,8 +432,14 @@ void extend_core(
     } else {
       index.update_graph(handle, raft::make_const_mdspan(updated_graph.view()));
     }
+  } else if (dynamic_cast<const cuvs::neighbors::empty_dataset<int64_t>*>(&index.data()) !=
+             nullptr) {
+    RAFT_FAIL(
+      "cagra::extend only supports an index to which the dataset is attached. Please check if the "
+      "index was built with index_param.attach_dataset_on_build = true, or if a dataset was "
+      "attached after the build.");
   } else {
-    RAFT_FAIL("Only uncompressed dataset is supported");
+    RAFT_FAIL("cagra::extend only supports uncompressed dataset");
   }
 }
 }  // namespace cuvs::neighbors::cagra
