@@ -20,11 +20,20 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 
-cuvsResources_t create_resource(int *returnValue) {
+#define try bool __HadError=false;
+#define catch(x) ExitJmp:if(__HadError)
+#define throw(x) {__HadError=true;goto ExitJmp;}
+
+cuvsResources_t create_resources(int *returnValue) {
   cuvsResources_t cuvsResources;
   *returnValue = cuvsResourcesCreate(&cuvsResources);
   return cuvsResources;
+}
+
+void destroy_resources(cuvsResources_t cuvsResources, int *returnValue) {
+  *returnValue = cuvsResourcesDestroy(cuvsResources);
 }
 
 DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code) {
@@ -43,7 +52,10 @@ DLManagedTensor prepare_tensor(void *data, int64_t shape[], DLDataTypeCode code)
 }
 
 cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, cuvsResources_t cuvsResources, int *returnValue,
-    cuvsCagraIndexParams_t index_params) {
+    cuvsCagraIndexParams_t index_params, cuvsCagraCompressionParams_t compression_params, int numWriterThreads) {
+
+  omp_set_num_threads(numWriterThreads);
+  cuvsRMMPoolMemoryResourceEnable(95, 95, true);
 
   int64_t dataset_shape[2] = {rows, dimensions};
   DLManagedTensor dataset_tensor = prepare_tensor(dataset, dataset_shape, kDLFloat);
@@ -51,8 +63,16 @@ cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, c
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
 
+  index_params->compression = compression_params;
   *returnValue = cuvsCagraBuild(cuvsResources, index_params, &dataset_tensor, index);
+
+  omp_set_num_threads(1);
+
   return index;
+}
+
+void destroy_cagra_index(cuvsCagraIndex_t index, int *returnValue) {
+  *returnValue = cuvsCagraIndexDestroy(index);
 }
 
 void serialize_cagra_index(cuvsResources_t cuvsResources, cuvsCagraIndex_t index, int *returnValue, char* filename) {
@@ -83,11 +103,13 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   int64_t distances_shape[2] = {n_queries, topk};
   DLManagedTensor distances_tensor = prepare_tensor(distances, distances_shape, kDLFloat);
 
-  cuvsCagraSearchParamsCreate(&search_params);
-
   *returnValue = cuvsCagraSearch(cuvsResources, search_params, index, &queries_tensor, &neighbors_tensor,
                   &distances_tensor);
 
   cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk, cudaMemcpyDefault);
   cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk, cudaMemcpyDefault);
+
+  cuvsRMMFree(cuvsResources, distances, sizeof(float) * n_queries * topk);
+  cuvsRMMFree(cuvsResources, neighbors, sizeof(uint32_t) * n_queries * topk);
+  cuvsRMMFree(cuvsResources, queries_d, sizeof(float) * n_queries * dimensions);
 }

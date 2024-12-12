@@ -27,6 +27,9 @@ project(
   LANGUAGES CXX C
 )
 
+find_package(OpenMP)
+find_package(Threads)
+
 option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
        ON
 )
@@ -53,4 +56,4 @@ include(get_dlpack.cmake)
 
 ADD_LIBRARY(cuvs_java SHARED src/cuvs_java.c)
 target_include_directories(cuvs_java PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>")
-target_link_libraries(cuvs_java PRIVATE cuvs::c_api $<TARGET_NAME_IF_EXISTS:conda_env>)
+target_link_libraries(cuvs_java PRIVATE cuvs::c_api $<TARGET_NAME_IF_EXISTS:conda_env> OpenMP::OpenMP_CXX Threads::Threads)
