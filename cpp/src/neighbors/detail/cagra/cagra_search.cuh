@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../../core/nvtx.hpp"
 #include "factory.cuh"
 #include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
@@ -23,7 +24,6 @@
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/nvtx.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
@@ -66,7 +66,7 @@ void search_main_core(raft::resources const& res,
     params.max_queries = std::min<size_t>(queries.extent(0), deviceProp.maxGridSize[1]);
   }
 
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "cagra::search(max_queries = %u, k = %u, dim = %zu)",
     params.max_queries,
     topk,
@@ -151,7 +151,7 @@ void search_main(raft::resources const& res,
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
     // Search using a plain (strided) row-major dataset
-    auto& desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
+    auto desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
       res, params, *strided_dset, index.metric());
     search_main_core<T, InternalIdxT, DistanceT, CagraSampleFilterT>(
       res, params, desc, graph_internal, queries, neighbors, distances, sample_filter);
@@ -161,7 +161,7 @@ void search_main(raft::resources const& res,
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
-    auto& desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
+    auto desc = dataset_descriptor_init_with_cache<T, InternalIdxT, DistanceT>(
       res, params, *vpq_dset, index.metric());
     search_main_core<T, InternalIdxT, DistanceT, CagraSampleFilterT>(
       res, params, desc, graph_internal, queries, neighbors, distances, sample_filter);

@@ -17,7 +17,7 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-python>=12.0,<13.0a0
+- cuda-python>=12.6.2,<13.0a0
 - cuda-version=12.5
 - cupy>=12.0.0
 - cxx-compiler
@@ -32,7 +32,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==24.10.*,>=0.0.0a0
+- librmm==25.2.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -41,7 +41,7 @@ dependencies:
 - openblas
 - pre-commit
 - pydata-sphinx-theme
-- pylibraft==24.10.*,>=0.0.0a0
+- pylibraft==25.2.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
 - rapids-build-backend>=0.3.0,<0.4.0.dev0

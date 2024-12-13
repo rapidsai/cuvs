@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cuda_fp16.h>
+#include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
@@ -330,6 +331,86 @@ void pairwise_distance(
   raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
   cuvs::distance::DistanceType metric,
   float metric_arg = 2.0f);
+
+/**
+ * @brief Compute sparse pairwise distances between x and y, using the provided
+ * input configuration and distance function.
+ *
+ * @code{.cpp}
+ * #include <raft/core/device_resources.hpp>
+ * #include <raft/core/device_csr_matrix.hpp>
+ * #include <raft/core/device_mdspan.hpp>
+ *
+ * int x_n_rows = 100000;
+ * int y_n_rows = 50000;
+ * int n_cols = 10000;
+ *
+ * raft::device_resources handle;
+ * auto x = raft::make_device_csr_matrix<float>(handle, x_n_rows, n_cols);
+ * auto y = raft::make_device_csr_matrix<float>(handle, y_n_rows, n_cols);
+ *
+ * ...
+ * // populate data
+ * ...
+ *
+ * auto out = raft::make_device_matrix<float>(handle, x_nrows, y_nrows);
+ * auto metric = cuvs::distance::DistanceType::L2Expanded;
+ * raft::sparse::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
+ * @endcode
+ *
+ * @param[in] handle raft::resources
+ * @param[in] x raft::device_csr_matrix_view
+ * @param[in] y raft::device_csr_matrix_view
+ * @param[out] dist raft::device_matrix_view dense matrix
+ * @param[in] metric distance metric to use
+ * @param[in] metric_arg metric argument (used for Minkowski distance)
+ */
+void pairwise_distance(raft::resources const& handle,
+                       raft::device_csr_matrix_view<const float, int, int, int> x,
+                       raft::device_csr_matrix_view<const float, int, int, int> y,
+                       raft::device_matrix_view<float, int, raft::row_major> dist,
+                       cuvs::distance::DistanceType metric,
+                       float metric_arg = 2.0f);
+
+/**
+ * @brief Compute sparse pairwise distances between x and y, using the provided
+ * input configuration and distance function.
+ *
+ * @code{.cpp}
+ * #include <raft/core/device_resources.hpp>
+ * #include <raft/core/device_csr_matrix.hpp>
+ * #include <raft/core/device_mdspan.hpp>
+ *
+ * int x_n_rows = 100000;
+ * int y_n_rows = 50000;
+ * int n_cols = 10000;
+ *
+ * raft::device_resources handle;
+ * auto x = raft::make_device_csr_matrix<double>(handle, x_n_rows, n_cols);
+ * auto y = raft::make_device_csr_matrix<double>(handle, y_n_rows, n_cols);
+ *
+ * ...
+ * // populate data
+ * ...
+ *
+ * auto out = raft::make_device_matrix<double>(handle, x_nrows, y_nrows);
+ * auto metric = cuvs::distance::DistanceType::L2Expanded;
+ * raft::sparse::distance::pairwise_distance(handle, x.view(), y.view(), out, metric);
+ * @endcode
+ *
+ * @param[in] handle raft::resources
+ * @param[in] x raft::device_csr_matrix_view
+ * @param[in] y raft::device_csr_matrix_view
+ * @param[out] dist raft::device_matrix_view dense matrix
+ * @param[in] metric distance metric to use
+ * @param[in] metric_arg metric argument (used for Minkowski distance)
+ */
+void pairwise_distance(raft::resources const& handle,
+                       raft::device_csr_matrix_view<const double, int, int, int> x,
+                       raft::device_csr_matrix_view<const double, int, int, int> y,
+                       raft::device_matrix_view<double, int, raft::row_major> dist,
+                       cuvs::distance::DistanceType metric,
+                       float metric_arg = 2.0f);
 
 /** @} */  // end group pairwise_distance_runtime
 

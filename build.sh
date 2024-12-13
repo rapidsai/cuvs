@@ -78,8 +78,8 @@ BUILD_REPORT_METRICS=""
 BUILD_REPORT_INCL_CACHE_STATS=OFF
 BUILD_SHARED_LIBS=ON
 
-TEST_TARGETS="NEIGHBORS_ANN_CAGRA_TEST"
-ANN_BENCH_TARGETS="CUVS_ANN_BENCH_ALL"
+TEST_TARGETS=""
+ANN_BENCH_TARGETS=""
 
 CACHE_ARGS=""
 NVTX=ON
@@ -275,14 +275,6 @@ fi
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
     CMAKE_TARGET="${CMAKE_TARGET};${TEST_TARGETS}"
-
-    # Force compile library when needed test targets are specified
-    if [[ $CMAKE_TARGET == *"CAGRA_C_TEST"* || \
-          $CMAKE_TARGET == *"INTEROP_TEST"* || \
-          $CMAKE_TARGET == *"NEIGHBORS_ANN_CAGRA_TEST"* ]]; then
-      echo "-- Enabling compiled lib for gtests"
-      COMPILE_LIBRARY=ON
-    fi
 fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
@@ -412,14 +404,14 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
           if [[ ${CACHE_TOOL} == "sccache" && -x "$(command -v sccache)" ]]; then
               COMPILE_REQUESTS=$(sccache -s | grep "Compile requests \+ [0-9]\+$" | awk '{ print $NF }')
               CACHE_HITS=$(sccache -s | grep "Cache hits \+ [0-9]\+$" | awk '{ print $NF }')
-              HIT_RATE=$(echo - | awk "{printf \"%.2f\n\", $CACHE_HITS / $COMPILE_REQUESTS * 100}")
+              HIT_RATE=$(COMPILE_REQUESTS="${COMPILE_REQUESTS}" CACHE_HITS="${CACHE_HITS}" python3 -c "import os; print(f'{int(os.getenv(\"CACHE_HITS\")) / int(os.getenv(\"COMPILE_REQUESTS\")):.2f}' if int(os.getenv(\"COMPILE_REQUESTS\")) else 'nan')")
               MSG="${MSG}<br/>cache hit rate ${HIT_RATE} %"
           elif [[ ${CACHE_TOOL} == "ccache" && -x "$(command -v ccache)" ]]; then
               CACHE_STATS_LINE=$(ccache -s | grep "Hits: \+ [0-9]\+ / [0-9]\+" | tail -n1)
               if [[ ! -z "$CACHE_STATS_LINE" ]]; then
                   CACHE_HITS=$(echo "$CACHE_STATS_LINE" - | awk '{ print $2 }')
                   COMPILE_REQUESTS=$(echo "$CACHE_STATS_LINE" - | awk '{ print $4 }')
-                  HIT_RATE=$(echo - | awk "{printf \"%.2f\n\", $CACHE_HITS / $COMPILE_REQUESTS * 100}")
+                  HIT_RATE=$(COMPILE_REQUESTS="${COMPILE_REQUESTS}" CACHE_HITS="${CACHE_HITS}" python3 -c "import os; print(f'{int(os.getenv(\"CACHE_HITS\")) / int(os.getenv(\"COMPILE_REQUESTS\")):.2f}' if int(os.getenv(\"COMPILE_REQUESTS\")) else 'nan')")
                   MSG="${MSG}<br/>cache hit rate ${HIT_RATE} %"
               fi
           fi
@@ -449,7 +441,7 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
         python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs
 fi
 
-# Build and (optionally) install the cuvs_bench Python package
+# Build and (optionally) install the cuvs-bench Python package
 if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
     python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi

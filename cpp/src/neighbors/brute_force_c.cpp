@@ -17,10 +17,12 @@
 
 #include <cstdint>
 #include <dlpack/dlpack.h>
+#include <fstream>
 
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
@@ -91,6 +93,22 @@ void _search(cuvsResources_t res,
   }
 }
 
+template <typename T>
+void _serialize(cuvsResources_t res, const char* filename, cuvsBruteForceIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::brute_force::index<T>*>(index.addr);
+  cuvs::neighbors::brute_force::serialize(*res_ptr, std::string(filename), *index_ptr);
+}
+
+template <typename T>
+void* _deserialize(cuvsResources_t res, const char* filename)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto index   = new cuvs::neighbors::brute_force::index<T>(*res_ptr);
+  cuvs::neighbors::brute_force::deserialize(*res_ptr, std::string(filename), index);
+  return index;
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsBruteForceIndexCreate(cuvsBruteForceIndex_t* index)
@@ -129,7 +147,7 @@ extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<float>(res, dataset_tensor, metric, metric_arg));
-      index->dtype.code = kDLFloat;
+      index->dtype = dataset.dtype;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -171,6 +189,41 @@ extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
                 queries.dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
+                                                 const char* filename,
+                                                 cuvsBruteForceIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // read the numpy dtype from the beginning of the file
+    std::ifstream is(filename, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", filename); }
+    char dtype_string[4];
+    is.read(dtype_string, 4);
+    auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
+
+    index->dtype.bits = dtype.itemsize * 8;
+    if (dtype.kind == 'f' && dtype.itemsize == 4) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
+                                               const char* filename,
+                                               cuvsBruteForceIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize<float>(res, filename, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
   });
 }

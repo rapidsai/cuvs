@@ -63,14 +63,9 @@ struct pointer_residency_count<Type, Types...> {
     auto [on_device, on_host] = pointer_residency_count<Types...>::run(ptrs...);
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-    switch (attr.type) {
-      case cudaMemoryTypeUnregistered: return std::make_tuple(on_device, on_host + 1);
-      case cudaMemoryTypeHost:
-        return std::make_tuple(on_device + int(attr.devicePointer == ptr), on_host + 1);
-      case cudaMemoryTypeDevice: return std::make_tuple(on_device + 1, on_host);
-      case cudaMemoryTypeManaged: return std::make_tuple(on_device + 1, on_host + 1);
-      default: return std::make_tuple(on_device, on_host);
-    }
+    if (attr.devicePointer || attr.type == cudaMemoryTypeDevice) { ++on_device; }
+    if (attr.hostPointer || attr.type == cudaMemoryTypeUnregistered) { ++on_host; }
+    return std::make_tuple(on_device, on_host);
   }
 };
 
@@ -408,6 +403,17 @@ struct batch_load_iterator {
 
   /** A single batch of data residing in device memory. */
   struct batch {
+    ~batch() noexcept
+    {
+      /*
+      If there's no copy, there's no allocation owned by the batch.
+      If there's no allocation, there's no guarantee that the device pointer is stream-ordered.
+      If there's no stream order guarantee, we must synchronize with the stream before the batch is
+      destroyed to make sure all GPU operations in that stream finish earlier.
+      */
+      if (!does_copy()) { RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream_)); }
+    }
+
     /** Logical width of a single row in a batch, in elements of type `T`. */
     [[nodiscard]] auto row_width() const -> size_type { return row_width_; }
     /** Logical offset of the batch, in rows (`row_width()`) */

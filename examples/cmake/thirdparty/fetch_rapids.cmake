@@ -11,11 +11,11 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 
-# Use this variable to update RAPIDS and RAFT versions
-set(RAPIDS_VERSION "24.10")
+# Use this variable to update RAPIDS and cuVS versions
+set(RAPIDS_VERSION "25.02")
 
-if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
+if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/CUVS_RAPIDS.cmake)
     file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-${RAPIDS_VERSION}/RAPIDS.cmake
-            ${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
+            ${CMAKE_CURRENT_BINARY_DIR}/CUVS_RAPIDS.cmake)
 endif()
-include(${CMAKE_CURRENT_BINARY_DIR}/RAFT_RAPIDS.cmake)
+include(${CMAKE_CURRENT_BINARY_DIR}/CUVS_RAPIDS.cmake)
