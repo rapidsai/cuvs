@@ -13,8 +13,8 @@
 
 # Use RAPIDS_VERSION_MAJOR_MINOR from rapids_config.cmake
 set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
-set(RAFT_FORK "rapidsai")
-set(RAFT_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
+set(RAFT_FORK "vyasr")
+set(RAFT_PINNED_TAG "feat/logger")
 
 function(find_and_configure_raft)
     set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
