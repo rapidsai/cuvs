@@ -123,7 +123,8 @@ files:
     extras:
       table: tool.rapids-build-backend
       key: requires
-    includes: []
+    includes:
+      - rapids_build_setuptools
   py_run_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
