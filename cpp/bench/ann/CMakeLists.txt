@@ -126,10 +126,11 @@ function(ConfigureAnnBench)
     PRIVATE ${ConfigureAnnBench_LINKS}
             nlohmann_json::nlohmann_json
             Threads::Threads
+            raft::raft_logger
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            $<TARGET_NAME_IF_EXISTS:cuvs_bench_rmm_logger>
+            $<TARGET_NAME_IF_EXISTS:cuvs_bench_logger>
   )
 
   set_target_properties(
@@ -176,8 +177,8 @@ function(ConfigureAnnBench)
 endfunction()
 
 if(CUVS_FAISS_ENABLE_GPU)
-  add_library(cuvs_bench_rmm_logger OBJECT)
-  target_link_libraries(cuvs_bench_rmm_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
+  add_library(cuvs_bench_logger OBJECT)
+  target_link_libraries(cuvs_bench_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
 endif()
 
 # ##################################################################################################

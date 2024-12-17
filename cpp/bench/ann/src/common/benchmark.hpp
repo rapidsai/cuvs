@@ -20,6 +20,8 @@
 #include "dataset.hpp"
 #include "util.hpp"
 
+#include <raft/core/logger.hpp>
+
 #include <benchmark/benchmark.h>
 #include <unistd.h>
 
@@ -642,7 +644,7 @@ inline auto run_main(int argc, char** argv) -> int
         parse_string_flag(argv[i], "--threads", threads_arg_txt) ||
         parse_string_flag(argv[i], "--raft_log_level", log_level_str)) {
       if (!log_level_str.empty()) {
-        raft_log_level = std::stoi(log_level_str);
+        raft_log_level = static_cast<raft::level_enum>(std::stoi(log_level_str));
         log_level_str  = "";
       }
       if (!threads_arg_txt.empty()) {
