@@ -19,6 +19,7 @@ package_name="cuvs"
 package_dir="python"
 
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
+LIBRAFT_CHANNEL=$(rapids-get-pr-conda-artifact raft 2530 cpp)
 
 version=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION=${version}
@@ -31,6 +32,7 @@ sccache --zero-stats
 rapids-conda-retry mambabuild \
   --no-test \
   --channel "${CPP_CHANNEL}" \
+    --channel "${LIBRAFT_CHANNEL}" \
   conda/recipes/cuvs
 
 sccache --show-adv-stats
@@ -40,6 +42,7 @@ sccache --zero-stats
 rapids-conda-retry mambabuild \
   --no-test \
   --channel "${CPP_CHANNEL}" \
+    --channel "${LIBRAFT_CHANNEL}" \
   --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
   conda/recipes/cuvs-bench
 
@@ -53,6 +56,7 @@ if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
   rapids-conda-retry mambabuild \
   --no-test \
   --channel "${CPP_CHANNEL}" \
+    --channel "${LIBRAFT_CHANNEL}" \
   --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
   conda/recipes/cuvs-bench-cpu
 
