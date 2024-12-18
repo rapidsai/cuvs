@@ -102,24 +102,24 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
          search_params params,
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
+         int64_t dataset_size,
          int64_t graph_degree,
          uint32_t topk)
-    : base_type(res, params, dataset_desc, dim, graph_degree, topk),
+    : base_type(res, params, dataset_desc, dim, dataset_size, graph_degree, topk),
       intermediate_indices(res),
       intermediate_distances(res),
       topk_workspace(res)
-
   {
     set_params(res, params);
   }
 
   void set_params(raft::resources const& res, const search_params& params)
   {
-    constexpr unsigned muti_cta_itopk_size = 32;
-    this->itopk_size                       = muti_cta_itopk_size;
-    search_width                           = 1;
+    constexpr unsigned multi_cta_itopk_size = 32;
+    this->itopk_size                        = multi_cta_itopk_size;
+    search_width                            = 1;
     num_cta_per_query =
-      max(params.search_width, raft::ceildiv(params.itopk_size, (size_t)muti_cta_itopk_size));
+      max(params.search_width, raft::ceildiv(params.itopk_size, (size_t)multi_cta_itopk_size));
     result_buffer_size = itopk_size + search_width * graph_degree;
     typedef raft::Pow2<32> AlignBytes;
     unsigned result_buffer_size_32 = AlignBytes::roundUp(result_buffer_size);
@@ -128,7 +128,8 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
 
     smem_size = dataset_desc.smem_ws_size_in_bytes +
                 (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * result_buffer_size_32 +
-                sizeof(uint32_t) * search_width + sizeof(uint32_t);
+                sizeof(INDEX_T) * hashmap::get_size(small_hash_bitlen) +
+                sizeof(INDEX_T) * search_width;
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
 
     //
@@ -222,6 +223,7 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
                    thread_block_size,
                    result_buffer_size,
                    smem_size,
+                   small_hash_bitlen,
                    hash_bitlen,
                    hashmap.data(),
                    num_cta_per_query,

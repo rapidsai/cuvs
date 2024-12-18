@@ -40,10 +40,11 @@ class factory {
     search_params const& params,
     const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
     int64_t dim,
+    int64_t dataset_size,
     int64_t graph_degree,
     uint32_t topk)
   {
-    search_plan_impl_base plan(params, dim, graph_degree, topk);
+    search_plan_impl_base plan(params, dim, dataset_size, graph_degree, topk);
     return dispatch_kernel(res, plan, dataset_desc);
   }
 
@@ -56,15 +57,15 @@ class factory {
     if (plan.algo == search_algo::SINGLE_CTA) {
       return std::make_unique<
         single_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-        res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk);
+        res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else if (plan.algo == search_algo::MULTI_CTA) {
       return std::make_unique<
         multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-        res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk);
+        res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else {
       return std::make_unique<
         multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
-        res, plan, dataset_desc, plan.dim, plan.graph_degree, plan.topk);
+        res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     }
   }
 };

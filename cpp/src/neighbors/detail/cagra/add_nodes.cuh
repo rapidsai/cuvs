@@ -127,6 +127,7 @@ void add_node_core(
     raft::resource::sync_stream(handle);
 
     // Step 2: rank-based reordering
+    bool search_returned_not_enough_values = false;
 #pragma omp parallel
     {
       std::vector<std::pair<IdxT, std::size_t>> detourable_node_count_list(base_degree);
@@ -135,10 +136,29 @@ void add_node_core(
         // Count detourable edges
         for (std::uint32_t i = 0; i < base_degree; i++) {
           std::uint32_t detourable_node_count = 0;
-          const auto a_id                     = host_neighbor_indices(vec_i, i);
+          // TODO: the invalid indices may be produced by neighbors::cagra::search above.
+          //       This may happen if the search function hasn't returned enough values.
+          //       - A valid reason could be: the index size is smaller than the base degree.
+          //       - A bad reason could be: search iterations is set to a too low value or some
+          //         other problem with the search config.
+          //       - This could also be a bug in the search function
+          // In the following, we check the indices and assign low priorities to invalid links,
+          // so that they are not likely to appear in the final graph.
+          const auto a_id = host_neighbor_indices(vec_i, i);
+          if (a_id >= idx.size()) {
+            detourable_node_count_list[i] = std::make_pair(a_id, base_degree);
+#pragma omp atomic write
+            search_returned_not_enough_values = true;
+            continue;
+          }
           for (std::uint32_t j = 0; j < i; j++) {
             const auto b0_id = host_neighbor_indices(vec_i, j);
-            assert(b0_id < idx.size());
+            if (b0_id >= idx.size()) {
+#pragma omp atomic write
+              search_returned_not_enough_values = true;
+              detourable_node_count++;
+              continue;
+            }
             for (std::uint32_t k = 0; k < degree; k++) {
               const auto b1_id = updated_graph(b0_id, k);
               if (a_id == b1_id) {
@@ -159,6 +179,11 @@ void add_node_core(
           updated_graph(old_size + batch.offset() + vec_i, i) = detourable_node_count_list[i].first;
         }
       }
+    }
+    if (search_returned_not_enough_values) {
+      RAFT_FAIL(
+        "CAGRA search returned not enough valid indices to add new nodes to the graph. "
+        "The resulting graph may contain invalid edges at the new nodes.");
     }
 
     // Step 3: Add reverse edges
@@ -248,7 +273,9 @@ void add_graph_nodes(
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,
   const cagra::extend_params& params)
 {
-  assert(input_updated_dataset_view.extent(0) >= index.size());
+  if (input_updated_dataset_view.extent(0) < index.size()) {
+    RAFT_FAIL("Updated dataset must be not smaller than the previous index state.");
+  }
 
   const std::size_t initial_dataset_size = index.size();
   const std::size_t new_dataset_size     = input_updated_dataset_view.extent(0);
