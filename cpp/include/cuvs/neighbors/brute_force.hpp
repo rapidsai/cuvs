@@ -394,6 +394,7 @@ void search(raft::resources const& handle,
  * See the [brute_force::build](#brute_force::build) documentation for a usage example.
  *
  * @param[in] handle
+ * @param[in] params parameters configuring the search
  * @param[in] index bruteforce constructed index
  * @param[in] queries a device pointer to a col-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
