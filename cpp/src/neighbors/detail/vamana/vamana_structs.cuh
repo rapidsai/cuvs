@@ -29,7 +29,7 @@
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <cuvs/distance/distance.hpp>

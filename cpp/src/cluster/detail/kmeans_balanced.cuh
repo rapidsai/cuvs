@@ -25,7 +25,8 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/cudart_utils.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger-macros.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -59,7 +60,6 @@
 
 namespace cuvs::cluster::kmeans::detail {
 
-static const std::string RAFT_NAME                 = "raft";
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
 /**

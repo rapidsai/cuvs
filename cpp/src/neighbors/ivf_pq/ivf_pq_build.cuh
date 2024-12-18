@@ -30,7 +30,7 @@
 #include "../../cluster/kmeans_balanced.cuh"
 
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -68,7 +68,6 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
-using raft::RAFT_NAME;                       // TODO: this is required for RAFT_LOG_XXX messages.
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.

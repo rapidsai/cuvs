@@ -50,8 +50,6 @@
 
 namespace cuvs::neighbors::dynamic_batching::detail {
 
-using raft::RAFT_NAME;  // TODO: a workaround for RAFT_LOG_XXX macros
-
 /**
  * A helper to make the requester threads more cooperative when busy-spinning.
  * It is used in the wait loops across this file to reduce the CPU usage.
