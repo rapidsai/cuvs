@@ -7,39 +7,39 @@ files:
       arch: [x86_64, aarch64]
     includes:
       - build
-      - rapids_build
       - build_py_cuvs
+      - build_wheels
+      - checks
       - cuda
       - cuda_version
-      - depends_on_pylibraft
+      - depends_on_cupy
       - depends_on_librmm
+      - depends_on_pylibraft
       - develop
-      - checks
-      - build_wheels
-      - test_libcuvs
       - docs
+      - rapids_build
       - run_py_cuvs
+      - rust
+      - test_libcuvs
       - test_python_common
       - test_py_cuvs
-      - cupy
-      - rust
   bench_ann:
     output: conda
     matrix:
       cuda: ["11.8", "12.5"]
       arch: [x86_64, aarch64]
     includes:
-      - rapids_build
+      - bench
+      - bench_python
       - build_py_cuvs
       - cuda
       - cuda_version
+      - depends_on_cupy
       - depends_on_pylibraft
       - depends_on_librmm
       - develop
-      - bench
-      - bench_python
+      - rapids_build
       - rapids_build_setuptools
-      - cupy
   test_cpp:
     output: none
     includes:
@@ -49,10 +49,10 @@ files:
     output: none
     includes:
       - cuda_version
+      - depends_on_cupy
       - py_version
       - test_python_common
       - test_py_cuvs
-      - cupy
   checks:
     output: none
     includes:
@@ -61,19 +61,19 @@ files:
   docs:
     output: none
     includes:
+      - cuda
       - cuda_version
-      - cupy
+      - depends_on_cupy
       - docs
       - py_version
-      - rust
       - rapids_build
-      - cuda
+      - rust
   rust:
     output: none
     includes:
+      - cuda
       - cuda_version
       - rapids_build
-      - cuda
       - rust
   py_build_cuvs:
     output: pyproject
@@ -89,8 +89,8 @@ files:
       table: tool.rapids-build-backend
       key: requires
     includes:
-      - rapids_build
       - build_py_cuvs
+      - rapids_build
   py_run_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -98,8 +98,8 @@ files:
       table: project
     includes:
       - cuda_wheels
-      - run_py_cuvs
       - depends_on_pylibraft
+      - run_py_cuvs
   py_test_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -107,9 +107,9 @@ files:
       table: project.optional-dependencies
       key: test
     includes:
+      - depends_on_cupy
       - test_python_common
       - test_py_cuvs
-      - cupy
   py_build_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
@@ -368,7 +368,7 @@ dependencies:
               - nvidia-cusolver
               - nvidia-cusparse
 
-  cupy:
+  depends_on_cupy:
     common:
       - output_types: conda
         packages:
