@@ -183,6 +183,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_DYNAMIC_BATCHING_TEST
     PATH
+    neighbors/dynamic_batching/test_brute_force.cu
     neighbors/dynamic_batching/test_cagra.cu
     neighbors/dynamic_batching/test_ivf_flat.cu
     neighbors/dynamic_batching/test_ivf_pq.cu
@@ -236,7 +237,7 @@ if(BUILD_TESTS)
     NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
     sparse/cluster/spectral.cu GPUS 1 PERCENT 100
   )
-  
+
   ConfigureTest(
     NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
   )

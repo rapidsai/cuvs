@@ -44,10 +44,12 @@ void* _build(cuvsResources_t res,
   using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
-  auto index_on_stack = cuvs::neighbors::brute_force::build(
-    *res_ptr, mds, static_cast<cuvs::distance::DistanceType>((int)metric), metric_arg);
-  auto index_on_heap = new cuvs::neighbors::brute_force::index<T>(std::move(index_on_stack));
+  cuvs::neighbors::brute_force::index_params params;
+  params.metric     = metric;
+  params.metric_arg = metric_arg;
 
+  auto index_on_stack = cuvs::neighbors::brute_force::build(*res_ptr, params, mds);
+  auto index_on_heap  = new cuvs::neighbors::brute_force::index<T>(std::move(index_on_stack));
   return index_on_heap;
 }
 
@@ -72,8 +74,11 @@ void _search(cuvsResources_t res,
   auto neighbors_mds = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
   auto distances_mds = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
 
+  cuvs::neighbors::brute_force::search_params params;
+
   if (prefilter.type == NO_FILTER) {
     cuvs::neighbors::brute_force::search(*res_ptr,
+                                         params,
                                          *index_ptr,
                                          queries_mds,
                                          neighbors_mds,
@@ -87,7 +92,7 @@ void _search(cuvsResources_t res,
                          queries_mds.extent(0),
                          index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
-      *res_ptr, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter_view);
+      *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter_view);
   } else {
     RAFT_FAIL("Unsupported prefilter type: BITSET");
   }
