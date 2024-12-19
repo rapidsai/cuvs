@@ -179,7 +179,7 @@ class device_matrix_view_from_host {
  public:
   device_matrix_view_from_host(raft::resources const& res,
                                raft::host_matrix_view<T, IdxT> host_view)
-    : host_view_(host_view)
+    : res_(res), host_view_(host_view)
   {
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, host_view.data_handle()));
@@ -199,6 +199,17 @@ class device_matrix_view_from_host {
     }
   }
 
+  ~device_matrix_view_from_host() noexcept
+  {
+    /*
+    If there's no copy, there's no allocation owned by this struct.
+    If there's no allocation, there's no guarantee that the device pointer is stream-ordered.
+    If there's no stream order guarantee, we must synchronize with the stream before the struct is
+    destroyed to make sure all GPU operations in that stream finish earlier.
+    */
+    if (!allocated_memory()) { raft::resource::sync_stream(res_); }
+  }
+
   raft::device_matrix_view<T, IdxT> view()
   {
     return raft::make_device_matrix_view<T, IdxT>(
@@ -207,9 +218,10 @@ class device_matrix_view_from_host {
 
   T* data_handle() { return device_ptr; }
 
-  bool allocated_memory() const { return device_mem_.has_value(); }
+  [[nodiscard]] bool allocated_memory() const { return device_mem_.has_value(); }
 
  private:
+  const raft::resources& res_;
   std::optional<raft::device_matrix<T, IdxT>> device_mem_;
   raft::host_matrix_view<T, IdxT> host_view_;
   T* device_ptr;

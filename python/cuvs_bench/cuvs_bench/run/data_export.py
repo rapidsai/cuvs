@@ -17,7 +17,6 @@
 import json
 import os
 import traceback
-import warnings
 
 import pandas as pd
 
@@ -170,44 +169,6 @@ def convert_json_to_csv_build(dataset, dataset_path):
             traceback.print_exc()
 
 
-def append_build_data(write, build_file):
-    """
-    Append build data to the search DataFrame.
-
-    Parameters
-    ----------
-    write : pandas.DataFrame
-        The DataFrame containing the search data to which build
-        data will be appended.
-    build_file : str
-        The file path to the build CSV file.
-    """
-    if os.path.exists(build_file):
-        build_df = pd.read_csv(build_file)
-        write_ncols = len(write.columns)
-        # Initialize columns for build data
-        build_columns = [
-            "build time",
-            "build threads",
-            "build cpu_time",
-            "build GPU",
-        ]
-        write = write.assign(**{col: None for col in build_columns})
-        # Append additional columns if available
-        for col_name in build_df.columns[6:]:
-            write[col_name] = None
-        # Match build rows with search rows by index_name
-        for s_index, search_row in write.iterrows():
-            for b_index, build_row in build_df.iterrows():
-                if search_row["index_name"] == build_row["index_name"]:
-                    write.iloc[s_index, write_ncols:] = build_row[2:].values
-                    break
-    else:
-        warnings.warn(
-            f"Build CSV not found for {build_file}, build params not appended."
-        )
-
-
 def convert_json_to_csv_search(dataset, dataset_path):
     """
     Convert search JSON files to CSV format.
@@ -232,7 +193,7 @@ def convert_json_to_csv_search(dataset, dataset_path):
             )
             algo_name = clean_algo_name(algo_name)
             df["name"] = df["name"].str.split("/").str[0]
-            write_data = pd.DataFrame(
+            write = pd.DataFrame(
                 {
                     "algo_name": [algo_name] * len(df),
                     "index_name": df["name"],
@@ -242,11 +203,35 @@ def convert_json_to_csv_search(dataset, dataset_path):
                 }
             )
             # Append build data
-            append_build_data(write_data, build_file)
+            for name in df:
+                if name not in skip_search_cols:
+                    write[name] = df[name]
+            if os.path.exists(build_file):
+                build_df = pd.read_csv(build_file)
+                write_ncols = len(write.columns)
+                write["build time"] = None
+                write["build threads"] = None
+                write["build cpu_time"] = None
+                write["build GPU"] = None
+
+                for col_idx in range(6, len(build_df.columns)):
+                    col_name = build_df.columns[col_idx]
+                    write[col_name] = None
+
+                for s_index, search_row in write.iterrows():
+                    for b_index, build_row in build_df.iterrows():
+                        if search_row["index_name"] == build_row["index_name"]:
+                            write.iloc[s_index, write_ncols] = build_df.iloc[
+                                b_index, 2
+                            ]
+                            write.iloc[
+                                s_index, write_ncols + 1 :
+                            ] = build_df.iloc[b_index, 3:]
+                            break
             # Write search data and compute frontiers
-            write_data.to_csv(file.replace(".json", ",raw.csv"), index=False)
-            write_frontier(file, write_data, "throughput")
-            write_frontier(file, write_data, "latency")
+            write.to_csv(file.replace(".json", ",raw.csv"), index=False)
+            write_frontier(file, write, "throughput")
+            write_frontier(file, write, "latency")
         except Exception as e:
             print(f"Error processing search file {file}: {e}. Skipping...")
             traceback.print_exc()
