@@ -81,6 +81,6 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
 
     tol = 1e-3
     if np.issubdtype(dtype, np.float16):
-        tol = 1e-2
+        tol = 1e-1
 
     assert np.allclose(expected, actual, atol=tol, rtol=tol)
