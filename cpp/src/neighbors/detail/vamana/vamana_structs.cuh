@@ -170,7 +170,7 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
     temp_dst[0] = dst_vec->coords[i];
     if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
     if (i + 64 < src_vec->Dim) temp_dst[2] = dst_vec->coords[i + 64];
-    if (i + 92 < src_vec->Dim) temp_dst[3] = dst_vec->coords[i + 96];
+    if (i + 96 < src_vec->Dim) temp_dst[3] = dst_vec->coords[i + 96];
 
     partial_sum[0] = fmaf(
       (src_vec[0].coords[i] - temp_dst[0]), (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
@@ -182,7 +182,7 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
       partial_sum[2] = fmaf((src_vec[0].coords[i + 64] - temp_dst[2]),
                             (src_vec[0].coords[i + 64] - temp_dst[2]),
                             partial_sum[2]);
-    if (i + 92 < src_vec->Dim)
+    if (i + 96 < src_vec->Dim)
       partial_sum[3] = fmaf((src_vec[0].coords[i + 96] - temp_dst[3]),
                             (src_vec[0].coords[i + 96] - temp_dst[3]),
                             partial_sum[3]);
@@ -192,6 +192,7 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
   for (int offset = 16; offset > 0; offset /= 2) {
     partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
   }
+
   return partial_sum[0];
 }
 

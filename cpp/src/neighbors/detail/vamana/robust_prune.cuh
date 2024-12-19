@@ -145,9 +145,11 @@ __global__ void RobustPruneKernel(
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
+  int align_padding = (((dim-1)/alignof(ShmemLayout))+1)*alignof(ShmemLayout) - dim;
+
   T* s_coords = reinterpret_cast<T*>(&smem[sort_smem_size]);
   DistPair<IdxT, accT>* new_nbh_list =
-    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[dim * sizeof(T) + sort_smem_size]);
+    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[(dim+align_padding) * sizeof(T) + sort_smem_size]);
 
   static __shared__ Point<T, accT> s_query;
   s_query.coords = s_coords;

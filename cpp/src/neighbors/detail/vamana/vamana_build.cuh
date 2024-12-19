@@ -175,13 +175,16 @@ void batched_insert_vamana(
   SELECT_SMEM_SIZES(degree, visited_size);  // Sets above 2 variables to appropriate sizes
 
   // Total dynamic shared memory used by GreedySearch
+  int align_padding = ((((dim-1)/16)+1)*16) - dim;
   int search_smem_total_size =
-    static_cast<int>(search_smem_sort_size + dim * sizeof(T) + visited_size * sizeof(Node<accT>) +
+    static_cast<int>(search_smem_sort_size + (dim+align_padding) * sizeof(T) + 
+		     visited_size * sizeof(Node<accT>) +
                      degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
   int prune_smem_total_size =
-    prune_smem_sort_size + dim * sizeof(T) + (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+                    prune_smem_sort_size + (dim+align_padding) * sizeof(T) 
+                    + (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
 
   RAFT_LOG_DEBUG("Dynamic shared memory usage (bytes): GreedySearch: %d, RobustPrune: %d",
                  search_smem_total_size,
@@ -228,7 +231,6 @@ void batched_insert_vamana(
                                                                  metric,
                                                                  queue_size,
                                                                  search_smem_sort_size);
-
       // Run on candidates of vectors being inserted
       RobustPruneKernel<T, accT, IdxT>
         <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
@@ -279,6 +281,7 @@ void batched_insert_vamana(
                                                 edge_dest.data_handle() + total_edges);
       auto unique_indices = raft::make_device_vector<int>(res, total_edges);
       raft::linalg::map_offset(res, unique_indices.view(), raft::identity_op{});
+
       thrust::unique_by_key(
         edge_dest_vec.begin(), edge_dest_vec.end(), unique_indices.data_handle());
 
@@ -371,8 +374,6 @@ index<T, IdxT> build(
   RAFT_EXPECTS(params.visited_size > graph_degree, "visited_size must be > graph_degree");
 
   int dim = dataset.extent(1);
-  // TODO - Fix issue with alignment when dataset dimension is odd
-  RAFT_EXPECTS(dim % 2 == 0, "Datasets with an odd number of dimensions not currently supported");
 
   RAFT_LOG_DEBUG("Creating empty graph structure");
   auto vamana_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);

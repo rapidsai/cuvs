@@ -264,9 +264,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 {
   std::vector<AnnVamanaInputs> inputs = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-    //    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // TODO - fix alignment
-    //    issue for odd dims
-    {16, 32, 64, 128, 192, 256, 512, 1024},  // dim
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024}, 
     {32},                                    // graph degree
     {64, 128, 256},                          // visited_size
     {0.06, 0.1},
@@ -282,54 +280,55 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 
   std::vector<AnnVamanaInputs> inputs2 =
     raft::util::itertools::product<AnnVamanaInputs>({1000},
-                                                    {16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-                                                    {64},             // graph degree
-                                                    {128, 256, 512},  // visited_size
-                                                    {0.06, 0.1},
-                                                    {cuvs::distance::DistanceType::L2Expanded},
-                                                    {false},
-                                                    {100},
-                                                    {10},
-                                                    {cagra::search_algo::AUTO},
-                                                    {10},
-                                                    {32},
-                                                    {1},
-                                                    {0.2});
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  
+    {64},             // graph degree
+    {128, 256, 512},  // visited_size
+    {0.06, 0.1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {100},
+    {10},
+    {cagra::search_algo::AUTO},
+    {10},
+    {32},
+    {1},
+    {0.2});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   inputs2 =
     raft::util::itertools::product<AnnVamanaInputs>({1000},
-                                                    {16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-                                                    {128},       // graph degree
-                                                    {256, 512},  // visited_size
-                                                    {0.06, 0.1},
-                                                    {cuvs::distance::DistanceType::L2Expanded},
-                                                    {false},
-                                                    {100},
-                                                    {10},
-                                                    {cagra::search_algo::AUTO},
-                                                    {10},
-                                                    {64},
-                                                    {1},
-                                                    {0.2});
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024}, 
+    {128},       // graph degree
+    {256, 512},  // visited_size
+    {0.06, 0.1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {100},
+    {10},
+    {cagra::search_algo::AUTO},
+    {10},
+    {64},
+    {1},
+    {0.2});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   inputs2 =
     raft::util::itertools::product<AnnVamanaInputs>({1000},
-                                                    {16, 32, 64, 128, 192, 256, 512, 1024},  // dim
-                                                    {256},        // graph degree
-                                                    {512, 1024},  // visited_size
-                                                    {0.06, 0.1},
-                                                    {cuvs::distance::DistanceType::L2Expanded},
-                                                    {false},
-                                                    {100},
-                                                    {10},
-                                                    {cagra::search_algo::AUTO},
-                                                    {10},
-                                                    {64},
-                                                    {1},
-                                                    {0.2});
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024}, 
+    {256},        // graph degree
+    {512, 1024},  // visited_size
+    {0.06, 0.1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {100},
+    {10},
+    {cagra::search_algo::AUTO},
+    {10},
+    {64},
+    {1},
+    {0.2});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+  
 
   return inputs;
 }
