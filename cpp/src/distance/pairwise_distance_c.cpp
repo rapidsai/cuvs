@@ -29,7 +29,7 @@
 
 namespace {
 
-template <typename T>
+template <typename T, typename DistT>
 void _pairwise_distance(cuvsResources_t res,
                         DLManagedTensor* x_tensor,
                         DLManagedTensor* y_tensor,
@@ -40,7 +40,7 @@ void _pairwise_distance(cuvsResources_t res,
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
   using mdspan_type           = raft::device_matrix_view<T const, int64_t, raft::row_major>;
-  using distances_mdspan_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
+  using distances_mdspan_type = raft::device_matrix_view<DistT, int64_t, raft::row_major>;
 
   auto x_mds         = cuvs::core::from_dlpack<mdspan_type>(x_tensor);
   auto y_mds         = cuvs::core::from_dlpack<mdspan_type>(y_tensor);
@@ -71,9 +71,14 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
     }
 
     if (x_dt.bits == 32) {
-      _pairwise_distance<float>(res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+      _pairwise_distance<float, float>(
+        res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+    } else if (x_dt.bits == 16) {
+      _pairwise_distance<half, float>(
+        res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
     } else if (x_dt.bits == 64) {
-      _pairwise_distance<double>(res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+      _pairwise_distance<double, double>(
+        res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
     } else {
       RAFT_FAIL("Unsupported DLtensor dtype: %d and bits: %d", x_dt.code, x_dt.bits);
     }
