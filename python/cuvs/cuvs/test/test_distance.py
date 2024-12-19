@@ -40,7 +40,7 @@ from cuvs.distance import pairwise_distance
     ],
 )
 @pytest.mark.parametrize("inplace", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
 def test_distance(n_rows, n_cols, inplace, metric, dtype):
     input1 = np.random.random_sample((n_rows, n_cols))
     input1 = np.asarray(input1).astype(dtype)
@@ -55,7 +55,10 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
         norm = np.sum(input1, axis=1)
         input1 = (input1.T / norm).T
 
-    output = np.zeros((n_rows, n_rows), dtype=dtype)
+    output_dtype = dtype
+    if np.issubdtype(dtype, np.float16):
+        output_dtype = np.float32
+    output = np.zeros((n_rows, n_rows), dtype=output_dtype)
 
     if metric == "inner_product":
         expected = np.matmul(input1, input1.T)
@@ -76,4 +79,8 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
 
     actual = output_device.copy_to_host()
 
-    assert np.allclose(expected, actual, atol=1e-3, rtol=1e-3)
+    tol = 1e-3
+    if np.issubdtype(dtype, np.float16):
+        tol = 1e-2
+
+    assert np.allclose(expected, actual, atol=tol, rtol=tol)
