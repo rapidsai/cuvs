@@ -21,7 +21,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 
 #include <cuda_fp16.h>
 

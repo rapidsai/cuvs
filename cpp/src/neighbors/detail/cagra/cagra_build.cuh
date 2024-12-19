@@ -26,7 +26,7 @@
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <cuvs/distance/distance.hpp>
@@ -45,8 +45,6 @@
 #include <vector>
 
 namespace cuvs::neighbors::cagra::detail {
-
-static const std::string RAFT_NAME = "raft";
 
 template <typename IdxT>
 void write_to_graph(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,

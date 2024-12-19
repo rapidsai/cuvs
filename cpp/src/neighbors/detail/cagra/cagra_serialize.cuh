@@ -18,7 +18,7 @@
 
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/host_mdarray.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -33,8 +33,6 @@
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
-
-static const std::string RAFT_NAME = "raft";
 
 constexpr int serialization_version = 4;
 
