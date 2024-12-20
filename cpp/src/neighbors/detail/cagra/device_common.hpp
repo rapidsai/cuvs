@@ -185,7 +185,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const uint32_t search_width)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
-  constexpr IndexT invalid_index    = raft::upper_bound<IndexT>();
+  constexpr IndexT invalid_index    = ~static_cast<IndexT>(0);
 
   // Read child indices of parents from knn graph and check if the distance
   // computaiton is necessary.

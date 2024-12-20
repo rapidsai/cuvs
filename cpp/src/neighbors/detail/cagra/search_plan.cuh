@@ -247,10 +247,10 @@ struct search_plan_impl : public search_plan_impl_base {
       // [visited_hash_table]
       // In the multi CTA algo, which node has been visited is managed in a hash
       // table that each CTA has in the shared memory. This hash table is not
-      // shared among CTAs.
+      // shared among CTAs. This hash table is reset and restored in each iteration.
       //
-      const uint32_t max_visited_nodes = mc_itopk_size + (graph_degree * max_iterations);
-      small_hash_bitlen                = 11;  // 2K
+      const uint32_t max_visited_nodes = mc_itopk_size + graph_degree;
+      small_hash_bitlen                = 8;  // 256
       while (max_visited_nodes > hashmap::get_size(small_hash_bitlen) * max_fill_rate) {
         small_hash_bitlen += 1;
       }

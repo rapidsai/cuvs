@@ -40,7 +40,7 @@ RAFT_DEVICE_INLINE_FUNCTION void init(IdxT* const table,
 {
   if (threadIdx.x < FIRST_TID) return;
   for (unsigned i = threadIdx.x - FIRST_TID; i < get_size(bitlen); i += blockDim.x - FIRST_TID) {
-    table[i] = utils::get_max_value<IdxT>();
+    table[i] = ~static_cast<IdxT>(0);
   }
 }
 

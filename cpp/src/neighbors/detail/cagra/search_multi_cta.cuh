@@ -127,7 +127,7 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
     RAFT_EXPECTS(result_buffer_size_32 <= 256, "Result buffer size cannot exceed 256");
 
     smem_size = dataset_desc.smem_ws_size_in_bytes +
-                (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * result_buffer_size_32 +
+                (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * (result_buffer_size_32) +
                 sizeof(INDEX_T) * hashmap::get_size(small_hash_bitlen) +
                 sizeof(INDEX_T) * search_width;
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
