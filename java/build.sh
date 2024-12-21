@@ -1,7 +1,12 @@
 export CMAKE_PREFIX_PATH=`pwd`/../cpp/build
+
+VERSION="25.02"
+GROUP_ID="com.nvidia.cuvs"
+SO_FILE_PATH="./internal"
+
 cd internal && cmake . && cmake --build . \
   && cd .. \
-  && mvn install:install-file -DgroupId=com.nvidia.cuvs -DartifactId=cuvs-java-internal -Dversion=25.02 -Dpackaging=so -Dfile=./internal/libcuvs_java.so \
+  && mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \
   && cd cuvs-java \
   && mvn package \
-  && mvn install:install-file -Dfile=./target/cuvs-java-25.02.1-jar-with-dependencies.jar -DgroupId=com.nvidia.cuvs -DartifactId=cuvs-java -Dversion=54.02.1 -Dpackaging=jar
+  && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-jar-with-dependencies.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar

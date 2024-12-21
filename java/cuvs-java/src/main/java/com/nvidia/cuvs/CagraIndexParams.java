@@ -144,7 +144,7 @@ public class CagraIndexParams {
     private int intermediateGraphDegree = 128;
     private int graphDegree = 64;
     private int nnDescentNumIterations = 20;
-    private int numWriterThreads = 1;
+    private int numWriterThreads = 2;
 
     public Builder(CuVSResources resources) {
       this.resources = resources;

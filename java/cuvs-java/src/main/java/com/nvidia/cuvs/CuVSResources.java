@@ -37,12 +37,12 @@ public class CuVSResources implements AutoCloseable {
 
   public final Arena arena;
   public final Linker linker;
-  public final SymbolLookup libcuvsNativeLibrary;
+  public final SymbolLookup symbolLookup;
   protected File nativeLibrary;
-
   private final MethodHandle createResourcesMethodHandle;
   private final MethodHandle destroyResourcesMethodHandle;
   private MemorySegment resourcesMemorySegment;
+  private MemoryLayout intMemoryLayout;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -52,14 +52,17 @@ public class CuVSResources implements AutoCloseable {
   public CuVSResources() throws Throwable {
     linker = Linker.nativeLinker();
     arena = Arena.ofShared();
-    nativeLibrary = Util.loadLibraryFromJar("/libcuvs_java.so");
-    libcuvsNativeLibrary = SymbolLookup.libraryLookup(nativeLibrary.getAbsolutePath(), arena);
 
-    createResourcesMethodHandle = linker.downcallHandle(libcuvsNativeLibrary.find("create_resources").get(),
+    nativeLibrary = Util.loadLibraryFromJar("/libcuvs_java.so");
+    symbolLookup = SymbolLookup.libraryLookup(nativeLibrary.getAbsolutePath(), arena);
+    intMemoryLayout = linker.canonicalLayouts().get("int");
+
+    createResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("create_resources").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    destroyResourcesMethodHandle = linker.downcallHandle(libcuvsNativeLibrary.find("destroy_resources").get(),
+    destroyResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("destroy_resources").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
     createResources();
   }
 
@@ -69,14 +72,14 @@ public class CuVSResources implements AutoCloseable {
    * @throws Throwable exception thrown when native function is invoked
    */
   public void createResources() throws Throwable {
-    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
+    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
     resourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValueMemorySegment);
   }
 
   @Override
   public void close() {
-    MemoryLayout returnValueMemoryLayout = linker.canonicalLayouts().get("int");
+    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
     MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
     try {
       destroyResourcesMethodHandle.invokeExact(resourcesMemorySegment, returnValueMemorySegment);
@@ -96,9 +99,10 @@ public class CuVSResources implements AutoCloseable {
   }
 
   /**
-   * Returns the loaded libcuvs_java.so as a {@link SymbolLookup}
+   * Returns the loaded libcuvs_java_cagra.so as a {@link SymbolLookup}
    */
-  protected SymbolLookup getLibcuvsNativeLibrary() {
-    return libcuvsNativeLibrary;
+  protected SymbolLookup getSymbolLookup() {
+    return symbolLookup;
   }
+
 }

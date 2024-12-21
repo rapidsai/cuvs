@@ -20,44 +20,28 @@ import java.util.Arrays;
 import java.util.Map;
 
 /**
- * CagraQuery holds the CagraSearchParams and the query vectors to be used while
- * invoking search.
+ * BruteForceQuery holds the query vectors to be used while invoking search.
  * 
  * @since 25.02
  */
-public class CagraQuery {
+public class BruteForceQuery {
 
-  private CagraSearchParams cagraSearchParameters;
   private Map<Integer, Integer> mapping;
   private float[][] queryVectors;
   private int topK;
 
   /**
-   * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
-   * preFilter, queryVectors, mapping, and topK.
+   * Constructs an instance of {@link BruteForceQuery} using queryVectors,
+   * mapping, and topK.
    * 
-   * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
-   *                              the search parameters
-   * @param queryVectors          2D float query vector array
-   * @param mapping               an instance of ID mapping
-   * @param topK                  the top k results to return
+   * @param queryVectors 2D float query vector array
+   * @param mapping      an instance of ID mapping
+   * @param topK         the top k results to return
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, Map<Integer, Integer> mapping,
-      int topK) {
-    super();
-    this.cagraSearchParameters = cagraSearchParameters;
+  public BruteForceQuery(float[][] queryVectors, Map<Integer, Integer> mapping, int topK) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
-  }
-
-  /**
-   * Gets the instance of CagraSearchParams initially set.
-   * 
-   * @return an instance CagraSearchParams
-   */
-  public CagraSearchParams getCagraSearchParameters() {
-    return cagraSearchParameters;
   }
 
   /**
@@ -81,7 +65,7 @@ public class CagraQuery {
   /**
    * Gets the topK value.
    * 
-   * @return the topK value
+   * @return an integer
    */
   public int getTopK() {
     return topK;
@@ -89,37 +73,18 @@ public class CagraQuery {
 
   @Override
   public String toString() {
-    return "CuVSQuery [cagraSearchParameters=" + cagraSearchParameters + ", queryVectors="
-        + Arrays.toString(queryVectors) + ", mapping=" + mapping + ", topK=" + topK + "]";
+    return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", topK=" + topK
+        + "]";
   }
 
   /**
-   * Builder helps configure and create an instance of CagraQuery.
+   * Builder helps configure and create an instance of BruteForceQuery.
    */
   public static class Builder {
 
-    private CagraSearchParams cagraSearchParams;
     private float[][] queryVectors;
     private Map<Integer, Integer> mapping;
     private int topK = 2;
-
-    /**
-     * Default constructor.
-     */
-    public Builder() {
-    }
-
-    /**
-     * Sets the instance of configured CagraSearchParams to be passed for search.
-     * 
-     * @param cagraSearchParams an instance of the configured CagraSearchParams to
-     *                          be used for this query
-     * @return an instance of this Builder
-     */
-    public Builder withSearchParams(CagraSearchParams cagraSearchParams) {
-      this.cagraSearchParams = cagraSearchParams;
-      return this;
-    }
 
     /**
      * Registers the query vectors to be passed in the search call.
@@ -155,12 +120,12 @@ public class CagraQuery {
     }
 
     /**
-     * Builds an instance of CuVSQuery.
+     * Builds an instance of {@link BruteForceQuery}
      * 
-     * @return an instance of CuVSQuery
+     * @return an instance of {@link BruteForceQuery}
      */
-    public CagraQuery build() {
-      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK);
+    public BruteForceQuery build() {
+      return new BruteForceQuery(queryVectors, mapping, topK);
     }
   }
 }

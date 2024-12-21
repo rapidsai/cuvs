@@ -30,6 +30,7 @@ import java.lang.invoke.VarHandle;
 import org.apache.commons.io.IOUtils;
 
 public class Util {
+
   /**
    * A utility method for getting an instance of {@link MemorySegment} for a
    * {@link String}.
@@ -38,8 +39,9 @@ public class Util {
    * @return an instance of {@link MemorySegment}
    */
   public static MemorySegment buildMemorySegment(Linker linker, Arena arena, String str) {
+    MemoryLayout charMemoryLayout = linker.canonicalLayouts().get("char");
     StringBuilder sb = new StringBuilder(str).append('\0');
-    MemoryLayout stringMemoryLayout = MemoryLayout.sequenceLayout(sb.length(), linker.canonicalLayouts().get("char"));
+    MemoryLayout stringMemoryLayout = MemoryLayout.sequenceLayout(sb.length(), charMemoryLayout);
     MemorySegment stringMemorySegment = arena.allocate(stringMemoryLayout);
 
     for (int i = 0; i < sb.length(); i++) {
@@ -47,6 +49,21 @@ public class Util {
       varHandle.set(stringMemorySegment, 0L, (byte) sb.charAt(i));
     }
     return stringMemorySegment;
+  }
+
+  /**
+   * A utility method for building a {@link MemorySegment} for a 1D long array.
+   * 
+   * @param data The 1D long array for which the {@link MemorySegment} is needed
+   * @return an instance of {@link MemorySegment}
+   */
+  public static MemorySegment buildMemorySegment(Linker linker, Arena arena, long[] data) {
+    int cells = data.length;
+    MemoryLayout longMemoryLayout = linker.canonicalLayouts().get("long");
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(cells, longMemoryLayout);
+    MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+    MemorySegment.copy(data, 0, dataMemorySegment, (ValueLayout) longMemoryLayout, 0, cells);
+    return dataMemorySegment;
   }
 
   /**
@@ -58,14 +75,14 @@ public class Util {
   public static MemorySegment buildMemorySegment(Linker linker, Arena arena, float[][] data) {
     long rows = data.length;
     long cols = rows > 0 ? data[0].length : 0;
-
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, linker.canonicalLayouts().get("float"));
+    MemoryLayout floatMemoryLayout = linker.canonicalLayouts().get("float");
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, floatMemoryLayout);
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
-    long floatByteSize = linker.canonicalLayouts().get("float").byteSize();
+    long floatByteSize = floatMemoryLayout.byteSize();
 
     for (int r = 0; r < rows; r++) {
-      MemorySegment.copy(data[r], 0, dataMemorySegment, (ValueLayout) linker.canonicalLayouts().get("float"),
-          (r * cols * floatByteSize), (int) cols);
+      MemorySegment.copy(data[r], 0, dataMemorySegment, (ValueLayout) floatMemoryLayout, (r * cols * floatByteSize),
+          (int) cols);
     }
 
     return dataMemorySegment;
