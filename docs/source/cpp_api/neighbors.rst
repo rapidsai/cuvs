@@ -18,3 +18,4 @@ Nearest Neighbors
    neighbors_nn_descent.rst
    neighbors_refine.rst
    neighbors_mg.rst
+   neighbors_vamana.rst

@@ -17,27 +17,27 @@
 #include "vamana.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
-namespace cuvs::neighbors::experimental::vamana {
+namespace cuvs::neighbors::vamana {
 
 #define RAFT_INST_VAMANA_BUILD(T, IdxT)                                                    \
   auto build(raft::resources const& handle,                                                \
-             const cuvs::neighbors::experimental::vamana::index_params& params,            \
+             const cuvs::neighbors::vamana::index_params& params,            \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)          \
-    ->cuvs::neighbors::experimental::vamana::index<T, IdxT>                                \
+    ->cuvs::neighbors::vamana::index<T, IdxT>                                \
   {                                                                                        \
-    return cuvs::neighbors::experimental::vamana::build<T, IdxT>(handle, params, dataset); \
+    return cuvs::neighbors::vamana::build<T, IdxT>(handle, params, dataset); \
   }                                                                                        \
                                                                                            \
   auto build(raft::resources const& handle,                                                \
-             const cuvs::neighbors::experimental::vamana::index_params& params,            \
+             const cuvs::neighbors::vamana::index_params& params,            \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)            \
-    ->cuvs::neighbors::experimental::vamana::index<T, IdxT>                                \
+    ->cuvs::neighbors::vamana::index<T, IdxT>                                \
   {                                                                                        \
-    return cuvs::neighbors::experimental::vamana::build<T, IdxT>(handle, params, dataset); \
+    return cuvs::neighbors::vamana::build<T, IdxT>(handle, params, dataset); \
   }
 
 RAFT_INST_VAMANA_BUILD(uint8_t, uint32_t);
 
 #undef RAFT_INST_VAMANA_BUILD
 
-}  // namespace cuvs::neighbors::experimental::vamana
+}  // namespace cuvs::neighbors::vamana

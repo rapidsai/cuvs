@@ -30,7 +30,7 @@
 #include <cstdio>
 #include <vector>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /* @defgroup greedy_search_detail greedy search
  * @{
@@ -286,4 +286,4 @@ __global__ void GreedySearchKernel(
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

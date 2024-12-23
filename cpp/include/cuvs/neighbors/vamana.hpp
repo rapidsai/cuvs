@@ -31,7 +31,7 @@
 #include <optional>
 #include <variant>
 
-namespace cuvs::neighbors::experimental::vamana {
+namespace cuvs::neighbors::vamana {
 /**
  * @defgroup vamana_cpp_index_params Vamana index build parameters
  * @{
@@ -219,34 +219,34 @@ struct index : cuvs::neighbors::index {
  *
  */
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<float, uint32_t>;
+  -> cuvs::neighbors::vamana::index<float, uint32_t>;
 
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<float, uint32_t>;
+  -> cuvs::neighbors::vamana::index<float, uint32_t>;
 
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<int8_t, uint32_t>;
 
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<int8_t, uint32_t>;
 
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 
 auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 
 /**
  * @defgroup vamana_cpp_serialize Vamana serialize functions
@@ -258,18 +258,18 @@ auto build(raft::resources const& handle,
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<float, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<float, uint32_t>& index);
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index);
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index);
 
 /**
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::vamana
+}  // namespace cuvs::neighbors::vamana

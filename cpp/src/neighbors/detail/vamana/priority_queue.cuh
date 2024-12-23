@@ -20,7 +20,7 @@
 #include <raft/util/warp_primitives.cuh>
 #include <stdio.h>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /***************************************************************************************
 ***************************************************************************************/
@@ -326,4 +326,4 @@ __forceinline__ __device__ void enqueue_all_neighbors(int num_neighbors,
   }
 }
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

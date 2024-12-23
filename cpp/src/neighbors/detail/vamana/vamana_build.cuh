@@ -46,7 +46,7 @@
 #include <cstdio>
 #include <vector>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /* @defgroup vamana_build_detail vamana build
  * @{
@@ -406,4 +406,4 @@ index<T, IdxT> build(
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

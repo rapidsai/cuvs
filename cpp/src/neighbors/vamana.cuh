@@ -31,7 +31,7 @@
 
 #include <rmm/cuda_stream_view.hpp>
 
-namespace cuvs::neighbors::experimental::vamana {
+namespace cuvs::neighbors::vamana {
 
 /**
  * @defgroup VAMANA ANN Graph-based nearest neighbor search
@@ -85,7 +85,7 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
-  return cuvs::neighbors::experimental::vamana::detail::build<T, IdxT, Accessor>(
+  return cuvs::neighbors::vamana::detail::build<T, IdxT, Accessor>(
     res, params, dataset);
 }
 
@@ -94,9 +94,9 @@ void serialize(raft::resources const& res,
                const std::string& file_prefix,
                const index<T, IdxT>& index_)
 {
-  cuvs::neighbors::experimental::vamana::detail::build<T, IdxT>(res, file_prefix, index_);
+  cuvs::neighbors::vamana::detail::build<T, IdxT>(res, file_prefix, index_);
 }
 
 /** @} */  // end group vamana
 
-}  // namespace cuvs::neighbors::experimental::vamana
+}  // namespace cuvs::neighbors::vamana
