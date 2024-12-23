@@ -154,6 +154,9 @@ void add_node_core(
           std::uint32_t detourable_node_count = 0;
           const auto a_id                     = host_neighbor_indices(vec_i, i);
           if (a_id >= idx.size()) {
+            // If the node ID is not valid, the number of detours is increased
+            // to a value greater than the maximum, so that the edge to that
+            // node is not selected as much as possible.
             detourable_node_count_list[i] = std::make_pair(a_id, base_degree + 1);
             continue;
           }
