@@ -19,6 +19,7 @@ import subprocess
 import sys
 from urllib.request import urlretrieve
 
+import urllib.request
 
 def get_dataset_path(name, ann_bench_data_path):
     if not os.path.exists(ann_bench_data_path):
@@ -29,7 +30,10 @@ def get_dataset_path(name, ann_bench_data_path):
 def download_dataset(url, path):
     if not os.path.exists(path):
         print(f"downloading {url} -> {path}...")
-        urlretrieve(url, path)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as response, open(path, 'wb') as out_file:
+            data = response.read()
+            out_file.write(data)
 
 
 def convert_hdf5_to_fbin(path, normalize):
