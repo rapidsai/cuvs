@@ -127,14 +127,15 @@ void add_node_core(
     raft::resource::sync_stream(handle);
 
     // Check search results
-    int num_warnings = 0;
+    constexpr int max_warnings = 3;
+    int num_warnings           = 0;
     for (std::size_t vec_i = 0; vec_i < batch.size(); vec_i++) {
       std::uint32_t invalid_edges = 0;
       for (std::uint32_t i = 0; i < base_degree; i++) {
         if (host_neighbor_indices(vec_i, i) >= old_size) { invalid_edges++; }
       }
       if (invalid_edges > 0) {
-        if (num_warnings < 3) {
+        if (num_warnings < max_warnings) {
           RAFT_LOG_WARN(
             "Invalid edges found in search results "
             "(vec_i:%lu, invalid_edges:%lu, degree:%lu, base_degree:%lu)",
@@ -146,7 +147,7 @@ void add_node_core(
         num_warnings += 1;
       }
     }
-    if (num_warnings > 0) {
+    if (num_warnings > max_warnings) {
       RAFT_LOG_WARN("The number of queries that contain invalid search results: %d", num_warnings);
     }
 

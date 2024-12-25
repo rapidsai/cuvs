@@ -120,7 +120,7 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
     search_width                            = 1;
     num_cta_per_query =
       max(params.search_width, raft::ceildiv(params.itopk_size, (size_t)multi_cta_itopk_size));
-    result_buffer_size = itopk_size + search_width * graph_degree;
+    result_buffer_size = itopk_size + (search_width * graph_degree);
     typedef raft::Pow2<32> AlignBytes;
     unsigned result_buffer_size_32 = AlignBytes::roundUp(result_buffer_size);
     // constexpr unsigned max_result_buffer_size = 256;
