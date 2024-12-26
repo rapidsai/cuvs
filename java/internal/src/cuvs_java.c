@@ -231,9 +231,8 @@ cuvsBruteForceIndex_t build_brute_force_index(float *dataset, long rows, long di
   cuvsError_t index_create_status = cuvsBruteForceIndexCreate(&index);
 
   cuvsStreamSync(cuvs_resources);
-  *return_value = cuvsBruteForceBuild(cuvs_resources, &dataset_tensor, L2Expanded, 0.f, index);
+  *return_value = cuvsBruteForceBuild(cuvs_resources, &dataset_tensor, L2Expanded, 0.0f, index);
 
-  cuvsRMMFree(cuvs_resources, dataset_d, sizeof(float) * rows * dimensions);
   omp_set_num_threads(1);
 
   return index;
@@ -301,4 +300,28 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
   cuvsRMMFree(cuvs_resources, neighbors, sizeof(int64_t) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, distances, sizeof(float) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
+}
+
+/**
+ * A function to serialize a BRUTEFORCE index
+ * 
+ * @param cuvs_resources reference of the underlying opaque C handle
+ * @param index cuvsBruteForceIndex_t reference
+ * @param return_value return value for cuvsBruteForceSerialize function call
+ * @param filename the filename of the index file
+ */
+void serialize_brute_force_index(cuvsResources_t cuvs_resources, cuvsBruteForceIndex_t index, int *return_value, char* filename) {
+  *return_value = cuvsBruteForceSerialize(cuvs_resources, filename, index);
+}
+
+/**
+ * A function to de-serialize a BRUTEFORCE index
+ * 
+ * @param cuvs_resources reference to the underlying opaque C handle
+ * @param index cuvsBruteForceIndex_t reference
+ * @param return_value return value for cuvsBruteForceDeserialize function call
+ * @param filename the filename of the index file
+ */
+void deserialize_brute_force_index(cuvsResources_t cuvs_resources, cuvsBruteForceIndex_t index, int *return_value, char* filename) {
+  *return_value = cuvsBruteForceDeserialize(cuvs_resources, filename, index);
 }

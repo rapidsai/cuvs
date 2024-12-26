@@ -18,10 +18,15 @@ package com.nvidia.cuvs;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -58,16 +63,24 @@ public class BruteForceAndSearchTest {
 
     // Expected search results
     List<Map<Integer, Float>> expectedResults = Arrays.asList(
-        Map.of(3, 0.59198487f, 1, 0.6283694f, 2, 0.77246666f),
-        Map.of(1, 0.2534914f, 3, 0.33350062f, 2, 0.8748074f),
-        Map.of(1, 0.4058035f, 3, 0.43066847f, 2, 0.72249544f),
-        Map.of(3, 0.11946076f, 1, 0.46753132f, 2, 1.0337032f)
+        Map.of(3, 0.038782537f, 2, 0.35904616f, 0, 0.83774555f),
+        Map.of(0, 0.12472606f, 2, 0.21700788f, 1, 0.3191862f),
+        Map.of(3, 0.047766685f, 2, 0.20332813f, 0, 0.48305476f),
+        Map.of(1, 0.15224183f, 0, 0.5906347f, 3, 0.5986643f)
       );
 
     for (int j = 0; j < 10; j++) {
 
       try (CuVSResources resources = new CuVSResources()) {
 
+        // Create a query object with the query vectors
+        BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
+            .withTopK(3)
+            .withQueryVectors(queries)
+            .withMapping(map)
+            .build();
+
+        // Set index parameters
         BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
             .withNumWriterThreads(32)
             .build();
@@ -78,13 +91,24 @@ public class BruteForceAndSearchTest {
             .withIndexParams(indexParams)
             .build();
 
-        // Create a query object with the query vectors
-        BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
-            .withTopK(3)
-            .withQueryVectors(queries)
-            .withMapping(map)
+        // Saving the index on to the disk.
+        String indexFileName = UUID.randomUUID().toString() + ".bf";
+        index.serialize(new FileOutputStream(indexFileName));
+
+        // Loading a BRUTEFORCE index from disk.
+        File indexFile = new File(indexFileName);
+        InputStream inputStream = new FileInputStream(indexFile);
+        BruteForceIndex loadedIndex = new BruteForceIndex.Builder(resources)
+            .from(inputStream)
             .build();
 
+        // Perform the search
+        SearchResults resultsFromLoadedIndex = loadedIndex.search(cuvsQuery);
+
+        // Check results
+        log.info(resultsFromLoadedIndex.getResults().toString());
+        assertEquals(expectedResults, resultsFromLoadedIndex.getResults());
+        
         // Perform the search
         SearchResults results = index.search(cuvsQuery);
 
@@ -92,7 +116,13 @@ public class BruteForceAndSearchTest {
         log.info(results.getResults().toString());
         assertEquals(expectedResults, results.getResults());
 
+        // Cleanup
         index.destroyIndex();
+        loadedIndex.destroyIndex();
+
+        if (indexFile.exists()) {
+          indexFile.delete();
+        }
       }
     }
   }

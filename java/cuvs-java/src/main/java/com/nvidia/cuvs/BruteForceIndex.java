@@ -16,7 +16,12 @@
 
 package com.nvidia.cuvs;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -24,12 +29,12 @@ import java.lang.foreign.SequenceLayout;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.util.UUID;
 
 import com.nvidia.cuvs.common.Util;
+import com.nvidia.cuvs.panama.cuvsBruteForceIndex;
 
 /**
- * The BRUTEFORCE method is running the KNN algorithm. It performs an extensive
- * search, and in contrast to ANN methods produces an exact result.
  * 
  * {@link BruteForceIndex} encapsulates a BRUTEFORCE index, along with methods
  * to interact with it.
@@ -44,6 +49,8 @@ public class BruteForceIndex {
   private MethodHandle indexMethodHandle;
   private MethodHandle searchMethodHandle;
   private MethodHandle destroyIndexMethodHandle;
+  private MethodHandle serializeMethodHandle;
+  private MethodHandle deserializeMethodHandle;
   private IndexReference bruteForceIndexReference;
   private BruteForceIndexParams bruteForceIndexParams;
   private MemoryLayout longMemoryLayout;
@@ -77,6 +84,26 @@ public class BruteForceIndex {
   }
 
   /**
+   * Constructor for loading the index from an {@link InputStream}
+   * 
+   * @param inputStream an instance of stream to read the index bytes from
+   * @param resources   an instance of {@link CuVSResources}
+   */
+  private BruteForceIndex(InputStream inputStream, CuVSResources resources) throws Throwable {
+    this.bruteForceIndexParams = null;
+    this.dataset = null;
+    this.prefilterData = null;
+    this.resources = resources;
+
+    longMemoryLayout = resources.linker.canonicalLayouts().get("long");
+    intMemoryLayout = resources.linker.canonicalLayouts().get("int");
+    floatMemoryLayout = resources.linker.canonicalLayouts().get("float");
+
+    initializeMethodHandles();
+    this.bruteForceIndexReference = deserialize(inputStream);
+  }
+
+  /**
    * Initializes the {@link MethodHandles} for invoking native methods.
    * 
    * @throws IOException @{@link IOException} is unable to load the native library
@@ -96,6 +123,14 @@ public class BruteForceIndex {
     destroyIndexMethodHandle = resources.linker.downcallHandle(
         resources.getSymbolLookup().find("destroy_brute_force_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+    serializeMethodHandle = resources.linker.downcallHandle(
+        resources.getSymbolLookup().find("serialize_brute_force_index").get(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+    deserializeMethodHandle = resources.linker.downcallHandle(
+        resources.getSymbolLookup().find("deserialize_brute_force_index").get(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
   }
 
   /**
@@ -163,6 +198,72 @@ public class BruteForceIndex {
   }
 
   /**
+   * A method to persist a BRUTEFORCE index using an instance of
+   * {@link OutputStream} for writing index bytes.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes into
+   */
+  public void serialize(OutputStream outputStream) throws Throwable {
+    serialize(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".bf"));
+  }
+
+  /**
+   * A method to persist a BRUTEFORCE index using an instance of
+   * {@link OutputStream} and path to the intermediate temporary file.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes to
+   * @param tempFile     an intermediate {@link File} where BRUTEFORCE index is
+   *                     written temporarily
+   */
+  public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
+    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
+    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
+    serializeMethodHandle.invokeExact(resources.getMemorySegment(), bruteForceIndexReference.getMemorySegment(),
+        returnValueMemorySegment,
+        Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
+    FileInputStream fileInputStream = new FileInputStream(tempFile);
+    byte[] chunk = new byte[1024]; // TODO: Make this configurable
+    int chunkLength = 0;
+    while ((chunkLength = fileInputStream.read(chunk)) != -1) {
+      outputStream.write(chunk, 0, chunkLength);
+    }
+    fileInputStream.close();
+    tempFile.delete();
+  }
+
+  /**
+   * Gets an instance of {@link IndexReference} by deserializing a BRUTEFORCE
+   * index using an {@link InputStream}.
+   * 
+   * @param inputStream an instance of {@link InputStream}
+   * @return an instance of {@link IndexReference}.
+   */
+  private IndexReference deserialize(InputStream inputStream) throws Throwable {
+    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
+    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
+    String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".bf";
+    IndexReference indexReference = new IndexReference(resources);
+
+    File tempFile = new File(tmpIndexFile);
+    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
+    byte[] chunk = new byte[1024];
+    int chunkLength = 0;
+    while ((chunkLength = inputStream.read(chunk)) != -1) {
+      fileOutputStream.write(chunk, 0, chunkLength);
+    }
+    deserializeMethodHandle.invokeExact(resources.getMemorySegment(), indexReference.getMemorySegment(),
+        returnValueMemorySegment, Util.buildMemorySegment(resources.linker, resources.arena, tmpIndexFile));
+
+    inputStream.close();
+    fileOutputStream.close();
+    tempFile.delete();
+
+    return indexReference;
+  }
+
+  /**
    * Builder helps configure and create an instance of {@link BruteForceIndex}.
    */
   public static class Builder {
@@ -171,6 +272,7 @@ public class BruteForceIndex {
     private long[] prefilterData;
     private CuVSResources cuvsResources;
     private BruteForceIndexParams bruteForceIndexParams;
+    private InputStream inputStream;
 
     /**
      * Constructs this Builder with an instance of {@link CuVSResources}.
@@ -190,6 +292,18 @@ public class BruteForceIndex {
      */
     public Builder withIndexParams(BruteForceIndexParams bruteForceIndexParams) {
       this.bruteForceIndexParams = bruteForceIndexParams;
+      return this;
+    }
+
+    /**
+     * Sets an instance of InputStream typically used when index deserialization is
+     * needed.
+     * 
+     * @param inputStream an instance of {@link InputStream}
+     * @return an instance of this Builder
+     */
+    public Builder from(InputStream inputStream) {
+      this.inputStream = inputStream;
       return this;
     }
 
@@ -221,7 +335,11 @@ public class BruteForceIndex {
      * @return an instance of {@link BruteForceIndex}
      */
     public BruteForceIndex build() throws Throwable {
-      return new BruteForceIndex(dataset, cuvsResources, bruteForceIndexParams, prefilterData);
+      if (inputStream != null) {
+        return new BruteForceIndex(inputStream, cuvsResources);
+      } else {
+        return new BruteForceIndex(dataset, cuvsResources, bruteForceIndexParams, prefilterData);
+      }
     }
   }
 
@@ -231,6 +349,13 @@ public class BruteForceIndex {
   protected static class IndexReference {
 
     private final MemorySegment memorySegment;
+
+    /**
+     * Constructs CagraIndexReference and allocate the MemorySegment.
+     */
+    protected IndexReference(CuVSResources resources) {
+      memorySegment = cuvsBruteForceIndex.allocate(resources.arena);
+    }
 
     /**
      * Constructs BruteForceIndexReference with an instance of MemorySegment passed
