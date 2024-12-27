@@ -82,10 +82,56 @@ func (index *CagraIndex) Close() error {
 // * `queries` - A tensor in device memory to query for
 // * `neighbors` - Tensor in device memory that receives the indices of the nearest neighbors
 // * `distances` - Tensor in device memory that receives the distances of the nearest neighbors
-func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *CagraIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[uint32], distances *cuvs.Tensor[T]) error {
+func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *CagraIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[uint32], distances *cuvs.Tensor[T], allowList []uint32) error {
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
 	}
 
-	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)))))
+	var filter C.cuvsFilter
+	bitset := createBitset(allowList)
+	allowListTensor, err := cuvs.NewVector[uint32](bitset)
+	if err != nil {
+		return err
+	}
+	defer allowListTensor.Close()
+	_, err = allowListTensor.ToDevice(&Resources)
+	if err != nil {
+		return err
+	}
+	if allowList == nil {
+		filter = C.cuvsFilter{
+			_type: C.NO_FILTER,
+			addr:  C.uintptr_t(0),
+		}
+	} else {
+		filter = C.cuvsFilter{
+			_type: C.BITSET,
+			addr:  C.uintptr_t(uintptr(unsafe.Pointer(allowListTensor.C_tensor))),
+		}
+	}
+	return cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraSearch(C.cuvsResources_t(Resources.Resource), params.params, index.index, (*C.DLManagedTensor)(unsafe.Pointer(queries.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(neighbors.C_tensor)), (*C.DLManagedTensor)(unsafe.Pointer(distances.C_tensor)), filter)))
+}
+
+func createBitset(allowList []uint32) []uint32 {
+	// Calculate size needed for the bitset array
+	// Each uint32 handles 32 bits, so we divide the max ID by 32 (shift right by 5)
+	maxID := uint32(0)
+	for _, id := range allowList {
+		if id > maxID {
+			maxID = id
+		}
+	}
+	size := (maxID >> 5) + 1 // Division by 32, add 1 to handle remainder
+	// Create and initialize bitset array
+	bitset := make([]uint32, size)
+	// Set bits for each ID in allowList
+	for _, id := range allowList {
+		// Calculate which uint32 in our array (divide by 32)
+		arrayIndex := id >> 5
+		// Calculate bit position within that uint32 (mod 32)
+		bitPosition := id & 31 // equivalent to id % 32
+		// Set the bit
+		bitset[arrayIndex] |= 1 << bitPosition
+	}
+	return bitset
 }

@@ -75,6 +75,57 @@ func NewTensor[T TensorNumberType](data [][]T) (Tensor[T], error) {
 	}, nil
 }
 
+func NewVector[T TensorNumberType](data []T) (Tensor[T], error) {
+	if len(data) == 0 {
+		return Tensor[T]{}, errors.New("empty data")
+	}
+
+	dtype := getDLDataType[T]()
+
+	totalElements := len(data)
+
+	dataPtr := C.malloc(C.size_t(totalElements * int(unsafe.Sizeof(T(0)))))
+	if dataPtr == nil {
+		return Tensor[T]{}, errors.New("data memory allocation failed")
+	}
+
+	dataSlice := unsafe.Slice((*T)(dataPtr), totalElements)
+	copy(dataSlice, data)
+
+	shapePtr := C.malloc(C.size_t(int(unsafe.Sizeof(C.int64_t(0)))))
+	if shapePtr == nil {
+		C.free(dataPtr)
+		return Tensor[T]{}, errors.New("shape memory allocation failed")
+	}
+
+	shapeSlice := unsafe.Slice((*C.int64_t)(shapePtr), 1)
+	shapeSlice[0] = C.int64_t(len(data))
+
+	// Create DLManagedTensor
+	dlm := (*C.DLManagedTensor)(C.malloc(C.size_t(unsafe.Sizeof(C.DLManagedTensor{}))))
+	if dlm == nil {
+		return Tensor[T]{}, errors.New("tensor allocation failed")
+	}
+
+	dlm.dl_tensor.data = dataPtr
+	dlm.dl_tensor.device = C.DLDevice{
+		device_type: C.DLDeviceType(C.kDLCPU),
+		device_id:   0,
+	}
+	dlm.dl_tensor.dtype = dtype
+	dlm.dl_tensor.ndim = 1
+	dlm.dl_tensor.shape = (*C.int64_t)(shapePtr)
+	dlm.dl_tensor.strides = nil
+	dlm.dl_tensor.byte_offset = 0
+	dlm.manager_ctx = nil
+	dlm.deleter = nil
+
+	return Tensor[T]{
+		C_tensor: dlm,
+		shape:    []int64{int64(len(data))},
+	}, nil
+}
+
 // Creates a new Tensor with uninitialized data on the current device.
 func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor[T], error) {
 	if len(shape) < 2 {
