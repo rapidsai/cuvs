@@ -166,7 +166,10 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   }
 }
 
-template <typename IndexT, typename DistanceT, typename DATASET_DESCRIPTOR_T>
+template <typename IndexT,
+          typename DistanceT,
+          typename DATASET_DESCRIPTOR_T,
+          int STATIC_RESULT_POSITION = 1>
 RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   IndexT* __restrict__ result_child_indices_ptr,
   DistanceT* __restrict__ result_child_distances_ptr,
@@ -182,7 +185,9 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const uint32_t traversed_hash_bitlen,
   const IndexT* __restrict__ parent_indices,
   const IndexT* __restrict__ internal_topk_list,
-  const uint32_t search_width)
+  const uint32_t search_width,
+  IndexT* __restrict__ temp_indices_ptr = nullptr,
+  int* __restrict__ result_position     = nullptr)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
   constexpr IndexT invalid_index    = ~static_cast<IndexT>(0);
@@ -207,7 +212,11 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
         child_id = invalid_index;
       }
     }
-    result_child_indices_ptr[i] = child_id;
+    if (STATIC_RESULT_POSITION) {
+      result_child_indices_ptr[i] = child_id;
+    } else {
+      temp_indices_ptr[i] = child_id;
+    }
   }
   __syncthreads();
 
@@ -219,8 +228,10 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const auto args             = dataset_desc.args.load();
   const bool lead_lane        = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += blockDim.x >> team_size_bits) {
-    const bool valid_i  = i < num_k;
-    const auto child_id = valid_i ? result_child_indices_ptr[i] : invalid_index;
+    const bool valid_i = i < num_k;
+    const auto child_id =
+      valid_i ? (STATIC_RESULT_POSITION ? result_child_indices_ptr[i] : temp_indices_ptr[i])
+              : invalid_index;
 
     // We should be calling `dataset_desc.compute_distance(..)` here as follows:
     // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
@@ -230,9 +241,19 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
       (child_id != invalid_index) ? compute_distance(args, child_id)
                                   : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
       team_size_bits);
+    __syncwarp();
 
     // Store the distance
-    if (valid_i && lead_lane) { result_child_distances_ptr[i] = child_dist; }
+    if (valid_i && lead_lane) {
+      if (STATIC_RESULT_POSITION) {
+        result_child_distances_ptr[i] = child_dist;
+      } else if (child_id != invalid_index) {
+        // Only valid results are stored in order from the back of the buffer
+        int j                         = atomicSub(result_position, 1) - 1;
+        result_child_indices_ptr[j]   = child_id;
+        result_child_distances_ptr[j] = child_dist;
+      }
+    }
   }
 }
 

@@ -249,7 +249,7 @@ struct search_plan_impl : public search_plan_impl_base {
       // table that each CTA has in the shared memory. This hash table is not
       // shared among CTAs. This hash table is reset and restored in each iteration.
       //
-      const uint32_t max_visited_nodes = mc_itopk_size + graph_degree;
+      const uint32_t max_visited_nodes = mc_itopk_size + (graph_degree * 2);
       small_hash_bitlen                = 8;  // 256
       while (max_visited_nodes > hashmap::get_size(small_hash_bitlen) * max_fill_rate) {
         small_hash_bitlen += 1;

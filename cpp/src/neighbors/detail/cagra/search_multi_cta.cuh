@@ -126,10 +126,13 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
     // constexpr unsigned max_result_buffer_size = 256;
     RAFT_EXPECTS(result_buffer_size_32 <= 256, "Result buffer size cannot exceed 256");
 
-    smem_size = dataset_desc.smem_ws_size_in_bytes +
-                (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * (result_buffer_size_32) +
-                sizeof(INDEX_T) * hashmap::get_size(small_hash_bitlen) +
-                sizeof(INDEX_T) * search_width;
+    smem_size =
+      dataset_desc.smem_ws_size_in_bytes +
+      (sizeof(INDEX_T) + sizeof(DISTANCE_T)) * (result_buffer_size_32) +
+      sizeof(INDEX_T) * hashmap::get_size(small_hash_bitlen) +  // local_visited_hashmap_ptr
+      sizeof(INDEX_T) * (search_width * graph_degree) +         // temp_indices_buffer
+      sizeof(INDEX_T) * search_width +                          // parent_indices_buffer
+      sizeof(int);                                              // result_position
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
 
     //
