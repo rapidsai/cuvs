@@ -29,7 +29,7 @@
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/init.cuh>
@@ -51,8 +51,6 @@ namespace cuvs::neighbors::experimental::vamana::detail {
 /* @defgroup vamana_build_detail vamana build
  * @{
  */
-
-static const std::string RAFT_NAME = "raft";
 
 static const int blockD    = 32;
 static const int maxBlocks = 10000;
