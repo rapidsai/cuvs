@@ -38,8 +38,6 @@
 
 namespace cuvs::neighbors {
 
-using raft::RAFT_NAME;  // For logging
-
 struct print_dtype {
   cudaDataType_t value;
 };

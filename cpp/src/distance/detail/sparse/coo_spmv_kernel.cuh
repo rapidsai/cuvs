@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <raft/core/detail/macros.hpp>
+
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_radix_sort.cuh>
 #include <cub/block/block_store.cuh>

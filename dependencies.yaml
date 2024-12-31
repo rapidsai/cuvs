@@ -394,22 +394,24 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - breathe
+          - breathe>=4.35.0
           - doxygen>=1.8.20
           - graphviz
           - ipython
           - numpydoc
-          - pydata-sphinx-theme
           - recommonmark
+          - sphinx>=8.0.0
           - sphinx-copybutton
           - sphinx-markdown-tables
+          - pip:
+            - nvidia-sphinx-theme
   rust:
     common:
       - output_types: [conda]
         packages:
           - make
           - rust
-          # clang/liblclang only needed for bindgen support
+          # clang/libclang only needed for bindgen support
           - clang
           - libclang
   build_wheels:

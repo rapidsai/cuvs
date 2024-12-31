@@ -28,11 +28,13 @@ from libcpp cimport bool, cast
 from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
+from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
+from cuvs.distance import DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
@@ -131,9 +133,11 @@ cdef class IndexParams:
     Parameters
     ----------
     metric : string denoting the metric type, default="sqeuclidean"
-        Valid values for metric: ["sqeuclidean"], where
+        Valid values for metric: ["sqeuclidean", "inner_product"], where
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
+            - inner_product distance is defined as
+              distance(a, b) = \\sum_i a_i * b_i.
     intermediate_graph_degree : int, default = 128
 
     graph_degree : int, default = 64
@@ -151,6 +155,7 @@ cdef class IndexParams:
     """
 
     cdef cuvsCagraIndexParams* params
+    cdef object _metric
 
     # hold on to a reference to the compression, to keep from being GC'ed
     cdef public object compression
@@ -170,10 +175,8 @@ cdef class IndexParams:
                  nn_descent_niter=20,
                  compression=None):
 
-        # todo (dgd): enable once other metrics are present
-        # and exposed in cuVS C API
-        # self.params.metric = _get_metric(metric)
-        # self.params.metric_arg = 0
+        self._metric = metric
+        self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.intermediate_graph_degree = intermediate_graph_degree
         self.params.graph_degree = graph_degree
         if build_algo == "ivf_pq":
@@ -186,9 +189,9 @@ cdef class IndexParams:
             self.params.compression = \
                 <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
 
-    # @property
-    # def metric(self):
-        # return self.params.metric
+    @property
+    def metric(self):
+        return self._metric
 
     @property
     def intermediate_graph_degree(self):
@@ -247,6 +250,7 @@ def build(IndexParams index_params, dataset, resources=None):
 
     The following distance metrics are supported:
         - L2
+        - InnerProduct
 
     Parameters
     ----------
