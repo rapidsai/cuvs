@@ -31,8 +31,6 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-using raft::RAFT_NAME;  // For logging
-
 struct test_ivf_sample_filter {
   static constexpr unsigned offset = 300;
 };
