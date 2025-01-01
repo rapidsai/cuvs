@@ -31,6 +31,7 @@ import java.util.function.Consumer;
 /**
  * {@snippet lang = c :
  * struct cuvsCagraIndexParams {
+ *     cuvsDistanceType metric;
  *     long intermediate_graph_degree;
  *     long graph_degree;
  *     enum cuvsCagraGraphBuildAlgo build_algo;
@@ -46,7 +47,8 @@ public class CuVSCagraIndexParams {
   }
 
   private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(cagra_h.C_LONG.withName("intermediate_graph_degree"), cagra_h.C_LONG.withName("graph_degree"),
+      .structLayout(cagra_h.C_INT.withName("metric"), MemoryLayout.paddingLayout(4),
+          cagra_h.C_LONG.withName("intermediate_graph_degree"), cagra_h.C_LONG.withName("graph_degree"),
           cagra_h.C_INT.withName("build_algo"), MemoryLayout.paddingLayout(4),
           cagra_h.C_LONG.withName("nn_descent_niter"), cagra_h.C_POINTER.withName("compression"))
       .withName("cuvsCagraIndexParams");
@@ -56,6 +58,46 @@ public class CuVSCagraIndexParams {
    */
   public static final GroupLayout layout() {
     return $LAYOUT;
+  }
+
+  private static final OfInt metric$LAYOUT = (OfInt) $LAYOUT.select(groupElement("metric"));
+
+  /**
+   * Layout for field:
+   * {@snippet lang = c : * cuvsDistanceType metric
+   * }
+   */
+  public static final OfInt metric$layout() {
+    return metric$LAYOUT;
+  }
+
+  private static final long metric$OFFSET = 0;
+
+  /**
+   * Offset for field:
+   * {@snippet lang = c : * cuvsDistanceType metric
+   * }
+   */
+  public static final long metric$offset() {
+    return metric$OFFSET;
+  }
+
+  /**
+   * Getter for field:
+   * {@snippet lang = c : * cuvsDistanceType metric
+   * }
+   */
+  public static int metric(MemorySegment struct) {
+    return struct.get(metric$LAYOUT, metric$OFFSET);
+  }
+
+  /**
+   * Setter for field:
+   * {@snippet lang = c : * cuvsDistanceType metric
+   * }
+   */
+  public static void metric(MemorySegment struct, int fieldValue) {
+    struct.set(metric$LAYOUT, metric$OFFSET, fieldValue);
   }
 
   private static final OfLong intermediate_graph_degree$LAYOUT = (OfLong) $LAYOUT
@@ -70,7 +112,7 @@ public class CuVSCagraIndexParams {
     return intermediate_graph_degree$LAYOUT;
   }
 
-  private static final long intermediate_graph_degree$OFFSET = 0;
+  private static final long intermediate_graph_degree$OFFSET = 8;
 
   /**
    * Offset for field:
@@ -110,7 +152,7 @@ public class CuVSCagraIndexParams {
     return graph_degree$LAYOUT;
   }
 
-  private static final long graph_degree$OFFSET = 8;
+  private static final long graph_degree$OFFSET = 16;
 
   /**
    * Offset for field:
@@ -150,7 +192,7 @@ public class CuVSCagraIndexParams {
     return build_algo$LAYOUT;
   }
 
-  private static final long build_algo$OFFSET = 16;
+  private static final long build_algo$OFFSET = 24;
 
   /**
    * Offset for field:
@@ -190,7 +232,7 @@ public class CuVSCagraIndexParams {
     return nn_descent_niter$LAYOUT;
   }
 
-  private static final long nn_descent_niter$OFFSET = 24;
+  private static final long nn_descent_niter$OFFSET = 32;
 
   /**
    * Offset for field:
@@ -230,7 +272,7 @@ public class CuVSCagraIndexParams {
     return compression$LAYOUT;
   }
 
-  private static final long compression$OFFSET = 32;
+  private static final long compression$OFFSET = 40;
 
   /**
    * Offset for field:

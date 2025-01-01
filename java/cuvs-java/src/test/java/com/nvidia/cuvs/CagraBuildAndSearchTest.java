@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
+import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import com.nvidia.cuvs.common.SearchResults;
 
 public class CagraBuildAndSearchTest {
@@ -79,6 +80,7 @@ public class CagraBuildAndSearchTest {
             .withGraphDegree(1)
             .withIntermediateGraphDegree(2)
             .withNumWriterThreads(32)
+            .withMetric(CuvsDistanceType.L2Expanded)
             .build();
 
         // Create the index with the dataset
