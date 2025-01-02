@@ -28,6 +28,7 @@ public class BruteForceQuery {
 
   private Map<Integer, Integer> mapping;
   private float[][] queryVectors;
+  private long[] prefilter;
   private int topK;
 
   /**
@@ -37,11 +38,14 @@ public class BruteForceQuery {
    * @param queryVectors 2D float query vector array
    * @param mapping      an instance of ID mapping
    * @param topK         the top k results to return
+   * @param prefilter    the prefilter data to use while searching the BRUTEFORCE
+   *                     index
    */
-  public BruteForceQuery(float[][] queryVectors, Map<Integer, Integer> mapping, int topK) {
+  public BruteForceQuery(float[][] queryVectors, Map<Integer, Integer> mapping, int topK, long[] prefilter) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
+    this.prefilter = prefilter;
   }
 
   /**
@@ -71,10 +75,19 @@ public class BruteForceQuery {
     return topK;
   }
 
+  /**
+   * Gets the prefilter long array
+   * 
+   * @return a long array
+   */
+  public long[] getPrefilter() {
+    return prefilter;
+  }
+
   @Override
   public String toString() {
-    return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", topK=" + topK
-        + "]";
+    return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", prefilter="
+        + Arrays.toString(prefilter) + ", topK=" + topK + "]";
   }
 
   /**
@@ -83,6 +96,7 @@ public class BruteForceQuery {
   public static class Builder {
 
     private float[][] queryVectors;
+    private long[] prefilter;
     private Map<Integer, Integer> mapping;
     private int topK = 2;
 
@@ -120,12 +134,23 @@ public class BruteForceQuery {
     }
 
     /**
+     * Sets the prefilter data for building the {@link BruteForceQuery}.
+     * 
+     * @param prefilter a one-dimensional long array
+     * @return an instance of this Builder
+     */
+    public Builder withPrefilter(long[] prefilter) {
+      this.prefilter = prefilter;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link BruteForceQuery}
      * 
      * @return an instance of {@link BruteForceQuery}
      */
     public BruteForceQuery build() {
-      return new BruteForceQuery(queryVectors, mapping, topK);
+      return new BruteForceQuery(queryVectors, mapping, topK, prefilter);
     }
   }
 }

@@ -44,7 +44,6 @@ import com.nvidia.cuvs.panama.cuvsBruteForceIndex;
 public class BruteForceIndex {
 
   private final float[][] dataset;
-  private final long[] prefilterData;
   private final CuVSResources resources;
   private MethodHandle indexMethodHandle;
   private MethodHandle searchMethodHandle;
@@ -65,13 +64,10 @@ public class BruteForceIndex {
    * @param resources             an instance of {@link CuVSResources}
    * @param bruteForceIndexParams an instance of {@link BruteForceIndexParams}
    *                              holding the index parameters
-   * @param prefilterData         the prefilter data to use while searching the
-   *                              BRUTEFORCE index
    */
-  private BruteForceIndex(float[][] dataset, CuVSResources resources, BruteForceIndexParams bruteForceIndexParams,
-      long[] prefilterData) throws Throwable {
+  private BruteForceIndex(float[][] dataset, CuVSResources resources, BruteForceIndexParams bruteForceIndexParams)
+      throws Throwable {
     this.dataset = dataset;
-    this.prefilterData = prefilterData;
     this.resources = resources;
     this.bruteForceIndexParams = bruteForceIndexParams;
 
@@ -92,7 +88,6 @@ public class BruteForceIndex {
   private BruteForceIndex(InputStream inputStream, CuVSResources resources) throws Throwable {
     this.bruteForceIndexParams = null;
     this.dataset = null;
-    this.prefilterData = null;
     this.resources = resources;
 
     longMemoryLayout = resources.linker.canonicalLayouts().get("long");
@@ -118,7 +113,7 @@ public class BruteForceIndex {
         resources.getSymbolLookup().find("search_brute_force_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout, longMemoryLayout,
             intMemoryLayout, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, longMemoryLayout));
+            ValueLayout.ADDRESS, longMemoryLayout, longMemoryLayout));
 
     destroyIndexMethodHandle = resources.linker.downcallHandle(
         resources.getSymbolLookup().find("destroy_brute_force_index").get(),
@@ -176,7 +171,8 @@ public class BruteForceIndex {
     long numQueries = cuvsQuery.getQueryVectors().length;
     long numBlocks = cuvsQuery.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? cuvsQuery.getQueryVectors()[0].length : 0;
-    long prefilterDataLength = prefilterData != null ? prefilterData.length : 0;
+    long prefilterDataLength = cuvsQuery.getPrefilter() != null ? cuvsQuery.getPrefilter().length : 0;
+    long numRows = dataset != null ? dataset.length : 0;
 
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, longMemoryLayout);
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, floatMemoryLayout);
@@ -184,14 +180,14 @@ public class BruteForceIndex {
     MemorySegment distancesMemorySegment = resources.arena.allocate(distancesSequenceLayout);
     MemoryLayout returnValueMemoryLayout = intMemoryLayout;
     MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    MemorySegment prefilterDataMemorySegment = prefilterData != null
-        ? Util.buildMemorySegment(resources.linker, resources.arena, prefilterData)
+    MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
+        ? Util.buildMemorySegment(resources.linker, resources.arena, cuvsQuery.getPrefilter())
         : MemorySegment.NULL;
 
     searchMethodHandle.invokeExact(bruteForceIndexReference.getMemorySegment(),
         Util.buildMemorySegment(resources.linker, resources.arena, cuvsQuery.getQueryVectors()), cuvsQuery.getTopK(),
         numQueries, vectorDimension, resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
-        returnValueMemorySegment, prefilterDataMemorySegment, prefilterDataLength);
+        returnValueMemorySegment, prefilterDataMemorySegment, prefilterDataLength, numRows);
 
     return new BruteForceSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
         distancesMemorySegment, cuvsQuery.getTopK(), cuvsQuery.getMapping(), numQueries);
@@ -269,7 +265,6 @@ public class BruteForceIndex {
   public static class Builder {
 
     private float[][] dataset;
-    private long[] prefilterData;
     private CuVSResources cuvsResources;
     private BruteForceIndexParams bruteForceIndexParams;
     private InputStream inputStream;
@@ -319,17 +314,6 @@ public class BruteForceIndex {
     }
 
     /**
-     * Sets the prefilter data for building the {@link BruteForceIndex}.
-     * 
-     * @param prefilterData a one-dimensional long array
-     * @return an instance of this Builder
-     */
-    public Builder withPrefilterData(long[] prefilterData) {
-      this.prefilterData = prefilterData;
-      return this;
-    }
-
-    /**
      * Builds and returns an instance of {@link BruteForceIndex}.
      * 
      * @return an instance of {@link BruteForceIndex}
@@ -338,7 +322,7 @@ public class BruteForceIndex {
       if (inputStream != null) {
         return new BruteForceIndex(inputStream, cuvsResources);
       } else {
-        return new BruteForceIndex(dataset, cuvsResources, bruteForceIndexParams, prefilterData);
+        return new BruteForceIndex(dataset, cuvsResources, bruteForceIndexParams);
       }
     }
   }
