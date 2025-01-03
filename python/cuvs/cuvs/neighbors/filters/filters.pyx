@@ -95,3 +95,52 @@ def from_bitmap(bitmap):
     filter.addr = <uintptr_t> bitmap_dlpack
 
     return Prefilter(filter, parent=bitmap)
+
+def from_bitset(bitset):
+    """
+    Create a pre-filter from an array with type of uint32.
+
+    Parameters
+    ----------
+    bitmap : numpy.ndarray
+        An array with type of `uint32` where each bit in the array corresponds
+        to if a sample and query pair is greenlit (not filtered) or filtered.
+        The array is row-major, meaning the bits are ordered by rows first.
+        Each bit in a `uint32` element represents a different sample-query
+        pair.
+
+        - Bit value of 1: The sample-query pair is greenlit (allowed).
+        - Bit value of 0: The sample-query pair is filtered.
+
+    Returns
+    -------
+    filter : cuvs.neighbors.filters.Prefilter
+        An instance of `Prefilter` that can be used to filter neighbors
+        based on the given bitmap.
+    {resources_docstring}
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> import numpy as np
+    >>> from cuvs.neighbors import filters
+    >>>
+    >>> n_samples = 50000
+    >>> n_queries = 1000
+    >>>
+    >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
+    >>> bitmap = cp.random.randint(1, 100, size=(n_bitmap,), dtype=cp.uint32)
+    >>> prefilter = filters.from_bitmap(bitmap)
+    """
+    bitset_cai = wrap_array(bitset)
+    _check_input_array(bitset_cai, [np.dtype('uint32')])
+
+    cdef cydlpack.DLManagedTensor* bitset_dlpack = \
+        cydlpack.dlpack_c(bitset_cai)
+
+    cdef cuvsFilter filter
+    filter.type = BITSET
+    filter.addr = <uintptr_t> bitset_dlpack
+
+    return Prefilter(filter, parent=bitset)

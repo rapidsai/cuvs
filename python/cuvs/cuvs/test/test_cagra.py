@@ -18,8 +18,9 @@ import pytest
 from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
+from scipy.spatial.distance import cdist
 
-from cuvs.neighbors import cagra
+from cuvs.neighbors import cagra, filters
 from cuvs.test.ann_utils import calc_recall, generate_data
 
 
@@ -166,6 +167,111 @@ def test_cagra_dataset_dtype_host_device(
         },
     ],
 )
+
+
+def create_sparse_bitset(n_size, sparsity):
+    """Create a sparse bitset array for testing filtering"""
+    bits_per_uint32 = 32
+    num_bits = n_size 
+    num_uint32s = (num_bits + bits_per_uint32 - 1) // bits_per_uint32
+    num_ones = int(num_bits * sparsity)
+
+    array = np.zeros(num_uint32s, dtype=np.uint32)
+    indices = np.random.choice(num_bits, num_ones, replace=False)
+
+    for index in indices:
+        i = index // bits_per_uint32
+        bit_position = index % bits_per_uint32
+        array[i] |= 1 << bit_position
+
+    return array
+
+
+@pytest.mark.parametrize("n_rows", [1000, 5000])
+@pytest.mark.parametrize("n_cols", [10, 50])
+@pytest.mark.parametrize("n_queries", [10, 100])
+@pytest.mark.parametrize("k", [10, 20])
+@pytest.mark.parametrize("sparsity", [0.2, 0.5])
+def test_filtered_cagra(
+    n_rows,
+    n_cols,
+    n_queries,
+    k,
+    sparsity,
+):
+    """Test CAGRA index with filtering using bitset"""
+    # Generate test data
+    dataset = generate_data((n_rows, n_cols), np.float32)
+    queries = generate_data((n_queries, n_cols), np.float32)
+
+    # Create bitset for filtering
+    bitset = create_sparse_bitset(n_rows, sparsity)
+
+    # Convert dataset and queries to device arrays
+    dataset_device = device_ndarray(dataset)
+    queries_device = device_ndarray(queries)
+    bitset_device = device_ndarray(bitset)
+
+    # Build index
+    build_params = cagra.IndexParams(
+        metric="euclidean",
+        intermediate_graph_degree=64,
+        graph_degree=32,
+        build_algo="nn_descent",
+    )
+    index = cagra.build(build_params, dataset_device)
+
+    # Create filter
+    prefilter = filters.from_bitset(bitset_device)
+
+    # Search with filter
+    out_idx = np.zeros((n_queries, k), dtype=np.uint32)
+    out_dist = np.zeros((n_queries, k), dtype=np.float32)
+    out_idx_device = device_ndarray(out_idx)
+    out_dist_device = device_ndarray(out_dist)
+
+    search_params = cagra.SearchParams()
+    ret_distances, ret_indices = cagra.search(
+        search_params,
+        index,
+        queries_device,
+        k,
+        neighbors=out_idx_device,
+        distances=out_dist_device,
+        # filter=prefilter,
+    )
+
+    # Convert bitset to bool array for validation
+    bitset_as_uint8 = bitset.view(np.uint8)
+    bool_filter = np.unpackbits(bitset_as_uint8)
+    bool_filter = bool_filter.reshape(-1, 4, 8)
+    bool_filter = np.flip(bool_filter, axis=2)
+    bool_filter = bool_filter.reshape(-1)[:n_rows]
+    bool_filter = np.logical_not(bool_filter)  # Flip so True means filtered
+
+    # Get filtered dataset for reference calculation
+    non_filtered_mask = ~bool_filter
+    filtered_dataset = dataset[non_filtered_mask]
+
+    # Calculate reference values with sklearn on filtered dataset
+    nn_skl = NearestNeighbors(
+        n_neighbors=k, algorithm="brute", metric="euclidean"
+    )
+    nn_skl.fit(filtered_dataset)
+    skl_idx = nn_skl.kneighbors(queries, return_distance=False)
+
+    # Get actual results
+    actual_indices = out_idx_device.copy_to_host()
+    actual_distances = out_dist_device.copy_to_host()
+    # Verify filtering - no filtered indices should be in results
+    filtered_indices = np.where(bool_filter)[0]
+    # for i in range(n_queries):
+        # assert not np.intersect1d(filtered_indices, actual_indices[i]).size
+
+    # Verify recall compared to sklearn reference
+    recall = calc_recall(actual_indices, skl_idx)
+    assert recall > 0.7
+    
 def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.

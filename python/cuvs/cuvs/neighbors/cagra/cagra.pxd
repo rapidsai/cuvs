@@ -28,7 +28,7 @@ from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
-
+from cuvs.neighbors.filters.filters cimport cuvsFilter
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
@@ -113,7 +113,8 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                 cuvsCagraIndex_t index,
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
-                                DLManagedTensor* distances) except +
+                                DLManagedTensor* distances,
+                                cuvsFilter filter) except +
 
     cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                    const char * filename,

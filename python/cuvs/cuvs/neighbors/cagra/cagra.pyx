@@ -47,6 +47,8 @@ from libc.stdint cimport (
 
 from cuvs.common.exceptions import check_cuvs
 
+from cuvs.neighbors.filters import no_filter
+
 
 cdef class CompressionParams:
     """
@@ -480,7 +482,8 @@ def search(SearchParams search_params,
            k,
            neighbors=None,
            distances=None,
-           resources=None):
+           resources=None,
+           filter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -553,6 +556,9 @@ def search(SearchParams search_params,
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
 
+    if filter is None:
+        filter = no_filter()
+
     cdef cuvsCagraSearchParams* params = &search_params.params
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
@@ -569,7 +575,8 @@ def search(SearchParams search_params,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            filter.prefilter
         ))
 
     return (distances, neighbors)
