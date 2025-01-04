@@ -90,6 +90,26 @@ public class hnsw_h {
   public static final AddressLayout C_POINTER = ValueLayout.ADDRESS
       .withTargetLayout(MemoryLayout.sequenceLayout(java.lang.Long.MAX_VALUE, JAVA_BYTE));
   public static final ValueLayout.OfLong C_LONG = ValueLayout.JAVA_LONG;
+  private static final int DLPACK_VERSION = (int) 80L;
+
+  /**
+   * {@snippet lang = c : * #define DLPACK_VERSION 80
+   * }
+   */
+  public static int DLPACK_VERSION() {
+    return DLPACK_VERSION;
+  }
+
+  private static final int DLPACK_ABI_VERSION = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * #define DLPACK_ABI_VERSION 1
+   * }
+   */
+  public static int DLPACK_ABI_VERSION() {
+    return DLPACK_ABI_VERSION;
+  }
+
   private static final int _STDINT_H = (int) 1L;
 
   /**
@@ -620,26 +640,6 @@ public class hnsw_h {
     return _BITS_STDINT_UINTN_H;
   }
 
-  private static final int DLPACK_MAJOR_VERSION = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * #define DLPACK_MAJOR_VERSION 1
-   * }
-   */
-  public static int DLPACK_MAJOR_VERSION() {
-    return DLPACK_MAJOR_VERSION;
-  }
-
-  private static final int DLPACK_MINOR_VERSION = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * #define DLPACK_MINOR_VERSION 0
-   * }
-   */
-  public static int DLPACK_MINOR_VERSION() {
-    return DLPACK_MINOR_VERSION;
-  }
-
   private static final int true_ = (int) 1L;
 
   /**
@@ -668,6 +668,216 @@ public class hnsw_h {
    */
   public static int __bool_true_false_are_defined() {
     return __bool_true_false_are_defined;
+  }
+
+  private static final int L2Expanded = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2Expanded = 0
+   * }
+   */
+  public static int L2Expanded() {
+    return L2Expanded;
+  }
+
+  private static final int L2SqrtExpanded = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2SqrtExpanded = 1
+   * }
+   */
+  public static int L2SqrtExpanded() {
+    return L2SqrtExpanded;
+  }
+
+  private static final int CosineExpanded = (int) 2L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.CosineExpanded = 2
+   * }
+   */
+  public static int CosineExpanded() {
+    return CosineExpanded;
+  }
+
+  private static final int L1 = (int) 3L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L1 = 3
+   * }
+   */
+  public static int L1() {
+    return L1;
+  }
+
+  private static final int L2Unexpanded = (int) 4L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2Unexpanded = 4
+   * }
+   */
+  public static int L2Unexpanded() {
+    return L2Unexpanded;
+  }
+
+  private static final int L2SqrtUnexpanded = (int) 5L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2SqrtUnexpanded = 5
+   * }
+   */
+  public static int L2SqrtUnexpanded() {
+    return L2SqrtUnexpanded;
+  }
+
+  private static final int InnerProduct = (int) 6L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.InnerProduct = 6
+   * }
+   */
+  public static int InnerProduct() {
+    return InnerProduct;
+  }
+
+  private static final int Linf = (int) 7L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Linf = 7
+   * }
+   */
+  public static int Linf() {
+    return Linf;
+  }
+
+  private static final int Canberra = (int) 8L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Canberra = 8
+   * }
+   */
+  public static int Canberra() {
+    return Canberra;
+  }
+
+  private static final int LpUnexpanded = (int) 9L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.LpUnexpanded = 9
+   * }
+   */
+  public static int LpUnexpanded() {
+    return LpUnexpanded;
+  }
+
+  private static final int CorrelationExpanded = (int) 10L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.CorrelationExpanded = 10
+   * }
+   */
+  public static int CorrelationExpanded() {
+    return CorrelationExpanded;
+  }
+
+  private static final int JaccardExpanded = (int) 11L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.JaccardExpanded = 11
+   * }
+   */
+  public static int JaccardExpanded() {
+    return JaccardExpanded;
+  }
+
+  private static final int HellingerExpanded = (int) 12L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.HellingerExpanded = 12
+   * }
+   */
+  public static int HellingerExpanded() {
+    return HellingerExpanded;
+  }
+
+  private static final int Haversine = (int) 13L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Haversine = 13
+   * }
+   */
+  public static int Haversine() {
+    return Haversine;
+  }
+
+  private static final int BrayCurtis = (int) 14L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.BrayCurtis = 14
+   * }
+   */
+  public static int BrayCurtis() {
+    return BrayCurtis;
+  }
+
+  private static final int JensenShannon = (int) 15L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.JensenShannon = 15
+   * }
+   */
+  public static int JensenShannon() {
+    return JensenShannon;
+  }
+
+  private static final int HammingUnexpanded = (int) 16L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.HammingUnexpanded = 16
+   * }
+   */
+  public static int HammingUnexpanded() {
+    return HammingUnexpanded;
+  }
+
+  private static final int KLDivergence = (int) 17L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.KLDivergence = 17
+   * }
+   */
+  public static int KLDivergence() {
+    return KLDivergence;
+  }
+
+  private static final int RusselRaoExpanded = (int) 18L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.RusselRaoExpanded = 18
+   * }
+   */
+  public static int RusselRaoExpanded() {
+    return RusselRaoExpanded;
+  }
+
+  private static final int DiceExpanded = (int) 19L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.DiceExpanded = 19
+   * }
+   */
+  public static int DiceExpanded() {
+    return DiceExpanded;
+  }
+
+  private static final int Precomputed = (int) 100L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Precomputed = 100
+   * }
+   */
+  public static int Precomputed() {
+    return Precomputed;
   }
 
   /**
@@ -1120,241 +1330,6 @@ public class hnsw_h {
    * }
    */
   public static final OfLong uintmax_t = hnsw_h.C_LONG;
-  private static final int CUVS_ERROR = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CUVS_ERROR = 0
-   * }
-   */
-  public static int CUVS_ERROR() {
-    return CUVS_ERROR;
-  }
-
-  private static final int CUVS_SUCCESS = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CUVS_SUCCESS = 1
-   * }
-   */
-  public static int CUVS_SUCCESS() {
-    return CUVS_SUCCESS;
-  }
-
-  /**
-   * {@snippet lang = c : * typedef uintptr_t cuvsResources_t
-   * }
-   */
-  public static final OfLong cuvsResources_t = hnsw_h.C_LONG;
-  private static final int L2Expanded = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2Expanded = 0
-   * }
-   */
-  public static int L2Expanded() {
-    return L2Expanded;
-  }
-
-  private static final int L2SqrtExpanded = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2SqrtExpanded = 1
-   * }
-   */
-  public static int L2SqrtExpanded() {
-    return L2SqrtExpanded;
-  }
-
-  private static final int CosineExpanded = (int) 2L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CosineExpanded = 2
-   * }
-   */
-  public static int CosineExpanded() {
-    return CosineExpanded;
-  }
-
-  private static final int L1 = (int) 3L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L1 = 3
-   * }
-   */
-  public static int L1() {
-    return L1;
-  }
-
-  private static final int L2Unexpanded = (int) 4L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2Unexpanded = 4
-   * }
-   */
-  public static int L2Unexpanded() {
-    return L2Unexpanded;
-  }
-
-  private static final int L2SqrtUnexpanded = (int) 5L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2SqrtUnexpanded = 5
-   * }
-   */
-  public static int L2SqrtUnexpanded() {
-    return L2SqrtUnexpanded;
-  }
-
-  private static final int InnerProduct = (int) 6L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.InnerProduct = 6
-   * }
-   */
-  public static int InnerProduct() {
-    return InnerProduct;
-  }
-
-  private static final int Linf = (int) 7L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Linf = 7
-   * }
-   */
-  public static int Linf() {
-    return Linf;
-  }
-
-  private static final int Canberra = (int) 8L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Canberra = 8
-   * }
-   */
-  public static int Canberra() {
-    return Canberra;
-  }
-
-  private static final int LpUnexpanded = (int) 9L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.LpUnexpanded = 9
-   * }
-   */
-  public static int LpUnexpanded() {
-    return LpUnexpanded;
-  }
-
-  private static final int CorrelationExpanded = (int) 10L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CorrelationExpanded = 10
-   * }
-   */
-  public static int CorrelationExpanded() {
-    return CorrelationExpanded;
-  }
-
-  private static final int JaccardExpanded = (int) 11L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.JaccardExpanded = 11
-   * }
-   */
-  public static int JaccardExpanded() {
-    return JaccardExpanded;
-  }
-
-  private static final int HellingerExpanded = (int) 12L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.HellingerExpanded = 12
-   * }
-   */
-  public static int HellingerExpanded() {
-    return HellingerExpanded;
-  }
-
-  private static final int Haversine = (int) 13L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Haversine = 13
-   * }
-   */
-  public static int Haversine() {
-    return Haversine;
-  }
-
-  private static final int BrayCurtis = (int) 14L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.BrayCurtis = 14
-   * }
-   */
-  public static int BrayCurtis() {
-    return BrayCurtis;
-  }
-
-  private static final int JensenShannon = (int) 15L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.JensenShannon = 15
-   * }
-   */
-  public static int JensenShannon() {
-    return JensenShannon;
-  }
-
-  private static final int HammingUnexpanded = (int) 16L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.HammingUnexpanded = 16
-   * }
-   */
-  public static int HammingUnexpanded() {
-    return HammingUnexpanded;
-  }
-
-  private static final int KLDivergence = (int) 17L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.KLDivergence = 17
-   * }
-   */
-  public static int KLDivergence() {
-    return KLDivergence;
-  }
-
-  private static final int RusselRaoExpanded = (int) 18L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.RusselRaoExpanded = 18
-   * }
-   */
-  public static int RusselRaoExpanded() {
-    return RusselRaoExpanded;
-  }
-
-  private static final int DiceExpanded = (int) 19L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.DiceExpanded = 19
-   * }
-   */
-  public static int DiceExpanded() {
-    return DiceExpanded;
-  }
-
-  private static final int Precomputed = (int) 100L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Precomputed = 100
-   * }
-   */
-  public static int Precomputed() {
-    return Precomputed;
-  }
-
   /**
    * {@snippet lang = c : * typedef long ptrdiff_t
    * }
@@ -1510,16 +1485,6 @@ public class hnsw_h {
     return kDLHexagon;
   }
 
-  private static final int kDLMAIA = (int) 17L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.kDLMAIA = 17
-   * }
-   */
-  public static int kDLMAIA() {
-    return kDLMAIA;
-  }
-
   private static final int kDLInt = (int) 0L;
 
   /**
@@ -1590,355 +1555,209 @@ public class hnsw_h {
     return kDLBool;
   }
 
+  private static final int AUTO_SELECT = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraGraphBuildAlgo.AUTO_SELECT = 0
+   * }
+   */
+  public static int AUTO_SELECT() {
+    return AUTO_SELECT;
+  }
+
+  private static final int IVF_PQ = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraGraphBuildAlgo.IVF_PQ = 1
+   * }
+   */
+  public static int IVF_PQ() {
+    return IVF_PQ;
+  }
+
+  private static final int NN_DESCENT = (int) 2L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraGraphBuildAlgo.NN_DESCENT = 2
+   * }
+   */
+  public static int NN_DESCENT() {
+    return NN_DESCENT;
+  }
+
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsCagraCompressionParams {
+   *     uint32_t pq_bits;
+   *     uint32_t pq_dim;
+   *     uint32_t vq_n_centers;
+   *     uint32_t kmeans_n_iters;
+   *     double vq_kmeans_trainset_fraction;
+   *     double pq_kmeans_trainset_fraction;
+   * } *cuvsCagraCompressionParams_t
+   * }
+   */
+  public static final AddressLayout cuvsCagraCompressionParams_t = hnsw_h.C_POINTER;
   /**
    * {@snippet lang = c :
-   * typedef struct cuvsHnswSearchParams {
-   *     int32_t ef;
-   *     int32_t numThreads;
-   * } *cuvsHnswSearchParams_t
+   * typedef struct cuvsCagraIndexParams {
+   *     cuvsDistanceType metric;
+   *     long intermediate_graph_degree;
+   *     long graph_degree;
+   *     enum cuvsCagraGraphBuildAlgo build_algo;
+   *     long nn_descent_niter;
+   *     cuvsCagraCompressionParams_t compression;
+   * } *cuvsCagraIndexParams_t
    * }
    */
-  public static final AddressLayout cuvsHnswSearchParams_t = hnsw_h.C_POINTER;
+  public static final AddressLayout cuvsCagraIndexParams_t = hnsw_h.C_POINTER;
+  private static final int SINGLE_CTA = (int) 0L;
 
-  private static class cuvsHnswSearchParamsCreate {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(hnsw_h.C_INT, hnsw_h.C_POINTER);
+  /**
+   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.SINGLE_CTA = 0
+   * }
+   */
+  public static int SINGLE_CTA() {
+    return SINGLE_CTA;
+  }
 
-    public static final MemorySegment ADDR = hnsw_h.findOrThrow("cuvsHnswSearchParamsCreate");
+  private static final int MULTI_CTA = (int) 1L;
 
-    public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+  /**
+   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.MULTI_CTA = 1
+   * }
+   */
+  public static int MULTI_CTA() {
+    return MULTI_CTA;
+  }
+
+  private static final int MULTI_KERNEL = (int) 2L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.MULTI_KERNEL = 2
+   * }
+   */
+  public static int MULTI_KERNEL() {
+    return MULTI_KERNEL;
+  }
+
+  private static final int AUTO = (int) 3L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.AUTO = 3
+   * }
+   */
+  public static int AUTO() {
+    return AUTO;
+  }
+
+  private static final int HASH = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraHashMode.HASH = 0
+   * }
+   */
+  public static int HASH() {
+    return HASH;
+  }
+
+  private static final int SMALL = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraHashMode.SMALL = 1
+   * }
+   */
+  public static int SMALL() {
+    return SMALL;
+  }
+
+  private static final int AUTO_HASH = (int) 2L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsCagraHashMode.AUTO_HASH = 2
+   * }
+   */
+  public static int AUTO_HASH() {
+    return AUTO_HASH;
   }
 
   /**
-   * Function descriptor for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t *params)
+   * {@snippet lang = c :
+   * typedef struct cuvsCagraSearchParams {
+   *     long max_queries;
+   *     long itopk_size;
+   *     long max_iterations;
+   *     enum cuvsCagraSearchAlgo algo;
+   *     long team_size;
+   *     long search_width;
+   *     long min_iterations;
+   *     long thread_block_size;
+   *     enum cuvsCagraHashMode hashmap_mode;
+   *     long hashmap_min_bitlen;
+   *     float hashmap_max_fill_rate;
+   *     uint32_t num_random_samplings;
+   *     uint64_t rand_xor_mask;
+   * } *cuvsCagraSearchParams_t
    * }
    */
-  public static FunctionDescriptor cuvsHnswSearchParamsCreate$descriptor() {
-    return cuvsHnswSearchParamsCreate.DESC;
+  public static final AddressLayout cuvsCagraSearchParams_t = hnsw_h.C_POINTER;
+  /**
+   * {@snippet lang = c : * typedef cuvsCagraIndex *cuvsCagraIndex_t
+   * }
+   */
+  public static final AddressLayout cuvsCagraIndex_t = hnsw_h.C_POINTER;
+  private static final int NONE = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsHnswHierarchy.NONE = 0
+   * }
+   */
+  public static int NONE() {
+    return NONE;
+  }
+
+  private static final int CPU = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsHnswHierarchy.CPU = 1
+   * }
+   */
+  public static int CPU() {
+    return CPU;
   }
 
   /**
-   * Downcall method handle for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t *params)
+   * {@snippet lang = c :
+   * typedef struct cuvsHnswIndexParams {
+   *     cuvsHnswHierarchy hierarchy;
+   *     int ef_construction;
+   *     int num_threads;
+   * } *cuvsHnswIndexParams_t
    * }
    */
-  public static MethodHandle cuvsHnswSearchParamsCreate$handle() {
-    return cuvsHnswSearchParamsCreate.HANDLE;
-  }
-
-  /**
-   * Address for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t *params)
-   * }
-   */
-  public static MemorySegment cuvsHnswSearchParamsCreate$address() {
-    return cuvsHnswSearchParamsCreate.ADDR;
-  }
-
-  /**
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsCreate(cuvsHnswSearchParams_t *params)
-   * }
-   */
-  public static int cuvsHnswSearchParamsCreate(MemorySegment params) {
-    var mh$ = cuvsHnswSearchParamsCreate.HANDLE;
-    try {
-      if (TRACE_DOWNCALLS) {
-        traceDowncall("cuvsHnswSearchParamsCreate", params);
-      }
-      return (int) mh$.invokeExact(params);
-    } catch (Throwable ex$) {
-      throw new AssertionError("should not reach here", ex$);
-    }
-  }
-
-  private static class cuvsHnswSearchParamsDestroy {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(hnsw_h.C_INT, hnsw_h.C_POINTER);
-
-    public static final MemorySegment ADDR = hnsw_h.findOrThrow("cuvsHnswSearchParamsDestroy");
-
-    public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-  }
-
-  /**
-   * Function descriptor for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
-   * }
-   */
-  public static FunctionDescriptor cuvsHnswSearchParamsDestroy$descriptor() {
-    return cuvsHnswSearchParamsDestroy.DESC;
-  }
-
-  /**
-   * Downcall method handle for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
-   * }
-   */
-  public static MethodHandle cuvsHnswSearchParamsDestroy$handle() {
-    return cuvsHnswSearchParamsDestroy.HANDLE;
-  }
-
-  /**
-   * Address for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
-   * }
-   */
-  public static MemorySegment cuvsHnswSearchParamsDestroy$address() {
-    return cuvsHnswSearchParamsDestroy.ADDR;
-  }
-
-  /**
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params)
-   * }
-   */
-  public static int cuvsHnswSearchParamsDestroy(MemorySegment params) {
-    var mh$ = cuvsHnswSearchParamsDestroy.HANDLE;
-    try {
-      if (TRACE_DOWNCALLS) {
-        traceDowncall("cuvsHnswSearchParamsDestroy", params);
-      }
-      return (int) mh$.invokeExact(params);
-    } catch (Throwable ex$) {
-      throw new AssertionError("should not reach here", ex$);
-    }
-  }
-
+  public static final AddressLayout cuvsHnswIndexParams_t = hnsw_h.C_POINTER;
   /**
    * {@snippet lang = c : * typedef cuvsHnswIndex *cuvsHnswIndex_t
    * }
    */
   public static final AddressLayout cuvsHnswIndex_t = hnsw_h.C_POINTER;
-
-  private static class cuvsHnswIndexCreate {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(hnsw_h.C_INT, hnsw_h.C_POINTER);
-
-    public static final MemorySegment ADDR = hnsw_h.findOrThrow("cuvsHnswIndexCreate");
-
-    public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-  }
-
   /**
-   * Function descriptor for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t *index)
+   * {@snippet lang = c :
+   * typedef struct cuvsHnswExtendParams {
+   *     int num_threads;
+   * } *cuvsHnswExtendParams_t
    * }
    */
-  public static FunctionDescriptor cuvsHnswIndexCreate$descriptor() {
-    return cuvsHnswIndexCreate.DESC;
-  }
-
+  public static final AddressLayout cuvsHnswExtendParams_t = hnsw_h.C_POINTER;
   /**
-   * Downcall method handle for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t *index)
+   * {@snippet lang = c :
+   * typedef struct cuvsHnswSearchParams {
+   *     int32_t ef;
+   *     int32_t num_threads;
+   * } *cuvsHnswSearchParams_t
    * }
    */
-  public static MethodHandle cuvsHnswIndexCreate$handle() {
-    return cuvsHnswIndexCreate.HANDLE;
-  }
-
-  /**
-   * Address for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t *index)
-   * }
-   */
-  public static MemorySegment cuvsHnswIndexCreate$address() {
-    return cuvsHnswIndexCreate.ADDR;
-  }
-
-  /**
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t *index)
-   * }
-   */
-  public static int cuvsHnswIndexCreate(MemorySegment index) {
-    var mh$ = cuvsHnswIndexCreate.HANDLE;
-    try {
-      if (TRACE_DOWNCALLS) {
-        traceDowncall("cuvsHnswIndexCreate", index);
-      }
-      return (int) mh$.invokeExact(index);
-    } catch (Throwable ex$) {
-      throw new AssertionError("should not reach here", ex$);
-    }
-  }
-
-  private static class cuvsHnswIndexDestroy {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(hnsw_h.C_INT, hnsw_h.C_POINTER);
-
-    public static final MemorySegment ADDR = hnsw_h.findOrThrow("cuvsHnswIndexDestroy");
-
-    public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-  }
-
-  /**
-   * Function descriptor for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
-   * }
-   */
-  public static FunctionDescriptor cuvsHnswIndexDestroy$descriptor() {
-    return cuvsHnswIndexDestroy.DESC;
-  }
-
-  /**
-   * Downcall method handle for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
-   * }
-   */
-  public static MethodHandle cuvsHnswIndexDestroy$handle() {
-    return cuvsHnswIndexDestroy.HANDLE;
-  }
-
-  /**
-   * Address for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
-   * }
-   */
-  public static MemorySegment cuvsHnswIndexDestroy$address() {
-    return cuvsHnswIndexDestroy.ADDR;
-  }
-
-  /**
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
-   * }
-   */
-  public static int cuvsHnswIndexDestroy(MemorySegment index) {
-    var mh$ = cuvsHnswIndexDestroy.HANDLE;
-    try {
-      if (TRACE_DOWNCALLS) {
-        traceDowncall("cuvsHnswIndexDestroy", index);
-      }
-      return (int) mh$.invokeExact(index);
-    } catch (Throwable ex$) {
-      throw new AssertionError("should not reach here", ex$);
-    }
-  }
-
-  private static class cuvsHnswSearch {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(hnsw_h.C_INT, hnsw_h.C_LONG, hnsw_h.C_POINTER,
-        hnsw_h.C_POINTER, hnsw_h.C_POINTER, hnsw_h.C_POINTER, hnsw_h.C_POINTER);
-
-    public static final MemorySegment ADDR = hnsw_h.findOrThrow("cuvsHnswSearch");
-
-    public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-  }
-
-  /**
-   * Function descriptor for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearch(cuvsResources_t res, cuvsHnswSearchParams_t params, cuvsHnswIndex_t index, DLManagedTensor *queries, DLManagedTensor *neighbors, DLManagedTensor *distances)
-   * }
-   */
-  public static FunctionDescriptor cuvsHnswSearch$descriptor() {
-    return cuvsHnswSearch.DESC;
-  }
-
-  /**
-   * Downcall method handle for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearch(cuvsResources_t res, cuvsHnswSearchParams_t params, cuvsHnswIndex_t index, DLManagedTensor *queries, DLManagedTensor *neighbors, DLManagedTensor *distances)
-   * }
-   */
-  public static MethodHandle cuvsHnswSearch$handle() {
-    return cuvsHnswSearch.HANDLE;
-  }
-
-  /**
-   * Address for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearch(cuvsResources_t res, cuvsHnswSearchParams_t params, cuvsHnswIndex_t index, DLManagedTensor *queries, DLManagedTensor *neighbors, DLManagedTensor *distances)
-   * }
-   */
-  public static MemorySegment cuvsHnswSearch$address() {
-    return cuvsHnswSearch.ADDR;
-  }
-
-  /**
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswSearch(cuvsResources_t res, cuvsHnswSearchParams_t params, cuvsHnswIndex_t index, DLManagedTensor *queries, DLManagedTensor *neighbors, DLManagedTensor *distances)
-   * }
-   */
-  public static int cuvsHnswSearch(long res, MemorySegment params, MemorySegment index, MemorySegment queries,
-      MemorySegment neighbors, MemorySegment distances) {
-    var mh$ = cuvsHnswSearch.HANDLE;
-    try {
-      if (TRACE_DOWNCALLS) {
-        traceDowncall("cuvsHnswSearch", res, params, index, queries, neighbors, distances);
-      }
-      return (int) mh$.invokeExact(res, params, index, queries, neighbors, distances);
-    } catch (Throwable ex$) {
-      throw new AssertionError("should not reach here", ex$);
-    }
-  }
-
-  private static class cuvsHnswDeserialize {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(hnsw_h.C_INT, hnsw_h.C_LONG, hnsw_h.C_POINTER,
-        hnsw_h.C_INT, hnsw_h.C_INT, hnsw_h.C_POINTER);
-
-    public static final MemorySegment ADDR = hnsw_h.findOrThrow("cuvsHnswDeserialize");
-
-    public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-  }
-
-  /**
-   * Function descriptor for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswDeserialize(cuvsResources_t res, const char *filename, int dim, cuvsDistanceType metric, cuvsHnswIndex_t index)
-   * }
-   */
-  public static FunctionDescriptor cuvsHnswDeserialize$descriptor() {
-    return cuvsHnswDeserialize.DESC;
-  }
-
-  /**
-   * Downcall method handle for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswDeserialize(cuvsResources_t res, const char *filename, int dim, cuvsDistanceType metric, cuvsHnswIndex_t index)
-   * }
-   */
-  public static MethodHandle cuvsHnswDeserialize$handle() {
-    return cuvsHnswDeserialize.HANDLE;
-  }
-
-  /**
-   * Address for:
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswDeserialize(cuvsResources_t res, const char *filename, int dim, cuvsDistanceType metric, cuvsHnswIndex_t index)
-   * }
-   */
-  public static MemorySegment cuvsHnswDeserialize$address() {
-    return cuvsHnswDeserialize.ADDR;
-  }
-
-  /**
-   * {@snippet lang = c
-   * : * cuvsError_t cuvsHnswDeserialize(cuvsResources_t res, const char *filename, int dim, cuvsDistanceType metric, cuvsHnswIndex_t index)
-   * }
-   */
-  public static int cuvsHnswDeserialize(long res, MemorySegment filename, int dim, int metric, MemorySegment index) {
-    var mh$ = cuvsHnswDeserialize.HANDLE;
-    try {
-      if (TRACE_DOWNCALLS) {
-        traceDowncall("cuvsHnswDeserialize", res, filename, dim, metric, index);
-      }
-      return (int) mh$.invokeExact(res, filename, dim, metric, index);
-    } catch (Throwable ex$) {
-      throw new AssertionError("should not reach here", ex$);
-    }
-  }
-
+  public static final AddressLayout cuvsHnswSearchParams_t = hnsw_h.C_POINTER;
   private static final long _POSIX_C_SOURCE = 200809L;
 
   /**
@@ -2527,25 +2346,5 @@ public class hnsw_h {
    */
   public static MemorySegment NULL() {
     return NULL;
-  }
-
-  private static final long DLPACK_FLAG_BITMASK_READ_ONLY = 1L;
-
-  /**
-   * {@snippet lang = c : * #define DLPACK_FLAG_BITMASK_READ_ONLY 1
-   * }
-   */
-  public static long DLPACK_FLAG_BITMASK_READ_ONLY() {
-    return DLPACK_FLAG_BITMASK_READ_ONLY;
-  }
-
-  private static final long DLPACK_FLAG_BITMASK_IS_COPIED = 2L;
-
-  /**
-   * {@snippet lang = c : * #define DLPACK_FLAG_BITMASK_IS_COPIED 2
-   * }
-   */
-  public static long DLPACK_FLAG_BITMASK_IS_COPIED() {
-    return DLPACK_FLAG_BITMASK_IS_COPIED;
   }
 }

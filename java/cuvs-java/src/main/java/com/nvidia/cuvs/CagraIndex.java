@@ -55,6 +55,7 @@ public class CagraIndex {
   private MethodHandle serializeMethodHandle;
   private MethodHandle deserializeMethodHandle;
   private MethodHandle destroyIndexMethodHandle;
+  private MethodHandle serializeCAGRAIndexToHNSWMethodHandle;
   private CagraIndexParams cagraIndexParameters;
   private CagraCompressionParams cagraCompressionParams;
   private IndexReference cagraIndexReference;
@@ -133,6 +134,11 @@ public class CagraIndex {
     destroyIndexMethodHandle = resources.linker.downcallHandle(
         resources.getSymbolLookup().find("destroy_cagra_index").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
+    serializeCAGRAIndexToHNSWMethodHandle = resources.linker.downcallHandle(
+        resources.getSymbolLookup().find("serialize_cagra_index_to_hnsw").get(),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+
   }
 
   /**
@@ -211,7 +217,33 @@ public class CagraIndex {
    *                     bytes into
    */
   public void serialize(OutputStream outputStream) throws Throwable {
-    serialize(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".cag"));
+    serialize(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".cag"), 1024);
+  }
+
+  /**
+   * A method to persist a CAGRA index using an instance of {@link OutputStream}
+   * for writing index bytes.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes into
+   * @param bufferLength the length of buffer to use for writing bytes. Default
+   *                     value is 1024
+   */
+  public void serialize(OutputStream outputStream, int bufferLength) throws Throwable {
+    serialize(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".cag"), bufferLength);
+  }
+
+  /**
+   * A method to persist a CAGRA index using an instance of {@link OutputStream}
+   * for writing index bytes.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes into
+   * @param tempFile     an intermediate {@link File} where CAGRA index is written
+   *                     temporarily
+   */
+  public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
+    serialize(outputStream, tempFile, 1024);
   }
 
   /**
@@ -222,15 +254,81 @@ public class CagraIndex {
    *                     bytes to
    * @param tempFile     an intermediate {@link File} where CAGRA index is written
    *                     temporarily
+   * @param bufferLength the length of buffer to use for writing bytes. Default
+   *                     value is 1024
    */
-  public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
+  public void serialize(OutputStream outputStream, File tempFile, int bufferLength) throws Throwable {
     MemoryLayout returnValueMemoryLayout = intMemoryLayout;
     MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     serializeMethodHandle.invokeExact(resources.getMemorySegment(), cagraIndexReference.getMemorySegment(),
         returnValueMemorySegment,
         Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
     FileInputStream fileInputStream = new FileInputStream(tempFile);
-    byte[] chunk = new byte[1024]; // TODO: Make this configurable
+    byte[] chunk = new byte[bufferLength];
+    int chunkLength = 0;
+    while ((chunkLength = fileInputStream.read(chunk)) != -1) {
+      outputStream.write(chunk, 0, chunkLength);
+    }
+    fileInputStream.close();
+    tempFile.delete();
+  }
+
+  /**
+   * A method to create and persist HNSW index from CAGRA index using an instance
+   * of {@link OutputStream} and path to the intermediate temporary file.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes to
+   */
+  public void serializeToHNSW(OutputStream outputStream) throws Throwable {
+    serializeToHNSW(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".hnsw"), 1024);
+  }
+
+  /**
+   * A method to create and persist HNSW index from CAGRA index using an instance
+   * of {@link OutputStream} and path to the intermediate temporary file.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes to
+   * @param bufferLength the length of buffer to use for writing bytes. Default
+   *                     value is 1024
+   */
+  public void serializeToHNSW(OutputStream outputStream, int bufferLength) throws Throwable {
+    serializeToHNSW(outputStream, File.createTempFile(UUID.randomUUID().toString(), ".hnsw"), bufferLength);
+  }
+
+  /**
+   * A method to create and persist HNSW index from CAGRA index using an instance
+   * of {@link OutputStream} and path to the intermediate temporary file.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes to
+   * @param tempFile     an intermediate {@link File} where CAGRA index is written
+   *                     temporarily
+   */
+  public void serializeToHNSW(OutputStream outputStream, File tempFile) throws Throwable {
+    serializeToHNSW(outputStream, tempFile, 1024);
+  }
+
+  /**
+   * A method to create and persist HNSW index from CAGRA index using an instance
+   * of {@link OutputStream} and path to the intermediate temporary file.
+   * 
+   * @param outputStream an instance of {@link OutputStream} to write the index
+   *                     bytes to
+   * @param tempFile     an intermediate {@link File} where CAGRA index is written
+   *                     temporarily
+   * @param bufferLength the length of buffer to use for writing bytes. Default
+   *                     value is 1024
+   */
+  public void serializeToHNSW(OutputStream outputStream, File tempFile, int bufferLength) throws Throwable {
+    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
+    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
+    serializeCAGRAIndexToHNSWMethodHandle.invokeExact(resources.getMemorySegment(),
+        Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()),
+        cagraIndexReference.getMemorySegment(), returnValueMemorySegment);
+    FileInputStream fileInputStream = new FileInputStream(tempFile);
+    byte[] chunk = new byte[bufferLength];
     int chunkLength = 0;
     while ((chunkLength = fileInputStream.read(chunk)) != -1) {
       outputStream.write(chunk, 0, chunkLength);
@@ -247,6 +345,19 @@ public class CagraIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
+    return deserialize(inputStream, 1024);
+  }
+
+  /**
+   * Gets an instance of {@link IndexReference} by deserializing a CAGRA index
+   * using an {@link InputStream}.
+   * 
+   * @param inputStream  an instance of {@link InputStream}
+   * @param bufferLength the length of the buffer to use while reading the bytes
+   *                     from the stream. Default value is 1024.
+   * @return an instance of {@link IndexReference}.
+   */
+  private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
     MemoryLayout returnValueMemoryLayout = intMemoryLayout;
     MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
@@ -254,7 +365,7 @@ public class CagraIndex {
 
     File tempFile = new File(tmpIndexFile);
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    byte[] chunk = new byte[1024];
+    byte[] chunk = new byte[bufferLength];
     int chunkLength = 0;
     while ((chunkLength = inputStream.read(chunk)) != -1) {
       fileOutputStream.write(chunk, 0, chunkLength);
