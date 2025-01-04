@@ -170,7 +170,6 @@ def test_cagra_dataset_dtype_host_device(
 
 
 def create_sparse_bitset(n_size, sparsity):
-    """Create a sparse bitset array for testing filtering"""
     bits_per_uint32 = 32
     num_bits = n_size 
     num_uint32s = (num_bits + bits_per_uint32 - 1) // bits_per_uint32
@@ -199,20 +198,15 @@ def test_filtered_cagra(
     k,
     sparsity,
 ):
-    """Test CAGRA index with filtering using bitset"""
-    # Generate test data
     dataset = generate_data((n_rows, n_cols), np.float32)
     queries = generate_data((n_queries, n_cols), np.float32)
 
-    # Create bitset for filtering
     bitset = create_sparse_bitset(n_rows, sparsity)
 
-    # Convert dataset and queries to device arrays
     dataset_device = device_ndarray(dataset)
     queries_device = device_ndarray(queries)
     bitset_device = device_ndarray(bitset)
 
-    # Build index
     build_params = cagra.IndexParams(
         metric="euclidean",
         intermediate_graph_degree=64,
@@ -221,10 +215,8 @@ def test_filtered_cagra(
     )
     index = cagra.build(build_params, dataset_device)
 
-    # Create filter
     prefilter = filters.from_bitset(bitset_device)
 
-    # Search with filter
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
     out_dist = np.zeros((n_queries, k), dtype=np.float32)
     out_idx_device = device_ndarray(out_idx)
@@ -238,7 +230,7 @@ def test_filtered_cagra(
         k,
         neighbors=out_idx_device,
         distances=out_dist_device,
-        # filter=prefilter,
+        filter=prefilter,
     )
 
     # Convert bitset to bool array for validation
@@ -263,13 +255,22 @@ def test_filtered_cagra(
     # Get actual results
     actual_indices = out_idx_device.copy_to_host()
     actual_distances = out_dist_device.copy_to_host()
+    
+    filtered_idx_map = np.cumsum(~bool_filter) - 1  # -1 because cumsum starts at 1
+
+    # Map CAGRA indices to filtered space
+    mapped_actual_indices = np.take(filtered_idx_map, 
+                               actual_indices, 
+                               mode='clip')
+    
     # Verify filtering - no filtered indices should be in results
     filtered_indices = np.where(bool_filter)[0]
-    # for i in range(n_queries):
-        # assert not np.intersect1d(filtered_indices, actual_indices[i]).size
+    for i in range(n_queries):
+        assert not np.intersect1d(filtered_indices, actual_indices[i]).size
 
-    # Verify recall compared to sklearn reference
-    recall = calc_recall(actual_indices, skl_idx)
+    # Now compare with sklearn results
+    recall = calc_recall(mapped_actual_indices, skl_idx)
+
     assert recall > 0.7
     
 def test_cagra_index_params(params):
