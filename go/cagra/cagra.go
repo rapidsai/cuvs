@@ -82,6 +82,7 @@ func (index *CagraIndex) Close() error {
 // * `queries` - A tensor in device memory to query for
 // * `neighbors` - Tensor in device memory that receives the indices of the nearest neighbors
 // * `distances` - Tensor in device memory that receives the distances of the nearest neighbors
+// * `allowList` - List of indices to allow in the search, if nil, no filtering is applied
 func SearchIndex[T any](Resources cuvs.Resource, params *SearchParams, index *CagraIndex, queries *cuvs.Tensor[T], neighbors *cuvs.Tensor[uint32], distances *cuvs.Tensor[T], allowList []uint32) error {
 	if !index.trained {
 		return errors.New("index needs to be built before calling search")
@@ -122,9 +123,7 @@ func createBitset(allowList []uint32) []uint32 {
 		}
 	}
 	size := (maxID >> 5) + 1 // Division by 32, add 1 to handle remainder
-	// Create and initialize bitset array
 	bitset := make([]uint32, size)
-	// Set bits for each ID in allowList
 	for _, id := range allowList {
 		// Calculate which uint32 in our array (divide by 32)
 		arrayIndex := id >> 5
