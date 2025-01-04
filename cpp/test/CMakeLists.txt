@@ -89,7 +89,7 @@ function(ConfigureTest)
 endfunction()
 
 add_library(test_rmm_logger OBJECT)
-target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl)
+target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
 
 # ##################################################################################################
 # test sources ##################################################################################
@@ -236,7 +236,7 @@ if(BUILD_TESTS)
     NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
     sparse/cluster/spectral.cu GPUS 1 PERCENT 100
   )
-  
+
   ConfigureTest(
     NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
   )
