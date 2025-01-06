@@ -258,10 +258,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
   auto* __restrict__ local_visited_hashmap_ptr =
     reinterpret_cast<INDEX_T*>(result_distances_buffer + result_buffer_size_32);
-  auto* __restrict__ temp_indices_buffer =
-    reinterpret_cast<INDEX_T*>(local_visited_hashmap_ptr + hashmap::get_size(visited_hash_bitlen));
   auto* __restrict__ parent_indices_buffer =
-    reinterpret_cast<INDEX_T*>(temp_indices_buffer + graph_degree);
+    reinterpret_cast<INDEX_T*>(local_visited_hashmap_ptr + hashmap::get_size(visited_hash_bitlen));
   auto* __restrict__ result_position = reinterpret_cast<int*>(parent_indices_buffer + 1);
 
   INDEX_T* const local_traversed_hashmap_ptr =
@@ -332,22 +330,19 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     if ((parent_indices_buffer[0] == invalid_index) && (iter >= min_iteration)) { break; }
 
     _CLK_START();
-    // Restore visited hashmap by putting nodes on result buffer in it.
     for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
       INDEX_T index = result_indices_buffer[i];
       if (index == invalid_index) { continue; }
-      index &= ~index_msb_1_mask;
-      hashmap::insert(local_visited_hashmap_ptr, visited_hash_bitlen, index);
-    }
-    // Remove nodes kicked out of the itopk list from the traversed hash table.
-    for (unsigned i = itopk_size + threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
-      INDEX_T index = result_indices_buffer[i];
-      if (index == invalid_index) { continue; }
-      if (index & index_msb_1_mask) {
+      if ((i >= itopk_size) && (index & index_msb_1_mask)) {
+        // Remove nodes kicked out of the itopk list from the traversed hash table.
         hashmap::remove<INDEX_T>(
           local_traversed_hashmap_ptr, traversed_hash_bitlen, index & ~index_msb_1_mask);
         result_indices_buffer[i]   = invalid_index;
         result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+      } else {
+        // Restore visited hashmap by putting nodes on result buffer in it.
+        index &= ~index_msb_1_mask;
+        hashmap::insert(local_visited_hashmap_ptr, visited_hash_bitlen, index);
       }
     }
     // Initialize buffer for compute_distance_to_child_nodes.
@@ -368,9 +363,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
       parent_indices_buffer,
       result_indices_buffer,
       1,
-      temp_indices_buffer,
-      result_position);
-    __syncthreads();
+      result_position,
+      result_buffer_size_32);
+    // __syncthreads();
 
     // Check the state of the nodes in the result buffer which were not updated
     // by the compute_distance_to_child_nodes above, and if it cannot be used as

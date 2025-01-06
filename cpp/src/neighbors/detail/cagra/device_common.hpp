@@ -186,8 +186,8 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const IndexT* __restrict__ parent_indices,
   const IndexT* __restrict__ internal_topk_list,
   const uint32_t search_width,
-  IndexT* __restrict__ temp_indices_ptr = nullptr,
-  int* __restrict__ result_position     = nullptr)
+  int* __restrict__ result_position = nullptr,
+  const int max_result_position     = 0)
 {
   constexpr IndexT index_msb_1_mask = utils::gen_index_msb_1_mask<IndexT>::value;
   constexpr IndexT invalid_index    = ~static_cast<IndexT>(0);
@@ -214,8 +214,9 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     }
     if (STATIC_RESULT_POSITION) {
       result_child_indices_ptr[i] = child_id;
-    } else {
-      temp_indices_ptr[i] = child_id;
+    } else if (child_id != invalid_index) {
+      int j                       = atomicSub(result_position, 1) - 1;
+      result_child_indices_ptr[j] = child_id;
     }
   }
   __syncthreads();
@@ -227,11 +228,11 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const auto compute_distance = dataset_desc.compute_distance_impl;
   const auto args             = dataset_desc.args.load();
   const bool lead_lane        = (threadIdx.x & ((1u << team_size_bits) - 1u)) == 0;
+  const uint32_t ofst         = STATIC_RESULT_POSITION ? 0 : result_position[0];
   for (uint32_t i = threadIdx.x >> team_size_bits; i < max_i; i += blockDim.x >> team_size_bits) {
-    const bool valid_i = i < num_k;
-    const auto child_id =
-      valid_i ? (STATIC_RESULT_POSITION ? result_child_indices_ptr[i] : temp_indices_ptr[i])
-              : invalid_index;
+    const auto j        = i + ofst;
+    const bool valid_i  = STATIC_RESULT_POSITION ? (j < num_k) : (j < max_result_position);
+    const auto child_id = valid_i ? result_child_indices_ptr[j] : invalid_index;
 
     // We should be calling `dataset_desc.compute_distance(..)` here as follows:
     // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
@@ -244,16 +245,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     __syncwarp();
 
     // Store the distance
-    if (valid_i && lead_lane) {
-      if (STATIC_RESULT_POSITION) {
-        result_child_distances_ptr[i] = child_dist;
-      } else if (child_id != invalid_index) {
-        // Only valid results are stored in order from the back of the buffer
-        int j                         = atomicSub(result_position, 1) - 1;
-        result_child_indices_ptr[j]   = child_id;
-        result_child_distances_ptr[j] = child_dist;
-      }
-    }
+    if (valid_i && lead_lane) { result_child_distances_ptr[j] = child_dist; }
   }
 }
 
