@@ -19,11 +19,15 @@ package com.nvidia.cuvs;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
+import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.nvidia.cuvs.common.SearchResults;
 
@@ -35,7 +39,7 @@ import com.nvidia.cuvs.common.SearchResults;
 public class CagraSearchResults implements SearchResults {
 
   private final List<Map<Integer, Float>> results;
-  private final Map<Integer, Integer> mapping; // TODO: Is this performant in a user application?
+  private final List<Integer> mapping; // TODO: Is this performant in a user application?
   private final SequenceLayout neighboursSequenceLayout;
   private final SequenceLayout distancesSequenceLayout;
   private final MemorySegment neighboursMemorySegment;
@@ -45,7 +49,7 @@ public class CagraSearchResults implements SearchResults {
 
   protected CagraSearchResults(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
       MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK,
-      Map<Integer, Integer> mapping, long numberOfQueries) {
+      List<Integer> mapping, long numberOfQueries) {
     super();
     this.topK = topK;
     this.numberOfQueries = numberOfQueries;
@@ -58,6 +62,7 @@ public class CagraSearchResults implements SearchResults {
 
     readResultMemorySegments();
   }
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * Reads neighbors and distances {@link MemorySegment} and loads the values
@@ -72,12 +77,16 @@ public class CagraSearchResults implements SearchResults {
     for (long i = 0; i < topK * numberOfQueries; i++) {
       int id = (int) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
       float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
-      intermediateResultMap.put(mapping != null ? mapping.get(id) : id, dst);
-      count += 1;
-      if (count == topK) {
-        results.add(intermediateResultMap);
-        intermediateResultMap = new LinkedHashMap<Integer, Float>();
-        count = 0;
+      if (id > mapping.size()) {
+    	  log.error("id is " + id + ", whereas mapping is "+mapping, new RuntimeException("Absurd values from cuvs layer"));
+      } else {
+    	  intermediateResultMap.put(mapping != null ? mapping.get(id): id, dst);
+    	  count += 1;
+    	  if (count == topK) {
+    		  results.add(intermediateResultMap);
+    		  intermediateResultMap = new LinkedHashMap<Integer, Float>();
+    		  count = 0;
+    	  }
       }
     }
   }

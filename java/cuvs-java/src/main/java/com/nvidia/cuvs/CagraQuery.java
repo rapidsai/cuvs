@@ -17,7 +17,7 @@
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.List;
 
 /**
  * CagraQuery holds the CagraSearchParams and the query vectors to be used while
@@ -28,7 +28,7 @@ import java.util.Map;
 public class CagraQuery {
 
   private CagraSearchParams cagraSearchParameters;
-  private Map<Integer, Integer> mapping;
+  private List<Integer> mapping;
   private float[][] queryVectors;
   private int topK;
 
@@ -42,7 +42,7 @@ public class CagraQuery {
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, Map<Integer, Integer> mapping,
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping,
       int topK) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
@@ -74,7 +74,7 @@ public class CagraQuery {
    * 
    * @return a map of ID mappings
    */
-  public Map<Integer, Integer> getMapping() {
+  public List<Integer> getMapping() {
     return mapping;
   }
 
@@ -100,7 +100,7 @@ public class CagraQuery {
 
     private CagraSearchParams cagraSearchParams;
     private float[][] queryVectors;
-    private Map<Integer, Integer> mapping;
+    private List<Integer> mapping;
     private int topK = 2;
 
     /**
@@ -138,7 +138,7 @@ public class CagraQuery {
      * @param mapping the ID mapping instance
      * @return an instance of this Builder
      */
-    public Builder withMapping(Map<Integer, Integer> mapping) {
+    public Builder withMapping(List<Integer> mapping) {
       this.mapping = mapping;
       return this;
     }
