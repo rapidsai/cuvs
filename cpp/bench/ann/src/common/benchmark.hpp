@@ -483,7 +483,14 @@ void register_search(std::shared_ptr<const dataset<T>> dataset,
                   ->MeasureProcessCPUTime()
                   ->UseRealTime();
 
-      if (metric_objective == Mode::kThroughput) { b->ThreadRange(threads[0], threads[1]); }
+      if (metric_objective == Mode::kThroughput) {
+        if (index.algo.find("faiss_gpu") != std::string::npos) {
+          log_warn(
+            "FAISS GPU does not work in throughput mode because the underlying "
+            "StandardGpuResources object is not thread-safe. This might give unexpected results");
+        }
+        b->ThreadRange(threads[0], threads[1]);
+      }
     }
   }
 }

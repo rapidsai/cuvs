@@ -41,7 +41,7 @@
 
 namespace {
 
-auto parse_metric_type(cuvs::bench::Metric metric) -> faiss::MetricType
+auto parse_metric_faiss(cuvs::bench::Metric metric) -> faiss::MetricType
 {
   if (metric == cuvs::bench::Metric::kInnerProduct) {
     return faiss::METRIC_INNER_PRODUCT;
@@ -93,7 +93,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
   faiss_gpu(Metric metric, int dim, const build_param& param)
     : algo<T>(metric, dim),
       gpu_resource_{std::make_shared<faiss::gpu::StandardGpuResources>()},
-      metric_type_(parse_metric_type(metric)),
+      metric_type_(parse_metric_faiss(metric)),
       nlist_{param.nlist},
       training_sample_fraction_{1.0 / double(param.ratio)}
   {
@@ -160,6 +160,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
   int device_;
   double training_sample_fraction_;
   std::shared_ptr<faiss::SearchParameters> search_params_;
+  std::shared_ptr<faiss::IndexRefineSearchParameters> refine_search_params_{nullptr};
   const T* dataset_;
   float refine_ratio_ = 1.0;
 };
@@ -199,19 +200,65 @@ template <typename T>
 void faiss_gpu<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
+  ASSERT(Mode::kLatency, "l2Knn: rowMajorIndex and rowMajorQuery should have same layout");
+  using IdxT = faiss::idx_t;
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
 
-  if (this->refine_ratio_ > 1.0) {
-    // TODO(snanditale): FAISS changed their search APIs to accept the search parameters as a struct
-    // object but their refine API doesn't allow the struct to be passed in. Once this is fixed, we
-    // need to re-enable refinement below
-    // index_refine_->search(batch_size, queries, k, distances,
-    // reinterpret_cast<faiss::idx_t*>(neighbors), this->search_params_.get()); Related FAISS issue:
-    // https://github.com/facebookresearch/faiss/issues/3118
-    throw std::runtime_error(
-      "FAISS doesn't support refinement in their new APIs so this feature is disabled in the "
-      "benchmarks for the time being.");
+  if (refine_ratio_ > 1.0) {
+    if (raft::get_device_for_address(queries) >= 0) {
+      uint32_t k0        = static_cast<uint32_t>(refine_ratio_ * k);
+      auto distances_tmp = raft::make_device_matrix<float, IdxT>(
+        gpu_resource_->getRaftHandle(device_), batch_size, k0);
+      auto candidates =
+        raft::make_device_matrix<IdxT, IdxT>(gpu_resource_->getRaftHandle(device_), batch_size, k0);
+      index_->search(batch_size,
+                     queries,
+                     k0,
+                     distances_tmp.data_handle(),
+                     candidates.data_handle(),
+                     this->search_params_.get());
+
+      auto queries_host    = raft::make_host_matrix<T, IdxT>(batch_size, index_->d);
+      auto candidates_host = raft::make_host_matrix<IdxT, IdxT>(batch_size, k0);
+      auto neighbors_host  = raft::make_host_matrix<IdxT, IdxT>(batch_size, k);
+      auto distances_host  = raft::make_host_matrix<float, IdxT>(batch_size, k);
+      auto dataset_v       = raft::make_host_matrix_view<const T, faiss::idx_t>(
+        this->dataset_, index_->ntotal, index_->d);
+
+      raft::device_resources handle_ = gpu_resource_->getRaftHandle(device_);
+
+      raft::copy(queries_host.data_handle(), queries, queries_host.size(), handle_.get_stream());
+      raft::copy(candidates_host.data_handle(),
+                 candidates.data_handle(),
+                 candidates_host.size(),
+                 handle_.get_stream());
+
+      // wait for the queries to copy to host in 'stream`
+      handle_.sync_stream();
+
+      raft::runtime::neighbors::refine(handle_,
+                                       dataset_v,
+                                       queries_host.view(),
+                                       candidates_host.view(),
+                                       neighbors_host.view(),
+                                       distances_host.view(),
+                                       parse_metric_faiss(this->metric_));
+
+      raft::copy(neighbors,
+                 (size_t*)neighbors_host.data_handle(),
+                 neighbors_host.size(),
+                 handle_.get_stream());
+      raft::copy(
+        distances, distances_host.data_handle(), distances_host.size(), handle_.get_stream());
+    } else {
+      index_refine_->search(batch_size,
+                            queries,
+                            k,
+                            distances,
+                            reinterpret_cast<faiss::idx_t*>(neighbors),
+                            this->refine_search_params_.get());
+    }
   } else {
     index_->search(batch_size,
                    queries,
@@ -253,15 +300,18 @@ void faiss_gpu<T>::load_(const std::string& file)
 template <typename T>
 class faiss_gpu_ivf_flat : public faiss_gpu<T> {
  public:
-  using typename faiss_gpu<T>::build_param;
+  struct build_param : public faiss_gpu<T>::build_param {
+    bool use_cuvs;
+  };
   using typename faiss_gpu<T>::search_param_base;
 
   faiss_gpu_ivf_flat(Metric metric, int dim, const build_param& param)
     : faiss_gpu<T>(metric, dim, param)
   {
     faiss::gpu::GpuIndexIVFFlatConfig config;
-    config.device = this->device_;
-    this->index_  = std::make_shared<faiss::gpu::GpuIndexIVFFlat>(
+    config.device   = this->device_;
+    config.use_cuvs = param.use_cuvs;
+    this->index_    = std::make_shared<faiss::gpu::GpuIndexIVFFlat>(
       this->gpu_resource_.get(), dim, param.nlist, this->metric_type_, config);
   }
 
@@ -298,6 +348,8 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
     int m;
     bool use_float16;
     bool use_precomputed;
+    bool use_cuvs;
+    int bits_per_code;
   };
   using typename faiss_gpu<T>::search_param_base;
 
@@ -307,14 +359,16 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
     faiss::gpu::GpuIndexIVFPQConfig config;
     config.useFloat16LookupTables = param.use_float16;
     config.usePrecomputedTables   = param.use_precomputed;
-    config.device                 = this->device_;
+    config.use_cuvs               = param.use_cuvs;
+    if (param.use_cuvs) { config.interleavedLayout = param.use_cuvs; }
+    config.device = this->device_;
 
     this->index_ =
       std::make_shared<faiss::gpu::GpuIndexIVFPQ>(this->gpu_resource_.get(),
                                                   dim,
                                                   param.nlist,
                                                   param.m,
-                                                  8,  // FAISS only supports bitsPerCode=8
+                                                  param.bits_per_code,
                                                   this->metric_type_,
                                                   config);
   }
@@ -334,6 +388,11 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
       this->index_refine_ =
         std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
       this->index_refine_.get()->k_factor = sp.refine_ratio;
+      faiss::IndexRefineSearchParameters faiss_refine_search_params;
+      faiss_refine_search_params.k_factor          = this->index_refine_.get()->k_factor;
+      faiss_refine_search_params.base_index_params = this->search_params_.get();
+      this->refine_search_params_ =
+        std::make_unique<faiss::IndexRefineSearchParameters>(faiss_refine_search_params);
     }
   }
 
