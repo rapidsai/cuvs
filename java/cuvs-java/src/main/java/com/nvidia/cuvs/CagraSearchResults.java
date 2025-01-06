@@ -77,16 +77,12 @@ public class CagraSearchResults implements SearchResults {
     for (long i = 0; i < topK * numberOfQueries; i++) {
       int id = (int) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
       float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
-      if (id > mapping.size()) {
-    	  log.error("id is " + id + ", whereas mapping is "+mapping, new RuntimeException("Absurd values from cuvs layer"));
-      } else {
-    	  intermediateResultMap.put(mapping != null ? mapping.get(id): id, dst);
-    	  count += 1;
-    	  if (count == topK) {
-    		  results.add(intermediateResultMap);
-    		  intermediateResultMap = new LinkedHashMap<Integer, Float>();
-    		  count = 0;
-    	  }
+      intermediateResultMap.put(mapping != null ? mapping.get(id): id, dst);
+      count += 1;
+      if (count == topK) {
+    	  results.add(intermediateResultMap);
+    	  intermediateResultMap = new LinkedHashMap<Integer, Float>();
+    	  count = 0;
       }
     }
   }
