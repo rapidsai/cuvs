@@ -604,18 +604,16 @@ inline auto parse_string_flag(const char* arg, const char* pat, std::string& res
 
 inline auto run_main(int argc, char** argv) -> int
 {
-  bool force_overwrite                = false;
-  bool build_mode                     = false;
-  bool search_mode                    = false;
-  bool no_lap_sync                    = false;
-  std::string data_prefix             = "data";
-  std::string index_prefix            = "index";
-  std::string new_override_kv         = "";
-  std::string mode                    = "latency";
-  std::string threads_arg_txt         = "";
-  std::vector<int> threads            = {1, -1};  // min_thread, max_thread
-  std::string log_level_str           = "";
-  [[maybe_unused]] int raft_log_level = 0;  // raft::logger::get(RAFT_NAME).get_level();
+  bool force_overwrite        = false;
+  bool build_mode             = false;
+  bool search_mode            = false;
+  bool no_lap_sync            = false;
+  std::string data_prefix     = "data";
+  std::string index_prefix    = "index";
+  std::string new_override_kv = "";
+  std::string mode            = "latency";
+  std::string threads_arg_txt = "";
+  std::vector<int> threads    = {1, -1};  // min_thread, max_thread
   kv_series override_kv{};
 
   char arg0_default[] = "benchmark";  // NOLINT
@@ -646,12 +644,7 @@ inline auto run_main(int argc, char** argv) -> int
         parse_string_flag(argv[i], "--index_prefix", index_prefix) ||
         parse_string_flag(argv[i], "--mode", mode) ||
         parse_string_flag(argv[i], "--override_kv", new_override_kv) ||
-        parse_string_flag(argv[i], "--threads", threads_arg_txt) ||
-        parse_string_flag(argv[i], "--raft_log_level", log_level_str)) {
-      if (!log_level_str.empty()) {
-        raft_log_level = std::stoi(log_level_str);
-        log_level_str  = "";
-      }
+        parse_string_flag(argv[i], "--threads", threads_arg_txt)) {
       if (!threads_arg_txt.empty()) {
         auto threads_arg = split(threads_arg_txt, ':');
         threads[0]       = std::stoi(threads_arg[0]);
@@ -679,8 +672,6 @@ inline auto run_main(int argc, char** argv) -> int
       i--;
     }
   }
-
-  // raft::logger::get(RAFT_NAME).set_level(raft_log_level);
 
   Mode metric_objective = Mode::kLatency;
   if (mode == "throughput") { metric_objective = Mode::kThroughput; }

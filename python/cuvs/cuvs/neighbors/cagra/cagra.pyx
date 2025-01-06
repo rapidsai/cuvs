@@ -136,6 +136,8 @@ cdef class IndexParams:
         Valid values for metric: ["sqeuclidean", "inner_product"], where
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
+            - inner_product distance is defined as
+              distance(a, b) = \\sum_i a_i * b_i.
     intermediate_graph_degree : int, default = 128
 
     graph_degree : int, default = 64
