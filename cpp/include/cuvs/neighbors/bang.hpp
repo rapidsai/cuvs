@@ -32,4 +32,4 @@ namespace cuvs::neighbors::bang {
  * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
  */
 
-} // namespace 
+}  // namespace cuvs::neighbors::bang
