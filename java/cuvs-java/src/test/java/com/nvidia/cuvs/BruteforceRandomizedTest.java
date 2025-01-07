@@ -10,10 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
-import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 
 @RunWith(RandomizedRunner.class)
-public class CagraRandomizedTest extends CuVSTestCase {
+public class BruteforceRandomizedTest extends CuVSTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -76,24 +75,23 @@ public class CagraRandomizedTest extends CuVSTestCase {
 
     // Create CuVS index and query
     try (CuVSResources resources = new CuVSResources()) {
-      CagraIndexParams indexParams = new CagraIndexParams.Builder(resources)
-          .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+
+      BruteForceQuery query = new BruteForceQuery.Builder()
+          .withTopK(topK)
+          .withQueryVectors(queries)
           .build();
-      CagraIndex index = new CagraIndex.Builder(resources)
+
+      BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
+          .withNumWriterThreads(32)
+          .build();
+
+      BruteForceIndex index = new BruteForceIndex.Builder(resources)
           .withDataset(dataset)
           .withIndexParams(indexParams)
           .build();
-      log.info("Index built successfully.");
 
-      // Execute search and retrieve results
-      CagraQuery query = new CagraQuery.Builder()
-          .withQueryVectors(queries)
-          .withTopK(topK)
-          .withSearchParams(new CagraSearchParams.Builder(resources)
-              .build())
-          .build();
-      log.info("Query built successfully. Executing search...");
-      CagraSearchResults results = index.search(query);
+      log.info("Index built successfully. Executing search...");
+      BruteForceSearchResults results = index.search(query);
 
       compareResults(results, expected, topK, datasetSize, numQueries);
     }

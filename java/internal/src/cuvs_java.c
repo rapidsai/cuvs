@@ -358,11 +358,11 @@ void serialize_cagra_index_to_hnsw(cuvsResources_t cuvs_resources, char *file_pa
 /**
  * @brief A function to deserialize the persisted HNSW index
  * 
- * @param cuvs_resources reference to the underlying opaque C handle
- * @param file_path the path to the persisted HNSW index file
- * @param hnsw_params reference to the HNSW index params
- * @param return_value return value for cuvsHnswDeserialize function call
- * @param vector_dimension the dimension of the vectors in the HNSW index
+ * @param[in] cuvs_resources reference to the underlying opaque C handle
+ * @param[in] file_path the path to the persisted HNSW index file
+ * @param[in] hnsw_params reference to the HNSW index params
+ * @param[out] return_value return value for cuvsHnswDeserialize function call
+ * @param[in] vector_dimension the dimension of the vectors in the HNSW index
  * @returns cuvsHnswIndex_t reference to the created HNSW index
  */
 cuvsHnswIndex_t deserialize_hnsw_index(cuvsResources_t cuvs_resources, char *file_path,
