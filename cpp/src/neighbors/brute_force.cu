@@ -160,45 +160,81 @@ void index<T, DistT>::update_dataset(
   dataset_view_ = raft::make_const_mdspan(dataset_.view());
 }
 
-#define CUVS_INST_BFKNN(T, DistT)                                                    \
-  auto build(raft::resources const& res,                                             \
-             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,    \
-             cuvs::distance::DistanceType metric,                                    \
-             DistT metric_arg)                                                       \
-    ->cuvs::neighbors::brute_force::index<T, DistT>                                  \
-  {                                                                                  \
-    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                \
-  }                                                                                  \
-  auto build(raft::resources const& res,                                             \
-             raft::device_matrix_view<const T, int64_t, raft::col_major> dataset,    \
-             cuvs::distance::DistanceType metric,                                    \
-             DistT metric_arg)                                                       \
-    ->cuvs::neighbors::brute_force::index<T, DistT>                                  \
-  {                                                                                  \
-    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                \
-  }                                                                                  \
-                                                                                     \
-  void search(raft::resources const& res,                                            \
-              const cuvs::neighbors::brute_force::index<T, DistT>& idx,              \
-              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,   \
-              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, \
-              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,   \
-              const cuvs::neighbors::filtering::base_filter& sample_filter)          \
-  {                                                                                  \
-    detail::search<T, int64_t, DistT, raft::row_major>(                              \
-      res, idx, queries, neighbors, distances, sample_filter);                       \
-  }                                                                                  \
-  void search(raft::resources const& res,                                            \
-              const cuvs::neighbors::brute_force::index<T, DistT>& idx,              \
-              raft::device_matrix_view<const T, int64_t, raft::col_major> queries,   \
-              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, \
-              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,   \
-              const cuvs::neighbors::filtering::base_filter& sample_filter)          \
-  {                                                                                  \
-    detail::search<T, int64_t, DistT, raft::col_major>(                              \
-      res, idx, queries, neighbors, distances, sample_filter);                       \
-  }                                                                                  \
-                                                                                     \
+#define CUVS_INST_BFKNN(T, DistT)                                                               \
+  auto build(raft::resources const& res,                                                        \
+             const cuvs::neighbors::brute_force::index_params& index_params,                    \
+             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)               \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                             \
+  {                                                                                             \
+    return detail::build<T, DistT>(res, dataset, index_params.metric, index_params.metric_arg); \
+  }                                                                                             \
+  auto build(raft::resources const& res,                                                        \
+             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,               \
+             cuvs::distance::DistanceType metric,                                               \
+             DistT metric_arg)                                                                  \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                             \
+  {                                                                                             \
+    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                           \
+  }                                                                                             \
+  auto build(raft::resources const& res,                                                        \
+             const cuvs::neighbors::brute_force::index_params& index_params,                    \
+             raft::device_matrix_view<const T, int64_t, raft::col_major> dataset)               \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                             \
+  {                                                                                             \
+    return detail::build<T, DistT>(res, dataset, index_params.metric, index_params.metric_arg); \
+  }                                                                                             \
+  auto build(raft::resources const& res,                                                        \
+             raft::device_matrix_view<const T, int64_t, raft::col_major> dataset,               \
+             cuvs::distance::DistanceType metric,                                               \
+             DistT metric_arg)                                                                  \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                             \
+  {                                                                                             \
+    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                           \
+  }                                                                                             \
+                                                                                                \
+  void search(raft::resources const& res,                                                       \
+              const cuvs::neighbors::brute_force::search_params& params,                        \
+              const cuvs::neighbors::brute_force::index<T, DistT>& idx,                         \
+              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,              \
+              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,            \
+              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,              \
+              const cuvs::neighbors::filtering::base_filter& sample_filter)                     \
+  {                                                                                             \
+    detail::search<T, int64_t, DistT, raft::row_major>(                                         \
+      res, idx, queries, neighbors, distances, sample_filter);                                  \
+  }                                                                                             \
+  void search(raft::resources const& res,                                                       \
+              const cuvs::neighbors::brute_force::index<T, DistT>& idx,                         \
+              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,              \
+              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,            \
+              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,              \
+              const cuvs::neighbors::filtering::base_filter& sample_filter)                     \
+  {                                                                                             \
+    detail::search<T, int64_t, DistT, raft::row_major>(                                         \
+      res, idx, queries, neighbors, distances, sample_filter);                                  \
+  }                                                                                             \
+  void search(raft::resources const& res,                                                       \
+              const cuvs::neighbors::brute_force::search_params& params,                        \
+              const cuvs::neighbors::brute_force::index<T, DistT>& idx,                         \
+              raft::device_matrix_view<const T, int64_t, raft::col_major> queries,              \
+              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,            \
+              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,              \
+              const cuvs::neighbors::filtering::base_filter& sample_filter)                     \
+  {                                                                                             \
+    detail::search<T, int64_t, DistT, raft::col_major>(                                         \
+      res, idx, queries, neighbors, distances, sample_filter);                                  \
+  }                                                                                             \
+  void search(raft::resources const& res,                                                       \
+              const cuvs::neighbors::brute_force::index<T, DistT>& idx,                         \
+              raft::device_matrix_view<const T, int64_t, raft::col_major> queries,              \
+              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,            \
+              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances,              \
+              const cuvs::neighbors::filtering::base_filter& sample_filter)                     \
+  {                                                                                             \
+    detail::search<T, int64_t, DistT, raft::col_major>(                                         \
+      res, idx, queries, neighbors, distances, sample_filter);                                  \
+  }                                                                                             \
+                                                                                                \
   template struct cuvs::neighbors::brute_force::index<T, DistT>;
 
 CUVS_INST_BFKNN(float, float);
