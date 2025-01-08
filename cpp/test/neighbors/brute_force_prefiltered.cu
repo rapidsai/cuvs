@@ -28,6 +28,7 @@
 #include <raft/random/rng_state.hpp>
 #include <raft/util/popc.cuh>
 
+#include <cusparse.h>
 #include <gtest/gtest.h>
 
 #include <cuda_fp16.h>
@@ -144,6 +145,22 @@ void set_bitmap(const index_t* src,
   set_bitmap_kernel<index_t, bitmap_t>
     <<<blocks, block_size, 0, stream>>>(src, dst, bitmap, n_edges, n_cols);
   RAFT_CUDA_TRY(cudaGetLastError());
+}
+
+bool isCuSparseVersionGreaterThan_12_0_1()
+{
+  int version;
+  cusparseHandle_t handle;
+  cusparseCreate(&handle);
+  cusparseGetVersion(handle, &version);
+
+  int major = version / 1000;
+  int minor = (version % 1000) / 100;
+  int patch = version % 100;
+
+  cusparseDestroy(handle);
+
+  return (major > 12) || (major == 12 && minor > 0) || (major == 12 && minor == 0 && patch >= 2);
 }
 
 template <typename value_t, typename dist_t, typename index_t, typename bitmap_t = uint32_t>
@@ -352,6 +369,9 @@ class PrefilteredBruteForceOnBitmapTest
 
   void SetUp() override
   {
+    if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
+      GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
+    }
     index_t element =
       raft::ceildiv(params.n_queries * params.n_dataset, index_t(sizeof(bitmap_t) * 8));
     std::vector<bitmap_t> filter_h(element);
@@ -776,6 +796,9 @@ class PrefilteredBruteForceOnBitsetTest
 
   void SetUp() override
   {
+    if (std::is_same_v<value_t, half> && !isCuSparseVersionGreaterThan_12_0_1()) {
+      GTEST_SKIP() << "Skipping all tests for half-float as cuSparse doesn't support it.";
+    }
     index_t element = raft::ceildiv(1 * params.n_dataset, index_t(sizeof(bitset_t) * 8));
     std::vector<bitset_t> filter_h(element);
     std::vector<bitset_t> filter_repeat_h(element * params.n_queries);
