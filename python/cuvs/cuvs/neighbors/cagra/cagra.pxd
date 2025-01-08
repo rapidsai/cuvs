@@ -29,6 +29,8 @@ from libcpp cimport bool
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.neighbors.filters.filters cimport cuvsFilter
+from cuvs.distance_type cimport cuvsDistanceType
+
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
@@ -47,6 +49,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
 
     ctypedef struct cuvsCagraIndexParams:
+        cuvsDistanceType metric
         size_t intermediate_graph_degree
         size_t graph_degree
         cuvsCagraGraphBuildAlgo build_algo

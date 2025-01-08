@@ -30,7 +30,7 @@ def run_cagra_build_search_test(
     n_queries=100,
     k=10,
     dtype=np.float32,
-    metric="euclidean",
+    metric="sqeuclidean",
     intermediate_graph_degree=128,
     graph_degree=64,
     build_algo="ivf_pq",
@@ -43,6 +43,8 @@ def run_cagra_build_search_test(
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
+        if dtype in [np.int8, np.uint8]:
+            pytest.skip("skip normalization for int8/uint8 data")
         dataset = normalize(dataset, norm="l2", axis=1)
     dataset_device = device_ndarray(dataset)
 
@@ -123,7 +125,7 @@ def run_cagra_build_search_test(
 @pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
 @pytest.mark.parametrize("array_type", ["device", "host"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-@pytest.mark.parametrize("metric", ["euclidean"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric
 ):
@@ -146,7 +148,7 @@ def test_cagra_dataset_dtype_host_device(
             "graph_degree": 32,
             "add_data_on_build": True,
             "k": 1,
-            "metric": "euclidean",
+            "metric": "sqeuclidean",
             "build_algo": "ivf_pq",
         },
         {

@@ -18,7 +18,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/common/nvtx.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -403,6 +403,17 @@ struct batch_load_iterator {
 
   /** A single batch of data residing in device memory. */
   struct batch {
+    ~batch() noexcept
+    {
+      /*
+      If there's no copy, there's no allocation owned by the batch.
+      If there's no allocation, there's no guarantee that the device pointer is stream-ordered.
+      If there's no stream order guarantee, we must synchronize with the stream before the batch is
+      destroyed to make sure all GPU operations in that stream finish earlier.
+      */
+      if (!does_copy()) { RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream_)); }
+    }
+
     /** Logical width of a single row in a batch, in elements of type `T`. */
     [[nodiscard]] auto row_width() const -> size_type { return row_width_; }
     /** Logical offset of the batch, in rows (`row_width()`) */

@@ -42,7 +42,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
-  auto index_params                      = cuvs::neighbors::cagra::index_params();
+  auto index_params   = cuvs::neighbors::cagra::index_params();
+  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric),
   index_params.intermediate_graph_degree = params.intermediate_graph_degree;
   index_params.graph_degree              = params.graph_degree;
 
@@ -276,7 +277,8 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
 extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsCagraIndexParams{.intermediate_graph_degree = 128,
+    *params = new cuvsCagraIndexParams{.metric                    = L2Expanded,
+                                       .intermediate_graph_degree = 128,
                                        .graph_degree              = 64,
                                        .build_algo                = IVF_PQ,
                                        .nn_descent_niter          = 20};
