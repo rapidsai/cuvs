@@ -183,6 +183,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_DYNAMIC_BATCHING_TEST
     PATH
+    neighbors/dynamic_batching/test_brute_force.cu
     neighbors/dynamic_batching/test_cagra.cu
     neighbors/dynamic_batching/test_ivf_flat.cu
     neighbors/dynamic_batching/test_ivf_pq.cu
