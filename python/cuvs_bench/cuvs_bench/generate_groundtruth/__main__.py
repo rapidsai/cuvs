@@ -380,4 +380,3 @@ fbin --nrows=2000000 --cols=128 --output=groundtruth_dir \
 
 if __name__ == "__main__":
     main()
-    
