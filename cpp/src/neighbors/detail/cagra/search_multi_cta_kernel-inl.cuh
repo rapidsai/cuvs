@@ -153,39 +153,6 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
   }
 }
 
-template <class INDEX_T, class DISTANCE_T>
-RAFT_DEVICE_INLINE_FUNCTION void move_valid_entries_to_head(
-  INDEX_T* indices,            // [num_elements]
-  DISTANCE_T* distances,       // [num_elements]
-  const uint32_t num_elements  // (*) num_elements must be multiple of 32
-)
-{
-  constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-  constexpr INDEX_T invalid_index    = ~static_cast<INDEX_T>(0);
-  const uint32_t warp_id             = threadIdx.x / 32;
-  if (warp_id > 0) { return; }
-  const uint32_t lane_id = threadIdx.x % 32;
-  uint32_t offset        = 0;
-  for (uint32_t i = lane_id; i < num_elements; i += 32) {
-    auto index      = indices[i];
-    auto distance   = distances[i];
-    bool is_valid   = (index != invalid_index);
-    const auto mask = __ballot_sync(0xffffffff, is_valid);
-    const auto j    = offset + __popc(mask & ((1 << lane_id) - 1));
-    if ((index != invalid_index) && (j < i)) {
-      indices[j]   = index;
-      distances[j] = distance;
-    }
-    offset += __popc(mask);
-    __syncwarp();
-  }
-  for (uint32_t i = offset + lane_id; i < num_elements; i += 32) {
-    indices[i]   = invalid_index;
-    distances[i] = utils::get_max_value<DISTANCE_T>();
-  }
-  __syncwarp();
-}
-
 //
 // multiple CTAs per single query
 //
