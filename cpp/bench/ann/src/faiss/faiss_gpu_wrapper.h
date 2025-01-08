@@ -32,6 +32,10 @@
 #include <faiss/index_io.h>
 #include <omp.h>
 
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdarray.hpp>
+
 #include <cassert>
 #include <iostream>
 #include <memory>
