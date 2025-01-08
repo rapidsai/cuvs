@@ -309,4 +309,3 @@ def write_frontier(file, write_data, metric):
     """
     frontier_data = get_frontier(write_data, metric)
     frontier_data.to_csv(file.replace(".json", f",{metric}.csv"), index=False)
-    
