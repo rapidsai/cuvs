@@ -22,7 +22,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <raft/core/logger-macros.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 
 // TODO: This shouldn't be invoking spatial/knn

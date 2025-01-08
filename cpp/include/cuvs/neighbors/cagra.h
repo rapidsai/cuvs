@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -87,6 +88,8 @@ typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
  *
  */
 struct cuvsCagraIndexParams {
+  /** Distance type. */
+  cuvsDistanceType metric;
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree;
   /** Degree of output graph. */

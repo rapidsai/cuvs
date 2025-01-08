@@ -100,7 +100,10 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
     n = y_cai.shape[0]
 
     if out is None:
-        out = device_ndarray.empty((m, n), dtype=y_cai.dtype)
+        output_dtype = y_cai.dtype
+        if np.issubdtype(y_cai.dtype, np.float16):
+            output_dtype = np.float32
+        out = device_ndarray.empty((m, n), dtype=output_dtype)
     out_cai = wrap_array(out)
 
     x_k = x_cai.shape[1]
@@ -119,7 +122,7 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
     y_dt = y_cai.dtype
     d_dt = out_cai.dtype
 
-    if x_dt != y_dt or x_dt != d_dt:
+    if x_dt != y_dt:
         raise ValueError("Inputs must have the same dtypes")
 
     cdef cydlpack.DLManagedTensor* x_dlpack = \
