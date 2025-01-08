@@ -17,6 +17,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/rng_state.hpp>
 
@@ -85,7 +86,7 @@ struct params : base_params {
   /**
    * verbosity level.
    */
-  int verbosity = RAFT_LEVEL_INFO;
+  raft::level_enum verbosity = raft::level_enum::info;
 
   /**
    * Seed to the random number generator.

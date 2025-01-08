@@ -76,11 +76,9 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
  protected:
   void testBruteForce()
   {
-    // #if (RAFT_ACTIVE_LEVEL >= RAFT_LEVEL_DEBUG)
     raft::print_device_vector("Input array: ", input_.data(), rows_ * cols_, std::cout);
     std::cout << "K: " << k_ << std::endl;
     raft::print_device_vector("Labels array: ", search_labels_.data(), rows_, std::cout);
-    // #endif
 
     auto index = raft::make_device_matrix_view<const T, IdxT, raft::row_major>(
       (const T*)(input_.data()), rows_, cols_);
@@ -91,10 +89,18 @@ class KNNTest : public ::testing::TestWithParam<KNNInputs<T>> {
     auto distances =
       raft::make_device_matrix_view<DistT, IdxT, raft::row_major>(distances_.data(), rows_, k_);
 
-    auto metric = cuvs::distance::DistanceType::L2Unexpanded;
-    auto idx    = cuvs::neighbors::brute_force::build(handle, index, metric);
-    cuvs::neighbors::brute_force::search(
-      handle, idx, search, indices, distances, cuvs::neighbors::filtering::none_sample_filter{});
+    cuvs::neighbors::brute_force::index_params index_params;
+    index_params.metric = cuvs::distance::DistanceType::L2Unexpanded;
+
+    auto idx = cuvs::neighbors::brute_force::build(handle, index_params, index);
+    cuvs::neighbors::brute_force::search_params search_params;
+    cuvs::neighbors::brute_force::search(handle,
+                                         search_params,
+                                         idx,
+                                         search,
+                                         indices,
+                                         distances,
+                                         cuvs::neighbors::filtering::none_sample_filter{});
 
     build_actual_output<<<raft::ceildiv(rows_ * k_, 32), 32, 0, stream>>>(
       actual_labels_.data(), rows_, k_, search_labels_.data(), indices_.data());
@@ -387,16 +393,22 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     auto distances = raft::make_device_matrix_view<DistT, int64_t, raft::row_major>(
       cuvs_distances_.data(), params_.num_queries, params_.k);
 
+    cuvs::neighbors::brute_force::index_params index_params;
+    index_params.metric     = metric;
+    index_params.metric_arg = metric_arg;
+
+    cuvs::neighbors::brute_force::search_params search_params;
+
     if (params_.row_major) {
       auto idx =
         cuvs::neighbors::brute_force::build(handle_,
+                                            index_params,
                                             raft::make_device_matrix_view<const T, int64_t>(
-                                              database.data(), params_.num_db_vecs, params_.dim),
-                                            metric,
-                                            metric_arg);
+                                              database.data(), params_.num_db_vecs, params_.dim));
 
       cuvs::neighbors::brute_force::search(
         handle_,
+        search_params,
         idx,
         raft::make_device_matrix_view<const T, int64_t>(
           search_queries.data(), params_.num_queries, params_.dim),
@@ -406,13 +418,13 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
     } else {
       auto idx = cuvs::neighbors::brute_force::build(
         handle_,
+        index_params,
         raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
-          database.data(), params_.num_db_vecs, params_.dim),
-        metric,
-        metric_arg);
+          database.data(), params_.num_db_vecs, params_.dim));
 
       cuvs::neighbors::brute_force::search(
         handle_,
+        search_params,
         idx,
         raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
           search_queries.data(), params_.num_queries, params_.dim),

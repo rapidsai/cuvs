@@ -28,7 +28,7 @@
 #include <cuvs/selection/select_k.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/custom_resource.hpp>
