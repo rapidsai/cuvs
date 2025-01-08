@@ -16,9 +16,9 @@
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
+from scipy.spatial.distance import cdist
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
-from scipy.spatial.distance import cdist
 
 from cuvs.neighbors import cagra, filters
 from cuvs.test.ann_utils import calc_recall, generate_data
@@ -169,11 +169,9 @@ def test_cagra_dataset_dtype_host_device(
         },
     ],
 )
-
-
 def create_sparse_bitset(n_size, sparsity):
     bits_per_uint32 = 32
-    num_bits = n_size 
+    num_bits = n_size
     num_uint32s = (num_bits + bits_per_uint32 - 1) // bits_per_uint32
     num_ones = int(num_bits * sparsity)
 
@@ -257,14 +255,16 @@ def test_filtered_cagra(
     # Get actual results
     actual_indices = out_idx_device.copy_to_host()
     actual_distances = out_dist_device.copy_to_host()
-    
-    filtered_idx_map = np.cumsum(~bool_filter) - 1  # -1 because cumsum starts at 1
+
+    filtered_idx_map = (
+        np.cumsum(~bool_filter) - 1
+    )  # -1 because cumsum starts at 1
 
     # Map CAGRA indices to filtered space
-    mapped_actual_indices = np.take(filtered_idx_map, 
-                               actual_indices, 
-                               mode='clip')
-    
+    mapped_actual_indices = np.take(
+        filtered_idx_map, actual_indices, mode="clip"
+    )
+
     # Verify filtering - no filtered indices should be in results
     filtered_indices = np.where(bool_filter)[0]
     for i in range(n_queries):
@@ -274,7 +274,8 @@ def test_filtered_cagra(
     recall = calc_recall(mapped_actual_indices, skl_idx)
 
     assert recall > 0.7
-    
+
+
 def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.

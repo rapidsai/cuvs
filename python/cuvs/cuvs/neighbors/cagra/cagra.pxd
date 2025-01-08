@@ -28,8 +28,8 @@ from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
-from cuvs.neighbors.filters.filters cimport cuvsFilter
 from cuvs.distance_type cimport cuvsDistanceType
+from cuvs.neighbors.filters.filters cimport cuvsFilter
 
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:

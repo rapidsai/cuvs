@@ -48,7 +48,6 @@ from libc.stdint cimport (
 )
 
 from cuvs.common.exceptions import check_cuvs
-
 from cuvs.neighbors.filters import no_filter
 
 
@@ -506,6 +505,9 @@ def search(SearchParams search_params,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    filter:     Optional cuvs.neighbors.cuvsFilter can be used to filter
+                neighbors based on a given bitset.
+        (default None)
     {resources_docstring}
 
     Examples
