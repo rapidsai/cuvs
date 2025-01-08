@@ -455,10 +455,12 @@ fi
 
 # Build the cuvs Java bindings 
 if (( ${NUMARGS} == 0 )) || hasArg java; then
+    # build libcuvs first as the Java API depends on it
+    ./$0 libcuvs
     cd ${REPODIR}/java
     ./build.sh
-fi 
-   
+fi
+
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
 export RAPIDS_VERSION_MAJOR_MINOR="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2/' "${REPODIR}/VERSION")"
 

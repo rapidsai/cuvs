@@ -1,5 +1,3 @@
-export CMAKE_PREFIX_PATH=`pwd`/../cpp/build
-
 VERSION="25.02"
 GROUP_ID="com.nvidia.cuvs"
 SO_FILE_PATH="./internal"

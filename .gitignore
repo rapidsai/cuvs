@@ -1,6 +1,5 @@
 ## common
 __pycache__
-.gitignore
 *.pyc
 *~
 \#*
