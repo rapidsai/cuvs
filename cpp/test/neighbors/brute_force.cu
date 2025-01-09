@@ -21,6 +21,7 @@
 #include <cuvs/selection/select_k.hpp>
 
 #include <cuvs/neighbors/brute_force.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
