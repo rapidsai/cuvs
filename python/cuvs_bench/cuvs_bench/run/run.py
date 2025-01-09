@@ -582,7 +582,7 @@ def run_benchmark(
     search_threads: int,
     dry_run: bool,
     data_export: bool,
-    raft_log_level: int,
+    # raft_log_level: int,
 ) -> None:
     """
     Runs a benchmarking process based on the provided configurations.
@@ -683,5 +683,5 @@ def run_benchmark(
         batch_size,
         search_threads,
         search_mode,
-        raft_log_level,
+        # raft_log_level,
     )

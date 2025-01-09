@@ -10,19 +10,19 @@ groups:
       ratio: [10]
       usePrecomputed: [False, True]
       useFloat16: [False, True]
-      use_raft: [False]
+      use_cuvs: [False]
       bitsPerCode: [8]
     search:
       nprobe: [1, 5, 10, 50, 100, 200]
       refine_ratio: [1, 2, 4]
-  baseraft:
+  basecuvs:
     build:
       nlist: [1024, 2048, 4096, 8192]
       M: [64, 32, 16]
       ratio: [10]
       usePrecomputed: [False]
       useFloat16: [False, True]
-      use_raft: [True]
+      use_cuvs: [True]
       bitsPerCode: [8, 6, 5, 4]
     search:
       nprobe: [1, 5, 10, 50, 100, 200]
@@ -34,19 +34,19 @@ groups:
       ratio: [4]
       usePrecomputed: [False, True]
       useFloat16: [False, True]
-      use_raft: [False]
+      use_cuvs: [False]
       bitsPerCode: [8]
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]
       refine_ratio: [1, 2, 4]
-  largeraft:
+  largecuvs:
     build:
       nlist: [8192, 16384, 32768, 65536]
       M: [48, 32, 16]
       ratio: [4]
       usePrecomputed: [False]
       useFloat16: [False, True]
-      use_raft: [True]
+      use_cuvs: [True]
       bitsPerCode: [8, 6, 5, 4]
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]
@@ -58,19 +58,19 @@ groups:
       ratio: [10]
       usePrecomputed: [False, True]
       useFloat16: [False, True]
-      use_raft: [False]
+      use_cuvs: [False]
       bitsPerCode: [8]
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]
       refine_ratio: [1]
-  100Mraft:
+  100Mcuvs:
     build:
       nlist: [50000]
       M: [48]
       ratio: [10]
       usePrecomputed: [False, True]
       useFloat16: [False, True]
-      use_raft: [True]
+      use_cuvs: [True]
       bitsPerCode: [8, 6, 5, 4]
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]

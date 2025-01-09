@@ -150,16 +150,16 @@ from .run import run_benchmark
     "were interrupted, use this option to convert those intermediate "
     "files manually.",
 )
-@click.option(
-    "--raft-log-level",
-    default="info",
-    show_default=True,
-    prompt="Enter the log level",
-    help="Log level, possible values are [off, error, warn, info, debug, "
-    "trace]. Default: 'info'. Note that 'debug' or more detailed "
-    "logging level requires that the library is compiled with "
-    "-DRAFT_ACTIVE_LEVEL=<L> where <L> >= <requested log level>.",
-)
+# @click.option(
+#     "--raft-log-level",
+#     default="info",
+#     show_default=True,
+#     prompt="Enter the log level",
+#     help="Log level, possible values are [off, error, warn, info, debug, "
+#     "trace]. Default: 'info'. Note that 'debug' or more detailed "
+#     "logging level requires that the library is compiled with "
+#     "-DRAFT_ACTIVE_LEVEL=<L> where <L> >= <requested log level>.",
+# )
 def main(
     subset_size: Optional[int],
     count: int,
@@ -178,7 +178,7 @@ def main(
     search_threads: Optional[str],
     dry_run: bool,
     data_export: bool,
-    raft_log_level: str,
+    # raft_log_level: str,
 ) -> None:
     """
     Main function to run the benchmark with the provided options.

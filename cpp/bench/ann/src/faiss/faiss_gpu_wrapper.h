@@ -17,6 +17,8 @@
 
 #include "../common/ann_types.hpp"
 #include "../common/util.hpp"
+#include <cuvs/neighbors/refine.hpp>
+#include "../cuvs/cuvs_ann_bench_utils.h"
 
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFFlat.h>
@@ -204,7 +206,7 @@ template <typename T>
 void faiss_gpu<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  ASSERT(Mode::kLatency, "l2Knn: rowMajorIndex and rowMajorQuery should have same layout");
+  // ASSERT(Mode::kLatency, "l2Knn: rowMajorIndex and rowMajorQuery should have same layout");
   using IdxT = faiss::idx_t;
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
@@ -241,16 +243,16 @@ void faiss_gpu<T>::search(
       // wait for the queries to copy to host in 'stream`
       handle_.sync_stream();
 
-      raft::runtime::neighbors::refine(handle_,
+      cuvs::neighbors::refine(handle_,
                                        dataset_v,
                                        queries_host.view(),
                                        candidates_host.view(),
                                        neighbors_host.view(),
                                        distances_host.view(),
-                                       parse_metric_faiss(this->metric_));
+                                       parse_metric_type(this->metric_));
 
       raft::copy(neighbors,
-                 (size_t*)neighbors_host.data_handle(),
+                 neighbors_host.data_handle(),
                  neighbors_host.size(),
                  handle_.get_stream());
       raft::copy(
@@ -353,7 +355,7 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
     bool use_float16;
     bool use_precomputed;
     bool use_cuvs;
-    int bits_per_code;
+    int bitsPerCode;
   };
   using typename faiss_gpu<T>::search_param_base;
 
@@ -372,7 +374,7 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
                                                   dim,
                                                   param.nlist,
                                                   param.m,
-                                                  param.bits_per_code,
+                                                  param.bitsPerCode,
                                                   this->metric_type_,
                                                   config);
   }
