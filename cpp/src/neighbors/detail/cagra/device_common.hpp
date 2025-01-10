@@ -155,7 +155,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         } else if ((traversed_hash_ptr != nullptr) &&
                    hashmap::search<IndexT, 1>(
                      traversed_hash_ptr, traversed_hash_bitlen, best_index_team_local)) {
-          // Deactivate this entry as it has been already used by otehrs.
+          // Deactivate this entry as it has been already used by others.
           best_norm2_team_local = raft::upper_bound<DistanceT>();
           best_index_team_local = raft::upper_bound<IndexT>();
         }
