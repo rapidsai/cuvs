@@ -208,7 +208,7 @@ public class HnswIndex {
      * Registers an instance of configured {@link HnswIndexParams} with this
      * Builder.
      * 
-     * @param cagraIndexParameters An instance of HnswIndexParams.
+     * @param hnswIndexParameters An instance of HnswIndexParams.
      * @return An instance of this Builder.
      */
     public Builder withIndexParams(HnswIndexParams hnswIndexParameters) {
