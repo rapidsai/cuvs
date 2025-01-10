@@ -20,12 +20,10 @@ files:
       - rapids_build
       - run_py_cuvs
       - rust
+      - go
       - test_libcuvs
       - test_python_common
       - test_py_cuvs
-      - cupy
-      - rust
-      - go
   bench_ann:
     output: conda
     matrix:
@@ -84,7 +82,7 @@ files:
       - cuda_version
       - rapids_build
       - cuda
-      - rust
+      - go
   py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
