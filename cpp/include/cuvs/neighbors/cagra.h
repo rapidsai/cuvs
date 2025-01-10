@@ -17,8 +17,8 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/common.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>

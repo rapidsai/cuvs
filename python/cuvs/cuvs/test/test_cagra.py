@@ -16,7 +16,6 @@
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
-from scipy.spatial.distance import cdist
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
@@ -254,7 +253,6 @@ def test_filtered_cagra(
 
     # Get actual results
     actual_indices = out_idx_device.copy_to_host()
-    actual_distances = out_dist_device.copy_to_host()
 
     filtered_idx_map = (
         np.cumsum(~bool_filter) - 1

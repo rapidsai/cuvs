@@ -96,6 +96,7 @@ def from_bitmap(bitmap):
 
     return Prefilter(filter, parent=bitmap)
 
+
 def from_bitset(bitset):
     """
     Create a pre-filter from an array with type of uint32.
@@ -103,9 +104,10 @@ def from_bitset(bitset):
     Parameters
     ----------
     bitset : numpy.ndarray
-        An array with type of `uint32` where each bit in the array corresponds
-        to if a sample is greenlit (not filtered) or filtered.
-        Each bit in a `uint32` element represents a different sample of the dataset.
+        An array with type of `uint32` where each bit in the array 
+        corresponds to if a sample is greenlit (not filtered) or filtered.
+        Each bit in a `uint32` element represents a different sample of 
+        the dataset.
 
         - Bit value of 1: The sample is greenlit (allowed).
         - Bit value of 0: The sample pair is filtered.
