@@ -15,8 +15,7 @@
  */
 
 module com.nvidia.cuvs {
-  requires org.slf4j;
-  requires org.apache.commons.io;
+  //requires org.apache.commons.io;
 
   exports com.nvidia.cuvs;
 }

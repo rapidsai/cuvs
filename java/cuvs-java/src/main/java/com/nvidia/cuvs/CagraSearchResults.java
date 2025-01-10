@@ -19,15 +19,11 @@ package com.nvidia.cuvs;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.nvidia.cuvs.common.SearchResults;
 
@@ -62,7 +58,6 @@ public class CagraSearchResults implements SearchResults {
 
     readResultMemorySegments();
   }
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * Reads neighbors and distances {@link MemorySegment} and loads the values

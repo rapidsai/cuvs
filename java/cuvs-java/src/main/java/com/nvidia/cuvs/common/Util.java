@@ -19,6 +19,8 @@ package com.nvidia.cuvs.common;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
@@ -27,7 +29,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
 
-import org.apache.commons.io.IOUtils;
+import com.nvidia.cuvs.LibraryNotFoundException;
 
 public class Util {
 
@@ -87,12 +89,13 @@ public class Util {
 
     return dataMemorySegment;
   }
-
+  
   /**
    * Load a file from the classpath to a temporary file. Suitable for loading .so
    * files from the jar.
    */
-  public static File loadLibraryFromJar(String path) throws IOException {
+  public static File loadLibraryFromJar(String path) throws LibraryNotFoundException, IOException {
+
     if (!path.startsWith("/")) {
       throw new IllegalArgumentException("The path has to be absolute (start with '/').");
     }
@@ -110,8 +113,41 @@ public class Util {
     }
     // Prepare temporary file
     File temp = File.createTempFile(prefix, suffix);
-    IOUtils.copy(Util.class.getResourceAsStream(path), new FileOutputStream(temp));
+    System.out.println("Classloader: " + Util.class.getClassLoader().getClass());
+    //System.out.println("Classloader: " + Util.class.getClassLoader().);
+    InputStream libraryStream = Util.class.getModule().getResourceAsStream(path); //Util.class.getResourceAsStream(path);
+    streamCopy(libraryStream, new FileOutputStream(temp));
 
     return temp;
+  }
+  
+  private static void streamCopy(InputStream is, OutputStream os) throws LibraryNotFoundException {
+	  if (is == null) {
+		  throw new LibraryNotFoundException("CuVS Library Not Found in ClassPath");
+	  }
+	  byte[] buffer = new byte[1024];
+	  int readBytes;
+
+	  try {
+		  while ((readBytes = is.read(buffer)) != -1) {
+			  os.write(buffer, 0, readBytes);
+		  }
+	  } catch (IOException e) {
+		  throw new LibraryNotFoundException(e);
+	  } finally {
+		  // If read/write fails, close streams safely before throwing an exception
+		  if (os != null)
+			try {
+				os.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		  if (is != null)
+			try {
+				is.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+	  }
   }
 }
