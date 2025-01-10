@@ -491,6 +491,7 @@ void register_search(std::shared_ptr<const dataset<T>> dataset,
         }
         b->ThreadRange(threads[0], threads[1]);
       }
+      if (metric_objective == Mode::kThroughput) { b->ThreadRange(threads[0], threads[1]); }
     }
   }
 }

@@ -69,8 +69,8 @@ def move(name, ann_bench_data_path):
 def download(name, normalize, ann_bench_data_path):
     path = get_dataset_path(name, ann_bench_data_path)
     try:
-        url = f"http://ann-benchmarks.com/{name}.hdf5"
-        download_dataset(url, path)
+        url = f"http://ann-benchmarks.com/deep-image-96-angular.hdf5"
+        # download_dataset(url, path)
 
         convert_hdf5_to_fbin(path, normalize)
 
