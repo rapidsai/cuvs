@@ -389,12 +389,13 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
         {
+          std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
           cagra::index<DataT, IdxT> index(handle_, index_params.metric);
           if (ps.host_dataset) {
-            auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
-            raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
+            database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
+            raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+              (const DataT*)database_host->data_handle(), ps.n_rows, ps.dim);
 
             index = cagra::build(handle_, index_params, database_host_view);
           } else {
@@ -567,13 +568,16 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto initial_database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), initial_database_size, ps.dim);
 
+        std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         cagra::index<DataT, IdxT> index(handle_);
         if (ps.host_dataset) {
-          auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
+          database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
           raft::copy(
-            database_host.data_handle(), database.data(), initial_database_view.size(), stream_);
+            database_host->data_handle(), database.data(), initial_database_view.size(), stream_);
           auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-            (const DataT*)database_host.data_handle(), initial_database_size, ps.dim);
+            (const DataT*)database_host->data_handle(), initial_database_size, ps.dim);
+          // NB: database_host must live no less than the index, because the index _may_be_
+          //     non-onwning
           index = cagra::build(handle_, index_params, database_host_view);
         } else {
           index = cagra::build(handle_, index_params, initial_database_view);
@@ -758,21 +762,18 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.algo        = ps.algo;
         search_params.max_queries = ps.max_queries;
         search_params.team_size   = ps.team_size;
-
-        // TODO: setting search_params.itopk_size here breaks the filter tests, but is required for
-        // k>1024 skip these tests until fixed
-        if (ps.k >= 1024) { GTEST_SKIP(); }
-        // search_params.itopk_size   = ps.itopk_size;
+        search_params.itopk_size  = ps.itopk_size;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
+        std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         cagra::index<DataT, IdxT> index(handle_);
         if (ps.host_dataset) {
-          auto database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
-          raft::copy(database_host.data_handle(), database.data(), database.size(), stream_);
+          database_host = raft::make_host_matrix<DataT, int64_t>(ps.n_rows, ps.dim);
+          raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
           auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-            (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
+            (const DataT*)database_host->data_handle(), ps.n_rows, ps.dim);
           index = cagra::build(handle_, index_params, database_host_view);
         } else {
           index = cagra::build(handle_, index_params, database_view);

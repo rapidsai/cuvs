@@ -348,6 +348,9 @@ if(BUILD_SHARED_LIBS)
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
     src/core/bitset.cu
+    src/distance/detail/kernels/gram_matrix.cu
+    src/distance/detail/kernels/kernel_factory.cu
+    src/distance/detail/kernels/kernel_matrices.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu
@@ -394,6 +397,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
+    src/embed/spectral.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
@@ -421,6 +425,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/cagra_build.cpp
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
+    src/neighbors/dynamic_batching.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
@@ -482,6 +487,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
+    src/preprocessing/quantize/scalar.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
@@ -504,12 +510,14 @@ if(BUILD_SHARED_LIBS)
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
   target_link_libraries(
-    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
-                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+    cuvs_objs
+    PUBLIC raft::raft rmm::rmm rmm::rmm_logger ${CUVS_CTK_MATH_DEPENDENCIES}
+           $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+    PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl
   )
 
-  add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
-  add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
+  add_library(cuvs SHARED $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+  add_library(cuvs_static STATIC $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
 
   target_compile_options(
     cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
@@ -601,6 +609,7 @@ if(BUILD_SHARED_LIBS)
 
   if(BUILD_CAGRA_HNSWLIB)
     target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
@@ -720,7 +729,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft
+      PRIVATE raft::raft rmm::rmm_logger_impl raft::raft_logger_impl
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries

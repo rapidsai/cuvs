@@ -118,9 +118,7 @@ instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::russel_rao_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
-  int64_t,
-  cuvs::distance::kernels::detail::rbf_fin_op);
+  cuvs::distance::detail::ops::l2_unexp_distance_op, int64_t, cuvs::distance::kernels::rbf_fin_op);
 
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::l2_exp_distance_op, int64_t);
