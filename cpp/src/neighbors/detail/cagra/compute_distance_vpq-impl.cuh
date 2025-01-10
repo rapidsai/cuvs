@@ -293,8 +293,6 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                         pq_codebook_ptr +
                           sizeof(CODE_BOOK_T) * ((1 << PQ_BITS) * 2 * m + (2 * (pq_code & 0xff))));
             // L2 distance
-            // printf("%f %f\n", float(c2.x), float((reinterpret_cast<half2(&)[PQ_LEN * vlen /
-            // 2]>(vq_vals)[d1]).x));
             half2 dist = dist_op<half2, DescriptorT::kMetric>(
               q2, c2 + reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1]);
             norm += static_cast<DISTANCE_T>(dist.x + dist.y);
