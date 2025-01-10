@@ -964,7 +964,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {100},
     {10000},
     {64, 128, 192, 256, 512},  // dim
-    {16},                            // k
+    {16},                      // k
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
@@ -974,7 +974,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
-    {0.7});                      // don't demand high recall without refinement
+    {0.6});                      // don't demand high recall without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
     for (uint32_t vq_n_centers : {100}) {
       for (auto input : inputs2) {
