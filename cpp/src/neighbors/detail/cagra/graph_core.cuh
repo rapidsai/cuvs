@@ -1208,8 +1208,7 @@ void optimize(
 
           // Store the neighbor index if its detourable count is equal to `num_detour`.
           if (num_detour_k != num_detour) { continue; }
-          output_graph_ptr[pk + (output_graph_degree * i)] =
-            input_graph_ptr[k + (input_graph_degree * i)];
+          pruned_graph(i, pk) = input_graph_ptr[k + (input_graph_degree * i)];
           pk += 1;
           if (pk >= output_graph_degree) break;
         }
