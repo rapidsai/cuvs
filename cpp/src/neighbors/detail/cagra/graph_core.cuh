@@ -1407,6 +1407,35 @@ void optimize(
                      (double)sum_hist / graph_size);
     }
   }
+
+  // Check duplication and out-of-range indices
+  {
+    uint64_t num_dup = 0;
+    uint64_t num_oor = 0;
+#pragma omp parallel for reduction(+ : num_dup) reduction(+ : num_oor)
+    for (uint64_t i = 0; i < graph_size; i++) {
+      auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
+      for (uint32_t j = 0; j < output_graph_degree; j++) {
+        const auto neighbor_a = my_out_graph[j];
+
+        // Check oor
+        if (neighbor_a > graph_size) {
+          num_oor++;
+          continue;
+        }
+
+        // Check duplication
+        for (uint32_t k = j + 1; k < output_graph_degree; k++) {
+          const auto neighbor_b = my_out_graph[k];
+          if (neighbor_a == neighbor_b) { num_dup++; }
+        }
+      }
+    }
+    if (num_dup) { RAFT_LOG_WARN("%lu duplicated node(s) are found in the CAGRA graph", num_dup); }
+    if (num_oor) {
+      RAFT_LOG_WARN("%lu out-of-range index node(s) are found in the CAGRA graph", num_oor);
+    }
+  }
 }
 
 }  // namespace cuvs::neighbors::cagra::detail::graph
