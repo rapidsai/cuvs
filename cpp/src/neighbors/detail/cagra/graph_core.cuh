@@ -1102,7 +1102,6 @@ void optimize(
     }
   }
 
-  auto pruned_graph = raft::make_host_matrix<uint32_t, int64_t>(graph_size, output_graph_degree);
   {
     //
     // Prune kNN graph
@@ -1195,7 +1194,7 @@ void optimize(
     for (uint64_t i = 0; i < graph_size; i++) {
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
       // count of the neighbors while increasing the target detourable count from zero.
-      uint64_t pk         = 0;
+      uint64_t pk         = mst_graph_num_edges_ptr[i];
       uint32_t num_detour = 0;
       while (pk < output_graph_degree) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
@@ -1208,8 +1207,20 @@ void optimize(
 
           // Store the neighbor index if its detourable count is equal to `num_detour`.
           if (num_detour_k != num_detour) { continue; }
-          pruned_graph(i, pk) = input_graph_ptr[k + (input_graph_degree * i)];
-          pk += 1;
+
+          // Check duplication and append
+          const auto candidate_node = input_graph_ptr[k + (input_graph_degree * i)];
+          bool dup                  = false;
+          for (uint32_t dk = 0; dk < pk; dk++) {
+            if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
+              dup = true;
+              break;
+            }
+          }
+          if (!dup) {
+            output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
+            pk += 1;
+          }
           if (pk >= output_graph_degree) break;
         }
         if (pk >= output_graph_degree) break;
@@ -1312,35 +1323,13 @@ void optimize(
 
 #pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
-      auto my_fwd_graph = pruned_graph.data_handle() + (output_graph_degree * i);
       auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
-      uint32_t kf       = 0;
       uint32_t k        = mst_graph_num_edges_ptr[i];
 
       const auto num_protected_edges = std::max<uint64_t>(k, output_graph_degree / 2);
       assert(num_protected_edges <= output_graph_degree);
       if (num_protected_edges == output_graph_degree) continue;
-
-      // Append edges from the pruned graph to output graph
-      while (k < output_graph_degree && kf < output_graph_degree) {
-        if (my_fwd_graph[kf] < graph_size) {
-          auto flag_match = false;
-          for (uint32_t kk = 0; kk < k; kk++) {
-            if (my_out_graph[kk] == my_fwd_graph[kf]) {
-              flag_match = true;
-              break;
-            }
-          }
-          if (!flag_match) {
-            my_out_graph[k] = my_fwd_graph[kf];
-            k += 1;
-          }
-        }
-        kf += 1;
-      }
-      assert(k == output_graph_degree);
-      assert(kf <= output_graph_degree);
 
       // Replace some edges of the output graph with edges of the reverse graph.
       auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
