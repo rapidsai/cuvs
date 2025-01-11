@@ -1217,7 +1217,7 @@ void optimize(
               break;
             }
           }
-          if (!dup) {
+          if (!dup && candidate_node < graph_size) {
             output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
             pk += 1;
           }
@@ -1431,9 +1431,9 @@ void optimize(
         }
       }
     }
-    if (num_dup) { RAFT_LOG_WARN("%lu duplicated node(s) are found in the CAGRA graph", num_dup); }
+    if (num_dup) { RAFT_LOG_ERROR("%lu duplicated node(s) are found in the CAGRA graph", num_dup); }
     if (num_oor) {
-      RAFT_LOG_WARN("%lu out-of-range index node(s) are found in the CAGRA graph", num_oor);
+      RAFT_LOG_ERROR("%lu out-of-range index node(s) are found in the CAGRA graph", num_oor);
     }
   }
 }
