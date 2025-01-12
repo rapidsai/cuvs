@@ -140,7 +140,7 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
   using kmeans_in_type = typename DatasetT::value_type;
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.n_iters = params.kmeans_n_iters;
-  kmeans_params.metric  = params.metric;
+  kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
   auto vq_centers_view =
     raft::make_device_matrix_view<MathT, ix_t>(vq_centers.data_handle(), vq_n_centers, dim);
   auto vq_trainset_view = raft::make_device_matrix_view<const kmeans_in_type, ix_t>(
@@ -170,7 +170,7 @@ auto predict_vq(const raft::resources& res,
   auto vq_labels = raft::make_device_vector<label_type, index_type>(res, dataset.extent(0));
 
   cuvs::cluster::kmeans::balanced_params kmeans_params;
-  kmeans_params.metric = metric;
+  kmeans_params.metric = cuvs::distance::DistanceType::L2Expanded;
 
   auto vq_centers_view = raft::make_device_matrix_view<const kmeans_math_type, index_type>(
     vq_centers.data_handle(), vq_centers.extent(0), vq_centers.extent(1));
