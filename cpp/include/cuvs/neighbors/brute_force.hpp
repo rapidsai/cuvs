@@ -204,6 +204,20 @@ auto build(raft::resources const& handle,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::brute_force::index<float, float>;
 
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * @param[in] handle
+ * @param[in] index_params parameters such as the distance metric to use
+ * @param[in] dataset a host pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed brute-force index
+ */
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::brute_force::index_params& index_params,
+           raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::brute_force::index<float, float>;
+
 [[deprecated]] auto build(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -229,6 +243,20 @@ auto build(raft::resources const& handle,
 auto build(raft::resources const& handle,
            const cuvs::neighbors::brute_force::index_params& index_params,
            raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::brute_force::index<half, float>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * @param[in] handle
+ * @param[in] index_params parameters such as the distance metric to use
+ * @param[in] dataset a host pointer to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed brute-force index
+ */
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::brute_force::index_params& index_params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::brute_force::index<half, float>;
 
 [[deprecated]] auto build(

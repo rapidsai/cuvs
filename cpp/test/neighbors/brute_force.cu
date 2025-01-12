@@ -21,6 +21,7 @@
 #include <cuvs/selection/select_k.hpp>
 
 #include <cuvs/neighbors/brute_force.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/init.cuh>
@@ -210,6 +211,7 @@ struct RandomKNNInputs {
   int k;
   cuvs::distance::DistanceType metric;
   bool row_major;
+  bool host_dataset;
 };
 
 std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
@@ -217,7 +219,7 @@ std::ostream& operator<<(std::ostream& os, const RandomKNNInputs& input)
   return os << "num_queries:" << input.num_queries << " num_vecs:" << input.num_db_vecs
             << " dim:" << input.dim << " k:" << input.k
             << " metric:" << cuvs::neighbors::print_metric{input.metric}
-            << " row_major:" << input.row_major;
+            << " row_major:" << input.row_major << " host_dataset:" << input.host_dataset;
 }
 
 template <typename T, typename DistT = T>
@@ -399,12 +401,15 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
     cuvs::neighbors::brute_force::search_params search_params;
 
-    if (params_.row_major) {
-      auto idx =
-        cuvs::neighbors::brute_force::build(handle_,
-                                            index_params,
-                                            raft::make_device_matrix_view<const T, int64_t>(
-                                              database.data(), params_.num_db_vecs, params_.dim));
+    if (params_.host_dataset) {
+      // test building from a dataset in host memory
+      auto host_database =
+        raft::make_host_matrix<T, int64_t, raft::row_major>(params_.num_db_vecs, params_.dim);
+      raft::copy(
+        host_database.data_handle(), database.data(), params_.num_db_vecs * params_.dim, stream_);
+
+      auto idx = cuvs::neighbors::brute_force::build(
+        handle_, index_params, raft::make_const_mdspan(host_database.view()));
 
       cuvs::neighbors::brute_force::search(
         handle_,
@@ -416,21 +421,39 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
         distances,
         cuvs::neighbors::filtering::none_sample_filter{});
     } else {
-      auto idx = cuvs::neighbors::brute_force::build(
-        handle_,
-        index_params,
-        raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
-          database.data(), params_.num_db_vecs, params_.dim));
+      if (params_.row_major) {
+        auto idx =
+          cuvs::neighbors::brute_force::build(handle_,
+                                              index_params,
+                                              raft::make_device_matrix_view<const T, int64_t>(
+                                                database.data(), params_.num_db_vecs, params_.dim));
 
-      cuvs::neighbors::brute_force::search(
-        handle_,
-        search_params,
-        idx,
-        raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
-          search_queries.data(), params_.num_queries, params_.dim),
-        indices,
-        distances,
-        cuvs::neighbors::filtering::none_sample_filter{});
+        cuvs::neighbors::brute_force::search(
+          handle_,
+          search_params,
+          idx,
+          raft::make_device_matrix_view<const T, int64_t>(
+            search_queries.data(), params_.num_queries, params_.dim),
+          indices,
+          distances,
+          cuvs::neighbors::filtering::none_sample_filter{});
+      } else {
+        auto idx = cuvs::neighbors::brute_force::build(
+          handle_,
+          index_params,
+          raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
+            database.data(), params_.num_db_vecs, params_.dim));
+
+        cuvs::neighbors::brute_force::search(
+          handle_,
+          search_params,
+          idx,
+          raft::make_device_matrix_view<const T, int64_t, raft::col_major>(
+            search_queries.data(), params_.num_queries, params_.dim),
+          indices,
+          distances,
+          cuvs::neighbors::filtering::none_sample_filter{});
+      }
     }
 
     ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(ref_indices_.data(),
@@ -480,42 +503,51 @@ class RandomBruteForceKNNTest : public ::testing::TestWithParam<RandomKNNInputs>
 
 const std::vector<RandomKNNInputs> random_inputs = {
   // test each distance metric on a small-ish input, with row-major inputs
-  {100, 256, 2, 65, cuvs::distance::DistanceType::L2Expanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L1, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::Linf, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::CorrelationExpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::CosineExpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::LpUnexpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::JensenShannon, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::Canberra, true},
+  {100, 256, 2, 65, cuvs::distance::DistanceType::L2Expanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L1, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::Linf, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::CorrelationExpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::CosineExpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::LpUnexpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::JensenShannon, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::Canberra, true, false},
   // test each distance metric with col-major inputs
-  {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L1, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::Linf, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::CorrelationExpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::CosineExpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::LpUnexpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::JensenShannon, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {256, 512, 16, 8, cuvs::distance::DistanceType::Canberra, false},
+  {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Unexpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L1, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::Linf, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::CorrelationExpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::CosineExpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::LpUnexpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::JensenShannon, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2SqrtExpanded, false, false},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::Canberra, false, false},
   // larger tests on different sized data / k values
-  {10000, 40000, 32, 30, cuvs::distance::DistanceType::L2Expanded, false},
-  {345, 1023, 16, 128, cuvs::distance::DistanceType::CosineExpanded, true},
-  {789, 20516, 64, 256, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 200000, 128, 128, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 200000, 128, 128, cuvs::distance::DistanceType::L2Expanded, false},
-  {1000, 5000, 128, 128, cuvs::distance::DistanceType::LpUnexpanded, true},
-  {1000, 5000, 128, 128, cuvs::distance::DistanceType::L2SqrtExpanded, false},
-  {1000, 5000, 128, 128, cuvs::distance::DistanceType::InnerProduct, false}};
+  {10000, 40000, 32, 30, cuvs::distance::DistanceType::L2Expanded, false, false},
+  {345, 1023, 16, 128, cuvs::distance::DistanceType::CosineExpanded, true, false},
+  {789, 20516, 64, 256, cuvs::distance::DistanceType::L2SqrtExpanded, false, false},
+  {1000, 200000, 128, 128, cuvs::distance::DistanceType::L2Expanded, true, false},
+  {1000, 200000, 128, 128, cuvs::distance::DistanceType::L2Expanded, false, false},
+  {1000, 5000, 128, 128, cuvs::distance::DistanceType::LpUnexpanded, true, false},
+  {1000, 5000, 128, 128, cuvs::distance::DistanceType::L2SqrtExpanded, false, false},
+  {1000, 5000, 128, 128, cuvs::distance::DistanceType::InnerProduct, false, false},
+  // test with datasets on host memory
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L2Expanded, true, true},
+  {256, 512, 32, 16, cuvs::distance::DistanceType::L2Unexpanded, true, true},
+  {256, 512, 8, 8, cuvs::distance::DistanceType::L2SqrtExpanded, true, true},
+  {256, 128, 32, 8, cuvs::distance::DistanceType::L2SqrtUnexpanded, true, true},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::L1, true, true},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::Linf, true, true},
+  {256, 512, 16, 8, cuvs::distance::DistanceType::InnerProduct, true, true},
+  {256, 512, 16, 7, cuvs::distance::DistanceType::L2Expanded, true, true}};
 
 typedef RandomBruteForceKNNTest<float, float> RandomBruteForceKNNTestF;
 TEST_P(RandomBruteForceKNNTestF, BruteForce) { this->testBruteForce(); }
