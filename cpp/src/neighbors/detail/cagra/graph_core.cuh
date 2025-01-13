@@ -1190,7 +1190,7 @@ void optimize(
     const auto num_full = host_stats.data_handle()[1];
 
     // Create pruned kNN graph
-    std::uint32_t num_invalid_neighbor_lists = 0;
+    uint32_t num_invalid_neighbor_lists = 0;
 #pragma omp parallel for reduction(+ : num_invalid_neighbor_lists)
     for (uint64_t i = 0; i < graph_size; i++) {
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
