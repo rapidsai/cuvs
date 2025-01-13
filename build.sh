@@ -76,8 +76,8 @@ BUILD_REPORT_METRICS=""
 BUILD_REPORT_INCL_CACHE_STATS=OFF
 BUILD_SHARED_LIBS=ON
 
-TEST_TARGETS="NEIGHBORS_ANN_CAGRA_TEST"
-ANN_BENCH_TARGETS="CUVS_ANN_BENCH_ALL"
+TEST_TARGETS=""
+ANN_BENCH_TARGETS=""
 
 CACHE_ARGS=""
 NVTX=ON
@@ -273,14 +273,6 @@ fi
 if hasArg tests || (( ${NUMARGS} == 0 )); then
     BUILD_TESTS=ON
     CMAKE_TARGET="${CMAKE_TARGET};${TEST_TARGETS}"
-
-    # Force compile library when needed test targets are specified
-    if [[ $CMAKE_TARGET == *"CAGRA_C_TEST"* || \
-          $CMAKE_TARGET == *"INTEROP_TEST"* || \
-          $CMAKE_TARGET == *"NEIGHBORS_ANN_CAGRA_TEST"* ]]; then
-      echo "-- Enabling compiled lib for gtests"
-      COMPILE_LIBRARY=ON
-    fi
 fi
 
 if hasArg bench-ann || (( ${NUMARGS} == 0 )); then

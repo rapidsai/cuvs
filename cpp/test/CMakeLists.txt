@@ -49,6 +49,7 @@ function(ConfigureTest)
     PRIVATE cuvs
             cuvs::cuvs
             raft::raft
+            test_rmm_logger
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
@@ -87,6 +88,9 @@ function(ConfigureTest)
   )
 endfunction()
 
+add_library(test_rmm_logger OBJECT)
+target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
+
 # ##################################################################################################
 # test sources ##################################################################################
 # ##################################################################################################
@@ -94,7 +98,7 @@ endfunction()
 if(BUILD_TESTS)
   ConfigureTest(
     NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
-    neighbors/refine.cu GPUS 1 PERCENT 100
+    neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
@@ -137,6 +141,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_ANN_CAGRA_TEST
     PATH
+    neighbors/ann_cagra/bug_extreme_inputs_oob.cu
     neighbors/ann_cagra/bug_multi_cta_crash.cu
     neighbors/ann_cagra/test_float_uint32_t.cu
     neighbors/ann_cagra/test_half_uint32_t.cu
@@ -174,6 +179,20 @@ if(BUILD_TESTS)
     100
   )
 
+  ConfigureTest(
+    NAME
+    NEIGHBORS_DYNAMIC_BATCHING_TEST
+    PATH
+    neighbors/dynamic_batching/test_brute_force.cu
+    neighbors/dynamic_batching/test_cagra.cu
+    neighbors/dynamic_batching/test_ivf_flat.cu
+    neighbors/dynamic_batching/test_ivf_pq.cu
+    GPUS
+    1
+    PERCENT
+    100
+  )
+
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
     target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
@@ -204,13 +223,25 @@ if(BUILD_TESTS)
     distance/dist_l_inf.cu
     distance/dist_lp_unexp.cu
     distance/dist_russell_rao.cu
+    distance/gram.cu
     distance/masked_nn.cu
+    distance/sparse_distance.cu
     sparse/neighbors/cross_component_nn.cu
     GPUS
     1
     PERCENT
     100
   )
+
+  ConfigureTest(
+    NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
+    sparse/cluster/spectral.cu GPUS 1 PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
+  )
+
   ConfigureTest(
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )

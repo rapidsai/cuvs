@@ -26,16 +26,38 @@ Index
     :members:
     :content-only:
 
+Index extend parameters
+-----------------------
+
+.. doxygengroup:: hnsw_c_extend_params
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index extend
+------------
+.. doxygengroup:: hnsw_c_index_extend
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index load
+----------
+.. doxygengroup:: hnsw_c_index_load
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index search
 ------------
 
-.. doxygengroup:: cagra_c_index_search
+.. doxygengroup:: hnsw_c_index_search
     :project: cuvs
     :members:
     :content-only:
 
 Index serialize
-------------
+---------------
 
 .. doxygengroup:: hnsw_c_index_serialize
     :project: cuvs

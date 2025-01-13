@@ -27,7 +27,8 @@
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger-macros.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -132,6 +133,10 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
 {
   const IdxT i = IdxT(blockDim.x) * IdxT(blockIdx.x) + threadIdx.x;
   if (i >= n_rows) { return; }
+  auto source_ix = source_ixs == nullptr ? i + batch_offset : source_ixs[i];
+  // In the context of refinement, some indices may be invalid (the generating NN algorithm does
+  // not return enough valid items). Do not add the item to the index in this case.
+  if (source_ix == ivf::kInvalidRecord<IdxT> || source_ix == raft::upper_bound<IdxT>()) { return; }
 
   auto list_id     = labels[i];
   auto inlist_id   = atomicAdd(list_sizes_ptr + list_id, 1);
@@ -139,7 +144,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   auto* list_data  = list_data_ptrs[list_id];
 
   // Record the source vector id in the index
-  list_index[inlist_id] = source_ixs == nullptr ? i + batch_offset : source_ixs[i];
+  list_index[inlist_id] = source_ix;
 
   // The data is written in interleaved groups of `index::kGroupSize` vectors
   using interleaved_group = raft::Pow2<kIndexGroupSize>;
@@ -151,7 +156,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
 
   // Point to the source vector
   if constexpr (gather_src) {
-    source_vecs += source_ixs[i] * dim;
+    source_vecs += source_ix * dim;
   } else {
     source_vecs += i * dim;
   }

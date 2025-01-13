@@ -7,7 +7,7 @@ channels:
 - conda-forge
 - nvidia
 dependencies:
-- breathe
+- breathe>=4.35.0
 - c-compiler
 - clang
 - clang-tools=16.0.6
@@ -17,7 +17,7 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-python>=12.0,<13.0a0,<=12.6.0
+- cuda-python>=12.6.2,<13.0a0
 - cuda-version=12.5
 - cupy>=12.0.0
 - cxx-compiler
@@ -32,7 +32,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==24.12.*,>=0.0.0a0
+- librmm==25.2.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -40,8 +40,7 @@ dependencies:
 - numpydoc
 - openblas
 - pre-commit
-- pydata-sphinx-theme
-- pylibraft==24.12.*,>=0.0.0a0
+- pylibraft==25.2.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
@@ -51,5 +50,8 @@ dependencies:
 - scikit-learn
 - sphinx-copybutton
 - sphinx-markdown-tables
+- sphinx>=8.0.0
 - sysroot_linux-64==2.17
+- pip:
+  - nvidia-sphinx-theme
 name: all_cuda-125_arch-x86_64

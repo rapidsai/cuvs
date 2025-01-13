@@ -7,37 +7,38 @@ files:
       arch: [x86_64, aarch64]
     includes:
       - build
-      - rapids_build
       - build_py_cuvs
+      - build_wheels
+      - checks
       - cuda
       - cuda_version
-      - depends_on_pylibraft
+      - depends_on_cupy
       - depends_on_librmm
+      - depends_on_pylibraft
       - develop
-      - checks
-      - build_wheels
-      - test_libcuvs
       - docs
+      - rapids_build
       - run_py_cuvs
+      - rust
+      - test_libcuvs
       - test_python_common
       - test_py_cuvs
-      - cupy
-      - rust
   bench_ann:
     output: conda
     matrix:
       cuda: ["11.8", "12.5"]
       arch: [x86_64, aarch64]
     includes:
-      - rapids_build
+      - bench
+      - bench_python
       - build_py_cuvs
       - cuda
       - cuda_version
+      - depends_on_cupy
       - depends_on_pylibraft
       - depends_on_librmm
       - develop
-      - bench
-      - bench_python
+      - rapids_build
       - rapids_build_setuptools
   test_cpp:
     output: none
@@ -48,10 +49,10 @@ files:
     output: none
     includes:
       - cuda_version
+      - depends_on_cupy
       - py_version
       - test_python_common
       - test_py_cuvs
-      - cupy
   checks:
     output: none
     includes:
@@ -60,19 +61,19 @@ files:
   docs:
     output: none
     includes:
+      - cuda
       - cuda_version
-      - cupy
+      - depends_on_cupy
       - docs
       - py_version
-      - rust
       - rapids_build
-      - cuda
+      - rust
   rust:
     output: none
     includes:
+      - cuda
       - cuda_version
       - rapids_build
-      - cuda
       - rust
   py_build_cuvs:
     output: pyproject
@@ -88,8 +89,8 @@ files:
       table: tool.rapids-build-backend
       key: requires
     includes:
-      - rapids_build
       - build_py_cuvs
+      - rapids_build
   py_run_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -97,8 +98,8 @@ files:
       table: project
     includes:
       - cuda_wheels
-      - run_py_cuvs
       - depends_on_pylibraft
+      - run_py_cuvs
   py_test_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -106,9 +107,9 @@ files:
       table: project.optional-dependencies
       key: test
     includes:
+      - depends_on_cupy
       - test_python_common
       - test_py_cuvs
-      - cupy
   py_build_cuvs_bench:
     output: pyproject
     pyproject_dir: python/cuvs_bench
@@ -213,11 +214,11 @@ dependencies:
           - matrix:
               cuda: "12.*"
             packages:
-              - &cuda_python12 cuda-python>=12.0,<13.0a0,<=12.6.0
+              - &cuda_python12 cuda-python>=12.6.2,<13.0a0
           - matrix:
               cuda: "11.*"
             packages:
-              - &cuda_python11 cuda-python>=11.7.1,<12.0a0,<=11.8.3
+              - &cuda_python11 cuda-python>=11.8.5,<12.0a0
           - matrix:
             packages:
               - &cuda_python cuda-python
@@ -367,7 +368,7 @@ dependencies:
               - nvidia-cusolver
               - nvidia-cusparse
 
-  cupy:
+  depends_on_cupy:
     common:
       - output_types: conda
         packages:
@@ -393,22 +394,24 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - breathe
+          - breathe>=4.35.0
           - doxygen>=1.8.20
           - graphviz
           - ipython
           - numpydoc
-          - pydata-sphinx-theme
           - recommonmark
+          - sphinx>=8.0.0
           - sphinx-copybutton
           - sphinx-markdown-tables
+          - pip:
+            - nvidia-sphinx-theme
   rust:
     common:
       - output_types: [conda]
         packages:
           - make
           - rust
-          # clang/liblclang only needed for bindgen support
+          # clang/libclang only needed for bindgen support
           - clang
           - libclang
   build_wheels:
@@ -470,17 +473,18 @@ dependencies:
     common:
       - output_types: [conda, pyproject, requirements]
         packages:
-          - hnswlib=0.6.2
           - nlohmann_json>=3.11.2
           - glog>=0.6.0
           - h5py>=3.8.0
           - benchmark>=1.8.2
           - openblas
+          - libcuvs==25.2.*,>=0.0.0a0
   bench_python:
     common:
       - output_types: [conda, pyproject, requirements]
         packages:
           - click
+          - cuvs==25.2.*,>=0.0.0a0
           - matplotlib
           - pandas
           - pyyaml
@@ -488,7 +492,7 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - &librmm_unsuffixed librmm==24.12.*,>=0.0.0a0
+          - &librmm_unsuffixed librmm==25.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -501,18 +505,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu12==24.12.*,>=0.0.0a0
+              - librmm-cu12==25.2.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu11==24.12.*,>=0.0.0a0
+              - librmm-cu11==25.2.*,>=0.0.0a0
           - {matrix: null, packages: [*librmm_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda
         packages:
-          - &pylibraft_unsuffixed pylibraft==24.12.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==25.2.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -525,10 +529,10 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu12==24.12.*,>=0.0.0a0
+              - pylibraft-cu12==25.2.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu11==24.12.*,>=0.0.0a0
+              - pylibraft-cu11==25.2.*,>=0.0.0a0
           - {matrix: null, packages: [*pylibraft_unsuffixed]}

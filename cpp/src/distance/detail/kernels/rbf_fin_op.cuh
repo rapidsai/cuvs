@@ -28,7 +28,7 @@
 #include <raft/core/math.hpp>                 // raft::exp
 #include <raft/util/cuda_dev_essentials.cuh>  // HD
 
-namespace cuvs::distance::kernels::detail {
+namespace cuvs::distance::kernels {
 
 /** @brief: Final op for Gram matrix with RBF kernel.
  *
@@ -48,4 +48,4 @@ struct rbf_fin_op {
   }
 };  // struct rbf_fin_op
 
-}  // namespace cuvs::distance::kernels::detail
+}  // namespace cuvs::distance::kernels
