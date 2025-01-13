@@ -1439,10 +1439,11 @@ void optimize(
         }
       }
     }
-    if (num_dup) { RAFT_LOG_ERROR("%lu duplicated node(s) are found in the CAGRA graph", num_dup); }
-    if (num_oor) {
-      RAFT_LOG_ERROR("%lu out-of-range index node(s) are found in the CAGRA graph", num_oor);
-    }
+    RAFT_EXPECTS(
+      num_dup == 0, "%lu duplicated node(s) are found in the generated CAGRA graph", num_dup);
+    RAFT_EXPECTS(num_oor == 0,
+                 "%lu out-of-range index node(s) are found in the generated CAGRA graph",
+                 num_oor);
   }
 }
 
