@@ -456,7 +456,6 @@ inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
-
 /**
  * @defgroup neighbors_filtering Filtering for ANN Types
  * @{
