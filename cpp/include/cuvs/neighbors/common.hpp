@@ -456,6 +456,12 @@ inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
+
+/**
+ * @defgroup neighbors_filtering Filtering for ANN Types
+ * @{
+ */
+
 struct base_filter {
   virtual ~base_filter() = default;
 };
@@ -542,6 +548,8 @@ struct bitset_filter : public base_filter {
     // the index of the current sample
     const uint32_t sample_ix) const;
 };
+
+/** @} */  // end group neighbors_filtering
 
 /**
  * If the filtering depends on the index of a sample, then the following

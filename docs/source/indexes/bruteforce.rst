@@ -57,6 +57,6 @@ Memory footprint
 Index footprint
 ~~~~~~~~~~~~~~~
 
-Raw vectors: :math:`n_vectors * n_dimensions * precision`
+Raw vectors: :math:`n\_vectors * n\_dimensions * precision`
 
-Vector norms (for distances which require them): :math:`n_vectors * precision`
+Vector norms (for distances which require them): :math:`n\_vectors * precision`

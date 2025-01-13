@@ -118,3 +118,5 @@ We always welcome patches for new features and bug fixes. Please read our `contr
    indexes/indexes.rst
    api_basics.rst
    api_interoperability.rst
+   working_with_ann_indexes.rst
+   filtering.rst

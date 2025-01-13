@@ -108,14 +108,14 @@ IVFPQ or NN-DESCENT can be used to build the graph (additions to the peak memory
 Dataset on device (graph on host):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Index memory footprint (device): :math:`n_index_vectors * n_dims * sizeof(T)`
+Index memory footprint (device): :math:`n\_index\_vectors * n\_dims * sizeof(T)`
 
-Index memory footprint (host): :math:`graph_degree * n_index_vectors * sizeof(T)``
+Index memory footprint (host): :math:`graph\_degree * n\_index\_vectors * sizeof(T)``
 
 Dataset on host (graph on host):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Index memory footprint (host): :math:`n_index_vectors * n_dims * sizeof(T) + graph_degree * n_index_vectors * sizeof(T)`
+Index memory footprint (host): :math:`n\_index\_vectors * n\_dims * sizeof(T) + graph\_degree * n\_index\_vectors * sizeof(T)`
 
 Build peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -123,7 +123,7 @@ Build peak memory usage:
 When built using NN-descent / IVF-PQ, the build process consists of two phases: (1) building an initial/(intermediate) graph and then (2) optimizing the graph. Key input parameters are n_vectors, intermediate_graph_degree, graph_degree.
 The memory usage in the first phase (building) depends on the chosen method. The biggest allocation is the graph (n_vectors*intermediate_graph_degree), but it’s stored in the host memory.
 Usually, the second phase (optimize) uses the most device memory. The peak memory usage is achieved during the pruning step (graph_core.cuh/optimize)
-Optimize: formula for peak memory usage (device): :math:`n_vectors * (4 + (sizeof(IdxT) + 1) * intermediate_degree)``
+Optimize: formula for peak memory usage (device): :math:`n\_vectors * (4 + (sizeof(IdxT) + 1) * intermediate_degree)``
 
 Build with out-of-core IVF-PQ peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,16 +134,20 @@ IVF-PQ Build:
 
 .. math::
 
-   n_vectors / train_set_ratio * dim * sizeof(float)   // trainset, may be in managed mem
-   + n_vectors / train_set_ratio * sizeof(uint32_t)    // labels, may be in managed mem
-   + n_clusters * n_dim * sizeof(float)                // cluster centers
+   n\_vectors / train\_set\_ratio * dim * sizeof(float)   // trainset, may be in managed mem
+
+   + n\_vectors / train\_set\_ratio * sizeof(uint32_t)    // labels, may be in managed mem
+
+   + n\_clusters * n\_dim * sizeof(float)                // cluster centers
 
 IVF-PQ Search (max batch size 1024 vectors on device at a time):
 
 .. math::
 
-   [n_vectors * (pq_dim * pq_bits / 8 + sizeof(int64_t)) + O(n_clusters)]
-   + [batch_size * n_dim * sizeof(float)] + [batch_size * intermediate_degree * sizeof(uint32_t)] +
-   [batch_size * intermediate_degree * sizeof(float)]
+   [n\_vectors * (pq\_dim * pq\_bits / 8 + sizeof(int64\_t)) + O(n\_clusters)]
+
+   + [batch\_size * n\_dim * sizeof(float)] + [batch\_size * intermediate\_degree * sizeof(uint32\_t)]
+
+   + [batch\_size * intermediate\_degree * sizeof(float)]
 
 
