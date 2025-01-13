@@ -1196,7 +1196,7 @@ void optimize(
       // count of the neighbors while increasing the target detourable count from zero.
       uint64_t pk         = mst_graph_num_edges_ptr[i];
       uint32_t num_detour = 0;
-      while (pk < output_graph_degree) {
+      for (uint32_t l = 0; l < input_graph_degree && pk < output_graph_degree; l++) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
         for (uint64_t k = 0; k < input_graph_degree; k++) {
           const auto num_detour_k = detour_count.data_handle()[k + (input_graph_degree * i)];
