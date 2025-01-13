@@ -1190,7 +1190,8 @@ void optimize(
     const auto num_full = host_stats.data_handle()[1];
 
     // Create pruned kNN graph
-#pragma omp parallel for
+    std::uint32_t num_invalid_neighbor_lists = 0;
+#pragma omp parallel for reduction(+ : num_invalid_neighbor_lists)
     for (uint64_t i = 0; i < graph_size; i++) {
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
       // count of the neighbors while increasing the target detourable count from zero.
@@ -1228,13 +1229,20 @@ void optimize(
         assert(next_num_detour != std::numeric_limits<uint32_t>::max());
         num_detour = next_num_detour;
       }
-      RAFT_EXPECTS(
-        pk == output_graph_degree,
-        "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
-        "node %lu in the rank-based node reranking process",
-        output_graph_degree,
-        i);
+      if (pk != output_graph_degree) {
+        RAFT_LOG_DEBUG(
+          "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+          "node %lu in the rank-based node reranking process",
+          output_graph_degree,
+          i);
+        num_invalid_neighbor_lists++;
+      }
     }
+    RAFT_EXPECTS(
+      num_invalid_neighbor_lists == 0,
+      "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
+      "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
+      "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
     RAFT_LOG_DEBUG(
