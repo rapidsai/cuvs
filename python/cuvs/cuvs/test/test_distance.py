@@ -35,7 +35,8 @@ from cuvs.distance import pairwise_distance
         "jensenshannon",
         "russellrao",
         "cosine",
-        "minkowski" "sqeuclidean",
+        "minkowski",
+        "sqeuclidean",
         "inner_product",
     ],
 )
