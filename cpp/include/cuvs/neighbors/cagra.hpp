@@ -247,6 +247,8 @@ struct extend_params {
    * degrade recall because no edges are added between the nodes in the same chunk. Auto select when
    * 0. */
   uint32_t max_chunk_size = 0;
+
+  uint32_t max_working_device_memory_size_in_megabyte = 512;
 };
 
 /**
