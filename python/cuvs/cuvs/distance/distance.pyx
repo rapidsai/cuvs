@@ -56,7 +56,7 @@ SUPPORTED_DISTANCES = ["euclidean", "l1", "cityblock", "l2", "inner_product",
 
 @auto_sync_resources
 @auto_convert_output
-def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
+def pairwise_distance(X, Y, out=None, metric="euclidean", p=2.0,
                       resources=None):
     """
     Compute pairwise distances between X and Y
