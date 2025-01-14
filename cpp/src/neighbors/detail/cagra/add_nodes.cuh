@@ -254,7 +254,8 @@ void add_graph_nodes(
   const std::size_t degree               = index.graph_degree();
   const std::size_t dim                  = index.dim();
   const std::size_t stride               = input_updated_dataset_view.stride(0);
-  const std::size_t max_chunk_size_      = params.max_chunk_size == 0 ? 1 : params.max_chunk_size;
+  const std::size_t max_chunk_size_ =
+    params.max_chunk_size == 0 ? new_dataset_size : params.max_chunk_size;
 
   raft::copy(updated_graph_view.data_handle(),
              index.graph().data_handle(),
