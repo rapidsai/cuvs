@@ -129,7 +129,7 @@ func NewVector[T TensorNumberType](data []T) (Tensor[T], error) {
 // Creates a new Tensor with uninitialized data on the current device.
 func NewTensorOnDevice[T TensorNumberType](res *Resource, shape []int64) (Tensor[T], error) {
 	if len(shape) < 2 {
-		return Tensor[T]{}, errors.New("shape must be atleast 2")
+		return Tensor[T]{}, errors.New("shape must be at least 2")
 	}
 
 	shapePtr := C.malloc(C.size_t(len(shape) * int(unsafe.Sizeof(C.int64_t(0)))))
