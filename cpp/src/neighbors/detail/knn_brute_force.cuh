@@ -28,6 +28,7 @@
 #include "./knn_utils.cuh"
 
 #include <raft/core/bitmap.cuh>
+#include <raft/core/copy.cuh>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -775,10 +776,10 @@ void search(raft::resources const& res,
   }
 }
 
-template <typename T, typename DistT, typename LayoutT = raft::row_major>
+template <typename T, typename DistT, typename AccessorT, typename LayoutT = raft::row_major>
 cuvs::neighbors::brute_force::index<T, DistT> build(
   raft::resources const& res,
-  raft::device_matrix_view<const T, int64_t, LayoutT> dataset,
+  mdspan<const T, matrix_extent<int64_t>, LayoutT, AccessorT> dataset,
   cuvs::distance::DistanceType metric,
   DistT metric_arg)
 {
@@ -789,18 +790,31 @@ cuvs::neighbors::brute_force::index<T, DistT> build(
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
+    auto dataset_storage = std::optional<device_matrix<T, int64_t, LayoutT>>{};
+    auto dataset_view    = [&res, &dataset_storage, dataset]() {
+      if constexpr (std::is_same_v<decltype(dataset),
+                                   raft::device_matrix_view<const T, int64_t, row_major>>) {
+        return dataset;
+      } else {
+        dataset_storage =
+          make_device_matrix<T, int64_t, LayoutT>(res, dataset.extent(0), dataset.extent(1));
+        raft::copy(res, dataset_storage->view(), dataset);
+        return raft::make_const_mdspan(dataset_storage->view());
+      }
+    }();
+
     norms = raft::make_device_vector<DistT, int64_t>(res, dataset.extent(0));
     // cosine needs the l2norm, where as l2 distances needs the squared norm
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       raft::linalg::norm(res,
-                         dataset,
+                         dataset_view,
                          norms->view(),
                          raft::linalg::NormType::L2Norm,
                          raft::linalg::Apply::ALONG_ROWS,
                          raft::sqrt_op{});
     } else {
       raft::linalg::norm(res,
-                         dataset,
+                         dataset_view,
                          norms->view(),
                          raft::linalg::NormType::L2Norm,
                          raft::linalg::Apply::ALONG_ROWS);
