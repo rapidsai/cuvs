@@ -41,10 +41,11 @@ from cuvs.distance import pairwise_distance
     ],
 )
 @pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("order", ["F", "C"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
-def test_distance(n_rows, n_cols, inplace, metric, dtype):
+def test_distance(n_rows, n_cols, inplace, order, metric, dtype):
     input1 = np.random.random_sample((n_rows, n_cols))
-    input1 = np.asarray(input1).astype(dtype)
+    input1 = np.asarray(input1, order=order).astype(dtype)
 
     # RussellRao expects boolean arrays
     if metric == "russellrao":
@@ -59,7 +60,7 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
     output_dtype = dtype
     if np.issubdtype(dtype, np.float16):
         output_dtype = np.float32
-    output = np.zeros((n_rows, n_rows), dtype=output_dtype)
+    output = np.zeros((n_rows, n_rows), dtype=output_dtype, order=order)
 
     if metric == "inner_product":
         expected = np.matmul(input1, input1.T)
