@@ -139,6 +139,6 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", p=2.0,
                                     y_dlpack,
                                     out_dlpack,
                                     distance_type,
-                                    metric_arg))
+                                    p))
 
     return out
