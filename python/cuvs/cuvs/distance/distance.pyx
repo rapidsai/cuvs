@@ -103,7 +103,9 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
         output_dtype = y_cai.dtype
         if np.issubdtype(y_cai.dtype, np.float16):
             output_dtype = np.float32
-        out = device_ndarray.empty((m, n), dtype=output_dtype)
+
+        order = "C" if getattr(X, "flags", X).c_contiguous else "F"
+        out = device_ndarray.empty((m, n), dtype=output_dtype, order=order)
     out_cai = wrap_array(out)
 
     x_k = x_cai.shape[1]
