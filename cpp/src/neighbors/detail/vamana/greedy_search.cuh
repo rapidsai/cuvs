@@ -103,7 +103,6 @@ __global__ void GreedySearchKernel(
 
   static __shared__ Point<T, accT> s_query;
 
-
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
     typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
@@ -113,7 +112,7 @@ __global__ void GreedySearchKernel(
     DistPair<IdxT, accT> candidate_queue;
   };
 
-  int align_padding = (((dim-1)/alignof(ShmemLayout))+1)*alignof(ShmemLayout) - dim;
+  int align_padding = (((dim - 1) / alignof(ShmemLayout)) + 1) * alignof(ShmemLayout) - dim;
 
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
@@ -121,7 +120,7 @@ __global__ void GreedySearchKernel(
   size_t smem_offset = sort_smem_size;  // temp sorting memory takes first chunk
 
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
-  smem_offset += (dim+align_padding) * sizeof(T);
+  smem_offset += (dim + align_padding) * sizeof(T);
 
   Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]);
   smem_offset += topk * sizeof(Node<accT>);
@@ -173,7 +172,7 @@ __global__ void GreedySearchKernel(
 
     if (threadIdx.x == 0) { heap_queue.insert_back(medoid_dist, medoid_id); }
     __syncthreads();
-    
+
     while (cand_q_size != 0) {
       __syncthreads();
 

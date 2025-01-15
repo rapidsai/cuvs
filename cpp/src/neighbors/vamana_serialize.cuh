@@ -28,10 +28,9 @@ namespace cuvs::neighbors::vamana {
 #define CUVS_INST_VAMANA_SERIALIZE(DTYPE)                                                     \
   void serialize(raft::resources const& handle,                                               \
                  const std::string& file_prefix,                                              \
-                 const cuvs::neighbors::vamana::index<DTYPE, uint32_t>& index_) \
+                 const cuvs::neighbors::vamana::index<DTYPE, uint32_t>& index_)               \
   {                                                                                           \
-    cuvs::neighbors::vamana::detail::serialize<DTYPE, uint32_t>(                \
-      handle, file_prefix, index_);                                                           \
+    cuvs::neighbors::vamana::detail::serialize<DTYPE, uint32_t>(handle, file_prefix, index_); \
   };
 
 /** @} */  // end group vamana
