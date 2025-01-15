@@ -1,7 +1,7 @@
 CAGRA
 =====
 
-VAMANA is the underlying graph construction algorithm used to construct indexes for the DiskANN vector search solution. DiskANN and the Vamana algortihm are described in detail in the `published paper <https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf>`, and a highly optimized `open-source repository <https://github.com/microsoft/DiskANN>`  includes many features for index construction and search. In cuVS, we provide a version of the Vamana algorithm optimized for GPU architectures to accelreate graph construction to build DiskANN idnexes. At a high level, the Vamana algorithm operates as follows:
+VAMANA is the underlying graph construction algorithm used to construct indexes for the DiskANN vector search solution. DiskANN and the Vamana algorithm are described in detail in the `published paper <https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf>`, and a highly optimized `open-source repository <https://github.com/microsoft/DiskANN>`  includes many features for index construction and search. In cuVS, we provide a version of the Vamana algorithm optimized for GPU architectures to accelreate graph construction to build DiskANN idnexes. At a high level, the Vamana algorithm operates as follows:
 
 * 1. Starting with an empty graph, select a medoid vector from the D-dimension vector dataset and insert it into the graph.
 * 2. Iteratively insert batches of dataset vectors into the graph, connecting each inserted vector to neighbors based on a graph traversal.
@@ -16,7 +16,7 @@ The current implementation of DiskANN in cuVS only includes the 'in-memory' grap
 Interoperability with CPU DiskANN
 --------------------------
 
-The 'vamana::serialize' API calls writes the index to a file with a format that is compatable with the `open-source DiskANN repositoriy <https://github.com/microsoft/DiskANN>`. This allows cuVS to be used to accelerate index construction while leveraging the efficient CPU-based search currently available.
+The 'vamana::serialize' API calls writes the index to a file with a format that is compatible with the `open-source DiskANN repositoriy <https://github.com/microsoft/DiskANN>`. This allows cuVS to be used to accelerate index construction while leveraging the efficient CPU-based search currently available.
 
 Configuration parameters
 ------------------------

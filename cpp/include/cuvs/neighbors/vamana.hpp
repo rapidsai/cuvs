@@ -55,7 +55,7 @@ struct index_params : cuvs::neighbors::index_params {
   /** Maximum fraction of dataset inserted per batch.              *
    * Larger max batch decreases graph quality, but improves speed */
   float max_fraction = 0.06;
-  /** Base of growth rate of batch sies **/
+  /** Base of growth rate of batch sizes **/
   float batch_base = 2;
   /** Size of candidate queue structure - should be (2^x)-1 */
   uint32_t queue_size = 127;
@@ -219,7 +219,7 @@ struct index : cuvs::neighbors::index {
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilies the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -252,7 +252,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilies the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -285,7 +285,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilies the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -318,7 +318,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilies the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -351,7 +351,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilies the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -384,7 +384,7 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient DiskANN search.
  *
- * The build utilies the Vamana insertion-based algorithm to create the graph. The algorithm
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
  * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
  * performing a greedy search for each vector to be inserted, and inserting it with edges to
  * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
@@ -422,7 +422,7 @@ auto build(raft::resources const& handle,
 /**
  * Save the index to file.
  *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatabilty.
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibilty.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -449,7 +449,7 @@ void serialize(raft::resources const& handle,
 /**
  * Save the index to file.
  *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatabilty.
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibilty.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -475,7 +475,7 @@ void serialize(raft::resources const& handle,
 /**
  * Save the index to file.
  *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatabilty.
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibilty.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
