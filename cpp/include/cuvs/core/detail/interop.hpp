@@ -86,7 +86,6 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
   RAFT_EXPECTS(to_data_type.lanes == tensor.dtype.lanes,
                "lanes mismatch between return mdspan and DLTensor");
   RAFT_EXPECTS(tensor.dtype.lanes == 1, "More than 1 DLTensor lanes not supported");
-  RAFT_EXPECTS(tensor.strides == nullptr, "Strided memory layout for DLTensor not supported");
 
   auto to_device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
   if (to_device.device_type == kDLCUDA) {
@@ -108,6 +107,38 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
   auto exts = typename MdspanType::extents_type{shape};
 
   return MdspanType{reinterpret_cast<typename MdspanType::data_handle_type>(tensor.data), exts};
+}
+
+inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if (!tensor.strides) { return false; }
+  int64_t expected_stride = 1;
+  for (int64_t i = 0; i < tensor.ndim; ++i) {
+    if (tensor.strides[i] != expected_stride) { return false; }
+    expected_stride *= tensor.shape[i];
+  }
+
+  return true;
+}
+
+inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if (!tensor.strides) {
+    // no stride information indicates a row-major tensor according to the dlpack spec
+    return true;
+  }
+
+  int64_t expected_stride = 1;
+  for (int64_t i = tensor.ndim - 1; i >= 0; --i) {
+    if (tensor.strides[i] != expected_stride) { return false; }
+    expected_stride *= tensor.shape[i];
+  }
+
+  return true;
 }
 
 }  // namespace cuvs::core::detail
