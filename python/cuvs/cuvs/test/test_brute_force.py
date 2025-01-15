@@ -40,12 +40,15 @@ from cuvs.neighbors import brute_force, filters
     ],
 )
 @pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("order", ["F", "C"])
 @pytest.mark.parametrize("dtype", [np.float32])
 def test_brute_force_knn(
-    n_index_rows, n_query_rows, n_cols, k, inplace, metric, dtype
+    n_index_rows, n_query_rows, n_cols, k, inplace, order, metric, dtype
 ):
-    index = np.random.random_sample((n_index_rows, n_cols)).astype(dtype)
-    queries = np.random.random_sample((n_query_rows, n_cols)).astype(dtype)
+    index = np.random.random_sample((n_index_rows, n_cols))
+    index = np.asarray(index, order=order).astype(dtype)
+    queries = np.random.random_sample((n_query_rows, n_cols))
+    queries = np.asarray(queries, order=order).astype(dtype)
 
     # RussellRao expects boolean arrays
     if metric == "russellrao":
