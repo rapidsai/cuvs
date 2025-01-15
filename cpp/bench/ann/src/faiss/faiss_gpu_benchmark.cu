@@ -120,6 +120,8 @@ auto create_algo(const std::string& algo_name,
       a = make_algo<T, cuvs::bench::faiss_gpu_ivfsq>(metric, dim, conf);
     } else if (algo_name == "faiss_gpu_flat") {
       a = std::make_unique<cuvs::bench::faiss_gpu_flat<T>>(metric, dim);
+    } else if (algo_name == "faiss_gpu_cagra") {
+      a = make_algo<T, cuvs::bench::faiss_gpu_cagra>(metric, dim, conf);
     }
   }
 

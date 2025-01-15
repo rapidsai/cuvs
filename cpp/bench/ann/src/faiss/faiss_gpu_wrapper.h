@@ -17,14 +17,15 @@
 
 #include "../common/ann_types.hpp"
 #include "../common/util.hpp"
-#include <cuvs/neighbors/refine.hpp>
 #include "../cuvs/cuvs_ann_bench_utils.h"
+#include <cuvs/neighbors/refine.hpp>
 
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
 #include <faiss/IndexRefine.h>
 #include <faiss/IndexScalarQuantizer.h>
+#include <faiss/gpu/GpuIndexCagra.h>
 #include <faiss/gpu/GpuIndexFlat.h>
 #include <faiss/gpu/GpuIndexIVFFlat.h>
 #include <faiss/gpu/GpuIndexIVFPQ.h>
@@ -244,17 +245,15 @@ void faiss_gpu<T>::search(
       handle_.sync_stream();
 
       cuvs::neighbors::refine(handle_,
-                                       dataset_v,
-                                       queries_host.view(),
-                                       candidates_host.view(),
-                                       neighbors_host.view(),
-                                       distances_host.view(),
-                                       parse_metric_type(this->metric_));
+                              dataset_v,
+                              queries_host.view(),
+                              candidates_host.view(),
+                              neighbors_host.view(),
+                              distances_host.view(),
+                              parse_metric_type(this->metric_));
 
-      raft::copy(neighbors,
-                 neighbors_host.data_handle(),
-                 neighbors_host.size(),
-                 handle_.get_stream());
+      raft::copy(
+        neighbors, neighbors_host.data_handle(), neighbors_host.size(), handle_.get_stream());
       raft::copy(
         distances, distances_host.data_handle(), distances_host.size(), handle_.get_stream());
     } else {
@@ -369,14 +368,13 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
     if (param.use_cuvs) { config.interleavedLayout = param.use_cuvs; }
     config.device = this->device_;
 
-    this->index_ =
-      std::make_shared<faiss::gpu::GpuIndexIVFPQ>(this->gpu_resource_.get(),
-                                                  dim,
-                                                  param.nlist,
-                                                  param.m,
-                                                  param.bitsPerCode,
-                                                  this->metric_type_,
-                                                  config);
+    this->index_ = std::make_shared<faiss::gpu::GpuIndexIVFPQ>(this->gpu_resource_.get(),
+                                                               dim,
+                                                               param.nlist,
+                                                               param.m,
+                                                               param.bitsPerCode,
+                                                               this->metric_type_,
+                                                               config);
   }
 
   void set_search_param(const search_param_base& param) override
@@ -504,6 +502,69 @@ class faiss_gpu_flat : public faiss_gpu<T> {
     this->template load_<faiss::gpu::GpuIndexFlat, faiss::IndexFlat>(file);
   }
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_flat<T>>(*this); };
+};
+
+template <typename T>
+class faiss_gpu_cagra : public faiss_gpu<T> {
+ public:
+  struct build_param : public faiss_gpu<T>::build_param {
+    size_t intermediate_graph_degree;
+    /// Degree of output graph.
+    size_t graph_degree;
+    /// ANN algorithm to build knn graph.
+    std::string cagra_build_algo;
+    /// Number of Iterations to run if building with NN_DESCENT
+    size_t nn_descent_niter;
+  };
+  using typename faiss_gpu<T>::search_param_base;
+
+  faiss_gpu_cagra(Metric metric, int dim, const build_param& param)
+    : faiss_gpu<T>(metric, dim, param)
+  {
+    faiss::gpu::GpuIndexCagraConfig config;
+    config.graph_degree              = param.graph_degree;
+    config.intermediate_graph_degree = param.intermediate_graph_degree;
+    config.device                    = this->device_;
+    if (param.cagra_build_algo == "IVF_PQ") {
+      config.build_algo = faiss::gpu::graph_build_algo::IVF_PQ;
+    } else {
+      config.build_algo = faiss::gpu::graph_build_algo::NN_DESCENT;
+    }
+    config.nn_descent_niter = param.nn_descent_niter;
+
+    this->index_ = std::make_shared<faiss::gpu::GpuIndexCagra>(
+      this->gpu_resource_, dim, parse_metric_faiss(this->metric_), config);
+  }
+
+  void set_search_param(const search_param_base& param) override
+  {
+    auto sp = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
+    this->refine_ratio_ = sp.refine_ratio;
+    faiss::gpu::SearchParametersCagra faiss_search_params;
+
+    this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(faiss_search_params);
+
+    if (sp.refine_ratio > 1.0) {
+      this->index_refine_ =
+        std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
+      this->index_refine_.get()->k_factor = sp.refine_ratio;
+      faiss::IndexRefineSearchParameters faiss_refine_search_params;
+      faiss_refine_search_params.k_factor          = this->index_refine_.get()->k_factor;
+      faiss_refine_search_params.base_index_params = this->search_params_.get();
+      this->refine_search_params_ =
+        std::make_unique<faiss::IndexRefineSearchParameters>(faiss_refine_search_params);
+    }
+  }
+
+  void save(const std::string& file) const override
+  {
+    this->template save_<faiss::gpu::GpuIndexCagra, faiss::IndexIVFPQ>(file);
+  }
+  void load(const std::string& file) override
+  {
+    this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexIVFPQ>(file);
+  }
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
 };
 
 }  // namespace cuvs::bench
