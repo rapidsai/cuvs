@@ -34,7 +34,8 @@ rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   --channel "${PYTHON_CHANNEL}" \
   "libcuvs=${RAPIDS_VERSION}" \
-  "cuvs=${RAPIDS_VERSION}"
+  "cuvs=${RAPIDS_VERSION}" \
+  "cuvs-bench=${RAPIDS_VERSION}"
 
 rapids-logger "Check GPU usage"
 nvidia-smi
@@ -53,6 +54,22 @@ pytest \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
  test
+
+rapids-logger "pytest cuvs-bench"
+pushd python/cuvs_bench/cuvs_bench
+pytest \
+ --cache-clear \
+ --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
+ --cov-config=../.coveragerc \
+ --cov=cuvs \
+ --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-bench-coverage.xml" \
+ --cov-report=term \
+ test
+
+rapids-logger "cuvs-bench e2e test"
+python -m cuvs_bench.get_dataset --dataset test-data
+python -m cuvs_bench.run --dataset test-data --dataset-path test_data/ --algorithms faiss_gpu_flat,faiss_gpu_ivf_flat,faiss_gpu_ivf_pq,faiss_gpu_ivf_sq,faiss_cpu_flat,faiss_cpu_ivf_flat,faiss_cpu_ivf_pq,cuvs_ivf_flat,cuvs_ivf_pq,cuvs_cagra,cuvs_brute_force,cuvs_mg_ivf_flat,cuvs_mg_ivf_pq,cuvs_mg_cagra,ggnn,hnswlib,cuvs_cagra_hnswlib --groups base
+python -m cuvs_bench.plot --dataset test-data
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

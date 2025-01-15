@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,14 @@
 # limitations under the License.
 
 import argparse
+import ast
+import h5py
+import numpy as np
 import os
 import subprocess
 import sys
+from sklearn.datasets import make_blobs
+from scipy.spatial.distance import cdist
 from urllib.request import urlretrieve
 
 
@@ -80,6 +85,60 @@ def download(name, normalize, ann_bench_data_path):
         raise
 
 
+def generate_ann_benchmark_like_data(
+    output_file='ann_benchmarks_like.hdf5',
+    n_train=1000,
+    n_test=100,
+    d=32,
+    centers=3,
+    k=100,
+    metric='euclidean'
+):
+    """
+    Generate a synthetic dataset in HDF5 format with a structure
+    similar to ann-benchmarks datasets. By default, ground truth
+    is computed for the top-100 nearest neighbors.
+    """
+
+    train_data, _ = make_blobs(
+        n_samples=n_train,
+        n_features=d,
+        centers=centers,
+        random_state=42
+    )
+
+    test_data, _ = make_blobs(
+        n_samples=n_test,
+        n_features=d,
+        centers=centers,
+        random_state=84
+    )
+
+    dist_matrix = cdist(test_data, train_data, metric=metric)
+
+    actual_k = min(k, n_train)
+    neighbors = np.argsort(dist_matrix, axis=1)[:, :actual_k].astype(np.int32)
+    distances = np.take_along_axis(dist_matrix, neighbors, axis=1)
+
+    with h5py.File(output_file, 'w') as f:
+        # Datasets
+        f.create_dataset('train', data=train_data)
+        f.create_dataset('test', data=test_data)
+        f.create_dataset('neighbors', data=neighbors)
+        f.create_dataset('distances', data=distances)
+
+        f.attrs['metric'] = metric
+
+    print(f"Created {output_file} with:")
+    print(f" - train shape = {train_data.shape}")
+    print(f" - test shape = {test_data.shape}")
+    print(f" - neighbors shape = {neighbors.shape}")
+    print(f" - distances shape = {distances.shape}")
+    print(f" - metric = {metric}")
+    print(f" - neighbors per test sample = {actual_k}")
+
+
+
 def main():
     call_path = os.getcwd()
     if "RAPIDS_DATASET_ROOT_DIR" in os.environ:
@@ -91,6 +150,21 @@ def main():
     )
     parser.add_argument(
         "--dataset", help="dataset to download", default="glove-100-angular"
+    )
+    parser.add_argument(
+        "--test-data-n-train", help="dataset to download", default=10000
+    )
+    parser.add_argument(
+        "--test-data-n-test", help="dataset to download", default=1000
+    )
+    parser.add_argument(
+        "--test-data-dims", help="dataset to download", default=32
+    )
+    parser.add_argument(
+        "--test-data-k", help="dataset to download", default=100
+    )
+    parser.add_argument(
+        "--test-data-output-file", help="dataset to download", default="ann_benchmarks_like.hdf5"
     )
     parser.add_argument(
         "--dataset-path",
@@ -108,7 +182,18 @@ def main():
         sys.exit(1)
     args = parser.parse_args()
 
-    download(args.dataset, args.normalize, args.dataset_path)
+    if args.dataset == "test-data":
+        generate_ann_benchmark_like_data(
+            output_file=args.test_data_output_file,
+            n_train=args.test_data_n_train,
+            n_test=args.test_data_n_test,
+            d=args.test_data_dims,
+            centers=3,
+            k=args.test_data_k,
+            metric='euclidean'
+        )
+    else:
+        download(args.dataset, args.normalize, args.dataset_path)
 
 
 if __name__ == "__main__":
