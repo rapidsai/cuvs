@@ -420,22 +420,24 @@ __global__ void populate_reverse_list_struct(QueryCandidates<IdxT, accT>* revers
                                              int* unique_indices,
                                              int unique_dests,
                                              int total_edges,
-                                             int N)
+                                             int N,
+                                             int rev_start,
+                                             int reverse_batch)
 {
-  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < unique_dests;
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < reverse_batch;
        i += blockDim.x * gridDim.x) {
-    reverse_list[i].queryId = edge_dest[unique_indices[i]];
-    if (i == unique_dests - 1) {
-      reverse_list[i].size = total_edges - unique_indices[i];
+    reverse_list[i].queryId = edge_dest[unique_indices[i + rev_start]];
+    if (rev_start + i == unique_dests - 1) {
+      reverse_list[i].size = total_edges - unique_indices[i + rev_start];
     } else {
-      reverse_list[i].size = unique_indices[i + 1] - unique_indices[i];
+      reverse_list[i].size = unique_indices[i + rev_start + 1] - unique_indices[i + rev_start];
     }
     if (reverse_list[i].size > reverse_list[i].maxSize) {
       reverse_list[i].size = reverse_list[i].maxSize;
     }
 
     for (int j = 0; j < reverse_list[i].size; j++) {
-      reverse_list[i].ids[j] = edge_src[unique_indices[i] + j];
+      reverse_list[i].ids[j] = edge_src[unique_indices[i + rev_start] + j];
     }
     for (int j = reverse_list[i].size; j < reverse_list[i].maxSize; j++) {
       reverse_list[i].ids[j]   = raft::upper_bound<IdxT>();
