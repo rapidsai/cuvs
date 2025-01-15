@@ -52,8 +52,24 @@ inline bool is_dlpack_host_compatible(DLTensor tensor)
 }
 
 /**
+ * @brief Check if DLManagedTensor has a row-major (c-contiguous) layout
+ *
+ * @param tensor DLManagedTensor object to check
+ * @return bool
+ */
+inline bool is_c_contiguous(DLManagedTensor* tensor) { return detail::is_c_contiguous(tensor); }
+
+/**
+ * @brief Check if DLManagedTensor has a col-major (f-contiguous) layout
+ *
+ * @param tensor DLManagedTensor object to check
+ * @return bool
+ */
+inline bool is_f_contiguous(DLManagedTensor* tensor) { return detail::is_f_contiguous(tensor); }
+
+/**
  * @brief Convert a DLManagedTensor to an mdspan
- * NOTE: This function only supports compact row-major layouts.
+ * NOTE: This function only supports compact row-major and col-major layouts.
  *
  * @code {.cpp}
  * #include <raft/core/device_mdspan.hpp>
