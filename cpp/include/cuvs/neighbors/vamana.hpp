@@ -422,7 +422,7 @@ auto build(raft::resources const& handle,
 /**
  * Save the index to file.
  *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibilty.
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -449,7 +449,7 @@ void serialize(raft::resources const& handle,
 /**
  * Save the index to file.
  *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibilty.
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
@@ -475,7 +475,7 @@ void serialize(raft::resources const& handle,
 /**
  * Save the index to file.
  *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibilty.
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
  *
  * @code{.cpp}
  * #include <raft/core/resources.hpp>
