@@ -35,6 +35,7 @@ from cuvs.distance import pairwise_distance
         "jensenshannon",
         "russellrao",
         "cosine",
+        "minkowski",
         "sqeuclidean",
         "inner_product",
     ],
@@ -70,10 +71,7 @@ def test_distance(n_rows, n_cols, inplace, order, metric, dtype):
     output_device = device_ndarray(output) if inplace else None
 
     ret_output = pairwise_distance(
-        input1_device,
-        input1_device,
-        output_device,
-        metric,
+        input1_device, input1_device, output_device, metric, p=2.0
     )
 
     output_device = ret_output if not inplace else output_device
