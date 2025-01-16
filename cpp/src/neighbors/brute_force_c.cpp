@@ -33,7 +33,7 @@
 
 namespace {
 
-template <typename T>
+template <typename T, typename LayoutT = raft::row_major>
 void* _build(cuvsResources_t res,
              DLManagedTensor* dataset_tensor,
              cuvsDistanceType metric,
@@ -41,7 +41,7 @@ void* _build(cuvsResources_t res,
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+  using mdspan_type = raft::device_matrix_view<T const, int64_t, LayoutT>;
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
   cuvs::neighbors::brute_force::index_params params;
@@ -53,7 +53,7 @@ void* _build(cuvsResources_t res,
   return index_on_heap;
 }
 
-template <typename T>
+template <typename T, typename QueriesLayoutT = raft::row_major>
 void _search(cuvsResources_t res,
              cuvsBruteForceIndex index,
              DLManagedTensor* queries_tensor,
@@ -64,7 +64,7 @@ void _search(cuvsResources_t res,
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::brute_force::index<T>*>(index.addr);
 
-  using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+  using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, QueriesLayoutT>;
   using neighbors_mdspan_type = raft::device_matrix_view<int64_t, int64_t, raft::row_major>;
   using distances_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
   using prefilter_mds_type    = raft::device_vector_view<const uint32_t, int64_t>;
@@ -150,8 +150,15 @@ extern "C" cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr =
-        reinterpret_cast<uintptr_t>(_build<float>(res, dataset_tensor, metric, metric_arg));
+      if (cuvs::core::is_c_contiguous(dataset_tensor)) {
+        index->addr =
+          reinterpret_cast<uintptr_t>(_build<float>(res, dataset_tensor, metric, metric_arg));
+      } else if (cuvs::core::is_f_contiguous(dataset_tensor)) {
+        index->addr = reinterpret_cast<uintptr_t>(
+          _build<float, raft::col_major>(res, dataset_tensor, metric, metric_arg));
+      } else {
+        RAFT_FAIL("dataset input to cuvsBruteForceBuild must be contiguous (non-strided)");
+      }
       index->dtype = dataset.dtype;
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
@@ -189,7 +196,14 @@ extern "C" cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
-      _search<float>(res, index, queries_tensor, neighbors_tensor, distances_tensor, prefilter);
+      if (cuvs::core::is_c_contiguous(queries_tensor)) {
+        _search<float>(res, index, queries_tensor, neighbors_tensor, distances_tensor, prefilter);
+      } else if (cuvs::core::is_f_contiguous(queries_tensor)) {
+        _search<float, raft::col_major>(
+          res, index, queries_tensor, neighbors_tensor, distances_tensor, prefilter);
+      } else {
+        RAFT_FAIL("queries input to cuvsBruteForceSearch must be contiguous (non-strided)");
+      }
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
