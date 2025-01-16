@@ -74,7 +74,7 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", p=2.0,
     Y : CUDA array interface compliant matrix shape (n, k)
     out : Optional writable CUDA array interface matrix shape (m, n)
     metric : string denoting the metric type (default="euclidean")
-    metric_arg : metric parameter (currently used only for "minkowski")
+    p : metric parameter (currently used only for "minkowski")
     {resources_docstring}
 
     Examples
