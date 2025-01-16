@@ -382,7 +382,7 @@ cdef class SearchParams:
                  hashmap_max_fill_rate=0.5,
                  num_random_samplings=1,
                  rand_xor_mask=0x128394,
-                 persistent=false,
+                 persistent=False,
                  persistent_lifetime=2,
                  persistent_device_usage=1.0):
         self.params.max_queries = max_queries
