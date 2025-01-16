@@ -187,3 +187,13 @@ def test_cagra_vpq_compression():
     run_cagra_build_search_test(
         n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
     )
+
+
+def test_cagra_persistent_search():
+    run_cagra_build_search_test(
+        search_params={
+            "persistent": True,
+            "persistent_lifetime": 10,
+            "persistent_device_usage": 0.5,
+        }
+    )

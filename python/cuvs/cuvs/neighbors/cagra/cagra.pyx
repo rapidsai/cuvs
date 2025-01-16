@@ -256,7 +256,7 @@ def build(IndexParams index_params, dataset, resources=None):
     ----------
     index_params : IndexParams object
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+              Supported dtype [float, int8, uint8]
     {resources_docstring}
 
     Returns
@@ -363,6 +363,7 @@ cdef class SearchParams:
         more.
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
+
     """
 
     cdef cuvsCagraSearchParams params
@@ -380,7 +381,10 @@ cdef class SearchParams:
                  hashmap_min_bitlen=0,
                  hashmap_max_fill_rate=0.5,
                  num_random_samplings=1,
-                 rand_xor_mask=0x128394):
+                 rand_xor_mask=0x128394,
+                 persistent=false,
+                 persistent_lifetime=2,
+                 persistent_device_usage=1.0):
         self.params.max_queries = max_queries
         self.params.itopk_size = itopk_size
         self.params.max_iterations = max_iterations
@@ -413,6 +417,10 @@ cdef class SearchParams:
         self.params.num_random_samplings = num_random_samplings
         self.params.rand_xor_mask = rand_xor_mask
 
+        self.params.persistent = persistent
+        self.params.persistent_lifetime = persistent_lifetime
+        self.params.persistent_device_usage = persistent_device_usage
+
     def __repr__(self):
         attr_str = [attr + "=" + str(getattr(self, attr))
                     for attr in [
@@ -420,7 +428,8 @@ cdef class SearchParams:
                         "team_size", "search_width", "min_iterations",
                         "thread_block_size", "hashmap_mode",
                         "hashmap_min_bitlen", "hashmap_max_fill_rate",
-                        "num_random_samplings", "rand_xor_mask"]]
+                        "num_random_samplings", "rand_xor_mask", "persistent",
+                        "persistent_lifetime", "persistent_device_usage"]]
         return "SearchParams(type=CAGRA, " + (", ".join(attr_str)) + ")"
 
     @property
@@ -474,6 +483,18 @@ cdef class SearchParams:
     @property
     def rand_xor_mask(self):
         return self.params.rand_xor_mask
+
+    @property
+    def persistent(self):
+        return self.params.persistent
+
+    @property
+    def persistent_lifetime(self):
+        return self.params.persistent_lifetime
+
+    @property
+    def persistent_device_usage(self):
+        return self.params.persistent_device_usage
 
 
 @auto_sync_resources
