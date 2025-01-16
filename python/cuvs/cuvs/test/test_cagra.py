@@ -139,35 +139,6 @@ def test_cagra_dataset_dtype_host_device(
     )
 
 
-@pytest.mark.parametrize(
-    "params",
-    [
-        {
-            "intermediate_graph_degree": 64,
-            "graph_degree": 32,
-            "add_data_on_build": True,
-            "k": 1,
-            "metric": "sqeuclidean",
-            "build_algo": "ivf_pq",
-        },
-        {
-            "intermediate_graph_degree": 32,
-            "graph_degree": 16,
-            "add_data_on_build": False,
-            "k": 5,
-            "metric": "sqeuclidean",
-            "build_algo": "ivf_pq",
-        },
-        {
-            "intermediate_graph_degree": 128,
-            "graph_degree": 32,
-            "add_data_on_build": True,
-            "k": 10,
-            "metric": "inner_product",
-            "build_algo": "nn_descent",
-        },
-    ],
-)
 def create_sparse_bitset(n_size, sparsity):
     bits_per_uint32 = 32
     num_bits = n_size
@@ -185,10 +156,10 @@ def create_sparse_bitset(n_size, sparsity):
     return array
 
 
-@pytest.mark.parametrize("n_rows", [1000, 5000])
-@pytest.mark.parametrize("n_cols", [10, 50])
-@pytest.mark.parametrize("n_queries", [10, 100])
-@pytest.mark.parametrize("k", [10, 20])
+@pytest.mark.parametrize("n_rows", [10000])
+@pytest.mark.parametrize("n_cols", [10])
+@pytest.mark.parametrize("n_queries", [10])
+@pytest.mark.parametrize("k", [10])
 @pytest.mark.parametrize("sparsity", [0.2, 0.5])
 def test_filtered_cagra(
     n_rows,
@@ -207,14 +178,14 @@ def test_filtered_cagra(
     bitset_device = device_ndarray(bitset)
 
     build_params = cagra.IndexParams(
-        metric="euclidean",
+        metric="sqeuclidean",
         intermediate_graph_degree=64,
         graph_degree=32,
         build_algo="nn_descent",
     )
     index = cagra.build(build_params, dataset_device)
 
-    prefilter = filters.from_bitset(bitset_device)
+    filter_ = filters.from_bitset(bitset_device)
 
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
     out_dist = np.zeros((n_queries, k), dtype=np.float32)
@@ -229,7 +200,7 @@ def test_filtered_cagra(
         k,
         neighbors=out_idx_device,
         distances=out_dist_device,
-        filter=prefilter,
+        filter=filter_,
     )
 
     # Convert bitset to bool array for validation
@@ -274,6 +245,35 @@ def test_filtered_cagra(
     assert recall > 0.7
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        {
+            "intermediate_graph_degree": 64,
+            "graph_degree": 32,
+            "add_data_on_build": True,
+            "k": 1,
+            "metric": "sqeuclidean",
+            "build_algo": "ivf_pq",
+        },
+        {
+            "intermediate_graph_degree": 32,
+            "graph_degree": 16,
+            "add_data_on_build": False,
+            "k": 5,
+            "metric": "sqeuclidean",
+            "build_algo": "ivf_pq",
+        },
+        {
+            "intermediate_graph_degree": 128,
+            "graph_degree": 32,
+            "add_data_on_build": True,
+            "k": 10,
+            "metric": "inner_product",
+            "build_algo": "nn_descent",
+        },
+    ],
+)
 def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.

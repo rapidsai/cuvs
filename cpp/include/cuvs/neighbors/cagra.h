@@ -389,7 +389,7 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
- * @param[in] prefilter cuvsFilter input prefilter that can be used
+ * @param[in] filter cuvsFilter input filter that can be used
               to filter queries and neighbors based on the given bitset.
  */
 cuvsError_t cuvsCagraSearch(cuvsResources_t res,
