@@ -316,8 +316,8 @@ template <typename K, typename V, typename L>
   typedef typename raft::KeyValuePair<K, V> KVP;
   std::shared_ptr<KVP[]> exp_h(new KVP[size]);
   std::shared_ptr<KVP[]> act_h(new KVP[size]);
-  raft::update_host<KVP[]>(exp_h.get(), expected, size, stream);
-  raft::update_host<KVP[]>(act_h.get(), actual, size, stream);
+  raft::update_host<KVP>(exp_h.get(), expected, size, stream);
+  raft::update_host<KVP>(act_h.get(), actual, size, stream);
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
   for (size_t i(0); i < size; ++i) {
     auto exp = exp_h.get()[i];
