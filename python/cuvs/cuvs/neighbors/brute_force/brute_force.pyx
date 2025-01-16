@@ -102,7 +102,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32')])
+    _check_input_array(dataset_ai, [np.dtype('float32')], exp_row_major=False)
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
@@ -218,7 +218,7 @@ def search(Index index,
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32')])
+    _check_input_array(queries_cai, [np.dtype('float32')], exp_row_major=False)
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 
