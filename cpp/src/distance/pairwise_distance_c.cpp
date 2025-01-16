@@ -99,7 +99,7 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
 
     if ((x_row_major != y_row_major) || (x_row_major != distances_row_major)) {
       RAFT_FAIL(
-        "Inputs to cuvsPairwiseDistance must all have the same layout (row-major or col-major");
+        "Inputs to cuvsPairwiseDistance must all have the same layout (row-major or col-major)");
     }
 
     if (x_row_major) {
