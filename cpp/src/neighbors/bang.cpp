@@ -161,32 +161,27 @@ void index<T, DistT>::update_dataset(
 }
 
 #define CUVS_INST_BANG(T, DistT)                                                        \
-  auto load_disk_index(raft::resources const& res,                                      \
-             raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,       \
-             cuvs::distance::DistanceType metric,                                       \
-             DistT metric_arg)                                                          \
-    ->cuvs::neighbors::brute_force::index<T, DistT>                                     \
-  {                                                                                     \
-    return bang::bang_load(raft::device_resources handle, char* indexfile_path_prefix)  \
-  }                                                                                  \
-  auto build(raft::resources const& res,                                             \
-             raft::device_matrix_view<const T, int64_t, raft::col_major> dataset,    \
-             cuvs::distance::DistanceType metric,                                    \
-             DistT metric_arg)                                                       \
-    ->cuvs::neighbors::brute_force::index<T, DistT>                                  \
-  {                                                                                  \
-    return detail::build<T, DistT>(res, dataset, metric, metric_arg);                \
-  }                                                                                  \
+  void load_disk_index(raft::resources const& res,                                      \
+             char* indexfile_path_prefix)                                       \                                                     \
+{                                                                                     \
+  return bang::bang_load(res, indexfile_path_prefix);  \
+}                                                                                    \                                                                                 \
                                                                                      \
-  void search(raft::resources const& res,                                            \
-              const cuvs::neighbors::brute_force::index<T, DistT>& idx,              \
+  void search(raft::resources const& res,
+              const search_params& params,                                            \
               raft::device_matrix_view<const T, int64_t, raft::row_major> queries,   \
               raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, \
-              raft::device_matrix_view<DistT, int64_t, raft::row_major> distances)   \
-  {                                                                                  \
+              raft::device_matrix_view<float, int64_t, raft::row_major> distances)   \
+  {
+    bang_set_searchparams(neighbors.extent(1),                                       \
+                          params.workslist_length);                                  \
+    bang::bang_alloc<T>(numQueries);                                                 \
     bang::bang_query(res, queries, queries.extent(0),                                \
-					neighbors.extent(1),                                                       \
-					distances.data_handle());                         `                        \
+          neighbors.data_handle(),                                                   \
+					distances.data_handle());
+    bang_free();
+    bang_unload();
+    free(queriesFP);                         `                        \
   }                                                                                  \
                                                                                      \
   template struct cuvs::neighbors::brute_force::index<T, DistT>;
