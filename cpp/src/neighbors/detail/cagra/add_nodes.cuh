@@ -31,8 +31,6 @@
 
 namespace cuvs::neighbors::cagra {
 
-static const std::string RAFT_NAME = "raft";
-
 template <class T, class IdxT, class Accessor>
 void add_node_core(
   raft::resources const& handle,

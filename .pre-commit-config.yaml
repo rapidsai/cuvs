@@ -108,8 +108,7 @@ repos:
                   [.](cmake|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs)$|
                   CMakeLists[.]txt$|
                   CMakeLists_standalone[.]txt$|
-                  meta[.]yaml$|
-                  setup[.]cfg$
+                  meta[.]yaml$
             exclude: |
               (?x)
                   docs/source/sphinxext/github_link\.py|
