@@ -1362,7 +1362,9 @@ void optimize(
 
         // Set pruned graph edges
         uint32_t l = 0;
-        for (uint32_t pruned_i = 0; pruned_i < output_graph_degree; pruned_i++) {
+        for (uint32_t pruned_i = 0;
+             (pruned_i < output_graph_degree) && (k + l < output_graph_degree);
+             pruned_i++) {
           const auto v = output_graph_ptr[pruned_i];
 
           // duplication check
