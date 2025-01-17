@@ -1355,11 +1355,29 @@ void optimize(
         my_out_graph = temp_output_neighbor_list.data();
         k            = mst_graph_num_edges_ptr[i];
 
+        // Set MST graph edges
         for (uint32_t j = 0; j < k; j++) {
           my_out_graph[j] = mst_graph(i, j);
         }
-        for (uint32_t j = k; j < output_graph_degree; j++) {
-          my_out_graph[j] = output_graph_ptr[(output_graph_degree * i) + j];
+
+        // Set pruned graph edges
+        uint32_t l = 0;
+        for (uint32_t pruned_i = 0; pruned_i < output_graph_degree; pruned_i++) {
+          const auto v = output_graph_ptr[pruned_i];
+
+          // duplication check
+          bool dup = false;
+          for (uint32_t m = 0; m < l + k; m++) {
+            if (v == my_out_graph[m]) {
+              dup = true;
+              break;
+            }
+          }
+
+          if (!dup) {
+            my_out_graph[k + l] = output_graph_ptr[(output_graph_degree * i) + pruned_i];
+            l++;
+          }
         }
       }
 
