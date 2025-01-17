@@ -156,17 +156,13 @@ def create_sparse_bitset(n_size, sparsity):
     return array
 
 
-@pytest.mark.parametrize("n_rows", [10000])
-@pytest.mark.parametrize("n_cols", [10])
-@pytest.mark.parametrize("n_queries", [10])
-@pytest.mark.parametrize("k", [10])
-@pytest.mark.parametrize("sparsity", [0.2, 0.5])
+@pytest.mark.parametrize("sparsity", [0.2, 0.5, 0.7, 1.0])
 def test_filtered_cagra(
-    n_rows,
-    n_cols,
-    n_queries,
-    k,
     sparsity,
+    n_rows = 10000,
+    n_cols = 10,
+    n_queries = 10,
+    k = 10,
 ):
     dataset = generate_data((n_rows, n_cols), np.float32)
     queries = generate_data((n_queries, n_cols), np.float32)
@@ -177,12 +173,7 @@ def test_filtered_cagra(
     queries_device = device_ndarray(queries)
     bitset_device = device_ndarray(bitset)
 
-    build_params = cagra.IndexParams(
-        metric="sqeuclidean",
-        intermediate_graph_degree=64,
-        graph_degree=32,
-        build_algo="nn_descent",
-    )
+    build_params = cagra.IndexParams()
     index = cagra.build(build_params, dataset_device)
 
     filter_ = filters.from_bitset(bitset_device)
@@ -215,14 +206,12 @@ def test_filtered_cagra(
     non_filtered_mask = ~bool_filter
     filtered_dataset = dataset[non_filtered_mask]
 
-    # Calculate reference values with sklearn on filtered dataset
     nn_skl = NearestNeighbors(
         n_neighbors=k, algorithm="brute", metric="euclidean"
     )
     nn_skl.fit(filtered_dataset)
     skl_idx = nn_skl.kneighbors(queries, return_distance=False)
 
-    # Get actual results
     actual_indices = out_idx_device.copy_to_host()
 
     filtered_idx_map = (
@@ -234,12 +223,10 @@ def test_filtered_cagra(
         filtered_idx_map, actual_indices, mode="clip"
     )
 
-    # Verify filtering - no filtered indices should be in results
     filtered_indices = np.where(bool_filter)[0]
     for i in range(n_queries):
         assert not np.intersect1d(filtered_indices, actual_indices[i]).size
 
-    # Now compare with sklearn results
     recall = calc_recall(mapped_actual_indices, skl_idx)
 
     assert recall > 0.7
