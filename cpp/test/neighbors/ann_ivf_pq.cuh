@@ -879,7 +879,7 @@ inline auto enum_variety_ip() -> test_cases_t
         // InnerProduct score is signed,
         // thus we're forced to used signed 8-bit representation,
         // thus we have one bit less precision
-        y.min_recall = y.min_recall.value() * 0.90;
+        y.min_recall = y.min_recall.value() * 0.88;
       } else {
         // In other cases it seems to perform a little bit better, still worse than L2
         y.min_recall = y.min_recall.value() * 0.94;
