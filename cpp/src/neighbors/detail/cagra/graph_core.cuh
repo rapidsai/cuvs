@@ -1088,6 +1088,7 @@ void optimize(
   auto output_graph_ptr              = new_graph.data_handle();
 
   // MST optimization
+  auto mst_graph               = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0);
   auto mst_graph_num_edges     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
   auto mst_graph_num_edges_ptr = mst_graph_num_edges.data_handle();
 #pragma omp parallel for
@@ -1095,9 +1096,11 @@ void optimize(
     mst_graph_num_edges_ptr[i] = 0;
   }
   if (guarantee_connectivity) {
+    mst_graph =
+      raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, output_graph_degree);
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
     constexpr bool use_gpu = true;
-    mst_optimization(res, knn_graph, new_graph, mst_graph_num_edges.view(), use_gpu);
+    mst_optimization(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
 
     for (uint64_t i = 0; i < graph_size; i++) {
       if (i < 8 || i >= graph_size - 8) {
@@ -1199,7 +1202,7 @@ void optimize(
     for (uint64_t i = 0; i < graph_size; i++) {
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
       // count of the neighbors while increasing the target detourable count from zero.
-      uint64_t pk         = mst_graph_num_edges_ptr[i];
+      uint64_t pk         = 0;
       uint32_t num_detour = 0;
       for (uint32_t l = 0; l < input_graph_degree && pk < output_graph_degree; l++) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
@@ -1342,7 +1345,23 @@ void optimize(
     for (uint64_t i = 0; i < graph_size; i++) {
       auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
-      uint32_t k        = mst_graph_num_edges_ptr[i];
+      uint32_t k        = 0;
+
+      // If guarantee_connectivity == true, use a temporal list to merge the neighbor lists of the
+      // graphs.
+      std::vector<IdxT> temp_output_neighbor_list;
+      if (guarantee_connectivity) {
+        temp_output_neighbor_list.resize(output_graph_degree);
+        my_out_graph = temp_output_neighbor_list.data();
+        k            = mst_graph_num_edges_ptr[i];
+
+        for (uint32_t j = 0; j < k; j++) {
+          my_out_graph[j] = mst_graph(i, j);
+        }
+        for (uint32_t j = k; j < output_graph_degree; j++) {
+          my_out_graph[j] = output_graph_ptr[(output_graph_degree * i) + j];
+        }
+      }
 
       const auto num_protected_edges = std::max<uint64_t>(k, output_graph_degree / 2);
       if (num_protected_edges > output_graph_degree) { check_num_protected_edges = false; }
@@ -1361,6 +1380,15 @@ void optimize(
           }
           shift_array<IdxT>(my_out_graph + num_protected_edges, num_shift);
           my_out_graph[num_protected_edges] = my_rev_graph[kr];
+        }
+      }
+
+      // If guarantee_connectivity == true, move the output neighbor list from the temporal list to
+      // the output list. If false, the copy is not needed because my_out_graph is a pointer to the
+      // output buffer.
+      if (guarantee_connectivity) {
+        for (uint32_t j = 0; j < output_graph_degree; j++) {
+          output_graph_ptr[(output_graph_degree * i) + j] = my_out_graph[j];
         }
       }
     }
