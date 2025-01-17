@@ -151,7 +151,7 @@ TEST(CagraC, BuildExtendSearch)
 
   const int32_t dimensions = 16;
   // main_data_size needs to be >= 128 (see issue #486)
-  const int32_t main_data_size       = 128;
+  const int32_t main_data_size       = 1024;
   const int32_t additional_data_size = 64;
   const int32_t num_queries          = 4;
 
