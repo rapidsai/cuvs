@@ -75,7 +75,7 @@ Conda
    conda activate cuvs_benchmarks
 
    # to install GPU package:
-   conda install -c rapidsai -c conda-forge -c nvidia cuvs-ann-bench=<rapids_version> cuda-version=11.8*
+   conda install -c rapidsai -c conda-forge -c nvidia cuvs-bench=<rapids_version> cuda-version=11.8*
 
    # to install CPU package for usage in CPU-only systems:
    conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
