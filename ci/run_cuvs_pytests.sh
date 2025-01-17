@@ -6,4 +6,4 @@ set -euo pipefail
 # Support invoking run_pytests.sh outside the script directory
 cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")"/../python/cuvs/cuvs
 
-pytest --cache-clear --verbose "$@" tests
+pytest --cache-clear --verbose "$@" test
