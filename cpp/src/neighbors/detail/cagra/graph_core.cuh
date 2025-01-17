@@ -35,7 +35,6 @@
 #include <omp.h>
 #include <sys/time.h>
 
-#include <cassert>
 #include <climits>
 #include <iostream>
 #include <memory>
@@ -994,14 +993,18 @@ void mst_optimization(raft::resources const& res,
         total_incoming_edges += incoming_num_edges_ptr[i];
       }
 
+      bool check_num_mst_edges = true;
 #pragma omp parallel for
       for (uint64_t i = 0; i < graph_size; i++) {
         if (outgoing_num_edges_ptr[i] < outgoing_max_edges_ptr[i]) continue;
         if (outgoing_num_edges_ptr[i] + incoming_num_edges_ptr[i] == mst_graph_degree) continue;
-        assert(outgoing_num_edges_ptr[i] + incoming_num_edges_ptr[i] < mst_graph_degree);
+        if (outgoing_num_edges_ptr[i] + incoming_num_edges_ptr[i] > mst_graph_degree) {
+          check_num_mst_edges = false;
+        }
         outgoing_max_edges_ptr[i] += 1;
         incoming_max_edges_ptr[i] = mst_graph_degree - outgoing_max_edges_ptr[i];
       }
+      RAFT_EXPECTS(check_num_mst_edges, "Some nodes have too many MST graph edges.");
     }
 
     // 6. Show stats
@@ -1018,8 +1021,9 @@ void mst_optimization(raft::resources const& res,
       }
       RAFT_LOG_DEBUG("%s", msg.c_str());
     }
-    assert(num_clusters > 0);
-    assert(total_outgoing_edges == total_incoming_edges);
+    RAFT_EXPECTS(num_clusters > 0, "No clusters could not be created in MST optimization.");
+    RAFT_EXPECTS(total_outgoing_edges == total_incoming_edges,
+                 "The numbers of incoming and outcoming edges are mismatch.");
     if (num_clusters == 1) { break; }
     num_clusters_pre = num_clusters;
   }
@@ -1226,7 +1230,11 @@ void optimize(
         }
         if (pk >= output_graph_degree) break;
 
-        assert(next_num_detour != std::numeric_limits<uint32_t>::max());
+        if (next_num_detour == std::numeric_limits<uint32_t>::max()) {
+          // There are no valid edges enough in the initial kNN graph. Break the loop here and catch
+          // the error at the next validation (pk != output_graph_degree).
+          break;
+        }
         num_detour = next_num_detour;
       }
       if (pk != output_graph_degree) {
@@ -1329,6 +1337,7 @@ void optimize(
     //
     const double time_replace_start = cur_time();
 
+    bool check_num_protected_edges = true;
 #pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
       auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
@@ -1336,7 +1345,7 @@ void optimize(
       uint32_t k        = mst_graph_num_edges_ptr[i];
 
       const auto num_protected_edges = std::max<uint64_t>(k, output_graph_degree / 2);
-      assert(num_protected_edges <= output_graph_degree);
+      if (num_protected_edges > output_graph_degree) { check_num_protected_edges = false; }
       if (num_protected_edges == output_graph_degree) continue;
 
       // Replace some edges of the output graph with edges of the reverse graph.
@@ -1355,6 +1364,9 @@ void optimize(
         }
       }
     }
+    RAFT_EXPECTS(check_num_protected_edges,
+                 "Failed to merge the MST, pruned, and reverse edge graphs. Some nodes have too "
+                 "many MST optimization edges.");
 
     const double time_replace_end = cur_time();
     RAFT_LOG_DEBUG("# Replacing edges time: %.1lf sec", time_replace_end - time_replace_start);
