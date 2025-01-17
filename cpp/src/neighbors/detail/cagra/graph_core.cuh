@@ -1365,7 +1365,7 @@ void optimize(
         for (uint32_t pruned_i = 0;
              (pruned_i < output_graph_degree) && (k + l < output_graph_degree);
              pruned_i++) {
-          const auto v = output_graph_ptr[pruned_i];
+          const auto v = output_graph_ptr[output_graph_degree * i + pruned_i];
 
           // duplication check
           bool dup = false;
@@ -1377,7 +1377,7 @@ void optimize(
           }
 
           if (!dup) {
-            my_out_graph[k + l] = output_graph_ptr[(output_graph_degree * i) + pruned_i];
+            my_out_graph[k + l] = v;
             l++;
           }
         }
