@@ -50,7 +50,7 @@ jobs:
   go-build:
     needs: cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.12
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.02
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}

@@ -142,7 +142,7 @@ jobs:
   go-build:
     needs: conda-cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-24.12
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.02
     with:
       build_type: pull-request
       node_type: "gpu-v100-latest-1"
