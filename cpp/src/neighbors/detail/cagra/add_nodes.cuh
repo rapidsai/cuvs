@@ -268,10 +268,10 @@ void add_node_core(
         interleave_switch = 1 - interleave_switch;
       }
       if (num_add < degree) {
-        RAFT_FAIL("Number of edges is not enough (target_new_node_id:%u, num_add:%u, degree:%u)",
-                  target_new_node_id,
-                  num_add,
-                  degree);
+        RAFT_FAIL("Number of edges is not enough (target_new_node_id:%lu, num_add:%lu, degree:%lu)",
+                  (uint64_t)target_new_node_id,
+                  (uint64_t)num_add,
+                  (uint64_t)degree);
       }
       for (std::uint32_t i = 0; i < degree; i++) {
         updated_graph(target_new_node_id, i) = temp[i];
