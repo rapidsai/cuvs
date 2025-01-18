@@ -10,4 +10,4 @@ RAPIDS_PY_WHEEL_NAME="cuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from
 # echo to expand wildcard before adding `[extra]` requires for pip
 python -m pip install $(echo ./dist/cuvs*.whl)[test]
 
-python -m pytest ./python/cuvs/cuvs/test
+python -m pytest ./python/cuvs/cuvs/tests
