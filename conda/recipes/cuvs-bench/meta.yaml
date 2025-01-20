@@ -82,6 +82,7 @@ requirements:
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
     - rmm ={{ minor_version }}
+    - setuptools>=64.0.0
 
   run:
     - benchmark

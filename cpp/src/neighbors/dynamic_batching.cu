@@ -16,6 +16,7 @@
 
 #include "detail/dynamic_batching.cuh"
 
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -52,6 +53,8 @@ namespace cuvs::neighbors::dynamic_batching {
   {                                                                                \
     return index.runner->search(res, params, queries, neighbors, distances);       \
   }
+
+CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::brute_force, index<float, float>);
 
 CUVS_INST_DYNAMIC_BATCHING_INDEX(float, uint32_t, cuvs::neighbors::cagra, index<float, uint32_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(half, uint32_t, cuvs::neighbors::cagra, index<half, uint32_t>);
