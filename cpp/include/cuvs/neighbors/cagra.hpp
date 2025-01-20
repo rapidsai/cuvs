@@ -247,12 +247,6 @@ struct extend_params {
    * degrade recall because no edges are added between the nodes in the same chunk. Auto select when
    * 0. */
   uint32_t max_chunk_size = 0;
-
-  /** The dataset chunk where the maximum size is defined by `max_chunk_size` is divided by
-   * sub-chunks to limit the working memory usage. This is the knob to control the working memory
-   * usage. Large working memory size can result in high throughput.
-   * */
-  uint32_t max_working_device_memory_size_in_megabyte = 512;
 };
 
 /**

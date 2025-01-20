@@ -72,14 +72,9 @@ void add_node_core(
   const std::size_t data_size_per_vector =
     sizeof(IdxT) * base_degree + sizeof(DistanceT) * base_degree + sizeof(T) * dim;
   const std::size_t max_search_batch_size =
-    std::min(std::max(1lu,
-                      extend_params.max_working_device_memory_size_in_megabyte * (1u << 20) /
-                        data_size_per_vector),
+    std::min(std::max(1lu, raft::resource::get_workspace_free_bytes(handle) / data_size_per_vector),
              num_add);
-  if (extend_params.max_working_device_memory_size_in_megabyte == 0) {
-    RAFT_LOG_DEBUG("Overwrites the memory size for the extend function to %lu Byte",
-                   data_size_per_vector);
-  }
+  RAFT_EXPECTS(max_search_batch_size > 0, "No enough working memory space is left.");
 
   cuvs::neighbors::cagra::search_params params;
   params.itopk_size = std::max(base_degree * 2lu, 256lu);
