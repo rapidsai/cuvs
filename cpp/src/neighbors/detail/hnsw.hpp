@@ -215,7 +215,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     host_dataset_view = host_dataset.view();
   }
   // build upper layers of hnsw index
-  int dim         = host_dataset.extent(1);
+  int dim         = host_dataset_view.extent(1);
   auto hnsw_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), hierarchy);
   auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     hnsw_index->get_space(),
