@@ -69,8 +69,15 @@ void add_node_core(
              new_size,
              raft::resource::get_cuda_stream(handle));
 
-  const std::size_t data_size_per_vector =
+  std::size_t data_size_per_vector =
     sizeof(IdxT) * base_degree + sizeof(DistanceT) * base_degree + sizeof(T) * dim;
+  cudaPointerAttributes attr;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, additional_dataset_view.data_handle()));
+  if (attr.devicePointer == nullptr) {
+    // for batch_load_iterator
+    data_size_per_vector += sizeof(T) * dim;
+  }
+
   const std::size_t max_search_batch_size =
     std::min(std::max(1lu, raft::resource::get_workspace_free_bytes(handle) / data_size_per_vector),
              num_add);
@@ -100,7 +107,7 @@ void add_node_core(
     additional_dataset_view.stride(0),
     max_search_batch_size,
     raft::resource::get_cuda_stream(handle),
-    raft::resource::get_workspace_resource(handle));
+    mr);
   for (const auto& batch : additional_dataset_batch) {
     // Step 1: Obtain K (=base_degree) nearest neighbors of the new vectors by CAGRA search
     // Create queries
