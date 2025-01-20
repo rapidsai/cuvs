@@ -1601,9 +1601,12 @@ void deserialize(raft::resources const& handle,
  * @param[in] index CAGRA index
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<float, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
@@ -1630,9 +1633,12 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] index CAGRA index
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<float, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
@@ -1658,9 +1664,12 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] index CAGRA index
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
@@ -1687,9 +1696,12 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] index CAGRA index
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
@@ -1715,9 +1727,12 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] index CAGRA index
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
@@ -1744,9 +1759,12 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] index CAGRA index
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * @}

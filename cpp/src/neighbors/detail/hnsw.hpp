@@ -21,6 +21,7 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 #include <memory>
+#include <raft/core/logger.hpp>
 #include <random>
 #include <thread>
 
@@ -163,14 +164,15 @@ template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
   const index_params& params,
-  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index)
+  const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   std::random_device dev;
   std::mt19937 rng(dev());
   std::uniform_int_distribution<std::mt19937::result_type> dist(0);
   auto uuid            = std::to_string(dist(rng));
   std::string filepath = "/tmp/" + uuid + ".bin";
-  cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index);
+  cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index, dataset);
 
   index<T>* hnsw_index = nullptr;
   cuvs::neighbors::hnsw::deserialize(
@@ -195,6 +197,10 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   } else {
     // move dataset to host, remove padding
     auto cagra_dataset = cagra_index.dataset();
+    RAFT_EXPECTS(cagra_dataset.size() > 0,
+                 "Invalid CAGRA dataset of size 0, shape %zux%zu",
+                 static_cast<size_t>(cagra_dataset.extent(0)),
+                 static_cast<size_t>(cagra_dataset.extent(1)));
     host_dataset =
       raft::make_host_matrix<T, int64_t>(cagra_dataset.extent(0), cagra_dataset.extent(1));
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
@@ -209,9 +215,9 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     host_dataset_view = host_dataset.view();
   }
   // build upper layers of hnsw index
-  auto hnsw_index =
-    std::make_unique<index_impl<T>>(cagra_index.dim(), cagra_index.metric(), hierarchy);
-  auto appr_algo = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+  int dim         = host_dataset.extent(1);
+  auto hnsw_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), hierarchy);
+  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     hnsw_index->get_space(),
     host_dataset_view.extent(0),
     cagra_index.graph().extent(1) / 2,
@@ -256,7 +262,7 @@ std::unique_ptr<index<T>> from_cagra(
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   if (params.hierarchy == HnswHierarchy::NONE) {
-    return from_cagra<T, HnswHierarchy::NONE>(res, params, cagra_index);
+    return from_cagra<T, HnswHierarchy::NONE>(res, params, cagra_index, dataset);
   } else if (params.hierarchy == HnswHierarchy::CPU) {
     return from_cagra<T, HnswHierarchy::CPU>(res, params, cagra_index, dataset);
   }
