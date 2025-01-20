@@ -104,7 +104,7 @@ void cuvs_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, nrow, dim_);
-  auto idx = cuvs::neighbors::mg::build(clique_, build_params, dataset_view);
+  auto idx = cuvs::neighbors::cagra::build(clique_, build_params, dataset_view);
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
       std::move(idx));
@@ -131,7 +131,7 @@ void cuvs_mg_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_mg_cagra<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::mg::serialize(clique_, *index_, file);
+  cuvs::neighbors::cagra::serialize(clique_, *index_, file);
 }
 
 template <typename T, typename IdxT>
@@ -139,7 +139,7 @@ void cuvs_mg_cagra<T, IdxT>::load(const std::string& file)
 {
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::cagra::index<T, IdxT>, T, IdxT>>(
-      std::move(cuvs::neighbors::mg::deserialize_cagra<T, IdxT>(clique_, file)));
+      std::move(cuvs::neighbors::cagra::deserialize<T, IdxT>(clique_, file)));
 }
 
 template <typename T, typename IdxT>
@@ -162,7 +162,7 @@ void cuvs_mg_cagra<T, IdxT>::search_base(
   auto distances_view =
     raft::make_host_matrix_view<float, int64_t, raft::row_major>(distances, batch_size, k);
 
-  cuvs::neighbors::mg::search(
+  cuvs::neighbors::cagra::search(
     clique_, *index_, search_params_, queries_view, neighbors_view, distances_view);
 }
 

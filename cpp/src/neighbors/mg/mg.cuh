@@ -21,7 +21,10 @@
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/mg.hpp>
 
 #include <fstream>

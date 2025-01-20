@@ -84,7 +84,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, IdxT(nrow), IdxT(dim_));
-  auto idx = cuvs::neighbors::mg::build(clique_, index_params_, dataset_view);
+  auto idx = cuvs::neighbors::ivf_pq::build(clique_, index_params_, dataset_view);
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
       std::move(idx));
@@ -104,7 +104,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
 template <typename T, typename IdxT>
 void cuvs_mg_ivf_pq<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::mg::serialize(clique_, *index_, file);
+  cuvs::neighbors::ivf_pq::serialize(clique_, *index_, file);
 }
 
 template <typename T, typename IdxT>
@@ -112,7 +112,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::load(const std::string& file)
 {
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
-      std::move(cuvs::neighbors::mg::deserialize_pq<T, IdxT>(clique_, file)));
+      std::move(cuvs::neighbors::ivf_pq::deserialize<T, IdxT>(clique_, file)));
 }
 
 template <typename T, typename IdxT>
@@ -132,7 +132,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::search(
   auto distances_view = raft::make_host_matrix_view<float, int64_t, raft::row_major>(
     distances, IdxT(batch_size), IdxT(k));
 
-  cuvs::neighbors::mg::search(
+  cuvs::neighbors::ivf_pq::search(
     clique_, *index_, search_params_, queries_view, neighbors_view, distances_view);
 }
 
