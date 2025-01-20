@@ -38,7 +38,7 @@ function(find_and_configure_ggnn)
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(ggnn)
-  
+
   if(NOT TARGET ggnn::ggnn)
     add_library(ggnn INTERFACE)
     target_include_directories(ggnn INTERFACE "$<BUILD_INTERFACE:${ggnn_SOURCE_DIR}/include>")

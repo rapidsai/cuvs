@@ -48,10 +48,10 @@ The `mdarray` is an owning object that forms a convenience layer over RMM and ca
 .. code-block:: c++
 
     #include <raft/core/device_mdarray.hpp>
-    
+
     int n_rows = 10;
     int n_cols = 10;
-    
+
     auto scalar = raft::make_device_scalar<float>(handle, 1.0);
     auto vector = raft::make_device_vector<float>(handle, n_cols);
     auto matrix = raft::make_device_matrix<float>(handle, n_rows, n_cols);
