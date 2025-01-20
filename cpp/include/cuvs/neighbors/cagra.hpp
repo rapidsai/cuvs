@@ -20,7 +20,6 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/mg.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
@@ -31,6 +30,10 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
+
+#ifdef CUVS_BUILD_MG_ALGOS
+#include <cuvs/neighbors/mg.hpp>
+#endif
 
 #include <optional>
 #include <variant>
@@ -1753,6 +1756,8 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @}
  */
 
+#ifdef CUVS_BUILD_MG_ALGOS
+
 /// \defgroup mg_cpp_index_build ANN MG index build
 
 /// \ingroup mg_cpp_index_build
@@ -2213,5 +2218,7 @@ auto deserialize(const raft::device_resources_snmg& clique, const std::string& f
 template <typename T, typename IdxT>
 auto distribute(const raft::device_resources_snmg& clique, const std::string& filename)
   -> cuvs::neighbors::mg::index<cagra::index<T, IdxT>, T, IdxT>;
+
+#endif
 
 }  // namespace cuvs::neighbors::cagra

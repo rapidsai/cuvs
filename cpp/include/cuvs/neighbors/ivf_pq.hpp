@@ -19,7 +19,6 @@
 #include <cuda_fp16.h>
 
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/mg.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/error.hpp>
@@ -27,6 +26,10 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
+
+#ifdef CUVS_BUILD_MG_ALGOS
+#include <cuvs/neighbors/mg.hpp>
+#endif
 
 namespace cuvs::neighbors::ivf_pq {
 
@@ -1729,6 +1732,8 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
+#ifdef CUVS_BUILD_MG_ALGOS
+
 /// \defgroup mg_cpp_index_build ANN MG index build
 
 /// \ingroup mg_cpp_index_build
@@ -2179,6 +2184,9 @@ auto deserialize(const raft::device_resources_snmg& clique, const std::string& f
 template <typename T, typename IdxT>
 auto distribute(const raft::device_resources_snmg& clique, const std::string& filename)
   -> cuvs::neighbors::mg::index<ivf_pq::index<IdxT>, T, IdxT>;
+
+#endif
+
 namespace helpers {
 /**
  * @defgroup ivf_pq_cpp_helpers IVF-PQ helper methods

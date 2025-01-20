@@ -19,9 +19,12 @@
 #include "common.hpp"
 #include <cstdint>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/mg.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
+
+#ifdef CUVS_BUILD_MG_ALGOS
+#include <cuvs/neighbors/mg.hpp>
+#endif
 
 namespace cuvs::neighbors::ivf_flat {
 /**
@@ -1599,6 +1602,8 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
+#ifdef CUVS_BUILD_MG_ALGOS
+
 /// \defgroup mg_cpp_index_build ANN MG index build
 
 /// \ingroup mg_cpp_index_build
@@ -1958,6 +1963,8 @@ auto deserialize(const raft::device_resources_snmg& clique, const std::string& f
 template <typename T, typename IdxT>
 auto distribute(const raft::device_resources_snmg& clique, const std::string& filename)
   -> cuvs::neighbors::mg::index<ivf_flat::index<T, IdxT>, T, IdxT>;
+
+#endif
 
 namespace helpers {
 
