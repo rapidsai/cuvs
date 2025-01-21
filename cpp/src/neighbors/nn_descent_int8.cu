@@ -31,7 +31,8 @@ namespace cuvs::neighbors::nn_descent {
     } else {                                                                                  \
       std::optional<raft::device_matrix_view<float, int64_t, raft::row_major>> distances =    \
         std::nullopt;                                                                         \
-      cuvs::neighbors::nn_descent::index<IdxT> idx{handle, graph.value(), distances};         \
+      cuvs::neighbors::nn_descent::index<IdxT> idx{                                           \
+        handle, graph.value(), distances, params.metric};                                     \
       cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset, idx);              \
       return idx;                                                                             \
     }                                                                                         \
@@ -48,7 +49,8 @@ namespace cuvs::neighbors::nn_descent {
     } else {                                                                                  \
       std::optional<raft::device_matrix_view<float, int64_t, raft::row_major>> distances =    \
         std::nullopt;                                                                         \
-      cuvs::neighbors::nn_descent::index<IdxT> idx{handle, graph.value(), distances};         \
+      cuvs::neighbors::nn_descent::index<IdxT> idx{                                           \
+        handle, graph.value(), distances, params.metric};                                     \
       cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset, idx);              \
       return idx;                                                                             \
     }                                                                                         \
