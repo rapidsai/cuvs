@@ -326,6 +326,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    if (ps.metric == HammingUnexpanded && (!std::is_same_v<DataT, uint8_t>)) GTEST_SKIP();
+
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
     std::vector<IdxT> indices_naive(queries_size);
@@ -501,6 +503,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
+    if (ps.metric == HammingUnexpanded && (!std::is_same_v<DataT, uint8_t>)) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -696,6 +699,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
+    if (ps.metric == HammingUnexpanded && (!std::is_same_v<DataT, uint8_t>)) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -887,7 +891,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
     {false},
     {true},
     {0.995});
@@ -903,7 +907,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
     {false},
     {true},
     {0.995});
@@ -919,7 +923,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0, 8, 16, 32},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
     {false},
     {false},
     {0.995});
@@ -936,27 +940,27 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {32, 64, 128, 256, 512, 768},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
     {false},
     {true},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {10000, 20000},
-                                                   {32},
-                                                   {10},
-                                                   {graph_build_algo::AUTO},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false, true},
-                                                   {false},
-                                                   {0.985});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {10000, 20000},
+    {32},
+    {10},
+    {graph_build_algo::AUTO},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
+    {false, true},
+    {false},
+    {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations
