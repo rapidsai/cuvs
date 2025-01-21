@@ -120,6 +120,8 @@ files:
       - build_cython
       - build_py_cuvs
       - depends_on_libcuvs
+      - depends_on_libraft
+      - depends_on_librmm
       - rapids_build
   py_run_cuvs:
     output: pyproject
