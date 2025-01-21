@@ -25,19 +25,28 @@
 
 namespace cuvs::neighbors::cagra::detail {
 namespace {
-template <typename T, cuvs::distance::DistanceType Metric>
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(T a, T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::L2Expanded, T>
+template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::L2Expanded, DISTANCE_T>
 {
-  T diff = a - b;
+  DISTANCE_T diff = a - b;
   return diff * diff;
 }
 
-template <typename T, cuvs::distance::DistanceType Metric>
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(T a, T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct, T>
+template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct, DISTANCE_T>
 {
   return -a * b;
+}
+
+template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::HammingUnexpanded &&
+                        std::is_integral_v<DATA_T>,
+                      DISTANCE_T>
+{
+  return __popc(~(a ^ b));
 }
 }  // namespace
 
@@ -49,7 +58,8 @@ template <cuvs::distance::DistanceType Metric,
           typename DistanceT>
 struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
-  using QUERY_T   = float;
+  using QUERY_T   = typename std::
+    conditional_t<Metric == cuvs::distance::DistanceType::HammingUnexpanded, DataT, float>;
   using base_type::args;
   using base_type::smem_ws_size_in_bytes;
   using typename base_type::args_t;
@@ -194,13 +204,13 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
         // because:
         // - Above the last element (dataset_dim-1), the query array is filled with zeros.
         // - The data buffer has to be also padded with zeros.
-        DISTANCE_T d;
+        QUERY_T d;
         device::lds(
           d,
           query_smem_ptr +
             sizeof(QUERY_T) * device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(k + v));
-        r += dist_op<DISTANCE_T, DescriptorT::kMetric>(
-          d, cuvs::spatial::knn::detail::utils::mapping<DISTANCE_T>{}(data[e][v]));
+        r += dist_op<DATA_T, DISTANCE_T, DescriptorT::kMetric>(
+          d, cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(data[e][v]));
       }
     }
   }
