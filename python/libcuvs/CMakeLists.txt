@@ -28,7 +28,7 @@ project(
 option(USE_CUDA_MATH_WHEELS "Use the CUDA math wheels instead of the system libraries" OFF)
 
 # Check if cuVS is already available. If so, it is the user's responsibility to ensure that the
-# CMake package is also available at build time of the Python raft package.
+# CMake package is also available at build time of the Python cuvs package.
 find_package(cuvs "${RAPIDS_VERSION}")
 
 if(cuvs_FOUND)
@@ -47,9 +47,13 @@ elseif(USE_CUDA_MATH_WHEELS)
   message(FATAL_ERROR "Cannot use CUDA math wheels with CUDA < 12.0")
 endif()
 
+# --- RAFT ---#
+set(CUVS_USE_RAFT_STATIC ON)
+
 # --- cuVS ---#
 set(BUILD_TESTS OFF)
 set(BUILD_C_LIBRARY ON)
+# TODO(jameslamb): avoid compiling and installing the static library
 
 add_subdirectory(../../cpp cuvs-cpp)
 

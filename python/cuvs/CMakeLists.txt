@@ -42,8 +42,14 @@ include(rapids-find)
 
 rapids_cpm_init()
 
+# --- cuVS ---#
 find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
+
+# --- dlpack ---#
 include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
+
+# ensure Cython targets can find dlpack headers (these do not come installed with with cuVS)
+target_include_directories(cuvs::cuvs INTERFACE "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>")
 
 # ##################################################################################################
 # * Build Cython artifacts -----------------------------------------------------

@@ -55,12 +55,6 @@ test = [
 Homepage = "https://github.com/rapidsai/cuvs"
 Documentation = "https://docs.rapids.ai/api/cuvs/stable/"
 
-[tool.setuptools]
-license-files = ["LICENSE"]
-
-[tool.setuptools.dynamic]
-version = {file = "cuvs/VERSION"}
-
 [tool.isort]
 line_length = 79
 multi_line_output = 3
@@ -132,9 +126,11 @@ matrix-entry = "cuda_suffixed=true"
 
 [tool.pydistcheck]
 select = [
-    # NOTE: size threshold is managed via CLI args in CI scripts
     "distro-too-large-compressed",
 ]
+
+# PyPI limit is 100 MiB, fail CI before we get too close to that
+max_allowed_size_compressed = '75M'
 
 [tool.pytest.ini_options]
 filterwarnings = [
