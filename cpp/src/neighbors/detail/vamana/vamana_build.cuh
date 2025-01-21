@@ -298,6 +298,7 @@ void batched_insert_vamana(
       edge_dest_vec.shrink_to_fit();
 
       // Batch execution of reverse edge creation/application
+      reverse_batch = params.reverse_batchsize;
       for (int rev_start = 0; rev_start < (int)unique_dests; rev_start += reverse_batch) {
         if (rev_start + reverse_batch > (int)unique_dests) {
           reverse_batch = (int)unique_dests - rev_start;
@@ -359,6 +360,7 @@ void batched_insert_vamana(
         // Write new edge lists to graph
         write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
           d_graph.view(), reverse_list_ptr.data_handle(), degree, reverse_batch);
+
       }
 
       start += step_size;

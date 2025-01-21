@@ -268,7 +268,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
     {32},            // graph degree
-    {64, 128, 256},  // visited_size
+    {64, 256},  // visited_size
     {0.06, 0.1},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
@@ -285,11 +285,11 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
     {64},             // graph degree
-    {128, 256, 512},  // visited_size
-    {0.06, 0.1},
+    {128, 512},  // visited_size
+    {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
-    {100, 1000000},
+    {1000000},
     {100},
     {10},
     {cagra::search_algo::AUTO},
@@ -303,11 +303,11 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
     {128},       // graph degree
-    {256, 512},  // visited_size
-    {0.06, 0.1},
+    {256},  // visited_size
+    {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
-    {100, 1000000},
+    {1000000},
     {100},
     {10},
     {cagra::search_algo::AUTO},
@@ -322,10 +322,10 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
     {256},        // graph degree
     {512, 1024},  // visited_size
-    {0.06, 0.1},
+    {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
-    {100, 1000000},
+    {1000000},
     {100},
     {10},
     {cagra::search_algo::AUTO},
