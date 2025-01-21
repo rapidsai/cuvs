@@ -53,7 +53,7 @@ set(CUVS_USE_RAFT_STATIC ON)
 # --- cuVS ---#
 set(BUILD_TESTS OFF)
 set(BUILD_C_LIBRARY ON)
-# TODO(jameslamb): avoid compiling and installing the static library
+set(CUVS_COMPILE_DYNAMIC_ONLY ON)
 
 add_subdirectory(../../cpp cuvs-cpp)
 
