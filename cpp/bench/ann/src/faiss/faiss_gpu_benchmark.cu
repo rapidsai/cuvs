@@ -86,10 +86,53 @@ void parse_build_param(const nlohmann::json& conf,
 }
 
 template <typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::faiss_gpu_cagra<T>::build_param& param)
+{
+  if (conf.contains("graph_degree")) {
+    param.graph_degree = conf.at("graph_degree");
+  } else {
+    param.graph_degree = 64;
+  }
+  if (conf.contains("intermediate_graph_degree")) {
+    param.intermediate_graph_degree = conf.at("intermediate_graph_degree");
+  } else {
+    param.intermediate_graph_degree = 128;
+  }
+  if (conf.contains("cagra_build_algo")) {
+    param.cagra_build_algo = conf.at("cagra_build_algo");
+  }
+}
+
+template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::faiss_gpu<T>::search_param& param)
 {
-  param.nprobe = conf.at("nprobe");
+  if (conf.contains("nprobe")) { param.nprobe = conf.at("nprobe"); }
+  if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
+}
+
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::faiss_gpu_cagra<T>::search_param& param)
+{
+  if (conf.contains("itopk")) { param.p.itopk_size = conf.at("itopk"); }
+  if (conf.contains("search_width")) { param.p.search_width = conf.at("search_width"); }
+  if (conf.contains("max_iterations")) { param.p.max_iterations = conf.at("max_iterations"); }
+  if (conf.contains("algo")) {
+    if (conf.at("algo") == "single_cta") {
+      param.p.algo = faiss::gpu::search_algo::SINGLE_CTA;
+    } else if (conf.at("algo") == "multi_cta") {
+      param.p.algo = faiss::gpu::search_algo::MULTI_CTA;
+    } else if (conf.at("algo") == "multi_kernel") {
+      param.p.algo = faiss::gpu::search_algo::MULTI_KERNEL;
+    } else if (conf.at("algo") == "auto") {
+      param.p.algo = faiss::gpu::search_algo::AUTO;
+    } else {
+      std::string tmp = conf.at("algo");
+      THROW("Invalid value for algo: %s", tmp.c_str());
+    }
+  }
   if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
 }
 
@@ -141,6 +184,10 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
     return param;
   } else if (algo_name == "faiss_gpu_flat") {
     auto param = std::make_unique<typename cuvs::bench::faiss_gpu<T>::search_param>();
+    return param;
+  } else if (algo_name == "faiss_gpu_cagra") {
+    auto param = std::make_unique<typename cuvs::bench::faiss_gpu_cagra<T>::search_param>();
+    parse_search_param<T>(conf, *param);
     return param;
   }
   // else

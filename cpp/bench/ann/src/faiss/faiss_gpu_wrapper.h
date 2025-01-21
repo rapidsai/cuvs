@@ -21,6 +21,7 @@
 #include <cuvs/neighbors/refine.hpp>
 
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
 #include <faiss/IndexRefine.h>
@@ -132,7 +133,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
     algo_property property;
     // to enable building big dataset which is larger than GPU memory
     property.dataset_memory_type = MemoryType::kHost;
-    property.query_memory_type   = MemoryType::kHost;
+    property.query_memory_type   = MemoryType::kDevice;
     return property;
   }
 
@@ -200,7 +201,10 @@ void faiss_gpu<T>::build(const T* dataset, size_t nrow)
   }
   index_->train(nrow, dataset);  // faiss::gpu::GpuIndexFlat::train() will do nothing
   assert(index_->is_trained);
-  index_->add(nrow, dataset);
+  auto index_cagra = dynamic_cast<faiss::gpu::GpuIndexCagra*>(index_.get());
+  if (index_cagra == nullptr) {
+    index_->add(nrow, dataset);
+  }
 }
 
 template <typename T>
@@ -225,6 +229,8 @@ void faiss_gpu<T>::search(
                      distances_tmp.data_handle(),
                      candidates.data_handle(),
                      this->search_params_.get());
+      gpu_resource_->getRaftHandle(device_).sync_stream();
+      RAFT_LOG_INFO("search completed");
 
       auto queries_host    = raft::make_host_matrix<T, IdxT>(batch_size, index_->d);
       auto candidates_host = raft::make_host_matrix<IdxT, IdxT>(batch_size, k0);
@@ -232,6 +238,7 @@ void faiss_gpu<T>::search(
       auto distances_host  = raft::make_host_matrix<float, IdxT>(batch_size, k);
       auto dataset_v       = raft::make_host_matrix_view<const T, faiss::idx_t>(
         this->dataset_, index_->ntotal, index_->d);
+      
 
       raft::device_resources handle_ = gpu_resource_->getRaftHandle(device_);
 
@@ -243,6 +250,7 @@ void faiss_gpu<T>::search(
 
       // wait for the queries to copy to host in 'stream`
       handle_.sync_stream();
+      RAFT_LOG_INFO("ALL COPIES COMPLETED");
 
       cuvs::neighbors::refine(handle_,
                               dataset_v,
@@ -251,11 +259,13 @@ void faiss_gpu<T>::search(
                               neighbors_host.view(),
                               distances_host.view(),
                               parse_metric_type(this->metric_));
+      handle_.sync_stream();
+      RAFT_LOG_INFO("REFINE COMPLETE");
 
-      raft::copy(
-        neighbors, neighbors_host.data_handle(), neighbors_host.size(), handle_.get_stream());
-      raft::copy(
-        distances, distances_host.data_handle(), distances_host.size(), handle_.get_stream());
+      // raft::copy(
+      //   neighbors, neighbors_host.data_handle(), neighbors_host.size(), handle_.get_stream());
+      // raft::copy(
+      //   distances, distances_host.data_handle(), distances_host.size(), handle_.get_stream());
     } else {
       index_refine_->search(batch_size,
                             queries,
@@ -516,7 +526,11 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     /// Number of Iterations to run if building with NN_DESCENT
     size_t nn_descent_niter;
   };
-  using typename faiss_gpu<T>::search_param_base;
+  using search_param_base = typename algo<T>::search_param;
+  struct search_param : public search_param_base {
+    faiss::gpu::SearchParametersCagra p;
+    float refine_ratio = 1.0;
+  };
 
   faiss_gpu_cagra(Metric metric, int dim, const build_param& param)
     : faiss_gpu<T>(metric, dim, param)
@@ -533,36 +547,36 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     config.nn_descent_niter = param.nn_descent_niter;
 
     this->index_ = std::make_shared<faiss::gpu::GpuIndexCagra>(
-      this->gpu_resource_, dim, parse_metric_faiss(this->metric_), config);
+      this->gpu_resource_.get(), dim, parse_metric_faiss(this->metric_), config);
   }
 
   void set_search_param(const search_param_base& param) override
   {
-    auto sp = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
+    auto sp = dynamic_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
     this->refine_ratio_ = sp.refine_ratio;
-    faiss::gpu::SearchParametersCagra faiss_search_params;
+    this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(sp.p);
 
-    this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(faiss_search_params);
-
-    if (sp.refine_ratio > 1.0) {
-      this->index_refine_ =
-        std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
-      this->index_refine_.get()->k_factor = sp.refine_ratio;
-      faiss::IndexRefineSearchParameters faiss_refine_search_params;
-      faiss_refine_search_params.k_factor          = this->index_refine_.get()->k_factor;
-      faiss_refine_search_params.base_index_params = this->search_params_.get();
-      this->refine_search_params_ =
-        std::make_unique<faiss::IndexRefineSearchParameters>(faiss_refine_search_params);
-    }
+    // if (sp.refine_ratio > 1.0) {
+    //   RAFT_LOG_INFO("now creating index_refine_");
+    //   this->index_refine_ =
+    //     std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
+    //   RAFT_LOG_INFO("now done creating index_refine_");
+    //   this->index_refine_.get()->k_factor = sp.refine_ratio;
+    //   faiss::IndexRefineSearchParameters faiss_refine_search_params;
+    //   faiss_refine_search_params.k_factor          = this->index_refine_.get()->k_factor;
+    //   faiss_refine_search_params.base_index_params = this->search_params_.get();
+    //   this->refine_search_params_ =
+    //     std::make_unique<faiss::IndexRefineSearchParameters>(faiss_refine_search_params);
+    // }
   }
 
   void save(const std::string& file) const override
   {
-    this->template save_<faiss::gpu::GpuIndexCagra, faiss::IndexIVFPQ>(file);
+    this->template save_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
   }
   void load(const std::string& file) override
   {
-    this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexIVFPQ>(file);
+    this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
   }
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
 };
