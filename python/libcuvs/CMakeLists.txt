@@ -48,7 +48,7 @@ elseif(USE_CUDA_MATH_WHEELS)
 endif()
 
 # --- RAFT ---#
-set(CUVS_USE_RAFT_STATIC ON)
+set(CUVS_USE_RAFT_STATIC OFF)
 
 # --- cuVS ---#
 set(BUILD_TESTS OFF)
@@ -58,12 +58,13 @@ set(CUVS_COMPILE_DYNAMIC_ONLY ON)
 add_subdirectory(../../cpp cuvs-cpp)
 
 if(NOT CUDA_STATIC_MATH_LIBRARIES AND USE_CUDA_MATH_WHEELS)
+  # assumes libcuvs.so is installed 2 levels deep, e.g. site-packages/libcuvs/lib64/libcuvs.so
   set(rpaths
-      "$ORIGIN/../nvidia/cublas/lib"
-      "$ORIGIN/../nvidia/curand/lib"
-      "$ORIGIN/../nvidia/cusolver/lib"
-      "$ORIGIN/../nvidia/cusparse/lib"
-      "$ORIGIN/../nvidia/nvjitlink/lib"
+      "$ORIGIN/../../nvidia/cublas/lib"
+      "$ORIGIN/../../nvidia/curand/lib"
+      "$ORIGIN/../../nvidia/cusolver/lib"
+      "$ORIGIN/../../nvidia/cusparse/lib"
+      "$ORIGIN/../../nvidia/nvjitlink/lib"
   )
   set_property(
     TARGET cuvs
