@@ -54,21 +54,21 @@ set(BUILD_C_LIBRARY ON)
 add_subdirectory(../../cpp cuvs-cpp)
 
 if(NOT CUDA_STATIC_MATH_LIBRARIES AND USE_CUDA_MATH_WHEELS)
-    set(rpaths
-        "$ORIGIN/../nvidia/cublas/lib"
-        "$ORIGIN/../nvidia/curand/lib"
-        "$ORIGIN/../nvidia/cusolver/lib"
-        "$ORIGIN/../nvidia/cusparse/lib"
-        "$ORIGIN/../nvidia/nvjitlink/lib"
-    )
-    set_property(
-        TARGET cuvs
-        PROPERTY INSTALL_RPATH ${rpaths}
-        APPEND
-    )
-    set_property(
-        TARGET cuvs_c
-        PROPERTY INSTALL_RPATH ${rpaths}
-        APPEND
-    )
+  set(rpaths
+      "$ORIGIN/../nvidia/cublas/lib"
+      "$ORIGIN/../nvidia/curand/lib"
+      "$ORIGIN/../nvidia/cusolver/lib"
+      "$ORIGIN/../nvidia/cusparse/lib"
+      "$ORIGIN/../nvidia/nvjitlink/lib"
+  )
+  set_property(
+    TARGET cuvs
+    PROPERTY INSTALL_RPATH ${rpaths}
+    APPEND
+  )
+  set_property(
+    TARGET cuvs_c
+    PROPERTY INSTALL_RPATH ${rpaths}
+    APPEND
+  )
 endif()
