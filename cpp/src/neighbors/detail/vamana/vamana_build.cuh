@@ -360,7 +360,6 @@ void batched_insert_vamana(
         // Write new edge lists to graph
         write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
           d_graph.view(), reverse_list_ptr.data_handle(), degree, reverse_batch);
-
       }
 
       start += step_size;

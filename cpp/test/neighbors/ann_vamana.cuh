@@ -267,7 +267,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
   std::vector<AnnVamanaInputs> inputs = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
-    {32},            // graph degree
+    {32},       // graph degree
     {64, 256},  // visited_size
     {0.06, 0.1},
     {cuvs::distance::DistanceType::L2Expanded},
@@ -284,7 +284,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
   std::vector<AnnVamanaInputs> inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
-    {64},             // graph degree
+    {64},        // graph degree
     {128, 512},  // visited_size
     {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
@@ -302,7 +302,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
   inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
-    {128},       // graph degree
+    {128},  // graph degree
     {256},  // visited_size
     {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
