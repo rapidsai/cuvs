@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from libraft._version import __git_commit__, __version__
-from libraft.load import load_library
+from libcuvs._version import __git_commit__, __version__
+from libcuvs.load import load_library
