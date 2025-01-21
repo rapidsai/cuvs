@@ -22,6 +22,7 @@ jobs:
       - conda-python-tests
       - docs-build
       - rust-build
+      - wheel-build-libcuvs
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
@@ -135,8 +136,15 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_rust.sh"
-  wheel-build-cuvs:
+  wheel-build-libcuvs:
     needs: checks
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
+    with:
+      build_type: pull-request
+      script: ci/build_wheel_libcuvs.sh
+  wheel-build-cuvs:
+    needs: wheel-build-libcuvs
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
     with:
