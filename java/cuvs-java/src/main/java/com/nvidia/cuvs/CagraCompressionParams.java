@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 import java.lang.foreign.MemorySegment;
 
-import com.nvidia.cuvs.panama.CuvsCagraCompressionParams;
+import com.nvidia.cuvs.panama.CuVSCagraCompressionParams;
 
 /**
  * Supplemental compression parameters to build CAGRA Index.
@@ -70,13 +70,13 @@ public class CagraCompressionParams {
    * Allocates the configured compression parameters in the MemorySegment.
    */
   private MemorySegment initMemorySegment() {
-    MemorySegment compressionParamsMemorySegment = CuvsCagraCompressionParams.allocate(resources.arena);
-    CuvsCagraCompressionParams.pq_bits(compressionParamsMemorySegment, pqBits);
-    CuvsCagraCompressionParams.pq_dim(compressionParamsMemorySegment, pqDim);
-    CuvsCagraCompressionParams.vq_n_centers(compressionParamsMemorySegment, vqNCenters);
-    CuvsCagraCompressionParams.kmeans_n_iters(compressionParamsMemorySegment, kmeansNIters);
-    CuvsCagraCompressionParams.vq_kmeans_trainset_fraction(compressionParamsMemorySegment, vqKmeansTrainsetFraction);
-    CuvsCagraCompressionParams.pq_kmeans_trainset_fraction(compressionParamsMemorySegment, pqKmeansTrainsetFraction);
+    MemorySegment compressionParamsMemorySegment = CuVSCagraCompressionParams.allocate(resources.arena);
+    CuVSCagraCompressionParams.pq_bits(compressionParamsMemorySegment, pqBits);
+    CuVSCagraCompressionParams.pq_dim(compressionParamsMemorySegment, pqDim);
+    CuVSCagraCompressionParams.vq_n_centers(compressionParamsMemorySegment, vqNCenters);
+    CuVSCagraCompressionParams.kmeans_n_iters(compressionParamsMemorySegment, kmeansNIters);
+    CuVSCagraCompressionParams.vq_kmeans_trainset_fraction(compressionParamsMemorySegment, vqKmeansTrainsetFraction);
+    CuVSCagraCompressionParams.pq_kmeans_trainset_fraction(compressionParamsMemorySegment, pqKmeansTrainsetFraction);
     return compressionParamsMemorySegment;
   }
 

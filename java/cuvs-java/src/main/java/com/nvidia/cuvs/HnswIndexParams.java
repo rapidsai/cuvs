@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 import java.lang.foreign.MemorySegment;
 
-import com.nvidia.cuvs.panama.CuvsHnswIndexParams;
+import com.nvidia.cuvs.panama.CuVSHnswIndexParams;
 
 /**
  * Supplemental parameters to build HNSW index.
@@ -76,9 +76,9 @@ public class HnswIndexParams {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuvsHnswIndexParams.allocate(resources.arena);
-    CuvsHnswIndexParams.ef_construction(memorySegment, efConstruction);
-    CuvsHnswIndexParams.num_threads(memorySegment, numThreads);
+    MemorySegment memorySegment = CuVSHnswIndexParams.allocate(resources.arena);
+    CuVSHnswIndexParams.ef_construction(memorySegment, efConstruction);
+    CuVSHnswIndexParams.num_threads(memorySegment, numThreads);
     return memorySegment;
   }
 

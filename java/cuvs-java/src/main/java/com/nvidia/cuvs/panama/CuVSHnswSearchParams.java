@@ -28,21 +28,20 @@ import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
- * struct cuvsHnswIndexParams {
- *     cuvsHnswHierarchy hierarchy;
- *     int ef_construction;
- *     int num_threads;
+ * struct cuvsHnswSearchParams {
+ *     int32_t ef;
+ *     int32_t num_threads;
  * }
  * }
  */
-public class CuvsHnswIndexParams {
+public class CuVSHnswSearchParams {
 
-  CuvsHnswIndexParams() {
+  CuVSHnswSearchParams() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(hnsw_h.C_INT.withName("hierarchy"),
-      hnsw_h.C_INT.withName("ef_construction"), hnsw_h.C_INT.withName("num_threads")).withName("cuvsHnswIndexParams");
+  private static final GroupLayout $LAYOUT = MemoryLayout
+      .structLayout(HnswH.C_INT.withName("ef"), HnswH.C_INT.withName("num_threads")).withName("cuvsHnswSearchParams");
 
   /**
    * The layout of this struct
@@ -51,102 +50,62 @@ public class CuvsHnswIndexParams {
     return $LAYOUT;
   }
 
-  private static final OfInt hierarchy$LAYOUT = (OfInt) $LAYOUT.select(groupElement("hierarchy"));
+  private static final OfInt ef$LAYOUT = (OfInt) $LAYOUT.select(groupElement("ef"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
+   * {@snippet lang = c : * int32_t ef
    * }
    */
-  public static final OfInt hierarchy$layout() {
-    return hierarchy$LAYOUT;
+  public static final OfInt ef$layout() {
+    return ef$LAYOUT;
   }
 
-  private static final long hierarchy$OFFSET = 0;
+  private static final long ef$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
+   * {@snippet lang = c : * int32_t ef
    * }
    */
-  public static final long hierarchy$offset() {
-    return hierarchy$OFFSET;
+  public static final long ef$offset() {
+    return ef$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
+   * {@snippet lang = c : * int32_t ef
    * }
    */
-  public static int hierarchy(MemorySegment struct) {
-    return struct.get(hierarchy$LAYOUT, hierarchy$OFFSET);
+  public static int ef(MemorySegment struct) {
+    return struct.get(ef$LAYOUT, ef$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
+   * {@snippet lang = c : * int32_t ef
    * }
    */
-  public static void hierarchy(MemorySegment struct, int fieldValue) {
-    struct.set(hierarchy$LAYOUT, hierarchy$OFFSET, fieldValue);
-  }
-
-  private static final OfInt ef_construction$LAYOUT = (OfInt) $LAYOUT.select(groupElement("ef_construction"));
-
-  /**
-   * Layout for field:
-   * {@snippet lang = c : * int ef_construction
-   * }
-   */
-  public static final OfInt ef_construction$layout() {
-    return ef_construction$LAYOUT;
-  }
-
-  private static final long ef_construction$OFFSET = 4;
-
-  /**
-   * Offset for field:
-   * {@snippet lang = c : * int ef_construction
-   * }
-   */
-  public static final long ef_construction$offset() {
-    return ef_construction$OFFSET;
-  }
-
-  /**
-   * Getter for field:
-   * {@snippet lang = c : * int ef_construction
-   * }
-   */
-  public static int ef_construction(MemorySegment struct) {
-    return struct.get(ef_construction$LAYOUT, ef_construction$OFFSET);
-  }
-
-  /**
-   * Setter for field:
-   * {@snippet lang = c : * int ef_construction
-   * }
-   */
-  public static void ef_construction(MemorySegment struct, int fieldValue) {
-    struct.set(ef_construction$LAYOUT, ef_construction$OFFSET, fieldValue);
+  public static void ef(MemorySegment struct, int fieldValue) {
+    struct.set(ef$LAYOUT, ef$OFFSET, fieldValue);
   }
 
   private static final OfInt num_threads$LAYOUT = (OfInt) $LAYOUT.select(groupElement("num_threads"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * int32_t num_threads
    * }
    */
   public static final OfInt num_threads$layout() {
     return num_threads$LAYOUT;
   }
 
-  private static final long num_threads$OFFSET = 8;
+  private static final long num_threads$OFFSET = 4;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * int32_t num_threads
    * }
    */
   public static final long num_threads$offset() {
@@ -155,7 +114,7 @@ public class CuvsHnswIndexParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * int32_t num_threads
    * }
    */
   public static int num_threads(MemorySegment struct) {
@@ -164,7 +123,7 @@ public class CuvsHnswIndexParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * int32_t num_threads
    * }
    */
   public static void num_threads(MemorySegment struct, int fieldValue) {

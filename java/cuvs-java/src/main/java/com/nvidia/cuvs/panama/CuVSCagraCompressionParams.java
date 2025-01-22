@@ -39,16 +39,16 @@ import java.util.function.Consumer;
  * }
  * }
  */
-public class CuvsCagraCompressionParams {
+public class CuVSCagraCompressionParams {
 
-  CuvsCagraCompressionParams() {
+  CuVSCagraCompressionParams() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(cagra_h.C_INT.withName("pq_bits"),
-      cagra_h.C_INT.withName("pq_dim"), cagra_h.C_INT.withName("vq_n_centers"),
-      cagra_h.C_INT.withName("kmeans_n_iters"), cagra_h.C_DOUBLE.withName("vq_kmeans_trainset_fraction"),
-      cagra_h.C_DOUBLE.withName("pq_kmeans_trainset_fraction")).withName("cuvsCagraCompressionParams");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_INT.withName("pq_bits"),
+      CagraH.C_INT.withName("pq_dim"), CagraH.C_INT.withName("vq_n_centers"),
+      CagraH.C_INT.withName("kmeans_n_iters"), CagraH.C_DOUBLE.withName("vq_kmeans_trainset_fraction"),
+      CagraH.C_DOUBLE.withName("pq_kmeans_trainset_fraction")).withName("cuvsCagraCompressionParams");
 
   /**
    * The layout of this struct

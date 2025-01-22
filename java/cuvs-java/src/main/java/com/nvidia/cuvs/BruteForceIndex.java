@@ -32,7 +32,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
 import com.nvidia.cuvs.common.Util;
-import com.nvidia.cuvs.panama.cuvsBruteForceIndex;
+import com.nvidia.cuvs.panama.CuVSBruteForceIndex;
 
 /**
  * 
@@ -338,7 +338,7 @@ public class BruteForceIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResources resources) {
-      memorySegment = cuvsBruteForceIndex.allocate(resources.arena);
+      memorySegment = CuVSBruteForceIndex.allocate(resources.arena);
     }
 
     /**

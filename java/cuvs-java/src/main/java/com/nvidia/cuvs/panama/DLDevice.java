@@ -41,8 +41,8 @@ public class DLDevice {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        dlpack_h.C_INT.withName("device_type"),
-        dlpack_h.C_INT.withName("device_id")
+        DlpackH.C_INT.withName("device_type"),
+        DlpackH.C_INT.withName("device_id")
     ).withName("$anon$126:9");
 
     /**

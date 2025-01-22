@@ -47,20 +47,20 @@ import java.util.function.Consumer;
  * }
  * }
  */
-public class CuvsCagraSearchParams {
+public class CuVSCagraSearchParams {
 
-  CuvsCagraSearchParams() {
+  CuVSCagraSearchParams() {
     // Should not be called directly
   }
 
   private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(cagra_h.C_LONG.withName("max_queries"), cagra_h.C_LONG.withName("itopk_size"),
-          cagra_h.C_LONG.withName("max_iterations"), cagra_h.C_INT.withName("algo"), MemoryLayout.paddingLayout(4),
-          cagra_h.C_LONG.withName("team_size"), cagra_h.C_LONG.withName("search_width"),
-          cagra_h.C_LONG.withName("min_iterations"), cagra_h.C_LONG.withName("thread_block_size"),
-          cagra_h.C_INT.withName("hashmap_mode"), MemoryLayout.paddingLayout(4),
-          cagra_h.C_LONG.withName("hashmap_min_bitlen"), cagra_h.C_FLOAT.withName("hashmap_max_fill_rate"),
-          cagra_h.C_INT.withName("num_random_samplings"), cagra_h.C_LONG.withName("rand_xor_mask"))
+      .structLayout(CagraH.C_LONG.withName("max_queries"), CagraH.C_LONG.withName("itopk_size"),
+          CagraH.C_LONG.withName("max_iterations"), CagraH.C_INT.withName("algo"), MemoryLayout.paddingLayout(4),
+          CagraH.C_LONG.withName("team_size"), CagraH.C_LONG.withName("search_width"),
+          CagraH.C_LONG.withName("min_iterations"), CagraH.C_LONG.withName("thread_block_size"),
+          CagraH.C_INT.withName("hashmap_mode"), MemoryLayout.paddingLayout(4),
+          CagraH.C_LONG.withName("hashmap_min_bitlen"), CagraH.C_FLOAT.withName("hashmap_max_fill_rate"),
+          CagraH.C_INT.withName("num_random_samplings"), CagraH.C_LONG.withName("rand_xor_mask"))
       .withName("cuvsCagraSearchParams");
 
   /**

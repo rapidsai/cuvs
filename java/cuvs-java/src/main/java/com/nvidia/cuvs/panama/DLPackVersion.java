@@ -41,8 +41,8 @@ public class DLPackVersion {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        dlpack_h.C_INT.withName("major"),
-        dlpack_h.C_INT.withName("minor")
+        DlpackH.C_INT.withName("major"),
+        DlpackH.C_INT.withName("minor")
     ).withName("$anon$61:9");
 
     /**

@@ -48,13 +48,13 @@ public class DLTensor {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        dlpack_h.C_POINTER.withName("data"),
+        DlpackH.C_POINTER.withName("data"),
         DLDevice.layout().withName("device"),
-        dlpack_h.C_INT.withName("ndim"),
+        DlpackH.C_INT.withName("ndim"),
         DLDataType.layout().withName("dtype"),
-        dlpack_h.C_POINTER.withName("shape"),
-        dlpack_h.C_POINTER.withName("strides"),
-        dlpack_h.C_LONG.withName("byte_offset")
+        DlpackH.C_POINTER.withName("shape"),
+        DlpackH.C_POINTER.withName("strides"),
+        DlpackH.C_LONG.withName("byte_offset")
     ).withName("$anon$192:9");
 
     /**

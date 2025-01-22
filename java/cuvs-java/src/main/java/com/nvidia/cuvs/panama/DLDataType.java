@@ -43,9 +43,9 @@ public class DLDataType {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        dlpack_h.C_CHAR.withName("code"),
-        dlpack_h.C_CHAR.withName("bits"),
-        dlpack_h.C_SHORT.withName("lanes")
+        DlpackH.C_CHAR.withName("code"),
+        DlpackH.C_CHAR.withName("bits"),
+        DlpackH.C_SHORT.withName("lanes")
     ).withName("$anon$174:9");
 
     /**

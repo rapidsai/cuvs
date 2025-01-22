@@ -17,31 +17,32 @@
 package com.nvidia.cuvs.panama;
 
 import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
+import static java.lang.foreign.MemoryLayout.PathElement.sequenceElement;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.ValueLayout.OfLong;
+import java.lang.foreign.SequenceLayout;
+import java.lang.invoke.VarHandle;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
  * struct {
- *     uintptr_t addr;
- *     DLDataType dtype;
+ *     int __val[2];
  * }
  * }
  */
-public class CuvsHnswIndex {
+public class Fsidt {
 
-  CuvsHnswIndex() {
+  Fsidt() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(hnsw_h.C_LONG.withName("addr"),
-      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$66:9");
+  private static final GroupLayout $LAYOUT = MemoryLayout
+      .structLayout(MemoryLayout.sequenceLayout(2, CagraH.C_INT).withName("__val")).withName("$anon$155:12");
 
   /**
    * The layout of this struct
@@ -50,84 +51,75 @@ public class CuvsHnswIndex {
     return $LAYOUT;
   }
 
-  private static final OfLong addr$LAYOUT = (OfLong) $LAYOUT.select(groupElement("addr"));
+  private static final SequenceLayout __val$LAYOUT = (SequenceLayout) $LAYOUT.select(groupElement("__val"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uintptr_t addr
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static final OfLong addr$layout() {
-    return addr$LAYOUT;
+  public static final SequenceLayout __val$layout() {
+    return __val$LAYOUT;
   }
 
-  private static final long addr$OFFSET = 0;
+  private static final long __val$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uintptr_t addr
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static final long addr$offset() {
-    return addr$OFFSET;
+  public static final long __val$offset() {
+    return __val$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uintptr_t addr
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static long addr(MemorySegment struct) {
-    return struct.get(addr$LAYOUT, addr$OFFSET);
+  public static MemorySegment __val(MemorySegment struct) {
+    return struct.asSlice(__val$OFFSET, __val$LAYOUT.byteSize());
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uintptr_t addr
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static void addr(MemorySegment struct, long fieldValue) {
-    struct.set(addr$LAYOUT, addr$OFFSET, fieldValue);
+  public static void __val(MemorySegment struct, MemorySegment fieldValue) {
+    MemorySegment.copy(fieldValue, 0L, struct, __val$OFFSET, __val$LAYOUT.byteSize());
   }
 
-  private static final GroupLayout dtype$LAYOUT = (GroupLayout) $LAYOUT.select(groupElement("dtype"));
+  private static long[] __val$DIMS = { 2 };
 
   /**
-   * Layout for field:
-   * {@snippet lang = c : * DLDataType dtype
+   * Dimensions for array field:
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static final GroupLayout dtype$layout() {
-    return dtype$LAYOUT;
+  public static long[] __val$dimensions() {
+    return __val$DIMS;
   }
 
-  private static final long dtype$OFFSET = 8;
+  private static final VarHandle __val$ELEM_HANDLE = __val$LAYOUT.varHandle(sequenceElement());
 
   /**
-   * Offset for field:
-   * {@snippet lang = c : * DLDataType dtype
+   * Indexed getter for field:
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static final long dtype$offset() {
-    return dtype$OFFSET;
-  }
-
-  /**
-   * Getter for field:
-   * {@snippet lang = c : * DLDataType dtype
-   * }
-   */
-  public static MemorySegment dtype(MemorySegment struct) {
-    return struct.asSlice(dtype$OFFSET, dtype$LAYOUT.byteSize());
+  public static int __val(MemorySegment struct, long index0) {
+    return (int) __val$ELEM_HANDLE.get(struct, 0L, index0);
   }
 
   /**
-   * Setter for field:
-   * {@snippet lang = c : * DLDataType dtype
+   * Indexed setter for field:
+   * {@snippet lang = c : * int __val[2]
    * }
    */
-  public static void dtype(MemorySegment struct, MemorySegment fieldValue) {
-    MemorySegment.copy(fieldValue, 0L, struct, dtype$OFFSET, dtype$LAYOUT.byteSize());
+  public static void __val(MemorySegment struct, long index0, int fieldValue) {
+    __val$ELEM_HANDLE.set(struct, 0L, index0, fieldValue);
   }
 
   /**

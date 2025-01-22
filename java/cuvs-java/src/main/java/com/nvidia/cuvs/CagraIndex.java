@@ -32,7 +32,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
 import com.nvidia.cuvs.common.Util;
-import com.nvidia.cuvs.panama.cuvsCagraIndex;
+import com.nvidia.cuvs.panama.CuVSCagraIndex;
 
 /**
  * {@link CagraIndex} encapsulates a CAGRA index, along with methods to interact
@@ -491,7 +491,7 @@ public class CagraIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResources resources) {
-      memorySegment = cuvsCagraIndex.allocate(resources.arena);
+      memorySegment = CuVSCagraIndex.allocate(resources.arena);
     }
 
     /**

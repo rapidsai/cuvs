@@ -39,9 +39,9 @@ import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public class cagra_h {
+public class HnswH {
 
-  cagra_h() {
+  HnswH() {
     // Should not be called directly
   }
 
@@ -884,467 +884,467 @@ public class cagra_h {
    * {@snippet lang = c : * typedef unsigned char __u_char
    * }
    */
-  public static final OfByte __u_char = cagra_h.C_CHAR;
+  public static final OfByte __u_char = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned short __u_short
    * }
    */
-  public static final OfShort __u_short = cagra_h.C_SHORT;
+  public static final OfShort __u_short = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef unsigned int __u_int
    * }
    */
-  public static final OfInt __u_int = cagra_h.C_INT;
+  public static final OfInt __u_int = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __u_long
    * }
    */
-  public static final OfLong __u_long = cagra_h.C_LONG;
+  public static final OfLong __u_long = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef signed char __int8_t
    * }
    */
-  public static final OfByte __int8_t = cagra_h.C_CHAR;
+  public static final OfByte __int8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned char __uint8_t
    * }
    */
-  public static final OfByte __uint8_t = cagra_h.C_CHAR;
+  public static final OfByte __uint8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef short __int16_t
    * }
    */
-  public static final OfShort __int16_t = cagra_h.C_SHORT;
+  public static final OfShort __int16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef unsigned short __uint16_t
    * }
    */
-  public static final OfShort __uint16_t = cagra_h.C_SHORT;
+  public static final OfShort __uint16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef int __int32_t
    * }
    */
-  public static final OfInt __int32_t = cagra_h.C_INT;
+  public static final OfInt __int32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned int __uint32_t
    * }
    */
-  public static final OfInt __uint32_t = cagra_h.C_INT;
+  public static final OfInt __uint32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __int64_t
    * }
    */
-  public static final OfLong __int64_t = cagra_h.C_LONG;
+  public static final OfLong __int64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __uint64_t
    * }
    */
-  public static final OfLong __uint64_t = cagra_h.C_LONG;
+  public static final OfLong __uint64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __int8_t __int_least8_t
    * }
    */
-  public static final OfByte __int_least8_t = cagra_h.C_CHAR;
+  public static final OfByte __int_least8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint8_t __uint_least8_t
    * }
    */
-  public static final OfByte __uint_least8_t = cagra_h.C_CHAR;
+  public static final OfByte __uint_least8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int16_t __int_least16_t
    * }
    */
-  public static final OfShort __int_least16_t = cagra_h.C_SHORT;
+  public static final OfShort __int_least16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint16_t __uint_least16_t
    * }
    */
-  public static final OfShort __uint_least16_t = cagra_h.C_SHORT;
+  public static final OfShort __uint_least16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int32_t __int_least32_t
    * }
    */
-  public static final OfInt __int_least32_t = cagra_h.C_INT;
+  public static final OfInt __int_least32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint32_t __uint_least32_t
    * }
    */
-  public static final OfInt __uint_least32_t = cagra_h.C_INT;
+  public static final OfInt __uint_least32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int64_t __int_least64_t
    * }
    */
-  public static final OfLong __int_least64_t = cagra_h.C_LONG;
+  public static final OfLong __int_least64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint64_t __uint_least64_t
    * }
    */
-  public static final OfLong __uint_least64_t = cagra_h.C_LONG;
+  public static final OfLong __uint_least64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __quad_t
    * }
    */
-  public static final OfLong __quad_t = cagra_h.C_LONG;
+  public static final OfLong __quad_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __u_quad_t
    * }
    */
-  public static final OfLong __u_quad_t = cagra_h.C_LONG;
+  public static final OfLong __u_quad_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __intmax_t
    * }
    */
-  public static final OfLong __intmax_t = cagra_h.C_LONG;
+  public static final OfLong __intmax_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __uintmax_t
    * }
    */
-  public static final OfLong __uintmax_t = cagra_h.C_LONG;
+  public static final OfLong __uintmax_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __dev_t
    * }
    */
-  public static final OfLong __dev_t = cagra_h.C_LONG;
+  public static final OfLong __dev_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __uid_t
    * }
    */
-  public static final OfInt __uid_t = cagra_h.C_INT;
+  public static final OfInt __uid_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned int __gid_t
    * }
    */
-  public static final OfInt __gid_t = cagra_h.C_INT;
+  public static final OfInt __gid_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __ino_t
    * }
    */
-  public static final OfLong __ino_t = cagra_h.C_LONG;
+  public static final OfLong __ino_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __ino64_t
    * }
    */
-  public static final OfLong __ino64_t = cagra_h.C_LONG;
+  public static final OfLong __ino64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __mode_t
    * }
    */
-  public static final OfInt __mode_t = cagra_h.C_INT;
+  public static final OfInt __mode_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __nlink_t
    * }
    */
-  public static final OfLong __nlink_t = cagra_h.C_LONG;
+  public static final OfLong __nlink_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __off_t
    * }
    */
-  public static final OfLong __off_t = cagra_h.C_LONG;
+  public static final OfLong __off_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __off64_t
    * }
    */
-  public static final OfLong __off64_t = cagra_h.C_LONG;
+  public static final OfLong __off64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int __pid_t
    * }
    */
-  public static final OfInt __pid_t = cagra_h.C_INT;
+  public static final OfInt __pid_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __clock_t
    * }
    */
-  public static final OfLong __clock_t = cagra_h.C_LONG;
+  public static final OfLong __clock_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __rlim_t
    * }
    */
-  public static final OfLong __rlim_t = cagra_h.C_LONG;
+  public static final OfLong __rlim_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __rlim64_t
    * }
    */
-  public static final OfLong __rlim64_t = cagra_h.C_LONG;
+  public static final OfLong __rlim64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __id_t
    * }
    */
-  public static final OfInt __id_t = cagra_h.C_INT;
+  public static final OfInt __id_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __time_t
    * }
    */
-  public static final OfLong __time_t = cagra_h.C_LONG;
+  public static final OfLong __time_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __useconds_t
    * }
    */
-  public static final OfInt __useconds_t = cagra_h.C_INT;
+  public static final OfInt __useconds_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __suseconds_t
    * }
    */
-  public static final OfLong __suseconds_t = cagra_h.C_LONG;
+  public static final OfLong __suseconds_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __suseconds64_t
    * }
    */
-  public static final OfLong __suseconds64_t = cagra_h.C_LONG;
+  public static final OfLong __suseconds64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int __daddr_t
    * }
    */
-  public static final OfInt __daddr_t = cagra_h.C_INT;
+  public static final OfInt __daddr_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __key_t
    * }
    */
-  public static final OfInt __key_t = cagra_h.C_INT;
+  public static final OfInt __key_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __clockid_t
    * }
    */
-  public static final OfInt __clockid_t = cagra_h.C_INT;
+  public static final OfInt __clockid_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef void *__timer_t
    * }
    */
-  public static final AddressLayout __timer_t = cagra_h.C_POINTER;
+  public static final AddressLayout __timer_t = HnswH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef long __blksize_t
    * }
    */
-  public static final OfLong __blksize_t = cagra_h.C_LONG;
+  public static final OfLong __blksize_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __blkcnt_t
    * }
    */
-  public static final OfLong __blkcnt_t = cagra_h.C_LONG;
+  public static final OfLong __blkcnt_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __blkcnt64_t
    * }
    */
-  public static final OfLong __blkcnt64_t = cagra_h.C_LONG;
+  public static final OfLong __blkcnt64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsblkcnt_t
    * }
    */
-  public static final OfLong __fsblkcnt_t = cagra_h.C_LONG;
+  public static final OfLong __fsblkcnt_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsblkcnt64_t
    * }
    */
-  public static final OfLong __fsblkcnt64_t = cagra_h.C_LONG;
+  public static final OfLong __fsblkcnt64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsfilcnt_t
    * }
    */
-  public static final OfLong __fsfilcnt_t = cagra_h.C_LONG;
+  public static final OfLong __fsfilcnt_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsfilcnt64_t
    * }
    */
-  public static final OfLong __fsfilcnt64_t = cagra_h.C_LONG;
+  public static final OfLong __fsfilcnt64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __fsword_t
    * }
    */
-  public static final OfLong __fsword_t = cagra_h.C_LONG;
+  public static final OfLong __fsword_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __ssize_t
    * }
    */
-  public static final OfLong __ssize_t = cagra_h.C_LONG;
+  public static final OfLong __ssize_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __syscall_slong_t
    * }
    */
-  public static final OfLong __syscall_slong_t = cagra_h.C_LONG;
+  public static final OfLong __syscall_slong_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __syscall_ulong_t
    * }
    */
-  public static final OfLong __syscall_ulong_t = cagra_h.C_LONG;
+  public static final OfLong __syscall_ulong_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __off64_t __loff_t
    * }
    */
-  public static final OfLong __loff_t = cagra_h.C_LONG;
+  public static final OfLong __loff_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef char *__caddr_t
    * }
    */
-  public static final AddressLayout __caddr_t = cagra_h.C_POINTER;
+  public static final AddressLayout __caddr_t = HnswH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef long __intptr_t
    * }
    */
-  public static final OfLong __intptr_t = cagra_h.C_LONG;
+  public static final OfLong __intptr_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __socklen_t
    * }
    */
-  public static final OfInt __socklen_t = cagra_h.C_INT;
+  public static final OfInt __socklen_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __sig_atomic_t
    * }
    */
-  public static final OfInt __sig_atomic_t = cagra_h.C_INT;
+  public static final OfInt __sig_atomic_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int8_t int8_t
    * }
    */
-  public static final OfByte int8_t = cagra_h.C_CHAR;
+  public static final OfByte int8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int16_t int16_t
    * }
    */
-  public static final OfShort int16_t = cagra_h.C_SHORT;
+  public static final OfShort int16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int32_t int32_t
    * }
    */
-  public static final OfInt int32_t = cagra_h.C_INT;
+  public static final OfInt int32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int64_t int64_t
    * }
    */
-  public static final OfLong int64_t = cagra_h.C_LONG;
+  public static final OfLong int64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint8_t uint8_t
    * }
    */
-  public static final OfByte uint8_t = cagra_h.C_CHAR;
+  public static final OfByte uint8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint16_t uint16_t
    * }
    */
-  public static final OfShort uint16_t = cagra_h.C_SHORT;
+  public static final OfShort uint16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint32_t uint32_t
    * }
    */
-  public static final OfInt uint32_t = cagra_h.C_INT;
+  public static final OfInt uint32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint64_t uint64_t
    * }
    */
-  public static final OfLong uint64_t = cagra_h.C_LONG;
+  public static final OfLong uint64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __int_least8_t int_least8_t
    * }
    */
-  public static final OfByte int_least8_t = cagra_h.C_CHAR;
+  public static final OfByte int_least8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int_least16_t int_least16_t
    * }
    */
-  public static final OfShort int_least16_t = cagra_h.C_SHORT;
+  public static final OfShort int_least16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int_least32_t int_least32_t
    * }
    */
-  public static final OfInt int_least32_t = cagra_h.C_INT;
+  public static final OfInt int_least32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int_least64_t int_least64_t
    * }
    */
-  public static final OfLong int_least64_t = cagra_h.C_LONG;
+  public static final OfLong int_least64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint_least8_t uint_least8_t
    * }
    */
-  public static final OfByte uint_least8_t = cagra_h.C_CHAR;
+  public static final OfByte uint_least8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint_least16_t uint_least16_t
    * }
    */
-  public static final OfShort uint_least16_t = cagra_h.C_SHORT;
+  public static final OfShort uint_least16_t = HnswH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint_least32_t uint_least32_t
    * }
    */
-  public static final OfInt uint_least32_t = cagra_h.C_INT;
+  public static final OfInt uint_least32_t = HnswH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint_least64_t uint_least64_t
    * }
    */
-  public static final OfLong uint_least64_t = cagra_h.C_LONG;
+  public static final OfLong uint_least64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef signed char int_fast8_t
    * }
    */
-  public static final OfByte int_fast8_t = cagra_h.C_CHAR;
+  public static final OfByte int_fast8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef long int_fast16_t
    * }
    */
-  public static final OfLong int_fast16_t = cagra_h.C_LONG;
+  public static final OfLong int_fast16_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long int_fast32_t
    * }
    */
-  public static final OfLong int_fast32_t = cagra_h.C_LONG;
+  public static final OfLong int_fast32_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long int_fast64_t
    * }
    */
-  public static final OfLong int_fast64_t = cagra_h.C_LONG;
+  public static final OfLong int_fast64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned char uint_fast8_t
    * }
    */
-  public static final OfByte uint_fast8_t = cagra_h.C_CHAR;
+  public static final OfByte uint_fast8_t = HnswH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast16_t
    * }
    */
-  public static final OfLong uint_fast16_t = cagra_h.C_LONG;
+  public static final OfLong uint_fast16_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast32_t
    * }
    */
-  public static final OfLong uint_fast32_t = cagra_h.C_LONG;
+  public static final OfLong uint_fast32_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast64_t
    * }
    */
-  public static final OfLong uint_fast64_t = cagra_h.C_LONG;
+  public static final OfLong uint_fast64_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long intptr_t
    * }
    */
-  public static final OfLong intptr_t = cagra_h.C_LONG;
+  public static final OfLong intptr_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uintptr_t
    * }
    */
-  public static final OfLong uintptr_t = cagra_h.C_LONG;
+  public static final OfLong uintptr_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __intmax_t intmax_t
    * }
    */
-  public static final OfLong intmax_t = cagra_h.C_LONG;
+  public static final OfLong intmax_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uintmax_t uintmax_t
    * }
    */
-  public static final OfLong uintmax_t = cagra_h.C_LONG;
+  public static final OfLong uintmax_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long ptrdiff_t
    * }
    */
-  public static final OfLong ptrdiff_t = cagra_h.C_LONG;
+  public static final OfLong ptrdiff_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long size_t
    * }
    */
-  public static final OfLong size_t = cagra_h.C_LONG;
+  public static final OfLong size_t = HnswH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int wchar_t
    * }
    */
-  public static final OfInt wchar_t = cagra_h.C_INT;
+  public static final OfInt wchar_t = HnswH.C_INT;
   private static final int kDLCPU = (int) 1L;
 
   /**
@@ -1597,7 +1597,7 @@ public class cagra_h {
    * } *cuvsCagraCompressionParams_t
    * }
    */
-  public static final AddressLayout cuvsCagraCompressionParams_t = cagra_h.C_POINTER;
+  public static final AddressLayout cuvsCagraCompressionParams_t = HnswH.C_POINTER;
   /**
    * {@snippet lang = c :
    * typedef struct cuvsCagraIndexParams {
@@ -1610,7 +1610,7 @@ public class cagra_h {
    * } *cuvsCagraIndexParams_t
    * }
    */
-  public static final AddressLayout cuvsCagraIndexParams_t = cagra_h.C_POINTER;
+  public static final AddressLayout cuvsCagraIndexParams_t = HnswH.C_POINTER;
   private static final int SINGLE_CTA = (int) 0L;
 
   /**
@@ -1700,12 +1700,64 @@ public class cagra_h {
    * } *cuvsCagraSearchParams_t
    * }
    */
-  public static final AddressLayout cuvsCagraSearchParams_t = cagra_h.C_POINTER;
+  public static final AddressLayout cuvsCagraSearchParams_t = HnswH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef cuvsCagraIndex *cuvsCagraIndex_t
    * }
    */
-  public static final AddressLayout cuvsCagraIndex_t = cagra_h.C_POINTER;
+  public static final AddressLayout cuvsCagraIndex_t = HnswH.C_POINTER;
+  private static final int NONE = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsHnswHierarchy.NONE = 0
+   * }
+   */
+  public static int NONE() {
+    return NONE;
+  }
+
+  private static final int CPU = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum cuvsHnswHierarchy.CPU = 1
+   * }
+   */
+  public static int CPU() {
+    return CPU;
+  }
+
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsHnswIndexParams {
+   *     cuvsHnswHierarchy hierarchy;
+   *     int ef_construction;
+   *     int num_threads;
+   * } *cuvsHnswIndexParams_t
+   * }
+   */
+  public static final AddressLayout cuvsHnswIndexParams_t = HnswH.C_POINTER;
+  /**
+   * {@snippet lang = c : * typedef cuvsHnswIndex *cuvsHnswIndex_t
+   * }
+   */
+  public static final AddressLayout cuvsHnswIndex_t = HnswH.C_POINTER;
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsHnswExtendParams {
+   *     int num_threads;
+   * } *cuvsHnswExtendParams_t
+   * }
+   */
+  public static final AddressLayout cuvsHnswExtendParams_t = HnswH.C_POINTER;
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsHnswSearchParams {
+   *     int32_t ef;
+   *     int32_t num_threads;
+   * } *cuvsHnswSearchParams_t
+   * }
+   */
+  public static final AddressLayout cuvsHnswSearchParams_t = HnswH.C_POINTER;
   private static final long _POSIX_C_SOURCE = 200809L;
 
   /**

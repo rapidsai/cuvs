@@ -23,24 +23,25 @@ import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.ValueLayout.OfInt;
+import java.lang.foreign.ValueLayout.OfLong;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
- * struct cuvsHnswExtendParams {
- *     int num_threads;
+ * struct {
+ *     uintptr_t addr;
+ *     DLDataType dtype;
  * }
  * }
  */
-public class CuvsHnswExtendParams {
+public class CuVSHnswIndex {
 
-  CuvsHnswExtendParams() {
+  CuVSHnswIndex() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(hnsw_h.C_INT.withName("num_threads"))
-      .withName("cuvsHnswExtendParams");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(HnswH.C_LONG.withName("addr"),
+      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$66:9");
 
   /**
    * The layout of this struct
@@ -49,44 +50,84 @@ public class CuvsHnswExtendParams {
     return $LAYOUT;
   }
 
-  private static final OfInt num_threads$LAYOUT = (OfInt) $LAYOUT.select(groupElement("num_threads"));
+  private static final OfLong addr$LAYOUT = (OfLong) $LAYOUT.select(groupElement("addr"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static final OfInt num_threads$layout() {
-    return num_threads$LAYOUT;
+  public static final OfLong addr$layout() {
+    return addr$LAYOUT;
   }
 
-  private static final long num_threads$OFFSET = 0;
+  private static final long addr$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static final long num_threads$offset() {
-    return num_threads$OFFSET;
+  public static final long addr$offset() {
+    return addr$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static int num_threads(MemorySegment struct) {
-    return struct.get(num_threads$LAYOUT, num_threads$OFFSET);
+  public static long addr(MemorySegment struct) {
+    return struct.get(addr$LAYOUT, addr$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * int num_threads
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static void num_threads(MemorySegment struct, int fieldValue) {
-    struct.set(num_threads$LAYOUT, num_threads$OFFSET, fieldValue);
+  public static void addr(MemorySegment struct, long fieldValue) {
+    struct.set(addr$LAYOUT, addr$OFFSET, fieldValue);
+  }
+
+  private static final GroupLayout dtype$LAYOUT = (GroupLayout) $LAYOUT.select(groupElement("dtype"));
+
+  /**
+   * Layout for field:
+   * {@snippet lang = c : * DLDataType dtype
+   * }
+   */
+  public static final GroupLayout dtype$layout() {
+    return dtype$LAYOUT;
+  }
+
+  private static final long dtype$OFFSET = 8;
+
+  /**
+   * Offset for field:
+   * {@snippet lang = c : * DLDataType dtype
+   * }
+   */
+  public static final long dtype$offset() {
+    return dtype$OFFSET;
+  }
+
+  /**
+   * Getter for field:
+   * {@snippet lang = c : * DLDataType dtype
+   * }
+   */
+  public static MemorySegment dtype(MemorySegment struct) {
+    return struct.asSlice(dtype$OFFSET, dtype$LAYOUT.byteSize());
+  }
+
+  /**
+   * Setter for field:
+   * {@snippet lang = c : * DLDataType dtype
+   * }
+   */
+  public static void dtype(MemorySegment struct, MemorySegment fieldValue) {
+    MemorySegment.copy(fieldValue, 0L, struct, dtype$OFFSET, dtype$LAYOUT.byteSize());
   }
 
   /**

@@ -23,29 +23,27 @@ import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.ValueLayout.OfInt;
 import java.lang.foreign.ValueLayout.OfLong;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang=c :
  * struct {
- *     uintptr_t addr;
- *     enum cuvsFilterType type;
+ *     long long __clang_max_align_nonce1;
+ *     long double __clang_max_align_nonce2;
  * }
  * }
  */
-public class cuvsFilter {
+public class MaxAlignT {
 
-    cuvsFilter() {
+    MaxAlignT() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        brute_force_h.C_LONG.withName("addr"),
-        brute_force_h.C_INT.withName("type"),
-        MemoryLayout.paddingLayout(4)
-    ).withName("$anon$50:9");
+        DlpackH.C_LONG_LONG.withName("__clang_max_align_nonce1"),
+        MemoryLayout.paddingLayout(24)
+    ).withName("$anon$19:9");
 
     /**
      * The layout of this struct
@@ -54,92 +52,48 @@ public class cuvsFilter {
         return $LAYOUT;
     }
 
-    private static final OfLong addr$LAYOUT = (OfLong)$LAYOUT.select(groupElement("addr"));
+    private static final OfLong __clang_max_align_nonce1$LAYOUT = (OfLong)$LAYOUT.select(groupElement("__clang_max_align_nonce1"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uintptr_t addr
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static final OfLong addr$layout() {
-        return addr$LAYOUT;
+    public static final OfLong __clang_max_align_nonce1$layout() {
+        return __clang_max_align_nonce1$LAYOUT;
     }
 
-    private static final long addr$OFFSET = 0;
+    private static final long __clang_max_align_nonce1$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uintptr_t addr
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static final long addr$offset() {
-        return addr$OFFSET;
+    public static final long __clang_max_align_nonce1$offset() {
+        return __clang_max_align_nonce1$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uintptr_t addr
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static long addr(MemorySegment struct) {
-        return struct.get(addr$LAYOUT, addr$OFFSET);
+    public static long __clang_max_align_nonce1(MemorySegment struct) {
+        return struct.get(__clang_max_align_nonce1$LAYOUT, __clang_max_align_nonce1$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uintptr_t addr
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static void addr(MemorySegment struct, long fieldValue) {
-        struct.set(addr$LAYOUT, addr$OFFSET, fieldValue);
-    }
-
-    private static final OfInt type$LAYOUT = (OfInt)$LAYOUT.select(groupElement("type"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * enum cuvsFilterType type
-     * }
-     */
-    public static final OfInt type$layout() {
-        return type$LAYOUT;
-    }
-
-    private static final long type$OFFSET = 8;
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * enum cuvsFilterType type
-     * }
-     */
-    public static final long type$offset() {
-        return type$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * enum cuvsFilterType type
-     * }
-     */
-    public static int type(MemorySegment struct) {
-        return struct.get(type$LAYOUT, type$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * enum cuvsFilterType type
-     * }
-     */
-    public static void type(MemorySegment struct, int fieldValue) {
-        struct.set(type$LAYOUT, type$OFFSET, fieldValue);
+    public static void __clang_max_align_nonce1(MemorySegment struct, long fieldValue) {
+        struct.set(__clang_max_align_nonce1$LAYOUT, __clang_max_align_nonce1$OFFSET, fieldValue);
     }
 
     /**

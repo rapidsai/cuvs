@@ -47,10 +47,10 @@ public class CuVSCagraIndexParams {
   }
 
   private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(cagra_h.C_INT.withName("metric"), MemoryLayout.paddingLayout(4),
-          cagra_h.C_LONG.withName("intermediate_graph_degree"), cagra_h.C_LONG.withName("graph_degree"),
-          cagra_h.C_INT.withName("build_algo"), MemoryLayout.paddingLayout(4),
-          cagra_h.C_LONG.withName("nn_descent_niter"), cagra_h.C_POINTER.withName("compression"))
+      .structLayout(CagraH.C_INT.withName("metric"), MemoryLayout.paddingLayout(4),
+          CagraH.C_LONG.withName("intermediate_graph_degree"), CagraH.C_LONG.withName("graph_degree"),
+          CagraH.C_INT.withName("build_algo"), MemoryLayout.paddingLayout(4),
+          CagraH.C_LONG.withName("nn_descent_niter"), CagraH.C_POINTER.withName("compression"))
       .withName("cuvsCagraIndexParams");
 
   /**

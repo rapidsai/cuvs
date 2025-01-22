@@ -46,8 +46,8 @@ public class DLManagedTensor {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         DLTensor.layout().withName("dl_tensor"),
-        dlpack_h.C_POINTER.withName("manager_ctx"),
-        dlpack_h.C_POINTER.withName("deleter")
+        DlpackH.C_POINTER.withName("manager_ctx"),
+        DlpackH.C_POINTER.withName("deleter")
     ).withName("DLManagedTensor");
 
     /**
@@ -164,7 +164,7 @@ public class DLManagedTensor {
         }
 
         private static final FunctionDescriptor $DESC = FunctionDescriptor.ofVoid(
-            dlpack_h.C_POINTER
+            DlpackH.C_POINTER
         );
 
         /**
@@ -174,7 +174,7 @@ public class DLManagedTensor {
             return $DESC;
         }
 
-        private static final MethodHandle UP$MH = dlpack_h.upcallHandle(deleter.Function.class, "apply", $DESC);
+        private static final MethodHandle UP$MH = DlpackH.upcallHandle(deleter.Function.class, "apply", $DESC);
 
         /**
          * Allocates a new upcall stub, whose implementation is defined by {@code fi}.

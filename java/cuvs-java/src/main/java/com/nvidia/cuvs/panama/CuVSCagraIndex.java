@@ -34,14 +34,14 @@ import java.util.function.Consumer;
  * }
  * }
  */
-public class cuvsBruteForceIndex {
+public class CuVSCagraIndex {
 
-  cuvsBruteForceIndex() {
+  CuVSCagraIndex() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(brute_force_h.C_LONG.withName("addr"),
-      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$22:9");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_LONG.withName("addr"),
+      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$175:9");
 
   /**
    * The layout of this struct

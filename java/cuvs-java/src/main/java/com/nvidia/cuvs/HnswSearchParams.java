@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 import java.lang.foreign.MemorySegment;
 
-import com.nvidia.cuvs.panama.CuvsHnswSearchParams;
+import com.nvidia.cuvs.panama.CuVSHnswSearchParams;
 
 /**
  * HnswSearchParams encapsulates the logic for configuring and holding search
@@ -52,9 +52,9 @@ public class HnswSearchParams {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuvsHnswSearchParams.allocate(resources.arena);
-    CuvsHnswSearchParams.ef(memorySegment, ef);
-    CuvsHnswSearchParams.num_threads(memorySegment, numThreads);
+    MemorySegment memorySegment = CuVSHnswSearchParams.allocate(resources.arena);
+    CuVSHnswSearchParams.ef(memorySegment, ef);
+    CuVSHnswSearchParams.num_threads(memorySegment, numThreads);
     return memorySegment;
   }
 

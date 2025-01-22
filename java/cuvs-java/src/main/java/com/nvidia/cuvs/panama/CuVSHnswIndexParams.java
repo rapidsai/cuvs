@@ -17,32 +17,32 @@
 package com.nvidia.cuvs.panama;
 
 import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
-import static java.lang.foreign.MemoryLayout.PathElement.sequenceElement;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.SequenceLayout;
-import java.lang.invoke.VarHandle;
+import java.lang.foreign.ValueLayout.OfInt;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
- * struct {
- *     int __val[2];
+ * struct cuvsHnswIndexParams {
+ *     cuvsHnswHierarchy hierarchy;
+ *     int ef_construction;
+ *     int num_threads;
  * }
  * }
  */
-public class __fsid_t {
+public class CuVSHnswIndexParams {
 
-  __fsid_t() {
+  CuVSHnswIndexParams() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(MemoryLayout.sequenceLayout(2, cagra_h.C_INT).withName("__val")).withName("$anon$155:12");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(HnswH.C_INT.withName("hierarchy"),
+      HnswH.C_INT.withName("ef_construction"), HnswH.C_INT.withName("num_threads")).withName("cuvsHnswIndexParams");
 
   /**
    * The layout of this struct
@@ -51,75 +51,124 @@ public class __fsid_t {
     return $LAYOUT;
   }
 
-  private static final SequenceLayout __val$LAYOUT = (SequenceLayout) $LAYOUT.select(groupElement("__val"));
+  private static final OfInt hierarchy$LAYOUT = (OfInt) $LAYOUT.select(groupElement("hierarchy"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * int __val[2]
+   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
    * }
    */
-  public static final SequenceLayout __val$layout() {
-    return __val$LAYOUT;
+  public static final OfInt hierarchy$layout() {
+    return hierarchy$LAYOUT;
   }
 
-  private static final long __val$OFFSET = 0;
+  private static final long hierarchy$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * int __val[2]
+   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
    * }
    */
-  public static final long __val$offset() {
-    return __val$OFFSET;
+  public static final long hierarchy$offset() {
+    return hierarchy$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * int __val[2]
+   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
    * }
    */
-  public static MemorySegment __val(MemorySegment struct) {
-    return struct.asSlice(__val$OFFSET, __val$LAYOUT.byteSize());
+  public static int hierarchy(MemorySegment struct) {
+    return struct.get(hierarchy$LAYOUT, hierarchy$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * int __val[2]
+   * {@snippet lang = c : * cuvsHnswHierarchy hierarchy
    * }
    */
-  public static void __val(MemorySegment struct, MemorySegment fieldValue) {
-    MemorySegment.copy(fieldValue, 0L, struct, __val$OFFSET, __val$LAYOUT.byteSize());
+  public static void hierarchy(MemorySegment struct, int fieldValue) {
+    struct.set(hierarchy$LAYOUT, hierarchy$OFFSET, fieldValue);
   }
 
-  private static long[] __val$DIMS = { 2 };
+  private static final OfInt ef_construction$LAYOUT = (OfInt) $LAYOUT.select(groupElement("ef_construction"));
 
   /**
-   * Dimensions for array field:
-   * {@snippet lang = c : * int __val[2]
+   * Layout for field:
+   * {@snippet lang = c : * int ef_construction
    * }
    */
-  public static long[] __val$dimensions() {
-    return __val$DIMS;
+  public static final OfInt ef_construction$layout() {
+    return ef_construction$LAYOUT;
   }
 
-  private static final VarHandle __val$ELEM_HANDLE = __val$LAYOUT.varHandle(sequenceElement());
+  private static final long ef_construction$OFFSET = 4;
 
   /**
-   * Indexed getter for field:
-   * {@snippet lang = c : * int __val[2]
+   * Offset for field:
+   * {@snippet lang = c : * int ef_construction
    * }
    */
-  public static int __val(MemorySegment struct, long index0) {
-    return (int) __val$ELEM_HANDLE.get(struct, 0L, index0);
+  public static final long ef_construction$offset() {
+    return ef_construction$OFFSET;
   }
 
   /**
-   * Indexed setter for field:
-   * {@snippet lang = c : * int __val[2]
+   * Getter for field:
+   * {@snippet lang = c : * int ef_construction
    * }
    */
-  public static void __val(MemorySegment struct, long index0, int fieldValue) {
-    __val$ELEM_HANDLE.set(struct, 0L, index0, fieldValue);
+  public static int ef_construction(MemorySegment struct) {
+    return struct.get(ef_construction$LAYOUT, ef_construction$OFFSET);
+  }
+
+  /**
+   * Setter for field:
+   * {@snippet lang = c : * int ef_construction
+   * }
+   */
+  public static void ef_construction(MemorySegment struct, int fieldValue) {
+    struct.set(ef_construction$LAYOUT, ef_construction$OFFSET, fieldValue);
+  }
+
+  private static final OfInt num_threads$LAYOUT = (OfInt) $LAYOUT.select(groupElement("num_threads"));
+
+  /**
+   * Layout for field:
+   * {@snippet lang = c : * int num_threads
+   * }
+   */
+  public static final OfInt num_threads$layout() {
+    return num_threads$LAYOUT;
+  }
+
+  private static final long num_threads$OFFSET = 8;
+
+  /**
+   * Offset for field:
+   * {@snippet lang = c : * int num_threads
+   * }
+   */
+  public static final long num_threads$offset() {
+    return num_threads$OFFSET;
+  }
+
+  /**
+   * Getter for field:
+   * {@snippet lang = c : * int num_threads
+   * }
+   */
+  public static int num_threads(MemorySegment struct) {
+    return struct.get(num_threads$LAYOUT, num_threads$OFFSET);
+  }
+
+  /**
+   * Setter for field:
+   * {@snippet lang = c : * int num_threads
+   * }
+   */
+  public static void num_threads(MemorySegment struct, int fieldValue) {
+    struct.set(num_threads$LAYOUT, num_threads$OFFSET, fieldValue);
   }
 
   /**

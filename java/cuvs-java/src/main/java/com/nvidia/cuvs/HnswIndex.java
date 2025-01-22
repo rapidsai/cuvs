@@ -30,7 +30,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
 import com.nvidia.cuvs.common.Util;
-import com.nvidia.cuvs.panama.CuvsHnswIndex;
+import com.nvidia.cuvs.panama.CuVSHnswIndex;
 
 /**
  * {@link HnswIndex} encapsulates a HNSW index, along with methods to interact
@@ -237,7 +237,7 @@ public class HnswIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResources resources) {
-      memorySegment = CuvsHnswIndex.allocate(resources.arena);
+      memorySegment = CuVSHnswIndex.allocate(resources.arena);
     }
 
     /**

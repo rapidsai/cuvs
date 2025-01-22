@@ -26,9 +26,9 @@ import java.util.stream.*;
 import static java.lang.foreign.ValueLayout.*;
 import static java.lang.foreign.MemoryLayout.PathElement.*;
 
-public class distance_h {
+public class DistanceH {
 
-    distance_h() {
+    DistanceH() {
         // Should not be called directly
     }
 

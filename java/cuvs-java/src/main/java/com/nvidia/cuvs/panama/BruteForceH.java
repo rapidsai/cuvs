@@ -39,9 +39,9 @@ import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public class hnsw_h {
+public class BruteForceH {
 
-  hnsw_h() {
+  BruteForceH() {
     // Should not be called directly
   }
 
@@ -640,711 +640,471 @@ public class hnsw_h {
     return _BITS_STDINT_UINTN_H;
   }
 
-  private static final int true_ = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * #define true 1
-   * }
-   */
-  public static int true_() {
-    return true_;
-  }
-
-  private static final int false_ = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * #define false 0
-   * }
-   */
-  public static int false_() {
-    return false_;
-  }
-
-  private static final int __bool_true_false_are_defined = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * #define __bool_true_false_are_defined 1
-   * }
-   */
-  public static int __bool_true_false_are_defined() {
-    return __bool_true_false_are_defined;
-  }
-
-  private static final int L2Expanded = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2Expanded = 0
-   * }
-   */
-  public static int L2Expanded() {
-    return L2Expanded;
-  }
-
-  private static final int L2SqrtExpanded = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2SqrtExpanded = 1
-   * }
-   */
-  public static int L2SqrtExpanded() {
-    return L2SqrtExpanded;
-  }
-
-  private static final int CosineExpanded = (int) 2L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CosineExpanded = 2
-   * }
-   */
-  public static int CosineExpanded() {
-    return CosineExpanded;
-  }
-
-  private static final int L1 = (int) 3L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L1 = 3
-   * }
-   */
-  public static int L1() {
-    return L1;
-  }
-
-  private static final int L2Unexpanded = (int) 4L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2Unexpanded = 4
-   * }
-   */
-  public static int L2Unexpanded() {
-    return L2Unexpanded;
-  }
-
-  private static final int L2SqrtUnexpanded = (int) 5L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2SqrtUnexpanded = 5
-   * }
-   */
-  public static int L2SqrtUnexpanded() {
-    return L2SqrtUnexpanded;
-  }
-
-  private static final int InnerProduct = (int) 6L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.InnerProduct = 6
-   * }
-   */
-  public static int InnerProduct() {
-    return InnerProduct;
-  }
-
-  private static final int Linf = (int) 7L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Linf = 7
-   * }
-   */
-  public static int Linf() {
-    return Linf;
-  }
-
-  private static final int Canberra = (int) 8L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Canberra = 8
-   * }
-   */
-  public static int Canberra() {
-    return Canberra;
-  }
-
-  private static final int LpUnexpanded = (int) 9L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.LpUnexpanded = 9
-   * }
-   */
-  public static int LpUnexpanded() {
-    return LpUnexpanded;
-  }
-
-  private static final int CorrelationExpanded = (int) 10L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CorrelationExpanded = 10
-   * }
-   */
-  public static int CorrelationExpanded() {
-    return CorrelationExpanded;
-  }
-
-  private static final int JaccardExpanded = (int) 11L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.JaccardExpanded = 11
-   * }
-   */
-  public static int JaccardExpanded() {
-    return JaccardExpanded;
-  }
-
-  private static final int HellingerExpanded = (int) 12L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.HellingerExpanded = 12
-   * }
-   */
-  public static int HellingerExpanded() {
-    return HellingerExpanded;
-  }
-
-  private static final int Haversine = (int) 13L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Haversine = 13
-   * }
-   */
-  public static int Haversine() {
-    return Haversine;
-  }
-
-  private static final int BrayCurtis = (int) 14L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.BrayCurtis = 14
-   * }
-   */
-  public static int BrayCurtis() {
-    return BrayCurtis;
-  }
-
-  private static final int JensenShannon = (int) 15L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.JensenShannon = 15
-   * }
-   */
-  public static int JensenShannon() {
-    return JensenShannon;
-  }
-
-  private static final int HammingUnexpanded = (int) 16L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.HammingUnexpanded = 16
-   * }
-   */
-  public static int HammingUnexpanded() {
-    return HammingUnexpanded;
-  }
-
-  private static final int KLDivergence = (int) 17L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.KLDivergence = 17
-   * }
-   */
-  public static int KLDivergence() {
-    return KLDivergence;
-  }
-
-  private static final int RusselRaoExpanded = (int) 18L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.RusselRaoExpanded = 18
-   * }
-   */
-  public static int RusselRaoExpanded() {
-    return RusselRaoExpanded;
-  }
-
-  private static final int DiceExpanded = (int) 19L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.DiceExpanded = 19
-   * }
-   */
-  public static int DiceExpanded() {
-    return DiceExpanded;
-  }
-
-  private static final int Precomputed = (int) 100L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Precomputed = 100
-   * }
-   */
-  public static int Precomputed() {
-    return Precomputed;
-  }
-
   /**
    * {@snippet lang = c : * typedef unsigned char __u_char
    * }
    */
-  public static final OfByte __u_char = hnsw_h.C_CHAR;
+  public static final OfByte __u_char = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned short __u_short
    * }
    */
-  public static final OfShort __u_short = hnsw_h.C_SHORT;
+  public static final OfShort __u_short = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef unsigned int __u_int
    * }
    */
-  public static final OfInt __u_int = hnsw_h.C_INT;
+  public static final OfInt __u_int = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __u_long
    * }
    */
-  public static final OfLong __u_long = hnsw_h.C_LONG;
+  public static final OfLong __u_long = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef signed char __int8_t
    * }
    */
-  public static final OfByte __int8_t = hnsw_h.C_CHAR;
+  public static final OfByte __int8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned char __uint8_t
    * }
    */
-  public static final OfByte __uint8_t = hnsw_h.C_CHAR;
+  public static final OfByte __uint8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef short __int16_t
    * }
    */
-  public static final OfShort __int16_t = hnsw_h.C_SHORT;
+  public static final OfShort __int16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef unsigned short __uint16_t
    * }
    */
-  public static final OfShort __uint16_t = hnsw_h.C_SHORT;
+  public static final OfShort __uint16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef int __int32_t
    * }
    */
-  public static final OfInt __int32_t = hnsw_h.C_INT;
+  public static final OfInt __int32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned int __uint32_t
    * }
    */
-  public static final OfInt __uint32_t = hnsw_h.C_INT;
+  public static final OfInt __uint32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __int64_t
    * }
    */
-  public static final OfLong __int64_t = hnsw_h.C_LONG;
+  public static final OfLong __int64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __uint64_t
    * }
    */
-  public static final OfLong __uint64_t = hnsw_h.C_LONG;
+  public static final OfLong __uint64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __int8_t __int_least8_t
    * }
    */
-  public static final OfByte __int_least8_t = hnsw_h.C_CHAR;
+  public static final OfByte __int_least8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint8_t __uint_least8_t
    * }
    */
-  public static final OfByte __uint_least8_t = hnsw_h.C_CHAR;
+  public static final OfByte __uint_least8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int16_t __int_least16_t
    * }
    */
-  public static final OfShort __int_least16_t = hnsw_h.C_SHORT;
+  public static final OfShort __int_least16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint16_t __uint_least16_t
    * }
    */
-  public static final OfShort __uint_least16_t = hnsw_h.C_SHORT;
+  public static final OfShort __uint_least16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int32_t __int_least32_t
    * }
    */
-  public static final OfInt __int_least32_t = hnsw_h.C_INT;
+  public static final OfInt __int_least32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint32_t __uint_least32_t
    * }
    */
-  public static final OfInt __uint_least32_t = hnsw_h.C_INT;
+  public static final OfInt __uint_least32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int64_t __int_least64_t
    * }
    */
-  public static final OfLong __int_least64_t = hnsw_h.C_LONG;
+  public static final OfLong __int_least64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint64_t __uint_least64_t
    * }
    */
-  public static final OfLong __uint_least64_t = hnsw_h.C_LONG;
+  public static final OfLong __uint_least64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __quad_t
    * }
    */
-  public static final OfLong __quad_t = hnsw_h.C_LONG;
+  public static final OfLong __quad_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __u_quad_t
    * }
    */
-  public static final OfLong __u_quad_t = hnsw_h.C_LONG;
+  public static final OfLong __u_quad_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __intmax_t
    * }
    */
-  public static final OfLong __intmax_t = hnsw_h.C_LONG;
+  public static final OfLong __intmax_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __uintmax_t
    * }
    */
-  public static final OfLong __uintmax_t = hnsw_h.C_LONG;
+  public static final OfLong __uintmax_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __dev_t
    * }
    */
-  public static final OfLong __dev_t = hnsw_h.C_LONG;
+  public static final OfLong __dev_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __uid_t
    * }
    */
-  public static final OfInt __uid_t = hnsw_h.C_INT;
+  public static final OfInt __uid_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned int __gid_t
    * }
    */
-  public static final OfInt __gid_t = hnsw_h.C_INT;
+  public static final OfInt __gid_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __ino_t
    * }
    */
-  public static final OfLong __ino_t = hnsw_h.C_LONG;
+  public static final OfLong __ino_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __ino64_t
    * }
    */
-  public static final OfLong __ino64_t = hnsw_h.C_LONG;
+  public static final OfLong __ino64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __mode_t
    * }
    */
-  public static final OfInt __mode_t = hnsw_h.C_INT;
+  public static final OfInt __mode_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __nlink_t
    * }
    */
-  public static final OfLong __nlink_t = hnsw_h.C_LONG;
+  public static final OfLong __nlink_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __off_t
    * }
    */
-  public static final OfLong __off_t = hnsw_h.C_LONG;
+  public static final OfLong __off_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __off64_t
    * }
    */
-  public static final OfLong __off64_t = hnsw_h.C_LONG;
+  public static final OfLong __off64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int __pid_t
    * }
    */
-  public static final OfInt __pid_t = hnsw_h.C_INT;
+  public static final OfInt __pid_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __clock_t
    * }
    */
-  public static final OfLong __clock_t = hnsw_h.C_LONG;
+  public static final OfLong __clock_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __rlim_t
    * }
    */
-  public static final OfLong __rlim_t = hnsw_h.C_LONG;
+  public static final OfLong __rlim_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __rlim64_t
    * }
    */
-  public static final OfLong __rlim64_t = hnsw_h.C_LONG;
+  public static final OfLong __rlim64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __id_t
    * }
    */
-  public static final OfInt __id_t = hnsw_h.C_INT;
+  public static final OfInt __id_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __time_t
    * }
    */
-  public static final OfLong __time_t = hnsw_h.C_LONG;
+  public static final OfLong __time_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __useconds_t
    * }
    */
-  public static final OfInt __useconds_t = hnsw_h.C_INT;
+  public static final OfInt __useconds_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __suseconds_t
    * }
    */
-  public static final OfLong __suseconds_t = hnsw_h.C_LONG;
+  public static final OfLong __suseconds_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __suseconds64_t
    * }
    */
-  public static final OfLong __suseconds64_t = hnsw_h.C_LONG;
+  public static final OfLong __suseconds64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int __daddr_t
    * }
    */
-  public static final OfInt __daddr_t = hnsw_h.C_INT;
+  public static final OfInt __daddr_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __key_t
    * }
    */
-  public static final OfInt __key_t = hnsw_h.C_INT;
+  public static final OfInt __key_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __clockid_t
    * }
    */
-  public static final OfInt __clockid_t = hnsw_h.C_INT;
+  public static final OfInt __clockid_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef void *__timer_t
    * }
    */
-  public static final AddressLayout __timer_t = hnsw_h.C_POINTER;
+  public static final AddressLayout __timer_t = BruteForceH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef long __blksize_t
    * }
    */
-  public static final OfLong __blksize_t = hnsw_h.C_LONG;
+  public static final OfLong __blksize_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __blkcnt_t
    * }
    */
-  public static final OfLong __blkcnt_t = hnsw_h.C_LONG;
+  public static final OfLong __blkcnt_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __blkcnt64_t
    * }
    */
-  public static final OfLong __blkcnt64_t = hnsw_h.C_LONG;
+  public static final OfLong __blkcnt64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsblkcnt_t
    * }
    */
-  public static final OfLong __fsblkcnt_t = hnsw_h.C_LONG;
+  public static final OfLong __fsblkcnt_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsblkcnt64_t
    * }
    */
-  public static final OfLong __fsblkcnt64_t = hnsw_h.C_LONG;
+  public static final OfLong __fsblkcnt64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsfilcnt_t
    * }
    */
-  public static final OfLong __fsfilcnt_t = hnsw_h.C_LONG;
+  public static final OfLong __fsfilcnt_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsfilcnt64_t
    * }
    */
-  public static final OfLong __fsfilcnt64_t = hnsw_h.C_LONG;
+  public static final OfLong __fsfilcnt64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __fsword_t
    * }
    */
-  public static final OfLong __fsword_t = hnsw_h.C_LONG;
+  public static final OfLong __fsword_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __ssize_t
    * }
    */
-  public static final OfLong __ssize_t = hnsw_h.C_LONG;
+  public static final OfLong __ssize_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __syscall_slong_t
    * }
    */
-  public static final OfLong __syscall_slong_t = hnsw_h.C_LONG;
+  public static final OfLong __syscall_slong_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __syscall_ulong_t
    * }
    */
-  public static final OfLong __syscall_ulong_t = hnsw_h.C_LONG;
+  public static final OfLong __syscall_ulong_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __off64_t __loff_t
    * }
    */
-  public static final OfLong __loff_t = hnsw_h.C_LONG;
+  public static final OfLong __loff_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef char *__caddr_t
    * }
    */
-  public static final AddressLayout __caddr_t = hnsw_h.C_POINTER;
+  public static final AddressLayout __caddr_t = BruteForceH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef long __intptr_t
    * }
    */
-  public static final OfLong __intptr_t = hnsw_h.C_LONG;
+  public static final OfLong __intptr_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __socklen_t
    * }
    */
-  public static final OfInt __socklen_t = hnsw_h.C_INT;
+  public static final OfInt __socklen_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __sig_atomic_t
    * }
    */
-  public static final OfInt __sig_atomic_t = hnsw_h.C_INT;
+  public static final OfInt __sig_atomic_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int8_t int8_t
    * }
    */
-  public static final OfByte int8_t = hnsw_h.C_CHAR;
+  public static final OfByte int8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int16_t int16_t
    * }
    */
-  public static final OfShort int16_t = hnsw_h.C_SHORT;
+  public static final OfShort int16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int32_t int32_t
    * }
    */
-  public static final OfInt int32_t = hnsw_h.C_INT;
+  public static final OfInt int32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int64_t int64_t
    * }
    */
-  public static final OfLong int64_t = hnsw_h.C_LONG;
+  public static final OfLong int64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint8_t uint8_t
    * }
    */
-  public static final OfByte uint8_t = hnsw_h.C_CHAR;
+  public static final OfByte uint8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint16_t uint16_t
    * }
    */
-  public static final OfShort uint16_t = hnsw_h.C_SHORT;
+  public static final OfShort uint16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint32_t uint32_t
    * }
    */
-  public static final OfInt uint32_t = hnsw_h.C_INT;
+  public static final OfInt uint32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint64_t uint64_t
    * }
    */
-  public static final OfLong uint64_t = hnsw_h.C_LONG;
+  public static final OfLong uint64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __int_least8_t int_least8_t
    * }
    */
-  public static final OfByte int_least8_t = hnsw_h.C_CHAR;
+  public static final OfByte int_least8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int_least16_t int_least16_t
    * }
    */
-  public static final OfShort int_least16_t = hnsw_h.C_SHORT;
+  public static final OfShort int_least16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int_least32_t int_least32_t
    * }
    */
-  public static final OfInt int_least32_t = hnsw_h.C_INT;
+  public static final OfInt int_least32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int_least64_t int_least64_t
    * }
    */
-  public static final OfLong int_least64_t = hnsw_h.C_LONG;
+  public static final OfLong int_least64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint_least8_t uint_least8_t
    * }
    */
-  public static final OfByte uint_least8_t = hnsw_h.C_CHAR;
+  public static final OfByte uint_least8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint_least16_t uint_least16_t
    * }
    */
-  public static final OfShort uint_least16_t = hnsw_h.C_SHORT;
+  public static final OfShort uint_least16_t = BruteForceH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint_least32_t uint_least32_t
    * }
    */
-  public static final OfInt uint_least32_t = hnsw_h.C_INT;
+  public static final OfInt uint_least32_t = BruteForceH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint_least64_t uint_least64_t
    * }
    */
-  public static final OfLong uint_least64_t = hnsw_h.C_LONG;
+  public static final OfLong uint_least64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef signed char int_fast8_t
    * }
    */
-  public static final OfByte int_fast8_t = hnsw_h.C_CHAR;
+  public static final OfByte int_fast8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef long int_fast16_t
    * }
    */
-  public static final OfLong int_fast16_t = hnsw_h.C_LONG;
+  public static final OfLong int_fast16_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long int_fast32_t
    * }
    */
-  public static final OfLong int_fast32_t = hnsw_h.C_LONG;
+  public static final OfLong int_fast32_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long int_fast64_t
    * }
    */
-  public static final OfLong int_fast64_t = hnsw_h.C_LONG;
+  public static final OfLong int_fast64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned char uint_fast8_t
    * }
    */
-  public static final OfByte uint_fast8_t = hnsw_h.C_CHAR;
+  public static final OfByte uint_fast8_t = BruteForceH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast16_t
    * }
    */
-  public static final OfLong uint_fast16_t = hnsw_h.C_LONG;
+  public static final OfLong uint_fast16_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast32_t
    * }
    */
-  public static final OfLong uint_fast32_t = hnsw_h.C_LONG;
+  public static final OfLong uint_fast32_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast64_t
    * }
    */
-  public static final OfLong uint_fast64_t = hnsw_h.C_LONG;
+  public static final OfLong uint_fast64_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long intptr_t
    * }
    */
-  public static final OfLong intptr_t = hnsw_h.C_LONG;
+  public static final OfLong intptr_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uintptr_t
    * }
    */
-  public static final OfLong uintptr_t = hnsw_h.C_LONG;
+  public static final OfLong uintptr_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __intmax_t intmax_t
    * }
    */
-  public static final OfLong intmax_t = hnsw_h.C_LONG;
+  public static final OfLong intmax_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uintmax_t uintmax_t
    * }
    */
-  public static final OfLong uintmax_t = hnsw_h.C_LONG;
+  public static final OfLong uintmax_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long ptrdiff_t
    * }
    */
-  public static final OfLong ptrdiff_t = hnsw_h.C_LONG;
+  public static final OfLong ptrdiff_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long size_t
    * }
    */
-  public static final OfLong size_t = hnsw_h.C_LONG;
+  public static final OfLong size_t = BruteForceH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int wchar_t
    * }
    */
-  public static final OfInt wchar_t = hnsw_h.C_INT;
+  public static final OfInt wchar_t = BruteForceH.C_INT;
   private static final int kDLCPU = (int) 1L;
 
   /**
@@ -1555,209 +1315,11 @@ public class hnsw_h {
     return kDLBool;
   }
 
-  private static final int AUTO_SELECT = (int) 0L;
-
   /**
-   * {@snippet lang = c : * enum cuvsCagraGraphBuildAlgo.AUTO_SELECT = 0
+   * {@snippet lang = c : * typedef cuvsBruteForceIndex *cuvsBruteForceIndex_t
    * }
    */
-  public static int AUTO_SELECT() {
-    return AUTO_SELECT;
-  }
-
-  private static final int IVF_PQ = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraGraphBuildAlgo.IVF_PQ = 1
-   * }
-   */
-  public static int IVF_PQ() {
-    return IVF_PQ;
-  }
-
-  private static final int NN_DESCENT = (int) 2L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraGraphBuildAlgo.NN_DESCENT = 2
-   * }
-   */
-  public static int NN_DESCENT() {
-    return NN_DESCENT;
-  }
-
-  /**
-   * {@snippet lang = c :
-   * typedef struct cuvsCagraCompressionParams {
-   *     uint32_t pq_bits;
-   *     uint32_t pq_dim;
-   *     uint32_t vq_n_centers;
-   *     uint32_t kmeans_n_iters;
-   *     double vq_kmeans_trainset_fraction;
-   *     double pq_kmeans_trainset_fraction;
-   * } *cuvsCagraCompressionParams_t
-   * }
-   */
-  public static final AddressLayout cuvsCagraCompressionParams_t = hnsw_h.C_POINTER;
-  /**
-   * {@snippet lang = c :
-   * typedef struct cuvsCagraIndexParams {
-   *     cuvsDistanceType metric;
-   *     long intermediate_graph_degree;
-   *     long graph_degree;
-   *     enum cuvsCagraGraphBuildAlgo build_algo;
-   *     long nn_descent_niter;
-   *     cuvsCagraCompressionParams_t compression;
-   * } *cuvsCagraIndexParams_t
-   * }
-   */
-  public static final AddressLayout cuvsCagraIndexParams_t = hnsw_h.C_POINTER;
-  private static final int SINGLE_CTA = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.SINGLE_CTA = 0
-   * }
-   */
-  public static int SINGLE_CTA() {
-    return SINGLE_CTA;
-  }
-
-  private static final int MULTI_CTA = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.MULTI_CTA = 1
-   * }
-   */
-  public static int MULTI_CTA() {
-    return MULTI_CTA;
-  }
-
-  private static final int MULTI_KERNEL = (int) 2L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.MULTI_KERNEL = 2
-   * }
-   */
-  public static int MULTI_KERNEL() {
-    return MULTI_KERNEL;
-  }
-
-  private static final int AUTO = (int) 3L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraSearchAlgo.AUTO = 3
-   * }
-   */
-  public static int AUTO() {
-    return AUTO;
-  }
-
-  private static final int HASH = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraHashMode.HASH = 0
-   * }
-   */
-  public static int HASH() {
-    return HASH;
-  }
-
-  private static final int SMALL = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraHashMode.SMALL = 1
-   * }
-   */
-  public static int SMALL() {
-    return SMALL;
-  }
-
-  private static final int AUTO_HASH = (int) 2L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsCagraHashMode.AUTO_HASH = 2
-   * }
-   */
-  public static int AUTO_HASH() {
-    return AUTO_HASH;
-  }
-
-  /**
-   * {@snippet lang = c :
-   * typedef struct cuvsCagraSearchParams {
-   *     long max_queries;
-   *     long itopk_size;
-   *     long max_iterations;
-   *     enum cuvsCagraSearchAlgo algo;
-   *     long team_size;
-   *     long search_width;
-   *     long min_iterations;
-   *     long thread_block_size;
-   *     enum cuvsCagraHashMode hashmap_mode;
-   *     long hashmap_min_bitlen;
-   *     float hashmap_max_fill_rate;
-   *     uint32_t num_random_samplings;
-   *     uint64_t rand_xor_mask;
-   * } *cuvsCagraSearchParams_t
-   * }
-   */
-  public static final AddressLayout cuvsCagraSearchParams_t = hnsw_h.C_POINTER;
-  /**
-   * {@snippet lang = c : * typedef cuvsCagraIndex *cuvsCagraIndex_t
-   * }
-   */
-  public static final AddressLayout cuvsCagraIndex_t = hnsw_h.C_POINTER;
-  private static final int NONE = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsHnswHierarchy.NONE = 0
-   * }
-   */
-  public static int NONE() {
-    return NONE;
-  }
-
-  private static final int CPU = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum cuvsHnswHierarchy.CPU = 1
-   * }
-   */
-  public static int CPU() {
-    return CPU;
-  }
-
-  /**
-   * {@snippet lang = c :
-   * typedef struct cuvsHnswIndexParams {
-   *     cuvsHnswHierarchy hierarchy;
-   *     int ef_construction;
-   *     int num_threads;
-   * } *cuvsHnswIndexParams_t
-   * }
-   */
-  public static final AddressLayout cuvsHnswIndexParams_t = hnsw_h.C_POINTER;
-  /**
-   * {@snippet lang = c : * typedef cuvsHnswIndex *cuvsHnswIndex_t
-   * }
-   */
-  public static final AddressLayout cuvsHnswIndex_t = hnsw_h.C_POINTER;
-  /**
-   * {@snippet lang = c :
-   * typedef struct cuvsHnswExtendParams {
-   *     int num_threads;
-   * } *cuvsHnswExtendParams_t
-   * }
-   */
-  public static final AddressLayout cuvsHnswExtendParams_t = hnsw_h.C_POINTER;
-  /**
-   * {@snippet lang = c :
-   * typedef struct cuvsHnswSearchParams {
-   *     int32_t ef;
-   *     int32_t num_threads;
-   * } *cuvsHnswSearchParams_t
-   * }
-   */
-  public static final AddressLayout cuvsHnswSearchParams_t = hnsw_h.C_POINTER;
+  public static final AddressLayout cuvsBruteForceIndex_t = BruteForceH.C_POINTER;
   private static final long _POSIX_C_SOURCE = 200809L;
 
   /**

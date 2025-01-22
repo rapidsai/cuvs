@@ -39,9 +39,9 @@ import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public class ivf_flat_h {
+public class IvfFlatH {
 
-  ivf_flat_h() {
+  IvfFlatH() {
     // Should not be called directly
   }
 
@@ -674,452 +674,452 @@ public class ivf_flat_h {
    * {@snippet lang = c : * typedef unsigned char __u_char
    * }
    */
-  public static final OfByte __u_char = ivf_flat_h.C_CHAR;
+  public static final OfByte __u_char = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned short __u_short
    * }
    */
-  public static final OfShort __u_short = ivf_flat_h.C_SHORT;
+  public static final OfShort __u_short = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef unsigned int __u_int
    * }
    */
-  public static final OfInt __u_int = ivf_flat_h.C_INT;
+  public static final OfInt __u_int = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __u_long
    * }
    */
-  public static final OfLong __u_long = ivf_flat_h.C_LONG;
+  public static final OfLong __u_long = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef signed char __int8_t
    * }
    */
-  public static final OfByte __int8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte __int8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned char __uint8_t
    * }
    */
-  public static final OfByte __uint8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte __uint8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef short __int16_t
    * }
    */
-  public static final OfShort __int16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort __int16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef unsigned short __uint16_t
    * }
    */
-  public static final OfShort __uint16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort __uint16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef int __int32_t
    * }
    */
-  public static final OfInt __int32_t = ivf_flat_h.C_INT;
+  public static final OfInt __int32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned int __uint32_t
    * }
    */
-  public static final OfInt __uint32_t = ivf_flat_h.C_INT;
+  public static final OfInt __uint32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __int64_t
    * }
    */
-  public static final OfLong __int64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __int64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __uint64_t
    * }
    */
-  public static final OfLong __uint64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __uint64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __int8_t __int_least8_t
    * }
    */
-  public static final OfByte __int_least8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte __int_least8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint8_t __uint_least8_t
    * }
    */
-  public static final OfByte __uint_least8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte __uint_least8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int16_t __int_least16_t
    * }
    */
-  public static final OfShort __int_least16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort __int_least16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint16_t __uint_least16_t
    * }
    */
-  public static final OfShort __uint_least16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort __uint_least16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int32_t __int_least32_t
    * }
    */
-  public static final OfInt __int_least32_t = ivf_flat_h.C_INT;
+  public static final OfInt __int_least32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint32_t __uint_least32_t
    * }
    */
-  public static final OfInt __uint_least32_t = ivf_flat_h.C_INT;
+  public static final OfInt __uint_least32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int64_t __int_least64_t
    * }
    */
-  public static final OfLong __int_least64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __int_least64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint64_t __uint_least64_t
    * }
    */
-  public static final OfLong __uint_least64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __uint_least64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __quad_t
    * }
    */
-  public static final OfLong __quad_t = ivf_flat_h.C_LONG;
+  public static final OfLong __quad_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __u_quad_t
    * }
    */
-  public static final OfLong __u_quad_t = ivf_flat_h.C_LONG;
+  public static final OfLong __u_quad_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __intmax_t
    * }
    */
-  public static final OfLong __intmax_t = ivf_flat_h.C_LONG;
+  public static final OfLong __intmax_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __uintmax_t
    * }
    */
-  public static final OfLong __uintmax_t = ivf_flat_h.C_LONG;
+  public static final OfLong __uintmax_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __dev_t
    * }
    */
-  public static final OfLong __dev_t = ivf_flat_h.C_LONG;
+  public static final OfLong __dev_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __uid_t
    * }
    */
-  public static final OfInt __uid_t = ivf_flat_h.C_INT;
+  public static final OfInt __uid_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned int __gid_t
    * }
    */
-  public static final OfInt __gid_t = ivf_flat_h.C_INT;
+  public static final OfInt __gid_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __ino_t
    * }
    */
-  public static final OfLong __ino_t = ivf_flat_h.C_LONG;
+  public static final OfLong __ino_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __ino64_t
    * }
    */
-  public static final OfLong __ino64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __ino64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __mode_t
    * }
    */
-  public static final OfInt __mode_t = ivf_flat_h.C_INT;
+  public static final OfInt __mode_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef unsigned long __nlink_t
    * }
    */
-  public static final OfLong __nlink_t = ivf_flat_h.C_LONG;
+  public static final OfLong __nlink_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __off_t
    * }
    */
-  public static final OfLong __off_t = ivf_flat_h.C_LONG;
+  public static final OfLong __off_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __off64_t
    * }
    */
-  public static final OfLong __off64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __off64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int __pid_t
    * }
    */
-  public static final OfInt __pid_t = ivf_flat_h.C_INT;
+  public static final OfInt __pid_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __clock_t
    * }
    */
-  public static final OfLong __clock_t = ivf_flat_h.C_LONG;
+  public static final OfLong __clock_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __rlim_t
    * }
    */
-  public static final OfLong __rlim_t = ivf_flat_h.C_LONG;
+  public static final OfLong __rlim_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __rlim64_t
    * }
    */
-  public static final OfLong __rlim64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __rlim64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __id_t
    * }
    */
-  public static final OfInt __id_t = ivf_flat_h.C_INT;
+  public static final OfInt __id_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __time_t
    * }
    */
-  public static final OfLong __time_t = ivf_flat_h.C_LONG;
+  public static final OfLong __time_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __useconds_t
    * }
    */
-  public static final OfInt __useconds_t = ivf_flat_h.C_INT;
+  public static final OfInt __useconds_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef long __suseconds_t
    * }
    */
-  public static final OfLong __suseconds_t = ivf_flat_h.C_LONG;
+  public static final OfLong __suseconds_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __suseconds64_t
    * }
    */
-  public static final OfLong __suseconds64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __suseconds64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int __daddr_t
    * }
    */
-  public static final OfInt __daddr_t = ivf_flat_h.C_INT;
+  public static final OfInt __daddr_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __key_t
    * }
    */
-  public static final OfInt __key_t = ivf_flat_h.C_INT;
+  public static final OfInt __key_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __clockid_t
    * }
    */
-  public static final OfInt __clockid_t = ivf_flat_h.C_INT;
+  public static final OfInt __clockid_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef void *__timer_t
    * }
    */
-  public static final AddressLayout __timer_t = ivf_flat_h.C_POINTER;
+  public static final AddressLayout __timer_t = IvfFlatH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef long __blksize_t
    * }
    */
-  public static final OfLong __blksize_t = ivf_flat_h.C_LONG;
+  public static final OfLong __blksize_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __blkcnt_t
    * }
    */
-  public static final OfLong __blkcnt_t = ivf_flat_h.C_LONG;
+  public static final OfLong __blkcnt_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __blkcnt64_t
    * }
    */
-  public static final OfLong __blkcnt64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __blkcnt64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsblkcnt_t
    * }
    */
-  public static final OfLong __fsblkcnt_t = ivf_flat_h.C_LONG;
+  public static final OfLong __fsblkcnt_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsblkcnt64_t
    * }
    */
-  public static final OfLong __fsblkcnt64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __fsblkcnt64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsfilcnt_t
    * }
    */
-  public static final OfLong __fsfilcnt_t = ivf_flat_h.C_LONG;
+  public static final OfLong __fsfilcnt_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __fsfilcnt64_t
    * }
    */
-  public static final OfLong __fsfilcnt64_t = ivf_flat_h.C_LONG;
+  public static final OfLong __fsfilcnt64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __fsword_t
    * }
    */
-  public static final OfLong __fsword_t = ivf_flat_h.C_LONG;
+  public static final OfLong __fsword_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __ssize_t
    * }
    */
-  public static final OfLong __ssize_t = ivf_flat_h.C_LONG;
+  public static final OfLong __ssize_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long __syscall_slong_t
    * }
    */
-  public static final OfLong __syscall_slong_t = ivf_flat_h.C_LONG;
+  public static final OfLong __syscall_slong_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long __syscall_ulong_t
    * }
    */
-  public static final OfLong __syscall_ulong_t = ivf_flat_h.C_LONG;
+  public static final OfLong __syscall_ulong_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __off64_t __loff_t
    * }
    */
-  public static final OfLong __loff_t = ivf_flat_h.C_LONG;
+  public static final OfLong __loff_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef char *__caddr_t
    * }
    */
-  public static final AddressLayout __caddr_t = ivf_flat_h.C_POINTER;
+  public static final AddressLayout __caddr_t = IvfFlatH.C_POINTER;
   /**
    * {@snippet lang = c : * typedef long __intptr_t
    * }
    */
-  public static final OfLong __intptr_t = ivf_flat_h.C_LONG;
+  public static final OfLong __intptr_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned int __socklen_t
    * }
    */
-  public static final OfInt __socklen_t = ivf_flat_h.C_INT;
+  public static final OfInt __socklen_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef int __sig_atomic_t
    * }
    */
-  public static final OfInt __sig_atomic_t = ivf_flat_h.C_INT;
+  public static final OfInt __sig_atomic_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int8_t int8_t
    * }
    */
-  public static final OfByte int8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte int8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int16_t int16_t
    * }
    */
-  public static final OfShort int16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort int16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int32_t int32_t
    * }
    */
-  public static final OfInt int32_t = ivf_flat_h.C_INT;
+  public static final OfInt int32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int64_t int64_t
    * }
    */
-  public static final OfLong int64_t = ivf_flat_h.C_LONG;
+  public static final OfLong int64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint8_t uint8_t
    * }
    */
-  public static final OfByte uint8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte uint8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint16_t uint16_t
    * }
    */
-  public static final OfShort uint16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort uint16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint32_t uint32_t
    * }
    */
-  public static final OfInt uint32_t = ivf_flat_h.C_INT;
+  public static final OfInt uint32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint64_t uint64_t
    * }
    */
-  public static final OfLong uint64_t = ivf_flat_h.C_LONG;
+  public static final OfLong uint64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __int_least8_t int_least8_t
    * }
    */
-  public static final OfByte int_least8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte int_least8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __int_least16_t int_least16_t
    * }
    */
-  public static final OfShort int_least16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort int_least16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __int_least32_t int_least32_t
    * }
    */
-  public static final OfInt int_least32_t = ivf_flat_h.C_INT;
+  public static final OfInt int_least32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __int_least64_t int_least64_t
    * }
    */
-  public static final OfLong int_least64_t = ivf_flat_h.C_LONG;
+  public static final OfLong int_least64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uint_least8_t uint_least8_t
    * }
    */
-  public static final OfByte uint_least8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte uint_least8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef __uint_least16_t uint_least16_t
    * }
    */
-  public static final OfShort uint_least16_t = ivf_flat_h.C_SHORT;
+  public static final OfShort uint_least16_t = IvfFlatH.C_SHORT;
   /**
    * {@snippet lang = c : * typedef __uint_least32_t uint_least32_t
    * }
    */
-  public static final OfInt uint_least32_t = ivf_flat_h.C_INT;
+  public static final OfInt uint_least32_t = IvfFlatH.C_INT;
   /**
    * {@snippet lang = c : * typedef __uint_least64_t uint_least64_t
    * }
    */
-  public static final OfLong uint_least64_t = ivf_flat_h.C_LONG;
+  public static final OfLong uint_least64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef signed char int_fast8_t
    * }
    */
-  public static final OfByte int_fast8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte int_fast8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef long int_fast16_t
    * }
    */
-  public static final OfLong int_fast16_t = ivf_flat_h.C_LONG;
+  public static final OfLong int_fast16_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long int_fast32_t
    * }
    */
-  public static final OfLong int_fast32_t = ivf_flat_h.C_LONG;
+  public static final OfLong int_fast32_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long int_fast64_t
    * }
    */
-  public static final OfLong int_fast64_t = ivf_flat_h.C_LONG;
+  public static final OfLong int_fast64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned char uint_fast8_t
    * }
    */
-  public static final OfByte uint_fast8_t = ivf_flat_h.C_CHAR;
+  public static final OfByte uint_fast8_t = IvfFlatH.C_CHAR;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast16_t
    * }
    */
-  public static final OfLong uint_fast16_t = ivf_flat_h.C_LONG;
+  public static final OfLong uint_fast16_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast32_t
    * }
    */
-  public static final OfLong uint_fast32_t = ivf_flat_h.C_LONG;
+  public static final OfLong uint_fast32_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uint_fast64_t
    * }
    */
-  public static final OfLong uint_fast64_t = ivf_flat_h.C_LONG;
+  public static final OfLong uint_fast64_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef long intptr_t
    * }
    */
-  public static final OfLong intptr_t = ivf_flat_h.C_LONG;
+  public static final OfLong intptr_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long uintptr_t
    * }
    */
-  public static final OfLong uintptr_t = ivf_flat_h.C_LONG;
+  public static final OfLong uintptr_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __intmax_t intmax_t
    * }
    */
-  public static final OfLong intmax_t = ivf_flat_h.C_LONG;
+  public static final OfLong intmax_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef __uintmax_t uintmax_t
    * }
    */
-  public static final OfLong uintmax_t = ivf_flat_h.C_LONG;
+  public static final OfLong uintmax_t = IvfFlatH.C_LONG;
   private static final int CUVS_ERROR = (int) 0L;
 
   /**
@@ -1144,7 +1144,7 @@ public class ivf_flat_h {
    * {@snippet lang = c : * typedef uintptr_t cuvsResources_t
    * }
    */
-  public static final OfLong cuvsResources_t = ivf_flat_h.C_LONG;
+  public static final OfLong cuvsResources_t = IvfFlatH.C_LONG;
   private static final int L2Expanded = (int) 0L;
 
   /**
@@ -1359,17 +1359,17 @@ public class ivf_flat_h {
    * {@snippet lang = c : * typedef long ptrdiff_t
    * }
    */
-  public static final OfLong ptrdiff_t = ivf_flat_h.C_LONG;
+  public static final OfLong ptrdiff_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef unsigned long size_t
    * }
    */
-  public static final OfLong size_t = ivf_flat_h.C_LONG;
+  public static final OfLong size_t = IvfFlatH.C_LONG;
   /**
    * {@snippet lang = c : * typedef int wchar_t
    * }
    */
-  public static final OfInt wchar_t = ivf_flat_h.C_INT;
+  public static final OfInt wchar_t = IvfFlatH.C_INT;
   private static final int kDLCPU = (int) 1L;
 
   /**
@@ -1604,12 +1604,12 @@ public class ivf_flat_h {
    * } *cuvsIvfFlatIndexParams_t
    * }
    */
-  public static final AddressLayout cuvsIvfFlatIndexParams_t = ivf_flat_h.C_POINTER;
+  public static final AddressLayout cuvsIvfFlatIndexParams_t = IvfFlatH.C_POINTER;
 
   private static class cuvsIvfFlatIndexParamsCreate {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatIndexParamsCreate");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatIndexParamsCreate");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -1662,9 +1662,9 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatIndexParamsDestroy {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatIndexParamsDestroy");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatIndexParamsDestroy");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -1723,12 +1723,12 @@ public class ivf_flat_h {
    * } *cuvsIvfFlatSearchParams_t
    * }
    */
-  public static final AddressLayout cuvsIvfFlatSearchParams_t = ivf_flat_h.C_POINTER;
+  public static final AddressLayout cuvsIvfFlatSearchParams_t = IvfFlatH.C_POINTER;
 
   private static class cuvsIvfFlatSearchParamsCreate {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatSearchParamsCreate");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatSearchParamsCreate");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -1781,9 +1781,9 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatSearchParamsDestroy {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatSearchParamsDestroy");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatSearchParamsDestroy");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -1839,12 +1839,12 @@ public class ivf_flat_h {
    * {@snippet lang = c : * typedef cuvsIvfFlatIndex *cuvsIvfFlatIndex_t
    * }
    */
-  public static final AddressLayout cuvsIvfFlatIndex_t = ivf_flat_h.C_POINTER;
+  public static final AddressLayout cuvsIvfFlatIndex_t = IvfFlatH.C_POINTER;
 
   private static class cuvsIvfFlatIndexCreate {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatIndexCreate");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatIndexCreate");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -1897,9 +1897,9 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatIndexDestroy {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatIndexDestroy");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatIndexDestroy");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -1952,10 +1952,10 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatBuild {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_LONG,
-        ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_LONG,
+        IvfFlatH.C_POINTER, IvfFlatH.C_POINTER, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatBuild");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatBuild");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -2008,10 +2008,10 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatSearch {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_LONG,
-        ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_LONG,
+        IvfFlatH.C_POINTER, IvfFlatH.C_POINTER, IvfFlatH.C_POINTER, IvfFlatH.C_POINTER, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatSearch");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatSearch");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -2065,10 +2065,10 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatSerialize {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_LONG,
-        ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_LONG,
+        IvfFlatH.C_POINTER, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatSerialize");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatSerialize");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -2121,10 +2121,10 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatDeserialize {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_LONG,
-        ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_LONG,
+        IvfFlatH.C_POINTER, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatDeserialize");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatDeserialize");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }
@@ -2177,10 +2177,10 @@ public class ivf_flat_h {
   }
 
   private static class cuvsIvfFlatExtend {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(ivf_flat_h.C_INT, ivf_flat_h.C_LONG,
-        ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER, ivf_flat_h.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfFlatH.C_INT, IvfFlatH.C_LONG,
+        IvfFlatH.C_POINTER, IvfFlatH.C_POINTER, IvfFlatH.C_POINTER);
 
-    public static final MemorySegment ADDR = ivf_flat_h.findOrThrow("cuvsIvfFlatExtend");
+    public static final MemorySegment ADDR = IvfFlatH.findOrThrow("cuvsIvfFlatExtend");
 
     public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
   }

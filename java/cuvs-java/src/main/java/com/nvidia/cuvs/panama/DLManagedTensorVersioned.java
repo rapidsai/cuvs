@@ -49,9 +49,9 @@ public class DLManagedTensorVersioned {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         DLPackVersion.layout().withName("version"),
-        dlpack_h.C_POINTER.withName("manager_ctx"),
-        dlpack_h.C_POINTER.withName("deleter"),
-        dlpack_h.C_LONG.withName("flags"),
+        DlpackH.C_POINTER.withName("manager_ctx"),
+        DlpackH.C_POINTER.withName("deleter"),
+        DlpackH.C_LONG.withName("flags"),
         DLTensor.layout().withName("dl_tensor")
     ).withName("DLManagedTensorVersioned");
 
@@ -169,7 +169,7 @@ public class DLManagedTensorVersioned {
         }
 
         private static final FunctionDescriptor $DESC = FunctionDescriptor.ofVoid(
-            dlpack_h.C_POINTER
+            DlpackH.C_POINTER
         );
 
         /**
@@ -179,7 +179,7 @@ public class DLManagedTensorVersioned {
             return $DESC;
         }
 
-        private static final MethodHandle UP$MH = dlpack_h.upcallHandle(deleter.Function.class, "apply", $DESC);
+        private static final MethodHandle UP$MH = DlpackH.upcallHandle(deleter.Function.class, "apply", $DESC);
 
         /**
          * Allocates a new upcall stub, whose implementation is defined by {@code fi}.

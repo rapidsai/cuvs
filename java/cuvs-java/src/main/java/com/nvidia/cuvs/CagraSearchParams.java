@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 import java.lang.foreign.MemorySegment;
 
-import com.nvidia.cuvs.panama.CuvsCagraSearchParams;
+import com.nvidia.cuvs.panama.CuVSCagraSearchParams;
 
 /**
  * CagraSearchParams encapsulates the logic for configuring and holding search
@@ -152,24 +152,24 @@ public class CagraSearchParams {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuvsCagraSearchParams.allocate(resources.arena);
-    CuvsCagraSearchParams.max_queries(memorySegment, maxQueries);
-    CuvsCagraSearchParams.itopk_size(memorySegment, iTopKSize);
-    CuvsCagraSearchParams.max_iterations(memorySegment, maxIterations);
+    MemorySegment memorySegment = CuVSCagraSearchParams.allocate(resources.arena);
+    CuVSCagraSearchParams.max_queries(memorySegment, maxQueries);
+    CuVSCagraSearchParams.itopk_size(memorySegment, iTopKSize);
+    CuVSCagraSearchParams.max_iterations(memorySegment, maxIterations);
     if (searchAlgo != null) {
-      CuvsCagraSearchParams.algo(memorySegment, searchAlgo.value);
+      CuVSCagraSearchParams.algo(memorySegment, searchAlgo.value);
     }
-    CuvsCagraSearchParams.team_size(memorySegment, teamSize);
-    CuvsCagraSearchParams.search_width(memorySegment, searchWidth);
-    CuvsCagraSearchParams.min_iterations(memorySegment, minIterations);
-    CuvsCagraSearchParams.thread_block_size(memorySegment, threadBlockSize);
+    CuVSCagraSearchParams.team_size(memorySegment, teamSize);
+    CuVSCagraSearchParams.search_width(memorySegment, searchWidth);
+    CuVSCagraSearchParams.min_iterations(memorySegment, minIterations);
+    CuVSCagraSearchParams.thread_block_size(memorySegment, threadBlockSize);
     if (hashMapMode != null) {
-      CuvsCagraSearchParams.hashmap_mode(memorySegment, hashMapMode.value);
+      CuVSCagraSearchParams.hashmap_mode(memorySegment, hashMapMode.value);
     }
-    CuvsCagraSearchParams.hashmap_min_bitlen(memorySegment, hashmapMinBitlen);
-    CuvsCagraSearchParams.hashmap_max_fill_rate(memorySegment, hashMapMaxFillRate);
-    CuvsCagraSearchParams.num_random_samplings(memorySegment, numRandomSamplings);
-    CuvsCagraSearchParams.rand_xor_mask(memorySegment, randXORMask);
+    CuVSCagraSearchParams.hashmap_min_bitlen(memorySegment, hashmapMinBitlen);
+    CuVSCagraSearchParams.hashmap_max_fill_rate(memorySegment, hashMapMaxFillRate);
+    CuVSCagraSearchParams.num_random_samplings(memorySegment, numRandomSamplings);
+    CuVSCagraSearchParams.rand_xor_mask(memorySegment, randXORMask);
     return memorySegment;
   }
 
