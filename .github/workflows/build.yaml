@@ -100,7 +100,7 @@ jobs:
       branch: ${{ inputs.branch }}
       sha: ${{ inputs.sha }}
       date: ${{ inputs.date }}
-      package-name: cuvs
+      package-name: libcuvs
       package-type: cpp
   wheel-build-cuvs:
     needs: wheel-build-libcuvs

@@ -44,6 +44,7 @@ echo "${NEXT_FULL_TAG}" > VERSION
 DEPENDENCIES=(
   dask-cuda
   cuvs
+  libcuvs
   libraft
   librmm
   pylibraft

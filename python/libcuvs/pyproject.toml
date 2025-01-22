@@ -55,26 +55,8 @@ include_trailing_comma = true
 force_grid_wrap = 0
 combine_as_imports = true
 order_by_type = true
-known_dask = [
-    "dask",
-    "distributed",
-    "dask_cuda",
-]
-known_rapids = [
-    "rmm",
-]
 known_first_party = [
-    "cuvs",
-]
-default_section = "THIRDPARTY"
-sections = [
-    "FUTURE",
-    "STDLIB",
-    "THIRDPARTY",
-    "DASK",
-    "RAPIDS",
-    "FIRSTPARTY",
-    "LOCALFOLDER",
+    "libcuvs",
 ]
 skip = [
     "thirdparty",
