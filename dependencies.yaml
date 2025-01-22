@@ -11,12 +11,12 @@ files:
       - build_py_cuvs
       - build_wheels
       - checks
+      - clang
       - cuda
       - cuda_version
       - depends_on_cupy
       - depends_on_librmm
       - depends_on_pylibraft
-      - develop
       - docs
       - rapids_build
       - run_py_cuvs
@@ -34,13 +34,13 @@ files:
       - bench_python
       - build_cython
       - build_py_cuvs
+      - clang
       - cuda
       - cuda_version
       - depends_on_cupy
       - depends_on_pylibraft
       - depends_on_libcuvs
       - depends_on_librmm
-      - develop
       - rapids_build
       - rapids_build_setuptools
   test_cpp:
@@ -74,6 +74,8 @@ files:
   rust:
     output: none
     includes:
+      # clang/libclang only needed for bindgen support
+      - clang
       - cuda
       - cuda_version
       - rapids_build
@@ -276,12 +278,13 @@ dependencies:
       - output_types: [conda, requirements]
         packages:
           - pre-commit
-  develop:
+  clang:
     common:
       - output_types: conda
         packages:
           - clang==16.0.6
-          - clang-tools=16.0.6
+          - clang-tools==16.0.6
+          - libclang==16.0.6
   cuda_version:
     specific:
       - output_types: conda
@@ -461,9 +464,6 @@ dependencies:
         packages:
           - make
           - rust
-          # clang/libclang only needed for bindgen support
-          - clang
-          - libclang
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
