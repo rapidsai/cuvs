@@ -554,19 +554,6 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     auto sp              = dynamic_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
     this->refine_ratio_  = sp.refine_ratio;
     this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(sp.p);
-
-    // if (sp.refine_ratio > 1.0) {
-    //   RAFT_LOG_INFO("now creating index_refine_");
-    //   this->index_refine_ =
-    //     std::make_shared<faiss::IndexRefineFlat>(this->index_.get(), this->dataset_);
-    //   RAFT_LOG_INFO("now done creating index_refine_");
-    //   this->index_refine_.get()->k_factor = sp.refine_ratio;
-    //   faiss::IndexRefineSearchParameters faiss_refine_search_params;
-    //   faiss_refine_search_params.k_factor          = this->index_refine_.get()->k_factor;
-    //   faiss_refine_search_params.base_index_params = this->search_params_.get();
-    //   this->refine_search_params_ =
-    //     std::make_unique<faiss::IndexRefineSearchParameters>(faiss_refine_search_params);
-    // }
   }
 
   void save(const std::string& file) const override
