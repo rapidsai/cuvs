@@ -133,7 +133,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
     algo_property property;
     // to enable building big dataset which is larger than GPU memory
     property.dataset_memory_type = MemoryType::kHost;
-    property.query_memory_type   = MemoryType::kDevice;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
 
