@@ -37,7 +37,6 @@ def cuvs_bench_cpp(
     batch_size: int,
     search_threads: Optional[int],
     mode: str = "throughput",
-    # raft_log_level: str = "info",
 ) -> None:
     """
     Run the CUVS benchmarking tool with the provided configuration.
@@ -72,8 +71,6 @@ def cuvs_bench_cpp(
     mode : str, optional
         The mode of search to perform ('latency' or 'throughput'),
         by default 'throughput'.
-    raft_log_level : str, optional
-        The logging level for the RAFT library, by default 'info'.
 
     Returns
     -------
@@ -117,7 +114,6 @@ def cuvs_bench_cpp(
                 "--benchmark_out_format=json",
                 "--benchmark_counters_tabular=true",
                 f"--benchmark_out={os.path.join(benchmark_out)}",
-                # f"--raft_log_level={parse_log_level(raft_log_level)}",
             ]
             if force:
                 cmd.append("--force")
@@ -156,7 +152,6 @@ def cuvs_bench_cpp(
                 "--benchmark_out_format=json",
                 f"--mode={mode}",
                 f"--benchmark_out={os.path.join(search_folder, search_file)}",
-                # f"--raft_log_level={parse_log_level(raft_log_level)}",
             ]
             if force:
                 cmd.append("--force")

@@ -178,7 +178,6 @@ def main(
     search_threads: Optional[str],
     dry_run: bool,
     data_export: bool,
-    # raft_log_level: str,
 ) -> None:
     """
     Main function to run the benchmark with the provided options.
@@ -217,8 +216,6 @@ def main(
         The number of threads to use for throughput benchmark.
     dry_run : bool
         Whether to perform a dry run without actual execution.
-    raft_log_level : str
-        The logging level for the RAFT library.
 
     """
 
