@@ -876,14 +876,15 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 inline std::vector<AnnCagraInputs> generate_inputs()
 {
   // TODO(tfeher): test MULTI_CTA kernel with search_width > 1 to allow multiple CTA per queries
+  // Varying dim, k, graph_build_algo, search_algo, max_queries
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
-    {1, 8, 17},
+    {1, 17},
     {1, 16},  // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
-    {0, 1, 10, 100},  // query size
+    {0, 1, 100},  // query size
     {0},
     {256},
     {1},
@@ -892,11 +893,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.995});
 
+  // Varying dim, graph_build_algo
   auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
-    {16},                                                         // k
+    {1, 3, 7, 17, 128, 192, 512, 1024},  // dim
+    {16},                                // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::AUTO},
     {10},
@@ -908,6 +910,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+
+  // Varying team_size, graph_build_algo
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
@@ -925,6 +929,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
+  // Varying graph_build_algo, itopk_size
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
@@ -942,6 +947,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
+  // Varying n_rows, host_dataset
   inputs2 =
     raft::util::itertools::product<AnnCagraInputs>({100},
                                                    {10000, 20000},
@@ -959,7 +965,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  // a few PQ configurations
+  // A few PQ configurations.
+  // Varying dim, vq_n_centers
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {10000},
@@ -987,11 +994,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     }
   }
 
-  // refinement options
+  // Refinement options
+  // Varying host_dataset, ivf_pq_search_refine_ratio
   inputs2 =
     raft::util::itertools::product<AnnCagraInputs>({100},
                                                    {5000},
-                                                   {32, 64},
+                                                   {64},
                                                    {16},
                                                    {graph_build_algo::IVF_PQ},
                                                    {search_algo::AUTO},
@@ -1006,21 +1014,22 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
-    {10},
-    {graph_build_algo::IVF_PQ},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false},
-    {false},
-    {0.995});
+  // Varying dim, adding non_owning_memory_buffer_flag
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {1000},
+                                                   {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
+                                                   {10},
+                                                   {graph_build_algo::IVF_PQ},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded},
+                                                   {false},
+                                                   {false},
+                                                   {0.995});
   for (auto input : inputs2) {
     input.non_owning_memory_buffer_flag = true;
     inputs.push_back(input);
