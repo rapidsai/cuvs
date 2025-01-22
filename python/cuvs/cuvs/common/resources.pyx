@@ -17,7 +17,7 @@
 
 import functools
 
-from cuda.ccudart cimport cudaStream_t
+from cuda.bindings.cyruntime cimport cudaStream_t
 
 from cuvs.common.c_api cimport (
     cuvsResources_t,
