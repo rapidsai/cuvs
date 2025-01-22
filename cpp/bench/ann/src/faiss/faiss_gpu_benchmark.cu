@@ -99,9 +99,7 @@ void parse_build_param(const nlohmann::json& conf,
   } else {
     param.intermediate_graph_degree = 128;
   }
-  if (conf.contains("cagra_build_algo")) {
-    param.cagra_build_algo = conf.at("cagra_build_algo");
-  }
+  if (conf.contains("cagra_build_algo")) { param.cagra_build_algo = conf.at("cagra_build_algo"); }
 }
 
 template <typename T>
@@ -202,18 +200,5 @@ REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
-int main(int argc, char** argv)
-{
-  rmm::mr::cuda_memory_resource cuda_mr;
-  // Construct a resource that uses a coalescing best-fit pool allocator
-  // and is initially sized to half of free device memory.
-  rmm::mr::pool_memory_resource<rmm::mr::cuda_memory_resource> pool_mr{
-    &cuda_mr, rmm::percent_of_free_device_memory(50)};
-  // Updates the current device resource pointer to `pool_mr`
-  auto old_mr = rmm::mr::set_current_device_resource(&pool_mr);
-  auto ret = cuvs::bench::run_main(argc, argv);
-  // Restores the current device resource pointer to its previous value
-  rmm::mr::set_current_device_resource(old_mr);
-  return ret;
-}
+int main(int argc, char** argv) { return cuvs::bench::run_main(argc, argv); }
 #endif

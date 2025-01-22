@@ -160,6 +160,9 @@ class faiss_gpu : public algo<T>, public algo_gpu {
    * faiss::gpu::StandardGpuResources are thread-safe.
    *
    */
+
+  // simply owning a configured_raft_resource object takes care of setting the pool memory resource
+  configured_raft_resources handle_{};
   mutable std::shared_ptr<faiss::gpu::StandardGpuResources> gpu_resource_;
   std::shared_ptr<faiss::gpu::GpuIndex> index_;
   std::shared_ptr<faiss::IndexRefineFlat> index_refine_{nullptr};
@@ -202,9 +205,7 @@ void faiss_gpu<T>::build(const T* dataset, size_t nrow)
   index_->train(nrow, dataset);  // faiss::gpu::GpuIndexFlat::train() will do nothing
   assert(index_->is_trained);
   auto index_cagra = dynamic_cast<faiss::gpu::GpuIndexCagra*>(index_.get());
-  if (index_cagra == nullptr) {
-    index_->add(nrow, dataset);
-  }
+  if (index_cagra == nullptr) { index_->add(nrow, dataset); }
 }
 
 template <typename T>
@@ -230,7 +231,6 @@ void faiss_gpu<T>::search(
                      candidates.data_handle(),
                      this->search_params_.get());
       gpu_resource_->getRaftHandle(device_).sync_stream();
-      RAFT_LOG_INFO("search completed");
 
       auto queries_host    = raft::make_host_matrix<T, IdxT>(batch_size, index_->d);
       auto candidates_host = raft::make_host_matrix<IdxT, IdxT>(batch_size, k0);
@@ -238,7 +238,6 @@ void faiss_gpu<T>::search(
       auto distances_host  = raft::make_host_matrix<float, IdxT>(batch_size, k);
       auto dataset_v       = raft::make_host_matrix_view<const T, faiss::idx_t>(
         this->dataset_, index_->ntotal, index_->d);
-      
 
       raft::device_resources handle_ = gpu_resource_->getRaftHandle(device_);
 
@@ -250,7 +249,6 @@ void faiss_gpu<T>::search(
 
       // wait for the queries to copy to host in 'stream`
       handle_.sync_stream();
-      RAFT_LOG_INFO("ALL COPIES COMPLETED");
 
       cuvs::neighbors::refine(handle_,
                               dataset_v,
@@ -260,12 +258,11 @@ void faiss_gpu<T>::search(
                               distances_host.view(),
                               parse_metric_type(this->metric_));
       handle_.sync_stream();
-      RAFT_LOG_INFO("REFINE COMPLETE");
 
-      // raft::copy(
-      //   neighbors, neighbors_host.data_handle(), neighbors_host.size(), handle_.get_stream());
-      // raft::copy(
-      //   distances, distances_host.data_handle(), distances_host.size(), handle_.get_stream());
+      raft::copy(
+        neighbors, neighbors_host.data_handle(), neighbors_host.size(), handle_.get_stream());
+      raft::copy(
+        distances, distances_host.data_handle(), distances_host.size(), handle_.get_stream());
     } else {
       index_refine_->search(batch_size,
                             queries,
@@ -552,8 +549,8 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
 
   void set_search_param(const search_param_base& param) override
   {
-    auto sp = dynamic_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
-    this->refine_ratio_ = sp.refine_ratio;
+    auto sp              = dynamic_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
+    this->refine_ratio_  = sp.refine_ratio;
     this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(sp.p);
 
     // if (sp.refine_ratio > 1.0) {
