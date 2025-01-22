@@ -19,13 +19,6 @@ cd "${package_dir}"
 
 EXCLUDE_ARGS=(
   --exclude "libraft.so"
-)
-
-# Avoid vendoring CUDA wheels.
-#
-# These should be either statically linked (e.g. on CUDA 11) or
-# loaded dynamically from corresponding wheels.
-EXCLUDE_ARGS+=(
   --exclude "libcublas.so.*"
   --exclude "libcublasLt.so.*"
   --exclude "libcurand.so.*"
