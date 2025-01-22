@@ -64,6 +64,7 @@ files:
   docs:
     output: none
     includes:
+      - clang
       - cuda
       - cuda_version
       - depends_on_cupy
