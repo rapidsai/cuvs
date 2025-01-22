@@ -212,7 +212,9 @@ template <typename T>
 void faiss_gpu<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  // ASSERT(Mode::kLatency, "l2Knn: rowMajorIndex and rowMajorQuery should have same layout");
+  ASSERT(
+    cuvs::bench::benchmark_n_threads == 1,
+    "Throughput mode disabled. Underlying StandardGpuResources object might not be thread-safe.");
   using IdxT = faiss::idx_t;
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
