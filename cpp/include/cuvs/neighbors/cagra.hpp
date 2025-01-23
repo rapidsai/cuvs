@@ -72,6 +72,10 @@ struct ivf_pq_params {
 };
 
 using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+
+// **** Experimental ****
+using iterative_search_params = cuvs::neighbors::search_params;
+
 }  // namespace graph_build_params
 
 struct index_params : cuvs::neighbors::index_params {
@@ -104,7 +108,8 @@ struct index_params : cuvs::neighbors::index_params {
    */
   std::variant<std::monostate,
                graph_build_params::ivf_pq_params,
-               graph_build_params::nn_descent_params>
+               graph_build_params::nn_descent_params,
+               graph_build_params::iterative_search_params>
     graph_build_params;
 
   /**
