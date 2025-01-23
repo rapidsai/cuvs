@@ -9,8 +9,7 @@ channels:
 dependencies:
 - breathe>=4.35.0
 - c-compiler
-- clang
-- clang-tools=16.0.6
+- clang-tools==16.0.6
 - clang==16.0.6
 - cmake>=3.26.4,!=3.30.0
 - cuda-cudart-dev
@@ -27,7 +26,7 @@ dependencies:
 - gcc_linux-aarch64=13.*
 - graphviz
 - ipython
-- libclang
+- libclang==16.0.6
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
