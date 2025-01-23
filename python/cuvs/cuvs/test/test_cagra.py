@@ -159,10 +159,10 @@ def create_sparse_bitset(n_size, sparsity):
 @pytest.mark.parametrize("sparsity", [0.2, 0.5, 0.7, 1.0])
 def test_filtered_cagra(
     sparsity,
-    n_rows = 10000,
-    n_cols = 10,
-    n_queries = 10,
-    k = 10,
+    n_rows=10000,
+    n_cols=10,
+    n_queries=10,
+    k=10,
 ):
     dataset = generate_data((n_rows, n_cols), np.float32)
     queries = generate_data((n_queries, n_cols), np.float32)
