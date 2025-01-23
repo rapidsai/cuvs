@@ -999,7 +999,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs2 =
     raft::util::itertools::product<AnnCagraInputs>({100},
                                                    {5000},
-                                                   {64},
+                                                   {32, 64},
                                                    {16},
                                                    {graph_build_algo::IVF_PQ},
                                                    {search_algo::AUTO},
