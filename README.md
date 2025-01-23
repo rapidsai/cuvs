@@ -109,7 +109,7 @@ pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
 
 ```bash
-conda install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=25.02
+conda install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=25.04
 ```
 
 cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
