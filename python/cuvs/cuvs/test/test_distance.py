@@ -21,6 +21,7 @@ from scipy.spatial.distance import cdist
 from cuvs.distance import pairwise_distance
 
 
+@pytest.mark.parametrize("times", range(20))
 @pytest.mark.parametrize("n_rows", [50, 100])
 @pytest.mark.parametrize("n_cols", [10, 50])
 @pytest.mark.parametrize(
@@ -35,15 +36,17 @@ from cuvs.distance import pairwise_distance
         "jensenshannon",
         "russellrao",
         "cosine",
+        "minkowski",
         "sqeuclidean",
         "inner_product",
     ],
 )
 @pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("order", ["F", "C"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
-def test_distance(n_rows, n_cols, inplace, metric, dtype):
+def test_distance(n_rows, n_cols, inplace, order, metric, dtype, times):
     input1 = np.random.random_sample((n_rows, n_cols))
-    input1 = np.asarray(input1).astype(dtype)
+    input1 = np.asarray(input1, order=order).astype(dtype)
 
     # RussellRao expects boolean arrays
     if metric == "russellrao":
@@ -58,7 +61,7 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
     output_dtype = dtype
     if np.issubdtype(dtype, np.float16):
         output_dtype = np.float32
-    output = np.zeros((n_rows, n_rows), dtype=output_dtype)
+    output = np.zeros((n_rows, n_rows), dtype=output_dtype, order=order)
 
     if metric == "inner_product":
         expected = np.matmul(input1, input1.T)
@@ -69,10 +72,7 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
     output_device = device_ndarray(output) if inplace else None
 
     ret_output = pairwise_distance(
-        input1_device,
-        input1_device,
-        output_device,
-        metric,
+        input1_device, input1_device, output_device, metric, p=2.0
     )
 
     output_device = ret_output if not inplace else output_device
@@ -80,7 +80,5 @@ def test_distance(n_rows, n_cols, inplace, metric, dtype):
     actual = output_device.copy_to_host()
 
     tol = 1e-3
-    if np.issubdtype(dtype, np.float16):
-        tol = 1e-1
 
     assert np.allclose(expected, actual, atol=tol, rtol=tol)
