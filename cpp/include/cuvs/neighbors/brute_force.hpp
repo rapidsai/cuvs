@@ -350,9 +350,17 @@ auto build(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter An optional device bitmap filter function with a `row-major` layout and
- * the shape of [n_queries, index->size()], which means the filter will use the first
- * `index->size()` bits to indicate whether queries[0] should compute the distance with dataset.
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
@@ -397,8 +405,17 @@ void search(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter a optional device bitmap filter function that greenlights samples for a
- * given
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
@@ -428,8 +445,17 @@ void search(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
@@ -459,8 +485,17 @@ void search(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,

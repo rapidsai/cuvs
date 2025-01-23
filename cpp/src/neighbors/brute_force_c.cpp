@@ -85,14 +85,14 @@ void _search(cuvsResources_t res,
                                          distances_mds,
                                          cuvs::neighbors::filtering::none_sample_filter{});
   } else if (prefilter.type == BITMAP) {
-    auto prefilter_ptr  = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
-    auto prefilter_mds  = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
-    auto prefilter_view = cuvs::neighbors::filtering::bitmap_filter(
+    auto prefilter_ptr   = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
+    auto prefilter_mds   = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
+    const auto prefilter = cuvs::neighbors::filtering::bitmap_filter(
       prefilter_bmp_type((uint32_t*)prefilter_mds.data_handle(),
                          queries_mds.extent(0),
                          index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
-      *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter_view);
+      *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter);
   } else {
     RAFT_FAIL("Unsupported prefilter type: BITSET");
   }
