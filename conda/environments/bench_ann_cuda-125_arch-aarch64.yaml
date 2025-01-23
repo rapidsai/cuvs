@@ -9,7 +9,7 @@ channels:
 dependencies:
 - benchmark>=1.8.2
 - c-compiler
-- clang-tools=16.0.6
+- clang-tools==16.0.6
 - clang==16.0.6
 - click
 - cmake>=3.26.4,!=3.30.0
@@ -27,6 +27,7 @@ dependencies:
 - gcc_linux-aarch64=13.*
 - glog>=0.6.0
 - h5py>=3.8.0
+- libclang==16.0.6
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
