@@ -75,7 +75,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   {
     // If explicit team_size is specified and doesn't match the instance, discard it
     if (params.team_size != 0 && TeamSize != params.team_size) { return -1.0; }
-    if (cuvs::distance::DistanceType::L2Expanded != metric) { return -1.0; }
+    if (Metric != metric) { return -1.0; }
     // Match codebook params
     if (dataset.pq_bits() != PqBits) { return -1.0; }
     if (dataset.pq_len() != PqLen) { return -1.0; }

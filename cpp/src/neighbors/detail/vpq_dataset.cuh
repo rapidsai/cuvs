@@ -156,7 +156,10 @@ auto train_vq(const raft::resources& res, const vpq_params& params, const Datase
 }
 
 template <typename LabelT, typename DatasetT, typename VqCentersT>
-auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCentersT& vq_centers)
+auto predict_vq(const raft::resources& res,
+                const DatasetT& dataset,
+                const VqCentersT& vq_centers,
+                cuvs::distance::DistanceType metric)
   -> raft::device_vector<LabelT, typename DatasetT::index_type>
 {
   using kmeans_data_type = typename DatasetT::value_type;
@@ -207,7 +210,7 @@ auto train_pq(const raft::resources& res,
 
   // Subtract VQ centers
   {
-    auto vq_labels   = predict_vq<uint32_t>(res, pq_trainset, vq_centers);
+    auto vq_labels   = predict_vq<uint32_t>(res, pq_trainset, vq_centers, params.metric);
     using index_type = typename DatasetT::index_type;
     raft::linalg::map_offset(
       res,
@@ -374,7 +377,7 @@ auto process_and_fill_codes(
          stream,
          rmm::mr::get_current_device_resource())) {
     auto batch_view = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
-    auto labels     = predict_vq<label_t>(res, batch_view, vq_centers);
+    auto labels     = predict_vq<label_t>(res, batch_view, vq_centers, params.metric);
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
     kernel<<<blocks, threads, 0, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
@@ -414,6 +417,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
 {
   // Use a heuristic to impute missing parameters.
   auto ps = fill_missing_params_heuristics(params, dataset);
+
+  RAFT_LOG_INFO("ps.metric %d", ps.metric);
 
   // Train codes
   auto vq_code_book = train_vq<MathT>(res, ps, dataset);

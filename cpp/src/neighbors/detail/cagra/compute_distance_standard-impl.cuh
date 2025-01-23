@@ -16,6 +16,7 @@
 #pragma once
 
 #include "compute_distance_standard.hpp"
+#include "distance_op.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/operators.hpp>
@@ -24,22 +25,6 @@
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
-namespace {
-template <typename T, cuvs::distance::DistanceType Metric>
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(T a, T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::L2Expanded, T>
-{
-  T diff = a - b;
-  return diff * diff;
-}
-
-template <typename T, cuvs::distance::DistanceType Metric>
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(T a, T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct, T>
-{
-  return -a * b;
-}
-}  // namespace
 
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
