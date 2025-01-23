@@ -23,6 +23,7 @@ jobs:
       - docs-build
       - rust-build
       - go-build
+      - wheel-build-libcuvs
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
@@ -150,7 +151,17 @@ jobs:
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_go.sh"
   wheel-build-cuvs:
+  wheel-build-libcuvs:
     needs: checks
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
+    with:
+      build_type: pull-request
+      script: ci/build_wheel_libcuvs.sh
+      # build for every combination of arch and CUDA version, but only for the latest Python
+      matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+  wheel-build-cuvs:
+    needs: wheel-build-libcuvs
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
     with:

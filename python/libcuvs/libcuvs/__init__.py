@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,17 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-# If libcuvs was installed as a wheel, we must request it to load the library
-# symbols. Otherwise, we assume that the library was installed in a system path that ld
-# can find.
-try:
-    import libcuvs
-except ModuleNotFoundError:
-    pass
-else:
-    libcuvs.load_library()
-    del libcuvs
-
-from cuvs._version import __git_commit__, __version__
+from libcuvs._version import __git_commit__, __version__
+from libcuvs.load import load_library
