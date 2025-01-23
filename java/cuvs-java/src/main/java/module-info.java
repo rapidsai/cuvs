@@ -15,7 +15,5 @@
  */
 
 module com.nvidia.cuvs {
-  //requires org.apache.commons.io;
-
   exports com.nvidia.cuvs;
 }
