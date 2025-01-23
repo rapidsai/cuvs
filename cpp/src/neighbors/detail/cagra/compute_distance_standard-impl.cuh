@@ -42,7 +42,7 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
 
 template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::HammingUnexpanded &&
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::BinaryHamming &&
                         std::is_integral_v<DATA_T>,
                       DISTANCE_T>
 {
@@ -59,7 +59,7 @@ template <cuvs::distance::DistanceType Metric,
 struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using QUERY_T   = typename std::
-    conditional_t<Metric == cuvs::distance::DistanceType::HammingUnexpanded, DataT, float>;
+    conditional_t<Metric == cuvs::distance::DistanceType::BinaryHamming, DataT, float>;
   using base_type::args;
   using base_type::smem_ws_size_in_bytes;
   using typename base_type::args_t;

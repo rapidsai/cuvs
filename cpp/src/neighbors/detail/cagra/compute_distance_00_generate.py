@@ -115,7 +115,7 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
 
 # CAGRA (Binary Hamming distance)
 for (mxdim, team) in mxdim_team:
-    metric = 'HammingUnexpanded'
+    metric = 'BinaryHamming'
     type_path = 'u8_uint32'
     idx_t = 'uint32_t'
     distance_t = 'float'

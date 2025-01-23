@@ -28,7 +28,7 @@
 namespace cuvs::neighbors::cagra::detail {
 
 using namespace cuvs::distance;
-template struct standard_descriptor_spec<DistanceType::HammingUnexpanded,
+template struct standard_descriptor_spec<DistanceType::BinaryHamming,
                                          8,
                                          128,
                                          uint8_t,
