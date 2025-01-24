@@ -42,7 +42,9 @@ enum cuvsHnswHierarchy {
   /* Flat hierarchy, search is base-layer only */
   NONE,
   /* Full hierarchy is built using the CPU */
-  CPU
+  CPU,
+  /* Full hierarchy is built using the GPU */
+  GPU
 };
 
 struct cuvsHnswIndexParams {

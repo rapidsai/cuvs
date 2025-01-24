@@ -45,7 +45,8 @@ namespace cuvs::neighbors::hnsw {
  */
 enum class HnswHierarchy {
   NONE,  // base-layer-only index
-  CPU    // full index with CPU-built hierarchy
+  CPU,   // full index with CPU-built hierarchy
+  GPU    // full index with GPU-built hierarchy
 };
 
 struct index_params : cuvs::neighbors::index_params {

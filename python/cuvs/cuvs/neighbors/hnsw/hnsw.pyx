@@ -49,6 +49,7 @@ cdef class IndexParams:
         The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
         - "none": No hierarchy is built.
         - "cpu": Hierarchy is built using CPU.
+        - "gpu": Hierarchy is built using GPU.
     ef_construction : int, default = 200 (optional)
         Maximum number of candidate list size used during construction
         when hierarchy is `cpu`.
@@ -76,6 +77,8 @@ cdef class IndexParams:
             self.params.hierarchy = cuvsHnswHierarchy.NONE
         elif hierarchy == "cpu":
             self.params.hierarchy = cuvsHnswHierarchy.CPU
+        elif hierarchy == "gpu":
+            self.params.hierarchy = cuvsHnswHierarchy.GPU
         else:
             raise ValueError("Invalid hierarchy type."
                              " Valid values are 'none' and 'cpu'.")
@@ -88,6 +91,8 @@ cdef class IndexParams:
             return "none"
         elif self.params.hierarchy == cuvsHnswHierarchy.CPU:
             return "cpu"
+        elif self.params.hierarchy == cuvsHnswHierarchy.GPU:
+            return "gpu"
 
     @property
     def ef_construction(self):
