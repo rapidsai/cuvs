@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,175 +20,52 @@
 
 #include <raft/core/copy.hpp>
 
-namespace cuvs::neighbors::bang {
+namespace {
+  enum class Metric {
+    L2,
+    MIPS,
+};
+}
+namespace cuvs::neighbors::experimental::bang {
 
-template <typename T, typename DistT>
-index<T, DistT>::index(raft::resources const& res)
+template <typename T>
+index<T>::index(raft::resources const& res,
+          const std::string& disk_index_path,
+          cuvs::distance::DistanceType metric)
   // this constructor is just for a temporary index, for use in the deserialization
   // api. all the parameters here will get replaced with loaded values - that aren't
   // necessarily known ahead of time before deserialization.
   // TODO: do we even need a handle here - could just construct one?
   : cuvs::neighbors::index(),
-    metric_(cuvs::distance::DistanceType::L2Expanded),
-    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
-    norms_(std::nullopt),
-    metric_arg_(0)
+    metric_(metric)
 {
+    bang_search_instance.bang_load(disk_index_path);
 }
 
-template <typename T, typename DistT>
-index<T, DistT>::index(raft::resources const& res,
-                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
-                       std::optional<raft::device_vector<DistT, int64_t>>&& norms,
-                       cuvs::distance::DistanceType metric,
-                       DistT metric_arg)
-  : cuvs::neighbors::index(),
-    metric_(metric),
-    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
-    norms_(std::move(norms)),
-    metric_arg_(metric_arg)
-{
-  if (norms_) { norms_view_ = raft::make_const_mdspan(norms_.value().view()); }
-  update_dataset(res, dataset);
-  raft::resource::sync_stream(res);
-}
-
-template <typename T, typename DistT>
-index<T, DistT>::index(raft::resources const& res,
-                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
-                       std::optional<raft::device_vector<DistT, int64_t>>&& norms,
-                       cuvs::distance::DistanceType metric,
-                       DistT metric_arg)
-  : cuvs::neighbors::index(),
-    metric_(metric),
-    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
-    norms_(std::move(norms)),
-    metric_arg_(metric_arg)
-{
-  if (norms_) { norms_view_ = raft::make_const_mdspan(norms_.value().view()); }
-  update_dataset(res, dataset);
-}
-
-template <typename T, typename DistT>
-index<T, DistT>::index(raft::resources const& res,
-                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset_view,
-                       std::optional<raft::device_vector_view<const DistT, int64_t>> norms_view,
-                       cuvs::distance::DistanceType metric,
-                       DistT metric_arg)
-  : cuvs::neighbors::index(),
-    metric_(metric),
-    dataset_(raft::make_device_matrix<T, int64_t>(res, 0, 0)),
-    dataset_view_(dataset_view),
-    norms_view_(norms_view),
-    metric_arg_(metric_arg)
-{
-}
-
-template <typename T, typename DistT>
-index<T, DistT>::index(raft::resources const& res,
-                       raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-                       std::optional<raft::device_vector<DistT, int64_t>>&& norms,
-                       cuvs::distance::DistanceType metric,
-                       DistT metric_arg)
-  : cuvs::neighbors::index(),
-    metric_(metric),
-    dataset_(
-      raft::make_device_matrix<T, int64_t>(res, dataset_view.extent(0), dataset_view.extent(1))),
-    norms_(std::move(norms)),
-    metric_arg_(metric_arg)
-{
-  // currently we don't support col_major inside tiled_brute_force_knn, because
-  // of limitations of the pairwise_distance API:
-  // 1) paiwise_distance takes a single 'isRowMajor' parameter - and we have
-  // multiple options here (both dataset and queries)
-  // 2) because of tiling, we need to be able to set a custom stride in the PW
-  // api, which isn't supported
-  // Instead, transpose the input matrices if they are passed as col-major.
-  // (note: we're doing the transpose here to avoid doing per query)
-  raft::linalg::transpose(res,
-                          const_cast<T*>(dataset_view.data_handle()),
-                          dataset_.data_handle(),
-                          dataset_view.extent(0),
-                          dataset_view.extent(1),
-                          raft::resource::get_cuda_stream(res));
-  dataset_view_ = raft::make_const_mdspan(dataset_.view());
-}
-
-template <typename T, typename DistT>
-index<T, DistT>::index(raft::resources const& res,
-                       raft::device_matrix_view<const T, int64_t, raft::col_major> dataset_view,
-                       std::optional<raft::device_vector_view<const DistT, int64_t>> norms_view,
-                       cuvs::distance::DistanceType metric,
-                       DistT metric_arg)
-  : cuvs::neighbors::index(),
-    metric_(metric),
-    dataset_(
-      raft::make_device_matrix<T, int64_t>(res, dataset_view.extent(0), dataset_view.extent(1))),
-    norms_view_(norms_view),
-    metric_arg_(metric_arg)
-{
-  // currently we don't support col_major inside tiled_brute_force_knn, because
-  // of limitations of the pairwise_distance API:
-  // 1) paiwise_distance takes a single 'isRowMajor' parameter - and we have
-  // multiple options here (both dataset and queries)
-  // 2) because of tiling, we need to be able to set a custom stride in the PW
-  // api, which isn't supported
-  // Instead, transpose the input matrices if they are passed as col-major.
-  // (note: we're doing the transpose here to avoid doing per query)
-  raft::linalg::transpose(res,
-                          const_cast<T*>(dataset_view.data_handle()),
-                          dataset_.data_handle(),
-                          dataset_view.extent(0),
-                          dataset_view.extent(1),
-                          raft::resource::get_cuda_stream(res));
-  dataset_view_ = raft::make_const_mdspan(dataset_.view());
-}
-
-template <typename T, typename DistT>
-void index<T, DistT>::update_dataset(
-  raft::resources const& res, raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
-{
-  dataset_view_ = dataset;
-}
-
-template <typename T, typename DistT>
-void index<T, DistT>::update_dataset(
-  raft::resources const& res, raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
-{
-  dataset_ = raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
-  raft::copy(res, dataset_.view(), dataset);
-  dataset_view_ = raft::make_const_mdspan(dataset_.view());
-}
-
-#define CUVS_INST_BANG(T, DistT)                                                        \
-  void load_disk_index(raft::resources const& res,                                      \
-             char* indexfile_path_prefix)                                       \                                                     \
-{                                                                                     \
-  return bang::bang_load(res, indexfile_path_prefix);  \
-}                                                                                    \                                                                                 \
-                                                                                     \
-  void search(raft::resources const& res,
-              const search_params& params,                                            \
-              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,   \
-              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, \
-              raft::device_matrix_view<float, int64_t, raft::row_major> distances)   \
+#define CUVS_INST_BANG(T, DistT)                                           
+                                                                                
+  void search(raft::resources const& res,                                      
+              const search_params& params,                                    
+              raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+              raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, 
+              raft::device_matrix_view<float, int64_t, raft::row_major> distances)   
   {
-    bang_set_searchparams(neighbors.extent(1),                                       \
-                          params.workslist_length);                                  \
-    bang::bang_alloc<T>(numQueries);                                                 \
-    bang::bang_query(res, queries, queries.extent(0),                                \
-          neighbors.data_handle(),                                                   \
+    int numQueries = static_cast<int>(queries.extent(0));
+    int k = static_cast<int>(neighbors.extent(1));
+    auto metric_enum = metric_ == cuvs::distance::DistanceType::L2Expanded ? Metric::L2 : Metric::MIPS;                                                                                  
+    bang_set_searchparams(k, params.workslist_length, Metric::L2Expanded);                                  
+    bang_search_instance.bang_alloc<T>(res, numQueries);                                                 
+    bang_search_instance.bang_init<T>(res, numQueries);
+    bang_search_instance.bang_query(res, queries, queries.extent(0),                                
+          neighbors.data_handle(),                                                   
 					distances.data_handle());
-    bang_free();
-    bang_unload();
-    free(queriesFP);                         `                        \
-  }                                                                                  \
-                                                                                     \
-  template struct cuvs::neighbors::brute_force::index<T, DistT>;
+    // bang_search_instance.bang_free();
+  }
 
-CUVS_INST_BANG(float, float);
-CUVS_INST_BANG(half, float);
+CUVS_INST_BANG(float);
+CUVS_INST_BANG(int8_t);
+CUVS_INST_BANG(uint8_t);
 
-#undef CUVS_INST_BFKNN
+#undef CUVS_INST_BANG
 
 }  // namespace cuvs::neighbors::brute_force

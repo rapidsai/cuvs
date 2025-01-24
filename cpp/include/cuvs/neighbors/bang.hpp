@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,17 +19,32 @@
 #include "cuvs/neighbors/common.hpp"
 #include <cstdint>
 
-namespace cuvs::neighbors::bang {
+namespace cuvs::neighbors::experimental::bang {
 
 /**
  * @defgroup bang_cpp_index_params bang index wrapper params
  * @{
  */
+struct search_params : cuvs::neighbors::search_params {
+    int worklist_length = 0;  // worklist length for greedy search
+};
 
+template <typename T>
+struct index {
+    index(raft::resources const& res,
+          const std::string& disk_index_path,
+          cuvs::distance::DistanceType metric);
+
+    bang::BangSearch<T> bang_instance;
+}
+    
+template <typename T>
+void search(raft::resources const& handle,
+            const search_params& params,
+            const index<T>& index,
+            raft::device_matrix_view<int, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
 /**
- * @brief Hierarchy for HNSW index when converting from CAGRA index
- *
- * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
+ * @}
  */
-
-}  // namespace cuvs::neighbors::bang
+}  // namespace cuvs::neighbors::experimental::bang

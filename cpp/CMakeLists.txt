@@ -173,6 +173,7 @@ rapids_cpm_init()
 if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
+  include(cmake/thirdparty/get_bang.cmake)
 endif()
 
 if(BUILD_C_LIBRARY)
@@ -374,6 +375,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
+    src/neighbors/bang.cpp
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu

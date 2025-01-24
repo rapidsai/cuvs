@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,20 +15,18 @@
 #=============================================================================
 
 function(find_and_configure_bang)
-  set(oneValueArgs VERSION REPOSITORY PINNED_TAG BUILD_STATIC_LIBS EXCLUDE_FROM_ALL ENABLE_GPU)
+  set(oneValueArgs VERSION FORK PINNED_TAG)
   cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
-                        "${multiValueArgs}" ${ARGN} )
+            "${multiValueArgs}" ${ARGN} )
 
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(faiss version repository tag shallow exclude)
+  rapids_cpm_package_details(bang version repository tag)
 
   rapids_cpm_find(bang ${version}
     GLOBAL_TARGETS bang bang::bang
     CPM_ARGS
-    GIT_REPOSITORY ${repository}
+    GIT_REPOSITORY https://github.com/${PKG_FORK}/BANG-Billion-Scale-ANN.git
     GIT_TAG ${tag}
-    GIT_SHALLOW ${shallow}
-    EXCLUDE_FROM_ALL ${exclude}
     )
 
   if(TARGET bang AND NOT TARGET bang::bang)
@@ -43,4 +41,7 @@ function(find_and_configure_bang)
 
 endfunction()
 
-find_and_configure_bang()
+find_and_configure_nlohmann_json(VERSION  0
+        FORK             tarang-jain
+        PINNED_TAG       rapids
+        )
