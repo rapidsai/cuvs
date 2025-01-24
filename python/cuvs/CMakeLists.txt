@@ -63,7 +63,3 @@ add_subdirectory(cuvs/common)
 add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
 add_subdirectory(cuvs/preprocessing)
-
-if(DEFINED cython_lib_dir)
-  rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")
-endif()
