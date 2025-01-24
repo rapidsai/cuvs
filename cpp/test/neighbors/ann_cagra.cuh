@@ -888,7 +888,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
@@ -905,7 +905,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
@@ -923,7 +923,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
@@ -941,7 +941,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0, 8, 16, 32},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {false},
     {0.995});
@@ -959,28 +959,28 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {32, 64, 128, 256, 512, 768},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying n_rows, host_dataset
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {10000},
-                                                   {32},
-                                                   {10},
-                                                   {graph_build_algo::AUTO},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false, true},
-                                                   {false},
-                                                   {0.985});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {10000},
+    {32},
+    {10},
+    {graph_build_algo::AUTO},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {false, true},
+    {false},
+    {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // A few PQ configurations.
@@ -996,7 +996,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.6});                      // don't demand high recall without refinement
@@ -1014,40 +1014,40 @@ inline std::vector<AnnCagraInputs> generate_inputs()
 
   // Refinement options
   // Varying host_dataset, ivf_pq_search_refine_ratio
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {5000},
-                                                   {32, 64},
-                                                   {16},
-                                                   {graph_build_algo::IVF_PQ},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false, true},
-                                                   {false},
-                                                   {0.99},
-                                                   {1.0f, 2.0f, 3.0f});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {5000},
+    {32, 64},
+    {16},
+    {graph_build_algo::IVF_PQ},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {false, true},
+    {false},
+    {0.99},
+    {1.0f, 2.0f, 3.0f});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim, adding non_owning_memory_buffer_flag
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {1000},
-                                                   {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
-                                                   {10},
-                                                   {graph_build_algo::IVF_PQ},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false},
-                                                   {false},
-                                                   {0.995});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
+    {10},
+    {graph_build_algo::IVF_PQ},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {false},
+    {false},
+    {0.995});
   for (auto input : inputs2) {
     input.non_owning_memory_buffer_flag = true;
     inputs.push_back(input);
@@ -1059,38 +1059,38 @@ inline std::vector<AnnCagraInputs> generate_inputs()
 inline std::vector<AnnCagraInputs> generate_addnode_inputs()
 {
   // changing dim
-  std::vector<AnnCagraInputs> inputs =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {1000},
-                                                   {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
-                                                   {16},                                 // k
-                                                   {graph_build_algo::NN_DESCENT},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false},
-                                                   {true},
-                                                   {0.995});
+  std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
+    {16},                                 // k
+    {graph_build_algo::NN_DESCENT},
+    {search_algo::AUTO},
+    {10},
+    {0},
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {false},
+    {true},
+    {0.995});
 
   // testing host and device datasets
-  auto inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {10000},
-                                                   {32},
-                                                   {10},
-                                                   {graph_build_algo::AUTO},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false, true},
-                                                   {false},
-                                                   {0.985});
+  auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {10000},
+    {32},
+    {10},
+    {graph_build_algo::AUTO},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {false, true},
+    {false},
+    {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations
@@ -1138,7 +1138,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
@@ -1155,7 +1155,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
@@ -1173,7 +1173,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.6});                      // don't demand high recall without refinement
