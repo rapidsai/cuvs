@@ -1442,8 +1442,11 @@ void build(raft::resources const& res,
   auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                          params.metric == cuvs::distance::DistanceType::CosineExpanded ||
                          params.metric == cuvs::distance::DistanceType::InnerProduct;
-  RAFT_EXPECTS(allowed_metrics && idx.metric() == params.metric,
+  RAFT_EXPECTS(allowed_metrics,
                "The metric for NN Descent should be L2Expanded, CosineExpanded or InnerProduct");
+  RAFT_EXPECTS(
+    idx.metric() == params.metric,
+    "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
 
