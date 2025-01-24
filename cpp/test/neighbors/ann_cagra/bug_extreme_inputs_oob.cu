@@ -40,8 +40,14 @@ class cagra_extreme_inputs_oob_test : public ::testing::Test {
     ix_ps.graph_degree              = 64;
     ix_ps.intermediate_graph_degree = 128;
 
-    [[maybe_unused]] auto ix = cagra::build(res, ix_ps, raft::make_const_mdspan(dataset->view()));
-    raft::resource::sync_stream(res);
+    try {
+      [[maybe_unused]] auto ix = cagra::build(res, ix_ps, raft::make_const_mdspan(dataset->view()));
+      raft::resource::sync_stream(res);
+    } catch (const std::exception&) {
+      SUCCEED();
+      return;
+    }
+    FAIL();
   }
 
   void SetUp() override
