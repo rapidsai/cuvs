@@ -326,7 +326,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    if (ps.metric == HammingUnexpanded && (!std::is_same_v<DataT, uint8_t>)) GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+        (!std::is_same_v<DataT, uint8_t>))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -503,7 +505,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
-    if (ps.metric == HammingUnexpanded && (!std::is_same_v<DataT, uint8_t>)) GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+        (!std::is_same_v<DataT, uint8_t>))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -699,7 +703,9 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
-    if (ps.metric == HammingUnexpanded && (!std::is_same_v<DataT, uint8_t>)) GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+        (!std::is_same_v<DataT, uint8_t>))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
