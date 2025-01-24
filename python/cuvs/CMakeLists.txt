@@ -116,6 +116,7 @@ target_link_libraries(cuvs_rmm_logger PRIVATE rmm::rmm_logger_impl)
 add_subdirectory(cuvs/common)
 add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
+add_subdirectory(cuvs/preprocessing)
 
 if(DEFINED cython_lib_dir)
   rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")
