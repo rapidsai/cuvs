@@ -432,16 +432,22 @@ void get_num_gpus(int *return_value, int *num_gpus) {
  * @param[out] return_value return value for cudaMemGetInfo function call
  * @param[in] num_gpus the count of gpus passed to expect details on
  * @param[out] gpu_id an integer array of gpu ids returned
- * @param[out] free_memory an array of free memory values (free_memory[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
- * @param[out] total_memory an array of total memory values (total_memory[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
+ * @param[out] free_memory an array of free memory bytes (free_memory[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
+ * @param[out] total_memory an array of total memory bytes (total_memory[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
+ * @param[out] compute_capability the compute capability (compute_capability[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
  */
-void get_gpu_info(int *return_value, int num_gpus, int *gpu_id, long *free_memory, long *total_memory) {
+void get_gpu_info(int *return_value, int num_gpus, int *gpu_id, long *free_memory, long *total_memory, float *compute_capability) {
   size_t free, total;
+  struct cudaDeviceProp deviceProp;
   for (int i = 0; i < num_gpus; i++) {
     cudaSetDevice(i);
+    cudaGetDeviceProperties(&deviceProp, i);
+    char buffer[10];
+    sprintf(buffer, "%d.%d", deviceProp.major, deviceProp.minor);
     *return_value = cudaMemGetInfo(&free, &total);
     *(gpu_id + i) = i;
     *(free_memory + i) = free;
     *(total_memory + i) = total;
+    *(compute_capability + i) = atof(buffer);
   }
 }
