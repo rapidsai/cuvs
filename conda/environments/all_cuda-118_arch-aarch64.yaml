@@ -7,10 +7,9 @@ channels:
 - conda-forge
 - nvidia
 dependencies:
-- breathe
+- breathe>=4.35.0
 - c-compiler
-- clang
-- clang-tools=16.0.6
+- clang-tools==16.0.6
 - clang==16.0.6
 - cmake>=3.26.4,!=3.30.0
 - cuda-nvtx=11.8
@@ -26,7 +25,7 @@ dependencies:
 - gcc_linux-aarch64=11.*
 - graphviz
 - ipython
-- libclang
+- libclang==16.0.6
 - libcublas-dev=11.11.3.6
 - libcublas=11.11.3.6
 - libcurand-dev=10.3.0.86
@@ -44,7 +43,6 @@ dependencies:
 - nvcc_linux-aarch64=11.8
 - openblas
 - pre-commit
-- pydata-sphinx-theme
 - pylibraft==25.2.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
@@ -55,5 +53,8 @@ dependencies:
 - scikit-learn
 - sphinx-copybutton
 - sphinx-markdown-tables
-- sysroot_linux-aarch64==2.17
+- sphinx>=8.0.0
+- sysroot_linux-aarch64==2.28
+- pip:
+  - nvidia-sphinx-theme
 name: all_cuda-118_arch-aarch64

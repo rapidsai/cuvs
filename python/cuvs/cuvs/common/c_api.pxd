@@ -16,7 +16,7 @@
 # cython: language_level=3
 
 
-from cuda.ccudart cimport cudaStream_t
+from cuda.bindings.cyruntime cimport cudaStream_t
 from libc.stdint cimport uintptr_t
 
 

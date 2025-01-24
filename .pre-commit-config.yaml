@@ -108,15 +108,14 @@ repos:
                   [.](cmake|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs)$|
                   CMakeLists[.]txt$|
                   CMakeLists_standalone[.]txt$|
-                  meta[.]yaml$|
-                  setup[.]cfg$
+                  meta[.]yaml$
             exclude: |
               (?x)
                   docs/source/sphinxext/github_link\.py|
                   cpp/cmake/modules/FindAVX\.cmake|
           - id: verify-alpha-spec
       - repo: https://github.com/rapidsai/dependency-file-generator
-        rev: v1.16.0
+        rev: v1.17.0
         hooks:
             - id: rapids-dependency-file-generator
               args: ["--clean"]
