@@ -891,7 +891,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BinaryHamming},
     {false},
     {true},
     {0.995});
@@ -907,7 +909,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BinaryHamming},
     {false},
     {true},
     {0.995});
@@ -923,7 +927,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0, 8, 16, 32},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BinaryHamming},
     {false},
     {false},
     {0.995});
@@ -940,27 +946,31 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {32, 64, 128, 256, 512, 768},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BinaryHamming},
     {false},
     {true},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000, 20000},
-    {32},
-    {10},
-    {graph_build_algo::AUTO},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::HammingUnexpanded},
-    {false, true},
-    {false},
-    {0.985});
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {10000, 20000},
+                                                   {32},
+                                                   {10},
+                                                   {graph_build_algo::AUTO},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::BinaryHamming},
+                                                   {false, true},
+                                                   {false},
+                                                   {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations
@@ -1003,7 +1013,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {0},  // team_size
                                                    {64},
                                                    {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::BinaryHamming},
                                                    {false, true},
                                                    {false},
                                                    {0.99},
@@ -1021,7 +1033,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BinaryHamming},
     {false},
     {false},
     {0.995});
