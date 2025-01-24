@@ -447,11 +447,14 @@ index<T, IdxT> build(
   // Dispatch based on graph_build_params
   if (std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params)) {
-    fprintf(stderr, "# dataset size: %lu\n", (uint64_t)dataset.extent(0));
-    fprintf(stderr, "# dataset dims: %lu\n", (uint64_t)dataset.extent(1));
-    fprintf(stderr, "# graph degree: %lu\n", (uint64_t)graph_degree);
-    fprintf(stderr, "# intermediate graph degree: %lu\n", (uint64_t)intermediate_degree);
+    // Iteratively improve the accuracy of the graph by repeatedly running
+    // CAGRA's search() and optimize(). As for the size of the graph, instead
+    // of targeting all nodes from the beginning, the number of nodes is
+    // initially small, and the number of nodes is doubled with each iteration.
+    RAFT_LOG_INFO(
+      "Iteratively creating/improving graph index using CAGRA's search() and optimize()");
 
+    // Copy dataset to device. This is used as dataset as well as queries.
     auto dev_dataset =
       raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
     raft::copy(dev_dataset.data_handle(),
@@ -459,67 +462,82 @@ index<T, IdxT> build(
                dev_dataset.size(),
                raft::resource::get_cuda_stream(res));
 
+    // Determine initial graph size.
     uint64_t final_graph_size   = (uint64_t)dataset.extent(0);
     uint64_t initial_graph_size = (final_graph_size + 1) / 2;
     while (initial_graph_size > graph_degree * 64) {
       initial_graph_size = (initial_graph_size + 1) / 2;
     }
-    fprintf(stderr, "# initial graph size: %lu\n", (uint64_t)initial_graph_size);
+    RAFT_LOG_DEBUG("# initial graph size = %lu", (uint64_t)initial_graph_size);
 
-    // Create an initial search graph
-    auto offset       = raft::make_host_vector<IdxT, int64_t>(graph_degree);
-    const double base = sqrt((double)2.0);
-    for (uint64_t j = 0; j < graph_degree; j++) {
-      if (j == 0) {
-        offset(j) = 1;
-      } else {
-        offset(j) = offset(j - 1) + 1;
-      }
-      IdxT ofst = initial_graph_size * pow(base, (double)j - graph_degree - 1);
-      if (offset(j) < ofst) { offset(j) = ofst; }
-      // fprintf(stderr, "# offset(%lu): %lu\n", (uint64_t)j, (uint64_t)offset(j));
-    }
-    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(initial_graph_size, graph_degree);
-    for (uint64_t i = 0; i < initial_graph_size; i++) {
-      for (uint64_t j = 0; j < graph_degree; j++) {
-        cagra_graph(i, j) = (i + offset(j)) % initial_graph_size;
-      }
-    }
-
-    // Allocate memory space for search results
+    // Allocate memory for search results.
     constexpr uint64_t max_chunk_size = 8192;
     auto topk                         = intermediate_degree;
     auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, max_chunk_size, topk);
     auto dev_distances = raft::make_device_matrix<float, int64_t>(res, max_chunk_size, topk);
 
-    cuvs::neighbors::cagra::search_params search_params;
-    search_params.algo        = cuvs::neighbors::cagra::search_algo::AUTO;
-    search_params.itopk_size  = topk * 2;
-    search_params.max_queries = max_chunk_size;
+    // Determine graph degree and number of search results while increasing
+    // graph size.
+    auto small_graph_degree = std::max(graph_degree / 2, std::min(graph_degree, (uint64_t)32));
+    auto small_topk         = topk * small_graph_degree / graph_degree;
+    RAFT_LOG_DEBUG("# graph_degree = %lu", (uint64_t)graph_degree);
+    RAFT_LOG_DEBUG("# small_graph_degree = %lu", (uint64_t)small_graph_degree);
+    RAFT_LOG_DEBUG("# topk = %lu", (uint64_t)topk);
+    RAFT_LOG_DEBUG("# small_topk = %lu", (uint64_t)small_topk);
 
-    uint64_t curr_graph_size = initial_graph_size;
+    // Create an initial graph. This can be inaccurate.
+    auto offset       = raft::make_host_vector<IdxT, int64_t>(small_graph_degree);
+    const double base = sqrt((double)2.0);
+    for (uint64_t j = 0; j < small_graph_degree; j++) {
+      if (j == 0) {
+        offset(j) = 1;
+      } else {
+        offset(j) = offset(j - 1) + 1;
+      }
+      IdxT ofst = initial_graph_size * pow(base, (double)j - small_graph_degree - 1);
+      if (offset(j) < ofst) { offset(j) = ofst; }
+      RAFT_LOG_DEBUG("# offset(%lu) = %lu\n", (uint64_t)j, (uint64_t)offset(j));
+    }
+    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(initial_graph_size, small_graph_degree);
+    for (uint64_t i = 0; i < initial_graph_size; i++) {
+      for (uint64_t j = 0; j < small_graph_degree; j++) {
+        cagra_graph(i, j) = (i + offset(j)) % initial_graph_size;
+      }
+    }
+
+    auto curr_graph_size = initial_graph_size;
     while (true) {
-      fprintf(stderr,
-              "# graph_size: %lu / %lu (%.3lf)\n",
-              (uint64_t)curr_graph_size,
-              (uint64_t)final_graph_size,
-              (double)curr_graph_size / final_graph_size);
+      RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
+                     (uint64_t)curr_graph_size,
+                     (double)curr_graph_size / final_graph_size);
 
-      // Create index
+      auto curr_query_size   = std::min(2 * curr_graph_size, final_graph_size);
+      auto curr_topk         = small_topk;
+      auto curr_itopk_size   = small_topk * 3 / 2;
+      auto curr_graph_degree = small_graph_degree;
+      if (curr_query_size == final_graph_size) {
+        curr_topk         = topk;
+        curr_itopk_size   = topk * 2;
+        curr_graph_degree = graph_degree;
+      }
+
+      cuvs::neighbors::cagra::search_params search_params;
+      search_params.algo        = cuvs::neighbors::cagra::search_algo::AUTO;
+      search_params.max_queries = max_chunk_size;
+      search_params.itopk_size  = curr_itopk_size;
+
+      // Create an index (idx), a query view (dev_query_view), and a mdarray for
+      // search results (neighbors).
       auto dev_dataset_view = raft::make_host_matrix_view<const T, int64_t>(
         dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
       auto idx = index<T, IdxT>(
         res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
-
-      // Create query view
-      uint64_t curr_query_size = std::min(2 * curr_graph_size, final_graph_size);
-      auto dev_query_view      = raft::make_device_matrix_view<const T, int64_t>(
+      auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
         dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
+      auto neighbors = raft::make_host_matrix<IdxT, int64_t>(curr_query_size, curr_topk);
 
-      // Create matrix for search results
-      auto neighbors = raft::make_host_matrix<IdxT, int64_t>(curr_query_size, topk);
-
-      // Search
+      // Search.
+      // Since there are many queries, divide them into batches and search them.
       cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
         dev_query_view.data_handle(),
         curr_query_size,
@@ -528,17 +546,12 @@ index<T, IdxT> build(
         raft::resource::get_cuda_stream(res),
         raft::resource::get_workspace_resource(res));
       for (const auto& batch : query_batch) {
-        fprintf(stderr,
-                "# Searching ... %lu / %lu    \r",
-                (uint64_t)batch.offset(),
-                (uint64_t)curr_query_size);
-
         auto batch_dev_query_view = raft::make_device_strided_matrix_view<const T, int64_t>(
           batch.data(), batch.size(), dev_query_view.extent(1), dev_query_view.stride(0));
         auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
-          dev_neighbors.data_handle(), batch.size(), dev_neighbors.extent(1));
+          dev_neighbors.data_handle(), batch.size(), curr_topk);
         auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
-          dev_distances.data_handle(), batch.size(), dev_distances.extent(1));
+          dev_distances.data_handle(), batch.size(), curr_topk);
 
         cuvs::neighbors::cagra::search(res,
                                        search_params,
@@ -548,18 +561,17 @@ index<T, IdxT> build(
                                        batch_dev_distances_view);
 
         auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
-          neighbors.data_handle() + batch.offset() * topk, batch.size(), topk);
+          neighbors.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
         raft::copy(batch_neighbors_view.data_handle(),
                    batch_dev_neighbors_view.data_handle(),
                    batch_neighbors_view.size(),
                    raft::resource::get_cuda_stream(res));
       }
-      fprintf(stderr, "\n");
 
       // Optimize graph
       bool flag_last  = (curr_graph_size == final_graph_size);
       curr_graph_size = curr_query_size;
-      cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, graph_degree);
+      cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
       optimize<IdxT>(
         res, neighbors.view(), cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
       if (flag_last) { break; }
