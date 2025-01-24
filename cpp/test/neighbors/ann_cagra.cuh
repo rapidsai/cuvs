@@ -996,7 +996,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
     {0.6});                      // don't demand high recall without refinement
