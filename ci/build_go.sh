@@ -23,8 +23,8 @@ set -eu
 
 rapids-print-env
 
-export CGO_CFLAGS="-I/usr/local/cuda/include -I/home/ajit/miniforge3/envs/cuvs/include"
-export CGO_LDFLAGS="-L/usr/local/cuda/lib64 -L/home/ajit/miniforge3/envs/cuvs/lib -lcudart -lcuvs -lcuvs_c"
+export CGO_CFLAGS="-I${CONDA_PREFIX}/include"
+export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
 export CC=clang
 
 rapids-logger "Downloading artifacts from previous jobs"

@@ -85,9 +85,10 @@ files:
   go:
     output: none
     includes:
+      - clang
+      - cuda
       - cuda_version
       - rapids_build
-      - cuda
       - go
   py_build_libcuvs:
     output: pyproject
@@ -477,11 +478,7 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - make
           - go
-          # clang/liblclang only needed for bindgen support
-          - clang
-          - libclang
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
