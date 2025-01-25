@@ -78,6 +78,11 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
+            let prefilter = ffi::cuvsFilter {
+                addr: 0,
+                type_: ffi::cuvsFilterType::NO_FILTER,
+            };
+
             check_cuvs(ffi::cuvsCagraSearch(
                 res.0,
                 params.0,
@@ -85,6 +90,7 @@ impl Index {
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
+                prefilter,
             ))
         }
     }
@@ -167,7 +173,8 @@ mod tests {
     #[test]
     fn test_cagra_compression() {
         use crate::cagra::CompressionParams;
-        let build_params = IndexParams::new().unwrap()
+        let build_params = IndexParams::new()
+            .unwrap()
             .set_compression(CompressionParams::new().unwrap());
         test_cagra(build_params);
     }
