@@ -113,4 +113,3 @@ Peak device memory usage for index build:
 :math:`workspace = min(1GB, n\_queries * [(n\_lists + 1 + n\_probes * (k + 1)) * sizeof_{float}) + n\_probes * k * sizeof_{idx}])`
 
 :math:`index\_size + workspace`
-
