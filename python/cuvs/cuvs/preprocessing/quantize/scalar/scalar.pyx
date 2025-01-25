@@ -90,7 +90,7 @@ def train(QuantizerParams params, dataset, resources=None):
     Parameters
     ----------
     params : QuantizerParams object
-    dataset : row major dataset
+    dataset : row major host or device dataset
     {resources_docstring}
 
     Returns
@@ -137,8 +137,8 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     Parameters
     ----------
     quantizer : trained Quantizer object
-    dataset : row major dataset to transform
-    output : optional preallocated output memory
+    dataset : row major host or device dataset to transform
+    output : optional preallocated output memory, on host or device memory
     {resources_docstring}
 
     Returns
@@ -163,8 +163,10 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     _check_input_array(dataset_ai, [np.dtype("float32"), np.dtype("float64")])
 
     if output is None:
-        output = device_ndarray.empty((dataset_ai.shape[0],
-                                       dataset_ai.shape[1]), dtype="int8")
+        on_device = hasattr(dataset, "__cuda_array_interface__")
+        ndarray = device_ndarray if on_device else np
+        output = ndarray.empty((dataset_ai.shape[0],
+                                dataset_ai.shape[1]), dtype="int8")
 
     output_ai = wrap_array(output)
     _check_input_array(output_ai, [np.dtype("int8")])
@@ -197,8 +199,8 @@ def inverse_transform(Quantizer quantizer, dataset, output=None,
     Parameters
     ----------
     quantizer : trained Quantizer object
-    dataset : row major dataset to transform
-    output : optional preallocated output memory
+    dataset : row major host or device dataset to transform
+    output : optional preallocated output memory, on host or device
     {resources_docstring}
 
     Returns
@@ -211,8 +213,10 @@ def inverse_transform(Quantizer quantizer, dataset, output=None,
     _check_input_array(dataset_ai, [np.dtype("int8")])
 
     if output is None:
-        output = device_ndarray.empty((dataset_ai.shape[0],
-                                       dataset_ai.shape[1]), dtype="float32")
+        on_device = hasattr(dataset, "__cuda_array_interface__")
+        ndarray = device_ndarray if on_device else np
+        output = ndarray.empty((dataset_ai.shape[0],
+                                dataset_ai.shape[1]), dtype="float32")
 
     output_ai = wrap_array(output)
     _check_input_array(output_ai, [np.dtype("float32"), np.dtype("float64")])

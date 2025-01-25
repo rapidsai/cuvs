@@ -23,21 +23,29 @@ from cuvs.preprocessing.quantize import scalar
 @pytest.mark.parametrize("n_rows", [50, 100])
 @pytest.mark.parametrize("n_cols", [10, 50])
 @pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("device_memory", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_scalar_quantizer(n_rows, n_cols, inplace, dtype):
+def test_scalar_quantizer(n_rows, n_cols, inplace, device_memory, dtype):
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)
-    output = np.zeros((n_rows, n_cols), dtype="int8")
+    output = np.zeros((n_rows, n_cols), dtype="int8") if inplace else None
 
     input1_device = device_ndarray(input1)
     output_device = device_ndarray(output) if inplace else None
 
-    params = scalar.QuantizerParams(quantile=1.0)
-    quantizer = scalar.train(params, input1)
-    transformed = scalar.transform(
-        quantizer, input1_device, output=output_device
+    params = scalar.QuantizerParams(quantile=0.99)
+    quantizer = scalar.train(
+        params, input1_device if device_memory else input1
     )
-    output_device = transformed if not inplace else output_device
-    actual = output_device.copy_to_host()
+    transformed = scalar.transform(
+        quantizer,
+        input1_device if device_memory else input1,
+        output=output_device if device_memory else output,
+    )
+    if device_memory:
+        actual = transformed if not inplace else output_device
+        actual = actual.copy_to_host()
+    else:
+        actual = transformed if not inplace else output
 
     # naive sq quantization
     start, end = quantizer.min, quantizer.max

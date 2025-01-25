@@ -87,7 +87,7 @@ cuvsError_t cuvsScalarQuantizerDestroy(cuvsScalarQuantizer_t quantizer);
  *
  * @param[in] res raft resource
  * @param[in] params configure scalar quantizer, e.g. quantile
- * @param[in] dataset a row-major matrix
+ * @param[in] dataset a row-major host or device matrix
  * @param[out] quantizer trained scalar quantizer
  */
 cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
@@ -100,8 +100,8 @@ cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
  *
  * @param[in] res raft resource
  * @param[in] quantizer a scalar quantizer
- * @param[in] dataset a row-major matrix to transform
- * @param[out] out a row-major matrix to store transformed data
+ * @param[in] dataset a row-major host or device matrix to transform
+ * @param[out] out a row-major host or device matrix to store transformed data
  */
 cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
                                          cuvsScalarQuantizer_t quantizer,
@@ -116,8 +116,8 @@ cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
  *
  * @param[in] res raft resource
  * @param[in] quantizer a scalar quantizer
- * @param[in] dataset a row-major matrix
- * @param[out] out a row-major matrix
+ * @param[in] dataset a row-major host or device matrix
+ * @param[out] out a row-major host or device matrix
  *
  */
 cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
