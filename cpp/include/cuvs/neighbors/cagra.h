@@ -18,6 +18,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -388,13 +389,16 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] filter cuvsFilter input filter that can be used
+              to filter queries and neighbors based on the given bitset.
  */
 cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsCagraSearchParams_t params,
                             cuvsCagraIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
-                            DLManagedTensor* distances);
+                            DLManagedTensor* distances,
+                            cuvsFilter filter);
 
 /**
  * @}
