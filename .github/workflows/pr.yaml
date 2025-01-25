@@ -12,6 +12,7 @@ concurrency:
 jobs:
   pr-builder:
     needs:
+      - check-nightly-ci
       - changed-files
       - checks
       - conda-cpp-build
@@ -21,6 +22,7 @@ jobs:
       - conda-python-tests
       - docs-build
       - rust-build
+      - wheel-build-libcuvs
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
@@ -29,6 +31,18 @@ jobs:
     if: always()
     with:
       needs: ${{ toJSON(needs) }}
+  check-nightly-ci:
+    # Switch to ubuntu-latest once it defaults to a version of Ubuntu that
+    # provides at least Python 3.11 (see
+    # https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)
+    runs-on: ubuntu-24.04
+    env:
+      RAPIDS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check if nightly CI is passing
+        uses: rapidsai/shared-actions/check_nightly_success/dispatch@main
+        with:
+          repo: cuvs
   changed-files:
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/changed-files.yaml@branch-25.02
@@ -122,8 +136,17 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_rust.sh"
-  wheel-build-cuvs:
+  wheel-build-libcuvs:
     needs: checks
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
+    with:
+      build_type: pull-request
+      script: ci/build_wheel_libcuvs.sh
+      # build for every combination of arch and CUDA version, but only for the latest Python
+      matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+  wheel-build-cuvs:
+    needs: wheel-build-libcuvs
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
     with:

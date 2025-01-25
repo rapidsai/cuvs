@@ -89,7 +89,7 @@ function(ConfigureTest)
 endfunction()
 
 add_library(test_rmm_logger OBJECT)
-target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl)
+target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
 
 # ##################################################################################################
 # test sources ##################################################################################
@@ -183,6 +183,7 @@ if(BUILD_TESTS)
     NAME
     NEIGHBORS_DYNAMIC_BATCHING_TEST
     PATH
+    neighbors/dynamic_batching/test_brute_force.cu
     neighbors/dynamic_batching/test_cagra.cu
     neighbors/dynamic_batching/test_ivf_flat.cu
     neighbors/dynamic_batching/test_ivf_pq.cu
