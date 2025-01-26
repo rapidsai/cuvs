@@ -88,6 +88,18 @@ index 3d3d2b8..3079d12 100644
  
  if (UNIT_TEST)
      enable_testing()
+diff --git a/include/ann_exception.h b/include/ann_exception.h
+index 6b81373..a385198 100644
+--- a/include/ann_exception.h
++++ b/include/ann_exception.h
+@@ -2,6 +2,7 @@
+ // Licensed under the MIT license.
+ 
+ #pragma once
++#include <cstdint>
+ #include <string>
+ #include <stdexcept>
+ #include <system_error>
 diff --git a/include/distance.h b/include/distance.h
 index f3b1de2..d4da72e 100644
 --- a/include/distance.h
