@@ -32,8 +32,10 @@ TEST_P(AnnCagraIndexMergeTestU8_U32, AnnCagra) { this->testCagra(); }
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestU8_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
                         AnnCagraAddNodesTestU8_U32,
-                        ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest, AnnCagraFilterTestU8_U32, ::testing::ValuesIn(inputs));
+                        ::testing::ValuesIn(inputs_addnode));
+INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,
+                        AnnCagraFilterTestU8_U32,
+                        ::testing::ValuesIn(inputs_filtering));
 INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
                         AnnCagraIndexMergeTestU8_U32,
                         ::testing::ValuesIn(inputs));
