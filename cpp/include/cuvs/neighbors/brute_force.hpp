@@ -332,15 +332,28 @@ auto build(raft::resources const& handle,
  * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
  * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
  * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`:
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
  * @code{.cpp}
- *   ...
- *   // Use the same allocator across multiple searches to reduce the number of
- *   // cuda memory allocations
- *   brute_force::search(handle, index, queries1, out_inds1, out_dists1);
- *   brute_force::search(handle, index, queries2, out_inds2, out_dists2);
- *   brute_force::search(handle, index, queries3, out_inds3, out_dists3);
- *   ...
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
  * @endcode
  *
  * @param[in] handle
@@ -387,15 +400,28 @@ void search(raft::resources const& handle,
  * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
  * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
  * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`:
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
  * @code{.cpp}
- *   ...
- *   // Use the same allocator across multiple searches to reduce the number of
- *   // cuda memory allocations
- *   brute_force::search(handle, index, queries1, out_inds1, out_dists1);
- *   brute_force::search(handle, index, queries2, out_inds2, out_dists2);
- *   brute_force::search(handle, index, queries3, out_inds3, out_dists3);
- *   ...
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<half>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
  * @endcode
  *
  * @param[in] handle
@@ -438,6 +464,33 @@ void search(raft::resources const& handle,
  *
  * See the [brute_force::build](#brute_force::build) documentation for a usage example.
  *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
+ * @endcode
+ *
  * @param[in] handle
  * @param[in] params parameters configuring the search
  * @param[in] index bruteforce constructed index
@@ -477,6 +530,33 @@ void search(raft::resources const& handle,
  * @brief Search ANN using the constructed index.
  *
  * See the [brute_force::build](#brute_force::build) documentation for a usage example.
+ *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<half>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
+ * @endcode
  *
  * @param[in] handle
  * @param[in] params parameters configuring the search
