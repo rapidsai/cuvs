@@ -248,11 +248,11 @@ auto build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
- *   auto index = cagra::build(res, index_params, dataset);
+ *   auto index = nn_descent::build(res, index_params, dataset);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -316,11 +316,11 @@ auto build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
- *   auto index = cagra::build(res, index_params, dataset);
+ *   auto index = nn_descent::build(res, index_params, dataset);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -384,11 +384,11 @@ auto build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
- *   auto index = cagra::build(res, index_params, dataset);
+ *   auto index = nn_descent::build(res, index_params, dataset);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -452,11 +452,11 @@ auto build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
- *   auto index = cagra::build(res, index_params, dataset);
+ *   auto index = nn_descent::build(res, index_params, dataset);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset

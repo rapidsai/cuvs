@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-//! The IVF-Flat method is an ANN algorithm. It uses an inverted file index (IVF) with 
-//! unmodified (that is, flat) vectors. This algorithm provides simple knobs to reduce 
+//! The IVF-Flat method is an ANN algorithm. It uses an inverted file index (IVF) with
+//! unmodified (that is, flat) vectors. This algorithm provides simple knobs to reduce
 //! the overall search space and to trade-off accuracy for speed.
 //!
 //! Example:
