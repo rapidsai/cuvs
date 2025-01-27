@@ -88,7 +88,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
-    int nprobe;
+    int nprobe         = 1;
     float refine_ratio = 1.0;
     [[nodiscard]] auto needs_dataset() const -> bool override { return refine_ratio > 1.0f; }
   };
@@ -525,10 +525,9 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     /// Number of Iterations to run if building with NN_DESCENT
     size_t nn_descent_niter;
   };
-  using search_param_base = typename algo<T>::search_param;
-  struct search_param : public search_param_base {
+  using typename faiss_gpu<T>::search_param_base;
+  struct search_param : public faiss_gpu<T>::search_param {
     faiss::gpu::SearchParametersCagra p;
-    float refine_ratio = 1.0;
   };
 
   faiss_gpu_cagra(Metric metric, int dim, const build_param& param)
@@ -551,8 +550,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
 
   void set_search_param(const search_param_base& param) override
   {
-    auto sp              = dynamic_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
-    this->refine_ratio_  = sp.refine_ratio;
+    auto sp              = static_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
     this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(sp.p);
   }
 
