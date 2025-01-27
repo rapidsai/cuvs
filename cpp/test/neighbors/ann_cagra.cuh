@@ -330,7 +330,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   void testCagra()
   {
     if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
-        (!std::is_same_v<DataT, uint8_t>))
+        ((!std::is_same_v<DataT, uint8_t>) ||
+         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -513,7 +514,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
-        (!std::is_same_v<DataT, uint8_t>))
+        ((!std::is_same_v<DataT, uint8_t>) ||
+         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -715,7 +717,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
-        (!std::is_same_v<DataT, uint8_t>))
+        ((!std::is_same_v<DataT, uint8_t>) ||
+         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -941,46 +944,46 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {1000},
-    {64},
-    {16},
-    {graph_build_algo::IVF_PQ,
-     graph_build_algo::NN_DESCENT,
-     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
-    {search_algo::AUTO},
-    {10},
-    {0, 8, 16, 32},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::BinaryHamming},
-    {false},
-    {false},
-    {0.995});
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {1000},
+                                                   {64},
+                                                   {16},
+                                                   {graph_build_algo::IVF_PQ,
+                                                    graph_build_algo::NN_DESCENT,
+                                                    graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0, 8, 16, 32},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::BinaryHamming},
+                                                   {false},
+                                                   {false},
+                                                   {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {1000},
-    {64},
-    {16},
-    {graph_build_algo::IVF_PQ,
-     graph_build_algo::NN_DESCENT,
-     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {32, 64, 128, 256, 512, 768},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::BinaryHamming},
-    {false},
-    {true},
-    {0.995});
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {1000},
+                                                   {64},
+                                                   {16},
+                                                   {graph_build_algo::IVF_PQ,
+                                                    graph_build_algo::NN_DESCENT,
+                                                    graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {32, 64, 128, 256, 512, 768},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::BinaryHamming},
+                                                   {false},
+                                                   {true},
+                                                   {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   inputs2 =
