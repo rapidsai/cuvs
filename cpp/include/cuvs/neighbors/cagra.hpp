@@ -248,6 +248,17 @@ struct extend_params {
    * 0. */
   uint32_t max_chunk_size = 0;
 };
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
+ * @{
+ */
+struct merge_params : public index_params {
+  merge_params(const index_params& params) : index_params(params) {}
+};
 
 /**
  * @}
@@ -1747,7 +1758,142 @@ void serialize_to_hnswlib(raft::resources const& handle,
 void serialize_to_hnswlib(raft::resources const& handle,
                           const std::string& filename,
                           const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+/**
+ * @}
+ */
 
+/**
+ * @defgroup cagra_cpp_index_merge CAGRA index build functions
+ * @{
+ */
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<float, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<float, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<float, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimensionality.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<half, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<half, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<half, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimensionality.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<int8_t, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<int8_t, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<int8_t, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimensionality.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<uint8_t, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<uint8_t, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<uint8_t, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimensionality.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
  */

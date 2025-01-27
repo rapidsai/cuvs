@@ -26,11 +26,16 @@ typedef AnnCagraAddNodesTest<float, std::uint8_t, std::uint32_t> AnnCagraAddNode
 TEST_P(AnnCagraAddNodesTestU8_U32, AnnCagra) { this->testCagra(); }
 typedef AnnCagraFilterTest<float, std::uint8_t, std::uint32_t> AnnCagraFilterTestU8_U32;
 TEST_P(AnnCagraFilterTestU8_U32, AnnCagra) { this->testCagra(); }
+typedef AnnCagraIndexMergeTest<float, std::uint8_t, std::uint32_t> AnnCagraIndexMergeTestU8_U32;
+TEST_P(AnnCagraIndexMergeTestU8_U32, AnnCagra) { this->testCagra(); }
 
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestU8_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
                         AnnCagraAddNodesTestU8_U32,
                         ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest, AnnCagraFilterTestU8_U32, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
+                        AnnCagraIndexMergeTestU8_U32,
+                        ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::cagra

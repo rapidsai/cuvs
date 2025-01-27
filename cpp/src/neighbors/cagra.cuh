@@ -18,6 +18,7 @@
 
 #include "detail/cagra/add_nodes.cuh"
 #include "detail/cagra/cagra_build.cuh"
+#include "detail/cagra/cagra_merge.cuh"
 #include "detail/cagra/cagra_search.cuh"
 #include "detail/cagra/graph_core.cuh"
 
@@ -367,6 +368,14 @@ void extend(
   std::optional<raft::device_matrix_view<IdxT, int64_t>> ngv)
 {
   cagra::extend_core<T, IdxT, Accessor>(handle, additional_dataset, index, params, ndv, ngv);
+}
+
+template <class T, class IdxT>
+index<T, IdxT> merge(raft::resources const& handle,
+                     const cagra::merge_params& params,
+                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
+{
+  return cagra::detail::merge<T, IdxT>(handle, params, indices);
 }
 
 /** @} */  // end group cagra
