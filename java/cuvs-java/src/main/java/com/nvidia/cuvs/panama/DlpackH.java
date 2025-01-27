@@ -1896,4 +1896,3 @@ public class DlpackH {
         return DLPACK_FLAG_BITMASK_IS_COPIED;
     }
 }
-

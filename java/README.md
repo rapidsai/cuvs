@@ -7,7 +7,7 @@ Prerequisites
 To build this API, please do `./build.sh java` in the top level directory. Since this API is dependent on `libcuvs` it must be noted that `libcuvs` gets built automatically before building this API.
 
 Alternatively, please build libcuvs (`./build.sh libcuvs` from top level directory) before building the Java API with `./build.sh` from this directory.
- 
+
 Building
 --------
 

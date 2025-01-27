@@ -22,7 +22,7 @@ import com.nvidia.cuvs.panama.CuVSHnswIndexParams;
 
 /**
  * Supplemental parameters to build HNSW index.
- * 
+ *
  * @since 25.02
  */
 public class HnswIndexParams {
@@ -87,7 +87,7 @@ public class HnswIndexParams {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public CuvsHnswHierarchy getHierarchy() {
@@ -95,7 +95,7 @@ public class HnswIndexParams {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public int getEfConstruction() {
@@ -103,7 +103,7 @@ public class HnswIndexParams {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public int getNumThreads() {
@@ -111,7 +111,7 @@ public class HnswIndexParams {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public int getVectorDimension() {
@@ -141,7 +141,7 @@ public class HnswIndexParams {
 
     /**
      * Constructs this Builder with an instance of Arena.
-     * 
+     *
      * @param resources the {@link CuVSResources} instance to use
      */
     public Builder(CuVSResources resources) {
@@ -150,10 +150,10 @@ public class HnswIndexParams {
 
     /**
      * Sets the hierarchy for HNSW index when converting from CAGRA index.
-     * 
+     *
      * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only
      * index.
-     * 
+     *
      * @param hierarchy the hierarchy for HNSW index when converting from CAGRA
      *                  index
      * @return an instance of Builder
@@ -166,7 +166,7 @@ public class HnswIndexParams {
     /**
      * Sets the size of the candidate list during hierarchy construction when
      * hierarchy is `CPU`.
-     * 
+     *
      * @param efConstruction the size of the candidate list during hierarchy
      *                       construction when hierarchy is `CPU`
      * @return an instance of Builder
@@ -179,7 +179,7 @@ public class HnswIndexParams {
     /**
      * Sets the number of host threads to use to construct hierarchy when hierarchy
      * is `CPU`.
-     * 
+     *
      * @param numThreads the number of threads
      * @return an instance of Builder
      */
@@ -190,7 +190,7 @@ public class HnswIndexParams {
 
     /**
      * Sets the vector dimension
-     * 
+     *
      * @param vectorDimension the vector dimension
      * @return an instance of Builder
      */
@@ -201,7 +201,7 @@ public class HnswIndexParams {
 
     /**
      * Builds an instance of {@link HnswIndexParams}.
-     * 
+     *
      * @return an instance of {@link HnswIndexParams}
      */
     public HnswIndexParams build() {

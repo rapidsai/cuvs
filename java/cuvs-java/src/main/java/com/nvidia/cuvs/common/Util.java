@@ -36,7 +36,7 @@ public class Util {
   /**
    * A utility method for getting an instance of {@link MemorySegment} for a
    * {@link String}.
-   * 
+   *
    * @param str the string for the expected {@link MemorySegment}
    * @return an instance of {@link MemorySegment}
    */
@@ -55,7 +55,7 @@ public class Util {
 
   /**
    * A utility method for building a {@link MemorySegment} for a 1D long array.
-   * 
+   *
    * @param data The 1D long array for which the {@link MemorySegment} is needed
    * @return an instance of {@link MemorySegment}
    */
@@ -70,7 +70,7 @@ public class Util {
 
   /**
    * A utility method for building a {@link MemorySegment} for a 2D float array.
-   * 
+   *
    * @param data The 2D float array for which the {@link MemorySegment} is needed
    * @return an instance of {@link MemorySegment}
    */
@@ -89,7 +89,7 @@ public class Util {
 
     return dataMemorySegment;
   }
-  
+
   /**
    * Load the CuVS .so file from environment variable CUVS_JAVA_SO_PATH. If not found there,
    * try to load it from the classpath to a temporary file.
@@ -127,7 +127,7 @@ public class Util {
 
     return temp;
   }
-  
+
   private static void streamCopy(InputStream is, OutputStream os) throws LibraryNotFoundException {
 	  if (is == null) {
 		  throw new LibraryNotFoundException("CuVS Library Not Found in ClassPath");

@@ -41,7 +41,7 @@ public class HnswBuildAndSearchTest {
 
   /**
    * A basic test that checks the whole flow - from indexing to search.
-   * 
+   *
    * @throws Throwable
    */
   @Test

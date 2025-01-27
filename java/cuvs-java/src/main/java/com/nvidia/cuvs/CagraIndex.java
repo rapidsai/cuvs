@@ -43,7 +43,7 @@ import com.nvidia.cuvs.panama.CuVSCagraIndex;
  * build and query performance for both small and large-batch sized search. Know
  * more about this algorithm
  * <a href="https://arxiv.org/abs/2308.15136" target="_blank">here</a>
- * 
+ *
  * @since 25.02
  */
 public class CagraIndex {
@@ -65,7 +65,7 @@ public class CagraIndex {
 
   /**
    * Constructor for building the index using specified dataset
-   * 
+   *
    * @param indexParameters        an instance of {@link CagraIndexParams} holding
    *                               the index parameters
    * @param cagraCompressionParams an instance of {@link CagraCompressionParams}
@@ -90,7 +90,7 @@ public class CagraIndex {
 
   /**
    * Constructor for loading the index from an {@link InputStream}
-   * 
+   *
    * @param inputStream an instance of stream to read the index bytes from
    * @param resources   an instance of {@link CuVSResources}
    */
@@ -110,7 +110,7 @@ public class CagraIndex {
 
   /**
    * Initializes the {@link MethodHandles} for invoking native methods.
-   * 
+   *
    * @throws IOException @{@link IOException} is unable to load the native library
    */
   private void initializeMethodHandles() throws IOException {
@@ -153,7 +153,7 @@ public class CagraIndex {
   /**
    * Invokes the native build_cagra_index function via the Panama API to build the
    * {@link CagraIndex}
-   * 
+   *
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
@@ -183,7 +183,7 @@ public class CagraIndex {
   /**
    * Invokes the native search_cagra_index via the Panama API for searching a
    * CAGRA index.
-   * 
+   *
    * @param query an instance of {@link CagraQuery} holding the query vectors and
    *              other parameters
    * @return an instance of {@link CagraSearchResults} containing the results
@@ -213,7 +213,7 @@ public class CagraIndex {
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
    * for writing index bytes.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes into
    */
@@ -224,7 +224,7 @@ public class CagraIndex {
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
    * for writing index bytes.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes into
    * @param bufferLength the length of buffer to use for writing bytes. Default
@@ -237,7 +237,7 @@ public class CagraIndex {
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
    * for writing index bytes.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes into
    * @param tempFile     an intermediate {@link File} where CAGRA index is written
@@ -250,7 +250,7 @@ public class CagraIndex {
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
    * and path to the intermediate temporary file.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
    * @param tempFile     an intermediate {@link File} where CAGRA index is written
@@ -277,7 +277,7 @@ public class CagraIndex {
   /**
    * A method to create and persist HNSW index from CAGRA index using an instance
    * of {@link OutputStream} and path to the intermediate temporary file.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
    */
@@ -288,7 +288,7 @@ public class CagraIndex {
   /**
    * A method to create and persist HNSW index from CAGRA index using an instance
    * of {@link OutputStream} and path to the intermediate temporary file.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
    * @param bufferLength the length of buffer to use for writing bytes. Default
@@ -301,7 +301,7 @@ public class CagraIndex {
   /**
    * A method to create and persist HNSW index from CAGRA index using an instance
    * of {@link OutputStream} and path to the intermediate temporary file.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
    * @param tempFile     an intermediate {@link File} where CAGRA index is written
@@ -314,7 +314,7 @@ public class CagraIndex {
   /**
    * A method to create and persist HNSW index from CAGRA index using an instance
    * of {@link OutputStream} and path to the intermediate temporary file.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
    * @param tempFile     an intermediate {@link File} where CAGRA index is written
@@ -341,7 +341,7 @@ public class CagraIndex {
   /**
    * Gets an instance of {@link IndexReference} by deserializing a CAGRA index
    * using an {@link InputStream}.
-   * 
+   *
    * @param inputStream an instance of {@link InputStream}
    * @return an instance of {@link IndexReference}.
    */
@@ -352,7 +352,7 @@ public class CagraIndex {
   /**
    * Gets an instance of {@link IndexReference} by deserializing a CAGRA index
    * using an {@link InputStream}.
-   * 
+   *
    * @param inputStream  an instance of {@link InputStream}
    * @param bufferLength the length of the buffer to use while reading the bytes
    *                     from the stream. Default value is 1024.
@@ -383,7 +383,7 @@ public class CagraIndex {
 
   /**
    * Gets an instance of {@link CagraIndexParams}
-   * 
+   *
    * @return an instance of {@link CagraIndexParams}
    */
   public CagraIndexParams getCagraIndexParameters() {
@@ -392,7 +392,7 @@ public class CagraIndex {
 
   /**
    * Gets an instance of {@link CuVSResources}
-   * 
+   *
    * @return an instance of {@link CuVSResources}
    */
   public CuVSResources getCuVSResources() {
@@ -412,7 +412,7 @@ public class CagraIndex {
 
     /**
      * Constructs this Builder with an instance of {@link CuVSResources}.
-     * 
+     *
      * @param cuvsResources an instance of {@link CuVSResources}
      */
     public Builder(CuVSResources cuvsResources) {
@@ -422,7 +422,7 @@ public class CagraIndex {
     /**
      * Sets an instance of InputStream typically used when index deserialization is
      * needed.
-     * 
+     *
      * @param inputStream an instance of {@link InputStream}
      * @return an instance of this Builder
      */
@@ -433,7 +433,7 @@ public class CagraIndex {
 
     /**
      * Sets the dataset for building the {@link CagraIndex}.
-     * 
+     *
      * @param dataset a two-dimensional float array
      * @return an instance of this Builder
      */
@@ -445,7 +445,7 @@ public class CagraIndex {
     /**
      * Registers an instance of configured {@link CagraIndexParams} with this
      * Builder.
-     * 
+     *
      * @param cagraIndexParameters An instance of CagraIndexParams.
      * @return An instance of this Builder.
      */
@@ -457,7 +457,7 @@ public class CagraIndex {
     /**
      * Registers an instance of configured {@link CagraCompressionParams} with this
      * Builder.
-     * 
+     *
      * @param cagraCompressionParams An instance of CagraCompressionParams.
      * @return An instance of this Builder.
      */
@@ -468,7 +468,7 @@ public class CagraIndex {
 
     /**
      * Builds and returns an instance of CagraIndex.
-     * 
+     *
      * @return an instance of CagraIndex
      */
     public CagraIndex build() throws Throwable {
@@ -497,7 +497,7 @@ public class CagraIndex {
     /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a
      * parameter.
-     * 
+     *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
      */
@@ -507,7 +507,7 @@ public class CagraIndex {
 
     /**
      * Gets the instance of index MemorySegment.
-     * 
+     *
      * @return index MemorySegment
      */
     protected MemorySegment getMemorySegment() {

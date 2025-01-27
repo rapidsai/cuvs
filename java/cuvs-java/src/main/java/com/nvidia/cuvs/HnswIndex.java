@@ -35,7 +35,7 @@ import com.nvidia.cuvs.panama.CuVSHnswIndex;
 /**
  * {@link HnswIndex} encapsulates a HNSW index, along with methods to interact
  * with it.
- * 
+ *
  * @since 25.02
  */
 public class HnswIndex {
@@ -52,7 +52,7 @@ public class HnswIndex {
 
   /**
    * Constructor for loading the index from an {@link InputStream}
-   * 
+   *
    * @param inputStream an instance of stream to read the index bytes from
    * @param resources   an instance of {@link CuVSResources}
    */
@@ -71,7 +71,7 @@ public class HnswIndex {
 
   /**
    * Initializes the {@link MethodHandles} for invoking native methods.
-   * 
+   *
    * @throws IOException @{@link IOException} is unable to load the native library
    */
   private void initializeMethodHandles() throws IOException {
@@ -102,7 +102,7 @@ public class HnswIndex {
   /**
    * Invokes the native search_hnsw_index via the Panama API for searching a HNSW
    * index.
-   * 
+   *
    * @param query an instance of {@link HnswQuery} holding the query vectors and
    *              other parameters
    * @return an instance of {@link HnswSearchResults} containing the results
@@ -132,7 +132,7 @@ public class HnswIndex {
   /**
    * Gets an instance of {@link IndexReference} by deserializing a HNSW index
    * using an {@link InputStream}.
-   * 
+   *
    * @param inputStream an instance of {@link InputStream}
    * @return an instance of {@link IndexReference}.
    */
@@ -143,7 +143,7 @@ public class HnswIndex {
   /**
    * Gets an instance of {@link IndexReference} by deserializing a HNSW index
    * using an {@link InputStream}.
-   * 
+   *
    * @param inputStream  an instance of {@link InputStream}
    * @param bufferLength the length of the buffer to use while reading the bytes
    *                     from the stream. Default value is 1024.
@@ -185,7 +185,7 @@ public class HnswIndex {
 
     /**
      * Constructs this Builder with an instance of {@link CuVSResources}.
-     * 
+     *
      * @param cuvsResources an instance of {@link CuVSResources}
      */
     public Builder(CuVSResources cuvsResources) {
@@ -195,7 +195,7 @@ public class HnswIndex {
     /**
      * Sets an instance of InputStream typically used when index deserialization is
      * needed.
-     * 
+     *
      * @param inputStream an instance of {@link InputStream}
      * @return an instance of this Builder
      */
@@ -207,7 +207,7 @@ public class HnswIndex {
     /**
      * Registers an instance of configured {@link HnswIndexParams} with this
      * Builder.
-     * 
+     *
      * @param hnswIndexParameters An instance of HnswIndexParams.
      * @return An instance of this Builder.
      */
@@ -218,7 +218,7 @@ public class HnswIndex {
 
     /**
      * Builds and returns an instance of CagraIndex.
-     * 
+     *
      * @return an instance of CagraIndex
      */
     public HnswIndex build() throws Throwable {
@@ -243,7 +243,7 @@ public class HnswIndex {
     /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a
      * parameter.
-     * 
+     *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
      */
@@ -253,7 +253,7 @@ public class HnswIndex {
 
     /**
      * Gets the instance of index MemorySegment.
-     * 
+     *
      * @return index MemorySegment
      */
     protected MemorySegment getMemorySegment() {

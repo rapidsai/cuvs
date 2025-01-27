@@ -23,7 +23,7 @@ import com.nvidia.cuvs.panama.CuVSHnswSearchParams;
 /**
  * HnswSearchParams encapsulates the logic for configuring and holding search
  * parameters for HNSW index.
- * 
+ *
  * @since 25.02
  */
 public class HnswSearchParams {
@@ -35,11 +35,11 @@ public class HnswSearchParams {
 
   /**
    * Constructs an instance of HnswSearchParams with passed search parameters.
-   * 
+   *
    * @param resources  the resources instance to use
    * @param ef         the ef value
    * @param numThreads the number of threads
-   * 
+   *
    */
   private HnswSearchParams(CuVSResources resources, int ef, int numThreads) {
     this.resources = resources;
@@ -64,7 +64,7 @@ public class HnswSearchParams {
 
   /**
    * Gets the ef value
-   * 
+   *
    * @return the integer ef value
    */
   public int getEf() {
@@ -73,7 +73,7 @@ public class HnswSearchParams {
 
   /**
    * Gets the number of threads
-   * 
+   *
    * @return the number of threads
    */
   public int getNumThreads() {
@@ -96,7 +96,7 @@ public class HnswSearchParams {
 
     /**
      * Constructs this Builder with an instance of Arena.
-     * 
+     *
      * @param resources the {@link CuVSResources} instance to use
      */
     public Builder(CuVSResources resources) {
@@ -105,7 +105,7 @@ public class HnswSearchParams {
 
     /**
      * Sets the ef value
-     * 
+     *
      * @param ef the ef value
      * @return an instance of this Builder
      */
@@ -116,7 +116,7 @@ public class HnswSearchParams {
 
     /**
      * Sets the number of threads
-     * 
+     *
      * @param numThreads the number of threads
      * @return an instance of this Builder
      */
@@ -127,7 +127,7 @@ public class HnswSearchParams {
 
     /**
      * Builds an instance of {@link HnswSearchParams} with passed search parameters.
-     * 
+     *
      * @return an instance of HnswSearchParams
      */
     public HnswSearchParams build() {

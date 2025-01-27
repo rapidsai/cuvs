@@ -447,7 +447,7 @@ if (( ${NUMARGS} == 0 )) || hasArg rust; then
     cargo test
 fi
 
-# Build the cuvs Java bindings 
+# Build the cuvs Java bindings
 if (( ${NUMARGS} == 0 )) || hasArg java; then
     # build libcuvs first as the Java API depends on it
     ./$0 libcuvs

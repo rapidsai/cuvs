@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 /**
  * Supplemental parameters to build BRUTEFORCE index.
- * 
+ *
  * @since 25.02
  */
 public class BruteForceIndexParams {
@@ -50,7 +50,7 @@ public class BruteForceIndexParams {
 
     /**
      * Sets the number of writer threads to use for indexing.
-     * 
+     *
      * @param numWriterThreads number of writer threads to use
      * @return an instance of Builder
      */
@@ -61,7 +61,7 @@ public class BruteForceIndexParams {
 
     /**
      * Builds an instance of {@link BruteForceIndexParams}.
-     * 
+     *
      * @return an instance of {@link BruteForceIndexParams}
      */
     public BruteForceIndexParams build() {

@@ -22,7 +22,7 @@ import java.util.Map;
 /**
  * HnswQuery holds the query vectors to be used while invoking search on the
  * HNSW index.
- * 
+ *
  * @since 25.02
  */
 public class HnswQuery {
@@ -35,7 +35,7 @@ public class HnswQuery {
   /**
    * Constructs an instance of {@link HnswQuery} using queryVectors, mapping, and
    * topK.
-   * 
+   *
    * @param hnswSearchParams the search parameters to use
    * @param queryVectors     2D float query vector array
    * @param mapping          an instance of ID mapping
@@ -51,7 +51,7 @@ public class HnswQuery {
 
   /**
    * Gets the instance of HnswSearchParams.
-   * 
+   *
    * @return the instance of {@link HnswSearchParams}
    */
   public HnswSearchParams getHnswSearchParams() {
@@ -60,7 +60,7 @@ public class HnswQuery {
 
   /**
    * Gets the query vector 2D float array.
-   * 
+   *
    * @return 2D float array
    */
   public float[][] getQueryVectors() {
@@ -69,7 +69,7 @@ public class HnswQuery {
 
   /**
    * Gets the passed map instance.
-   * 
+   *
    * @return a map of ID mappings
    */
   public Map<Integer, Integer> getMapping() {
@@ -78,7 +78,7 @@ public class HnswQuery {
 
   /**
    * Gets the topK value.
-   * 
+   *
    * @return an integer
    */
   public int getTopK() {
@@ -102,7 +102,7 @@ public class HnswQuery {
 
     /**
      * Sets the instance of configured HnswSearchParams to be passed for search.
-     * 
+     *
      * @param hnswSearchParams an instance of the configured HnswSearchParams to be
      *                         used for this query
      * @return an instance of this Builder
@@ -114,7 +114,7 @@ public class HnswQuery {
 
     /**
      * Registers the query vectors to be passed in the search call.
-     * 
+     *
      * @param queryVectors 2D float query vector array
      * @return an instance of this Builder
      */
@@ -125,7 +125,7 @@ public class HnswQuery {
 
     /**
      * Sets the instance of mapping to be used for ID mapping.
-     * 
+     *
      * @param mapping the ID mapping instance
      * @return an instance of this Builder
      */
@@ -136,7 +136,7 @@ public class HnswQuery {
 
     /**
      * Registers the topK value.
-     * 
+     *
      * @param topK the topK value used to retrieve the topK results
      * @return an instance of this Builder
      */
@@ -147,7 +147,7 @@ public class HnswQuery {
 
     /**
      * Builds an instance of {@link HnswQuery}
-     * 
+     *
      * @return an instance of {@link HnswQuery}
      */
     public HnswQuery build() {

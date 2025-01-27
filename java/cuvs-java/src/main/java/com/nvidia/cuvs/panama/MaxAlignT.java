@@ -140,4 +140,3 @@ public class MaxAlignT {
         return addr.reinterpret(layout().byteSize() * elementCount, arena, cleanup);
     }
 }
-

@@ -272,4 +272,3 @@ public class DistanceH {
         return Precomputed;
     }
 }
-

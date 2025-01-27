@@ -35,10 +35,10 @@ import com.nvidia.cuvs.common.Util;
 import com.nvidia.cuvs.panama.CuVSBruteForceIndex;
 
 /**
- * 
+ *
  * {@link BruteForceIndex} encapsulates a BRUTEFORCE index, along with methods
  * to interact with it.
- * 
+ *
  * @since 25.02
  */
 public class BruteForceIndex {
@@ -58,7 +58,7 @@ public class BruteForceIndex {
 
   /**
    * Constructor for building the index using specified dataset
-   * 
+   *
    * @param dataset               the dataset used for creating the BRUTEFORCE
    *                              index
    * @param resources             an instance of {@link CuVSResources}
@@ -81,7 +81,7 @@ public class BruteForceIndex {
 
   /**
    * Constructor for loading the index from an {@link InputStream}
-   * 
+   *
    * @param inputStream an instance of stream to read the index bytes from
    * @param resources   an instance of {@link CuVSResources}
    */
@@ -100,7 +100,7 @@ public class BruteForceIndex {
 
   /**
    * Initializes the {@link MethodHandles} for invoking native methods.
-   * 
+   *
    * @throws IOException @{@link IOException} is unable to load the native library
    */
   private void initializeMethodHandles() throws IOException {
@@ -141,7 +141,7 @@ public class BruteForceIndex {
   /**
    * Invokes the native build_brute_force_index function via the Panama API to
    * build the {@link BruteForceIndex}
-   * 
+   *
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
@@ -162,7 +162,7 @@ public class BruteForceIndex {
   /**
    * Invokes the native search_brute_force_index via the Panama API for searching
    * a BRUTEFORCE index.
-   * 
+   *
    * @param cuvsQuery an instance of {@link BruteForceQuery} holding the query
    *                  vectors and other parameters
    * @return an instance of {@link BruteForceSearchResults} containing the results
@@ -196,7 +196,7 @@ public class BruteForceIndex {
   /**
    * A method to persist a BRUTEFORCE index using an instance of
    * {@link OutputStream} for writing index bytes.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes into
    */
@@ -207,7 +207,7 @@ public class BruteForceIndex {
   /**
    * A method to persist a BRUTEFORCE index using an instance of
    * {@link OutputStream} and path to the intermediate temporary file.
-   * 
+   *
    * @param outputStream an instance of {@link OutputStream} to write the index
    *                     bytes to
    * @param tempFile     an intermediate {@link File} where BRUTEFORCE index is
@@ -232,7 +232,7 @@ public class BruteForceIndex {
   /**
    * Gets an instance of {@link IndexReference} by deserializing a BRUTEFORCE
    * index using an {@link InputStream}.
-   * 
+   *
    * @param inputStream an instance of {@link InputStream}
    * @return an instance of {@link IndexReference}.
    */
@@ -271,7 +271,7 @@ public class BruteForceIndex {
 
     /**
      * Constructs this Builder with an instance of {@link CuVSResources}.
-     * 
+     *
      * @param cuvsResources an instance of {@link CuVSResources}
      */
     public Builder(CuVSResources cuvsResources) {
@@ -281,7 +281,7 @@ public class BruteForceIndex {
     /**
      * Registers an instance of configured {@link BruteForceIndexParams} with this
      * Builder.
-     * 
+     *
      * @param bruteForceIndexParams An instance of BruteForceIndexParams
      * @return An instance of this Builder
      */
@@ -293,7 +293,7 @@ public class BruteForceIndex {
     /**
      * Sets an instance of InputStream typically used when index deserialization is
      * needed.
-     * 
+     *
      * @param inputStream an instance of {@link InputStream}
      * @return an instance of this Builder
      */
@@ -304,7 +304,7 @@ public class BruteForceIndex {
 
     /**
      * Sets the dataset for building the {@link BruteForceIndex}.
-     * 
+     *
      * @param dataset a two-dimensional float array
      * @return an instance of this Builder
      */
@@ -315,7 +315,7 @@ public class BruteForceIndex {
 
     /**
      * Builds and returns an instance of {@link BruteForceIndex}.
-     * 
+     *
      * @return an instance of {@link BruteForceIndex}
      */
     public BruteForceIndex build() throws Throwable {
@@ -344,7 +344,7 @@ public class BruteForceIndex {
     /**
      * Constructs BruteForceIndexReference with an instance of MemorySegment passed
      * as a parameter.
-     * 
+     *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
      */
@@ -354,7 +354,7 @@ public class BruteForceIndex {
 
     /**
      * Gets the instance of index MemorySegment.
-     * 
+     *
      * @return index MemorySegment
      */
     protected MemorySegment getMemorySegment() {

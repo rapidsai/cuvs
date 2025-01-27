@@ -35,7 +35,7 @@ import com.nvidia.cuvs.common.Util;
 
 /**
  * Used for allocating resources for cuVS
- * 
+ *
  * @since 25.02
  */
 public class CuVSResources implements AutoCloseable {
@@ -55,7 +55,7 @@ public class CuVSResources implements AutoCloseable {
 
   /**
    * Constructor that allocates the resources needed for cuVS
-   * 
+   *
    * @throws Throwable exception thrown when native function is invoked
    */
   public CuVSResources() throws Throwable {
@@ -87,7 +87,7 @@ public class CuVSResources implements AutoCloseable {
   /**
    * Get the list of compatible GPUs based on compute capability >= 7.0 and total
    * memory >= 8GB
-   * 
+   *
    * @return a list of compatible GPUs. See {@link GPUInfo}
    */
   public List<GPUInfo> compatibleGPUs() throws Throwable {
@@ -97,7 +97,7 @@ public class CuVSResources implements AutoCloseable {
   /**
    * Get the list of compatible GPUs based on given compute capability and total
    * memory
-   * 
+   *
    * @param minComputeCapability the minimum compute capability
    * @param minDeviceMemoryMB    the minimum total available memory in MB
    * @return a list of compatible GPUs. See {@link GPUInfo}
@@ -115,7 +115,7 @@ public class CuVSResources implements AutoCloseable {
 
   /**
    * Gets all the available GPUs
-   * 
+   *
    * @return a list of {@link GPUInfo} objects with GPU details
    */
   public List<GPUInfo> availableGPUs() throws Throwable {
@@ -161,7 +161,7 @@ public class CuVSResources implements AutoCloseable {
 
   /**
    * Gets the number of GPUs on the machine
-   * 
+   *
    * @return the number of GPUs on the machine
    */
   private int getNumGPUs() throws Throwable {
@@ -191,7 +191,7 @@ public class CuVSResources implements AutoCloseable {
 
   /**
    * Creates the resources used internally and returns its reference.
-   * 
+   *
    * @throws Throwable exception thrown when native function is invoked
    */
   public void createResources() throws Throwable {
@@ -209,13 +209,15 @@ public class CuVSResources implements AutoCloseable {
     } catch (Throwable e) {
       e.printStackTrace();
     }
-    arena.close();
+    if (!arena.scope().isAlive()) {
+      arena.close();
+    }
     nativeLibrary.delete();
   }
 
   /**
    * Gets the reference to the cuvsResources MemorySegment.
-   * 
+   *
    * @return cuvsResources MemorySegment
    */
   protected MemorySegment getMemorySegment() {

@@ -22,7 +22,7 @@ import com.nvidia.cuvs.panama.CuVSCagraIndexParams;
 
 /**
  * Supplemental parameters to build CAGRA Index.
- * 
+ *
  * @since 25.02
  */
 public class CagraIndexParams {
@@ -189,7 +189,7 @@ public class CagraIndexParams {
 
   /**
    * Gets the degree of input graph for pruning.
-   * 
+   *
    * @return the degree of input graph
    */
   public int getIntermediateGraphDegree() {
@@ -198,7 +198,7 @@ public class CagraIndexParams {
 
   /**
    * Gets the degree of output graph.
-   * 
+   *
    * @return the degree of output graph
    */
   public int getGraphDegree() {
@@ -230,7 +230,7 @@ public class CagraIndexParams {
   public CuvsDistanceType getCuvsDistanceType() {
     return cuvsDistanceType;
   }
-  
+
   /**
    * Gets the number of threads used to build the index.
    */
@@ -264,7 +264,7 @@ public class CagraIndexParams {
 
     /**
      * Sets the degree of input graph for pruning.
-     * 
+     *
      * @param intermediateGraphDegree degree of input graph for pruning
      * @return an instance of Builder
      */
@@ -275,7 +275,7 @@ public class CagraIndexParams {
 
     /**
      * Sets the degree of output graph.
-     * 
+     *
      * @param graphDegree degree of output graph
      * @return an instance to Builder
      */
@@ -286,7 +286,7 @@ public class CagraIndexParams {
 
     /**
      * Sets the CuvsCagraGraphBuildAlgo to use.
-     * 
+     *
      * @param cuvsCagraGraphBuildAlgo the CuvsCagraGraphBuildAlgo to use
      * @return an instance of Builder
      */
@@ -297,7 +297,7 @@ public class CagraIndexParams {
 
     /**
      * Sets the metric to use.
-     * 
+     *
      * @param cuvsDistanceType the {@link CuvsDistanceType} to use
      * @return an instance of Builder
      */
@@ -309,7 +309,7 @@ public class CagraIndexParams {
     /**
      * Sets the Number of Iterations to run if building with
      * {@link CagraGraphBuildAlgo#NN_DESCENT}.
-     * 
+     *
      * @param nnDescentNiter number of Iterations to run if building with
      *                       {@link CagraGraphBuildAlgo#NN_DESCENT}
      * @return an instance of Builder
@@ -321,7 +321,7 @@ public class CagraIndexParams {
 
     /**
      * Sets the number of writer threads to use for indexing.
-     * 
+     *
      * @param numWriterThreads number of writer threads to use
      * @return an instance of Builder
      */
@@ -332,7 +332,7 @@ public class CagraIndexParams {
 
     /**
      * Builds an instance of {@link CagraIndexParams}.
-     * 
+     *
      * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {

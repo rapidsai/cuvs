@@ -22,7 +22,7 @@ import com.nvidia.cuvs.panama.CuVSCagraCompressionParams;
 
 /**
  * Supplemental compression parameters to build CAGRA Index.
- * 
+ *
  * @since 25.02
  */
 public class CagraCompressionParams {
@@ -39,7 +39,7 @@ public class CagraCompressionParams {
   /**
    * Constructs an instance of CagraCompressionParams with passed search
    * parameters.
-   * 
+   *
    * @param resources                the resources instance to use
    * @param pqBits                   the bit length of the vector element after
    *                                 compression by PQ
@@ -82,7 +82,7 @@ public class CagraCompressionParams {
 
   /**
    * Gets the memory segment instance containing the compression parameters.
-   * 
+   *
    * @return the memory segment instance containing the compression parameters.
    */
   protected MemorySegment getMemorySegment() {
@@ -91,7 +91,7 @@ public class CagraCompressionParams {
 
   /**
    * Gets the bit length of the vector element after compression by PQ.
-   * 
+   *
    * @return the bit length of the vector element after compression by PQ.
    */
   public int getPqBits() {
@@ -100,7 +100,7 @@ public class CagraCompressionParams {
 
   /**
    * Gets the dimensionality of the vector after compression by PQ.
-   * 
+   *
    * @return the dimensionality of the vector after compression by PQ.
    */
   public int getPqDim() {
@@ -110,7 +110,7 @@ public class CagraCompressionParams {
   /**
    * Gets the vector quantization (VQ) codebook size - number of “coarse cluster
    * centers”.
-   * 
+   *
    * @return the vector quantization (VQ) codebook size - number of “coarse
    *         cluster centers”.
    */
@@ -121,7 +121,7 @@ public class CagraCompressionParams {
   /**
    * Gets the number of iterations searching for kmeans centers (both VQ and PQ
    * phases).
-   * 
+   *
    * @return the number of iterations searching for kmeans centers (both VQ and PQ
    *         phases).
    */
@@ -131,7 +131,7 @@ public class CagraCompressionParams {
 
   /**
    * Gets the fraction of data to use during iterative kmeans building (VQ phase).
-   * 
+   *
    * @return the fraction of data to use during iterative kmeans building (VQ
    *         phase).
    */
@@ -141,7 +141,7 @@ public class CagraCompressionParams {
 
   /**
    * Gets the fraction of data to use during iterative kmeans building (PQ phase).
-   * 
+   *
    * @return the fraction of data to use during iterative kmeans building (PQ
    *         phase).
    */
@@ -175,11 +175,11 @@ public class CagraCompressionParams {
 
     /**
      * Sets the bit length of the vector element after compression by PQ.
-     * 
+     *
      * Possible values: [4, 5, 6, 7, 8]. Hint: the smaller the ‘pq_bits’, the
      * smaller the index size and the better the search performance, but the lower
      * the recall.
-     * 
+     *
      * @param pqBits
      * @return an instance of Builder
      */
@@ -190,9 +190,9 @@ public class CagraCompressionParams {
 
     /**
      * Sets the dimensionality of the vector after compression by PQ.
-     * 
+     *
      * When zero, an optimal value is selected using a heuristic.
-     * 
+     *
      * @param pqDim
      * @return an instance of Builder
      */
@@ -204,9 +204,9 @@ public class CagraCompressionParams {
     /**
      * Sets the vector quantization (VQ) codebook size - number of “coarse cluster
      * centers”.
-     * 
+     *
      * When zero, an optimal value is selected using a heuristic.
-     * 
+     *
      * @param vqNCenters
      * @return an instance of Builder
      */
@@ -218,7 +218,7 @@ public class CagraCompressionParams {
     /**
      * Sets the number of iterations searching for kmeans centers (both VQ and PQ
      * phases).
-     * 
+     *
      * @param kmeansNIters
      * @return an instance of Builder
      */
@@ -229,9 +229,9 @@ public class CagraCompressionParams {
 
     /**
      * Sets the fraction of data to use during iterative kmeans building (VQ phase).
-     * 
+     *
      * When zero, an optimal value is selected using a heuristic.
-     * 
+     *
      * @param vqKmeansTrainsetFraction
      * @return an instance of Builder
      */
@@ -242,9 +242,9 @@ public class CagraCompressionParams {
 
     /**
      * Sets the fraction of data to use during iterative kmeans building (PQ phase).
-     * 
+     *
      * When zero, an optimal value is selected using a heuristic.
-     * 
+     *
      * @param pqKmeansTrainsetFraction
      * @return an instance of Builder
      */
@@ -255,7 +255,7 @@ public class CagraCompressionParams {
 
     /**
      * Builds an instance of {@link CagraCompressionParams}.
-     * 
+     *
      * @return an instance of {@link CagraCompressionParams}
      */
     public CagraCompressionParams build() {

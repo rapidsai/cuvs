@@ -40,7 +40,7 @@ public class BruteForceAndSearchTest {
 
   /**
    * A basic test that checks the whole flow - from indexing to search.
-   * 
+   *
    * @throws Throwable
    */
   @Test
@@ -108,7 +108,7 @@ public class BruteForceAndSearchTest {
         // Check results
         log.info(resultsFromLoadedIndex.getResults().toString());
         assertEquals(expectedResults, resultsFromLoadedIndex.getResults());
-        
+
         // Perform the search
         SearchResults results = index.search(cuvsQuery);
 

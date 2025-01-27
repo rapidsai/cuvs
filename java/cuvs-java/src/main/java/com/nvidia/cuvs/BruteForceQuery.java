@@ -21,7 +21,7 @@ import java.util.Map;
 
 /**
  * BruteForceQuery holds the query vectors to be used while invoking search.
- * 
+ *
  * @since 25.02
  */
 public class BruteForceQuery {
@@ -34,7 +34,7 @@ public class BruteForceQuery {
   /**
    * Constructs an instance of {@link BruteForceQuery} using queryVectors,
    * mapping, and topK.
-   * 
+   *
    * @param queryVectors 2D float query vector array
    * @param mapping      an instance of ID mapping
    * @param topK         the top k results to return
@@ -50,7 +50,7 @@ public class BruteForceQuery {
 
   /**
    * Gets the query vector 2D float array.
-   * 
+   *
    * @return 2D float array
    */
   public float[][] getQueryVectors() {
@@ -59,7 +59,7 @@ public class BruteForceQuery {
 
   /**
    * Gets the passed map instance.
-   * 
+   *
    * @return a map of ID mappings
    */
   public Map<Integer, Integer> getMapping() {
@@ -68,7 +68,7 @@ public class BruteForceQuery {
 
   /**
    * Gets the topK value.
-   * 
+   *
    * @return an integer
    */
   public int getTopK() {
@@ -77,7 +77,7 @@ public class BruteForceQuery {
 
   /**
    * Gets the prefilter long array
-   * 
+   *
    * @return a long array
    */
   public long[] getPrefilter() {
@@ -102,7 +102,7 @@ public class BruteForceQuery {
 
     /**
      * Registers the query vectors to be passed in the search call.
-     * 
+     *
      * @param queryVectors 2D float query vector array
      * @return an instance of this Builder
      */
@@ -113,7 +113,7 @@ public class BruteForceQuery {
 
     /**
      * Sets the instance of mapping to be used for ID mapping.
-     * 
+     *
      * @param mapping the ID mapping instance
      * @return an instance of this Builder
      */
@@ -124,7 +124,7 @@ public class BruteForceQuery {
 
     /**
      * Registers the topK value.
-     * 
+     *
      * @param topK the topK value used to retrieve the topK results
      * @return an instance of this Builder
      */
@@ -135,7 +135,7 @@ public class BruteForceQuery {
 
     /**
      * Sets the prefilter data for building the {@link BruteForceQuery}.
-     * 
+     *
      * @param prefilter a one-dimensional long array
      * @return an instance of this Builder
      */
@@ -146,7 +146,7 @@ public class BruteForceQuery {
 
     /**
      * Builds an instance of {@link BruteForceQuery}
-     * 
+     *
      * @return an instance of {@link BruteForceQuery}
      */
     public BruteForceQuery build() {

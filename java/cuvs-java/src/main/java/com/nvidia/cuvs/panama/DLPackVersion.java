@@ -184,4 +184,3 @@ public class DLPackVersion {
         return addr.reinterpret(layout().byteSize() * elementCount, arena, cleanup);
     }
 }
-

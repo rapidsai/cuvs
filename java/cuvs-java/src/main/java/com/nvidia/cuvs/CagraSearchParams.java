@@ -23,7 +23,7 @@ import com.nvidia.cuvs.panama.CuVSCagraSearchParams;
 /**
  * CagraSearchParams encapsulates the logic for configuring and holding search
  * parameters.
- * 
+ *
  * @since 25.02
  */
 public class CagraSearchParams {
@@ -104,7 +104,7 @@ public class CagraSearchParams {
 
   /**
    * Constructs an instance of CagraSearchParams with passed search parameters.
-   * 
+   *
    * @param resources          the resources instance to use
    * @param maxQueries         the maximum number of queries to search at the same
    *                           time (batch size)
@@ -175,7 +175,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the maximum number of queries to search at the same time (batch size).
-   * 
+   *
    * @return the maximum number of queries
    */
   public int getMaxQueries() {
@@ -184,7 +184,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the number of intermediate search results retained during the search.
-   * 
+   *
    * @return the number of intermediate search results
    */
   public int getITopKSize() {
@@ -193,7 +193,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the upper limit of search iterations.
-   * 
+   *
    * @return the upper limit value
    */
   public int getMaxIterations() {
@@ -202,7 +202,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the number of threads used to calculate a single distance.
-   * 
+   *
    * @return the number of threads configured
    */
   public int getTeamSize() {
@@ -212,7 +212,7 @@ public class CagraSearchParams {
   /**
    * Gets the number of graph nodes to select as the starting point for the search
    * in each iteration.
-   * 
+   *
    * @return the number of graph nodes
    */
   public int getSearchWidth() {
@@ -221,7 +221,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the lower limit of search iterations.
-   * 
+   *
    * @return the lower limit value
    */
   public int getMinIterations() {
@@ -230,7 +230,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the thread block size.
-   * 
+   *
    * @return the thread block size
    */
   public int getThreadBlockSize() {
@@ -239,7 +239,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the lower limit of hash map bit length.
-   * 
+   *
    * @return the lower limit value
    */
   public int getHashmapMinBitlen() {
@@ -248,7 +248,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the number of iterations of initial random seed node selection.
-   * 
+   *
    * @return the number of iterations
    */
   public int getNumRandomSamplings() {
@@ -257,7 +257,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the upper limit of hash map fill rate.
-   * 
+   *
    * @return the upper limit of hash map fill rate
    */
   public float getHashMapMaxFillRate() {
@@ -266,7 +266,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the bit mask used for initial random seed node selection.
-   * 
+   *
    * @return the bit mask value
    */
   public long getRandXORMask() {
@@ -275,7 +275,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the MemorySegment holding CagraSearchParams.
-   * 
+   *
    * @return the MemorySegment holding CagraSearchParams
    */
   protected MemorySegment getMemorySegment() {
@@ -284,7 +284,7 @@ public class CagraSearchParams {
 
   /**
    * Gets which search implementation is configured.
-   * 
+   *
    * @return the configured {@link SearchAlgo}
    */
   public SearchAlgo getCagraSearchAlgo() {
@@ -293,7 +293,7 @@ public class CagraSearchParams {
 
   /**
    * Gets the hash map mode configured.
-   * 
+   *
    * @return the configured {@link HashMapMode}
    */
   public HashMapMode getHashMapMode() {
@@ -332,7 +332,7 @@ public class CagraSearchParams {
 
     /**
      * Constructs this Builder with an instance of Arena.
-     * 
+     *
      * @param resources the {@link CuVSResources} instance to use
      */
     public Builder(CuVSResources resources) {
@@ -342,7 +342,7 @@ public class CagraSearchParams {
     /**
      * Sets the maximum number of queries to search at the same time (batch size).
      * Auto select when 0.
-     * 
+     *
      * @param maxQueries the maximum number of queries
      * @return an instance of this Builder
      */
@@ -355,7 +355,7 @@ public class CagraSearchParams {
      * Sets the number of intermediate search results retained during the search.
      * This is the main knob to adjust trade off between accuracy and search speed.
      * Higher values improve the search accuracy.
-     * 
+     *
      * @param iTopKSize the number of intermediate search results
      * @return an instance of this Builder
      */
@@ -366,7 +366,7 @@ public class CagraSearchParams {
 
     /**
      * Sets the upper limit of search iterations. Auto select when 0.
-     * 
+     *
      * @param maxIterations the upper limit of search iterations
      * @return an instance of this Builder
      */
@@ -377,7 +377,7 @@ public class CagraSearchParams {
 
     /**
      * Sets which search implementation to use.
-     * 
+     *
      * @param cuvsCagraSearchAlgo the {@link SearchAlgo} to use
      * @return an instance of this Builder
      */
@@ -389,7 +389,7 @@ public class CagraSearchParams {
     /**
      * Sets the number of threads used to calculate a single distance. 4, 8, 16, or
      * 32.
-     * 
+     *
      * @param teamSize the number of threads used to calculate a single distance
      * @return an instance of this Builder
      */
@@ -401,7 +401,7 @@ public class CagraSearchParams {
     /**
      * Sets the number of graph nodes to select as the starting point for the search
      * in each iteration.
-     * 
+     *
      * @param searchWidth the number of graph nodes to select
      * @return an instance of this Builder
      */
@@ -412,7 +412,7 @@ public class CagraSearchParams {
 
     /**
      * Sets the lower limit of search iterations.
-     * 
+     *
      * @param minIterations the lower limit of search iterations
      * @return an instance of this Builder
      */
@@ -424,7 +424,7 @@ public class CagraSearchParams {
     /**
      * Sets the thread block size. 0, 64, 128, 256, 512, 1024. Auto selection when
      * 0.
-     * 
+     *
      * @param threadBlockSize the thread block size
      * @return an instance of this Builder
      */
@@ -435,7 +435,7 @@ public class CagraSearchParams {
 
     /**
      * Sets the hash map type. Auto selection when AUTO.
-     * 
+     *
      * @param hashMapMode the {@link HashMapMode}
      * @return an instance of this Builder
      */
@@ -446,7 +446,7 @@ public class CagraSearchParams {
 
     /**
      * Sets the lower limit of hash map bit length. More than 8.
-     * 
+     *
      * @param hashMapMinBitlen the lower limit of hash map bit length
      * @return an instance of this Builder
      */
@@ -457,7 +457,7 @@ public class CagraSearchParams {
 
     /**
      * Sets the upper limit of hash map fill rate. More than 0.1, less than 0.9.
-     * 
+     *
      * @param hashMapMaxFillRate the upper limit of hash map fill rate
      * @return an instance of this Builder
      */
@@ -469,7 +469,7 @@ public class CagraSearchParams {
     /**
      * Sets the number of iterations of initial random seed node selection. 1 or
      * more.
-     * 
+     *
      * @param numRandomSamplings the number of iterations of initial random seed
      *                           node selection
      * @return an instance of this Builder
@@ -481,7 +481,7 @@ public class CagraSearchParams {
 
     /**
      * Sets the bit mask used for initial random seed node selection.
-     * 
+     *
      * @param randXORMask the bit mask used for initial random seed node selection
      * @return an instance of this Builder
      */
@@ -493,7 +493,7 @@ public class CagraSearchParams {
     /**
      * Builds an instance of {@link CagraSearchParams} with passed search
      * parameters.
-     * 
+     *
      * @return an instance of CagraSearchParams
      */
     public CagraSearchParams build() {

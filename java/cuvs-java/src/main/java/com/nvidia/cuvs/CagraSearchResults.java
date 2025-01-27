@@ -29,7 +29,7 @@ import com.nvidia.cuvs.common.SearchResults;
 
 /**
  * SearchResult encapsulates the logic for reading and holding search results.
- * 
+ *
  * @since 25.02
  */
 public class CagraSearchResults implements SearchResults {
@@ -84,7 +84,7 @@ public class CagraSearchResults implements SearchResults {
 
   /**
    * Gets a list results as a map of neighbor IDs to distances.
-   * 
+   *
    * @return a list of results for each query as a map of neighbor IDs to distance
    */
   @Override

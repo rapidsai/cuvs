@@ -42,21 +42,21 @@ public class CagraBuildAndSearchTest {
 
   /**
    * A basic test that checks the whole flow - from indexing to search.
-   * 
+   *
    * @throws Throwable
    */
   @Test
   public void testIndexingAndSearchingFlow() throws Throwable {
 
     // Sample data and query
-    float[][] dataset = { 
+    float[][] dataset = {
         { 0.74021935f, 0.9209938f },
         { 0.03902049f, 0.9689629f },
         { 0.92514056f, 0.4463501f },
-        { 0.6673192f, 0.10993068f } 
+        { 0.6673192f, 0.10993068f }
       };
     List<Integer> map = List.of(0, 1, 2, 3);
-    float[][] queries = { 
+    float[][] queries = {
         { 0.48216683f, 0.0428398f },
         { 0.5084142f, 0.6545497f },
         { 0.51260436f, 0.2643005f },

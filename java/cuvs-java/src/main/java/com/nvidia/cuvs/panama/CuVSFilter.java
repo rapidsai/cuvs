@@ -186,4 +186,3 @@ public class CuVSFilter {
         return addr.reinterpret(layout().byteSize() * elementCount, arena, cleanup);
     }
 }
-
