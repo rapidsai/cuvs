@@ -209,6 +209,7 @@ public class CuVSResources implements AutoCloseable {
     } catch (Throwable e) {
       e.printStackTrace();
     }
+    arena.close();
     nativeLibrary.delete();
   }
 
