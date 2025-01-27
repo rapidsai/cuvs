@@ -16,6 +16,7 @@
 #pragma once
 
 #include "cuvs_cagra_wrapper.h"
+#include <chrono>
 #include <cuvs/neighbors/hnsw.hpp>
 
 #include <memory>
@@ -85,13 +86,21 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
 template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
 {
+  auto start_time = std::chrono::high_resolution_clock::now();
   cagra_build_.build(dataset, nrow);
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  std::cout << "CAGRA build time: " << duration.count() << " ms" << std::endl;
   auto* cagra_index      = cagra_build_.get_index();
   auto host_dataset_view = raft::make_host_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
   auto opt_dataset_view =
     std::optional<raft::host_matrix_view<const T, int64_t>>(std::move(host_dataset_view));
+  start_time  = std::chrono::high_resolution_clock::now();
   hnsw_index_ = cuvs::neighbors::hnsw::from_cagra(
     handle_, build_param_.hnsw_index_params, *cagra_index, opt_dataset_view);
+  end_time = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+  std::cout << "HNSW conversion time: " << duration.count() << " ms" << std::endl;
 }
 
 template <typename T, typename IdxT>

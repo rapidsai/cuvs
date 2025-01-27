@@ -54,7 +54,7 @@ def run_hnsw_build_search_test(
 
     assert index.trained
 
-    hnsw_params = hnsw.IndexParams(hierarchy=hierarchy, num_threads=1)
+    hnsw_params = hnsw.IndexParams(hierarchy=hierarchy)
     hnsw_index = hnsw.from_cagra(hnsw_params, index)
 
     queries = generate_data((n_queries, n_cols), dtype)
@@ -135,7 +135,7 @@ def run_hnsw_extend_test(
 
     assert index.trained
 
-    hnsw_params = hnsw.IndexParams(hierarchy="cpu", num_threads=1)
+    hnsw_params = hnsw.IndexParams(hierarchy="cpu")
     hnsw_index = hnsw.from_cagra(hnsw_params, index)
     hnsw.extend(hnsw.ExtendParams(), hnsw_index, add_dataset)
 
