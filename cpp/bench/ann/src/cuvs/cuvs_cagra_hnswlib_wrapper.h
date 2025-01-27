@@ -16,7 +16,6 @@
 #pragma once
 
 #include "cuvs_cagra_wrapper.h"
-#include <chrono>
 #include <cuvs/neighbors/hnsw.hpp>
 
 #include <memory>
