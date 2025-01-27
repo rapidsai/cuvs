@@ -184,8 +184,13 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   DLManagedTensor distances_tensor = prepare_tensor(distances, distances_shape, kDLFloat, 32, 2, kDLCUDA);
 
   cuvsStreamSync(cuvs_resources);
+
+  cuvsFilter filter; // TODO: Implement Cagra Pre-Filtering, but leave it as no-op for now
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
   *return_value = cuvsCagraSearch(cuvs_resources, search_params, index, &queries_tensor, &neighbors_tensor,
-                  &distances_tensor);
+                  &distances_tensor, filter);
 
   cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk, cudaMemcpyDefault);
   cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk, cudaMemcpyDefault);
