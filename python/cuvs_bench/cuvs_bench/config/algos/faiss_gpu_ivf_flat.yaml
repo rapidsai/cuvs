@@ -7,7 +7,6 @@ groups:
       use_cuvs: [False]
     search:
       nprobe: [1, 5, 10, 50, 100, 200]
-      refine_ratio: [1]
   basecuvs:
     build:
       nlist: [1024, 2048, 4096]
@@ -15,7 +14,6 @@ groups:
       use_cuvs: [True]
     search:
       nprobe: [1, 5, 10, 50, 100, 200]
-      refine_ratio: [1]
   large:
     build:
       nlist: [8192, 16384, 32768]
@@ -23,7 +21,6 @@ groups:
       use_cuvs: [False]
     search:
       nprobe: [10, 20, 30, 50, 100, 200, 500, 1000]
-      refine_ratio: [1]
   largecuvs:
     build:
       nlist: [8192, 16384, 32768]
@@ -31,4 +28,3 @@ groups:
       use_cuvs: [True]
     search:
       nprobe: [10, 20, 30, 50, 100, 200, 500, 1000]
-      refine_ratio: [1]

@@ -23,7 +23,7 @@ function(find_and_configure_faiss)
     HEADER_NAMES  faiss/IndexFlat.h
     LIBRARY_NAMES faiss
     )
-  
+
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/faiss_override.json")
 
@@ -63,7 +63,7 @@ function(find_and_configure_faiss)
     "CMAKE_MESSAGE_LOG_LEVEL VERBOSE"
     )
 
-  
+
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(faiss)
 
