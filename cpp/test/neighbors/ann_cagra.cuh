@@ -254,6 +254,8 @@ enum class graph_build_algo {
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
   NN_DESCENT,
+  /* Experimental, iteratively execute CAGRA's search() and optimize() */
+  ITERATIVE_CAGRA_SEARCH,
   /* Choose default automatically */
   AUTO
 };
@@ -294,7 +296,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
   };
 
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
-  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
+  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
@@ -376,6 +378,10 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           case graph_build_algo::NN_DESCENT: {
             index_params.graph_build_params = graph_build_params::nn_descent_params(
               index_params.intermediate_graph_degree, index_params.metric);
+            break;
+          }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
           case graph_build_algo::AUTO:
@@ -556,6 +562,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
           case graph_build_algo::NN_DESCENT: {
             index_params.graph_build_params =
               graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
           case graph_build_algo::AUTO:
@@ -762,6 +772,10 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
               graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
             break;
           }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
+            break;
+          }
           case graph_build_algo::AUTO:
             // do nothing
             break;
@@ -891,7 +905,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 8, 17},
     {1, 16},  // k
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 1, 10, 100},  // query size
     {0},
@@ -909,7 +925,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},  // dim
     {16},                                                         // k
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},
@@ -927,7 +945,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0, 8, 16, 32},  // team_size
@@ -946,7 +966,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},  // team_size
