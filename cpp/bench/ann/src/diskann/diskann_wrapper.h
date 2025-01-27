@@ -81,7 +81,7 @@ class diskann_memory : public algo<T> {
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
     algo_property property;
-    property.dataset_memory_type = MemoryType::kHost;
+    property.dataset_memory_type = MemoryType::kHostMmap;
     property.query_memory_type   = MemoryType::kHost;
     return property;
   }
