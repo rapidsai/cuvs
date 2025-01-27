@@ -454,14 +454,18 @@ index<T, IdxT> build(
     RAFT_LOG_INFO(
       "Iteratively creating/improving graph index using CAGRA's search() and optimize()");
 
-    // Copy dataset to device. This is used as dataset as well as queries.
-    auto dev_dataset =
-      raft::make_device_matrix<T, int64_t>(res, dataset.extent(0), dataset.extent(1));
-    raft::copy(dev_dataset.data_handle(),
-               dataset.data_handle(),
-               dev_dataset.size(),
-               raft::resource::get_cuda_stream(res));
+    // If dataset is a host matrix, change it to a device matrix. Also, if the
+    // dimensionality of the dataset does not meet the alighnemt restriction,
+    // add extra dimensions and change it to a strided matrix.
+    auto dev_aligned_dataset      = make_aligned_dataset(res, dataset);
+    auto dev_aligned_dataset_view = dev_aligned_dataset.get()->view();
 
+    // If the matrix stride and extent do no match, the extra dimensions are
+    // also as extent since it cannot be used as query matrix.
+    auto dev_dataset =
+      raft::make_device_matrix_view<const T, int64_t>(dev_aligned_dataset_view.data_handle(),
+                                                      dev_aligned_dataset_view.extent(0),
+                                                      dev_aligned_dataset_view.stride(0));
     // Determine initial graph size.
     uint64_t final_graph_size   = (uint64_t)dataset.extent(0);
     uint64_t initial_graph_size = (final_graph_size + 1) / 2;
@@ -528,10 +532,12 @@ index<T, IdxT> build(
 
       // Create an index (idx), a query view (dev_query_view), and a mdarray for
       // search results (neighbors).
-      auto dev_dataset_view = raft::make_host_matrix_view<const T, int64_t>(
+      auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
         dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
+
       auto idx = index<T, IdxT>(
         res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
+
       auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
         dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
       auto neighbors = raft::make_host_matrix<IdxT, int64_t>(curr_query_size, curr_topk);
@@ -541,13 +547,13 @@ index<T, IdxT> build(
       cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
         dev_query_view.data_handle(),
         curr_query_size,
-        dev_query_view.stride(0),
+        dev_query_view.extent(1),
         max_chunk_size,
         raft::resource::get_cuda_stream(res),
         raft::resource::get_workspace_resource(res));
       for (const auto& batch : query_batch) {
-        auto batch_dev_query_view = raft::make_device_strided_matrix_view<const T, int64_t>(
-          batch.data(), batch.size(), dev_query_view.extent(1), dev_query_view.stride(0));
+        auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
+          batch.data(), batch.size(), dev_query_view.extent(1));
         auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
           dev_neighbors.data_handle(), batch.size(), curr_topk);
         auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
