@@ -238,7 +238,7 @@ TEST(CagraC, BuildExtendSearch)
   cuvsCagraExtendParams_t extend_params;
   cuvsCagraExtendParamsCreate(&extend_params);
   cuvsCagraExtend(
-    res, extend_params, &additional_dataset_tensor, &additional_dataset_return_tensor, index);
+    res, extend_params, &additional_dataset_tensor, index, &additional_dataset_return_tensor);
 
   // create queries DLTensor
   rmm::device_uvector<float> queries_d(num_queries * dimensions, stream);
@@ -331,10 +331,15 @@ TEST(CagraC, BuildExtendSearch)
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = nullptr;
 
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsCagraSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // make sure that extend_return_d points to the extended dataset
   ASSERT_TRUE(cuvs::devArrMatch(

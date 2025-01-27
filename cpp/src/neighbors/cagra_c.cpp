@@ -269,8 +269,8 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
 extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
                                        cuvsCagraExtendParams_t params,
                                        DLManagedTensor* additional_dataset_tensor,
-                                       DLManagedTensor* return_dataset_tensor,
-                                       cuvsCagraIndex_t index_c_ptr)
+                                       cuvsCagraIndex_t index_c_ptr,
+                                       DLManagedTensor* return_dataset_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = additional_dataset_tensor->dl_tensor;
