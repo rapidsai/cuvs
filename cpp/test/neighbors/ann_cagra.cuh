@@ -288,6 +288,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     switch (dist) {
       case InnerProduct: return "InnerProduct";
       case L2Expanded: return "L2";
+      case BinaryHamming: return "BinaryHamming";
       default: break;
     }
     return "Unknown";
