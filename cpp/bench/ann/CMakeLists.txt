@@ -125,7 +125,6 @@ function(ConfigureAnnBench)
   target_link_libraries(
     ${BENCH_NAME}
     PRIVATE ${ConfigureAnnBench_LINKS}
-            $<$<BOOL:${CUVS_FAISS_ENABLE_GPU}>:raft::raft>
             nlohmann_json::nlohmann_json
             Threads::Threads
             $<TARGET_NAME_IF_EXISTS:raft::raft_logger>
@@ -276,25 +275,25 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS} raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS} raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS} raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
-    NAME FAISS_GPU_CAGRA PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    NAME FAISS_GPU_CAGRA PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS} raft::raft
   )
 endif()
 
