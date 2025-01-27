@@ -53,7 +53,7 @@ struct cuvsHnswIndexParams {
   /** Number of host threads to use to construct hierarchy when hierarchy is `CPU`
       When the value is 0, the number of threads is automatically determined to the maximum
       number of threads available.
-  **/
+  */
   int num_threads;
 };
 
