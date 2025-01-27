@@ -46,8 +46,13 @@ float queries[4][2] = {{0.48216683, 0.0428398},
                        {0.51260436, 0.2643005},
                        {0.05198065, 0.5789965}};
 
+uint32_t filter[1] = {0b1001};  // index 1 and 2 are removed
+
 uint32_t neighbors_exp[4] = {3, 0, 3, 1};
 float distances_exp[4]    = {0.03878258, 0.12472608, 0.04776672, 0.15224178};
+
+uint32_t neighbors_exp_filtered[4] = {3, 0, 3, 0};
+float distances_exp_filtered[4]    = {0.03878258, 0.12472608, 0.04776672, 0.59063464};
 
 TEST(CagraC, BuildSearch)
 {
@@ -121,10 +126,15 @@ TEST(CagraC, BuildSearch)
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = nullptr;
 
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
   // search index
   cuvsCagraSearchParams_t search_params;
   cuvsCagraSearchParamsCreate(&search_params);
-  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+  cuvsCagraSearch(
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // verify output
   ASSERT_TRUE(

@@ -71,7 +71,7 @@ mod tests {
         let distances = ManagedTensor::from(&distances_host)
             .to_device(&res)
             .unwrap();
-    
+
         pairwise_distance(&res, &dataset_device, &dataset_device, &distances, DistanceType::L2Expanded,
         None).unwrap();
 

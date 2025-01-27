@@ -133,8 +133,3 @@ Build peak memory usage (device):
    + n\_clusters * dim * sizeof_{float}
 
 Note, if there’s not enough space left in the workspace memory resource, IVF-PQ build automatically switches to the managed memory for the training set and labels.
-
-
-
-
-

@@ -88,4 +88,3 @@ Contents
    cuvs_bench/index.rst
    api_docs.rst
    contributing.md
-
