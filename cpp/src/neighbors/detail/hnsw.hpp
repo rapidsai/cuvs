@@ -166,7 +166,6 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     params.ef_construction);
   appr_algo->base_layer_init = false;  // tell hnswlib to build upper layers only
   auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
-  std::cout << "num_threads: " << num_threads << std::endl;
 #pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
     appr_algo->addPoint((void*)(host_dataset_view.data_handle() + i * host_dataset_view.extent(1)),
