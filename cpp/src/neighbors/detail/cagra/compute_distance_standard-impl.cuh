@@ -209,7 +209,7 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
           d,
           query_smem_ptr +
             sizeof(QUERY_T) * device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(k + v));
-        r += dist_op<DATA_T, DISTANCE_T, DescriptorT::kMetric>(
+        r += dist_op<QUERY_T, DISTANCE_T, DescriptorT::kMetric>(
           d, cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(data[e][v]));
       }
     }
