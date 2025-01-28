@@ -329,9 +329,16 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    // IVF_PQ and NN_DESCENT graph builds do not support BinaryHamming
     if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+      GTEST_SKIP();
+    // If the dataset dimension is small and the dataset size is large, there can be a lot of
+    // dataset vectors that have the same distance to the query, especially in the binary Hamming
+    // distance, making it impossible to make a top-k ground truth.
+    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -513,9 +520,16 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
+    // IVF_PQ and NN_DESCENT graph builds do not support BinaryHamming
     if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+      GTEST_SKIP();
+    // If the dataset dimension is small and the dataset size is large, there can be a lot of
+    // dataset vectors that have the same distance to the query, especially in the binary Hamming
+    // distance, making it impossible to make a top-k ground truth.
+    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -716,9 +730,16 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
+    // IVF_PQ and NN_DESCENT graph builds do not support BinaryHamming
     if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+      GTEST_SKIP();
+    // If the dataset dimension is small and the dataset size is large, there can be a lot of
+    // dataset vectors that have the same distance to the query, especially in the binary Hamming
+    // distance, making it impossible to make a top-k ground truth.
+    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
