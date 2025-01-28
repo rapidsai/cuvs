@@ -18,7 +18,7 @@ import pytest
 from pylibraft.common import device_ndarray
 
 from cuvs.neighbors import brute_force, cagra, ivf_flat, ivf_pq
-from cuvs.test.ann_utils import generate_data
+from cuvs.tests.ann_utils import generate_data
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.int8, np.ubyte])

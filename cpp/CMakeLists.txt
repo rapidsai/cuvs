@@ -798,7 +798,7 @@ endif()
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(internal)
-  add_subdirectory(test)
+  add_subdirectory(tests)
 endif()
 
 # ##################################################################################################
