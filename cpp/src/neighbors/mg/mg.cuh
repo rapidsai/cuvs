@@ -17,12 +17,14 @@
 #pragma once
 
 #include "../detail/knn_merge_parts.cuh"
-#include <raft/core/resource/nccl_clique.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/mg.hpp>
 
 #include <fstream>
@@ -49,45 +51,39 @@ using namespace raft;
 
 // local index deserialization and distribution
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize_and_distribute(const raft::device_resources& handle,
+void deserialize_and_distribute(const raft::device_resources_snmg& clique,
                                 index<AnnIndexType, T, IdxT>& index,
                                 const std::string& filename)
 {
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
   for (int rank = 0; rank < index.num_ranks_; rank++) {
-    int dev_id                            = clique.device_ids_[rank];
-    const raft::device_resources& dev_res = clique.device_resources_[rank];
-    RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-    auto& ann_if = index.ann_interfaces_.emplace_back();
+    const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+    auto& ann_if                          = index.ann_interfaces_.emplace_back();
     cuvs::neighbors::deserialize(dev_res, ann_if, filename);
   }
 }
 
 // MG index deserialization
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::device_resources_snmg& clique,
                  index<AnnIndexType, T, IdxT>& index,
                  const std::string& filename)
 {
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
+  const auto& handle = clique.set_current_device_to_root_rank();
+  index.mode_        = (cuvs::neighbors::mg::distribution_mode)deserialize_scalar<int>(handle, is);
+  index.num_ranks_   = deserialize_scalar<int>(handle, is);
 
-  index.mode_      = (cuvs::neighbors::mg::distribution_mode)deserialize_scalar<int>(handle, is);
-  index.num_ranks_ = deserialize_scalar<int>(handle, is);
-
-  if (index.num_ranks_ != clique.num_ranks_) {
+  if (index.num_ranks_ != clique.get_num_ranks()) {
     RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
               index.num_ranks_,
-              clique.num_ranks_);
+              clique.get_num_ranks());
   }
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
-    int dev_id                            = clique.device_ids_[rank];
-    const raft::device_resources& dev_res = clique.device_resources_[rank];
-    RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-    auto& ann_if = index.ann_interfaces_.emplace_back();
+    const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+    auto& ann_if                          = index.ann_interfaces_.emplace_back();
     cuvs::neighbors::deserialize(dev_res, ann_if, is);
   }
 
@@ -95,24 +91,20 @@ void deserialize(const raft::device_resources& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void build(const raft::device_resources& handle,
+void build(const raft::device_resources_snmg& clique,
            index<AnnIndexType, T, IdxT>& index,
            const cuvs::neighbors::index_params* index_params,
            raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
-
   if (index.mode_ == REPLICATED) {
     int64_t n_rows = index_dataset.extent(0);
-    RAFT_LOG_INFO("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
+    RAFT_LOG_DEBUG("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
 
     index.ann_interfaces_.resize(index.num_ranks_);
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-      auto& ann_if = index.ann_interfaces_[rank];
+      const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+      auto& ann_if                          = index.ann_interfaces_[rank];
       cuvs::neighbors::build(dev_res, ann_if, index_params, index_dataset);
       resource::sync_stream(dev_res);
     }
@@ -121,18 +113,16 @@ void build(const raft::device_resources& handle,
     int64_t n_cols           = index_dataset.extent(1);
     int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
 
-    RAFT_LOG_INFO("SHARDED BUILD: %d*%drows", index.num_ranks_, n_rows_per_shard);
+    RAFT_LOG_DEBUG("SHARDED BUILD: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
     index.ann_interfaces_.resize(index.num_ranks_);
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-      int64_t offset                  = rank * n_rows_per_shard;
-      int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
-      const T* partition_ptr          = index_dataset.data_handle() + (offset * n_cols);
-      auto partition                  = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+      int64_t offset                        = rank * n_rows_per_shard;
+      int64_t n_rows_of_current_shard       = std::min(n_rows_per_shard, n_rows - offset);
+      const T* partition_ptr                = index_dataset.data_handle() + (offset * n_cols);
+      auto partition = raft::make_host_matrix_view<const T, int64_t, row_major>(
         partition_ptr, n_rows_of_current_shard, n_cols);
       auto& ann_if = index.ann_interfaces_[rank];
       cuvs::neighbors::build(dev_res, ann_if, index_params, partition);
@@ -142,23 +132,19 @@ void build(const raft::device_resources& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void extend(const raft::device_resources& handle,
+void extend(const raft::device_resources_snmg& clique,
             index<AnnIndexType, T, IdxT>& index,
             raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)
 {
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
-
   int64_t n_rows = new_vectors.extent(0);
   if (index.mode_ == REPLICATED) {
-    RAFT_LOG_INFO("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
+    RAFT_LOG_DEBUG("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
 
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-      auto& ann_if = index.ann_interfaces_[rank];
+      const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+      auto& ann_if                          = index.ann_interfaces_[rank];
       cuvs::neighbors::extend(dev_res, ann_if, new_vectors, new_indices);
       resource::sync_stream(dev_res);
     }
@@ -166,17 +152,15 @@ void extend(const raft::device_resources& handle,
     int64_t n_cols           = new_vectors.extent(1);
     int64_t n_rows_per_shard = raft::ceildiv(n_rows, (int64_t)index.num_ranks_);
 
-    RAFT_LOG_INFO("SHARDED EXTEND: %d*%drows", index.num_ranks_, n_rows_per_shard);
+    RAFT_LOG_DEBUG("SHARDED EXTEND: %d*%drows", index.num_ranks_, n_rows_per_shard);
 
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-      int64_t offset                  = rank * n_rows_per_shard;
-      int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
-      const T* new_vectors_ptr        = new_vectors.data_handle() + (offset * n_cols);
-      auto new_vectors_part           = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+      int64_t offset                        = rank * n_rows_per_shard;
+      int64_t n_rows_of_current_shard       = std::min(n_rows_per_shard, n_rows - offset);
+      const T* new_vectors_ptr              = new_vectors.data_handle() + (offset * n_cols);
+      auto new_vectors_part = raft::make_host_matrix_view<const T, int64_t, row_major>(
         new_vectors_ptr, n_rows_of_current_shard, n_cols);
 
       std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices_part = std::nullopt;
@@ -193,7 +177,7 @@ void extend(const raft::device_resources& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
+void sharded_search_with_direct_merge(const raft::device_resources_snmg& clique,
                                       const index<AnnIndexType, T, IdxT>& index,
                                       const cuvs::neighbors::search_params* search_params,
                                       raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -228,13 +212,11 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
     check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
+      const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
       auto& ann_if                          = index.ann_interfaces_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
 
-      if (rank == clique.root_rank_) {  // root rank
-        uint64_t batch_offset = clique.root_rank_ * part_size;
+      if (rank == clique.get_root_rank()) {  // root rank
+        uint64_t batch_offset = clique.get_root_rank() * part_size;
         auto d_neighbors      = raft::make_device_matrix_view<IdxT, int64_t, row_major>(
           in_neighbors.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
         auto d_distances = raft::make_device_matrix_view<float, int64_t, row_major>(
@@ -245,20 +227,20 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
         // wait for other ranks
         ncclGroupStart();
         for (int from_rank = 0; from_rank < index.num_ranks_; from_rank++) {
-          if (from_rank == clique.root_rank_) continue;
+          if (from_rank == clique.get_root_rank()) continue;
 
           batch_offset = from_rank * part_size;
           ncclRecv(in_neighbors.data_handle() + batch_offset,
                    part_size * sizeof(IdxT),
                    ncclUint8,
                    from_rank,
-                   clique.nccl_comms_[rank],
+                   clique.get_nccl_comm(rank),
                    resource::get_cuda_stream(dev_res));
           ncclRecv(in_distances.data_handle() + batch_offset,
                    part_size * sizeof(float),
                    ncclUint8,
                    from_rank,
-                   clique.nccl_comms_[rank],
+                   clique.get_nccl_comm(rank),
                    resource::get_cuda_stream(dev_res));
         }
         ncclGroupEnd();
@@ -276,14 +258,14 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
         ncclSend(d_neighbors.data_handle(),
                  part_size * sizeof(IdxT),
                  ncclUint8,
-                 clique.root_rank_,
-                 clique.nccl_comms_[rank],
+                 clique.get_root_rank(),
+                 clique.get_nccl_comm(rank),
                  resource::get_cuda_stream(dev_res));
         ncclSend(d_distances.data_handle(),
                  part_size * sizeof(float),
                  ncclUint8,
-                 clique.root_rank_,
-                 clique.nccl_comms_[rank],
+                 clique.get_root_rank(),
+                 clique.get_nccl_comm(rank),
                  resource::get_cuda_stream(dev_res));
         ncclGroupEnd();
         resource::sync_stream(dev_res);
@@ -327,7 +309,7 @@ void sharded_search_with_direct_merge(const raft::comms::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
+void sharded_search_with_tree_merge(const raft::device_resources_snmg& clique,
                                     const index<AnnIndexType, T, IdxT>& index,
                                     const cuvs::neighbors::search_params* search_params,
                                     raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -351,10 +333,8 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
     check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      int dev_id                            = clique.device_ids_[rank];
-      const raft::device_resources& dev_res = clique.device_resources_[rank];
+      const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
       auto& ann_if                          = index.ann_interfaces_[rank];
-      RAFT_CUDA_TRY(cudaSetDevice(dev_id));
 
       int64_t part_size = n_rows_of_current_batch * n_neighbors;
 
@@ -399,13 +379,13 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
                      part_size * sizeof(IdxT),
                      ncclUint8,
                      other_id,
-                     clique.nccl_comms_[rank],
+                     clique.get_nccl_comm(rank),
                      resource::get_cuda_stream(dev_res));
             ncclRecv(tmp_distances.data_handle() + part_size,
                      part_size * sizeof(float),
                      ncclUint8,
                      other_id,
-                     clique.nccl_comms_[rank],
+                     clique.get_nccl_comm(rank),
                      resource::get_cuda_stream(dev_res));
             received_something = true;
           }
@@ -416,13 +396,13 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
                    part_size * sizeof(IdxT),
                    ncclUint8,
                    other_id,
-                   clique.nccl_comms_[rank],
+                   clique.get_nccl_comm(rank),
                    resource::get_cuda_stream(dev_res));
           ncclSend(tmp_distances.data_handle(),
                    part_size * sizeof(float),
                    ncclUint8,
                    other_id,
-                   clique.nccl_comms_[rank],
+                   clique.get_nccl_comm(rank),
                    resource::get_cuda_stream(dev_res));
         }
         ncclGroupEnd();
@@ -462,7 +442,7 @@ void sharded_search_with_tree_merge(const raft::comms::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void run_search_batch(const raft::comms::nccl_clique& clique,
+void run_search_batch(const raft::device_resources_snmg& clique,
                       const index<AnnIndexType, T, IdxT>& index,
                       int rank,
                       const cuvs::neighbors::search_params* search_params,
@@ -475,9 +455,7 @@ void run_search_batch(const raft::comms::nccl_clique& clique,
                       int64_t n_cols,
                       int64_t n_neighbors)
 {
-  int dev_id = clique.device_ids_[rank];
-  RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-  const raft::device_resources& dev_res = clique.device_resources_[rank];
+  const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
   auto& ann_if                          = index.ann_interfaces_[rank];
 
   auto query_partition = raft::make_host_matrix_view<const T, int64_t, row_major>(
@@ -503,7 +481,7 @@ void run_search_batch(const raft::comms::nccl_clique& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(const raft::device_resources& handle,
+void search(const raft::device_resources_snmg& clique,
             const index<AnnIndexType, T, IdxT>& index,
             const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -511,8 +489,6 @@ void search(const raft::device_resources& handle,
             raft::host_matrix_view<float, int64_t, row_major> distances,
             int64_t n_rows_per_batch)
 {
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
-
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
@@ -542,7 +518,7 @@ void search(const raft::device_resources& handle,
       int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
       if (n_batches <= 1) n_rows_per_batch = n_rows;
 
-      RAFT_LOG_INFO(
+      RAFT_LOG_DEBUG(
         "REPLICATED SEARCH IN LOAD BALANCER MODE: %d*%drows", n_batches, n_rows_per_batch);
 
 #pragma omp parallel for
@@ -567,7 +543,7 @@ void search(const raft::device_resources& handle,
                          n_neighbors);
       }
     } else if (search_mode == ROUND_ROBIN) {
-      RAFT_LOG_INFO("REPLICATED SEARCH IN ROUND ROBIN MODE: %d*%drows", 1, n_rows);
+      RAFT_LOG_DEBUG("REPLICATED SEARCH IN ROUND ROBIN MODE: %d*%drows", 1, n_rows);
 
       ASSERT(n_rows <= n_rows_per_batch,
              "In round-robin mode, n_rows must lower or equal to n_rows_per_batch");
@@ -611,9 +587,9 @@ void search(const raft::device_resources& handle,
     if (n_batches <= 1) n_rows_per_batch = n_rows;
 
     if (merge_mode == MERGE_ON_ROOT_RANK) {
-      RAFT_LOG_INFO("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
-                    n_batches,
-                    n_rows_per_batch);
+      RAFT_LOG_DEBUG("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
+                     n_batches,
+                     n_rows_per_batch);
       sharded_search_with_direct_merge(clique,
                                        index,
                                        search_params,
@@ -626,7 +602,7 @@ void search(const raft::device_resources& handle,
                                        n_neighbors,
                                        n_batches);
     } else if (merge_mode == TREE_MERGE) {
-      RAFT_LOG_INFO(
+      RAFT_LOG_DEBUG(
         "SHARDED SEARCH WITH TREE_MERGE MERGE MODE %d*%drows", n_batches, n_rows_per_batch);
       sharded_search_with_tree_merge(clique,
                                      index,
@@ -644,23 +620,20 @@ void search(const raft::device_resources& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(const raft::device_resources& handle,
+void serialize(const raft::device_resources_snmg& clique,
                const index<AnnIndexType, T, IdxT>& index,
                const std::string& filename)
 {
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
-
+  const auto& handle = clique.set_current_device_to_root_rank();
   serialize_scalar(handle, of, (int)index.mode_);
   serialize_scalar(handle, of, index.num_ranks_);
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
-    int dev_id                            = clique.device_ids_[rank];
-    const raft::device_resources& dev_res = clique.device_resources_[rank];
-    RAFT_CUDA_TRY(cudaSetDevice(dev_id));
-    auto& ann_if = index.ann_interfaces_[rank];
+    const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
+    auto& ann_if                          = index.ann_interfaces_[rank];
     cuvs::neighbors::serialize(dev_res, ann_if, of);
   }
 
@@ -683,10 +656,10 @@ index<AnnIndexType, T, IdxT>::index(distribution_mode mode, int num_ranks_)
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-index<AnnIndexType, T, IdxT>::index(const raft::device_resources& handle,
+index<AnnIndexType, T, IdxT>::index(const raft::device_resources_snmg& clique,
                                     const std::string& filename)
   : round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
-  cuvs::neighbors::mg::detail::deserialize(handle, *this, filename);
+  cuvs::neighbors::mg::detail::deserialize(clique, *this, filename);
 }
 }  // namespace cuvs::neighbors::mg

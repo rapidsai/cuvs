@@ -19,7 +19,7 @@
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_ivf_pq_wrapper.h"
 #include <cuvs/neighbors/mg.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
+#include <raft/core/device_resources_snmg.hpp>
 
 namespace cuvs::bench {
 using namespace cuvs::neighbors;
@@ -37,11 +37,11 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
   };
 
   cuvs_mg_ivf_pq(Metric metric, int dim, const build_param& param)
-    : algo<T>(metric, dim), index_params_(param)
+    : algo<T>(metric, dim), index_params_(param), clique_()
   {
     index_params_.metric = parse_metric_type(metric);
-    // init nccl clique outside as to not affect benchmark
-    const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle_);
+
+    clique_.set_memory_pool(80);
   }
 
   void build(const T* dataset, size_t nrow) final;
@@ -62,7 +62,7 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
-    auto stream = raft::resource::get_cuda_stream(handle_);
+    auto stream = raft::resource::get_cuda_stream(clique_);
     return stream;
   }
 
@@ -73,7 +73,7 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  raft::device_resources handle_;
+  raft::device_resources_snmg clique_;
   build_param index_params_;
   cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params_;
   std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>> index_;
@@ -84,7 +84,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::build(const T* dataset, size_t nrow)
 {
   auto dataset_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, IdxT(nrow), IdxT(dim_));
-  auto idx = cuvs::neighbors::mg::build(handle_, index_params_, dataset_view);
+  auto idx = cuvs::neighbors::ivf_pq::build(clique_, index_params_, dataset_view);
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
       std::move(idx));
@@ -104,7 +104,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
 template <typename T, typename IdxT>
 void cuvs_mg_ivf_pq<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::mg::serialize(handle_, *index_, file);
+  cuvs::neighbors::ivf_pq::serialize(clique_, *index_, file);
 }
 
 template <typename T, typename IdxT>
@@ -112,7 +112,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::load(const std::string& file)
 {
   index_ =
     std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
-      std::move(cuvs::neighbors::mg::deserialize_pq<T, IdxT>(handle_, file)));
+      std::move(cuvs::neighbors::ivf_pq::deserialize<T, IdxT>(clique_, file)));
 }
 
 template <typename T, typename IdxT>
@@ -132,8 +132,8 @@ void cuvs_mg_ivf_pq<T, IdxT>::search(
   auto distances_view = raft::make_host_matrix_view<float, int64_t, raft::row_major>(
     distances, IdxT(batch_size), IdxT(k));
 
-  cuvs::neighbors::mg::search(
-    handle_, *index_, search_params_, queries_view, neighbors_view, distances_view);
+  cuvs::neighbors::ivf_pq::search(
+    clique_, *index_, search_params_, queries_view, neighbors_view, distances_view);
 }
 
 }  // namespace cuvs::bench
