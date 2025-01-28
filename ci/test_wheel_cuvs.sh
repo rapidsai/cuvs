@@ -13,4 +13,4 @@ python -m pip install \
     ./local-libcuvs-dep/libcuvs*.whl \
     "$(echo ./dist/cuvs*.whl)[test]"
 
-python -m pytest ./python/cuvs/cuvs/test
+python -m pytest ./python/cuvs/cuvs/tests

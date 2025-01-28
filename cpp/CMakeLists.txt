@@ -685,6 +685,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/cagra_c.cpp
       $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
       src/neighbors/refine/refine_c.cpp
+      src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
     )
 
@@ -797,7 +798,7 @@ endif()
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(internal)
-  add_subdirectory(test)
+  add_subdirectory(tests)
 endif()
 
 # ##################################################################################################
