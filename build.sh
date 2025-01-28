@@ -449,8 +449,9 @@ fi
 
 # Build the cuvs Java bindings
 if (( ${NUMARGS} == 0 )) || hasArg java; then
-    # build libcuvs first as the Java API depends on it
-    ./$0 libcuvs
+    if ! hasArg libcuvs; then
+        echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
+    fi
     cd ${REPODIR}/java
     ./build.sh
 fi

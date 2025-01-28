@@ -11,4 +11,4 @@ Alternatively, please build libcuvs (`./build.sh libcuvs` from top level directo
 Building
 --------
 
-`./build.sh` will generate the libcuvs_java.so file in internal/ directory, and then build the final jar file for the cuVS Java API in cuvs-java/ directory.
+`./build.sh` will generate the `libcuvs_java.so` file in the `internal/` directory, and then build the final jar file for the cuVS Java API in the `cuvs-java/` directory.
