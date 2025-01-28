@@ -52,7 +52,7 @@ pytest \
  --cov=cuvs \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
- test
+ tests
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

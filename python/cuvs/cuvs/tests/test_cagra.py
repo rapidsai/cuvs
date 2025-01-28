@@ -20,7 +20,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
 from cuvs.neighbors import cagra, filters
-from cuvs.test.ann_utils import calc_recall, generate_data
+from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
 def run_cagra_build_search_test(
