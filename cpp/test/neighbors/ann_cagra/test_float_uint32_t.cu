@@ -32,7 +32,9 @@ TEST_P(AnnCagraFilterTestF_U32, AnnCagra) { this->testCagra(); }
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestF_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
                         AnnCagraAddNodesTestF_U32,
-                        ::testing::ValuesIn(inputs));
-INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest, AnnCagraFilterTestF_U32, ::testing::ValuesIn(inputs));
+                        ::testing::ValuesIn(inputs_addnode));
+INSTANTIATE_TEST_CASE_P(AnnCagraFilterTest,
+                        AnnCagraFilterTestF_U32,
+                        ::testing::ValuesIn(inputs_filtering));
 
 }  // namespace cuvs::neighbors::cagra
