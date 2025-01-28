@@ -78,8 +78,11 @@ index<T, IdxT> merge(raft::resources const& handle,
     }
   }
 
-  auto host_updated_dataset = raft::make_host_matrix<T, std::int64_t>(new_dataset_size, dim);
-  memset(host_updated_dataset.data_handle(), 0, sizeof(T) * host_updated_dataset.size());
+  // Allocate the new dataset on device
+  auto device_updated_dataset =
+    raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, dim);
+  auto device_updated_dataset_view = raft::make_device_matrix_view<T, std::int64_t>(
+    device_updated_dataset.data_handle(), new_dataset_size, dim);
 
   IdxT offset = 0;
 
@@ -87,7 +90,7 @@ index<T, IdxT> merge(raft::resources const& handle,
     using ds_idx_type  = decltype(index->data().n_rows());
     auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
 
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_updated_dataset.data_handle() + offset * dim,
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(device_updated_dataset.data_handle() + offset * dim,
                                     sizeof(T) * dim,
                                     strided_dset->view().data_handle(),
                                     sizeof(T) * stride,
@@ -98,17 +101,6 @@ index<T, IdxT> merge(raft::resources const& handle,
 
     offset += IdxT(index->data().n_rows());
   }
-  // Allocate the new dataset on device
-  auto device_updated_dataset =
-    raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, dim);
-  auto device_updated_dataset_view = raft::make_device_matrix_view<T, std::int64_t>(
-    device_updated_dataset.data_handle(), new_dataset_size, dim);
-
-  // Copy updated dataset on host memory to device memory
-  raft::copy(device_updated_dataset.data_handle(),
-             host_updated_dataset.data_handle(),
-             new_dataset_size * dim,
-             raft::resource::get_cuda_stream(handle));
 
   auto merged_index =
     cagra::build(handle, params, raft::make_const_mdspan(device_updated_dataset_view));
