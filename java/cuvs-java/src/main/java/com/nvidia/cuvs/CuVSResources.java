@@ -21,15 +21,10 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SequenceLayout;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.VarHandle;
-import java.util.ArrayList;
-import java.util.List;
 
 import com.nvidia.cuvs.common.Util;
 
@@ -46,12 +41,8 @@ public class CuVSResources implements AutoCloseable {
   protected File nativeLibrary;
   private final MethodHandle createResourcesMethodHandle;
   private final MethodHandle destroyResourcesMethodHandle;
-  private final MethodHandle getGpuInfoMethodHandle;
-  private final MethodHandle getNumGpusMethodHandle;
   private MemorySegment resourcesMemorySegment;
   private MemoryLayout intMemoryLayout;
-  private MemoryLayout floatMemoryLayout;
-  private MemoryLayout longMemoryLayout;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -65,8 +56,6 @@ public class CuVSResources implements AutoCloseable {
     nativeLibrary = Util.loadNativeLibrary();
     symbolLookup = SymbolLookup.libraryLookup(nativeLibrary.getAbsolutePath(), arena);
     intMemoryLayout = linker.canonicalLayouts().get("int");
-    floatMemoryLayout = linker.canonicalLayouts().get("float");
-    longMemoryLayout = linker.canonicalLayouts().get("long");
 
     createResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("create_resources").get(),
         FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
@@ -74,119 +63,7 @@ public class CuVSResources implements AutoCloseable {
     destroyResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("destroy_resources").get(),
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-    getNumGpusMethodHandle = linker.downcallHandle(symbolLookup.find("get_num_gpus").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    getGpuInfoMethodHandle = linker.downcallHandle(symbolLookup.find("get_gpu_info").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, intMemoryLayout, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
     createResources();
-  }
-
-  /**
-   * Get the list of compatible GPUs based on compute capability >= 7.0 and total
-   * memory >= 8GB
-   *
-   * @return a list of compatible GPUs. See {@link GPUInfo}
-   */
-  public List<GPUInfo> compatibleGPUs() throws Throwable {
-    return compatibleGPUs(7.0f, 8192);
-  }
-
-  /**
-   * Get the list of compatible GPUs based on given compute capability and total
-   * memory
-   *
-   * @param minComputeCapability the minimum compute capability
-   * @param minDeviceMemoryMB    the minimum total available memory in MB
-   * @return a list of compatible GPUs. See {@link GPUInfo}
-   */
-  public List<GPUInfo> compatibleGPUs(float minComputeCapability, int minDeviceMemoryMB) throws Throwable {
-    List<GPUInfo> compatibleGPUs = new ArrayList<GPUInfo>();
-    double minDeviceMemoryB = Math.pow(2, 20) * minDeviceMemoryMB;
-    for (GPUInfo gpuInfo : availableGPUs()) {
-      if (gpuInfo.getComputeCapability() >= minComputeCapability && gpuInfo.getTotalMemory() >= minDeviceMemoryB) {
-        compatibleGPUs.add(gpuInfo);
-      }
-    }
-    return compatibleGPUs;
-  }
-
-  /**
-   * Gets all the available GPUs
-   *
-   * @return a list of {@link GPUInfo} objects with GPU details
-   */
-  public List<GPUInfo> availableGPUs() throws Throwable {
-    int numGPUs = getNumGPUs();
-    List<GPUInfo> results = new ArrayList<GPUInfo>();
-
-    if (numGPUs == 0)
-      return results;
-
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-
-    SequenceLayout gpuIdSequenceLayout = MemoryLayout.sequenceLayout(numGPUs, intMemoryLayout);
-    MemorySegment gpuIdMemorySegment = arena.allocate(gpuIdSequenceLayout);
-
-    SequenceLayout freeMemSequenceLayout = MemoryLayout.sequenceLayout(numGPUs, longMemoryLayout);
-    MemorySegment freeMemMemorySegment = arena.allocate(freeMemSequenceLayout);
-
-    SequenceLayout totalMemSequenceLayout = MemoryLayout.sequenceLayout(numGPUs, longMemoryLayout);
-    MemorySegment totalMemMemorySegment = arena.allocate(totalMemSequenceLayout);
-
-    SequenceLayout computeCapabilitySequenceLayout = MemoryLayout.sequenceLayout(numGPUs, floatMemoryLayout);
-    MemorySegment computeCapabilityMemorySegment = arena.allocate(computeCapabilitySequenceLayout);
-
-    getGpuInfoMethodHandle.invokeExact(returnValueMemorySegment, numGPUs, gpuIdMemorySegment, freeMemMemorySegment,
-        totalMemMemorySegment, computeCapabilityMemorySegment);
-
-    VarHandle gpuIdVarHandle = gpuIdSequenceLayout.varHandle(PathElement.sequenceElement());
-    VarHandle freeMemVarHandle = freeMemSequenceLayout.varHandle(PathElement.sequenceElement());
-    VarHandle totalMemVarHandle = totalMemSequenceLayout.varHandle(PathElement.sequenceElement());
-    VarHandle computeCapabilityVarHandle = computeCapabilitySequenceLayout.varHandle(PathElement.sequenceElement());
-
-    for (int i = 0; i < numGPUs; i++) {
-      int gpuId = (int) gpuIdVarHandle.get(gpuIdMemorySegment, 0L, i);
-      long freeMemory = (long) freeMemVarHandle.get(freeMemMemorySegment, 0L, i);
-      long totalMemory = (long) totalMemVarHandle.get(totalMemMemorySegment, 0L, i);
-      float computeCapability = (float) computeCapabilityVarHandle.get(computeCapabilityMemorySegment, 0L, i);
-      results.add(new GPUInfo(gpuId, freeMemory, totalMemory, computeCapability));
-    }
-
-    return results;
-  }
-
-  /**
-   * Gets the number of GPUs on the machine
-   *
-   * @return the number of GPUs on the machine
-   */
-  private int getNumGPUs() throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-
-    MemoryLayout numGPUsMemoryLayout = intMemoryLayout;
-    MemorySegment numGPUsMemorySegment = arena.allocate(numGPUsMemoryLayout);
-
-    getNumGpusMethodHandle.invokeExact(returnValueMemorySegment, numGPUsMemorySegment);
-    int returnValue = returnValueMemorySegment.get(ValueLayout.JAVA_INT, 0);
-
-    switch (returnValue) {
-    case 0: // cudaSuccess
-      return numGPUsMemorySegment.get(ValueLayout.JAVA_INT, 0);
-    case 3: // cudaErrorInitializationError
-      throw new GPUException("The API call failed because the CUDA driver and runtime could not be initialized.");
-    case 35: // cudaErrorInsufficientDriver
-      throw new GPUException("The installed NVIDIA CUDA driver is older than the CUDA runtime library");
-    case 100: // cudaErrorNoDevice
-      throw new GPUException("No CUDA-capable devices were detected by the installed CUDA driver");
-    default:
-      throw new GPUException("Returned value: " + returnValue
-          + " Please find more details here: https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html#group__CUDART__TYPES_1g3f51e3575c2178246db0a94a430e0038");
-    }
   }
 
   /**

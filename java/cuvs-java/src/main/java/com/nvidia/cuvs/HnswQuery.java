@@ -17,7 +17,7 @@
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.List;
 
 /**
  * HnswQuery holds the query vectors to be used while invoking search on the
@@ -28,7 +28,7 @@ import java.util.Map;
 public class HnswQuery {
 
   private HnswSearchParams hnswSearchParams;
-  private Map<Integer, Integer> mapping;
+  private List<Integer> mapping;
   private float[][] queryVectors;
   private int topK;
 
@@ -41,8 +41,7 @@ public class HnswQuery {
    * @param mapping          an instance of ID mapping
    * @param topK             the top k results to return
    */
-  private HnswQuery(HnswSearchParams hnswSearchParams, float[][] queryVectors, Map<Integer, Integer> mapping,
-      int topK) {
+  private HnswQuery(HnswSearchParams hnswSearchParams, float[][] queryVectors, List<Integer> mapping, int topK) {
     this.hnswSearchParams = hnswSearchParams;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
@@ -72,7 +71,7 @@ public class HnswQuery {
    *
    * @return a map of ID mappings
    */
-  public Map<Integer, Integer> getMapping() {
+  public List<Integer> getMapping() {
     return mapping;
   }
 
@@ -97,7 +96,7 @@ public class HnswQuery {
 
     private HnswSearchParams hnswSearchParams;
     private float[][] queryVectors;
-    private Map<Integer, Integer> mapping;
+    private List<Integer> mapping;
     private int topK = 2;
 
     /**
@@ -129,7 +128,7 @@ public class HnswQuery {
      * @param mapping the ID mapping instance
      * @return an instance of this Builder
      */
-    public Builder withMapping(Map<Integer, Integer> mapping) {
+    public Builder withMapping(List<Integer> mapping) {
       this.mapping = mapping;
       return this;
     }

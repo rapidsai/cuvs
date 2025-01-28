@@ -165,7 +165,8 @@ public class CagraIndexParams {
   }
 
   private CagraIndexParams(CuVSResources resources, int intermediateGraphDegree, int graphDegree,
-      CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo, int nnDescentNiter, int writerThreads, CuvsDistanceType cuvsDistanceType) {
+      CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo, int nnDescentNiter, int writerThreads,
+      CuvsDistanceType cuvsDistanceType) {
     this.resources = resources;
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;

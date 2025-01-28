@@ -17,7 +17,7 @@
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.List;
 
 /**
  * BruteForceQuery holds the query vectors to be used while invoking search.
@@ -26,7 +26,7 @@ import java.util.Map;
  */
 public class BruteForceQuery {
 
-  private Map<Integer, Integer> mapping;
+  private List<Integer> mapping;
   private float[][] queryVectors;
   private long[] prefilter;
   private int topK;
@@ -41,7 +41,7 @@ public class BruteForceQuery {
    * @param prefilter    the prefilter data to use while searching the BRUTEFORCE
    *                     index
    */
-  public BruteForceQuery(float[][] queryVectors, Map<Integer, Integer> mapping, int topK, long[] prefilter) {
+  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, long[] prefilter) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
@@ -62,7 +62,7 @@ public class BruteForceQuery {
    *
    * @return a map of ID mappings
    */
-  public Map<Integer, Integer> getMapping() {
+  public List<Integer> getMapping() {
     return mapping;
   }
 
@@ -97,7 +97,7 @@ public class BruteForceQuery {
 
     private float[][] queryVectors;
     private long[] prefilter;
-    private Map<Integer, Integer> mapping;
+    private List<Integer> mapping;
     private int topK = 2;
 
     /**
@@ -117,7 +117,7 @@ public class BruteForceQuery {
      * @param mapping the ID mapping instance
      * @return an instance of this Builder
      */
-    public Builder withMapping(Map<Integer, Integer> mapping) {
+    public Builder withMapping(List<Integer> mapping) {
       this.mapping = mapping;
       return this;
     }

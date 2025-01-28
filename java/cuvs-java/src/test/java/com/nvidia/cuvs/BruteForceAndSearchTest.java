@@ -53,7 +53,7 @@ public class BruteForceAndSearchTest {
         { 0.92514056f, 0.4463501f },
         { 0.6673192f, 0.10993068f }
       };
-    Map<Integer, Integer> map = Map.of(0, 0, 1, 1, 2, 2, 3, 3);
+    List<Integer> map = List.of(0, 1, 2, 3);
     float[][] queries = {
         { 0.48216683f, 0.0428398f },
         { 0.5084142f, 0.6545497f },

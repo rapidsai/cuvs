@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 
 @RunWith(RandomizedRunner.class)
-public class BruteforceRandomizedTest extends CuVSTestCase {
+public class BruteForceRandomizedTest extends CuVSTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

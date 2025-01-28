@@ -189,7 +189,7 @@ public class CagraIndex {
    * @return an instance of {@link CagraSearchResults} containing the results
    */
   public CagraSearchResults search(CagraQuery query) throws Throwable {
-	int topK = query.getMapping() != null ? Math.min(query.getMapping().size(), query.getTopK()): query.getTopK();
+    int topK = query.getMapping() != null ? Math.min(query.getMapping().size(), query.getTopK()) : query.getTopK();
     long numQueries = query.getQueryVectors().length;
     long numBlocks = topK * numQueries;
     int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
@@ -202,8 +202,8 @@ public class CagraIndex {
     MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
 
     searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
-        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), topK,
-        numQueries, vectorDimension, resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
+        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), topK, numQueries,
+        vectorDimension, resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
         returnValueMemorySegment, query.getCagraSearchParameters().getMemorySegment());
 
     return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,

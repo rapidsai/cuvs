@@ -42,8 +42,7 @@ public class CagraQuery {
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping,
-      int topK) {
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;

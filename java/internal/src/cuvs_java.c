@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
+#include <string.h>
 
 #define try bool __HadError=false;
 #define catch(x) ExitJmp:if(__HadError)
@@ -422,37 +423,42 @@ void destroy_hnsw_index(cuvsHnswIndex_t hnsw_index, int *return_value) {
 }
 
 /**
- * @brief A function to get the number of GPUs
- *
- * @param[out] return_value return value for cudaGetDeviceCount function call
- * @param[out] num_gpus the number of GPUs detected
+ * @brief struct for containing gpu information
  */
-void get_num_gpus(int *return_value, int *num_gpus) {
-  *return_value = cudaGetDeviceCount(num_gpus);
-}
+typedef struct gpuInfo {
+  int gpu_id;
+  char name[256];
+  long free_memory;
+  long total_memory;
+  float compute_capability;
+} gpuInfo;
 
 /**
  * @brief A function to get GPU details
  *
  * @param[out] return_value return value for cudaMemGetInfo function call
- * @param[in] num_gpus the count of gpus passed to expect details on
- * @param[out] gpu_id an integer array of gpu ids returned
- * @param[out] free_memory an array of free memory bytes (free_memory[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
- * @param[out] total_memory an array of total memory bytes (total_memory[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
- * @param[out] compute_capability the compute capability (compute_capability[n] for gpu[n] where 0 <= n <= (cudaGetDeviceCount() - 1))
+ * @param[out] num_gpus the number of devices found
+ * @param[out] gpu_info_arr reference to the array of gpuInfo objects
  */
-void get_gpu_info(int *return_value, int num_gpus, int *gpu_id, long *free_memory, long *total_memory, float *compute_capability) {
+void get_gpu_info(int *return_value, int *num_gpus, gpuInfo *gpu_info_arr) {
+  cudaGetDeviceCount(num_gpus);
+  // Limiting the num_gpus to 1024. For more details please see comments in Util.availableGPUs()
+  *num_gpus = (*num_gpus > 1024) ? 1024 : *num_gpus;
+  struct gpuInfo gpuInfos[*num_gpus];
   size_t free, total;
+  // https://docs.nvidia.com/cuda/cuda-runtime-api/structcudaDeviceProp.html#structcudaDeviceProp
   struct cudaDeviceProp deviceProp;
-  for (int i = 0; i < num_gpus; i++) {
+  for (int i = 0; i < *num_gpus; i++) {
     cudaSetDevice(i);
     cudaGetDeviceProperties(&deviceProp, i);
     char buffer[10];
     sprintf(buffer, "%d.%d", deviceProp.major, deviceProp.minor);
     *return_value = cudaMemGetInfo(&free, &total);
-    *(gpu_id + i) = i;
-    *(free_memory + i) = free;
-    *(total_memory + i) = total;
-    *(compute_capability + i) = atof(buffer);
+    gpuInfos[i].gpu_id = i;
+    strcpy(gpuInfos[i].name, deviceProp.name);
+    gpuInfos[i].free_memory = free;
+    gpuInfos[i].total_memory = total;
+    gpuInfos[i].compute_capability = atof(buffer);
+    *(gpu_info_arr + i) = gpuInfos[i];
   }
 }
