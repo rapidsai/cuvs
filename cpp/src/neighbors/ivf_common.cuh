@@ -268,6 +268,7 @@ void postprocess_distances(ScoreOutT* out,      // [n_queries, topk]
         raft::linalg::unaryOp(out, in, len, raft::cast_op<ScoreOutT>{}, stream);
       }
     } break;
+    case distance::DistanceType::BinaryHamming: break;
     default: RAFT_FAIL("Unexpected metric.");
   }
 }

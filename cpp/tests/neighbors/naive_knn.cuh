@@ -47,23 +47,28 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
     for (IdxT i = 0; i < k; ++i) {
       IdxT xidx = i + midx * k;
       IdxT yidx = i + nidx * k;
-      auto xv   = EvalT(x[xidx]);
-      auto yv   = EvalT(y[yidx]);
+      auto xv   = x[xidx];
+      auto yv   = y[yidx];
       switch (metric) {
         case cuvs::distance::DistanceType::InnerProduct: {
-          acc += xv * yv;
+          acc += static_cast<EvalT>(xv) * static_cast<EvalT>(yv);
         } break;
         case cuvs::distance::DistanceType::CosineExpanded: {
-          acc += xv * yv;
-          normX += xv * xv;
-          normY += yv * yv;
+          acc += static_cast<EvalT>(xv) * static_cast<EvalT>(yv);
+          normX += static_cast<EvalT>(xv) * static_cast<EvalT>(xv);
+          normY += static_cast<EvalT>(yv) * static_cast<EvalT>(yv);
         } break;
         case cuvs::distance::DistanceType::L2SqrtExpanded:
         case cuvs::distance::DistanceType::L2SqrtUnexpanded:
         case cuvs::distance::DistanceType::L2Expanded:
         case cuvs::distance::DistanceType::L2Unexpanded: {
-          auto diff = xv - yv;
+          auto diff = static_cast<EvalT>(xv) - static_cast<EvalT>(yv);
           acc += diff * diff;
+        } break;
+        case cuvs::distance::DistanceType::BinaryHamming: {
+          if constexpr (std::is_same_v<uint8_t, DataT>) {
+            acc += __popc(static_cast<uint32_t>(~(xv ^ yv)) & 0xff);
+          }
         } break;
         default: break;
       }
