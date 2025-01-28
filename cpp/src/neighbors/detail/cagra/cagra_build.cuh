@@ -441,6 +441,11 @@ index<T, IdxT> build(
       knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), params.metric);
     }
   }
+  RAFT_EXPECTS(
+    params.metric != BinaryHamming ||
+      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(knn_build_params),
+    "IVF_PQ and NN_DESCENT for CAGRA graph build do not support BinaryHamming as a metric. Please "
+    "use the iterative CAGRA search build.");
 
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
