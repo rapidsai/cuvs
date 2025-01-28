@@ -124,7 +124,6 @@ raft::device_matrix<T,idxT> read_bin_dataset(raft::device_resources const &dev_r
 
   auto dataset = raft::make_device_matrix<T, idxT>(dev_resources, N, dim);
   raft::copy(dataset.data_handle(), data.data(), data.size(), raft::resource::get_cuda_stream(dev_resources));
- 
+
   return dataset;
 }
-
