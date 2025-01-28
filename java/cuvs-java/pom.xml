@@ -22,7 +22,7 @@
     <groupId>com.nvidia.cuvs</groupId>
     <artifactId>cuvs-java</artifactId>
     <!-- NOTE: The version automatically gets updated when ci/release/update-version.sh is invoked. -->
-    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.02.00</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
+    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.02.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
     <name>cuvs-java</name>
     <packaging>jar</packaging>
 
@@ -97,7 +97,7 @@
                                     <groupId>com.nvidia.cuvs</groupId>
                                     <artifactId>cuvs-java-internal</artifactId>
                                     <!-- NOTE: The version automatically gets updated when ci/release/update-version.sh is invoked. -->
-                                    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.02.00</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
+                                    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.02.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
                                     <type>so</type>
                                     <overWrite>false</overWrite>
                                     <outputDirectory>
