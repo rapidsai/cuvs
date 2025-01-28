@@ -21,6 +21,7 @@ from scipy.spatial.distance import cdist
 from cuvs.distance import pairwise_distance
 
 
+@pytest.mark.parametrize("times", range(20))
 @pytest.mark.parametrize("n_rows", [50, 100])
 @pytest.mark.parametrize("n_cols", [10, 50])
 @pytest.mark.parametrize(
@@ -43,7 +44,7 @@ from cuvs.distance import pairwise_distance
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("order", ["F", "C"])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
-def test_distance(n_rows, n_cols, inplace, order, metric, dtype):
+def test_distance(n_rows, n_cols, inplace, order, metric, dtype, times):
     input1 = np.random.random_sample((n_rows, n_cols))
     input1 = np.asarray(input1, order=order).astype(dtype)
 
@@ -79,7 +80,5 @@ def test_distance(n_rows, n_cols, inplace, order, metric, dtype):
     actual = output_device.copy_to_host()
 
     tol = 1e-3
-    if np.issubdtype(dtype, np.float16):
-        tol = 1e-1
 
     assert np.allclose(expected, actual, atol=tol, rtol=tol)

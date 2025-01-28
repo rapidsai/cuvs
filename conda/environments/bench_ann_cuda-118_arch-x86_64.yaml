@@ -9,7 +9,7 @@ channels:
 dependencies:
 - benchmark>=1.8.2
 - c-compiler
-- clang-tools=16.0.6
+- clang-tools==16.0.6
 - clang==16.0.6
 - click
 - cmake>=3.26.4,!=3.30.0
@@ -26,6 +26,7 @@ dependencies:
 - gcc_linux-64=11.*
 - glog>=0.6.0
 - h5py>=3.8.0
+- libclang==16.0.6
 - libcublas-dev=11.11.3.6
 - libcublas=11.11.3.6
 - libcurand-dev=10.3.0.86
@@ -47,6 +48,6 @@ dependencies:
 - pyyaml
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
 - setuptools
-- sysroot_linux-64==2.17
+- sysroot_linux-64==2.28
 - wheel
 name: bench_ann_cuda-118_arch-x86_64

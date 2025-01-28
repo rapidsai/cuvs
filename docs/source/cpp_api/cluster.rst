@@ -11,4 +11,3 @@ Cluster
 
    cluster_kmeans.rst
    cluster_agglomerative.rst
-
