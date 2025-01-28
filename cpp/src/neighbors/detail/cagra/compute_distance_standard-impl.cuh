@@ -37,7 +37,7 @@ template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Met
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
   -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct, DISTANCE_T>
 {
-  return -a * b;
+  return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
 }
 
 template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
@@ -46,7 +46,9 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
                         std::is_integral_v<DATA_T>,
                       DISTANCE_T>
 {
-  return __popc(~(a ^ b));
+  // mask the result of xor for the integer promotion
+  const auto v = (~(a ^ b)) & 0xffu;
+  return __popc(v);
 }
 }  // namespace
 
@@ -160,7 +162,14 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
     if (i < dim) {
       buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(queries_ptr[i]);
     } else {
-      buf[j] = 0.0;
+      if constexpr (DescriptorT::kMetric == BinaryHamming) {
+        static_assert(std::is_same_v<QUERY_T, uint8_t>);
+        // Set the padding elements of the query vector to 0xff because the ones of dataset vectors
+        // are 0x00 and the binary Hamming distance between them is 0.
+        buf[j] = 0xff;
+      } else {
+        buf[j] = 0.0;
+      }
     }
   }
 
