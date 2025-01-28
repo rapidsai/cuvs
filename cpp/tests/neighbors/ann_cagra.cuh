@@ -1118,21 +1118,23 @@ inline std::vector<AnnCagraInputs> generate_inputs()
 inline std::vector<AnnCagraInputs> generate_addnode_inputs()
 {
   // changing dim
-  std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {1000},
-    {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
-    {16},                                 // k
-    {graph_build_algo::NN_DESCENT},
-    {search_algo::AUTO},
-    {10},
-    {0},
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
-    {false},
-    {true},
-    {0.995});
+  std::vector<AnnCagraInputs> inputs =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {1000},
+                                                   {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
+                                                   {16},                                 // k
+                                                   {graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::BinaryHamming},
+                                                   {false},
+                                                   {true},
+                                                   {0.995});
 
   // testing host and device datasets
   auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
@@ -1189,7 +1191,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
-    {1, 8, 17},
+    {1, 8, 17, 102},
     {16},  // k
     {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
@@ -1197,7 +1199,9 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BinaryHamming},
     {false},
     {true},
     {0.995});
