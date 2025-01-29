@@ -70,7 +70,7 @@ public class CagraCompressionParams {
    * Allocates the configured compression parameters in the MemorySegment.
    */
   private MemorySegment initMemorySegment() {
-    MemorySegment compressionParamsMemorySegment = CuVSCagraCompressionParams.allocate(resources.arena);
+    MemorySegment compressionParamsMemorySegment = CuVSCagraCompressionParams.allocate(resources.getArena());
     CuVSCagraCompressionParams.pq_bits(compressionParamsMemorySegment, pqBits);
     CuVSCagraCompressionParams.pq_dim(compressionParamsMemorySegment, pqDim);
     CuVSCagraCompressionParams.vq_n_centers(compressionParamsMemorySegment, vqNCenters);

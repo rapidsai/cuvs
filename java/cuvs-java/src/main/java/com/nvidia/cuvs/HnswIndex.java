@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -32,6 +33,13 @@ import java.util.UUID;
 import com.nvidia.cuvs.common.Util;
 import com.nvidia.cuvs.panama.CuVSHnswIndex;
 
+import static com.nvidia.cuvs.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 /**
  * {@link HnswIndex} encapsulates a HNSW index, along with methods to interact
  * with it.
@@ -40,15 +48,18 @@ import com.nvidia.cuvs.panama.CuVSHnswIndex;
  */
 public class HnswIndex {
 
+  private static final MethodHandle deserializeHnswIndexMethodHandle = downcallHandle("deserialize_hnsw_index",
+      FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_INT));
+
+  private static final MethodHandle searchHnswIndexMethodHandle = downcallHandle("search_hnsw_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_INT, C_INT, C_LONG));
+
+  private static final MethodHandle destroyHnswIndexMethodHandle = downcallHandle("destroy_hnsw_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
+
   private final CuVSResources resources;
-  private MethodHandle deserializeHnswIndexMethodHandle;
-  private MethodHandle searchHnswIndexMethodHandle;
-  private MethodHandle destroyHnswIndexMethodHandle;
-  private HnswIndexParams hnswIndexParams;
-  private IndexReference hnswIndexReference;
-  private MemoryLayout longMemoryLayout;
-  private MemoryLayout intMemoryLayout;
-  private MemoryLayout floatMemoryLayout;
+  private final HnswIndexParams hnswIndexParams;
+  private final IndexReference hnswIndexReference;
 
   /**
    * Constructor for loading the index from an {@link InputStream}
@@ -60,43 +71,18 @@ public class HnswIndex {
       throws Throwable {
     this.hnswIndexParams = hnswIndexParams;
     this.resources = resources;
-
-    longMemoryLayout = resources.linker.canonicalLayouts().get("long");
-    intMemoryLayout = resources.linker.canonicalLayouts().get("int");
-    floatMemoryLayout = resources.linker.canonicalLayouts().get("float");
-
-    initializeMethodHandles();
     this.hnswIndexReference = deserialize(inputStream);
-  }
-
-  /**
-   * Initializes the {@link MethodHandles} for invoking native methods.
-   *
-   * @throws IOException @{@link IOException} is unable to load the native library
-   */
-  private void initializeMethodHandles() throws IOException {
-    deserializeHnswIndexMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("deserialize_hnsw_index").get(), FunctionDescriptor.of(ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout));
-
-    searchHnswIndexMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("search_hnsw_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout, intMemoryLayout,
-            longMemoryLayout));
-
-    destroyHnswIndexMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("destroy_hnsw_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
   }
 
   /**
    * Invokes the native destroy_hnsw_index to de-allocate the HNSW index
    */
   public void destroyIndex() throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    destroyHnswIndexMethodHandle.invokeExact(hnswIndexReference.getMemorySegment(), returnValueMemorySegment);
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      destroyHnswIndexMethodHandle.invokeExact(hnswIndexReference.getMemorySegment(), returnValue);
+      checkError(returnValue.get(C_INT, 0L), "destroyHnswIndexMethodHandle");
+    }
   }
 
   /**
@@ -112,19 +98,28 @@ public class HnswIndex {
     long numBlocks = query.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
 
-    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, longMemoryLayout);
-    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, floatMemoryLayout);
-    MemorySegment neighborsMemorySegment = resources.arena.allocate(neighborsSequenceLayout);
-    MemorySegment distancesMemorySegment = resources.arena.allocate(distancesSequenceLayout);
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
+    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
+    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+    MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
+    MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
 
-    searchHnswIndexMethodHandle.invokeExact(resources.getMemorySegment(), hnswIndexReference.getMemorySegment(),
-        query.getHnswSearchParams().getHnswSearchParamsMemorySegment(), returnValueMemorySegment,
-        neighborsMemorySegment, distancesMemorySegment,
-        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), query.getTopK(),
-        vectorDimension, numQueries);
-
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment querySeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
+      searchHnswIndexMethodHandle.invokeExact(
+        resources.getMemorySegment(),
+        hnswIndexReference.getMemorySegment(),
+        query.getHnswSearchParams().getHnswSearchParamsMemorySegment(),
+        returnValue,
+        neighborsMemorySegment,
+        distancesMemorySegment,
+        querySeg,
+        query.getTopK(),
+        vectorDimension,
+        numQueries
+      );
+      checkError(returnValue.get(C_INT, 0L), "searchHnswIndexMethodHandle");
+    }
     return new HnswSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
         distancesMemorySegment, query.getTopK(), query.getMapping(), numQueries);
   }
@@ -150,28 +145,33 @@ public class HnswIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".hnsw";
 
     File tempFile = new File(tmpIndexFile);
-    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    byte[] chunk = new byte[bufferLength];
-    int chunkLength = 0;
-    while ((chunkLength = inputStream.read(chunk)) != -1) {
-      fileOutputStream.write(chunk, 0, chunkLength);
+    try (var in = inputStream;
+         FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      byte[] chunk = new byte[bufferLength];
+      int chunkLength;
+      while ((chunkLength = in.read(chunk)) != -1) {
+        fileOutputStream.write(chunk, 0, chunkLength);
+      }
+
+      try (var localArena = Arena.ofConfined()) {
+        MemorySegment returnValue = localArena.allocate(C_INT);
+        MemorySegment pathSeg = Util.buildMemorySegment(localArena, tmpIndexFile);
+        MemorySegment deserSeg = (MemorySegment) deserializeHnswIndexMethodHandle.invokeExact(
+          resources.getMemorySegment(),
+          pathSeg,
+          hnswIndexParams.getHnswIndexParamsMemorySegment(),
+          returnValue,
+          hnswIndexParams.getVectorDimension()
+        );
+        checkError(returnValue.get(C_INT, 0L), "deserializeHnswIndexMethodHandle");
+        return new IndexReference(deserSeg);
+      }
+    } finally {
+      tempFile.delete();
     }
-
-    IndexReference indexReference = new IndexReference((MemorySegment) deserializeHnswIndexMethodHandle.invokeExact(
-        resources.getMemorySegment(), Util.buildMemorySegment(resources.linker, resources.arena, tmpIndexFile),
-        hnswIndexParams.getHnswIndexParamsMemorySegment(), returnValueMemorySegment,
-        hnswIndexParams.getVectorDimension()));
-
-    inputStream.close();
-    fileOutputStream.close();
-    tempFile.delete();
-
-    return indexReference;
   }
 
   /**
@@ -237,7 +237,7 @@ public class HnswIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResources resources) {
-      memorySegment = CuVSHnswIndex.allocate(resources.arena);
+      memorySegment = CuVSHnswIndex.allocate(resources.getArena());
     }
 
     /**

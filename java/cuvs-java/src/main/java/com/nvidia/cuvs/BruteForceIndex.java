@@ -19,20 +19,25 @@ package com.nvidia.cuvs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
-import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
 import com.nvidia.cuvs.common.Util;
 import com.nvidia.cuvs.panama.CuVSBruteForceIndex;
+
+import static com.nvidia.cuvs.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
 
 /**
  *
@@ -43,18 +48,26 @@ import com.nvidia.cuvs.panama.CuVSBruteForceIndex;
  */
 public class BruteForceIndex {
 
+  private static final MethodHandle indexMethodHandle = downcallHandle("build_brute_force_index",
+      FunctionDescriptor.of(ADDRESS, ADDRESS, C_LONG, C_LONG, ADDRESS, ADDRESS, C_INT));
+
+  private static final MethodHandle searchMethodHandle = downcallHandle("search_brute_force_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG, C_LONG));
+
+  private static final MethodHandle destroyIndexMethodHandle = downcallHandle("destroy_brute_force_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
+
+  private static final MethodHandle serializeMethodHandle = downcallHandle("serialize_brute_force_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
+  private static final MethodHandle deserializeMethodHandle = downcallHandle("deserialize_brute_force_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
   private final float[][] dataset;
   private final CuVSResources resources;
-  private MethodHandle indexMethodHandle;
-  private MethodHandle searchMethodHandle;
-  private MethodHandle destroyIndexMethodHandle;
-  private MethodHandle serializeMethodHandle;
-  private MethodHandle deserializeMethodHandle;
-  private IndexReference bruteForceIndexReference;
-  private BruteForceIndexParams bruteForceIndexParams;
-  private MemoryLayout longMemoryLayout;
-  private MemoryLayout intMemoryLayout;
-  private MemoryLayout floatMemoryLayout;
+  private final IndexReference bruteForceIndexReference;
+  private final BruteForceIndexParams bruteForceIndexParams;
+  private boolean destroyed;
 
   /**
    * Constructor for building the index using specified dataset
@@ -70,12 +83,6 @@ public class BruteForceIndex {
     this.dataset = dataset;
     this.resources = resources;
     this.bruteForceIndexParams = bruteForceIndexParams;
-
-    longMemoryLayout = resources.linker.canonicalLayouts().get("long");
-    intMemoryLayout = resources.linker.canonicalLayouts().get("int");
-    floatMemoryLayout = resources.linker.canonicalLayouts().get("float");
-
-    initializeMethodHandles();
     this.bruteForceIndexReference = build();
   }
 
@@ -89,43 +96,13 @@ public class BruteForceIndex {
     this.bruteForceIndexParams = null;
     this.dataset = null;
     this.resources = resources;
-
-    longMemoryLayout = resources.linker.canonicalLayouts().get("long");
-    intMemoryLayout = resources.linker.canonicalLayouts().get("int");
-    floatMemoryLayout = resources.linker.canonicalLayouts().get("float");
-
-    initializeMethodHandles();
     this.bruteForceIndexReference = deserialize(inputStream);
   }
 
-  /**
-   * Initializes the {@link MethodHandles} for invoking native methods.
-   *
-   * @throws IOException @{@link IOException} is unable to load the native library
-   */
-  private void initializeMethodHandles() throws IOException {
-    indexMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("build_brute_force_index").get(),
-        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, longMemoryLayout, longMemoryLayout,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout));
-
-    searchMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("search_brute_force_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout, longMemoryLayout,
-            intMemoryLayout, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS, longMemoryLayout, longMemoryLayout));
-
-    destroyIndexMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("destroy_brute_force_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    serializeMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("serialize_brute_force_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    deserializeMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("deserialize_brute_force_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+  private void checkNotDestroyed() {
+    if (destroyed) {
+      throw new IllegalStateException("destroyed");
+    }
   }
 
   /**
@@ -133,9 +110,12 @@ public class BruteForceIndex {
    * BRUTEFORCE index
    */
   public void destroyIndex() throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    destroyIndexMethodHandle.invokeExact(bruteForceIndexReference.getMemorySegment(), returnValueMemorySegment);
+    checkNotDestroyed();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      destroyIndexMethodHandle.invokeExact(bruteForceIndexReference.getMemorySegment(), returnValue);
+      checkError(returnValue.get(C_INT, 0L), "destroyIndexMethodHandle");
+    }
   }
 
   /**
@@ -149,14 +129,20 @@ public class BruteForceIndex {
     long rows = dataset.length;
     long cols = rows > 0 ? dataset[0].length : 0;
 
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-
-    IndexReference indexReference = new IndexReference((MemorySegment) indexMethodHandle.invokeExact(
-        Util.buildMemorySegment(resources.linker, resources.arena, dataset), rows, cols, resources.getMemorySegment(),
-        returnValueMemorySegment, bruteForceIndexParams.getNumWriterThreads()));
-
-    return indexReference;
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment dataSeg = Util.buildMemorySegment(localArena, dataset);
+      MemorySegment indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
+        dataSeg,
+        rows,
+        cols,
+        resources.getMemorySegment(),
+        returnValue,
+        bruteForceIndexParams.getNumWriterThreads()
+      );
+      checkError(returnValue.get(C_INT, 0L), "indexMethodHandle");
+      return new IndexReference(indexSeg);
+    }
   }
 
   /**
@@ -168,29 +154,40 @@ public class BruteForceIndex {
    * @return an instance of {@link BruteForceSearchResults} containing the results
    */
   public BruteForceSearchResults search(BruteForceQuery cuvsQuery) throws Throwable {
+    checkNotDestroyed();
     long numQueries = cuvsQuery.getQueryVectors().length;
     long numBlocks = cuvsQuery.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? cuvsQuery.getQueryVectors()[0].length : 0;
     long prefilterDataLength = cuvsQuery.getPrefilter() != null ? cuvsQuery.getPrefilter().length : 0;
     long numRows = dataset != null ? dataset.length : 0;
 
-    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, longMemoryLayout);
-    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, floatMemoryLayout);
-    MemorySegment neighborsMemorySegment = resources.arena.allocate(neighborsSequenceLayout);
-    MemorySegment distancesMemorySegment = resources.arena.allocate(distancesSequenceLayout);
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
-        ? Util.buildMemorySegment(resources.linker, resources.arena, cuvsQuery.getPrefilter())
-        : MemorySegment.NULL;
-
-    searchMethodHandle.invokeExact(bruteForceIndexReference.getMemorySegment(),
-        Util.buildMemorySegment(resources.linker, resources.arena, cuvsQuery.getQueryVectors()), cuvsQuery.getTopK(),
-        numQueries, vectorDimension, resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
-        returnValueMemorySegment, prefilterDataMemorySegment, prefilterDataLength, numRows);
-
+    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
+    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+    MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
+    MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
+              ? Util.buildMemorySegment(localArena, cuvsQuery.getPrefilter())
+              : MemorySegment.NULL;
+      MemorySegment querySeg = Util.buildMemorySegment(localArena, cuvsQuery.getQueryVectors());
+      searchMethodHandle.invokeExact(
+        bruteForceIndexReference.getMemorySegment(),
+        querySeg,
+        cuvsQuery.getTopK(),
+        numQueries,
+        vectorDimension,
+        resources.getMemorySegment(),
+        neighborsMemorySegment,
+        distancesMemorySegment,
+        returnValue,
+        prefilterDataMemorySegment,
+        prefilterDataLength, numRows
+      );
+      checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
+    }
     return new BruteForceSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
-        distancesMemorySegment, cuvsQuery.getTopK(), cuvsQuery.getMapping(), numQueries);
+            distancesMemorySegment, cuvsQuery.getTopK(), cuvsQuery.getMapping(), numQueries);
   }
 
   /**
@@ -214,19 +211,24 @@ public class BruteForceIndex {
    *                     written temporarily
    */
   public void serialize(OutputStream outputStream, File tempFile) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    serializeMethodHandle.invokeExact(resources.getMemorySegment(), bruteForceIndexReference.getMemorySegment(),
-        returnValueMemorySegment,
-        Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
-    FileInputStream fileInputStream = new FileInputStream(tempFile);
-    byte[] chunk = new byte[1024]; // TODO: Make this configurable
-    int chunkLength = 0;
-    while ((chunkLength = fileInputStream.read(chunk)) != -1) {
-      outputStream.write(chunk, 0, chunkLength);
+    checkNotDestroyed();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment pathSeg = Util.buildMemorySegment(localArena, tempFile.getAbsolutePath());
+      serializeMethodHandle.invokeExact(
+        resources.getMemorySegment(),
+        bruteForceIndexReference.getMemorySegment(),
+        returnValue,
+        pathSeg
+      );
+      checkError(returnValue.get(C_INT, 0L), "serializeMethodHandle");
+
+      try (FileInputStream fileInputStream = new FileInputStream(tempFile)) {
+        fileInputStream.transferTo(outputStream);
+      } finally {
+        tempFile.delete();
+      }
     }
-    fileInputStream.close();
-    tempFile.delete();
   }
 
   /**
@@ -237,25 +239,28 @@ public class BruteForceIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
+    checkNotDestroyed();
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".bf";
     IndexReference indexReference = new IndexReference(resources);
 
     File tempFile = new File(tmpIndexFile);
-    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    byte[] chunk = new byte[1024];
-    int chunkLength = 0;
-    while ((chunkLength = inputStream.read(chunk)) != -1) {
-      fileOutputStream.write(chunk, 0, chunkLength);
+    try (var in = inputStream;
+         FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      in.transferTo(fileOutputStream);
+      try (var localArena = Arena.ofConfined()) {
+        MemorySegment returnValue = localArena.allocate(C_INT);
+        MemorySegment pathSeg = Util.buildMemorySegment(localArena, tmpIndexFile);
+        deserializeMethodHandle.invokeExact(
+          resources.getMemorySegment(),
+          indexReference.getMemorySegment(),
+          returnValue,
+          pathSeg
+        );
+        checkError(returnValue.get(C_INT, 0L), "deserializeMethodHandle");
+      }
+    } finally {
+      tempFile.delete();
     }
-    deserializeMethodHandle.invokeExact(resources.getMemorySegment(), indexReference.getMemorySegment(),
-        returnValueMemorySegment, Util.buildMemorySegment(resources.linker, resources.arena, tmpIndexFile));
-
-    inputStream.close();
-    fileOutputStream.close();
-    tempFile.delete();
-
     return indexReference;
   }
 
@@ -265,7 +270,7 @@ public class BruteForceIndex {
   public static class Builder {
 
     private float[][] dataset;
-    private CuVSResources cuvsResources;
+    private final CuVSResources cuvsResources;
     private BruteForceIndexParams bruteForceIndexParams;
     private InputStream inputStream;
 
@@ -338,7 +343,7 @@ public class BruteForceIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResources resources) {
-      memorySegment = CuVSBruteForceIndex.allocate(resources.arena);
+      memorySegment = CuVSBruteForceIndex.allocate(resources.getArena());
     }
 
     /**

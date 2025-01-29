@@ -52,7 +52,7 @@ public class HnswSearchParams {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuVSHnswSearchParams.allocate(resources.arena);
+    MemorySegment memorySegment = CuVSHnswSearchParams.allocate(resources.getArena());
     CuVSHnswSearchParams.ef(memorySegment, ef);
     CuVSHnswSearchParams.num_threads(memorySegment, numThreads);
     return memorySegment;

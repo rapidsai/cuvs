@@ -16,17 +16,15 @@
 
 package com.nvidia.cuvs;
 
-import java.io.File;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.Linker;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SymbolLookup;
-import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 
-import com.nvidia.cuvs.common.Util;
+import static com.nvidia.cuvs.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
 
 /**
  * Used for allocating resources for cuVS
@@ -35,14 +33,17 @@ import com.nvidia.cuvs.common.Util;
  */
 public class CuVSResources implements AutoCloseable {
 
-  public final Arena arena;
-  public final Linker linker;
-  public final SymbolLookup symbolLookup;
-  protected File nativeLibrary;
-  private final MethodHandle createResourcesMethodHandle;
-  private final MethodHandle destroyResourcesMethodHandle;
-  private MemorySegment resourcesMemorySegment;
-  private MemoryLayout intMemoryLayout;
+  static final MethodHandle createResourcesMethodHandle = downcallHandle(
+      "create_resources", FunctionDescriptor.of(ADDRESS, ADDRESS)
+  );
+
+  private static final MethodHandle destroyResourcesMethodHandle = downcallHandle(
+       "destroy_resources", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)
+  );
+
+  private final Arena arena;
+  private final MemorySegment resourcesMemorySegment;
+  private boolean destroyed;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -50,46 +51,35 @@ public class CuVSResources implements AutoCloseable {
    * @throws Throwable exception thrown when native function is invoked
    */
   public CuVSResources() throws Throwable {
-    linker = Linker.nativeLinker();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      resourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValue);
+      checkError(returnValue.get(C_INT, 0L), "createResourcesMethodHandle");
+    }
     arena = Arena.ofShared();
-
-    nativeLibrary = Util.loadNativeLibrary();
-    symbolLookup = SymbolLookup.libraryLookup(nativeLibrary.getAbsolutePath(), arena);
-    intMemoryLayout = linker.canonicalLayouts().get("int");
-
-    createResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("create_resources").get(),
-        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    destroyResourcesMethodHandle = linker.downcallHandle(symbolLookup.find("destroy_resources").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    createResources();
-  }
-
-  /**
-   * Creates the resources used internally and returns its reference.
-   *
-   * @throws Throwable exception thrown when native function is invoked
-   */
-  public void createResources() throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-    resourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValueMemorySegment);
   }
 
   @Override
   public void close() {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = arena.allocate(returnValueMemoryLayout);
-    try {
-      destroyResourcesMethodHandle.invokeExact(resourcesMemorySegment, returnValueMemorySegment);
+    checkNotDestroyed();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      destroyResourcesMethodHandle.invokeExact(resourcesMemorySegment, returnValue);
+      checkError(returnValue.get(C_INT, 0L), "destroyResourcesMethodHandle");
     } catch (Throwable e) {
       e.printStackTrace();
+    } finally {
+      destroyed = true;
     }
     if (!arena.scope().isAlive()) {
       arena.close();
     }
-    nativeLibrary.delete();
+  }
+
+  private void checkNotDestroyed() {
+    if (destroyed) {
+      throw new IllegalStateException("destroyed");
+    }
   }
 
   /**
@@ -98,14 +88,16 @@ public class CuVSResources implements AutoCloseable {
    * @return cuvsResources MemorySegment
    */
   protected MemorySegment getMemorySegment() {
+    checkNotDestroyed();
     return resourcesMemorySegment;
   }
 
   /**
-   * Returns the loaded libcuvs_java_cagra.so as a {@link SymbolLookup}
+   * The allocation arena used by this resources.
    */
-  protected SymbolLookup getSymbolLookup() {
-    return symbolLookup;
+  protected Arena getArena() {
+    checkNotDestroyed();
+    return arena;
   }
 
   /**

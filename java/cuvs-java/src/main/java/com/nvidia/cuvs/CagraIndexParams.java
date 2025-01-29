@@ -179,7 +179,7 @@ public class CagraIndexParams {
   }
 
   private MemorySegment initMemorySegment() {
-    MemorySegment indexParamsMemorySegment = CuVSCagraIndexParams.allocate(resources.arena);
+    MemorySegment indexParamsMemorySegment = CuVSCagraIndexParams.allocate(resources.getArena());
     CuVSCagraIndexParams.intermediate_graph_degree(indexParamsMemorySegment, intermediateGraphDegree);
     CuVSCagraIndexParams.graph_degree(indexParamsMemorySegment, graphDegree);
     CuVSCagraIndexParams.build_algo(indexParamsMemorySegment, cuvsCagraGraphBuildAlgo.value);

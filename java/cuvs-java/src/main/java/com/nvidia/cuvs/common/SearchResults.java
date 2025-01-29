@@ -12,8 +12,7 @@ public abstract class SearchResults {
 
   protected final List<Map<Integer, Float>> results;
   protected final List<Integer> mapping; // TODO: Is this performant in a user application?
-  protected final SequenceLayout neighboursSequenceLayout;
-  protected final SequenceLayout distancesSequenceLayout;
+
   protected final MemorySegment neighboursMemorySegment;
   protected final MemorySegment distancesMemorySegment;
   protected final int topK;
@@ -26,8 +25,6 @@ public abstract class SearchResults {
       long numberOfQueries) {
     this.topK = topK;
     this.numberOfQueries = numberOfQueries;
-    this.neighboursSequenceLayout = neighboursSequenceLayout;
-    this.distancesSequenceLayout = distancesSequenceLayout;
     this.neighboursMemorySegment = neighboursMemorySegment;
     this.distancesMemorySegment = distancesMemorySegment;
     this.mapping = mapping;

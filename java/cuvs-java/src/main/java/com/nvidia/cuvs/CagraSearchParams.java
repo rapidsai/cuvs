@@ -152,7 +152,7 @@ public class CagraSearchParams {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuVSCagraSearchParams.allocate(resources.arena);
+    MemorySegment memorySegment = CuVSCagraSearchParams.allocate(resources.getArena());
     CuVSCagraSearchParams.max_queries(memorySegment, maxQueries);
     CuVSCagraSearchParams.itopk_size(memorySegment, iTopKSize);
     CuVSCagraSearchParams.max_iterations(memorySegment, maxIterations);

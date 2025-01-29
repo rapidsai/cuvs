@@ -19,20 +19,25 @@ package com.nvidia.cuvs;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
-import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
 import com.nvidia.cuvs.common.Util;
 import com.nvidia.cuvs.panama.CuVSCagraIndex;
+
+import static com.nvidia.cuvs.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
 
 /**
  * {@link CagraIndex} encapsulates a CAGRA index, along with methods to interact
@@ -48,20 +53,30 @@ import com.nvidia.cuvs.panama.CuVSCagraIndex;
  */
 public class CagraIndex {
 
+  private static final MethodHandle indexMethodHandle = downcallHandle("build_cagra_index",
+      FunctionDescriptor.of(ADDRESS, ADDRESS, C_LONG, C_LONG, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_INT));
+
+  private static final MethodHandle searchMethodHandle = downcallHandle("search_cagra_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
+  private static final MethodHandle serializeMethodHandle = downcallHandle("serialize_cagra_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
+  private static final MethodHandle deserializeMethodHandle = downcallHandle("deserialize_cagra_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
+  private static final MethodHandle destroyIndexMethodHandle = downcallHandle("destroy_cagra_index",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
+
+  private static final MethodHandle serializeCAGRAIndexToHNSWMethodHandle = downcallHandle("serialize_cagra_index_to_hnsw",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
   private final float[][] dataset;
   private final CuVSResources resources;
-  private MethodHandle indexMethodHandle;
-  private MethodHandle searchMethodHandle;
-  private MethodHandle serializeMethodHandle;
-  private MethodHandle deserializeMethodHandle;
-  private MethodHandle destroyIndexMethodHandle;
-  private MethodHandle serializeCAGRAIndexToHNSWMethodHandle;
-  private CagraIndexParams cagraIndexParameters;
-  private CagraCompressionParams cagraCompressionParams;
-  private IndexReference cagraIndexReference;
-  private MemoryLayout longMemoryLayout;
-  private MemoryLayout intMemoryLayout;
-  private MemoryLayout floatMemoryLayout;
+  private final CagraIndexParams cagraIndexParameters;
+  private final CagraCompressionParams cagraCompressionParams;
+  private final IndexReference cagraIndexReference;
+  private boolean destroyed;
 
   /**
    * Constructor for building the index using specified dataset
@@ -79,12 +94,6 @@ public class CagraIndex {
     this.cagraCompressionParams = cagraCompressionParams;
     this.dataset = dataset;
     this.resources = resources;
-
-    longMemoryLayout = resources.linker.canonicalLayouts().get("long");
-    intMemoryLayout = resources.linker.canonicalLayouts().get("int");
-    floatMemoryLayout = resources.linker.canonicalLayouts().get("float");
-
-    initializeMethodHandles();
     this.cagraIndexReference = build();
   }
 
@@ -99,55 +108,27 @@ public class CagraIndex {
     this.cagraCompressionParams = null;
     this.dataset = null;
     this.resources = resources;
-
-    longMemoryLayout = resources.linker.canonicalLayouts().get("long");
-    intMemoryLayout = resources.linker.canonicalLayouts().get("int");
-    floatMemoryLayout = resources.linker.canonicalLayouts().get("float");
-
-    initializeMethodHandles();
     this.cagraIndexReference = deserialize(inputStream);
   }
 
-  /**
-   * Initializes the {@link MethodHandles} for invoking native methods.
-   *
-   * @throws IOException @{@link IOException} is unable to load the native library
-   */
-  private void initializeMethodHandles() throws IOException {
-    indexMethodHandle = resources.linker.downcallHandle(resources.getSymbolLookup().find("build_cagra_index").get(),
-        FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, longMemoryLayout, longMemoryLayout,
-            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout));
-
-    searchMethodHandle = resources.linker.downcallHandle(resources.getSymbolLookup().find("search_cagra_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, intMemoryLayout, longMemoryLayout,
-            intMemoryLayout, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-            ValueLayout.ADDRESS));
-
-    serializeMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("serialize_cagra_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    deserializeMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("deserialize_cagra_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    destroyIndexMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("destroy_cagra_index").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
-    serializeCAGRAIndexToHNSWMethodHandle = resources.linker.downcallHandle(
-        resources.getSymbolLookup().find("serialize_cagra_index_to_hnsw").get(),
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
-
+  private void checkNotDestroyed() {
+    if (destroyed) {
+      throw new IllegalStateException("destroyed");
+    }
   }
 
   /**
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
   public void destroyIndex() throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    destroyIndexMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(), returnValueMemorySegment);
+    checkNotDestroyed();
+    try (var arena = Arena.ofConfined()) {
+      MemorySegment returnValue = arena.allocate(C_INT);
+      destroyIndexMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(), returnValue);
+      checkError(returnValue.get(C_INT, 0L), "destroyIndexMethodHandle");
+    } finally {
+      destroyed = true;
+    }
   }
 
   /**
@@ -161,9 +142,6 @@ public class CagraIndex {
     long rows = dataset.length;
     long cols = rows > 0 ? dataset[0].length : 0;
 
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-
     MemorySegment indexParamsMemorySegment = cagraIndexParameters != null ? cagraIndexParameters.getMemorySegment()
         : MemorySegment.NULL;
 
@@ -173,11 +151,22 @@ public class CagraIndex {
         ? cagraCompressionParams.getMemorySegment()
         : MemorySegment.NULL;
 
-    IndexReference indexReference = new IndexReference((MemorySegment) indexMethodHandle.invokeExact(
-        Util.buildMemorySegment(resources.linker, resources.arena, dataset), rows, cols, resources.getMemorySegment(),
-        returnValueMemorySegment, indexParamsMemorySegment, compressionParamsMemorySegment, numWriterThreads));
-
-    return indexReference;
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment dataSeg = Util.buildMemorySegment(localArena, dataset);
+      var indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
+        dataSeg,
+        rows,
+        cols,
+        resources.getMemorySegment(),
+        returnValue,
+        indexParamsMemorySegment,
+        compressionParamsMemorySegment,
+        numWriterThreads
+      );
+      checkError(returnValue.get(C_INT, 0L), "indexMethodHandle");
+      return new IndexReference(indexSeg);
+    }
   }
 
   /**
@@ -189,23 +178,33 @@ public class CagraIndex {
    * @return an instance of {@link CagraSearchResults} containing the results
    */
   public CagraSearchResults search(CagraQuery query) throws Throwable {
+    checkNotDestroyed();
     int topK = query.getMapping() != null ? Math.min(query.getMapping().size(), query.getTopK()) : query.getTopK();
     long numQueries = query.getQueryVectors().length;
     long numBlocks = topK * numQueries;
     int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
 
-    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, intMemoryLayout);
-    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, floatMemoryLayout);
-    MemorySegment neighborsMemorySegment = resources.arena.allocate(neighborsSequenceLayout);
-    MemorySegment distancesMemorySegment = resources.arena.allocate(distancesSequenceLayout);
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-
-    searchMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(),
-        Util.buildMemorySegment(resources.linker, resources.arena, query.getQueryVectors()), topK, numQueries,
-        vectorDimension, resources.getMemorySegment(), neighborsMemorySegment, distancesMemorySegment,
-        returnValueMemorySegment, query.getCagraSearchParameters().getMemorySegment());
-
+    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
+    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+    MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
+    MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment floatsSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
+      searchMethodHandle.invokeExact(
+        cagraIndexReference.getMemorySegment(),
+        floatsSeg,
+        topK,
+        numQueries,
+        vectorDimension,
+        resources.getMemorySegment(),
+        neighborsMemorySegment,
+        distancesMemorySegment,
+        returnValue,
+        query.getCagraSearchParameters().getMemorySegment()
+      );
+      checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
+    }
     return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
         distancesMemorySegment, topK, query.getMapping(), numQueries);
   }
@@ -259,19 +258,28 @@ public class CagraIndex {
    *                     value is 1024
    */
   public void serialize(OutputStream outputStream, File tempFile, int bufferLength) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    serializeMethodHandle.invokeExact(resources.getMemorySegment(), cagraIndexReference.getMemorySegment(),
-        returnValueMemorySegment,
-        Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()));
-    FileInputStream fileInputStream = new FileInputStream(tempFile);
-    byte[] chunk = new byte[bufferLength];
-    int chunkLength = 0;
-    while ((chunkLength = fileInputStream.read(chunk)) != -1) {
-      outputStream.write(chunk, 0, chunkLength);
+    checkNotDestroyed();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment pathSeg = Util.buildMemorySegment(localArena, tempFile.getAbsolutePath());
+      serializeMethodHandle.invokeExact(
+        resources.getMemorySegment(),
+        cagraIndexReference.getMemorySegment(),
+        returnValue,
+        pathSeg
+      );
+      checkError(returnValue.get(C_INT, 0L), "serializeMethodHandle");
+
+      try (FileInputStream fileInputStream = new FileInputStream(tempFile)) {
+        byte[] chunk = new byte[bufferLength];
+        int chunkLength = 0;
+        while ((chunkLength = fileInputStream.read(chunk)) != -1) {
+          outputStream.write(chunk, 0, chunkLength);
+        }
+      } finally {
+        tempFile.delete();
+      }
     }
-    fileInputStream.close();
-    tempFile.delete();
   }
 
   /**
@@ -323,19 +331,28 @@ public class CagraIndex {
    *                     value is 1024
    */
   public void serializeToHNSW(OutputStream outputStream, File tempFile, int bufferLength) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
-    serializeCAGRAIndexToHNSWMethodHandle.invokeExact(resources.getMemorySegment(),
-        Util.buildMemorySegment(resources.linker, resources.arena, tempFile.getAbsolutePath()),
-        cagraIndexReference.getMemorySegment(), returnValueMemorySegment);
-    FileInputStream fileInputStream = new FileInputStream(tempFile);
-    byte[] chunk = new byte[bufferLength];
-    int chunkLength = 0;
-    while ((chunkLength = fileInputStream.read(chunk)) != -1) {
-      outputStream.write(chunk, 0, chunkLength);
+    checkNotDestroyed();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment returnValue = localArena.allocate(C_INT);
+      MemorySegment pathSeg = Util.buildMemorySegment(localArena, tempFile.getAbsolutePath());
+      serializeCAGRAIndexToHNSWMethodHandle.invokeExact(
+        resources.getMemorySegment(),
+        pathSeg,
+        cagraIndexReference.getMemorySegment(),
+        returnValue
+      );
+      checkError(returnValue.get(C_INT, 0L), "serializeCAGRAIndexToHNSWMethodHandle");
+
+      try (FileInputStream fileInputStream = new FileInputStream(tempFile)) {
+        byte[] chunk = new byte[bufferLength];
+        int chunkLength;
+        while ((chunkLength = fileInputStream.read(chunk)) != -1) {
+          outputStream.write(chunk, 0, chunkLength);
+        }
+      } finally {
+        tempFile.delete();
+      }
     }
-    fileInputStream.close();
-    tempFile.delete();
   }
 
   /**
@@ -359,25 +376,27 @@ public class CagraIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
-    MemoryLayout returnValueMemoryLayout = intMemoryLayout;
-    MemorySegment returnValueMemorySegment = resources.arena.allocate(returnValueMemoryLayout);
     String tmpIndexFile = "/tmp/" + UUID.randomUUID().toString() + ".cag";
     IndexReference indexReference = new IndexReference(resources);
 
     File tempFile = new File(tmpIndexFile);
-    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-    byte[] chunk = new byte[bufferLength];
-    int chunkLength = 0;
-    while ((chunkLength = inputStream.read(chunk)) != -1) {
-      fileOutputStream.write(chunk, 0, chunkLength);
+    try (var in = inputStream;
+         FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      in.transferTo(fileOutputStream);
+      try (var localArena = Arena.ofConfined()) {
+        MemorySegment returnValue = localArena.allocate(C_INT);
+        MemorySegment pathSeg = Util.buildMemorySegment(localArena, tmpIndexFile);
+        deserializeMethodHandle.invokeExact(
+          resources.getMemorySegment(),
+          indexReference.getMemorySegment(),
+          returnValue,
+          pathSeg
+        );
+        checkError(returnValue.get(C_INT, 0L), "deserializeMethodHandle");
+      }
+    } finally {
+      tempFile.delete();
     }
-    deserializeMethodHandle.invokeExact(resources.getMemorySegment(), indexReference.getMemorySegment(),
-        returnValueMemorySegment, Util.buildMemorySegment(resources.linker, resources.arena, tmpIndexFile));
-
-    inputStream.close();
-    fileOutputStream.close();
-    tempFile.delete();
-
     return indexReference;
   }
 
@@ -491,7 +510,7 @@ public class CagraIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResources resources) {
-      memorySegment = CuVSCagraIndex.allocate(resources.arena);
+      memorySegment = CuVSCagraIndex.allocate(resources.getArena());
     }
 
     /**
