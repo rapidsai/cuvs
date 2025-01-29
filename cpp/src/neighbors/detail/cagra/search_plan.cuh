@@ -207,7 +207,7 @@ struct search_plan_impl : public search_plan_impl_base {
       }
       int64_t num_reachable_nodes = 1;
       while (num_reachable_nodes < dataset_size) {
-        num_reachable_nodes *= graph_degree / 2;
+        num_reachable_nodes *= max((int64_t)2, graph_degree / 2);
         _max_iterations += 1;
       }
     }
