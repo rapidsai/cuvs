@@ -382,6 +382,18 @@ void bench_search(::benchmark::State& state,
         size_t i_orig_idx = batch_offset + i;
         size_t i_out_idx  = out_offset + i;
         if (i_out_idx < rows) {
+          /* NOTE: recall correctness & filtering
+
+          In the loop below, we filter the ground truth values on-the-fly.
+          We need enough ground truth values to compute recall correctly though.
+          But the ground truth file only contains `max_k` values per row; if there are less valid
+          values than k among them, we overestimate the recall. Essentially, we compare the first
+          `filter_pass_count` values of the algorithm output, and this counter can be less than `k`.
+          In the extreme case of very high filtering rate, we may be bypassing entire rows of
+          results. However, this is still better than no recall estimate at all.
+
+          TODO: consider generating the filtered ground truth on-the-fly
+          */
           uint32_t filter_pass_count = 0;
           for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
             auto exp_idx = gt[i_orig_idx * max_k + l];
@@ -402,6 +414,12 @@ void bench_search(::benchmark::State& state,
       batch_offset = (batch_offset + queries_stride) % query_set_size;
     }
     double actual_recall = static_cast<double>(match_count) / static_cast<double>(total_count);
+    /* NOTE: recall in the throughput mode & filtering
+
+    When filtering is enabled, `total_count` may vary between individual threads, but we still take
+    the simple average across in-thread recalls. Strictly speaking, this is incorrect, but it's good
+    enough under assumption that the filtering is more-or-less uniform.
+    */
     state.counters.insert({"Recall", {actual_recall, benchmark::Counter::kAvgThreads}});
   }
 }
