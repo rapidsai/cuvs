@@ -77,7 +77,7 @@ function(ConfigureTest)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
   endif()
 
-  target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/test>")
+  target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/tests>")
 
   rapids_test_add(
     NAME ${TEST_NAME}

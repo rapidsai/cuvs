@@ -20,6 +20,7 @@ list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA "Include faiss' cagra algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
        ON
@@ -287,18 +288,28 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA AND CUVS_FAISS_ENABLE_GPU)
+  ConfigureAnnBench(
+    NAME FAISS_GPU_CAGRA PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
   )
 endif()
 
