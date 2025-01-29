@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,526 +19,876 @@
 #include "util.hpp"
 
 #include <cerrno>
+#include <linux/mman.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
-#include <vector>
+#include <variant>
 
 namespace cuvs::bench {
 
-// http://big-algo-benchmarks.com/index.html:
-// binary format that starts with 8 bytes of data consisting of num_points(uint32_t)
-// num_dimensions(uint32) followed by num_pts x num_dimensions x sizeof(type) bytes of
-// data stored one vector after another.
-// Data files will have suffixes .fbin, .u8bin, and .i8bin to represent float32, uint8
-// and int8 type data.
-// As extensions for this benchmark, half and int data files will have suffixes .f16bin
-// and .ibin, respectively.
-template <typename T>
-class bin_file {
+/** RAII wrapper for a file descriptor. */
+struct file_descriptor {
+  explicit file_descriptor(std::string file_name) : fd_{std::fopen(file_name.c_str(), "r")} {}
+
+  explicit file_descriptor(size_t file_size_bytes) : fd_{std::tmpfile()}
+  {
+    if (ftruncate(fileno(fd_), file_size_bytes) == -1) {
+      throw std::runtime_error(
+        "cuvs::bench::file_descriptor: failed to call `ftruncate` to allocate memory for a "
+        "temporary file.");
+    }
+  }
+
+  // No copies for owning struct
+  file_descriptor(const file_descriptor& res)                      = delete;
+  auto operator=(const file_descriptor& other) -> file_descriptor& = delete;
+  // Moving is fine
+  file_descriptor(file_descriptor&& other) : fd_{std::exchange(other.fd_, nullptr)} {}
+  auto operator=(file_descriptor&& other) -> file_descriptor&
+  {
+    std::swap(this->fd_, other.fd_);
+    return *this;
+  }
+
+  ~file_descriptor() noexcept
+  {
+    if (fd_ != nullptr) { std::fclose(fd_); }
+  }
+
+  [[nodiscard]] auto value() const -> FILE* { return fd_; }
+
+ private:
+  FILE* fd_ = nullptr;
+};
+
+class mmap_error : public std::runtime_error {
+ private:
+  int errno_;
+
  public:
-  bin_file(std::string file,
-           const std::string& mode,
-           uint32_t subset_first_row = 0,
-           uint32_t subset_size      = 0);
-  ~bin_file()
+  mmap_error()
+    : std::runtime_error("cuvs::bench::mmap_owner: `mmap` error: Value of errno " +
+                         std::to_string(errno) + ", " + std::string(strerror(errno))),
+      errno_(errno)
   {
-    if (mapped_ptr_ != nullptr) { unmap(); }
-    if (fp_ != nullptr) { fclose(fp_); }
-  }
-  bin_file(const bin_file&)                    = delete;
-  auto operator=(const bin_file&) -> bin_file& = delete;
-
-  void get_shape(size_t* nrows, int* ndims) const
-  {
-    assert(read_mode_);
-    if (!fp_) { open_file(); }
-    *nrows = nrows_;
-    *ndims = ndims_;
   }
 
-  void read(T* data) const
+  [[nodiscard]] auto code() const noexcept { return errno_; }
+};
+
+/** RAII wrapper for a mmap/munmap. */
+struct mmap_owner {
+  /** Map a file */
+  mmap_owner(
+    const file_descriptor& descriptor, size_t offset, size_t size, int flags, bool writable = false)
+    : ptr_{mmap_verbose(size,
+                        writable ? PROT_READ | PROT_WRITE : PROT_READ,
+                        flags,
+                        fileno(descriptor.value()),
+                        offset)},
+      size_{size}
   {
-    assert(read_mode_);
-    if (!fp_) { open_file(); }
-    size_t total = static_cast<size_t>(nrows_) * ndims_;
-    if (fread(data, sizeof(T), total, fp_) != total) {
-      throw std::runtime_error{"fread() bin_file " + file_ + " failed"};
+  }
+
+  /** Allocate a new memory (not backed by a file). */
+  mmap_owner(size_t size, int flags)
+    : ptr_{mmap_verbose(size, PROT_READ | PROT_WRITE, flags, -1, 0)}, size_{size}
+  {
+  }
+
+  ~mmap_owner() noexcept
+  {
+    if (ptr_ != nullptr) { munmap(ptr_, size_); }
+  }
+
+  // No copies for owning struct
+  mmap_owner(const mmap_owner& res)                      = delete;
+  auto operator=(const mmap_owner& other) -> mmap_owner& = delete;
+  // Moving is fine
+  mmap_owner(mmap_owner&& other)
+    : ptr_{std::exchange(other.ptr_, nullptr)}, size_{std::exchange(other.size_, 0)}
+  {
+  }
+  auto operator=(mmap_owner&& other) -> mmap_owner&
+  {
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
+    return *this;
+  }
+
+  [[nodiscard]] auto data() const -> void* { return ptr_; }
+  [[nodiscard]] auto size() const -> size_t { return size_; }
+
+ private:
+  void* ptr_;
+  size_t size_;
+
+  static inline auto mmap_verbose(size_t length, int prot, int flags, int fd, off_t offset) -> void*
+  {
+    auto ptr = mmap(nullptr, length, prot, flags, fd, offset);
+    if (ptr == MAP_FAILED) {
+      log_error("cuvs::bench::mmap_owner:mmap(nullptr, %zu, 0x%08x, 0x%08x, %d, %zd)",
+                length,
+                prot,
+                flags,
+                fd,
+                offset);
+      throw mmap_error{};
+    }
+    return ptr;
+  }
+};
+
+/** RAII wrapper for managed memory. */
+struct managed_mem_owner {
+  explicit managed_mem_owner(size_t size) : size_{size}
+  {
+#ifndef BUILD_CPU_ONLY
+    auto err_code = cudaMallocManaged(&ptr_, size_);
+    if (err_code != cudaSuccess) {
+      ptr_ = nullptr;
+      throw std::runtime_error{
+        "cuvs::bench::managed_mem_owner: call to cudaMallocManaged failed with code " +
+        std::to_string(err_code)};
+    }
+#else
+    throw std::runtime_error{
+      "Device functions are not available when built with BUILD_CPU_ONLY flag."};
+#endif
+  }
+
+  ~managed_mem_owner() noexcept
+  {
+    if (ptr_ != nullptr) {
+#ifndef BUILD_CPU_ONLY
+      cudaFree(ptr_);
+#endif
     }
   }
 
-  void write(const T* data, uint32_t nrows, uint32_t ndims)
+  // No copies for owning struct
+  managed_mem_owner(const managed_mem_owner& res)                      = delete;
+  auto operator=(const managed_mem_owner& other) -> managed_mem_owner& = delete;
+  // Moving is fine
+  managed_mem_owner(managed_mem_owner&& other)
+    : ptr_{std::exchange(other.ptr_, nullptr)}, size_{std::exchange(other.size_, 0)}
   {
-    assert(!read_mode_);
-    if (!fp_) { open_file(); }
-    if (fwrite(&nrows, sizeof(uint32_t), 1, fp_) != 1) {
-      throw std::runtime_error{"fwrite() bin_file " + file_ + " failed"};
-    }
-    if (fwrite(&ndims, sizeof(uint32_t), 1, fp_) != 1) {
-      throw std::runtime_error{"fwrite() bin_file " + file_ + " failed"};
-    }
-
-    size_t total = static_cast<size_t>(nrows) * ndims;
-    if (fwrite(data, sizeof(T), total, fp_) != total) {
-      throw std::runtime_error{"fwrite() bin_file " + file_ + " failed"};
-    }
+  }
+  auto operator=(managed_mem_owner&& other) -> managed_mem_owner&
+  {
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
+    return *this;
   }
 
-  auto map() const -> T*
+  [[nodiscard]] auto data() const -> void* { return ptr_; }
+  [[nodiscard]] auto size() const -> size_t { return size_; }
+
+ private:
+  void* ptr_ = nullptr;
+  size_t size_;
+};
+
+/** RAII wrapper for managed memory. */
+struct device_mem_owner {
+  explicit device_mem_owner(size_t size) : size_{size}
   {
-    assert(read_mode_);
-    if (!fp_) { open_file(); }
-    int fid     = fileno(fp_);
-    mapped_ptr_ = mmap(nullptr, file_size_, PROT_READ, MAP_PRIVATE, fid, 0);
-    if (mapped_ptr_ == MAP_FAILED) {
-      mapped_ptr_ = nullptr;
-      throw std::runtime_error{"mmap error: Value of errno " + std::to_string(errno) + ", " +
-                               std::string(strerror(errno))};
+#ifndef BUILD_CPU_ONLY
+    auto err_code = cudaMalloc(&ptr_, size_);
+    if (err_code != cudaSuccess) {
+      ptr_ = nullptr;
+      throw std::runtime_error{
+        "cuvs::bench::device_mem_owner: call to cudaMalloc failed with code " +
+        std::to_string(err_code)};
     }
-    return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(mapped_ptr_) + 2 * sizeof(uint32_t) +
-                                subset_first_row_ * ndims_ * sizeof(T));
+#else
+    throw std::runtime_error{
+      "Device functions are not available when built with BUILD_CPU_ONLY flag."};
+#endif
+  }
+  ~device_mem_owner() noexcept
+  {
+    if (ptr_ != nullptr) {
+#ifndef BUILD_CPU_ONLY
+      cudaFree(ptr_);
+#endif
+    }
+  }
+  // No copies for owning struct
+  device_mem_owner(const device_mem_owner& res)                      = delete;
+  auto operator=(const device_mem_owner& other) -> device_mem_owner& = delete;
+  // Moving is fine
+  device_mem_owner(device_mem_owner&& other)
+    : ptr_{std::exchange(other.ptr_, nullptr)}, size_{std::exchange(other.size_, 0)}
+  {
+  }
+  auto operator=(device_mem_owner&& other) -> device_mem_owner&
+  {
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
+    return *this;
   }
 
-  void unmap() const
+  [[nodiscard]] auto data() const -> void* { return ptr_; }
+  [[nodiscard]] auto size() const -> size_t { return size_; }
+
+ private:
+  void* ptr_ = nullptr;
+  size_t size_;
+};
+
+/** Lazy-initialized file handle. */
+struct file {
+  explicit file(std::string file_name) : reqsize_or_name_{std::move(file_name)} {}
+  explicit file(size_t tmp_size_bytes) : reqsize_or_name_{tmp_size_bytes} {}
+
+  // this shouldn't be necessary, but adds extra safety (make sure descriptors are not copied)
+  file(const file&)                    = delete;
+  auto operator=(const file&) -> file& = delete;
+  file(file&&);
+  auto operator=(file&&) -> file&;
+
+  [[nodiscard]] auto descriptor() const -> const file_descriptor&
   {
-    if (munmap(mapped_ptr_, file_size_) == -1) {
-      throw std::runtime_error{"munmap error: " + std::string(strerror(errno))};
+    if (!descriptor_.has_value()) {
+      std::visit([&d = descriptor_](auto&& x) { d.emplace(x); }, reqsize_or_name_);
     }
+    return descriptor_.value();
+  }
+
+  [[nodiscard]] auto path() const -> std::string
+  {
+    return std::holds_alternative<std::string>(reqsize_or_name_)
+             ? std::get<std::string>(reqsize_or_name_)
+             : "<temporary>";
+  }
+
+  [[nodiscard]] auto size() const -> size_t
+  {
+    if (!size_.has_value()) {
+      size_.emplace(std::visit(
+        [&s = size_](auto&& x) {
+          if constexpr (std::is_same_v<std::decay_t<decltype(x)>, size_t>) {
+            return x;
+          } else {
+            struct stat statbuf;
+            if (stat(x.c_str(), &statbuf) != 0) {
+              throw std::runtime_error{"cuvs::bench::file::size() error: `stat` failed: " + x};
+            }
+            return static_cast<size_t>(statbuf.st_size);
+          }
+        },
+        reqsize_or_name_));
+    }
+    return size_.value();
+  }
+
+  [[nodiscard]] auto is_temporary() const -> bool
+  {
+    return std::holds_alternative<size_t>(reqsize_or_name_);
   }
 
  private:
-  void check_suffix();
-  void open_file() const;
+  std::variant<size_t, std::string> reqsize_or_name_;
+  mutable std::optional<file_descriptor> descriptor_ = std::nullopt;
+  mutable std::optional<size_t> size_                = std::nullopt;
+};
 
-  std::string file_;
-  bool read_mode_;
-  uint32_t subset_first_row_;
-  uint32_t subset_size_;
+// declare the move constructors explicitly outside of the class declaration to make sure if
+// anything is wrong, we catch that at compile time.
+inline file::file(file&&)                    = default;
+inline auto file::operator=(file&&) -> file& = default;
 
-  mutable FILE* fp_{nullptr};
-  mutable uint32_t nrows_;
-  mutable uint32_t ndims_;
-  mutable size_t file_size_;
-  mutable void* mapped_ptr_{nullptr};
+/**
+ * Lazy-initialized file handle with the size information provided by our .bin format:
+ * The file always starts with two uint32_t values: [n_rows, n_cols].
+ */
+template <typename T>
+struct blob_file : public file {
+  explicit blob_file(std::string file_name, uint32_t rows_offset = 0, uint32_t rows_limit = 0)
+    : file{std::move(file_name)}, rows_offset_{rows_offset}, rows_limit_{rows_limit}
+  {
+  }
+
+  explicit blob_file(uint32_t n_rows, uint32_t n_cols)
+    : file{sizeof(T) * n_rows * n_cols + 2 * sizeof(uint32_t)}, rows_offset_{0}, rows_limit_{0}
+  {
+    // NB: this forces the file descriptor, thus breaking lazy-initialization. Not sure if it's
+    // worth refactoring in this case.
+    std::array<uint32_t, 2> h{n_rows, n_cols};
+    if (std::fwrite(h.data(), sizeof(uint32_t), h.size(), descriptor().value()) != 2) {
+      throw std::runtime_error{
+        "cuvs::bench::blob_file `fwrite` failed when initializing a tmp file."};
+    }
+    if (std::fflush(descriptor().value()) != 0) {
+      throw std::runtime_error{
+        "cuvs::bench::blob_file `fflush` failed with non-zero code when initializing a tmp file."};
+    }
+  }
+
+  blob_file(const blob_file<T>&)                    = delete;
+  auto operator=(const blob_file<T>&) -> blob_file& = delete;
+  blob_file(blob_file<T>&&);
+  auto operator=(blob_file<T>&&) -> blob_file<T>&;
+
+  [[nodiscard]] auto n_rows() const -> uint32_t { return header()[0]; }
+  [[nodiscard]] auto n_cols() const -> uint32_t { return header()[1]; }
+
+  [[nodiscard]] auto rows_offset() const -> uint32_t { return rows_offset_; }
+  [[nodiscard]] auto rows_limit() const -> uint32_t
+  {
+    auto rows_max = n_rows() - std::min(rows_offset(), n_rows());          // available rows
+    return rows_limit_ == 0 ? rows_max : std::min(rows_limit_, rows_max);  // limited rows
+  }
+
+ private:
+  mutable std::optional<std::array<uint32_t, 2>> header_ = std::nullopt;
+  uint32_t rows_offset_;
+  uint32_t rows_limit_;
+
+  [[nodiscard]] auto header() const -> const std::array<uint32_t, 2>&
+  {
+    if (!header_.has_value()) {
+      std::array<uint32_t, 2> h;
+      std::rewind(descriptor().value());
+      if (std::fread(h.data(), sizeof(uint32_t), h.size(), descriptor().value()) != 2) {
+        throw std::runtime_error{"cuvs::bench::blob_file read header of bin file failed: " +
+                                 path()};
+      }
+      header_.emplace(h);
+    }
+    return header_.value();
+  }
+};
+
+// declare the move constructors explicitly outside of the class declaration to make sure if
+// anything is wrong, we catch that at compile time.
+template <typename T>
+inline blob_file<T>::blob_file(blob_file<T>&&) = default;
+template <typename T>
+inline auto blob_file<T>::operator=(blob_file<T>&&) -> blob_file<T>& = default;
+
+/** Lazily map or copy the file content onto host memory. */
+template <typename T>
+struct blob_mmap {
+  explicit blob_mmap(blob_file<T>&& file, bool copy_in_memory = false, bool hugepages_2mb = false)
+    : file_{std::move(file)},
+      copy_in_memory_{copy_in_memory},
+      hugepages_2mb_requested_{hugepages_2mb},
+      hugepages_2mb_actual_{hugepages_2mb}
+  {
+  }
+  explicit blob_mmap(std::string file_name,
+                     uint32_t rows_offset = 0,
+                     uint32_t rows_limit  = 0,
+                     bool copy_in_memory  = false,
+                     bool hugepages_2mb   = false)
+    : blob_mmap{
+        blob_file<T>{std::move(file_name), rows_offset, rows_limit}, copy_in_memory, hugepages_2mb}
+  {
+  }
+
+ private:
+  blob_file<T> file_;
+  bool copy_in_memory_;
+  bool hugepages_2mb_requested_;
+  mutable bool hugepages_2mb_actual_;
+
+  mutable std::optional<std::tuple<mmap_owner, ptrdiff_t>> handle_;
+
+  [[nodiscard]] auto handle() const -> const std::tuple<mmap_owner, ptrdiff_t>&
+  {
+    if (!handle_.has_value()) {
+      size_t page_size = hugepages_2mb_actual_ ? 1024ull * 1024ull * 2ull : sysconf(_SC_PAGE_SIZE);
+      int flags        = 0;
+      if (hugepages_2mb_actual_) { flags |= MAP_HUGETLB | MAP_HUGE_2MB; }
+      size_t data_start = sizeof(T) * file_.rows_offset() * file_.n_cols() + sizeof(uint32_t) * 2;
+      size_t data_end   = sizeof(T) * file_.rows_limit() * file_.n_cols() + data_start;
+
+      try {
+        if (copy_in_memory_) {
+          // Copy the content in-memory
+          flags |= MAP_ANONYMOUS | MAP_PRIVATE;
+          size_t size = data_end - data_start;
+          mmap_owner owner{size, flags};
+          std::fseek(file_.descriptor().value(), data_start, SEEK_SET);
+          size_t n_elems = file_.rows_limit() * file_.n_cols();
+          if (std::fread(owner.data(), sizeof(T), n_elems, file_.descriptor().value()) != n_elems) {
+            throw std::runtime_error{"cuvs::bench::blob_mmap() fread " + file_.path() + " failed"};
+          }
+          handle_.emplace(std::move(owner), 0);
+        } else {
+          // Map the file
+          // If this is a temporary file, we're supposed to write to it, hence MAP_SHARED.
+          flags |= file_.is_temporary() ? MAP_SHARED : MAP_PRIVATE;
+          size_t mmap_start = (data_start / page_size) * page_size;
+          size_t mmap_size  = data_end - mmap_start;
+          handle_.emplace(
+            mmap_owner{file_.descriptor(), mmap_start, mmap_size, flags, file_.is_temporary()},
+            data_start - mmap_start);
+        }
+      } catch (const mmap_error& e) {
+        if (e.code() == EPERM && hugepages_2mb_requested_ && hugepages_2mb_actual_) {
+          log_warn(
+            "cuvs::bench::blob_mmap: `mmap` failed to map due to EPERM, which is likely caused by "
+            "the permissions issue. You either need a CAP_IPC_LOCK capability or run the program "
+            "with sudo. "
+            "We will try again without huge pages.");
+          hugepages_2mb_actual_ = false;
+          return handle();
+        }
+        if (e.code() == EINVAL && hugepages_2mb_requested_ && hugepages_2mb_actual_ &&
+            !copy_in_memory_) {
+          log_warn(
+            "cuvs::bench::blob_mmap: `mmap` failed to map due to EINVAL, which is likely caused by "
+            "the file system not supporting huge pages. "
+            "We will try again without huge pages.");
+          hugepages_2mb_actual_ = false;
+          return handle();
+        }
+        throw;  // The error is not due to huge pages or otherwise unrecoverable
+      }
+    }
+    return handle_.value();
+  }
+
+ public:
+  [[nodiscard]] auto data() const -> T*
+  {
+    auto& [owner, offset] = handle();
+    return reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(owner.data()) + offset);
+  }
+
+  [[nodiscard]] auto is_in_memory() const -> bool { return copy_in_memory_; }
+  [[nodiscard]] auto is_hugepage() const -> bool { return hugepages_2mb_requested_; }
+  [[nodiscard]] auto n_rows() const -> uint32_t { return file_.rows_limit(); }
+  [[nodiscard]] auto n_cols() const -> uint32_t { return file_.n_cols(); }
+  [[nodiscard]] auto size() const -> size_t { return sizeof(T) * n_rows() * n_cols(); }
+  [[nodiscard]] auto unmap() && noexcept -> blob_file<T>
+  {
+    // If we used mmap on a temporary file, then it was writable.
+    // Then there's a chance the user wrote something to the mmap.
+    // Then we must ensure the changes are visible in the file before migrating it.
+    bool flush_writes = file_.is_temporary() && handle_.has_value();
+    if (flush_writes) {
+      auto& [owner, _] = handle();
+      msync(owner.data(), owner.size(), MS_SYNC | MS_INVALIDATE);
+    }
+    handle_.reset();
+    if (flush_writes) { std::fflush(file_.descriptor().value()); }
+    return blob_file<T>{std::move(file_)};
+  }
+  [[nodiscard]] auto release() && noexcept -> blob_file<T> { return std::move(*this).unmap(); }
 };
 
 template <typename T>
-bin_file<T>::bin_file(std::string file,
-                      const std::string& mode,
-                      uint32_t subset_first_row,
-                      uint32_t subset_size)
-  : file_(std::move(file)),
-    read_mode_(mode == "r"),
-    subset_first_row_(subset_first_row),
-    subset_size_(subset_size)
+struct blob_pinned {
+ private:
+  mutable blob_mmap<T> blob_;
+  mutable void* ptr_ = nullptr;
 
-{
-  check_suffix();
-
-  if (!read_mode_) {
-    if (mode == "w") {
-      if (subset_first_row != 0) {
-        throw std::runtime_error{"subset_first_row should be zero for write mode"};
-      }
-      if (subset_size != 0) {
-        throw std::runtime_error{"subset_size should be zero for write mode"};
-      }
-    } else {
-      throw std::runtime_error{"bin_file's mode must be either 'r' or 'w': " + file_};
-    }
-  }
-}
-
-template <typename T>
-void bin_file<T>::open_file() const
-{
-  fp_ = fopen(file_.c_str(), read_mode_ ? "r" : "w");
-  if (!fp_) { throw std::runtime_error{"open bin_file failed: " + file_}; }
-
-  if (read_mode_) {
-    struct stat statbuf;
-    if (stat(file_.c_str(), &statbuf) != 0) { throw std::runtime_error{"stat() failed: " + file_}; }
-    file_size_ = statbuf.st_size;
-
-    uint32_t header[2];
-    if (fread(header, sizeof(uint32_t), 2, fp_) != 2) {
-      throw std::runtime_error{"read header of bin_file failed: " + file_};
-    }
-    nrows_ = header[0];
-    ndims_ = header[1];
-
-    size_t expected_file_size =
-      2 * sizeof(uint32_t) + static_cast<size_t>(nrows_) * ndims_ * sizeof(T);
-    if (file_size_ != expected_file_size) {
-      throw std::runtime_error{"expected file size of " + file_ + " is " +
-                               std::to_string(expected_file_size) + ", however, actual size is " +
-                               std::to_string(file_size_)};
-    }
-
-    if (subset_first_row_ >= nrows_) {
-      throw std::runtime_error{file_ + ": subset_first_row (" + std::to_string(subset_first_row_) +
-                               ") >= nrows (" + std::to_string(nrows_) + ")"};
-    }
-    if (subset_first_row_ + subset_size_ > nrows_) {
-      throw std::runtime_error{file_ + ": subset_first_row (" + std::to_string(subset_first_row_) +
-                               ") + subset_size (" + std::to_string(subset_size_) + ") > nrows (" +
-                               std::to_string(nrows_) + ")"};
-    }
-
-    if (subset_first_row_) {
-      static_assert(sizeof(long) == 8, "fseek() don't support 64-bit offset");
-      if (fseek(fp_, sizeof(T) * subset_first_row_ * ndims_, SEEK_CUR) == -1) {
-        throw std::runtime_error{file_ + ": fseek failed"};
-      }
-      nrows_ -= subset_first_row_;
-    }
-    if (subset_size_) { nrows_ = subset_size_; }
-  }
-}
-
-template <typename T>
-void bin_file<T>::check_suffix()
-{
-  auto pos = file_.rfind('.');
-  if (pos == std::string::npos) {
-    throw std::runtime_error{"name of bin_file doesn't have a suffix: " + file_};
-  }
-  std::string suffix = file_.substr(pos + 1);
-
-  if constexpr (std::is_same_v<T, float>) {
-    if (suffix != "fbin") {
-      throw std::runtime_error{"bin_file<float> should has .fbin suffix: " + file_};
-    }
-  } else if constexpr (std::is_same_v<T, half>) {
-    if (suffix != "f16bin" && suffix != "fbin") {
-      throw std::runtime_error{"bin_file<half> should has .f16bin suffix: " + file_};
-    }
-  } else if constexpr (std::is_same_v<T, int>) {
-    if (suffix != "ibin") {
-      throw std::runtime_error{"bin_file<int> should has .ibin suffix: " + file_};
-    }
-  } else if constexpr (std::is_same_v<T, uint8_t>) {
-    if (suffix != "u8bin") {
-      throw std::runtime_error{"bin_file<uint8_t> should has .u8bin suffix: " + file_};
-    }
-  } else if constexpr (std::is_same_v<T, int8_t>) {
-    if (suffix != "i8bin") {
-      throw std::runtime_error{"bin_file<int8_t> should has .i8bin suffix: " + file_};
-    }
-  } else {
-    throw std::runtime_error(
-      "T of bin_file<T> should be one of float, half, int, uint8_t, or int8_t");
-  }
-}
-
-template <typename T>
-class dataset {
  public:
-  explicit dataset(std::string name) : name_(std::move(name)) {}
-  dataset(std::string name, std::string distance)
-    : name_(std::move(name)), distance_(std::move(distance))
+  explicit blob_pinned(blob_mmap<T>&& blob) : blob_{std::move(blob)} {}
+  // First map the file and then register to CUDA.
+  // NB: as per docs, huge pages are not supported.
+  explicit blob_pinned(blob_file<T>&& blob, bool copy_in_memory = true)
+    : blob_{std::move(blob), copy_in_memory, false}
   {
   }
-  dataset(const dataset&)                    = delete;
-  auto operator=(const dataset&) -> dataset& = delete;
-  virtual ~dataset();
-
-  auto name() const -> std::string { return name_; }
-  auto distance() const -> std::string { return distance_; }
-  virtual auto dim() const -> int               = 0;
-  virtual auto max_k() const -> uint32_t        = 0;
-  virtual auto base_set_size() const -> size_t  = 0;
-  virtual auto query_set_size() const -> size_t = 0;
-
-  // load data lazily, so don't pay the overhead of reading unneeded set
-  // e.g. don't load base set when searching
-  auto base_set() const -> const T*
+  explicit blob_pinned(std::string file_name,
+                       uint32_t rows_offset = 0,
+                       uint32_t rows_limit  = 0,
+                       bool copy_in_memory  = true)
+    : blob_pinned{blob_file<T>{file_name, rows_offset, rows_limit}, copy_in_memory}
   {
-    if (!base_set_) { load_base_set(); }
-    return base_set_;
   }
 
-  auto query_set() const -> const T*
+  ~blob_pinned() noexcept
   {
-    if (!query_set_) { load_query_set(); }
-    return query_set_;
-  }
-
-  auto gt_set() const -> const int32_t*
-  {
-    if (!gt_set_) { load_gt_set(); }
-    return gt_set_;
-  }
-
-  auto base_set_on_gpu() const -> const T*;
-  auto query_set_on_gpu() const -> const T*;
-  auto mapped_base_set() const -> const T*;
-
-  auto query_set(MemoryType memory_type) const -> const T*
-  {
-    switch (memory_type) {
-      case MemoryType::kDevice: return query_set_on_gpu();
-      case MemoryType::kHost: {
-        auto r = query_set();
+    if (ptr_ != nullptr) {
 #ifndef BUILD_CPU_ONLY
-        if (query_set_pinned_) {
-          cudaHostUnregister(const_cast<T*>(r));
-          query_set_pinned_ = false;
-        }
+      cudaHostUnregister(ptr_);
 #endif
-        return r;
-      }
-      case MemoryType::kHostPinned: {
-        auto r = query_set();
-#ifndef BUILD_CPU_ONLY
-        if (!query_set_pinned_) {
-          cudaHostRegister(
-            const_cast<T*>(r), query_set_size() * dim() * sizeof(T), cudaHostRegisterDefault);
-          query_set_pinned_ = true;
-        }
-#endif
-        return r;
-      }
-      default: return nullptr;
     }
   }
 
-  auto base_set(MemoryType memory_type) const -> const T*
+  // No copies for owning struct
+  blob_pinned(const blob_pinned& res)                      = delete;
+  auto operator=(const blob_pinned& other) -> blob_pinned& = delete;
+  // Moving is fine
+  blob_pinned(blob_pinned&& other) : blob_{std::move(other.blob_)}, ptr_{other.ptr_}
+  {
+    other.ptr_ = nullptr;
+  }
+  auto operator=(blob_pinned&& other) -> blob_pinned&
+  {
+    std::swap(this->blob_, other.blob_);
+    std::swap(this->ptr_, other.ptr_);
+    return *this;
+  }
+
+  [[nodiscard]] auto data() const -> T*
+  {
+    if (ptr_ == nullptr) {
+      void* ptr = reinterpret_cast<void*>(blob_.data());
+#ifndef BUILD_CPU_ONLY
+      int flags       = cudaHostRegisterDefault;
+      auto error_code = cudaSuccess;
+      if (!blob_.is_in_memory()) {
+        flags      = cudaHostRegisterIoMemory | cudaHostRegisterReadOnly;
+        error_code = cudaHostRegister(ptr, blob_.size(), flags);
+        if (error_code == cudaErrorNotSupported) {
+          // Sometimes read-only is not supported
+          flags      = cudaHostRegisterIoMemory;
+          error_code = cudaHostRegister(ptr, blob_.size(), error_code);
+        }
+      } else {
+        error_code = cudaHostRegister(ptr, blob_.size(), cudaHostRegisterDefault);
+      }
+      if (error_code == cudaErrorInvalidValue && (!blob_.is_in_memory() || blob_.is_hugepage())) {
+        auto hugepage = blob_.is_hugepage() && blob_.is_in_memory();  // only enable hugepage
+        auto file     = std::move(blob_).release();
+        blob_         = blob_mmap<T>{std::move(file), true, hugepage};
+        return data();
+      }
+      if (error_code != cudaSuccess) {
+        log_error(
+          "cuvs::bench::blob_pinned: cudaHostRegister(%p, %zu, %d)", ptr, blob_.size(), flags);
+        throw std::runtime_error{
+          "cuvs::bench::blob_pinned: call to cudaHostRegister failed with code " +
+          std::to_string(error_code)};
+      }
+#endif
+      ptr_ = ptr;
+    }
+    return reinterpret_cast<T*>(ptr_);
+  }
+
+  [[nodiscard]] auto unpin() && noexcept -> blob_mmap<T>
+  {
+    // unregister the memory before passing it to a third party
+#ifndef BUILD_CPU_ONLY
+    if (ptr_ != nullptr) { cudaHostUnregister(ptr_); }
+#endif
+    return blob_mmap<T>{std::move(blob_)};
+  }
+
+  [[nodiscard]] auto is_in_memory() const noexcept -> bool { return true; }
+  [[nodiscard]] auto is_hugepage() const noexcept -> bool { return blob_.is_hugepage(); }
+  [[nodiscard]] auto n_rows() const -> uint32_t { return blob_.n_rows(); }
+  [[nodiscard]] auto n_cols() const -> uint32_t { return blob_.n_cols(); }
+  [[nodiscard]] auto size() const -> size_t { return blob_.size(); }
+  [[nodiscard]] auto release() && noexcept -> blob_file<T>
+  {
+    return std::move(*this).unpin().release();
+  }
+};
+
+template <typename OwnerType, typename T>
+struct blob_copying {
+ private:
+  blob_mmap<T> blob_;
+  mutable std::optional<OwnerType> mem_ = std::nullopt;
+
+ public:
+  explicit blob_copying(blob_mmap<T>&& blob) : blob_{std::move(blob)} {}
+  // First map the file and then copy it to device; use huge pages for faster copy
+  explicit blob_copying(blob_file<T>&& blob) : blob_{std::move(blob), false, true} {}
+  explicit blob_copying(std::string file_name, uint32_t rows_offset = 0, uint32_t rows_limit = 0)
+    : blob_copying{blob_file<T>{file_name, rows_offset, rows_limit}}
+  {
+  }
+
+  [[nodiscard]] auto data() const -> T*
+  {
+    if (!mem_.has_value()) {
+      mem_.emplace(blob_.size());
+#ifndef BUILD_CPU_ONLY
+      auto error_code = cudaMemcpy(mem_->data(), blob_.data(), blob_.size(), cudaMemcpyDefault);
+      if (error_code != cudaSuccess) {
+        throw std::runtime_error{"cuvs::bench::blob_device: call to cudaMemcpy failed with code " +
+                                 std::to_string(error_code)};
+      }
+#endif
+    }
+    return reinterpret_cast<T*>(mem_->data());
+  }
+
+  [[nodiscard]] auto free() && noexcept -> blob_mmap<T>
+  {
+    mem_.reset();
+    return blob_mmap<T>{std::move(blob_)};
+  }
+
+  [[nodiscard]] auto is_in_memory() const noexcept -> bool { return true; }
+  [[nodiscard]] auto is_hugepage() const noexcept -> bool { return blob_.is_hugepage(); }
+  [[nodiscard]] auto n_rows() const -> uint32_t { return blob_.n_rows(); }
+  [[nodiscard]] auto n_cols() const -> uint32_t { return blob_.n_cols(); }
+  [[nodiscard]] auto size() const -> size_t { return blob_.size(); }
+  [[nodiscard]] auto release() && noexcept -> blob_file<T>
+  {
+    return std::move(*this).free().release();
+  }
+};
+
+template <typename T>
+using blob_device = blob_copying<device_mem_owner, T>;
+template <typename T>
+using blob_managed = blob_copying<managed_mem_owner, T>;
+
+template <typename T>
+struct blob {
+ private:
+  using blob_type = std::variant<blob_mmap<T>, blob_pinned<T>, blob_device<T>, blob_managed<T>>;
+  mutable blob_type value_;
+
+  [[nodiscard]] auto data_mmap(bool in_memory, bool request_hugepages_2mb) const -> T*
+  {
+    if (auto* v = std::get_if<blob_mmap<T>>(&value_)) {
+      if (v->is_in_memory() == in_memory && v->is_hugepage() == request_hugepages_2mb) {
+        return v->data();
+      }
+    }
+    blob_type tmp{std::move(value_)};
+    value_ = std::visit(
+      [in_memory, request_hugepages_2mb](auto&& val) {
+        return blob_mmap<T>{std::move(val).release(), in_memory, request_hugepages_2mb};
+      },
+      std::move(tmp));
+
+    return data();
+  }
+
+  [[nodiscard]] auto data_pinned(bool request_hugepages_2mb) const -> T*
+  {
+    // The requested type is there
+    if (auto* v = std::get_if<blob_pinned<T>>(&value_)) {
+      if (v->is_hugepage() == request_hugepages_2mb) { return v->data(); }
+    }
+    // If there's already an mmap allocation, we just need to pin it.
+    if (auto* v = std::get_if<blob_mmap<T>>(&value_)) {
+      if (v->is_hugepage() == request_hugepages_2mb) {
+        blob_mmap<T> tmp{std::move(*v)};
+        return value_.template emplace<blob_pinned<T>>(std::move(tmp)).data();
+      }
+    }
+    // otherwise do full reset
+    blob_type tmp{std::move(value_)};
+    value_ = std::visit(
+      [request_hugepages_2mb](auto&& val) {
+        blob_mmap<T> tmp{std::move(val).release(), true, request_hugepages_2mb};
+        return blob_pinned<T>{std::move(tmp)};
+      },
+      std::move(value_));
+
+    return data();
+  }
+
+  [[nodiscard]] auto data_device() const -> T*
+  {
+    // The requested type is there
+    if (auto* v = std::get_if<blob_device<T>>(&value_)) { return v->data(); }
+    // otherwise do full reset
+    blob_type tmp{std::move(value_)};
+    value_ = std::visit([](auto&& val) { return blob_device<T>{std::move(val).release()}; },
+                        std::move(tmp));
+    return data();
+  }
+
+  [[nodiscard]] auto data_managed() const -> T*
+  {
+    // The requested type is there
+    if (auto* v = std::get_if<blob_managed<T>>(&value_)) { return v->data(); }
+    // otherwise do full reset
+    blob_type tmp{std::move(value_)};
+    value_ = std::visit([](auto&& val) { return blob_managed<T>{std::move(val).release()}; },
+                        std::move(tmp));
+    return data();
+  }
+
+ public:
+  explicit blob(std::string file_name,
+                uint32_t rows_offset = 0,
+                uint32_t rows_limit  = 0,
+                bool copy_in_memory  = false,
+                bool hugepages_2mb   = false)
+    : value_{std::in_place_type<blob_mmap<T>>,
+             std::move(file_name),
+             rows_offset,
+             rows_limit,
+             copy_in_memory,
+             hugepages_2mb}
+  {
+  }
+
+  template <typename VariantT>
+  explicit blob(VariantT&& blob_variant) : value_{std::move(blob_variant)}
+  {
+  }
+
+  [[nodiscard]] auto data() const -> T*
+  {
+    return std::visit([](auto&& val) { return val.data(); }, value_);
+  }
+
+  [[nodiscard]] auto data(MemoryType memory_type, bool request_hugepages_2mb = false) const -> T*
   {
     switch (memory_type) {
-      case MemoryType::kDevice: return base_set_on_gpu();
-      case MemoryType::kHost: {
-        auto r = base_set();
-#ifndef BUILD_CPU_ONLY
-        if (base_set_pinned_) {
-          cudaHostUnregister(const_cast<T*>(r));
-          base_set_pinned_ = false;
+      case MemoryType::kHost: return data_mmap(true, request_hugepages_2mb);
+      case MemoryType::kHostMmap: return data_mmap(false, request_hugepages_2mb);
+      case MemoryType::kHostPinned:
+        if (request_hugepages_2mb) {
+          log_error(
+            "cuvs::bench::blob::data(): huge pages are requested but not supported by "
+            "cudaHostRegister at the moment. We will try nevertheless...");
         }
-#endif
-        return r;
-      }
-      case MemoryType::kHostPinned: {
-        auto r = base_set();
-#ifndef BUILD_CPU_ONLY
-        if (!base_set_pinned_) {
-          cudaHostRegister(
-            const_cast<T*>(r), base_set_size() * dim() * sizeof(T), cudaHostRegisterDefault);
-          base_set_pinned_ = true;
-        }
-#endif
-        return r;
-      }
-      case MemoryType::kHostMmap: return mapped_base_set();
-      default: return nullptr;
+        return data_pinned(request_hugepages_2mb);
+      case MemoryType::kDevice: return data_device();    // hugepages are not relevant here
+      case MemoryType::kManaged: return data_managed();  // hugepages are not relevant here
+      default:
+        throw std::runtime_error{"cuvs::bench::blob::data(): unexpected memory type " +
+                                 std::to_string(static_cast<int>(memory_type))};
     }
   }
 
- protected:
-  virtual void load_base_set() const  = 0;
-  virtual void load_gt_set() const    = 0;
-  virtual void load_query_set() const = 0;
-  virtual void map_base_set() const   = 0;
+  [[nodiscard]] auto is_in_memory() const noexcept -> bool
+  {
+    return std::visit([](auto&& val) { return val.is_in_memory(); }, value_);
+  }
+  [[nodiscard]] auto is_hugepage() const noexcept -> bool
+  {
+    return std::visit([](auto&& val) { return val.is_hugepage(); }, value_);
+  }
+  [[nodiscard]] auto n_rows() const -> uint32_t
+  {
+    return std::visit([](auto&& val) { return val.n_rows(); }, value_);
+  }
+  [[nodiscard]] auto n_cols() const -> uint32_t
+  {
+    return std::visit([](auto&& val) { return val.n_cols(); }, value_);
+  }
+  [[nodiscard]] auto size() const -> size_t
+  {
+    return std::visit([](auto&& val) { return val.size(); }, value_);
+  }
+};
 
+template <typename CarrierT>
+void generate_bernoulli(CarrierT* data, size_t words, double p)
+{
+  constexpr size_t kBitsPerCarrierValue = sizeof(CarrierT) * 8;
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::bernoulli_distribution d(p);
+  for (size_t i = 0; i < words; i++) {
+    CarrierT word = 0;
+    for (size_t j = 0; j < kBitsPerCarrierValue; j++) {
+      word |= CarrierT{d(gen)} << j;
+    }
+    data[i] = word;
+  }
+};
+
+template <typename DataT, typename IdxT = int32_t>
+struct dataset {
+ public:
+  using bitset_carrier_type                           = uint32_t;
+  static inline constexpr size_t kBitsPerCarrierValue = sizeof(bitset_carrier_type) * 8;
+
+ private:
   std::string name_;
   std::string distance_;
+  blob<DataT> base_set_;
+  blob<DataT> query_set_;
+  std::optional<blob<IdxT>> ground_truth_set_;
+  std::optional<blob<bitset_carrier_type>> filter_bitset_;
 
-  mutable T* base_set_        = nullptr;
-  mutable T* query_set_       = nullptr;
-  mutable T* d_base_set_      = nullptr;
-  mutable T* d_query_set_     = nullptr;
-  mutable T* mapped_base_set_ = nullptr;
-  mutable int32_t* gt_set_    = nullptr;
-
-  mutable bool base_set_pinned_  = false;
-  mutable bool query_set_pinned_ = false;
-};
-
-template <typename T>
-dataset<T>::~dataset()
-{
-#ifndef BUILD_CPU_ONLY
-  if (d_base_set_) { cudaFree(d_base_set_); }
-  if (d_query_set_) { cudaFree(d_query_set_); }
-  if (base_set_pinned_) { cudaHostUnregister(base_set_); }
-  if (query_set_pinned_) { cudaHostUnregister(query_set_); }
-#endif
-  delete[] base_set_;
-  delete[] query_set_;
-  delete[] gt_set_;
-}
-
-template <typename T>
-auto dataset<T>::base_set_on_gpu() const -> const T*
-{
-#ifndef BUILD_CPU_ONLY
-  if (!d_base_set_) {
-    base_set();
-    cudaMalloc(reinterpret_cast<void**>(&d_base_set_), base_set_size() * dim() * sizeof(T));
-    cudaMemcpy(d_base_set_, base_set_, base_set_size() * dim() * sizeof(T), cudaMemcpyHostToDevice);
-  }
-#endif
-  return d_base_set_;
-}
-
-template <typename T>
-auto dataset<T>::query_set_on_gpu() const -> const T*
-{
-#ifndef BUILD_CPU_ONLY
-  if (!d_query_set_) {
-    query_set();
-    cudaMalloc(reinterpret_cast<void**>(&d_query_set_), query_set_size() * dim() * sizeof(T));
-    cudaMemcpy(
-      d_query_set_, query_set_, query_set_size() * dim() * sizeof(T), cudaMemcpyHostToDevice);
-  }
-#endif
-  return d_query_set_;
-}
-
-template <typename T>
-auto dataset<T>::mapped_base_set() const -> const T*
-{
-  if (!mapped_base_set_) { map_base_set(); }
-  return mapped_base_set_;
-}
-
-template <typename T>
-class bin_dataset : public dataset<T> {
  public:
-  bin_dataset(const std::string& name,
-              const std::string& base_file,
-              size_t subset_first_row,
-              size_t subset_size,
-              const std::string& query_file,
-              const std::string& distance,
-              const std::optional<std::string>& groundtruth_neighbors_file);
+  dataset(std::string name,
+          std::string base_file,
+          uint32_t subset_first_row,
+          uint32_t subset_size,
+          std::string query_file,
+          std::string distance,
+          std::optional<std::string> groundtruth_neighbors_file,
+          std::optional<double> filtering_rate = std::nullopt)
+    : name_{std::move(name)},
+      distance_{std::move(distance)},
+      base_set_{base_file, subset_first_row, subset_size},
+      query_set_{query_file},
+      ground_truth_set_{groundtruth_neighbors_file.has_value()
+                          ? std::make_optional<blob<IdxT>>(groundtruth_neighbors_file.value())
+                          : std::nullopt}
+  {
+    if (filtering_rate.has_value()) {
+      // Generate a random bitset for filtering
+      auto bitset_size = (base_set_size() - 1) / kBitsPerCarrierValue + 1;
+      blob_file<bitset_carrier_type> bitset_blob_file{uint32_t(bitset_size), 1};
+      blob_mmap<bitset_carrier_type> bitset_blob{std::move(bitset_blob_file), false, false};
+      generate_bernoulli(const_cast<bitset_carrier_type*>(bitset_blob.data()),
+                         bitset_size,
+                         1.0 - filtering_rate.value());
+      filter_bitset_.emplace(std::move(bitset_blob));
+    }
+  }
 
-  auto dim() const -> int override;
-  auto max_k() const -> uint32_t override;
-  auto base_set_size() const -> size_t override;
-  auto query_set_size() const -> size_t override;
+  [[nodiscard]] auto name() const -> std::string { return name_; }
+  [[nodiscard]] auto distance() const -> std::string { return distance_; }
+  [[nodiscard]] auto dim() const -> int { return static_cast<int>(base_set_.n_cols()); }
+  [[nodiscard]] auto max_k() const -> uint32_t
+  {
+    if (ground_truth_set_.has_value()) { return ground_truth_set_->n_cols(); }
+    return 0;
+  }
+  [[nodiscard]] auto base_set_size() const -> size_t { return base_set_.n_rows(); }
+  [[nodiscard]] auto query_set_size() const -> size_t { return query_set_.n_rows(); }
 
- private:
-  void load_base_set() const;
-  void load_query_set() const;
-  void load_gt_set() const;
-  void map_base_set() const;
+  [[nodiscard]] auto gt_set() const -> const IdxT*
+  {
+    if (ground_truth_set_.has_value()) { return ground_truth_set_->data(); }
+    return nullptr;
+  }
 
-  mutable int dim_               = 0;
-  mutable uint32_t max_k_        = 0;
-  mutable size_t base_set_size_  = 0;
-  mutable size_t query_set_size_ = 0;
+  [[nodiscard]] auto query_set() const -> const DataT* { return query_set_.data(); }
+  [[nodiscard]] auto query_set(MemoryType memory_type, bool request_hugepages_2mb = false) const
+    -> const DataT*
+  {
+    return query_set_.data(memory_type, request_hugepages_2mb);
+  }
 
-  bin_file<T> base_file_;
-  bin_file<T> query_file_;
-  std::optional<bin_file<std::int32_t>> gt_file_{std::nullopt};
+  [[nodiscard]] auto base_set() const -> const DataT* { return base_set_.data(); }
+  [[nodiscard]] auto base_set(MemoryType memory_type, bool request_hugepages_2mb = false) const
+    -> const DataT*
+  {
+    return base_set_.data(memory_type, request_hugepages_2mb);
+  }
+
+  [[nodiscard]] auto filter_bitset() const -> const bitset_carrier_type*
+  {
+    if (filter_bitset_.has_value()) { return filter_bitset_->data(); }
+    return nullptr;
+  }
+
+  [[nodiscard]] auto filter_bitset(MemoryType memory_type, bool request_hugepages_2mb = false) const
+    -> const bitset_carrier_type*
+  {
+    if (filter_bitset_.has_value()) {
+      return filter_bitset_->data(memory_type, request_hugepages_2mb);
+    }
+    return nullptr;
+  }
 };
-
-template <typename T>
-bin_dataset<T>::bin_dataset(const std::string& name,
-                            const std::string& base_file,
-                            size_t subset_first_row,
-                            size_t subset_size,
-                            const std::string& query_file,
-                            const std::string& distance,
-                            const std::optional<std::string>& groundtruth_neighbors_file)
-  : dataset<T>(name, distance),
-    base_file_(base_file, "r", subset_first_row, subset_size),
-    query_file_(query_file, "r")
-{
-  if (groundtruth_neighbors_file.has_value()) {
-    gt_file_.emplace(groundtruth_neighbors_file.value(), "r");
-  }
-}
-
-template <typename T>
-auto bin_dataset<T>::dim() const -> int
-{
-  if (dim_ > 0) { return dim_; }
-  if (base_set_size() > 0) { return dim_; }
-  if (query_set_size() > 0) { return dim_; }
-  return dim_;
-}
-
-template <typename T>
-auto bin_dataset<T>::max_k() const -> uint32_t
-{
-  if (!this->gt_set_) { load_gt_set(); }
-  return max_k_;
-}
-
-template <typename T>
-auto bin_dataset<T>::query_set_size() const -> size_t
-{
-  if (query_set_size_ > 0) { return query_set_size_; }
-  int dim;
-  query_file_.get_shape(&query_set_size_, &dim);
-  if (query_set_size_ == 0) { throw std::runtime_error{"Zero query set size"}; }
-  if (dim == 0) { throw std::runtime_error{"Zero query set dim"}; }
-  if (dim_ == 0) {
-    dim_ = dim;
-  } else if (dim_ != dim) {
-    throw std::runtime_error{"base set dim (" + std::to_string(dim_) + ") != query set dim (" +
-                             std::to_string(dim)};
-  }
-  return query_set_size_;
-}
-
-template <typename T>
-auto bin_dataset<T>::base_set_size() const -> size_t
-{
-  if (base_set_size_ > 0) { return base_set_size_; }
-  int dim;
-  base_file_.get_shape(&base_set_size_, &dim);
-  if (base_set_size_ == 0) { throw std::runtime_error{"Zero base set size"}; }
-  if (dim == 0) { throw std::runtime_error{"Zero base set dim"}; }
-  if (dim_ == 0) {
-    dim_ = dim;
-  } else if (dim_ != dim) {
-    throw std::runtime_error{"base set dim (" + std::to_string(dim) + ") != query set dim (" +
-                             std::to_string(dim_)};
-  }
-  return base_set_size_;
-}
-
-template <typename T>
-void bin_dataset<T>::load_base_set() const
-{
-  this->base_set_ = new T[base_set_size() * dim()];
-  base_file_.read(this->base_set_);
-}
-
-template <typename T>
-void bin_dataset<T>::load_query_set() const
-{
-  this->query_set_ = new T[query_set_size() * dim()];
-  query_file_.read(this->query_set_);
-}
-
-template <typename T>
-void bin_dataset<T>::load_gt_set() const
-{
-  if (gt_file_.has_value()) {
-    size_t queries;
-    int k;
-    gt_file_->get_shape(&queries, &k);
-    this->gt_set_ = new std::int32_t[queries * k];
-    gt_file_->read(this->gt_set_);
-    max_k_ = k;
-  }
-}
-
-template <typename T>
-void bin_dataset<T>::map_base_set() const
-{
-  this->mapped_base_set_ = base_file_.map();
-}
 
 }  // namespace  cuvs::bench

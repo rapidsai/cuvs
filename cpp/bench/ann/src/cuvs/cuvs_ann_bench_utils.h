@@ -275,4 +275,16 @@ void refine_helper(const raft::resources& res,
   }
 }
 
+inline auto make_cuvs_filter(const void* filter_bitset, int64_t n_rows)
+  -> std::shared_ptr<cuvs::neighbors::filtering::base_filter>
+{
+  if (filter_bitset != nullptr) {
+    return std::make_shared<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>(
+      raft::core::bitset_view<uint32_t, int64_t>(
+        const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(filter_bitset)), n_rows));
+  } else {
+    return std::make_shared<cuvs::neighbors::filtering::none_sample_filter>();
+  }
+}
+
 }  // namespace cuvs::bench

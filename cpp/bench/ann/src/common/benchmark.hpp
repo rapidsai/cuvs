@@ -271,7 +271,8 @@ void bench_search(::benchmark::State& state,
       }
     }
     try {
-      a->set_search_param(*search_param);
+      a->set_search_param(*search_param,
+                          dataset->filter_bitset(current_algo_props->dataset_memory_type));
     } catch (const std::exception& ex) {
       state.SkipWithError("An error occurred setting search parameters: " + std::string(ex.what()));
       return;
@@ -515,13 +516,15 @@ void dispatch_benchmark(std::string cmdline,
   auto query_file         = combine_path(data_prefix, dataset_conf.query_file);
   auto gt_file            = dataset_conf.groundtruth_neighbors_file;
   if (gt_file.has_value()) { gt_file.emplace(combine_path(data_prefix, gt_file.value())); }
-  auto dataset = std::make_shared<bin_dataset<T>>(dataset_conf.name,
-                                                  base_file,
-                                                  dataset_conf.subset_first_row,
-                                                  dataset_conf.subset_size,
-                                                  query_file,
-                                                  dataset_conf.distance,
-                                                  gt_file);
+  auto dataset =
+    std::make_shared<bench::dataset<T>>(dataset_conf.name,
+                                        base_file,
+                                        dataset_conf.subset_first_row,
+                                        dataset_conf.subset_size,
+                                        query_file,
+                                        dataset_conf.distance,
+                                        gt_file,
+                                        search_mode ? dataset_conf.filtering_rate : std::nullopt);
   ::benchmark::AddCustomContext("dataset", dataset_conf.name);
   ::benchmark::AddCustomContext("distance", dataset_conf.distance);
   std::vector<configuration::index> indices = conf.get_indices();
