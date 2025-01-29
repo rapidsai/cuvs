@@ -159,7 +159,7 @@ void batched_insert_vamana(
   SELECT_SMEM_SIZES(degree, visited_size);  // Sets above 2 variables to appropriate sizes
 
   // Total dynamic shared memory used by GreedySearch
-  int align_padding          = ((((dim - 1) / 16) + 1) * 16) - dim;
+  int align_padding          = raft::alignTo(dim, 16) - dim;
   int search_smem_total_size = static_cast<int>(
     search_smem_sort_size + (dim + align_padding) * sizeof(T) + visited_size * sizeof(Node<accT>) +
     degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
@@ -236,6 +236,7 @@ void batched_insert_vamana(
 
       int total_edges;
       raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
+      RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
       auto edge_dest =
         raft::make_device_mdarray<IdxT>(res,

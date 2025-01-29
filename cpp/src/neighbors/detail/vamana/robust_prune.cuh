@@ -19,6 +19,8 @@
 #include <cub/cub.cuh>
 #include <thrust/sort.h>
 
+#include <raft/util/cuda_dev_essentials.cuh>
+
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
@@ -145,7 +147,7 @@ __global__ void RobustPruneKernel(
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-  int align_padding = (((dim - 1) / alignof(ShmemLayout)) + 1) * alignof(ShmemLayout) - dim;
+  int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
 
   T* s_coords                        = reinterpret_cast<T*>(&smem[sort_smem_size]);
   DistPair<IdxT, accT>* new_nbh_list = reinterpret_cast<DistPair<IdxT, accT>*>(
