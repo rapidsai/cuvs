@@ -2,7 +2,6 @@
 # Copyright (c) 2025, NVIDIA CORPORATION.
 
 set -euo pipefail
-
 package_name="libcuvs"
 package_dir="python/libcuvs"
 
@@ -16,6 +15,7 @@ rapids-dependency-file-generator \
   --matrix "${matrix_selectors}" \
 | tee /tmp/requirements-build.txt
 
+set -x
 # TODO: remove me once gha-tools is released
 if ! command -v "rapids-pip-retry" &> /dev/null
 then
