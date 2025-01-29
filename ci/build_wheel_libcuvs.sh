@@ -21,7 +21,7 @@ if ! command -v "rapids-pip-retry" &> /dev/null
 then
     git clone --branch rapids-pip-retry https://github.com/gforsyth/gha-tools.git
 
-    export PATH="$PWD/tools":$PATH
+    export PATH="$PWD/gha-tools/tools":$PATH
 fi
 
 rapids-logger "Installing build requirements"
