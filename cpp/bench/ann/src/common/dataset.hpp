@@ -78,9 +78,10 @@ class mmap_error : public std::runtime_error {
   int errno_;
 
  public:
-  mmap_error()
+  mmap_error(std::string extra_msg)
     : std::runtime_error("cuvs::bench::mmap_owner: `mmap` error: Value of errno " +
-                         std::to_string(errno) + ", " + std::string(strerror(errno))),
+                         std::to_string(errno) + ", " + std::string(strerror(errno)) + ". " +
+                         extra_msg),
       errno_(errno)
   {
   }
@@ -139,13 +140,16 @@ struct mmap_owner {
   {
     auto ptr = mmap(nullptr, length, prot, flags, fd, offset);
     if (ptr == MAP_FAILED) {
-      log_error("cuvs::bench::mmap_owner:mmap(nullptr, %zu, 0x%08x, 0x%08x, %d, %zd)",
-                length,
-                prot,
-                flags,
-                fd,
-                offset);
-      throw mmap_error{};
+      std::array<char, 256> buf;
+      snprintf(buf.data(),
+               sizeof(buf),
+               "Failed call: cuvs::bench::mmap_owner:mmap(nullptr, %zu, 0x%08x, 0x%08x, %d, %zd)",
+               length,
+               prot,
+               flags,
+               fd,
+               offset);
+      throw mmap_error{std::string(buf.data())};
     }
     return ptr;
   }
@@ -383,18 +387,20 @@ inline auto blob_file<T>::operator=(blob_file<T>&&) -> blob_file<T>& = default;
 /** Lazily map or copy the file content onto host memory. */
 template <typename T>
 struct blob_mmap {
-  explicit blob_mmap(blob_file<T>&& file, bool copy_in_memory = false, bool hugepages_2mb = false)
+  explicit blob_mmap(blob_file<T>&& file,
+                     bool copy_in_memory     = false,
+                     HugePages hugepages_2mb = HugePages::kDisable)
     : file_{std::move(file)},
       copy_in_memory_{copy_in_memory},
       hugepages_2mb_requested_{hugepages_2mb},
-      hugepages_2mb_actual_{hugepages_2mb}
+      hugepages_2mb_actual_{hugepages_2mb > HugePages::kDisable}
   {
   }
   explicit blob_mmap(std::string file_name,
-                     uint32_t rows_offset = 0,
-                     uint32_t rows_limit  = 0,
-                     bool copy_in_memory  = false,
-                     bool hugepages_2mb   = false)
+                     uint32_t rows_offset    = 0,
+                     uint32_t rows_limit     = 0,
+                     bool copy_in_memory     = false,
+                     HugePages hugepages_2mb = HugePages::kDisable)
     : blob_mmap{
         blob_file<T>{std::move(file_name), rows_offset, rows_limit}, copy_in_memory, hugepages_2mb}
   {
@@ -403,7 +409,7 @@ struct blob_mmap {
  private:
   blob_file<T> file_;
   bool copy_in_memory_;
-  bool hugepages_2mb_requested_;
+  HugePages hugepages_2mb_requested_;
   mutable bool hugepages_2mb_actual_;
 
   mutable std::optional<std::tuple<mmap_owner, ptrdiff_t>> handle_;
@@ -440,21 +446,26 @@ struct blob_mmap {
             data_start - mmap_start);
         }
       } catch (const mmap_error& e) {
-        if (e.code() == EPERM && hugepages_2mb_requested_ && hugepages_2mb_actual_) {
-          log_warn(
-            "cuvs::bench::blob_mmap: `mmap` failed to map due to EPERM, which is likely caused by "
-            "the permissions issue. You either need a CAP_IPC_LOCK capability or run the program "
-            "with sudo. "
-            "We will try again without huge pages.");
+        bool hugepages_2mb_asked = hugepages_2mb_requested_ == HugePages::kAsk ||
+                                   hugepages_2mb_requested_ == HugePages::kRequire;
+        if (e.code() == EPERM && hugepages_2mb_asked && hugepages_2mb_actual_) {
+          if (hugepages_2mb_requested_ == HugePages::kRequire) {
+            log_warn(
+              "cuvs::bench::blob_mmap: `mmap` failed to map due to EPERM, which is likely caused "
+              "by the permissions issue. You either need a CAP_IPC_LOCK capability or run the "
+              "program with sudo. We will try again without huge pages.");
+          }
           hugepages_2mb_actual_ = false;
           return handle();
         }
-        if (e.code() == EINVAL && hugepages_2mb_requested_ && hugepages_2mb_actual_ &&
+        if (e.code() == EINVAL && hugepages_2mb_asked && hugepages_2mb_actual_ &&
             !copy_in_memory_) {
-          log_warn(
-            "cuvs::bench::blob_mmap: `mmap` failed to map due to EINVAL, which is likely caused by "
-            "the file system not supporting huge pages. "
-            "We will try again without huge pages.");
+          if (hugepages_2mb_requested_ == HugePages::kRequire) {
+            log_warn(
+              "cuvs::bench::blob_mmap: `mmap` failed to map due to EINVAL, which is likely caused "
+              "by the file system not supporting huge pages. We will try again without huge "
+              "pages.");
+          }
           hugepages_2mb_actual_ = false;
           return handle();
         }
@@ -472,7 +483,24 @@ struct blob_mmap {
   }
 
   [[nodiscard]] auto is_in_memory() const -> bool { return copy_in_memory_; }
-  [[nodiscard]] auto is_hugepage() const -> bool { return hugepages_2mb_requested_; }
+  [[nodiscard]] auto is_hugepage() const -> bool { return hugepages_2mb_actual_; }
+  /**
+   * Enabling hugepages is not always possible. For convenience, we may silently disable it in some
+   * cases. This function helps to decide whether the current setting is compatible with the
+   * request.R
+   */
+  [[nodiscard]] auto hugepage_compliant(HugePages request) const -> bool
+  {
+    if (request == hugepages_2mb_requested_) {
+      // whatever the actual state is, the result would be the same if we recreated
+      // the mapping.
+      return true;
+    }
+    bool hp_enabled    = hugepages_2mb_actual_ && request > HugePages::kDisable;
+    bool hp_disabled   = !hugepages_2mb_actual_ && request == HugePages::kDisable;
+    bool hp_not_forced = !hugepages_2mb_actual_ && request == HugePages::kAsk;
+    return hp_enabled || hp_disabled || hp_not_forced;
+  }
   [[nodiscard]] auto n_rows() const -> uint32_t { return file_.rows_limit(); }
   [[nodiscard]] auto n_cols() const -> uint32_t { return file_.n_cols(); }
   [[nodiscard]] auto size() const -> size_t { return sizeof(T) * n_rows() * n_cols(); }
@@ -558,9 +586,10 @@ struct blob_pinned {
         error_code = cudaHostRegister(ptr, blob_.size(), cudaHostRegisterDefault);
       }
       if (error_code == cudaErrorInvalidValue && (!blob_.is_in_memory() || blob_.is_hugepage())) {
-        auto hugepage = blob_.is_hugepage() && blob_.is_in_memory();  // only enable hugepage
-        auto file     = std::move(blob_).release();
-        blob_         = blob_mmap<T>{std::move(file), true, hugepage};
+        auto hugepage =
+          (blob_.is_hugepage() && blob_.is_in_memory()) ? HugePages::kAsk : HugePages::kDisable;
+        auto file = std::move(blob_).release();
+        blob_     = blob_mmap<T>{std::move(file), true, hugepage};
         return data();
       }
       if (error_code != cudaSuccess) {
@@ -587,6 +616,10 @@ struct blob_pinned {
 
   [[nodiscard]] auto is_in_memory() const noexcept -> bool { return true; }
   [[nodiscard]] auto is_hugepage() const noexcept -> bool { return blob_.is_hugepage(); }
+  [[nodiscard]] auto hugepage_compliant(HugePages request) const -> bool
+  {
+    return blob_.hugepage_compliant(request);
+  }
   [[nodiscard]] auto n_rows() const -> uint32_t { return blob_.n_rows(); }
   [[nodiscard]] auto n_cols() const -> uint32_t { return blob_.n_cols(); }
   [[nodiscard]] auto size() const -> size_t { return blob_.size(); }
@@ -605,7 +638,7 @@ struct blob_copying {
  public:
   explicit blob_copying(blob_mmap<T>&& blob) : blob_{std::move(blob)} {}
   // First map the file and then copy it to device; use huge pages for faster copy
-  explicit blob_copying(blob_file<T>&& blob) : blob_{std::move(blob), false, true} {}
+  explicit blob_copying(blob_file<T>&& blob) : blob_{std::move(blob), false, HugePages::kAsk} {}
   explicit blob_copying(std::string file_name, uint32_t rows_offset = 0, uint32_t rows_limit = 0)
     : blob_copying{blob_file<T>{file_name, rows_offset, rows_limit}}
   {
@@ -634,6 +667,8 @@ struct blob_copying {
 
   [[nodiscard]] auto is_in_memory() const noexcept -> bool { return true; }
   [[nodiscard]] auto is_hugepage() const noexcept -> bool { return blob_.is_hugepage(); }
+  // For copying CUDA allocation, the hugepage setting is not relevant at all.
+  [[nodiscard]] auto hugepage_compliant(HugePages request) const -> bool { return true; }
   [[nodiscard]] auto n_rows() const -> uint32_t { return blob_.n_rows(); }
   [[nodiscard]] auto n_cols() const -> uint32_t { return blob_.n_cols(); }
   [[nodiscard]] auto size() const -> size_t { return blob_.size(); }
@@ -654,10 +689,10 @@ struct blob {
   using blob_type = std::variant<blob_mmap<T>, blob_pinned<T>, blob_device<T>, blob_managed<T>>;
   mutable blob_type value_;
 
-  [[nodiscard]] auto data_mmap(bool in_memory, bool request_hugepages_2mb) const -> T*
+  [[nodiscard]] auto data_mmap(bool in_memory, HugePages request_hugepages_2mb) const -> T*
   {
     if (auto* v = std::get_if<blob_mmap<T>>(&value_)) {
-      if (v->is_in_memory() == in_memory && v->is_hugepage() == request_hugepages_2mb) {
+      if (v->is_in_memory() == in_memory && v->hugepage_compliant(request_hugepages_2mb)) {
         return v->data();
       }
     }
@@ -671,15 +706,15 @@ struct blob {
     return data();
   }
 
-  [[nodiscard]] auto data_pinned(bool request_hugepages_2mb) const -> T*
+  [[nodiscard]] auto data_pinned(HugePages request_hugepages_2mb) const -> T*
   {
     // The requested type is there
     if (auto* v = std::get_if<blob_pinned<T>>(&value_)) {
-      if (v->is_hugepage() == request_hugepages_2mb) { return v->data(); }
+      if (v->hugepage_compliant(request_hugepages_2mb)) { return v->data(); }
     }
     // If there's already an mmap allocation, we just need to pin it.
     if (auto* v = std::get_if<blob_mmap<T>>(&value_)) {
-      if (v->is_hugepage() == request_hugepages_2mb) {
+      if (v->hugepage_compliant(request_hugepages_2mb)) {
         blob_mmap<T> tmp{std::move(*v)};
         return value_.template emplace<blob_pinned<T>>(std::move(tmp)).data();
       }
@@ -720,10 +755,10 @@ struct blob {
 
  public:
   explicit blob(std::string file_name,
-                uint32_t rows_offset = 0,
-                uint32_t rows_limit  = 0,
-                bool copy_in_memory  = false,
-                bool hugepages_2mb   = false)
+                uint32_t rows_offset    = 0,
+                uint32_t rows_limit     = 0,
+                bool copy_in_memory     = false,
+                HugePages hugepages_2mb = HugePages::kDisable)
     : value_{std::in_place_type<blob_mmap<T>>,
              std::move(file_name),
              rows_offset,
@@ -743,13 +778,14 @@ struct blob {
     return std::visit([](auto&& val) { return val.data(); }, value_);
   }
 
-  [[nodiscard]] auto data(MemoryType memory_type, bool request_hugepages_2mb = false) const -> T*
+  [[nodiscard]] auto data(MemoryType memory_type,
+                          HugePages request_hugepages_2mb = HugePages::kDisable) const -> T*
   {
     switch (memory_type) {
       case MemoryType::kHost: return data_mmap(true, request_hugepages_2mb);
       case MemoryType::kHostMmap: return data_mmap(false, request_hugepages_2mb);
       case MemoryType::kHostPinned:
-        if (request_hugepages_2mb) {
+        if (request_hugepages_2mb > HugePages::kDisable) {
           log_error(
             "cuvs::bench::blob::data(): huge pages are requested but not supported by "
             "cudaHostRegister at the moment. We will try nevertheless...");
@@ -836,7 +872,8 @@ struct dataset {
       // Generate a random bitset for filtering
       auto bitset_size = (base_set_size() - 1) / kBitsPerCarrierValue + 1;
       blob_file<bitset_carrier_type> bitset_blob_file{uint32_t(bitset_size), 1};
-      blob_mmap<bitset_carrier_type> bitset_blob{std::move(bitset_blob_file), false, false};
+      blob_mmap<bitset_carrier_type> bitset_blob{
+        std::move(bitset_blob_file), false, HugePages::kDisable};
       generate_bernoulli(const_cast<bitset_carrier_type*>(bitset_blob.data()),
                          bitset_size,
                          1.0 - filtering_rate.value());
@@ -862,14 +899,16 @@ struct dataset {
   }
 
   [[nodiscard]] auto query_set() const -> const DataT* { return query_set_.data(); }
-  [[nodiscard]] auto query_set(MemoryType memory_type, bool request_hugepages_2mb = false) const
+  [[nodiscard]] auto query_set(MemoryType memory_type,
+                               HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const DataT*
   {
     return query_set_.data(memory_type, request_hugepages_2mb);
   }
 
   [[nodiscard]] auto base_set() const -> const DataT* { return base_set_.data(); }
-  [[nodiscard]] auto base_set(MemoryType memory_type, bool request_hugepages_2mb = false) const
+  [[nodiscard]] auto base_set(MemoryType memory_type,
+                              HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const DataT*
   {
     return base_set_.data(memory_type, request_hugepages_2mb);
@@ -881,7 +920,8 @@ struct dataset {
     return nullptr;
   }
 
-  [[nodiscard]] auto filter_bitset(MemoryType memory_type, bool request_hugepages_2mb = false) const
+  [[nodiscard]] auto filter_bitset(MemoryType memory_type,
+                                   HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const bitset_carrier_type*
   {
     if (filter_bitset_.has_value()) {

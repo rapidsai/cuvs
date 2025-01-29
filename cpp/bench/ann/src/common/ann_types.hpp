@@ -40,6 +40,18 @@ enum class MemoryType {
   kManaged,
 };
 
+/** Request 2MB huge pages support for an allocation */
+enum class HugePages {
+  /** Don't use huge pages if possible. */
+  kDisable = 0,
+  /** Enable huge pages if possible, ignore otherwise. */
+  kAsk = 1,
+  /** Enable huge pages if possible, warn the user otherwise. */
+  kRequire = 2,
+  /** Force enable huge pages, throw an exception if not possible. */
+  kDemand = 3
+};
+
 enum class Metric {
   kInnerProduct,
   kEuclidean,
