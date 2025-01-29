@@ -27,8 +27,8 @@ dependencies:
 - gcc_linux-64=13.*
 - glog>=0.6.0
 - h5py>=3.8.0
-- libaio=0.3.113
-- libboost-devel=1.87
+- libaio
+- libboost-devel
 - libclang==16.0.6
 - libcublas-dev
 - libcurand-dev

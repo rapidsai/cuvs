@@ -135,12 +135,6 @@ void bench_build(::benchmark::State& state,
     }
   }
 
-  if (index.algo == "diskann_ssd") {
-    make_sure_parent_dir_exists(index.file);
-    index.build_param["dataset_file"]  = dataset->base_filename();
-    index.build_param["path_to_index"] = index.file;
-  }
-
   std::unique_ptr<algo<T>> algo;
   try {
     algo = create_algo<T>(index.algo, dataset->distance(), dataset->dim(), index.build_param);
@@ -150,7 +144,7 @@ void bench_build(::benchmark::State& state,
 
   const auto algo_property = parse_algo_property(algo->get_preference(), index.build_param);
 
-  const T* base_set = dataset->base_set(algo_property.dataset_memory_type);
+  const T* base_set      = dataset->base_set(algo_property.dataset_memory_type);
   std::size_t index_size = dataset->base_set_size();
 
   cuda_timer gpu_timer{algo};
@@ -229,12 +223,7 @@ void bench_search(::benchmark::State& state,
 
   const T* query_set = nullptr;
 
-  std::string filename;
-  if (index.algo != "diskann_ssd")
-    filename = index.file;
-  else
-    filename = index.file + "_disk.index";
-  if (!file_exists(filename)) {
+  if (!file_exists(index.file)) {
     state.SkipWithError("Index file is missing. Run the benchmark in the build mode first.");
     return;
   }

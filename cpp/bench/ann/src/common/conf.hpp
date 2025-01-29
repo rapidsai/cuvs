@@ -116,6 +116,10 @@ class configuration {
       index.file        = conf.at("file");
       index.batch_size  = batch_size;
       index.k           = k;
+      // transfer base file and index paths into build params to be consumed by certain algorithms
+      // in the build stage
+      index.build_param["dataset_file"]  = dataset_conf_.base_file;
+      index.build_param["path_to_index"] = conf.at("file");
 
       for (auto param : conf.at("search_params")) {
         /*  ### Special parameters for backward compatibility ###

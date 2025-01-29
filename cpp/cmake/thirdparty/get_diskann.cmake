@@ -40,7 +40,7 @@ function(find_and_configure_diskann)
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(diskann)
-    
+
   if(NOT TARGET diskann::diskann)
       target_include_directories(diskann INTERFACE "$<BUILD_INTERFACE:${diskann_SOURCE_DIR}/include>")
       add_library(diskann::diskann ALIAS diskann)
