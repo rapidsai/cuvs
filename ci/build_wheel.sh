@@ -38,7 +38,7 @@ rapids-logger "Building '${package_name}' wheel"
 
 sccache --zero-stats
 
-python -m pip wheel \
+rapids-pip-retry wheel \
     -w dist \
     -v \
     --no-deps \
