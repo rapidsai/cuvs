@@ -49,7 +49,7 @@ namespace cuvs::neighbors::vamana {
  * all vectors are re-inserted to improve graph quality.
  * `max_fraction`: The maximum batch size is this fraction of the total dataset size. Larger
  * gives faster build but lower graph quality.
- * `alpha`: Used to determine how aggresive the pruning will be.
+ * `alpha`: Used to determine how aggressive the pruning will be.
  */
 
 struct index_params : cuvs::neighbors::index_params {
