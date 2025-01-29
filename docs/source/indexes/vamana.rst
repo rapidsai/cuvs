@@ -7,9 +7,9 @@ VAMANA is the underlying graph construction algorithm used to construct indexes 
 * 2. Iteratively insert batches of dataset vectors into the graph, connecting each inserted vector to neighbors based on a graph traversal.
 * 3. For each batch, create reverse edges and prune unnecessary edges.
 
-There are many algorithmic details that are outlined in the `paper <https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf>`, and many GPU-specific optimizations are included in this implementation. 
+There are many algorithmic details that are outlined in the `paper <https://papers.nips.cc/paper/9527-rand-nsg-fast-accurate-billion-point-nearest-neighbor-search-on-a-single-node.pdf>`, and many GPU-specific optimizations are included in this implementation.
 
-The current implementation of DiskANN in cuVS only includes the 'in-memory' graph construction and a serialization step that writes the index to a file. This index file can be then used by the `open-source DiskANN <https://github.com/microsoft/DiskANN>` library to perform efficient search. Additional DiskANN functionality, including GPU-accelerated search and 'ssd' index build are planned for future cuVS releases. 
+The current implementation of DiskANN in cuVS only includes the 'in-memory' graph construction and a serialization step that writes the index to a file. This index file can be then used by the `open-source DiskANN <https://github.com/microsoft/DiskANN>` library to perform efficient search. Additional DiskANN functionality, including GPU-accelerated search and 'ssd' index build are planned for future cuVS releases.
 
 [ :doc:`C++ API <../cpp_api/neighbors_vamana>` | :doc:`Python API <../python_api/neighbors_vamana>` ]
 
@@ -61,7 +61,7 @@ The 2 hyper-parameters that are most often tuned are `graph_degree` and `visited
 Memory footprint
 ----------------
 
-Vamana builds a graph that is stored in device memory. However, in order to serialize the index and write it to a file for later use, it must be moved into host memory. If the `include_dataset` parameter is also set, then the dataset must be resident in host memory when calling serialize as well. 
+Vamana builds a graph that is stored in device memory. However, in order to serialize the index and write it to a file for later use, it must be moved into host memory. If the `include_dataset` parameter is also set, then the dataset must be resident in host memory when calling serialize as well.
 
 Device memory usage
 ~~~~~~~~~~~~~~~~~~~
