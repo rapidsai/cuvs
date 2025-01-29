@@ -931,7 +931,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 1024},  // dim
     {16},                                                    // k
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT, graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},
