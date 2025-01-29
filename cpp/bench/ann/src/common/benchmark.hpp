@@ -360,13 +360,19 @@ void bench_search(::benchmark::State& state,
   // Each thread calculates recall on their partition of queries.
   // evaluate recall
   if (dataset->max_k() >= k) {
-    const std::int32_t* gt    = dataset->gt_set();
+    const std::int32_t* gt             = dataset->gt_set();
+    const std::uint32_t* filter_bitset = dataset->filter_bitset(MemoryType::kHostMmap);
+    auto filter                        = [filter_bitset](std::int32_t i) -> bool {
+      if (filter_bitset == nullptr) { return true; }
+      auto word = filter_bitset[i >> 5];
+      return word & (1 << (i & 31));
+    };
     const std::uint32_t max_k = dataset->max_k();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
     std::size_t rows        = std::min(queries_processed, query_set_size);
     std::size_t match_count = 0;
-    std::size_t total_count = rows * static_cast<size_t>(k);
+    std::size_t total_count = 0;
 
     // We go through the groundtruth with same stride as the benchmark loop.
     size_t out_offset   = 0;
@@ -376,16 +382,20 @@ void bench_search(::benchmark::State& state,
         size_t i_orig_idx = batch_offset + i;
         size_t i_out_idx  = out_offset + i;
         if (i_out_idx < rows) {
-          for (std::uint32_t j = 0; j < k; j++) {
-            auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-            for (std::uint32_t l = 0; l < k; l++) {
-              auto exp_idx = gt[i_orig_idx * max_k + l];
+          uint32_t filter_pass_count = 0;
+          for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
+            auto exp_idx = gt[i_orig_idx * max_k + l];
+            if (!filter(exp_idx)) { continue; }
+            filter_pass_count++;
+            for (std::uint32_t j = 0; j < k; j++) {
+              auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
               if (act_idx == exp_idx) {
                 match_count++;
                 break;
               }
             }
           }
+          total_count += filter_pass_count;
         }
       }
       out_offset += n_queries;
