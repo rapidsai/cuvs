@@ -19,49 +19,34 @@ from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
-from cuvs.neighbors import ivf_pq
-from cuvs.test.ann_utils import calc_recall, generate_data
+from cuvs.neighbors import ivf_flat
+from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
-def run_ivf_pq_build_search_test(
+def run_ivf_flat_build_search_test(
     n_rows=10000,
     n_cols=10,
     n_queries=100,
     k=10,
     dtype=np.float32,
-    n_lists=100,
-    metric="euclidean",
-    pq_bits=8,
-    pq_dim=0,
-    codebook_kind="subspace",
     add_data_on_build=True,
-    n_probes=100,
-    lut_dtype=np.float32,
-    internal_distance_dtype=np.float32,
-    force_random_rotation=False,
-    kmeans_trainset_fraction=1,
-    kmeans_n_iters=20,
+    metric="euclidean",
     compare=True,
     inplace=True,
+    search_params={},
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
         dataset = normalize(dataset, norm="l2", axis=1)
     dataset_device = device_ndarray(dataset)
 
-    build_params = ivf_pq.IndexParams(
-        n_lists=n_lists,
+    build_params = ivf_flat.IndexParams(
         metric=metric,
-        kmeans_n_iters=kmeans_n_iters,
-        kmeans_trainset_fraction=kmeans_trainset_fraction,
-        pq_bits=pq_bits,
-        pq_dim=pq_dim,
-        codebook_kind=codebook_kind,
-        force_random_rotation=force_random_rotation,
         add_data_on_build=add_data_on_build,
     )
 
-    index = ivf_pq.build(build_params, dataset_device)
+    index = ivf_flat.build(build_params, dataset_device)
+
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]
         dataset_2 = dataset[n_rows // 2 :, :]
@@ -72,8 +57,8 @@ def run_ivf_pq_build_search_test(
         dataset_2_device = device_ndarray(dataset_2)
         indices_1_device = device_ndarray(indices_1)
         indices_2_device = device_ndarray(indices_2)
-        index = ivf_pq.extend(index, dataset_1_device, indices_1_device)
-        index = ivf_pq.extend(index, dataset_2_device, indices_2_device)
+        index = ivf_flat.extend(index, dataset_1_device, indices_1_device)
+        index = ivf_flat.extend(index, dataset_2_device, indices_2_device)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.int64)
@@ -83,13 +68,9 @@ def run_ivf_pq_build_search_test(
     out_idx_device = device_ndarray(out_idx) if inplace else None
     out_dist_device = device_ndarray(out_dist) if inplace else None
 
-    search_params = ivf_pq.SearchParams(
-        n_probes=n_probes,
-        lut_dtype=lut_dtype,
-        internal_distance_dtype=internal_distance_dtype,
-    )
+    search_params = ivf_flat.SearchParams(**search_params)
 
-    ret_output = ivf_pq.search(
+    ret_output = ivf_flat.search(
         search_params,
         index,
         queries_device,
@@ -111,6 +92,7 @@ def run_ivf_pq_build_search_test(
     skl_metric = {
         "sqeuclidean": "sqeuclidean",
         "inner_product": "cosine",
+        "cosine": "cosine",
         "euclidean": "euclidean",
     }[metric]
     nn_skl = NearestNeighbors(
@@ -126,78 +108,24 @@ def run_ivf_pq_build_search_test(
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32])
 @pytest.mark.parametrize(
-    "metric", ["sqeuclidean", "inner_product", "euclidean"]
+    "metric", ["sqeuclidean", "inner_product", "euclidean", "cosine"]
 )
-def test_ivf_pq(inplace, dtype, metric):
-    run_ivf_pq_build_search_test(
+def test_ivf_flat(inplace, dtype, metric):
+    run_ivf_flat_build_search_test(
         dtype=dtype,
         inplace=inplace,
         metric=metric,
     )
 
 
-@pytest.mark.parametrize(
-    "params",
-    [
-        {
-            "k": 10,
-            "n_probes": 100,
-            "lut": np.float16,
-            "idd": np.float32,
-        },
-        {
-            "k": 10,
-            "n_probes": 99,
-            "lut": np.uint8,
-            "idd": np.float32,
-        },
-        {
-            "k": 10,
-            "n_probes": 100,
-            "lut": np.float16,
-            "idd": np.float16,
-        },
-        {
-            "k": 129,
-            "n_probes": 100,
-            "lut": np.float32,
-            "idd": np.float32,
-        },
-    ],
-)
-def test_ivf_pq_search_params(params):
-    run_ivf_pq_build_search_test(
-        n_rows=10000,
-        n_cols=16,
-        n_queries=1000,
-        k=params["k"],
-        n_lists=100,
-        n_probes=params["n_probes"],
-        metric="sqeuclidean",
-        dtype=np.float32,
-        lut_dtype=params["lut"],
-        internal_distance_dtype=params["idd"],
-    )
-
-
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
 def test_extend(dtype):
-    run_ivf_pq_build_search_test(
+    run_ivf_flat_build_search_test(
         n_rows=10000,
         n_cols=10,
         n_queries=100,
         k=10,
-        n_lists=100,
         metric="sqeuclidean",
         dtype=dtype,
         add_data_on_build=False,
-    )
-
-
-@pytest.mark.parametrize("inplace", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
-def test_ivf_pq_dtype(inplace, dtype):
-    run_ivf_pq_build_search_test(
-        dtype=dtype,
-        inplace=inplace,
     )
