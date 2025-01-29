@@ -138,8 +138,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
       else
         search_params.merge_mode = TREE_MERGE;
+
+      search_params.n_rows_per_batch = n_rows_per_search_batch;
       cuvs::neighbors::ivf_flat::search(
-        clique_, new_index, search_params, queries, neighbors, distances, n_rows_per_search_batch);
+        clique_, new_index, search_params, queries, neighbors, distances);
       resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
@@ -197,8 +199,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
       else
         search_params.merge_mode = TREE_MERGE;
+
+      search_params.n_rows_per_batch = n_rows_per_search_batch;
       cuvs::neighbors::ivf_pq::search(
-        clique_, new_index, search_params, queries, neighbors, distances, n_rows_per_search_batch);
+        clique_, new_index, search_params, queries, neighbors, distances);
       resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
@@ -250,8 +254,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
       else
         search_params.merge_mode = TREE_MERGE;
+
+      search_params.n_rows_per_batch = n_rows_per_search_batch;
       cuvs::neighbors::cagra::search(
-        clique_, new_index, search_params, queries, neighbors, distances, n_rows_per_search_batch);
+        clique_, new_index, search_params, queries, neighbors, distances);
       resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
@@ -297,13 +303,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distributed_index =
         cuvs::neighbors::ivf_flat::distribute<DataT, int64_t>(clique_, "local_ivf_flat_index");
       search_params.merge_mode = TREE_MERGE;
-      cuvs::neighbors::ivf_flat::search(clique_,
-                                        distributed_index,
-                                        search_params,
-                                        queries,
-                                        neighbors,
-                                        distances,
-                                        n_rows_per_search_batch);
+
+      search_params.n_rows_per_batch = n_rows_per_search_batch;
+      cuvs::neighbors::ivf_flat::search(
+        clique_, distributed_index, search_params, queries, neighbors, distances);
 
       resource::sync_stream(clique_);
 
@@ -349,13 +352,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distributed_index =
         cuvs::neighbors::ivf_pq::distribute<DataT, int64_t>(clique_, "local_ivf_pq_index");
       search_params.merge_mode = TREE_MERGE;
-      cuvs::neighbors::ivf_pq::search(clique_,
-                                      distributed_index,
-                                      search_params,
-                                      queries,
-                                      neighbors,
-                                      distances,
-                                      n_rows_per_search_batch);
+
+      search_params.n_rows_per_batch = n_rows_per_search_batch;
+      cuvs::neighbors::ivf_pq::search(
+        clique_, distributed_index, search_params, queries, neighbors, distances);
 
       resource::sync_stream(clique_);
 
@@ -397,13 +397,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         cuvs::neighbors::cagra::distribute<DataT, uint32_t>(clique_, "local_cagra_index");
 
       search_params.merge_mode = TREE_MERGE;
-      cuvs::neighbors::cagra::search(clique_,
-                                     distributed_index,
-                                     search_params,
-                                     queries,
-                                     neighbors,
-                                     distances,
-                                     n_rows_per_search_batch);
+
+      search_params.n_rows_per_batch = n_rows_per_search_batch;
+      cuvs::neighbors::cagra::search(
+        clique_, distributed_index, search_params, queries, neighbors, distances);
 
       resource::sync_stream(clique_);
 
@@ -457,13 +454,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
           load_balancer_neighbors_snmg_ann.data() + offset, ps.num_queries, ps.k);
         auto small_batch_distances = raft::make_host_matrix_view<float, int64_t, row_major>(
           load_balancer_distances_snmg_ann.data() + offset, ps.num_queries, ps.k);
+
+        search_params.n_rows_per_batch = n_rows_per_search_batch;
         cuvs::neighbors::ivf_flat::search(clique_,
                                           index,
                                           search_params,
                                           small_batch_query,
                                           small_batch_neighbors,
-                                          small_batch_distances,
-                                          n_rows_per_search_batch);
+                                          small_batch_distances);
 
         std::vector<int64_t> small_batch_neighbors_vec(
           small_batch_neighbors.data_handle(),
@@ -521,13 +519,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
           load_balancer_neighbors_snmg_ann.data() + offset, ps.num_queries, ps.k);
         auto small_batch_distances = raft::make_host_matrix_view<float, int64_t, row_major>(
           load_balancer_distances_snmg_ann.data() + offset, ps.num_queries, ps.k);
+
+        search_params.n_rows_per_batch = n_rows_per_search_batch;
         cuvs::neighbors::ivf_pq::search(clique_,
                                         index,
                                         search_params,
                                         small_batch_query,
                                         small_batch_neighbors,
-                                        small_batch_distances,
-                                        n_rows_per_search_batch);
+                                        small_batch_distances);
 
         std::vector<int64_t> small_batch_neighbors_vec(
           small_batch_neighbors.data_handle(),
@@ -580,13 +579,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
           load_balancer_neighbors_snmg_ann.data() + offset, ps.num_queries, ps.k);
         auto small_batch_distances = raft::make_host_matrix_view<float, int64_t, row_major>(
           load_balancer_distances_snmg_ann.data() + offset, ps.num_queries, ps.k);
+
+        search_params.n_rows_per_batch = n_rows_per_search_batch;
         cuvs::neighbors::cagra::search(clique_,
                                        index,
                                        search_params,
                                        small_batch_query,
                                        small_batch_neighbors,
-                                       small_batch_distances,
-                                       n_rows_per_search_batch);
+                                       small_batch_distances);
 
         std::vector<uint32_t> small_batch_neighbors_vec(
           small_batch_neighbors.data_handle(),

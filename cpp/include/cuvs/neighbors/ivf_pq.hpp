@@ -1753,7 +1753,7 @@ void deserialize(raft::resources const& handle,
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::device_resources_snmg& clique,
+auto build(const raft::resources& clique,
            const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>;
@@ -1775,7 +1775,7 @@ auto build(const raft::device_resources_snmg& clique,
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::device_resources_snmg& clique,
+auto build(const raft::resources& clique,
            const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>;
@@ -1797,7 +1797,7 @@ auto build(const raft::device_resources_snmg& clique,
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::device_resources_snmg& clique,
+auto build(const raft::resources& clique,
            const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>;
@@ -1819,7 +1819,7 @@ auto build(const raft::device_resources_snmg& clique,
  *
  * @return the constructed IVF-PQ MG index
  */
-auto build(const raft::device_resources_snmg& clique,
+auto build(const raft::resources& clique,
            const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
   -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
@@ -1845,7 +1845,7 @@ auto build(const raft::device_resources_snmg& clique,
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::device_resources_snmg& clique,
+void extend(const raft::resources& clique,
             cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -1869,7 +1869,7 @@ void extend(const raft::device_resources_snmg& clique,
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::device_resources_snmg& clique,
+void extend(const raft::resources& clique,
             cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>& index,
             raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -1893,7 +1893,7 @@ void extend(const raft::device_resources_snmg& clique,
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::device_resources_snmg& clique,
+void extend(const raft::resources& clique,
             cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -1917,7 +1917,7 @@ void extend(const raft::device_resources_snmg& clique,
  * `std::nullopt` means default continuous range `[0...n_rows)`
  *
  */
-void extend(const raft::device_resources_snmg& clique,
+void extend(const raft::resources& clique,
             cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
@@ -1944,16 +1944,14 @@ void extend(const raft::device_resources_snmg& clique,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::device_resources_snmg& clique,
+void search(const raft::resources& clique,
             const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>& index,
             const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
-            raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<float, int64_t, row_major> distances);
 
 /// \ingroup mg_cpp_index_search
 /**
@@ -1975,16 +1973,14 @@ void search(const raft::device_resources_snmg& clique,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::device_resources_snmg& clique,
+void search(const raft::resources& clique,
             const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>& index,
             const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const half, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
-            raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<float, int64_t, row_major> distances);
 
 /// \ingroup mg_cpp_index_search
 /**
@@ -2006,16 +2002,14 @@ void search(const raft::device_resources_snmg& clique,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::device_resources_snmg& clique,
+void search(const raft::resources& clique,
             const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
-            raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<float, int64_t, row_major> distances);
 
 /// \ingroup mg_cpp_index_search
 /**
@@ -2037,16 +2031,14 @@ void search(const raft::device_resources_snmg& clique,
  * @param[in] queries a row-major matrix on host [n_rows, dim]
  * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
  * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
- * @param[in] n_rows_per_batch (optional) search batch size
  *
  */
-void search(const raft::device_resources_snmg& clique,
+void search(const raft::resources& clique,
             const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
-            raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch = DEFAULT_SEARCH_BATCH_SIZE);
+            raft::host_matrix_view<float, int64_t, row_major> distances);
 
 /// \defgroup mg_cpp_serialize ANN MG index serialization
 
@@ -2068,7 +2060,7 @@ void search(const raft::device_resources_snmg& clique,
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::device_resources_snmg& clique,
+void serialize(const raft::resources& clique,
                const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>& index,
                const std::string& filename);
 
@@ -2090,7 +2082,7 @@ void serialize(const raft::device_resources_snmg& clique,
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::device_resources_snmg& clique,
+void serialize(const raft::resources& clique,
                const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>& index,
                const std::string& filename);
 
@@ -2112,7 +2104,7 @@ void serialize(const raft::device_resources_snmg& clique,
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::device_resources_snmg& clique,
+void serialize(const raft::resources& clique,
                const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
                const std::string& filename);
 
@@ -2134,7 +2126,7 @@ void serialize(const raft::device_resources_snmg& clique,
  * @param[in] filename path to the file to be serialized
  *
  */
-void serialize(const raft::device_resources_snmg& clique,
+void serialize(const raft::resources& clique,
                const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
                const std::string& filename);
 
@@ -2157,7 +2149,7 @@ void serialize(const raft::device_resources_snmg& clique,
  *
  */
 template <typename T, typename IdxT>
-auto deserialize(const raft::device_resources_snmg& clique, const std::string& filename)
+auto deserialize(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg::index<ivf_pq::index<IdxT>, T, IdxT>;
 
 /// \defgroup mg_cpp_distribute ANN MG local index distribution
@@ -2182,7 +2174,7 @@ auto deserialize(const raft::device_resources_snmg& clique, const std::string& f
  *
  */
 template <typename T, typename IdxT>
-auto distribute(const raft::device_resources_snmg& clique, const std::string& filename)
+auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg::index<ivf_pq::index<IdxT>, T, IdxT>;
 
 #endif

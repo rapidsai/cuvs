@@ -19,9 +19,6 @@
 #ifdef CUVS_BUILD_MG_ALGOS
 
 #include <cuvs/neighbors/common.hpp>
-#include <raft/core/device_resources_snmg.hpp>
-
-#define DEFAULT_SEARCH_BATCH_SIZE 1 << 20
 
 /// \defgroup mg_cpp_index_params ANN MG index build parameters
 
@@ -82,12 +79,14 @@ struct search_params : public Upstream {
   cuvs::neighbors::mg::replicated_search_mode search_mode = LOAD_BALANCER;
   /** Sharded merge mode */
   cuvs::neighbors::mg::sharded_merge_mode merge_mode = TREE_MERGE;
+  /** Number of rows per batch */
+  int64_t n_rows_per_batch = 1 << 20;
 };
 
 template <typename AnnIndexType, typename T, typename IdxT>
 struct index {
-  index(distribution_mode mode, int num_ranks_);
-  index(const raft::device_resources_snmg& clique, const std::string& filename);
+  index(const raft::resources& clique, distribution_mode mode);
+  index(const raft::resources& clique, const std::string& filename);
 
   index(const index&)                    = delete;
   index(index&&)                         = default;

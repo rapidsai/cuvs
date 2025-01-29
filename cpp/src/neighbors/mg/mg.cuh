@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../detail/knn_merge_parts.cuh"
+#include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -31,6 +32,18 @@
 
 namespace cuvs::neighbors {
 using namespace raft;
+
+inline const raft::device_resources_snmg& get_snmng_clique(const raft::resources& res)
+{
+  try {
+    const raft::device_resources_snmg& clique =
+      dynamic_cast<const raft::device_resources_snmg&>(res);
+    return clique;
+  } catch (const std::bad_cast& e) {
+    throw std::runtime_error(
+      "MG function was not used with an appropriate raft::device_resources_snmg object");
+  }
+}
 
 template <typename AnnIndexType, typename T, typename IdxT>
 void search(const raft::device_resources& handle,
@@ -51,10 +64,11 @@ using namespace raft;
 
 // local index deserialization and distribution
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize_and_distribute(const raft::device_resources_snmg& clique,
+void deserialize_and_distribute(const raft::resources& res,
                                 index<AnnIndexType, T, IdxT>& index,
                                 const std::string& filename)
 {
+  const auto& clique = get_snmng_clique(res);
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
     auto& ann_if                          = index.ann_interfaces_.emplace_back();
@@ -64,10 +78,11 @@ void deserialize_and_distribute(const raft::device_resources_snmg& clique,
 
 // MG index deserialization
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources_snmg& clique,
+void deserialize(const raft::resources& res,
                  index<AnnIndexType, T, IdxT>& index,
                  const std::string& filename)
 {
+  const auto& clique = get_snmng_clique(res);
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
@@ -91,11 +106,12 @@ void deserialize(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void build(const raft::device_resources_snmg& clique,
+void build(const raft::resources& res,
            index<AnnIndexType, T, IdxT>& index,
            const cuvs::neighbors::index_params* index_params,
            raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
+  const auto& clique = get_snmng_clique(res);
   if (index.mode_ == REPLICATED) {
     int64_t n_rows = index_dataset.extent(0);
     RAFT_LOG_DEBUG("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
@@ -132,12 +148,13 @@ void build(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void extend(const raft::device_resources_snmg& clique,
+void extend(const raft::resources& res,
             index<AnnIndexType, T, IdxT>& index,
             raft::host_matrix_view<const T, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)
 {
-  int64_t n_rows = new_vectors.extent(0);
+  const auto& clique = get_snmng_clique(res);
+  int64_t n_rows     = new_vectors.extent(0);
   if (index.mode_ == REPLICATED) {
     RAFT_LOG_DEBUG("REPLICATED EXTEND: %d*%drows", index.num_ranks_, n_rows);
 
@@ -177,7 +194,7 @@ void extend(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void sharded_search_with_direct_merge(const raft::device_resources_snmg& clique,
+void sharded_search_with_direct_merge(const raft::resources& res,
                                       const index<AnnIndexType, T, IdxT>& index,
                                       const cuvs::neighbors::search_params* search_params,
                                       raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -189,6 +206,7 @@ void sharded_search_with_direct_merge(const raft::device_resources_snmg& clique,
                                       int64_t n_neighbors,
                                       int64_t n_batches)
 {
+  const auto& clique      = get_snmng_clique(res);
   const auto& root_handle = clique.set_current_device_to_root_rank();
   auto in_neighbors       = raft::make_device_matrix<IdxT, int64_t, row_major>(
     root_handle, index.num_ranks_ * n_rows_per_batch, n_neighbors);
@@ -309,7 +327,7 @@ void sharded_search_with_direct_merge(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void sharded_search_with_tree_merge(const raft::device_resources_snmg& clique,
+void sharded_search_with_tree_merge(const raft::resources& res,
                                     const index<AnnIndexType, T, IdxT>& index,
                                     const cuvs::neighbors::search_params* search_params,
                                     raft::host_matrix_view<const T, int64_t, row_major> queries,
@@ -321,6 +339,7 @@ void sharded_search_with_tree_merge(const raft::device_resources_snmg& clique,
                                     int64_t n_neighbors,
                                     int64_t n_batches)
 {
+  const auto& clique = get_snmng_clique(res);
   for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
     int64_t offset                  = batch_idx * n_rows_per_batch;
     int64_t query_offset            = offset * n_cols;
@@ -442,7 +461,7 @@ void sharded_search_with_tree_merge(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void run_search_batch(const raft::device_resources_snmg& clique,
+void run_search_batch(const raft::resources& res,
                       const index<AnnIndexType, T, IdxT>& index,
                       int rank,
                       const cuvs::neighbors::search_params* search_params,
@@ -455,6 +474,7 @@ void run_search_batch(const raft::device_resources_snmg& clique,
                       int64_t n_cols,
                       int64_t n_neighbors)
 {
+  const auto& clique                    = get_snmng_clique(res);
   const raft::device_resources& dev_res = clique.set_current_device_to_rank(rank);
   auto& ann_if                          = index.ann_interfaces_[rank];
 
@@ -481,34 +501,38 @@ void run_search_batch(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(const raft::device_resources_snmg& clique,
+void search(const raft::resources& res,
             const index<AnnIndexType, T, IdxT>& index,
             const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> queries,
             raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
-            raft::host_matrix_view<float, int64_t, row_major> distances,
-            int64_t n_rows_per_batch)
+            raft::host_matrix_view<float, int64_t, row_major> distances)
 {
+  const auto& clique  = get_snmng_clique(res);
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
 
+  int64_t n_rows_per_batch = -1;
   if (index.mode_ == REPLICATED) {
     cuvs::neighbors::mg::replicated_search_mode search_mode;
     if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
       const cuvs::neighbors::mg::search_params<ivf_flat::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg::search_params<ivf_flat::search_params>*>(
           search_params);
-      search_mode = mg_search_params->search_mode;
+      search_mode      = mg_search_params->search_mode;
+      n_rows_per_batch = mg_search_params->n_rows_per_batch;
     } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
       const cuvs::neighbors::mg::search_params<ivf_pq::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg::search_params<ivf_pq::search_params>*>(
           search_params);
-      search_mode = mg_search_params->search_mode;
+      search_mode      = mg_search_params->search_mode;
+      n_rows_per_batch = mg_search_params->n_rows_per_batch;
     } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
       const cuvs::neighbors::mg::search_params<cagra::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg::search_params<cagra::search_params>*>(search_params);
-      search_mode = mg_search_params->search_mode;
+      search_mode      = mg_search_params->search_mode;
+      n_rows_per_batch = mg_search_params->n_rows_per_batch;
     }
 
     if (search_mode == LOAD_BALANCER) {
@@ -571,16 +595,19 @@ void search(const raft::device_resources_snmg& clique,
       const cuvs::neighbors::mg::search_params<ivf_flat::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg::search_params<ivf_flat::search_params>*>(
           search_params);
-      merge_mode = mg_search_params->merge_mode;
+      merge_mode       = mg_search_params->merge_mode;
+      n_rows_per_batch = mg_search_params->n_rows_per_batch;
     } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
       const cuvs::neighbors::mg::search_params<ivf_pq::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg::search_params<ivf_pq::search_params>*>(
           search_params);
-      merge_mode = mg_search_params->merge_mode;
+      merge_mode       = mg_search_params->merge_mode;
+      n_rows_per_batch = mg_search_params->n_rows_per_batch;
     } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
       const cuvs::neighbors::mg::search_params<cagra::search_params>* mg_search_params =
         static_cast<const cuvs::neighbors::mg::search_params<cagra::search_params>*>(search_params);
-      merge_mode = mg_search_params->merge_mode;
+      merge_mode       = mg_search_params->merge_mode;
+      n_rows_per_batch = mg_search_params->n_rows_per_batch;
     }
 
     int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
@@ -620,10 +647,11 @@ void search(const raft::device_resources_snmg& clique,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(const raft::device_resources_snmg& clique,
+void serialize(const raft::resources& res,
                const index<AnnIndexType, T, IdxT>& index,
                const std::string& filename)
 {
+  const auto& clique = get_snmng_clique(res);
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
@@ -648,18 +676,17 @@ using namespace cuvs::neighbors;
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
-index<AnnIndexType, T, IdxT>::index(distribution_mode mode, int num_ranks_)
-  : mode_(mode),
-    num_ranks_(num_ranks_),
-    round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
+index<AnnIndexType, T, IdxT>::index(const raft::resources& res, distribution_mode mode)
+  : mode_(mode), round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
+  const auto& clique = get_snmng_clique(res);
+  num_ranks_         = clique.get_num_ranks();
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-index<AnnIndexType, T, IdxT>::index(const raft::device_resources_snmg& clique,
-                                    const std::string& filename)
+index<AnnIndexType, T, IdxT>::index(const raft::resources& res, const std::string& filename)
   : round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
-  cuvs::neighbors::mg::detail::deserialize(clique, *this, filename);
+  cuvs::neighbors::mg::detail::deserialize(res, *this, filename);
 }
 }  // namespace cuvs::neighbors::mg
