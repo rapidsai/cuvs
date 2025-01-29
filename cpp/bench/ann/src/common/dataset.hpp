@@ -205,7 +205,7 @@ struct managed_mem_owner {
   size_t size_;
 };
 
-/** RAII wrapper for managed memory. */
+/** RAII wrapper for device memory. */
 struct device_mem_owner {
   explicit device_mem_owner(size_t size) : size_{size}
   {
