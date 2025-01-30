@@ -265,7 +265,6 @@ struct search_plan_impl : public search_plan_impl_base {
         small_hash_bitlen += 1;
       }
       RAFT_EXPECTS(small_hash_bitlen <= 14, "small_hash_bitlen cannot be largen than 14 (16K)");
-      small_hash_reset_interval = 1024 * 1024;  // This is not used.
       //
       // [traversed_hash_table]
       // Whether a node has ever been used as the starting point for a traversal
@@ -338,7 +337,9 @@ struct search_plan_impl : public search_plan_impl_base {
         while (max_visited_nodes > hashmap::get_size(hash_bitlen) * max_fill_rate) {
           hash_bitlen += 1;
         }
-        RAFT_EXPECTS(hash_bitlen <= 20, "hash_bitlen cannot be largen than 20 (1M)");
+        RAFT_EXPECTS(hash_bitlen <= 20,
+                     "hash_bitlen cannot be largen than 20 (1M). You can decrease itopk_size, "
+                     "search_width or max_iterations to reduce the required hashmap size.");
       }
     }
     RAFT_LOG_DEBUG("# internal topK = %lu", itopk_size);

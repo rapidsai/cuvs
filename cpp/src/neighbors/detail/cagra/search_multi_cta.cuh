@@ -117,8 +117,8 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
   {
     const size_t global_itopk_size          = itopk_size;
     constexpr unsigned multi_cta_itopk_size = 32;
+    this->itopk_size                        = multi_cta_itopk_size;
     search_width                            = 1;
-    itopk_size                              = multi_cta_itopk_size;
     num_cta_per_query =
       max(params.search_width, raft::ceildiv(params.itopk_size, (size_t)multi_cta_itopk_size));
     result_buffer_size = itopk_size + (search_width * graph_degree);
