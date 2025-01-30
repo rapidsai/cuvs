@@ -137,6 +137,31 @@ void add_node_core(
                raft::resource::get_cuda_stream(handle));
     raft::resource::sync_stream(handle);
 
+    // Check search results
+    constexpr int max_warnings = 3;
+    int num_warnings           = 0;
+    for (std::size_t vec_i = 0; vec_i < batch.size(); vec_i++) {
+      std::uint32_t invalid_edges = 0;
+      for (std::uint32_t i = 0; i < base_degree; i++) {
+        if (host_neighbor_indices(vec_i, i) >= old_size) { invalid_edges++; }
+      }
+      if (invalid_edges > 0) {
+        if (num_warnings < max_warnings) {
+          RAFT_LOG_WARN(
+            "Invalid edges found in search results "
+            "(vec_i:%lu, invalid_edges:%lu, degree:%lu, base_degree:%lu)",
+            (uint64_t)vec_i,
+            (uint64_t)invalid_edges,
+            (uint64_t)degree,
+            (uint64_t)base_degree);
+        }
+        num_warnings += 1;
+      }
+    }
+    if (num_warnings > max_warnings) {
+      RAFT_LOG_WARN("The number of queries that contain invalid search results: %d", num_warnings);
+    }
+
     // Step 2: rank-based reordering
 #pragma omp parallel
     {
@@ -147,9 +172,16 @@ void add_node_core(
         for (std::uint32_t i = 0; i < base_degree; i++) {
           std::uint32_t detourable_node_count = 0;
           const auto a_id                     = host_neighbor_indices(vec_i, i);
+          if (a_id >= idx.size()) {
+            // If the node ID is not valid, the number of detours is increased
+            // to a value greater than the maximum, so that the edge to that
+            // node is not selected as much as possible.
+            detourable_node_count_list[i] = std::make_pair(a_id, base_degree + 1);
+            continue;
+          }
           for (std::uint32_t j = 0; j < i; j++) {
             const auto b0_id = host_neighbor_indices(vec_i, j);
-            assert(b0_id < idx.size());
+            if (b0_id >= idx.size()) { continue; }
             for (std::uint32_t k = 0; k < degree; k++) {
               const auto b1_id = updated_graph(b0_id, k);
               if (a_id == b1_id) {
@@ -160,6 +192,7 @@ void add_node_core(
           }
           detourable_node_count_list[i] = std::make_pair(a_id, detourable_node_count);
         }
+
         std::sort(detourable_node_count_list.begin(),
                   detourable_node_count_list.end(),
                   [&](const std::pair<IdxT, std::size_t> a, const std::pair<IdxT, std::size_t> b) {
@@ -181,13 +214,18 @@ void add_node_core(
       const auto target_new_node_id = old_size + batch.offset() + vec_i;
       for (std::size_t i = 0; i < num_rev_edges; i++) {
         const auto target_node_id = updated_graph(old_size + batch.offset() + vec_i, i);
-
+        if (target_node_id >= new_size) {
+          RAFT_FAIL("Invalid node ID found in updated_graph (%u)\n", target_node_id);
+        }
         IdxT replace_id                        = new_size;
         IdxT replace_id_j                      = 0;
         std::size_t replace_num_incoming_edges = 0;
         for (std::int32_t j = degree - 1; j >= static_cast<std::int32_t>(rev_edge_search_range);
              j--) {
-          const auto neighbor_id               = updated_graph(target_node_id, j);
+          const auto neighbor_id = updated_graph(target_node_id, j);
+          if (neighbor_id >= new_size) {
+            RAFT_FAIL("Invalid node ID found in updated_graph (%u)\n", neighbor_id);
+          }
           const std::size_t num_incoming_edges = host_num_incoming_edges(neighbor_id);
           if (num_incoming_edges > replace_num_incoming_edges) {
             // Check duplication
@@ -206,10 +244,6 @@ void add_node_core(
             replace_id_j               = j;
           }
         }
-        if (replace_id >= new_size) {
-          std::fprintf(stderr, "Invalid rev edge index (%u)\n", replace_id);
-          return;
-        }
         updated_graph(target_node_id, replace_id_j) = target_new_node_id;
         rev_edges[i]                                = replace_id;
       }
@@ -221,13 +255,15 @@ void add_node_core(
       const auto rank_based_list_ptr =
         updated_graph.data_handle() + (old_size + batch.offset() + vec_i) * degree;
       const auto rev_edges_return_list_ptr = rev_edges.data();
-      while (num_add < degree) {
+      while ((num_add < degree) &&
+             ((rank_base_i < degree) || (rev_edges_return_i < num_rev_edges))) {
         const auto node_list_ptr =
           interleave_switch == 0 ? rank_based_list_ptr : rev_edges_return_list_ptr;
         auto& node_list_index          = interleave_switch == 0 ? rank_base_i : rev_edges_return_i;
         const auto max_node_list_index = interleave_switch == 0 ? degree : num_rev_edges;
         for (; node_list_index < max_node_list_index; node_list_index++) {
           const auto candidate = node_list_ptr[node_list_index];
+          if (candidate >= new_size) { continue; }
           // Check duplication
           bool dup = false;
           for (std::uint32_t j = 0; j < num_add; j++) {
@@ -244,6 +280,12 @@ void add_node_core(
         }
         interleave_switch = 1 - interleave_switch;
       }
+      if (num_add < degree) {
+        RAFT_FAIL("Number of edges is not enough (target_new_node_id:%lu, num_add:%lu, degree:%lu)",
+                  (uint64_t)target_new_node_id,
+                  (uint64_t)num_add,
+                  (uint64_t)degree);
+      }
       for (std::uint32_t i = 0; i < degree; i++) {
         updated_graph(target_new_node_id, i) = temp[i];
       }
@@ -259,7 +301,9 @@ void add_graph_nodes(
   raft::host_matrix_view<IdxT, std::int64_t> updated_graph_view,
   const cagra::extend_params& params)
 {
-  assert(input_updated_dataset_view.extent(0) >= index.size());
+  if (input_updated_dataset_view.extent(0) < index.size()) {
+    RAFT_FAIL("Updated dataset must be not smaller than the previous index state.");
+  }
 
   const std::size_t initial_dataset_size = index.size();
   const std::size_t new_dataset_size     = input_updated_dataset_view.extent(0);
