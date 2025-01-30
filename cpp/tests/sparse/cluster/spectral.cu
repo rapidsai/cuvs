@@ -73,13 +73,13 @@ TEST(Raft, Spectral)
   raft::update_device(indices.data(), h_indices.data(), h_indices.size(), handle.get_stream());
   raft::update_device(values.data(), h_values.data(), h_values.size(), handle.get_stream());
 
-  raft::spectral::matrix::sparse_matrix_t<int32_t, float> const matrix{
+  raft::spectral::matrix::sparse_matrix_t<int32_t, float, uint64_t> const matrix{
     handle,
     offsets.data(),
     indices.data(),
     values.data(),
     static_cast<int32_t>(offsets.size() - 1),
-    static_cast<int32_t>(indices.size())};
+    static_cast<uint64_t>(indices.size())};
 
   cuvs::spectral::eigen_solver_config_t<int32_t, float> eig_cfg{
     n_eigenvectors, evs_max_it, restartIter_lanczos, evs_tol, reorthog, seed1};

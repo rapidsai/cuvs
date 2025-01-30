@@ -266,11 +266,13 @@ void tiled_brute_force_knn(const raft::resources& handle,
                          });
       }
 
+      std::optional<raft::device_matrix_view<const IndexType, int64_t, raft::row_major>>
+        null_optional = std::nullopt;
       cuvs::selection::select_k(
         handle,
         raft::make_device_matrix_view<const DistanceT, int64_t, raft::row_major>(
           temp_distances.data(), current_query_size, current_centroid_size),
-        std::nullopt,
+        null_optional,
         raft::make_device_matrix_view<DistanceT, int64_t, raft::row_major>(
           distances + i * k, current_query_size, current_k),
         raft::make_device_matrix_view<IndexType, int64_t, raft::row_major>(

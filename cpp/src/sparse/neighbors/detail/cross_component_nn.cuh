@@ -449,10 +449,10 @@ void min_components_by_color(raft::sparse::COO<value_t, value_idx>& coo,
  * is done
  * @param[in] metric distance metric
  */
-template <typename value_idx, typename value_t, typename red_op>
+template <typename value_idx, typename value_t, typename red_op, typename nnz_t = size_t>
 void cross_component_nn(
   raft::resources const& handle,
-  raft::sparse::COO<value_t, value_idx>& out,
+  raft::sparse::COO<value_t, value_idx, nnz_t>& out,
   const value_t* X,
   const value_idx* orig_colors,
   size_t n_rows,
@@ -510,7 +510,7 @@ void cross_component_nn(
    * Take the min for any duplicate colors
    */
   // Compute mask of duplicates
-  rmm::device_uvector<value_idx> out_index(n_rows + 1, stream);
+  rmm::device_uvector<nnz_t> out_index(n_rows + 1, stream);
   raft::sparse::op::compute_duplicates_mask(
     out_index.data(), colors.data(), nn_colors.data(), n_rows, stream);
 
@@ -520,13 +520,13 @@ void cross_component_nn(
                          out_index.data());
 
   // compute final size
-  value_idx size = 0;
+  nnz_t size = 0;
   raft::update_host(&size, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
 
   size++;
 
-  raft::sparse::COO<value_t, value_idx> min_edges(stream);
+  raft::sparse::COO<value_t, value_idx, nnz_t> min_edges(stream);
   min_edges.allocate(size, n_rows, n_rows, true, stream);
 
   min_components_by_color(

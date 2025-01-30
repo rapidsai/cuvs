@@ -36,6 +36,7 @@ TEST(Raft, EigenSolvers)
   using namespace raft::spectral::matrix;
   using index_type = int;
   using value_type = double;
+  using nnz_type   = int;
 
   raft::resources h;
   ASSERT_EQ(0, raft::resource::get_device_id(h));
@@ -43,10 +44,10 @@ TEST(Raft, EigenSolvers)
   index_type* ro{nullptr};
   index_type* ci{nullptr};
   value_type* vs{nullptr};
-  index_type nnz   = 0;
+  nnz_type nnz     = 0;
   index_type nrows = 0;
 
-  sparse_matrix_t<index_type, value_type> sm1{h, ro, ci, vs, nrows, nnz};
+  sparse_matrix_t<index_type, value_type, nnz_type> sm1{h, ro, ci, vs, nrows, nnz};
   ASSERT_EQ(nullptr, sm1.row_offsets_);
 
   index_type neigvs{10};
