@@ -134,18 +134,18 @@ IVF-PQ Build:
 
 .. math::
 
-   n\_vectors / train\_set\_ratio * dim * sizeof(float)   // trainset, may be in managed mem
+   n\_vectors / train\_set\_ratio * dim * sizeof_{float}   // trainset, may be in managed mem
 
    + n\_vectors / train\_set\_ratio * sizeof(uint32_t)    // labels, may be in managed mem
 
-   + n\_clusters * n\_dim * sizeof(float)                // cluster centers
+   + n\_clusters * n\_dim * sizeof_{float}                // cluster centers
 
 IVF-PQ Search (max batch size 1024 vectors on device at a time):
 
 .. math::
 
-   [n\_vectors * (pq\_dim * pq\_bits / 8 + sizeof(int64\_t)) + O(n\_clusters)]
+   [n\_vectors * (pq\_dim * pq\_bits / 8 + sizeof_{int64\_t}) + O(n\_clusters)]
 
-   + [batch\_size * n\_dim * sizeof(float)] + [batch\_size * intermediate\_degree * sizeof(uint32\_t)]
+   + [batch\_size * n\_dim * sizeof_{float}] + [batch\_size * intermediate\_degree * sizeof_{uint32\_t}]
 
-   + [batch\_size * intermediate\_degree * sizeof(float)]
+   + [batch\_size * intermediate\_degree * sizeof_{float}]

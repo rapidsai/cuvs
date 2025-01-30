@@ -97,9 +97,9 @@ Simple approximate formula: :math:`n\_vectors * (pq\_dim * \frac{pq\_bits}{8} + 
 
 The IVF lists end up being represented by a sparse data structure that stores the pointers to each list, an indices array that contains the indexes of each vector in each list, and an array with the encoded (and interleaved) data for each list.
 
-IVF list pointers: :math:`n\_clusters * sizeof(uint32_t)`
+IVF list pointers: :math:`n\_clusters * sizeof_{uint32\_t}`
 
-Indices: :math:`n\_vectors * sizeof(idx)`
+Indices: :math:`n\_vectors * sizeof_{idx}`
 
 Encoded data (interleaved): :math:`n\_vectors * pq\_dim * \frac{pq\_bits}{8}`
 
@@ -112,7 +112,7 @@ Extras: :math:`n\_clusters * (20 + 8 * dim)`
 Index (host memory):
 ~~~~~~~~~~~~~~~~~~~~
 
-When refinement is used with the dataset on host, the original raw vectors are needed: :math:`n\_vectors * dims * sizeof(float)`
+When refinement is used with the dataset on host, the original raw vectors are needed: :math:`n\_vectors * dims * sizeof_{float}`
 
 Search peak memory usage (device);
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,10 +126,10 @@ Build peak memory usage (device):
 
 .. math::
 
-   \frac{n\_vectors}{trainset\_ratio * dims * sizeof(float)}
+   \frac{n\_vectors}{trainset\_ratio * dims * sizeof_{float}}
 
-   + \frac{n\_vectors}{trainset\_ratio * sizeof(uint32_t)}
+   + \frac{n\_vectors}{trainset\_ratio * sizeof_{uint32\_t}}
 
-   + n\_clusters * dim * sizeof(float)
+   + n\_clusters * dim * sizeof_{float}
 
 Note, if there’s not enough space left in the workspace memory resource, IVF-PQ build automatically switches to the managed memory for the training set and labels.
