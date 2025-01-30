@@ -25,6 +25,8 @@ cdef void deleter(DLManagedTensor* tensor) noexcept:
     if tensor.manager_ctx is NULL:
         return
     stdlib.free(tensor.dl_tensor.shape)
+    if tensor.dl_tensor.strides is not NULL:
+        stdlib.free(tensor.dl_tensor.strides)
     tensor.manager_ctx = NULL
     stdlib.free(tensor)
 
@@ -95,10 +97,19 @@ cdef DLManagedTensor* dlpack_c(ary):
     tensor.data = <void*> tensor_ptr
     tensor.device = dev
     tensor.dtype = dtype
-    tensor.strides = NULL
     tensor.ndim = ndim
     tensor.shape = shape
     tensor.byte_offset = 0
+
+    if ary.c_contiguous:
+        tensor.strides = NULL
+    elif ary.f_contiguous:
+        tensor.strides = <int64_t*>stdlib.malloc(ndim * sizeof(int64_t))
+        tensor.strides[0] = 1
+        for i in range(1, ndim):
+            tensor.strides[i] = tensor.strides[i-1] * tensor.shape[i-1]
+    else:
+        raise ValueError("Input data must be contiguous")
 
     dlm.dl_tensor = tensor
     dlm.manager_ctx = NULL

@@ -24,16 +24,6 @@ This tool offers several benefits, including
 
   * `Docker`_
 
-- `How to run the benchmarks`_
-
-  * `Step 1: Prepare the dataset`_
-
-  * `Step 2: Build and search index`_
-
-  * `Step 3: Data export`_
-
-  * `Step 4: Plot the results`_
-
 - `Running the benchmarks`_
 
   * `End-to-end: smaller-scale benchmarks (<1M to 10M)`_
@@ -75,7 +65,7 @@ Conda
    conda activate cuvs_benchmarks
 
    # to install GPU package:
-   conda install -c rapidsai -c conda-forge -c nvidia cuvs-ann-bench=<rapids_version> cuda-version=11.8*
+   conda install -c rapidsai -c conda-forge -c nvidia cuvs-bench=<rapids_version> cuda-version=11.8*
 
    # to install CPU package for usage in CPU-only systems:
    conda install -c rapidsai -c conda-forge  cuvs-bench-cpu
@@ -93,199 +83,24 @@ We provide images for GPU enabled systems, as well as systems without a GPU. The
 - `cuvs-bench-datasets`: Contains the GPU and CPU benchmarks with million-scale datasets already included in the container. Best suited for users that want to run multiple million scale datasets already included in the image.
 - `cuvs-bench-cpu`: Contains only CPU benchmarks with minimal size. Best suited for users that want the smallest containers to reproduce benchmarks on systems without a GPU.
 
-Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_, meanwhile release (stable) versions are located in `NGC <https://hub.docker.com/r/rapidsai/cuvs-bench>`_, starting with release 24.10.
+Nightly images are located in `dockerhub <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_.
 
-The following command pulls the nightly container for Python version 3.10, CUDA version 12.0, and cuVS version 24.10:
+The following command pulls the nightly container for Python version 3.10, CUDA version 12.5, and cuVS version 24.12:
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs-bench:24.10a-cuda12.0-py3.10 #substitute cuvs-bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:24.12a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
 
 The CUDA and python versions can be changed for the supported values:
-- Supported CUDA versions: 11.4 and 12.x
-- Supported Python versions: 3.9 and 3.10.
+- Supported CUDA versions: 11.8 and 12.5
+- Supported Python versions: 3.10 and 3.11.
 
 You can see the exact versions as well in the dockerhub site:
 - `cuVS bench images <https://hub.docker.com/r/rapidsai/cuvs-bench/tags>`_
-- `cuVS bench with datasets preloaded images <https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags>`_
+- `cuVS bench with pre-loaded million-scale datasets images <https://hub.docker.com/r/rapidsai/cuvs-bench-cpu/tags>`_
 - `cuVS bench CPU only images <https://hub.docker.com/r/rapidsai/cuvs-bench-datasets/tags>`_
 
 **Note:** GPU containers use the CUDA toolkit from inside the container, the only requirement is a driver installed on the host machine that supports that version. So, for example, CUDA 11.8 containers can run in systems with a CUDA 12.x capable driver. Please also note that the Nvidia-Docker runtime from the `Nvidia Container Toolkit <https://github.com/NVIDIA/nvidia-docker>`_ is required to use GPUs inside docker containers.
-
-How to run the benchmarks
-=========================
-
-We provide a collection of lightweight Python scripts to run the benchmarks. There are 4 general steps to running the benchmarks and visualizing the results.
-#. Prepare Dataset
-#. Build Index and Search Index
-#. Data Export
-#. Plot Results
-
-Step 1: Prepare the dataset
----------------------------
-
-The script `cuvs_bench.get_dataset` will download and unpack the dataset in directory that the user provides. As of now, only million-scale datasets are supported by this script. For more information on :doc:`datasets and formats <datasets>`.
-
-The usage of this script is:
-
-.. code-block:: bash
-
-    usage: get_dataset.py [-h] [--name NAME] [--dataset-path DATASET_PATH] [--normalize]
-
-    options:
-      -h, --help            show this help message and exit
-      --dataset DATASET     dataset to download (default: glove-100-angular)
-      --dataset-path DATASET_PATH
-                            path to download dataset (default: ${RAPIDS_DATASET_ROOT_DIR})
-      --normalize           normalize cosine distance to inner product (default: False)
-
-When option `normalize` is provided to the script, any dataset that has cosine distances
-will be normalized to inner product. So, for example, the dataset `glove-100-angular`
-will be written at location `datasets/glove-100-inner/`.
-
-Step 2: Build and search index
-------------------------------
-
-The script `cuvs_bench.run` will build and search indices for a given dataset and its
-specified configuration.
-
-The usage of the script `cuvs_bench.run` is:
-
-.. code-block:: bash
-
-    usage: __main__.py [-h] [--subset-size SUBSET_SIZE] [-k COUNT] [-bs BATCH_SIZE] [--dataset-configuration DATASET_CONFIGURATION] [--configuration CONFIGURATION] [--dataset DATASET]
-                       [--dataset-path DATASET_PATH] [--build] [--search] [--algorithms ALGORITHMS] [--groups GROUPS] [--algo-groups ALGO_GROUPS] [-f] [-m SEARCH_MODE]
-
-    options:
-      -h, --help            show this help message and exit
-      --subset-size SUBSET_SIZE
-                            the number of subset rows of the dataset to build the index (default: None)
-      -k COUNT, --count COUNT
-                            the number of nearest neighbors to search for (default: 10)
-      -bs BATCH_SIZE, --batch-size BATCH_SIZE
-                            number of query vectors to use in each query trial (default: 10000)
-      --dataset-configuration DATASET_CONFIGURATION
-                            path to YAML configuration file for datasets (default: None)
-      --configuration CONFIGURATION
-                            path to YAML configuration file or directory for algorithms Any run groups found in the specified file/directory will automatically override groups of the same name
-                            present in the default configurations, including `base` (default: None)
-      --dataset DATASET     name of dataset (default: glove-100-inner)
-      --dataset-path DATASET_PATH
-                            path to dataset folder, by default will look in RAPIDS_DATASET_ROOT_DIR if defined, otherwise a datasets subdirectory from the calling directory (default:
-                            os.getcwd()/datasets/)
-      --build
-      --search
-      --algorithms ALGORITHMS
-                            run only comma separated list of named algorithms. If parameters `groups` and `algo-groups` are both undefined, then group `base` is run by default (default: None)
-      --groups GROUPS       run only comma separated groups of parameters (default: base)
-      --algo-groups ALGO_GROUPS
-                            add comma separated <algorithm>.<group> to run. Example usage: "--algo-groups=cuvs_cagra.large,hnswlib.large" (default: None)
-      -f, --force           re-run algorithms even if their results already exist (default: False)
-      -m SEARCH_MODE, --search-mode SEARCH_MODE
-                            run search in 'latency' (measure individual batches) or 'throughput' (pipeline batches and measure end-to-end) mode (default: throughput)
-      -t SEARCH_THREADS, --search-threads SEARCH_THREADS
-                            specify the number threads to use for throughput benchmark. Single value or a pair of min and max separated by ':'. Example --search-threads=1:4. Power of 2 values between 'min' and 'max' will be used. If only 'min' is
-                            specified, then a single test is run with 'min' threads. By default min=1, max=<num hyper threads>. (default: None)
-      -r, --dry-run         dry-run mode will convert the yaml config for the specified algorithms and datasets to the json format that's consumed by the lower-level c++ binaries and then print the command to run execute the benchmarks but
-                            will not actually execute the command. (default: False)
-
-`dataset`: name of the dataset to be searched in `datasets.yaml`_
-
-`dataset-configuration`: optional filepath to custom dataset YAML config which has an entry for arg `dataset`
-
-`configuration`: optional filepath to YAML configuration for an algorithm or to directory that contains YAML configurations for several algorithms. Refer to `Dataset.yaml config`_ for more info.
-
-`algorithms`: runs all algorithms that it can find in YAML configs found by `configuration`. By default, only `base` group will be run.
-
-`groups`: run only specific groups of parameters configurations for an algorithm. Groups are defined in YAML configs (see `configuration`), and by default run `base` group
-
-`algo-groups`: this parameter is helpful to append any specific algorithm+group combination to run the benchmark for in addition to all the arguments from `algorithms` and `groups`. It is of the format `<algorithm>.<group>`, or for example, `cuvs_cagra.large`
-
-For every algorithm run by this script, it outputs an index build statistics JSON file in `<dataset-path/<dataset>/result/build/<{algo},{group}.json>`
-and an index search statistics JSON file in `<dataset-path/<dataset>/result/search/<{algo},{group},k{k},bs{batch_size}.json>`. NOTE: The filenames will not have ",{group}" if `group = "base"`.
-
-For every algorithm run by this script, it outputs an index build statistics JSON file in `<dataset-path/<dataset>/result/build/<{algo},{group}.json>`
-and an index search statistics JSON file in `<dataset-path/<dataset>/result/search/<{algo},{group},k{k},bs{batch_size}.json>`. NOTE: The filenames will not have ",{group}" if `group = "base"`.
-
-`dataset-path` :
-#. data is read from `<dataset-path>/<dataset>`
-#. indices are built in `<dataset-path>/<dataset>/index`
-#. build/search results are stored in `<dataset-path>/<dataset>/result`
-
-`build` and `search` : if both parameters are not supplied to the script then it is assumed both are `True`.
-
-`indices` and `algorithms` : these parameters ensure that the algorithm specified for an index is available in `algos.yaml` and not disabled, as well as having an associated executable.
-
-Step 3: Data export
--------------------
-
-The script `cuvs_bench.data_export` will convert the intermediate JSON outputs produced by `cuvs_bench.run` to more easily readable CSV files, which are needed to build charts made by `cuvs_bench.plot`.
-
-.. code-block:: bash
-
-    usage: data_export.py [-h] [--dataset DATASET] [--dataset-path DATASET_PATH]
-
-    options:
-      -h, --help            show this help message and exit
-      --dataset DATASET     dataset to download (default: glove-100-inner)
-      --dataset-path DATASET_PATH
-                            path to dataset folder (default: ${RAPIDS_DATASET_ROOT_DIR})
-
-Build statistics CSV file is stored in `<dataset-path/<dataset>/result/build/<{algo},{group}.csv>`
-and index search statistics CSV file in `<dataset-path/<dataset>/result/search/<{algo},{group},k{k},bs{batch_size},{suffix}.csv>`, where suffix has three values:
-#. `raw`: All search results are exported
-#. `throughput`: Pareto frontier of throughput results is exported
-#. `latency`: Pareto frontier of latency results is exported
-
-Step 4: Plot the results
-------------------------
-
-The script `cuvs_bench.plot` will plot results for all algorithms found in index search statistics CSV files `<dataset-path/<dataset>/result/search/*.csv`.
-
-The usage of this script is:
-
-.. code-block:: bash
-
-    usage:  [-h] [--dataset DATASET] [--dataset-path DATASET_PATH] [--output-filepath OUTPUT_FILEPATH] [--algorithms ALGORITHMS] [--groups GROUPS] [--algo-groups ALGO_GROUPS]
-            [-k COUNT] [-bs BATCH_SIZE] [--build] [--search] [--x-scale X_SCALE] [--y-scale {linear,log,symlog,logit}] [--x-start X_START] [--mode {throughput,latency}]
-            [--time-unit {s,ms,us}] [--raw]
-
-    options:
-      -h, --help            show this help message and exit
-      --dataset DATASET     dataset to plot (default: glove-100-inner)
-      --dataset-path DATASET_PATH
-                            path to dataset folder (default: /home/coder/cuvs/datasets/)
-      --output-filepath OUTPUT_FILEPATH
-                            directory for PNG to be saved (default: /home/coder/cuvs)
-      --algorithms ALGORITHMS
-                            plot only comma separated list of named algorithms. If parameters `groups` and `algo-groups are both undefined, then group `base` is plot by default
-                            (default: None)
-      --groups GROUPS       plot only comma separated groups of parameters (default: base)
-      --algo-groups ALGO_GROUPS, --algo-groups ALGO_GROUPS
-                            add comma separated <algorithm>.<group> to plot. Example usage: "--algo-groups=cuvs_cagra.large,hnswlib.large" (default: None)
-      -k COUNT, --count COUNT
-                            the number of nearest neighbors to search for (default: 10)
-      -bs BATCH_SIZE, --batch-size BATCH_SIZE
-                            number of query vectors to use in each query trial (default: 10000)
-      --build
-      --search
-      --x-scale X_SCALE     Scale to use when drawing the X-axis. Typically linear, logit or a2 (default: linear)
-      --y-scale {linear,log,symlog,logit}
-                            Scale to use when drawing the Y-axis (default: linear)
-      --x-start X_START     Recall values to start the x-axis from (default: 0.8)
-      --mode {throughput,latency}
-                            search mode whose Pareto frontier is used on the y-axis (default: throughput)
-      --time-unit {s,ms,us}
-                            time unit to plot when mode is latency (default: ms)
-      --raw                 Show raw results (not just Pareto frontier) of mode arg (default: False)
-
-`mode`: plots pareto frontier of `throughput` or `latency` results exported in the previous step
-
-`algorithms`: plots all algorithms that it can find results for the specified `dataset`. By default, only `base` group will be plotted.
-
-`groups`: plot only specific groups of parameters configurations for an algorithm. Groups are defined in YAML configs (see `configuration`), and by default run `base` group
-
-`algo-groups`: this parameter is helpful to append any specific algorithm+group combination to plot results for in addition to all the arguments from `algorithms` and `groups`. It is of the format `<algorithm>.<group>`, or for example, `cuvs_cagra.large`
 
 Running the benchmarks
 ======================
@@ -572,7 +387,7 @@ Creating and customizing dataset configurations
 
 A single configuration will often define a set of algorithms, with associated index and search parameters, that can be generalize across datasets. We use YAML to define dataset specific and algorithm specific configurations.
 
-A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs-ann-bench/src/cuvs_bench/run/conf` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
+A default `datasets.yaml` is provided by CUVS in `${CUVS_HOME}/python/cuvs_bench/src/cuvs_bench/run/conf` with configurations available for several datasets. Here's a simple example entry for the `sift-128-euclidean` dataset:
 
 .. code-block:: yaml
 

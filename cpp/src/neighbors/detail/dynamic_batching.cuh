@@ -238,8 +238,8 @@ enum struct slot_state : int32_t {
 struct batch_token {
   uint64_t value = 0;
 
-  constexpr inline batch_token() {}
-  explicit constexpr inline batch_token(uint32_t buffer_id) { id() = buffer_id; }
+  constexpr inline batch_token() = default;
+  RAFT_INLINE_FUNCTION explicit batch_token(uint32_t buffer_id) { id() = buffer_id; }
 
   /**
    * Sequential id of the batch in the array of batches.
@@ -492,7 +492,7 @@ struct batch_queue_t {
    * NB: "round" is the number of times the queue counters went over the whole ring buffer.
    *     It's used to avoid the ABA problem for atomic token updates.
    */
-  static constexpr inline auto make_empty_token(seq_order_id seq_id) noexcept -> batch_token
+  static inline auto make_empty_token(seq_order_id seq_id) noexcept -> batch_token
   {
     // Modify the seq_id to identify that the token slot is empty
     auto empty_round    = static_cast<uint32_t>(slot_state::kEmptyPast) * kSize;

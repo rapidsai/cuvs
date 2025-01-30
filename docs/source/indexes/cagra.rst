@@ -149,5 +149,3 @@ IVF-PQ Search (max batch size 1024 vectors on device at a time):
    + [batch\_size * n\_dim * sizeof(float)] + [batch\_size * intermediate\_degree * sizeof(uint32\_t)]
 
    + [batch\_size * intermediate\_degree * sizeof(float)]
-
-

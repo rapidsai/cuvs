@@ -56,7 +56,7 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
     DLManagedTensor neighbors_tensor;
     int64_t neighbors_shape[2] = {n_queries, topk};
     int_tensor_initialize(neighbors_d, neighbors_shape, &neighbors_tensor);
-    
+
     DLManagedTensor distances_tensor;
     int64_t distances_shape[2] = {n_queries, topk};
     float_tensor_initialize(distances_d, distances_shape, &distances_tensor);
@@ -91,7 +91,7 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
 
     cuvsIvfFlatSearchParamsDestroy(search_params);
     cuvsIvfFlatIndexDestroy(index);
-    cuvsIvfFlatIndexParamsDestroy(index_params);  
+    cuvsIvfFlatIndexParamsDestroy(index_params);
 }
 
 void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trainset_tensor, DLManagedTensor * dataset_tensor, DLManagedTensor * queries_tensor) {
@@ -102,7 +102,7 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
     int64_t data_indices_shape[1] = {n_dataset};
     int_tensor_initialize(data_indices_d, data_indices_shape, &data_indices_tensor);
     data_indices_tensor.dl_tensor.ndim = 1;
-    
+
     printf("\nRun k-means clustering using the training set\n");
 
     int64_t *data_indices = (int64_t *)malloc(n_dataset * sizeof(int64_t));
@@ -154,11 +154,11 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
     DLManagedTensor neighbors_tensor;
     int64_t neighbors_shape[2] = {n_queries, topk};
     int_tensor_initialize(neighbors_d, neighbors_shape, &neighbors_tensor);
-    
+
     DLManagedTensor distances_tensor;
     int64_t distances_shape[2] = {n_queries, topk};
     float_tensor_initialize(distances_d, distances_shape, &distances_tensor);
-    
+
     // Create default search params
     cuvsIvfFlatSearchParams_t search_params;
     cuvsIvfFlatSearchParamsCreate(&search_params);
@@ -203,7 +203,7 @@ int main() {
     float *queries = (float *)malloc(n_queries * n_dim * sizeof(float));
     generate_dataset(dataset, n_samples, n_dim, -10.0, 10.0);
     generate_dataset(queries, n_queries, n_dim, -1.0, 1.0);
-    
+
     // Create a cuvsResources_t object
     cuvsResources_t res;
     cuvsResourcesCreate(&res);
@@ -245,7 +245,7 @@ int main() {
     DLManagedTensor trainset_tensor;
     int64_t trainset_shape[2] = {n_trainset, n_dim};
     float_tensor_initialize(trainset_d, trainset_shape, &trainset_tensor);
-    
+
     // Build and extend example.
     ivf_flat_build_extend_search(&res, &trainset_tensor, &dataset_tensor, &queries_tensor);
 
