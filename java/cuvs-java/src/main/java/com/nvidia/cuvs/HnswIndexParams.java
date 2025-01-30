@@ -16,10 +16,6 @@
 
 package com.nvidia.cuvs;
 
-import java.lang.foreign.MemorySegment;
-
-import com.nvidia.cuvs.panama.CuVSHnswIndexParams;
-
 /**
  * Supplemental parameters to build HNSW index.
  *
@@ -55,35 +51,17 @@ public class HnswIndexParams {
     }
   };
 
-  private CuVSResources resources;
-  private MemorySegment memorySegment;
   private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.NONE;
   private int efConstruction = 200;
   private int numThreads = 2;
   private int vectorDimension;
 
-  private HnswIndexParams(CuVSResources resources, CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads,
+  private HnswIndexParams(CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads,
       int vectorDimension) {
-    this.resources = resources;
     this.hierarchy = hierarchy;
     this.efConstruction = efConstruction;
     this.numThreads = numThreads;
     this.vectorDimension = vectorDimension;
-    this.memorySegment = allocateMemorySegment();
-  }
-
-  /**
-   * Allocates the configured search parameters in the MemorySegment.
-   */
-  private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuVSHnswIndexParams.allocate(resources.getArena());
-    CuVSHnswIndexParams.ef_construction(memorySegment, efConstruction);
-    CuVSHnswIndexParams.num_threads(memorySegment, numThreads);
-    return memorySegment;
-  }
-
-  public MemorySegment getHnswIndexParamsMemorySegment() {
-    return memorySegment;
   }
 
   /**
@@ -116,10 +94,6 @@ public class HnswIndexParams {
    */
   public int getVectorDimension() {
     return vectorDimension;
-  }
-
-  public CuVSResources getResources() {
-    return resources;
   }
 
   @Override
@@ -205,7 +179,7 @@ public class HnswIndexParams {
      * @return an instance of {@link HnswIndexParams}
      */
     public HnswIndexParams build() {
-      return new HnswIndexParams(resources, hierarchy, efConstruction, numThreads, vectorDimension);
+      return new HnswIndexParams(hierarchy, efConstruction, numThreads, vectorDimension);
     }
   }
 }

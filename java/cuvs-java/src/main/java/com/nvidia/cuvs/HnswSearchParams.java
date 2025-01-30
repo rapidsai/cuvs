@@ -16,10 +16,6 @@
 
 package com.nvidia.cuvs;
 
-import java.lang.foreign.MemorySegment;
-
-import com.nvidia.cuvs.panama.CuVSHnswSearchParams;
-
 /**
  * HnswSearchParams encapsulates the logic for configuring and holding search
  * parameters for HNSW index.
@@ -28,38 +24,18 @@ import com.nvidia.cuvs.panama.CuVSHnswSearchParams;
  */
 public class HnswSearchParams {
 
-  private CuVSResources resources;
-  private MemorySegment memorySegment;
   private int ef = 200;
   private int numThreads = 0;
 
   /**
    * Constructs an instance of HnswSearchParams with passed search parameters.
    *
-   * @param resources  the resources instance to use
    * @param ef         the ef value
    * @param numThreads the number of threads
-   *
    */
-  private HnswSearchParams(CuVSResources resources, int ef, int numThreads) {
-    this.resources = resources;
+  private HnswSearchParams(int ef, int numThreads) {
     this.ef = ef;
     this.numThreads = numThreads;
-    this.memorySegment = allocateMemorySegment();
-  }
-
-  /**
-   * Allocates the configured search parameters in the MemorySegment.
-   */
-  private MemorySegment allocateMemorySegment() {
-    MemorySegment memorySegment = CuVSHnswSearchParams.allocate(resources.getArena());
-    CuVSHnswSearchParams.ef(memorySegment, ef);
-    CuVSHnswSearchParams.num_threads(memorySegment, numThreads);
-    return memorySegment;
-  }
-
-  public MemorySegment getHnswSearchParamsMemorySegment() {
-    return memorySegment;
   }
 
   /**
@@ -131,7 +107,7 @@ public class HnswSearchParams {
      * @return an instance of HnswSearchParams
      */
     public HnswSearchParams build() {
-      return new HnswSearchParams(resources, ef, numThreads);
+      return new HnswSearchParams(ef, numThreads);
     }
   }
 }

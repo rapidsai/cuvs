@@ -16,129 +16,49 @@
 
 package com.nvidia.cuvs;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.MemorySegment;
-import java.lang.invoke.MethodHandle;
+import com.nvidia.cuvs.spi.CuVSProvider;
 
-import static com.nvidia.cuvs.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import java.nio.file.Path;
 
 /**
  * Used for allocating resources for cuVS
  *
  * @since 25.02
  */
-public class CuVSResources implements AutoCloseable {
-
-  static final MethodHandle createResourcesMethodHandle = downcallHandle(
-      "create_resources", FunctionDescriptor.of(ADDRESS, ADDRESS)
-  );
-
-  private static final MethodHandle destroyResourcesMethodHandle = downcallHandle(
-       "destroy_resources", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)
-  );
-
-  private final Arena arena;
-  private final MemorySegment resourcesMemorySegment;
-  private boolean destroyed;
+public interface CuVSResources extends AutoCloseable {
 
   /**
-   * Constructor that allocates the resources needed for cuVS
-   *
-   * @throws Throwable exception thrown when native function is invoked
+   * Closes this resources and releases any resources associated with it.
    */
-  public CuVSResources() throws Throwable {
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      resourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValue);
-      checkError(returnValue.get(C_INT, 0L), "createResourcesMethodHandle");
-    }
-    arena = Arena.ofShared();
-  }
-
   @Override
-  public void close() {
-    checkNotDestroyed();
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      destroyResourcesMethodHandle.invokeExact(resourcesMemorySegment, returnValue);
-      checkError(returnValue.get(C_INT, 0L), "destroyResourcesMethodHandle");
-    } catch (Throwable e) {
-      e.printStackTrace();
-    } finally {
-      destroyed = true;
-    }
-    if (!arena.scope().isAlive()) {
-      arena.close();
-    }
-  }
+  void close();
 
-  private void checkNotDestroyed() {
-    if (destroyed) {
-      throw new IllegalStateException("destroyed");
-    }
+
+  /**
+   * The temporary directory to use for intermediate operations.
+   * Defaults to {@systemProperty java.io.tmpdir}.
+   */
+  Path tempDirectory();
+
+  /**
+   * Creates a new resources.
+   * Equivalent to
+   * <pre>{@code
+   *   create(CuVSProvider.tempDirectory())
+   * }</pre>
+   */
+  static CuVSResources create() throws Throwable {
+    return create(CuVSProvider.tempDirectory());
   }
 
   /**
-   * Gets the reference to the cuvsResources MemorySegment.
+   * Creates a new resources.
    *
-   * @return cuvsResources MemorySegment
+   * @param tempDirectory the temporary directory to use for intermediate operations
+   * @throws UnsupportedOperationException if the provider does not cuvs
+   * @throws LibraryException if the native library cannot be loaded
    */
-  protected MemorySegment getMemorySegment() {
-    checkNotDestroyed();
-    return resourcesMemorySegment;
-  }
-
-  /**
-   * The allocation arena used by this resources.
-   */
-  protected Arena getArena() {
-    checkNotDestroyed();
-    return arena;
-  }
-
-  /**
-   * Container for GPU information
-   */
-  public class GPUInfo {
-
-    private final int gpuId;
-    private final long freeMemory;
-    private final long totalMemory;
-    private final float computeCapability;
-
-    public GPUInfo(int gpuId, long freeMemory, long totalMemory, float computeCapability) {
-      super();
-      this.gpuId = gpuId;
-      this.freeMemory = freeMemory;
-      this.totalMemory = totalMemory;
-      this.computeCapability = computeCapability;
-    }
-
-    public int getGpuId() {
-      return gpuId;
-    }
-
-    public long getFreeMemory() {
-      return freeMemory;
-    }
-
-    public long getTotalMemory() {
-      return totalMemory;
-    }
-
-    public float getComputeCapability() {
-      return computeCapability;
-    }
-
-    @Override
-    public String toString() {
-      return "GPUInfo [gpuId=" + gpuId + ", freeMemory=" + freeMemory + ", totalMemory=" + totalMemory
-          + ", computeCapability=" + computeCapability + "]";
-    }
-
+  static CuVSResources create(Path tempDirectory) throws Throwable {
+    return CuVSProvider.provider().newCuVSResources(tempDirectory);
   }
 }

@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.nvidia.cuvs;
 
 import static org.junit.Assert.assertEquals;
@@ -10,11 +26,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 
+import com.nvidia.cuvs.SearchResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.carrotsearch.randomizedtesting.RandomizedContext;
-import com.nvidia.cuvs.common.SearchResults;
 
 public abstract class CuVSTestCase {
   protected Random random;
@@ -22,7 +38,7 @@ public abstract class CuVSTestCase {
 
   protected void initializeRandom() {
     random = RandomizedContext.current().getRandom();
-    log.info("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
+    System.out.println("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
   }
 
   protected float[][] generateData(Random random, int rows, int cols) {
@@ -55,7 +71,7 @@ public abstract class CuVSTestCase {
       neighborsResult.add(neighbors.subList(0, Math.min(topK * 2, dataset.length)));
     }
 
-    log.info("Expected results generated successfully.");
+    System.out.println("Expected results generated successfully.");
     return neighborsResult;
   }
 
@@ -63,8 +79,8 @@ public abstract class CuVSTestCase {
       int numQueries) {
 
     for (int i = 0; i < numQueries; i++) {
-      log.info("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
-      log.info("Expected results for query " + i + ": " + expected.get(i).subList(0, Math.min(topK, datasetSize)));
+      System.out.println("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
+      System.out.println("Expected results for query " + i + ": " + expected.get(i).subList(0, Math.min(topK, datasetSize)));
     }
 
     // actual vs. expected results
