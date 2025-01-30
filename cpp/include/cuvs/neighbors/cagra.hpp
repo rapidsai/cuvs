@@ -1599,6 +1599,8 @@ void deserialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] os output stream
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
 void serialize_to_hnswlib(
@@ -1631,6 +1633,8 @@ void serialize_to_hnswlib(
  * @param[in] handle the raft handle
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
 void serialize_to_hnswlib(
@@ -1662,6 +1666,8 @@ void serialize_to_hnswlib(
  * @param[in] handle the raft handle
  * @param[in] os output stream
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
 void serialize_to_hnswlib(
@@ -1694,6 +1700,8 @@ void serialize_to_hnswlib(
  * @param[in] handle the raft handle
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
 void serialize_to_hnswlib(
@@ -1725,6 +1733,8 @@ void serialize_to_hnswlib(
  * @param[in] handle the raft handle
  * @param[in] os output stream
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
 void serialize_to_hnswlib(
@@ -1757,6 +1767,8 @@ void serialize_to_hnswlib(
  * @param[in] handle the raft handle
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
 void serialize_to_hnswlib(
