@@ -17,9 +17,9 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/rng_state.hpp>
+#include <rapids_logger/logger.hpp>
 
 namespace cuvs::cluster::kmeans {
 
@@ -86,7 +86,7 @@ struct params : base_params {
   /**
    * verbosity level.
    */
-  raft::level_enum verbosity = raft::level_enum::info;
+  rapids_logger::level_enum verbosity = rapids_logger::level_enum::info;
 
   /**
    * Seed to the random number generator.

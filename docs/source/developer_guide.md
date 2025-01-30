@@ -227,61 +227,6 @@ Keep in mind that this only applies to files tracked by git that have been modif
 ## Error handling
 Call CUDA APIs via the provided helper macros `RAFT_CUDA_TRY`, `RAFT_CUBLAS_TRY` and `RAFT_CUSOLVER_TRY`. These macros take care of checking the return values of the used API calls and generate an exception when the command is not successful. If you need to avoid an exception, e.g. inside a destructor, use `RAFT_CUDA_TRY_NO_THROW`, `RAFT_CUBLAS_TRY_NO_THROW ` and `RAFT_CUSOLVER_TRY_NO_THROW`. These macros log the error but do not throw an exception.
 
-## Logging
-
-### Introduction
-Anything and everything about logging is defined inside [logger.hpp](https://github.com/rapidsai/raft/blob/branch-25.04/cpp/include/raft/core/logger.hpp). It uses [spdlog](https://github.com/gabime/spdlog) underneath, but this information is transparent to all.
-
-### Usage
-```cpp
-#include <raft/core/logger.hpp>
-
-// Inside your method or function, use any of these macros
-RAFT_LOG_TRACE("Hello %s!", "world");
-RAFT_LOG_DEBUG("Hello %s!", "world");
-RAFT_LOG_INFO("Hello %s!", "world");
-RAFT_LOG_WARN("Hello %s!", "world");
-RAFT_LOG_ERROR("Hello %s!", "world");
-RAFT_LOG_CRITICAL("Hello %s!", "world");
-```
-
-### Changing logging level
-There are 7 logging levels with each successive level becoming quieter:
-1. RAFT_LEVEL_TRACE
-2. RAFT_LEVEL_DEBUG
-3. RAFT_LEVEL_INFO
-4. RAFT_LEVEL_WARN
-5. RAFT_LEVEL_ERROR
-6. RAFT_LEVEL_CRITICAL
-7. RAFT_LEVEL_OFF
-   Pass one of these as per your needs into the `set_level()` method as follows:
-```cpp
-raft::logger::get().set_level(RAFT_LEVEL_WARN);
-// From now onwards, this will print only WARN and above kind of messages
-```
-
-### Changing logging pattern
-Pass the [format string](https://github.com/gabime/spdlog/wiki/3.-Custom-formatting) as follows in order use a different logging pattern than the default.
-```cpp
-raft::logger::get.set_pattern(YourFavoriteFormat);
-```
-One can also use the corresponding `get_pattern()` method to know the current format as well.
-
-### Temporarily changing the logging pattern
-Sometimes, we need to temporarily change the log pattern (eg: for reporting decision tree structure). This can be achieved in a RAII-like approach as follows:
-```cpp
-{
-  PatternSetter _(MyNewTempFormat);
-  // new log format is in effect from here onwards
-  doStuff();
-  // once the above temporary object goes out-of-scope, the old format will be restored
-}
-```
-
-### Tips
-* Do NOT end your logging messages with a newline! It is automatically added by spdlog.
-* The `RAFT_LOG_TRACE()` is by default not compiled due to the `RAFT_ACTIVE_LEVEL` macro setup, for performance reasons. If you need it to be enabled, change this macro accordingly during compilation time
-
 ## Common Design Considerations
 
 1. Use the `hpp` extension for files which can be compiled with `gcc` against the CUDA-runtime. Use the `cuh` extension for files which require `nvcc` to be compiled. `hpp` can also be used for functions marked `__host__ __device__` only if proper checks are in place to remove the `__device__` designation when not compiling with `nvcc`.
