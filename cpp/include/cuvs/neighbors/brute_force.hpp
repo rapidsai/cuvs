@@ -367,11 +367,11 @@ auto build(raft::resources const& handle,
  * be considered for each query.
  *
  * - Supports two types of filters:
- *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
  *      where each bit indicates whether a specific dataset element should be considered for a
  *      particular query. (1 for inclusion, 0 for exclusion).
- *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
- *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
  *
  * - The default value is `none_sample_filter`, which applies no filtering.
  */
@@ -435,11 +435,11 @@ void search(raft::resources const& handle,
  * be considered for each query.
  *
  * - Supports two types of filters:
- *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
  *      where each bit indicates whether a specific dataset element should be considered for a
  *      particular query. (1 for inclusion, 0 for exclusion).
- *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
- *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
  *
  * - The default value is `none_sample_filter`, which applies no filtering.
  */
@@ -502,11 +502,11 @@ void search(raft::resources const& handle,
  * be considered for each query.
  *
  * - Supports two types of filters:
- *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
  *      where each bit indicates whether a specific dataset element should be considered for a
  *      particular query. (1 for inclusion, 0 for exclusion).
- *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
- *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
  *
  * - The default value is `none_sample_filter`, which applies no filtering.
  */
@@ -569,11 +569,11 @@ void search(raft::resources const& handle,
  * be considered for each query.
  *
  * - Supports two types of filters:
- *   1. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
  *      where each bit indicates whether a specific dataset element should be considered for a
  *      particular query. (1 for inclusion, 0 for exclusion).
- *   2. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
- *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
  *
  * - The default value is `none_sample_filter`, which applies no filtering.
  */
