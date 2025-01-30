@@ -47,7 +47,7 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
                       DISTANCE_T>
 {
   // mask the result of xor for the integer promotion
-  const auto v = (~(a ^ b)) & 0xffu;
+  const auto v = (a ^ b) & 0xffu;
   return __popc(v);
 }
 }  // namespace
@@ -162,14 +162,7 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
     if (i < dim) {
       buf[j] = cuvs::spatial::knn::detail::utils::mapping<QUERY_T>{}(queries_ptr[i]);
     } else {
-      if constexpr (DescriptorT::kMetric == BinaryHamming) {
-        static_assert(std::is_same_v<QUERY_T, uint8_t>);
-        // Set the padding elements of the query vector to 0xff because the ones of dataset vectors
-        // are 0x00 and the binary Hamming distance between them is 0.
-        buf[j] = 0xff;
-      } else {
-        buf[j] = 0.0;
-      }
+      buf[j] = 0;
     }
   }
 
