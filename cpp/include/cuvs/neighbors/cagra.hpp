@@ -304,7 +304,7 @@ struct index : cuvs::neighbors::index {
     return data_rows > 0 ? data_rows : graph_view_.extent(0);
   }
 
-  /** Dimensionality of the data. */
+  /** dimension of the data. */
   [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dataset_->dim(); }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
@@ -1772,6 +1772,9 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * This function merges multiple CAGRA indices into one, combining both the datasets and graph
  * structures.
  *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
@@ -1790,7 +1793,7 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] res RAFT resources used for the merge operation.
  * @param[in] params Parameters that control the merging process.
  * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimensionality.
+ *                    - Have attached datasets with the same dimension.
  *
  * @return A new CAGRA index containing the merged indices, graph, and dataset.
  */
@@ -1803,6 +1806,9 @@ auto merge(raft::resources const& res,
  *
  * This function merges multiple CAGRA indices into one, combining both the datasets and graph
  * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
  *
  * Usage example:
  * @code{.cpp}
@@ -1822,7 +1828,7 @@ auto merge(raft::resources const& res,
  * @param[in] res RAFT resources used for the merge operation.
  * @param[in] params Parameters that control the merging process.
  * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimensionality.
+ *                    - Have attached datasets with the same dimension.
  *
  * @return A new CAGRA index containing the merged indices, graph, and dataset.
  */
@@ -1835,6 +1841,9 @@ auto merge(raft::resources const& res,
  *
  * This function merges multiple CAGRA indices into one, combining both the datasets and graph
  * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
  *
  * Usage example:
  * @code{.cpp}
@@ -1854,7 +1863,7 @@ auto merge(raft::resources const& res,
  * @param[in] res RAFT resources used for the merge operation.
  * @param[in] params Parameters that control the merging process.
  * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimensionality.
+ *                    - Have attached datasets with the same dimension.
  *
  * @return A new CAGRA index containing the merged indices, graph, and dataset.
  */
@@ -1867,6 +1876,9 @@ auto merge(raft::resources const& res,
  *
  * This function merges multiple CAGRA indices into one, combining both the datasets and graph
  * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
  *
  * Usage example:
  * @code{.cpp}
@@ -1886,7 +1898,7 @@ auto merge(raft::resources const& res,
  * @param[in] res RAFT resources used for the merge operation.
  * @param[in] params Parameters that control the merging process.
  * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
- *                    - Have attached datasets with the same dimensionality.
+ *                    - Have attached datasets with the same dimension.
  *
  * @return A new CAGRA index containing the merged indices, graph, and dataset.
  */

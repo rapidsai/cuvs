@@ -78,45 +78,72 @@ index<T, IdxT> merge(raft::resources const& handle,
     }
   }
 
-  // Allocate the new dataset on device
-  auto device_updated_dataset =
-    raft::make_device_matrix<T, std::int64_t>(handle, new_dataset_size, dim);
-  auto device_updated_dataset_view = raft::make_device_matrix_view<T, std::int64_t>(
-    device_updated_dataset.data_handle(), new_dataset_size, dim);
-
   IdxT offset = 0;
 
-  for (auto index : indices) {
-    using ds_idx_type  = decltype(index->data().n_rows());
-    auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
+  // Allocate the new dataset on device
+  bool dataset_on_device = cuvs::neighbors::nn_descent::has_enough_device_memory(
+    handle, raft::make_extents<std::int64_t>(new_dataset_size, dim), sizeof(IdxT));
 
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(device_updated_dataset.data_handle() + offset * dim,
-                                    sizeof(T) * dim,
-                                    strided_dset->view().data_handle(),
-                                    sizeof(T) * stride,
-                                    sizeof(T) * dim,
-                                    strided_dset->n_rows(),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(handle)));
+  auto merge_dataset = [&](T* dst) {
+    for (auto index : indices) {
+      using ds_idx_type  = decltype(index->data().n_rows());
+      auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
 
-    offset += IdxT(index->data().n_rows());
+      RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst + offset * dim,
+                                      sizeof(T) * dim,
+                                      strided_dset->view().data_handle(),
+                                      sizeof(T) * stride,
+                                      sizeof(T) * dim,
+                                      strided_dset->n_rows(),
+                                      cudaMemcpyDefault,
+                                      raft::resource::get_cuda_stream(handle)));
+
+      offset += IdxT(index->data().n_rows());
+    }
+  };
+
+  if (dataset_on_device) {
+    RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
+
+    auto updated_dataset = raft::make_device_matrix<T, std::int64_t>(
+      handle, std::int64_t(new_dataset_size), std::int64_t(dim));
+
+    merge_dataset(updated_dataset.data_handle());
+
+    auto merged_index =
+      cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
+    if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
+      using matrix_t           = decltype(updated_dataset);
+      using layout_t           = typename matrix_t::layout_type;
+      using container_policy_t = typename matrix_t::container_policy_type;
+      using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
+      auto out_layout          = raft::make_strided_layout(updated_dataset.view().extents(),
+                                                  std::array<int64_t, 2>{stride, 1});
+      merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
+    }
+    return merged_index;
+
+  } else {
+    RAFT_LOG_DEBUG("cagra::merge: using host memory for merged dataset");
+
+    auto updated_dataset =
+      raft::make_host_matrix<T, std::int64_t>(std::int64_t(new_dataset_size), std::int64_t(dim));
+
+    merge_dataset(updated_dataset.data_handle());
+
+    auto merged_index =
+      cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
+    if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
+      using matrix_t           = decltype(updated_dataset);
+      using layout_t           = typename matrix_t::layout_type;
+      using container_policy_t = typename matrix_t::container_policy_type;
+      using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
+      auto out_layout          = raft::make_strided_layout(updated_dataset.view().extents(),
+                                                  std::array<int64_t, 2>{stride, 1});
+      merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
+    }
+    return merged_index;
   }
-
-  auto merged_index =
-    cagra::build(handle, params, raft::make_const_mdspan(device_updated_dataset_view));
-
-  if (static_cast<std::size_t>(stride) == dim) {
-    using out_mdarray_type          = decltype(device_updated_dataset);
-    using out_layout_type           = typename out_mdarray_type::layout_type;
-    using out_container_policy_type = typename out_mdarray_type::container_policy_type;
-    using out_owning_type = owning_dataset<T, int64_t, out_layout_type, out_container_policy_type>;
-    auto out_layout       = raft::make_strided_layout(device_updated_dataset_view.extents(),
-                                                std::array<int64_t, 2>{stride, 1});
-
-    merged_index.update_dataset(handle,
-                                out_owning_type{std::move(device_updated_dataset), out_layout});
-  }
-  return merged_index;
 }
 
 }  // namespace cuvs::neighbors::cagra::detail
