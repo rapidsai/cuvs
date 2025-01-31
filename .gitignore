@@ -83,3 +83,6 @@ ivf_pq_index
 # cuvs_bench
 datasets/
 /*.json
+
+# java
+.classpath

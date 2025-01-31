@@ -88,6 +88,43 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
 }
 
 template <typename T>
+void _extend(cuvsResources_t res,
+             cuvsCagraExtendParams params,
+             cuvsCagraIndex index,
+             DLManagedTensor* additional_dataset_tensor,
+             DLManagedTensor* return_tensor)
+{
+  auto dataset          = additional_dataset_tensor->dl_tensor;
+  auto return_dl_tensor = return_tensor->dl_tensor;
+  auto index_ptr        = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
+  auto res_ptr          = reinterpret_cast<raft::resources*>(res);
+
+  // TODO: use C struct here (see issue #487)
+  auto extend_params           = cuvs::neighbors::cagra::extend_params();
+  extend_params.max_chunk_size = params.max_chunk_size;
+
+  if (cuvs::core::is_dlpack_device_compatible(dataset) &&
+      cuvs::core::is_dlpack_device_compatible(return_dl_tensor)) {
+    using mdspan_type        = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+    using mdspan_return_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
+    auto mds                 = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
+    auto return_mds          = cuvs::core::from_dlpack<mdspan_return_type>(return_tensor);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, return_mds);
+  } else if (cuvs::core::is_dlpack_host_compatible(dataset) &&
+             cuvs::core::is_dlpack_host_compatible(return_dl_tensor)) {
+    using mdspan_type        = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    using mdspan_return_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
+    auto mds                 = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
+    auto return_mds          = cuvs::core::from_dlpack<mdspan_return_type>(return_tensor);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, return_mds);
+  } else {
+    RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+              dataset.dtype.code,
+              dataset.dtype.bits);
+  }
+}
+
+template <typename T>
 void _search(cuvsResources_t res,
              cuvsCagraSearchParams params,
              cuvsCagraIndex index,
@@ -229,6 +266,30 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
   });
 }
 
+extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                                       cuvsCagraExtendParams_t params,
+                                       DLManagedTensor* additional_dataset_tensor,
+                                       cuvsCagraIndex_t index_c_ptr,
+                                       DLManagedTensor* return_dataset_tensor)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto dataset = additional_dataset_tensor->dl_tensor;
+    auto index   = *index_c_ptr;
+
+    if ((dataset.dtype.code == kDLFloat) && (dataset.dtype.bits == 32)) {
+      _extend<float>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
+    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+      _extend<int8_t>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
+    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+      _extend<uint8_t>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
+    } else {
+      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+                dataset.dtype.code,
+                dataset.dtype.bits);
+    }
+  });
+}
+
 extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                                        cuvsCagraSearchParams_t params,
                                        cuvsCagraIndex_t index_c_ptr,
@@ -305,6 +366,17 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionPara
 }
 
 extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { *params = new cuvsCagraExtendParams{.max_chunk_size = 0}; });
+}
+
+extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
