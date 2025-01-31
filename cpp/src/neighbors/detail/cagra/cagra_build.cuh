@@ -457,7 +457,8 @@ auto iterative_build_graph(
   RAFT_LOG_DEBUG("# topk = %lu", (uint64_t)topk);
   RAFT_LOG_DEBUG("# small_topk = %lu", (uint64_t)small_topk);
 
-  // Create an initial graph. This can be inaccurate.
+  // Create an initial graph. The initial graph created here is not suitable for
+  // searching, but connectivity is guaranteed.
   auto offset       = raft::make_host_vector<IdxT, int64_t>(small_graph_degree);
   const double base = sqrt((double)2.0);
   for (uint64_t j = 0; j < small_graph_degree; j++) {
