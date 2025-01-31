@@ -552,8 +552,9 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
       this->gpu_resource_.get(), dim, parse_metric_faiss(this->metric_), config);
   }
 
-  void set_search_param(const search_param_base& param) override
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp              = static_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
     this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(sp.p);
   }

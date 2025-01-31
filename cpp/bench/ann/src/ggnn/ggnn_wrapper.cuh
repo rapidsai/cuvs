@@ -59,8 +59,7 @@ class ggnn : public algo<T>, public algo_gpu {
 
   void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
-    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
-    impl_->set_search_param(param);
+    impl_->set_search_param(param, filter_bitset);
   }
   void search(const T* queries,
               int batch_size,
