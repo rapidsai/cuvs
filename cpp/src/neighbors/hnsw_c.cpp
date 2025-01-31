@@ -123,7 +123,7 @@ extern "C" cuvsError_t cuvsHnswIndexParamsCreate(cuvsHnswIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
     *params = new cuvsHnswIndexParams{
-      .hierarchy = cuvsHnswHierarchy::NONE, .ef_construction = 200, .num_threads = 2};
+      .hierarchy = cuvsHnswHierarchy::NONE, .ef_construction = 200, .num_threads = 0};
   });
 }
 

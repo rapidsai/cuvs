@@ -21,64 +21,12 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 #include <memory>
+#include <omp.h>
 #include <raft/core/logger.hpp>
 #include <random>
 #include <thread>
 
 namespace cuvs::neighbors::hnsw::detail {
-
-// Multithreaded executor
-// The helper function is copied from the hnswlib repository
-// as for some reason, adding vectors to the hnswlib index does not
-// work well with omp parallel for
-template <class Function>
-inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn)
-{
-  if (numThreads <= 0) { numThreads = std::thread::hardware_concurrency(); }
-
-  if (numThreads == 1) {
-    for (size_t id = start; id < end; id++) {
-      fn(id, 0);
-    }
-  } else {
-    std::vector<std::thread> threads;
-    std::atomic<size_t> current(start);
-
-    // keep track of exceptions in threads
-    // https://stackoverflow.com/a/32428427/1713196
-    std::exception_ptr lastException = nullptr;
-    std::mutex lastExceptMutex;
-
-    for (size_t threadId = 0; threadId < numThreads; ++threadId) {
-      threads.push_back(std::thread([&, threadId] {
-        while (true) {
-          size_t id = current.fetch_add(1);
-
-          if (id >= end) { break; }
-
-          try {
-            fn(id, threadId);
-          } catch (...) {
-            std::unique_lock<std::mutex> lastExcepLock(lastExceptMutex);
-            lastException = std::current_exception();
-            /*
-             * This will work even when current is the largest value that
-             * size_t can fit, because fetch_add returns the previous value
-             * before the increment (what will result in overflow
-             * and produce 0 instead of current + 1).
-             */
-            current = end;
-            break;
-          }
-        }
-      }));
-    }
-    for (auto& thread : threads) {
-      thread.join();
-    }
-    if (lastException) { std::rethrow_exception(lastException); }
-  }
-}
 
 template <typename T>
 struct hnsw_dist_t {
@@ -223,10 +171,12 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     cagra_index.graph().extent(1) / 2,
     params.ef_construction);
   appr_algo->base_layer_init = false;  // tell hnswlib to build upper layers only
-  ParallelFor(0, host_dataset_view.extent(0), params.num_threads, [&](size_t i, size_t threadId) {
+  auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+#pragma omp parallel for num_threads(num_threads)
+  for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
     appr_algo->addPoint((void*)(host_dataset_view.data_handle() + i * host_dataset_view.extent(1)),
                         i);
-  });
+  }
   appr_algo->base_layer_init = true;  // reset to true to allow addition of new points
 
   // move cagra graph to host
@@ -242,11 +192,13 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
 // copy cagra graph to hnswlib base layer
 #pragma omp parallel for
   for (size_t i = 0; i < static_cast<size_t>(host_graph.extent(0)); ++i) {
-    auto ll_i = appr_algo->get_linklist0(i);
+    auto hnsw_internal_id = appr_algo->label_lookup_.find(i)->second;
+    auto ll_i             = appr_algo->get_linklist0(hnsw_internal_id);
     appr_algo->setListCount(ll_i, host_graph.extent(1));
     auto* data = (uint32_t*)(ll_i + 1);
     for (size_t j = 0; j < static_cast<size_t>(host_graph.extent(1)); ++j) {
-      data[j] = host_graph(i, j);
+      auto neighbor_internal_id = appr_algo->label_lookup_.find(host_graph(i, j))->second;
+      data[j]                   = neighbor_internal_id;
     }
   }
 
@@ -281,19 +233,15 @@ void extend(raft::resources const& res,
     const_cast<void*>(idx.get_index()));
   auto current_element_count = hnswlib_index->getCurrentElementCount();
   auto new_element_count     = additional_dataset.extent(0);
-  auto num_threads           = params.num_threads == 0 ? std::thread::hardware_concurrency()
-                                                       : static_cast<size_t>(params.num_threads);
+  auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
 
   hnswlib_index->resizeIndex(current_element_count + new_element_count);
-  ParallelFor(current_element_count,
-              current_element_count + new_element_count,
-              num_threads,
-              [&](size_t i, size_t threadId) {
-                hnswlib_index->addPoint(
-                  (void*)(additional_dataset.data_handle() +
-                          (i - current_element_count) * additional_dataset.extent(1)),
-                  i);
-              });
+#pragma omp parallel for num_threads(num_threads)
+  for (int64_t i = 0; i < additional_dataset.extent(0); i++) {
+    hnswlib_index->addPoint(
+      (void*)(additional_dataset.data_handle() + i * additional_dataset.extent(1)),
+      current_element_count + i);
+  }
 }
 
 template <typename T>

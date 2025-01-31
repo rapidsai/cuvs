@@ -332,15 +332,28 @@ auto build(raft::resources const& handle,
  * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
  * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
  * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`:
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
  * @code{.cpp}
- *   ...
- *   // Use the same allocator across multiple searches to reduce the number of
- *   // cuda memory allocations
- *   brute_force::search(handle, index, queries1, out_inds1, out_dists1);
- *   brute_force::search(handle, index, queries2, out_inds2, out_dists2);
- *   brute_force::search(handle, index, queries3, out_inds3, out_dists3);
- *   ...
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
  * @endcode
  *
  * @param[in] handle
@@ -350,9 +363,17 @@ auto build(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter An optional device bitmap filter function with a `row-major` layout and
- * the shape of [n_queries, index->size()], which means the filter will use the first
- * `index->size()` bits to indicate whether queries[0] should compute the distance with dataset.
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
@@ -379,15 +400,28 @@ void search(raft::resources const& handle,
  * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
  * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
  * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
- * eliminate entirely allocations happening within `search`:
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
  * @code{.cpp}
- *   ...
- *   // Use the same allocator across multiple searches to reduce the number of
- *   // cuda memory allocations
- *   brute_force::search(handle, index, queries1, out_inds1, out_dists1);
- *   brute_force::search(handle, index, queries2, out_inds2, out_dists2);
- *   brute_force::search(handle, index, queries3, out_inds3, out_dists3);
- *   ...
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<half>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
  * @endcode
  *
  * @param[in] handle
@@ -397,8 +431,17 @@ void search(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter a optional device bitmap filter function that greenlights samples for a
- * given
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
@@ -421,6 +464,33 @@ void search(raft::resources const& handle,
  *
  * See the [brute_force::build](#brute_force::build) documentation for a usage example.
  *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
+ * @endcode
+ *
  * @param[in] handle
  * @param[in] params parameters configuring the search
  * @param[in] index bruteforce constructed index
@@ -428,8 +498,17 @@ void search(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
@@ -452,6 +531,33 @@ void search(raft::resources const& handle,
  *
  * See the [brute_force::build](#brute_force::build) documentation for a usage example.
  *
+ * Note, this function requires a temporary buffer to store intermediate results between cuda kernel
+ * calls, which may lead to undesirable allocations and slowdown. To alleviate the problem, you can
+ * pass a pool memory resource or a large enough pre-allocated memory resource to reduce or
+ * eliminate entirely allocations happening within `search`.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *
+ *   // use default index parameters
+ *   brute_force::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   brute_force::index_params index_params;
+ *   auto index = brute_force::build(handle, index_params, dataset);
+ *   // use default search parameters
+ *   brute_force::search_params search_params;
+ *   // create a bitset to filter the search
+ *   auto removed_indices = raft::make_device_vector<int64_t, int64_t>(res, n_removed_indices);
+ *   raft::core::bitset<std::uint32_t, int64_t> removed_indices_bitset(
+ *     res, removed_indices.view(), dataset.extent(0));
+ *   // search K nearest neighbours according to a bitset
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<half>(res, n_queries, k);
+ *   auto filter    = filtering::bitset_filter(removed_indices_bitset.view());
+ *   brute_force::search(res, search_params, index, queries, neighbors, distances, filter);
+ * @endcode
+ *
  * @param[in] handle
  * @param[in] params parameters configuring the search
  * @param[in] index bruteforce constructed index
@@ -459,8 +565,17 @@ void search(raft::resources const& handle,
  * @param[out] neighbors a device pointer to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device pointer to the distances to the selected neighbors [n_queries, k]
- * @param[in] sample_filter an optional device bitmap filter function that greenlights samples for a
- * given query
+ * @param[in] sample_filter An optional device filter that restricts which dataset elements should
+ * be considered for each query.
+ *
+ * - Supports two types of filters:
+ *   1. **Bitset Filter**: A shared filter where each bit corresponds to a dataset element.
+ *      All queries share the same filter, with a logical shape of `[1, index->size()]`.
+ *   2. **Bitmap Filter**: A per-query filter with a logical shape of `[n_queries, index->size()]`,
+ *      where each bit indicates whether a specific dataset element should be considered for a
+ *      particular query. (1 for inclusion, 0 for exclusion).
+ *
+ * - The default value is `none_sample_filter`, which applies no filtering.
  */
 void search(raft::resources const& handle,
             const cuvs::neighbors::brute_force::search_params& params,
