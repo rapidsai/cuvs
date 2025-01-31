@@ -60,7 +60,9 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
   const auto lane_id = threadIdx.x % warp_size;
   for (uint32_t j_offset = 0; j_offset < dataset_dim; j_offset += warp_size * bits_per_pack) {
     // Load dataset vector elements with coalesce access. The mapping of the vector element position
-    // and the `pack` register is as follows: lane_id | LSB  (pack(u8))  MSB
+    // and the `pack` register is as follows:
+    //
+    // lane_id | LSB  (pack(u8))  MSB
     //       0 |  0, 32, 64, ..., 224
     //       1 |  1, 33, 65, ..., 225
     //       ...
@@ -79,13 +81,16 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
 
     // Store the result with (a kind of) transposition so that the the coalesce access can be used.
     // The mapping of the result `pack` register bit position and (smem_index, bit_position) is as
-    // follows: lane_id | LSB          (pack(u8))         MSB
+    // follows:
+    //
+    // lane_id | LSB          (pack(u8))         MSB
     //       0 | ( 0,0), ( 1,0), ( 2,0), ..., ( 7,0)
     //       1 | ( 8,0), ( 9,0), (10,0), ..., (15,0)
     //       ...
     //       4 | ( 0,1), ( 1,1), ( 2,1), ..., ( 7,1)
     //       ...
     //      31 | (24,7), (25,7), (26,7), ..., (31,7)
+    //
     // The `bit_position`-th bit of `local_smem[smem_index]` is copied to the corresponding `pack`
     // bit. By this mapping, the quantization result of 8*i-th ~ (8*(i+1)-1)-th vector elements is
     // stored by the lane_id=i thread.
