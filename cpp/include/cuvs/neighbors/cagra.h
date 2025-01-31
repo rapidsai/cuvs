@@ -154,9 +154,12 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
  *
  */
 struct cuvsCagraExtendParams {
-  /** Degree of input graph for pruning. */
+  /** The additional dataset is divided into chunks and added to the graph. This is the knob to
+   * adjust the tradeoff between the recall and operation throughput. Large chunk sizes can result
+   * in high throughput, but use more working memory (O(max_chunk_size*degree^2)). This can also
+   * degrade recall because no edges are added between the nodes in the same chunk. Auto select when
+   * 0. */
   uint32_t max_chunk_size;
-  /** Degree of output graph. */
 };
 
 typedef struct cuvsCagraExtendParams* cuvsCagraExtendParams_t;
