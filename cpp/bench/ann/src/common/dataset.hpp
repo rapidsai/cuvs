@@ -78,8 +78,13 @@ struct dataset {
   {
     if (filtering_rate.has_value()) {
       // Generate a random bitset for filtering
-      auto bitset_size = (base_set_size() - 1) / kBitsPerCarrierValue + 1;
-      blob_file<bitset_carrier_type> bitset_blob_file{uint32_t(bitset_size), 1};
+      auto n_rows = static_cast<size_t>(subset_size) + static_cast<size_t>(subset_first_row);
+      if (subset_size == 0) {
+        // Read the base set size as a last resort only - for better laziness
+        n_rows = base_set_size();
+      }
+      auto bitset_size = (n_rows - 1) / kBitsPerCarrierValue + 1;
+      blob_file<bitset_carrier_type> bitset_blob_file{static_cast<uint32_t>(bitset_size), 1};
       blob_mmap<bitset_carrier_type> bitset_blob{
         std::move(bitset_blob_file), false, HugePages::kDisable};
       generate_bernoulli(const_cast<bitset_carrier_type*>(bitset_blob.data()),
