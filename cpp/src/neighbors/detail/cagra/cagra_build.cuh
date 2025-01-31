@@ -424,7 +424,13 @@ auto iterative_build_graph(
   // If dataset is a host matrix, change it to a device matrix. Also, if the
   // dimensionality of the dataset does not meet the alighnemt restriction,
   // add extra dimensions and change it to a strided matrix.
-  auto dev_aligned_dataset      = make_aligned_dataset(res, dataset);
+  std::unique_ptr<strided_dataset<T, int64_t>> dev_aligned_dataset;
+  try {
+    dev_aligned_dataset = make_aligned_dataset(res, dataset);
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_ERROR("Iterative CAGRA graph build requires the dataset to fit GPU memory");
+    throw e;
+  }
   auto dev_aligned_dataset_view = dev_aligned_dataset.get()->view();
 
   // If the matrix stride and extent do no match, the extra dimensions are
