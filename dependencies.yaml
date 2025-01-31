@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["11.8", "12.5"]
+      cuda: ["11.8", "12.8"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -27,7 +27,7 @@ files:
   bench_ann:
     output: conda
     matrix:
-      cuda: ["11.8", "12.5"]
+      cuda: ["11.8", "12.8"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -319,6 +319,10 @@ dependencies:
               cuda: "12.5"
             packages:
               - cuda-version=12.5
+          - matrix:
+              cuda: "12.8"
+            packages:
+              - cuda-version=12.8
   cuda:
     specific:
       - output_types: conda
@@ -535,7 +539,7 @@ dependencies:
       - output_types: [conda, pyproject, requirements]
         packages:
           - click
-          - cuvs==25.2.*,>=0.0.0a0
+          - cuvs==25.4.*,>=0.0.0a0
           - matplotlib
           - pandas
           - pyyaml
@@ -543,7 +547,7 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - &libcuvs_unsuffixed libcuvs==25.2.*,>=0.0.0a0
+          - &libcuvs_unsuffixed libcuvs==25.4.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -556,18 +560,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - libcuvs-cu12==25.2.*,>=0.0.0a0
+              - libcuvs-cu12==25.4.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - libcuvs-cu11==25.2.*,>=0.0.0a0
+              - libcuvs-cu11==25.4.*,>=0.0.0a0
           - {matrix: null, packages: [*libcuvs_unsuffixed]}
   depends_on_libraft:
     common:
       - output_types: conda
         packages:
-          - &libraft_unsuffixed libraft==25.2.*,>=0.0.0a0
+          - &libraft_unsuffixed libraft==25.4.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -580,18 +584,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - libraft-cu12==25.2.*,>=0.0.0a0
+              - libraft-cu12==25.4.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - libraft-cu11==25.2.*,>=0.0.0a0
+              - libraft-cu11==25.4.*,>=0.0.0a0
           - {matrix: null, packages: [*libraft_unsuffixed]}
   depends_on_librmm:
     common:
       - output_types: conda
         packages:
-          - &librmm_unsuffixed librmm==25.2.*,>=0.0.0a0
+          - &librmm_unsuffixed librmm==25.4.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -604,18 +608,18 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu12==25.2.*,>=0.0.0a0
+              - librmm-cu12==25.4.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - librmm-cu11==25.2.*,>=0.0.0a0
+              - librmm-cu11==25.4.*,>=0.0.0a0
           - {matrix: null, packages: [*librmm_unsuffixed]}
   depends_on_pylibraft:
     common:
       - output_types: conda
         packages:
-          - &pylibraft_unsuffixed pylibraft==25.2.*,>=0.0.0a0
+          - &pylibraft_unsuffixed pylibraft==25.4.*,>=0.0.0a0
       - output_types: requirements
         packages:
           # pip recognizes the index as a global option for the requirements.txt file
@@ -628,10 +632,10 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu12==25.2.*,>=0.0.0a0
+              - pylibraft-cu12==25.4.*,>=0.0.0a0
           - matrix:
               cuda: "11.*"
               cuda_suffixed: "true"
             packages:
-              - pylibraft-cu11==25.2.*,>=0.0.0a0
+              - pylibraft-cu11==25.4.*,>=0.0.0a0
           - {matrix: null, packages: [*pylibraft_unsuffixed]}

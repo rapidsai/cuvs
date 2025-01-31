@@ -17,13 +17,13 @@ dependencies:
 - cuda-nvtx-dev
 - cuda-profiler-api
 - cuda-python>=12.6.2,<13.0a0
-- cuda-version=12.5
+- cuda-version=12.8
 - cupy>=12.0.0
 - cxx-compiler
 - cython>=3.0.0
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
-- gcc_linux-aarch64=13.*
+- gcc_linux-64=13.*
 - graphviz
 - ipython
 - libclang==16.0.6
@@ -31,7 +31,7 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==25.2.*,>=0.0.0a0
+- librmm==25.4.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -39,7 +39,7 @@ dependencies:
 - numpydoc
 - openblas
 - pre-commit
-- pylibraft==25.2.*,>=0.0.0a0
+- pylibraft==25.4.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
@@ -50,7 +50,7 @@ dependencies:
 - sphinx-copybutton
 - sphinx-markdown-tables
 - sphinx>=8.0.0
-- sysroot_linux-aarch64==2.28
+- sysroot_linux-64==2.28
 - pip:
   - nvidia-sphinx-theme
-name: all_cuda-125_arch-aarch64
+name: all_cuda-128_arch-x86_64
