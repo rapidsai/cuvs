@@ -15,10 +15,6 @@
  */
 #pragma once
 
-#include "../../../core/nvtx.hpp"
-#include "../../vpq_dataset.cuh"
-#include "cagra_build.cuh"
-#include "graph_core.cuh"
 #include <cuvs/neighbors/cagra.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -35,9 +31,6 @@
 #include <cuvs/neighbors/refine.hpp>
 
 #include <cuvs/neighbors/nn_descent.hpp>
-
-// TODO: This shouldn't be calling spatial/knn APIs
-#include "../ann_utils.cuh"
 
 #include <rmm/resource_ref.hpp>
 
@@ -57,6 +50,8 @@ index<T, IdxT> merge(raft::resources const& handle,
   int64_t stride               = -1;
 
   for (auto index : indices) {
+    RAFT_EXPECTS(index != nullptr,
+                 "Null pointer detected in 'indices'. Ensure all elements are valid before usage.");
     using ds_idx_type = decltype(index->data().n_rows());
     if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
         strided_dset != nullptr) {
