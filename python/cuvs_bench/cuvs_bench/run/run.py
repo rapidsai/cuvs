@@ -586,7 +586,6 @@ def run_benchmark(
     search_threads: int,
     dry_run: bool,
     data_export: bool,
-    raft_log_level: int,
 ) -> None:
     """
     Runs a benchmarking process based on the provided configurations.
@@ -625,8 +624,6 @@ def run_benchmark(
         The number of threads to use for searching.
     dry_run : bool
         Whether to perform a dry run without actual execution.
-    raft_log_level : int
-        The logging level for the RAFT library.
 
     Returns
     -------
@@ -689,5 +686,4 @@ def run_benchmark(
         batch_size,
         search_threads,
         search_mode,
-        raft_log_level,
     )

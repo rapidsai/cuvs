@@ -9,3 +9,4 @@ Python API Documentation
 
    python_api/distance.rst
    python_api/neighbors.rst
+   python_api/preprocessing.rst

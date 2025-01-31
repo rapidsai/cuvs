@@ -9,6 +9,7 @@ Nearest Neighbor Indexes
    cagra.rst
    ivfflat.rst
    ivfpq.rst
+   vamana.rst
 
 
 Indices and tables
