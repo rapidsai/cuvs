@@ -91,9 +91,9 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** Parameters for graph building.
    *
-   * Set ivf_pq_params or nn_descent_params to select the graph build algorithm and control their
-   * parameters. The default (std::monostate) is to use a heuristic to decide the algorithm and its
-   * parameters.
+   * Set ivf_pq_params, nn_descent_params, or iterative_search_params to select the graph build
+   * algorithm and control their parameters. The default (std::monostate) is to use a heuristic
+   *  to decide the algorithm and its parameters.
    *
    * @code{.cpp}
    * cagra::index_params params;
@@ -104,6 +104,10 @@ struct index_params : cuvs::neighbors::index_params {
    * // 2. Choose NN Descent algorithm for kNN graph construction
    * params.graph_build_params =
    * cagra::graph_build_params::nn_descent_params(params.intermediate_graph_degree);
+   *
+   * // 3. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
+   * params.graph_build_params =
+   * cagra::graph_build_params::iterative_search_params();
    * @endcode
    */
   std::variant<std::monostate,
