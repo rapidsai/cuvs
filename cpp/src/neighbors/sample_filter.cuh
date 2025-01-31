@@ -20,6 +20,7 @@
 #include <raft/core/bitmap.cuh>
 #include <raft/core/bitset.cuh>
 #include <raft/core/detail/macros.hpp>
+#include <raft/sparse/convert/csr.cuh>
 
 #include <cstddef>
 #include <cstdint>
@@ -108,6 +109,13 @@ inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
   return bitset_view_.test(sample_ix);
 }
 
+template <typename bitset_t, typename index_t>
+template <typename csr_matrix_t>
+void bitset_filter<bitset_t, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
+{
+  raft::sparse::convert::bitset_to_csr(handle, bitset_view_, csr);
+}
+
 template <typename bitmap_t, typename index_t>
 bitmap_filter<bitmap_t, index_t>::bitmap_filter(
   const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_for_filtering)
@@ -124,4 +132,12 @@ inline _RAFT_HOST_DEVICE bool bitmap_filter<bitmap_t, index_t>::operator()(
 {
   return bitmap_view_.test(query_ix, sample_ix);
 }
+
+template <typename bitmap_t, typename index_t>
+template <typename csr_matrix_t>
+void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr_matrix_t& csr)
+{
+  raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);
+}
+
 }  // namespace cuvs::neighbors::filtering
