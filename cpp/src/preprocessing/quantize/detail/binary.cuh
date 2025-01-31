@@ -28,15 +28,15 @@
 namespace cuvs::preprocessing::quantize::detail {
 
 template <class T>
-_RAFT_HOST_DEVICE bool set_bit(const T& a)
+_RAFT_HOST_DEVICE bool is_positive(const T& a)
 {
   return a > 0;
 }
 
 template <>
-_RAFT_HOST_DEVICE bool set_bit<half>(const half& a)
+_RAFT_HOST_DEVICE bool is_positive<half>(const half& a)
 {
-  return set_bit(static_cast<float>(a));
+  return is_positive(static_cast<float>(a));
 }
 
 template <class T, uint32_t block_size, class pack_t = uint8_t>
@@ -70,7 +70,7 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
       const auto j = j_offset + lane_id + bit_offset * warp_size;
       if (j < dataset_dim) {
         const auto v = in_ptr[vector_id * ldi + j];
-        if (set_bit(v)) { pack |= (1u << bit_offset); }
+        if (is_positive(v)) { pack |= (1u << bit_offset); }
       }
     }
 
@@ -156,7 +156,7 @@ void transform(raft::resources const& res,
       for (uint32_t pack_j = 0; pack_j < bits_per_pack; ++pack_j) {
         const uint32_t in_j = out_j * bits_per_pack + pack_j;
         if (in_j < dataset_dim) {
-          if (set_bit(dataset(i, in_j))) { pack |= (1u << pack_j); }
+          if (is_positive(dataset(i, in_j))) { pack |= (1u << pack_j); }
         }
       }
       out(i, out_j) = pack;
