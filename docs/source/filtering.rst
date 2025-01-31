@@ -20,11 +20,8 @@ bitset length should match the number of vectors present in the database.
 Bitmap
 ======
 
-A bitmap is based on the same principle as a bitset, but in two dimensions. This allows users to provide a different bitset for each query 
+A bitmap is based on the same principle as a bitset, but in two dimensions. This allows users to provide a different bitset for each query
 being searched. Check out RAFT's `bitmap API documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitmap/>`.
-
-Using filters in cuVS
-=====================
 
 Examples
 =======

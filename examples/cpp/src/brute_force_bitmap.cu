@@ -47,7 +47,7 @@ int main()
   brute_force::search_params search_params;
   auto dataset = raft::make_device_matrix<dataset_dtype, indexing_dtype>(res, n_vectors, dim);
   auto queries = raft::make_device_matrix<dataset_dtype, indexing_dtype>(res, n_queries, dim);
-  
+
   load_dataset(res, dataset.data_handle(), n_vectors, dim);
   load_dataset(res, queries.data_handle(), n_queries, dim);
   auto index = brute_force::build(res, index_params, raft::make_const_mdspan(dataset.view()));
