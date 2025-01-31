@@ -98,11 +98,14 @@ struct dataset {
     if (query_set_accessed_) { return static_cast<int>(query_set_.n_cols()); }
     // Otherwise, try reading both (one of the two sets may be missing)
     try {
+      query_set_accessed_ = true;
       return static_cast<int>(query_set_.n_cols());
     } catch (const std::runtime_error& e) {
       // Any exception raised above will re-raise next time we try to access the query set.
+      query_set_accessed_ = false;
       query_set_.reset_lazy_state();
     }
+    base_set_accessed_ = true;
     return static_cast<int>(base_set_.n_cols());
   }
   [[nodiscard]] auto max_k() const -> uint32_t
