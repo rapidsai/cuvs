@@ -208,9 +208,9 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/cagra_search_int8.cu
     src/neighbors/cagra_search_uint8.cu
     src/neighbors/detail/cagra/compute_distance.cu
-    src/neighbors/detail/cagra/compute_distance_standard_BinaryHamming_u8_uint32_dim128_t8.cu
-    src/neighbors/detail/cagra/compute_distance_standard_BinaryHamming_u8_uint32_dim256_t16.cu
-    src/neighbors/detail/cagra/compute_distance_standard_BinaryHamming_u8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu

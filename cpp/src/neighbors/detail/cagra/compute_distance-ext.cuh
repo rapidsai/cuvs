@@ -392,19 +392,19 @@ extern template struct vpq_descriptor_spec<DistanceType::L2Expanded,
                                            uint8_t,
                                            uint32_t,
                                            float>;
-extern template struct standard_descriptor_spec<DistanceType::BinaryHamming,
+extern template struct standard_descriptor_spec<DistanceType::BitwiseHamming,
                                                 8,
                                                 128,
                                                 uint8_t,
                                                 uint32_t,
                                                 float>;
-extern template struct standard_descriptor_spec<DistanceType::BinaryHamming,
+extern template struct standard_descriptor_spec<DistanceType::BitwiseHamming,
                                                 16,
                                                 256,
                                                 uint8_t,
                                                 uint32_t,
                                                 float>;
-extern template struct standard_descriptor_spec<DistanceType::BinaryHamming,
+extern template struct standard_descriptor_spec<DistanceType::BitwiseHamming,
                                                 32,
                                                 512,
                                                 uint8_t,
@@ -460,9 +460,9 @@ extern template struct instance_selector<
   standard_descriptor_spec<DistanceType::InnerProduct, 32, 512, uint8_t, uint32_t, float>,
   vpq_descriptor_spec<DistanceType::L2Expanded, 32, 512, 8, 2, half, uint8_t, uint32_t, float>,
   vpq_descriptor_spec<DistanceType::L2Expanded, 32, 512, 8, 4, half, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<DistanceType::BinaryHamming, 8, 128, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<DistanceType::BinaryHamming, 16, 256, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<DistanceType::BinaryHamming, 32, 512, uint8_t, uint32_t, float>>;
+  standard_descriptor_spec<DistanceType::BitwiseHamming, 8, 128, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<DistanceType::BitwiseHamming, 16, 256, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<DistanceType::BitwiseHamming, 32, 512, uint8_t, uint32_t, float>>;
 
 using descriptor_instances = instance_selector<
   standard_descriptor_spec<DistanceType::L2Expanded, 8, 128, float, uint32_t, float>,
@@ -513,9 +513,9 @@ using descriptor_instances = instance_selector<
   standard_descriptor_spec<DistanceType::InnerProduct, 32, 512, uint8_t, uint32_t, float>,
   vpq_descriptor_spec<DistanceType::L2Expanded, 32, 512, 8, 2, half, uint8_t, uint32_t, float>,
   vpq_descriptor_spec<DistanceType::L2Expanded, 32, 512, 8, 4, half, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<DistanceType::BinaryHamming, 8, 128, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<DistanceType::BinaryHamming, 16, 256, uint8_t, uint32_t, float>,
-  standard_descriptor_spec<DistanceType::BinaryHamming, 32, 512, uint8_t, uint32_t, float>>;
+  standard_descriptor_spec<DistanceType::BitwiseHamming, 8, 128, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<DistanceType::BitwiseHamming, 16, 256, uint8_t, uint32_t, float>,
+  standard_descriptor_spec<DistanceType::BitwiseHamming, 32, 512, uint8_t, uint32_t, float>>;
 
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,

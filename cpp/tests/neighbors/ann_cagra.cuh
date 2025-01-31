@@ -290,7 +290,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     switch (dist) {
       case InnerProduct: return "InnerProduct";
       case L2Expanded: return "L2";
-      case BinaryHamming: return "BinaryHamming";
+      case BitwiseHamming: return "BitwiseHamming";
       default: break;
     }
     return "Unknown";
@@ -329,15 +329,15 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    // IVF_PQ and NN_DESCENT graph builds do not support BinaryHamming
-    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
-    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
@@ -520,15 +520,15 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
-    // IVF_PQ and NN_DESCENT graph builds do not support BinaryHamming
-    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
-    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
@@ -730,15 +730,15 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
-    // IVF_PQ and NN_DESCENT graph builds do not support BinaryHamming
-    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
     // distance, making it impossible to make a top-k ground truth.
-    if (ps.metric == cuvs::distance::DistanceType::BinaryHamming &&
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
@@ -933,7 +933,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {16},  // k
     {graph_build_algo::NN_DESCENT,
      graph_build_algo::ITERATIVE_CAGRA_SEARCH},  // build algo. ITERATIVE_CAGRA_SEARCH is needed to
-                                                 // test BinaryHamming
+                                                 // test BitwiseHamming
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 10},  // query size
     {0},
@@ -978,7 +978,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::BinaryHamming},
+     cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
     {0.995});
@@ -1103,7 +1103,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {1},
                                                    {cuvs::distance::DistanceType::L2Expanded,
                                                     cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BinaryHamming},
+                                                    cuvs::distance::DistanceType::BitwiseHamming},
                                                    {false},
                                                    {false},
                                                    {0.995});
@@ -1131,7 +1131,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                    {1},
                                                    {cuvs::distance::DistanceType::L2Expanded,
                                                     cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BinaryHamming},
+                                                    cuvs::distance::DistanceType::BitwiseHamming},
                                                    {false},
                                                    {true},
                                                    {0.995});
@@ -1201,7 +1201,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::BinaryHamming},
+     cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
     {0.995});
