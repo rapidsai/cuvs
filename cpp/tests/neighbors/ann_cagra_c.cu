@@ -25,6 +25,7 @@
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/math.hpp>

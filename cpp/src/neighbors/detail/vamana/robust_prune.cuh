@@ -19,10 +19,12 @@
 #include <cub/cub.cuh>
 #include <thrust/sort.h>
 
+#include <raft/util/cuda_dev_essentials.cuh>
+
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 // Load candidates (from query) and previous edges (from nbh_list) into registers (tmp) spanning
 // warp
@@ -145,9 +147,11 @@ __global__ void RobustPruneKernel(
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-  T* s_coords = reinterpret_cast<T*>(&smem[sort_smem_size]);
-  DistPair<IdxT, accT>* new_nbh_list =
-    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[dim * sizeof(T) + sort_smem_size]);
+  int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
+
+  T* s_coords                        = reinterpret_cast<T*>(&smem[sort_smem_size]);
+  DistPair<IdxT, accT>* new_nbh_list = reinterpret_cast<DistPair<IdxT, accT>*>(
+    &smem[(dim + align_padding) * sizeof(T) + sort_smem_size]);
 
   static __shared__ Point<T, accT> s_query;
   s_query.coords = s_coords;
@@ -245,4 +249,4 @@ __global__ void RobustPruneKernel(
 
 }  // namespace
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail
