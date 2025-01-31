@@ -457,6 +457,11 @@ inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
+/**
+ * @defgroup neighbors_filtering Filtering for ANN Types
+ * @{
+ */
+
 enum class FilterType { None, Bitmap, Bitset };
 
 struct base_filter {
@@ -566,6 +571,8 @@ struct bitset_filter : public base_filter {
   template <typename csr_matrix_t>
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
+
+/** @} */  // end group neighbors_filtering
 
 /**
  * If the filtering depends on the index of a sample, then the following
