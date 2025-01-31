@@ -146,6 +146,45 @@ cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t param
  */
 
 /**
+ * @defgroup cagra_c_extend_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+/**
+ * @brief Supplemental parameters to extend CAGRA Index
+ *
+ */
+struct cuvsCagraExtendParams {
+  /** The additional dataset is divided into chunks and added to the graph. This is the knob to
+   * adjust the tradeoff between the recall and operation throughput. Large chunk sizes can result
+   * in high throughput, but use more working memory (O(max_chunk_size*degree^2)). This can also
+   * degrade recall because no edges are added between the nodes in the same chunk. Auto select when
+   * 0. */
+  uint32_t max_chunk_size;
+};
+
+typedef struct cuvsCagraExtendParams* cuvsCagraExtendParams_t;
+
+/**
+ * @brief Allocate CAGRA Extend params, and populate with default values
+ *
+ * @param[in] params cuvsCagraExtendParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
+
+/**
+ * @brief De-allocate CAGRA Extend params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
+
+/**
+ * @}
+ */
+
+/**
  * @defgroup cagra_c_search_params C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
@@ -335,6 +374,36 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            cuvsCagraIndexParams_t params,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_extend_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+
+/**
+ * @brief Extend a CAGRA index with a `DLManagedTensor` which has underlying
+ *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
+ *        or `kDLCPU`. Also, acceptable underlying types are:
+ *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
+ * @param[in] additional_dataset DLManagedTensor* additional dataset
+ * @param[in,out] index cuvsCagraIndex_t CAGRA index
+ * @param[out] return_dataset DLManagedTensor* extended dataset
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                            cuvsCagraExtendParams_t params,
+                            DLManagedTensor* additional_dataset,
+                            cuvsCagraIndex_t index,
+                            DLManagedTensor* return_dataset);
 
 /**
  * @}

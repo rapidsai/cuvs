@@ -30,7 +30,7 @@
 #include <cstdio>
 #include <vector>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /* @defgroup greedy_search_detail greedy search
  * @{
@@ -112,13 +112,15 @@ __global__ void GreedySearchKernel(
     DistPair<IdxT, accT> candidate_queue;
   };
 
+  int align_padding = (((dim - 1) / alignof(ShmemLayout)) + 1) * alignof(ShmemLayout) - dim;
+
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
   size_t smem_offset = sort_smem_size;  // temp sorting memory takes first chunk
 
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
-  smem_offset += dim * sizeof(T);
+  smem_offset += (dim + align_padding) * sizeof(T);
 
   Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]);
   smem_offset += topk * sizeof(Node<accT>);
@@ -283,4 +285,4 @@ __global__ void GreedySearchKernel(
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail
