@@ -67,8 +67,8 @@ void _search(cuvsResources_t res,
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, QueriesLayoutT>;
   using neighbors_mdspan_type = raft::device_matrix_view<int64_t, int64_t, raft::row_major>;
   using distances_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
-  using prefilter_mds_type    = raft::device_vector_view<const uint32_t, int64_t>;
-  using prefilter_bmp_type    = cuvs::core::bitmap_view<const uint32_t, int64_t>;
+  using prefilter_mds_type    = raft::device_vector_view<uint32_t, int64_t>;
+  using prefilter_bmp_type    = cuvs::core::bitmap_view<uint32_t, int64_t>;
 
   auto queries_mds   = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
   auto neighbors_mds = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
@@ -85,14 +85,14 @@ void _search(cuvsResources_t res,
                                          distances_mds,
                                          cuvs::neighbors::filtering::none_sample_filter{});
   } else if (prefilter.type == BITMAP) {
-    auto prefilter_ptr  = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
-    auto prefilter_mds  = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
-    auto prefilter_view = cuvs::neighbors::filtering::bitmap_filter(
-      prefilter_bmp_type((const uint32_t*)prefilter_mds.data_handle(),
+    auto prefilter_ptr   = reinterpret_cast<DLManagedTensor*>(prefilter.addr);
+    auto prefilter_mds   = cuvs::core::from_dlpack<prefilter_mds_type>(prefilter_ptr);
+    const auto prefilter = cuvs::neighbors::filtering::bitmap_filter(
+      prefilter_bmp_type((uint32_t*)prefilter_mds.data_handle(),
                          queries_mds.extent(0),
                          index_ptr->dataset().extent(0)));
     cuvs::neighbors::brute_force::search(
-      *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter_view);
+      *res_ptr, params, *index_ptr, queries_mds, neighbors_mds, distances_mds, prefilter);
   } else {
     RAFT_FAIL("Unsupported prefilter type: BITSET");
   }
