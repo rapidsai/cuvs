@@ -546,6 +546,7 @@ auto iterative_build_graph(
     // Optimize graph
     bool flag_last  = (curr_graph_size == final_graph_size);
     curr_graph_size = curr_query_size;
+    cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
     optimize<IdxT>(
       res, neighbors.view(), cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
