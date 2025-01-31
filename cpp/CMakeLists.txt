@@ -173,6 +173,9 @@ include(cmake/modules/ConfigureCUDA.cmake)
 rapids_cpm_init()
 
 if(NOT BUILD_CPU_ONLY)
+  # We must find CCCL ourselves before raft so that we get the right version.
+  include(${rapids-cmake-dir}/cpm/cccl.cmake)
+  rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
 endif()
@@ -685,6 +688,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/cagra_c.cpp
       $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
       src/neighbors/refine/refine_c.cpp
+      src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
     )
 
@@ -797,7 +801,7 @@ endif()
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(internal)
-  add_subdirectory(test)
+  add_subdirectory(tests)
 endif()
 
 # ##################################################################################################

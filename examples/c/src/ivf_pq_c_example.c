@@ -45,7 +45,7 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
         cuvsIvfPqIndexParamsDestroy(index_params);
         return;
     }
-    
+
     // Create output arrays.
     int64_t topk      = 10;
     int64_t n_queries = queries_tensor->dl_tensor.shape[0];
@@ -89,7 +89,7 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
 
     printf("\nOriginal results:\n");
     print_results(neighbors, distances, 2, topk);
-    
+
     // Re-ranking operation: refine the initial search results by computing exact distances
     int64_t topk_refined = 7;
     int64_t *neighbors_refined_d;
@@ -100,11 +100,11 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
     DLManagedTensor neighbors_refined_tensor;
     int64_t neighbors_refined_shape[2] = {n_queries, topk_refined};
     int_tensor_initialize(neighbors_refined_d, neighbors_refined_shape, &neighbors_refined_tensor);
-    
+
     DLManagedTensor distances_refined_tensor;
     int64_t distances_refined_shape[2] = {n_queries, topk_refined};
     float_tensor_initialize(distances_refined_d, distances_refined_shape, &distances_refined_tensor);
-    
+
     // Note, refinement requires the original dataset and the queries.
     // Don't forget to specify the same distance metric as used by the index.
     cuvsError_t refine_status = cuvsRefine(*res, dataset_tensor, queries_tensor,
@@ -140,7 +140,7 @@ void ivf_pq_build_search(cuvsResources_t *res, DLManagedTensor * dataset_tensor,
 
     cuvsIvfPqSearchParamsDestroy(search_params);
     cuvsIvfPqIndexDestroy(index);
-    cuvsIvfPqIndexParamsDestroy(index_params);  
+    cuvsIvfPqIndexParamsDestroy(index_params);
 }
 
 int main() {
@@ -152,7 +152,7 @@ int main() {
     float *queries = (float *)malloc(n_queries * n_dim * sizeof(float));
     generate_dataset(dataset, n_samples, n_dim, -10.0, 10.0);
     generate_dataset(queries, n_queries, n_dim, -1.0, 1.0);
-    
+
     // Create a cuvsResources_t object
     cuvsResources_t res;
     cuvsResourcesCreate(&res);
@@ -166,7 +166,7 @@ int main() {
     DLManagedTensor dataset_tensor;
     int64_t dataset_shape[2] = {n_samples,n_dim};
     float_tensor_initialize(dataset_d, dataset_shape, &dataset_tensor);
-    
+
     // Allocate memory for `queries`
     float *queries_d;
     cuvsRMMAlloc(res, (void**) &queries_d, sizeof(float) * n_queries * n_dim);
@@ -177,7 +177,7 @@ int main() {
     DLManagedTensor queries_tensor;
     int64_t queries_shape[2] = {n_queries, n_dim};
     float_tensor_initialize(queries_d, queries_shape, &queries_tensor);
-    
+
     // Simple build and search example.
     ivf_pq_build_search(&res, &dataset_tensor, &queries_tensor);
 

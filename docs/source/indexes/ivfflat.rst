@@ -86,7 +86,7 @@ Memory footprint
 ----------------
 
 Each cluster is padded to at least 32 vectors (but potentially up to 1024). Assuming uniform random distribution of vectors/list, we would have
-:math:`cluster\_overhead = (conservative\_memory\_allocation ? 16 : 512 ) * dim * sizeof_{float})`
+:math:`cluster\_overhead = (conservative\_memory\_allocation ? 16 : 512 ) * dim * sizeof_{float}`
 
 Note that each cluster is allocated as a separate allocation. If we use a `cuda_memory_resource`, that would grab memory in 1 MiB chunks, so on average we might have 0.5 MiB overhead per cluster. If we us 10s of thousands of clusters, it becomes essential to use pool allocator to avoid this overhead.
 
@@ -110,7 +110,6 @@ Index (device memory):
 Peak device memory usage for index build:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:math:`workspace = min(1GB, n\_queries * [(n\_lists + 1 + n\_probes * (k + 1)) * sizeof_{float}) + n\_probes * k * sizeof_{idx}])`
+:math:`workspace = min(1GB, n\_queries * [(n\_lists + 1 + n\_probes * (k + 1)) * sizeof_{float} + n\_probes * k * sizeof_{idx}])`
 
 :math:`index\_size + workspace`
-
