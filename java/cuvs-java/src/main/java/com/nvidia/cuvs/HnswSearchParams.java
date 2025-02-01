@@ -20,64 +20,36 @@ package com.nvidia.cuvs;
  * HnswSearchParams encapsulates the logic for configuring and holding search
  * parameters for HNSW index.
  *
+ * @param ef the ef value
+ * @param numThreads the number of threads
  * @since 25.02
  */
-public class HnswSearchParams {
+public record HnswSearchParams (int ef, int numThreads) {
 
-  private int ef = 200;
-  private int numThreads = 0;
-
-  /**
-   * Constructs an instance of HnswSearchParams with passed search parameters.
-   *
-   * @param ef         the ef value
-   * @param numThreads the number of threads
-   */
-  private HnswSearchParams(int ef, int numThreads) {
-    this.ef = ef;
-    this.numThreads = numThreads;
-  }
-
-  /**
-   * Gets the ef value
-   *
-   * @return the integer ef value
-   */
-  public int getEf() {
-    return ef;
-  }
-
-  /**
-   * Gets the number of threads
-   *
-   * @return the number of threads
-   */
-  public int getNumThreads() {
-    return numThreads;
-  }
-
-  @Override
-  public String toString() {
-    return "HnswSearchParams [ef=" + ef + ", numThreads=" + numThreads + "]";
-  }
+    public HnswSearchParams {
+      if (ef < 0) {
+        throw new IllegalArgumentException();
+      }
+      if (numThreads < 0) {
+        throw new IllegalArgumentException();
+      }
+    }
 
   /**
    * Builder configures and creates an instance of HnswSearchParams.
    */
   public static class Builder {
 
-    private CuVSResources resources;
-    private int ef = 200;
-    private int numThreads = 0;
+    private static final int DEFAULT_EF_VALUE = 200;
+    private static final int DEFAULT_NUM_THREADS = 0;
+
+    private int ef = DEFAULT_EF_VALUE;
+    private int numThreads = DEFAULT_NUM_THREADS;
 
     /**
      * Constructs this Builder with an instance of Arena.
-     *
-     * @param resources the {@link CuVSResources} instance to use
      */
-    public Builder(CuVSResources resources) {
-      this.resources = resources;
-    }
+    public Builder() { }
 
     /**
      * Sets the ef value

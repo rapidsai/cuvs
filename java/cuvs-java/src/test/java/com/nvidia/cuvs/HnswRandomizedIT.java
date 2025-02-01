@@ -137,7 +137,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
           .withIndexParams(hnswIndexParams)
           .build();
 
-      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder(resources)
+      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder()
           .withNumThreads(32)
           .build();
 

@@ -198,8 +198,8 @@ public class HnswIndexImpl implements HnswIndex {
    */
   private MemorySegment segmentFromSearchParams(HnswSearchParams params) {
     MemorySegment seg = CuVSHnswSearchParams.allocate(resources.getArena());
-    CuVSHnswSearchParams.ef(seg, params.getEf());
-    CuVSHnswSearchParams.num_threads(seg, params.getNumThreads());
+    CuVSHnswSearchParams.ef(seg, params.ef());
+    CuVSHnswSearchParams.num_threads(seg, params.numThreads());
     return seg;
   }
 

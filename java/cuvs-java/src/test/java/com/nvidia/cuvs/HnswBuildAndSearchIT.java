@@ -112,7 +112,7 @@ public class HnswBuildAndSearchIT {
             .withIndexParams(hnswIndexParams)
             .build();
 
-        HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder(resources)
+        HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder()
             .build();
 
         HnswQuery hnswQuery = new HnswQuery.Builder()
