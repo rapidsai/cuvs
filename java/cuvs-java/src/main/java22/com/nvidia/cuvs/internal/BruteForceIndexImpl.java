@@ -139,9 +139,9 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long rows = dataset.length;
     long cols = rows > 0 ? dataset[0].length : 0;
 
+    MemorySegment dataSeg = Util.buildMemorySegment(resources.getArena(), dataset);
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment dataSeg = Util.buildMemorySegment(localArena, dataset);
       MemorySegment indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
         dataSeg,
         rows,
@@ -176,12 +176,12 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
     MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
+    MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
+            ? Util.buildMemorySegment(resources.getArena(), cuvsQuery.getPrefilter())
+            : MemorySegment.NULL;
+    MemorySegment querySeg = Util.buildMemorySegment(resources.getArena(), cuvsQuery.getQueryVectors());
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
-              ? Util.buildMemorySegment(localArena, cuvsQuery.getPrefilter())
-              : MemorySegment.NULL;
-      MemorySegment querySeg = Util.buildMemorySegment(localArena, cuvsQuery.getQueryVectors());
       searchMethodHandle.invokeExact(
         bruteForceIndexReference.getMemorySegment(),
         querySeg,
@@ -211,9 +211,9 @@ public class BruteForceIndexImpl implements BruteForceIndex{
   public void serialize(OutputStream outputStream, Path tempFile) throws Throwable {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
+    MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment pathSeg = Util.buildMemorySegment(localArena, tempFile.toString());
       serializeMethodHandle.invokeExact(
         resources.getMemorySegment(),
         bruteForceIndexReference.getMemorySegment(),
@@ -246,9 +246,9 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     try (var in = inputStream;
          FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
       in.transferTo(fileOutputStream);
+      MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
       try (var localArena = Arena.ofConfined()) {
         MemorySegment returnValue = localArena.allocate(C_INT);
-        MemorySegment pathSeg = Util.buildMemorySegment(localArena, tmpIndexFile.toString());
         deserializeMethodHandle.invokeExact(
           resources.getMemorySegment(),
           indexReference.getMemorySegment(),

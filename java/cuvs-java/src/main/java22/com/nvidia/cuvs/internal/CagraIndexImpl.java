@@ -165,9 +165,10 @@ public class CagraIndexImpl implements CagraIndex {
         ? segmentFromCompressionParams(cagraCompressionParams)
         : MemorySegment.NULL;
 
+    MemorySegment dataSeg = Util.buildMemorySegment(resources.getArena(), dataset);
+
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment dataSeg = Util.buildMemorySegment(localArena, dataset);
       var indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
         dataSeg,
         rows,
@@ -203,9 +204,10 @@ public class CagraIndexImpl implements CagraIndex {
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
     MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
+    MemorySegment floatsSeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
+
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment floatsSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
       searchMethodHandle.invokeExact(
         cagraIndexReference.getMemorySegment(),
         floatsSeg,
@@ -240,9 +242,9 @@ public class CagraIndexImpl implements CagraIndex {
   public void serialize(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
+    MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment pathSeg = Util.buildMemorySegment(localArena, tempFile.toString());
       serializeMethodHandle.invokeExact(
         resources.getMemorySegment(),
         cagraIndexReference.getMemorySegment(),
@@ -279,9 +281,9 @@ public class CagraIndexImpl implements CagraIndex {
   public void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
+    MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment pathSeg = Util.buildMemorySegment(localArena, tempFile.toString());
       serializeCAGRAIndexToHNSWMethodHandle.invokeExact(
         resources.getMemorySegment(),
         pathSeg,
@@ -330,9 +332,9 @@ public class CagraIndexImpl implements CagraIndex {
     try (var in = inputStream;
          FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
       in.transferTo(fileOutputStream);
+      MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
       try (var localArena = Arena.ofConfined()) {
         MemorySegment returnValue = localArena.allocate(C_INT);
-        MemorySegment pathSeg = Util.buildMemorySegment(localArena, tmpIndexFile.toString());
         deserializeMethodHandle.invokeExact(
           resources.getMemorySegment(),
           indexReference.getMemorySegment(),

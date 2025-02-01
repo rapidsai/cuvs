@@ -111,10 +111,10 @@ public class HnswIndexImpl implements HnswIndex {
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
     MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
+    MemorySegment querySeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
 
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment querySeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
       searchHnswIndexMethodHandle.invokeExact(
         resources.getMemorySegment(),
         hnswIndexReference.getMemorySegment(),
@@ -165,9 +165,9 @@ public class HnswIndexImpl implements HnswIndex {
         fileOutputStream.write(chunk, 0, chunkLength);
       }
 
+      MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
       try (var localArena = Arena.ofConfined()) {
         MemorySegment returnValue = localArena.allocate(C_INT);
-        MemorySegment pathSeg = Util.buildMemorySegment(localArena, tmpIndexFile.toString());
         MemorySegment deserSeg = (MemorySegment) deserializeHnswIndexMethodHandle.invokeExact(
           resources.getMemorySegment(),
           pathSeg,

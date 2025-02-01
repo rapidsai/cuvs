@@ -44,6 +44,9 @@ public class Util {
   private static final MethodHandle getGpuInfoMethodHandle = downcallHandle("get_gpu_info",
           FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
 
+  private static final MethodHandle getLastErrorTextMethodHandle = downcallHandle("cuvsGetLastErrorText",
+          FunctionDescriptor.of(ADDRESS));
+
   private Util() {}
 
   /**
@@ -54,8 +57,19 @@ public class Util {
    */
   public static void checkError(int value, String caller) {
     if (value != CUVS_SUCCESS) {
-      // TODO: handle error
-      throw new AssertionError(caller + " returned " + value);
+      String errorMsg = getLastErrorText();
+      throw new RuntimeException(caller + " returned " + value + "[" + errorMsg + "]");
+    }
+  }
+
+  static final long MAX_ERROR_TEXT = 1_000_000L;
+
+  static String getLastErrorText() {
+    try {
+      MemorySegment seg = (MemorySegment) getLastErrorTextMethodHandle.invokeExact();
+      return seg.reinterpret(MAX_ERROR_TEXT).getString(0L);
+    } catch (Throwable t) {
+      throw new RuntimeException(t);
     }
   }
 
@@ -179,7 +193,7 @@ public class Util {
     MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, C_FLOAT);
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
     for (int r = 0; r < rows; r++) {
-      MemorySegment.copy(data[r], 0, dataMemorySegment, (ValueLayout) C_FLOAT, (r * cols * C_FLOAT.byteSize()),
+      MemorySegment.copy(data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()),
           (int) cols);
     }
     return dataMemorySegment;
