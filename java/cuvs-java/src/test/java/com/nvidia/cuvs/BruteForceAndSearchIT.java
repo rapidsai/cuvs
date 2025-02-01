@@ -16,8 +16,6 @@
 
 package com.nvidia.cuvs;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -28,18 +26,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.BruteForceIndexParams;
-import com.nvidia.cuvs.BruteForceQuery;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.SearchResults;
+import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BruteForceAndSearchIT {
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+import static org.junit.Assert.assertEquals;
+
+public class BruteForceAndSearchIT extends CuVSTestCase{
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+  @Before
+  public void setup() {
+    assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
+  }
 
   /**
    * A basic test that checks the whole flow - from indexing to search.

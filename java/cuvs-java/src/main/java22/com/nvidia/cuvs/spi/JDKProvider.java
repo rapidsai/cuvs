@@ -25,6 +25,7 @@ import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -32,7 +33,14 @@ final class JDKProvider extends CuVSProvider {
 
   @Override
   public CuVSResources newCuVSResources(Path tempDirectory) throws Throwable {
-    return new CuVSResourcesImpl(Objects.requireNonNull(tempDirectory));
+    Objects.requireNonNull(tempDirectory);
+    if (Files.notExists(tempDirectory)) {
+      throw new IllegalArgumentException("does not exist:" + tempDirectory);
+    }
+    if (!Files.isDirectory(tempDirectory)) {
+      throw new IllegalArgumentException("not a directory:" + tempDirectory);
+    }
+    return new CuVSResourcesImpl(tempDirectory);
   }
 
   @Override

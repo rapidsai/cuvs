@@ -138,7 +138,7 @@
                                     <type>so</type>
                                     <overWrite>false</overWrite>
                                     <outputDirectory>
-                                        ${project.build.directory}/classes</outputDirectory>
+                                        ${project.build.directory}/classes/META-INF/native/linux_x64</outputDirectory>
                                     <destFileName>libcuvs_java.so</destFileName>
                                 </artifactItem>
                             </artifactItems>

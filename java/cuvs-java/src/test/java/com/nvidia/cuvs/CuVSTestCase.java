@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 
-import com.nvidia.cuvs.SearchResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,5 +99,10 @@ public abstract class CuVSTestCase {
             expected.get(i).contains(sortedResultKeys.get(j)));
       }
     }
+  }
+
+  static boolean isLinuxAmd64() {
+    String name = System.getProperty("os.name");
+    return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
   }
 }

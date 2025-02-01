@@ -19,12 +19,6 @@ package com.nvidia.cuvs;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraIndexParams;
-import com.nvidia.cuvs.CagraQuery;
-import com.nvidia.cuvs.CagraSearchParams;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.SearchResults;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+
 @RunWith(RandomizedRunner.class)
 public class CagraRandomizedIT extends CuVSTestCase {
 
@@ -41,6 +37,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
   @Before
   public void setup() {
+    assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
     log.info("Random context initialized for test.");
   }

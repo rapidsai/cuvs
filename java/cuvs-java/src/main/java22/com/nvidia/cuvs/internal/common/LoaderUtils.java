@@ -37,14 +37,18 @@ class LoaderUtils {
   static Path loadNativeLibrary() throws LibraryException {
     String libraryPathFromEnvironment = System.getenv("CUVS_JAVA_SO_PATH");
     if (libraryPathFromEnvironment != null) {
-      Path file = Path.of(libraryPathFromEnvironment);
+      Path file = Path.of(libraryPathFromEnvironment).toAbsolutePath();
       if (Files.notExists(file)) {
         throw new LibraryException(
           "Environment variable CUVS_JAVA_SO_PATH points to non-existent file: " + libraryPathFromEnvironment);
       }
+      if (Files.isDirectory(file)) {
+        throw new LibraryException(
+          "Environment variable CUVS_JAVA_SO_PATH points to a directory: " + libraryPathFromEnvironment);
+      }
       return file;
     }
-    return loadLibraryFromJar("/libcuvs_java.so");
+    return loadLibraryFromJar("/META-INF/native/linux_x64/libcuvs_java.so");
   }
 
   static Path loadLibraryFromJar(String path) throws LibraryException {
@@ -52,21 +56,18 @@ class LoaderUtils {
       throw new IllegalArgumentException("The path has to be absolute (start with '/').");
     }
     // Obtain filename from path
-    String[] parts = path.split("/");
-    String filename = (parts.length > 1) ? parts[parts.length - 1] : null;
+    String filename = path.substring(path.lastIndexOf("/") + 1);
 
     // Split filename to prefix and suffix (extension)
-    String prefix = "";
-    String suffix = null;
-    if (filename != null) {
-      parts = filename.split("\\.", 2);
-      prefix = parts[0];
-      suffix = (parts.length > 1) ? "." + parts[parts.length - 1] : null;
-    }
+    String[] parts = filename.split("\\.", 2);
+    String prefix = parts[0];
+    String suffix = (parts.length > 1) ? "." + parts[parts.length - 1] : null;
+
     // Prepare temporary file
     try {
       Path temp = Files.createTempFile(prefix, suffix);
-      InputStream libraryStream = Util.class.getModule().getResourceAsStream(path); // Util.class.getResourceAsStream(path);
+      temp.toFile().deleteOnExit();
+      InputStream libraryStream = Util.class.getModule().getResourceAsStream(path);
       if (libraryStream == null) {
         throw new LibraryException("CuVS Library Not Found in ClassPath");
       }

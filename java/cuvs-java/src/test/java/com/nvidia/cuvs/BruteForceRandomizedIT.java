@@ -19,11 +19,6 @@ package com.nvidia.cuvs;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.BruteForceIndexParams;
-import com.nvidia.cuvs.BruteForceQuery;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.SearchResults;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+
 @RunWith(RandomizedRunner.class)
 public class BruteForceRandomizedIT extends CuVSTestCase {
 
@@ -39,6 +36,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
 
   @Before
   public void setup() {
+    assumeTrue(isLinuxAmd64());
     initializeRandom();
     log.info("Random context initialized for test.");
   }

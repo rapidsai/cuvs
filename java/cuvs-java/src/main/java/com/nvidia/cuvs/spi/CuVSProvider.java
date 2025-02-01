@@ -60,17 +60,25 @@ public abstract class CuVSProvider {
     static final CuVSProvider INSTANCE = provider();
 
     static CuVSProvider provider() {
-      if (Runtime.version().feature() < 22) {
-        return new UnsupportedProvider();
+      if (Runtime.version().feature() > 21 && isLinuxAmd64()) {
+        try {
+          var cls = Class.forName("com.nvidia.cuvs.spi.JDKProvider");
+          var ctr = MethodHandles.lookup().findConstructor(cls, MethodType.methodType(void.class));
+          return (CuVSProvider) ctr.invoke();
+        } catch (Throwable e) {
+          throw new AssertionError(e);
+        }
       }
-      // >= JDK 22
-      try {
-        var cls = Class.forName("com.nvidia.cuvs.spi.JDKProvider");
-        var ctr = MethodHandles.lookup().findConstructor(cls, MethodType.methodType(void.class));
-        return (CuVSProvider) ctr.invoke();
-      } catch (Throwable e) {
-        throw new AssertionError(e);
-      }
+      return new UnsupportedProvider();
+    }
+
+    /**
+     * Returns true iff the architecture is x64 (amd64) and the OS Linux
+     * (the * OS we currently support for the native lib).
+     */
+    static boolean isLinuxAmd64() {
+      String name = System.getProperty("os.name");
+      return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
     }
   }
 }
