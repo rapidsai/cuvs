@@ -115,6 +115,48 @@ void transform(raft::resources const& res,
                raft::host_matrix_view<const float, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
 
+/**
+ * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
+ * set the corresponding bit to 1.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(handle, samples,
+ * features); cuvs::preprocessing::quantize::binary::transform(handle, dataset,
+ * quantized_dataset.view());
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
+ *
+ */
+void transform(raft::resources const& res,
+               raft::device_matrix_view<const half, int64_t> dataset,
+               raft::device_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
+ * set the corresponding bit to 1.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle, samples,
+ * features); cuvs::preprocessing::quantize::binary::transform(handle, dataset,
+ * quantized_dataset.view());
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on host
+ * @param[out] out a row-major matrix view on host
+ *
+ */
+void transform(raft::resources const& res,
+               raft::host_matrix_view<const half, int64_t> dataset,
+               raft::host_matrix_view<uint8_t, int64_t> out);
+
 /** @} */  // end of group binary
 
 }  // namespace cuvs::preprocessing::quantize::binary
