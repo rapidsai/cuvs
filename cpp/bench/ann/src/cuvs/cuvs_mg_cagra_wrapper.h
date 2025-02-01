@@ -52,7 +52,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void set_search_dataset(const T* dataset, size_t nrow) override;
 
@@ -114,8 +114,10 @@ void cuvs_mg_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 inline auto allocator_to_string(AllocatorType mem_type) -> std::string;
 
 template <typename T, typename IdxT>
-void cuvs_mg_cagra<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_mg_cagra<T, IdxT>::set_search_param(const search_param_base& param,
+                                              const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   auto sp = dynamic_cast<const search_param&>(param);
   // search_params_ = static_cast<mg::search_params<cagra::search_params>>(sp.p);
   cagra::search_params* search_params_ptr_ = static_cast<cagra::search_params*>(&search_params_);
