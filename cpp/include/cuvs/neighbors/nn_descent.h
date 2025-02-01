@@ -171,7 +171,7 @@ cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
 /**
  * @brief Get the KNN graph from a built NN-Descent index
  *
- * @param[int] index cuvsNNDescentIndex_t Built NN-Descent index
+ * @param[in] index cuvsNNDescentIndex_t Built NN-Descent index
  * @param[inout] graph Optional preallocated graph on host memory to store output
  * @return cuvsError_t
  */
