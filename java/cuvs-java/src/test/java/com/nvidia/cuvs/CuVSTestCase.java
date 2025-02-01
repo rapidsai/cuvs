@@ -38,7 +38,7 @@ public abstract class CuVSTestCase {
 
   protected void initializeRandom() {
     random = RandomizedContext.current().getRandom();
-    System.out.println("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
+    log.info("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
   }
 
   protected float[][] generateData(Random random, int rows, int cols) {
@@ -71,7 +71,7 @@ public abstract class CuVSTestCase {
       neighborsResult.add(neighbors.subList(0, Math.min(topK * 2, dataset.length)));
     }
 
-    System.out.println("Expected results generated successfully.");
+    log.info("Expected results generated successfully.");
     return neighborsResult;
   }
 
@@ -79,8 +79,8 @@ public abstract class CuVSTestCase {
       int numQueries) {
 
     for (int i = 0; i < numQueries; i++) {
-      System.out.println("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
-      System.out.println("Expected results for query " + i + ": " + expected.get(i).subList(0, Math.min(topK, datasetSize)));
+      log.info("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
+      log.info("Expected results for query " + i + ": " + expected.get(i).subList(0, Math.min(topK, datasetSize)));
     }
 
     // actual vs. expected results
