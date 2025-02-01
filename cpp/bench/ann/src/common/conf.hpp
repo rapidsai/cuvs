@@ -45,14 +45,16 @@ class configuration {
     // the range of rows is [subset_first_row, subset_first_row + subset_size)
     // however, subset_size = 0 means using all rows after subset_first_row
     // that is, the subset is [subset_first_row, #rows in base_file)
-    size_t subset_first_row{0};
-    size_t subset_size{0};
+    uint32_t subset_first_row{0};
+    uint32_t subset_size{0};
     std::string query_file;
     std::string distance;
     std::optional<std::string> groundtruth_neighbors_file{std::nullopt};
 
     // data type of input dataset, possible values ["float", "int8", "uint8"]
     std::string dtype;
+
+    std::optional<double> filtering_rate{std::nullopt};
   };
 
   explicit inline configuration(std::istream& conf_stream)
@@ -74,6 +76,9 @@ class configuration {
     dataset_conf_.base_file  = conf.at("base_file");
     dataset_conf_.query_file = conf.at("query_file");
     dataset_conf_.distance   = conf.at("distance");
+    if (conf.contains("filtering_rate")) {
+      dataset_conf_.filtering_rate.emplace(conf.at("filtering_rate"));
+    }
 
     if (conf.contains("groundtruth_neighbors_file")) {
       dataset_conf_.groundtruth_neighbors_file = conf.at("groundtruth_neighbors_file");
