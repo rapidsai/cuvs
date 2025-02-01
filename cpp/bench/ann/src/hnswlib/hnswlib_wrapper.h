@@ -79,7 +79,7 @@ class hnsw_lib : public algo<T> {
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
   void search(const T* query,
               int batch_size,
               int k,
@@ -169,8 +169,9 @@ void hnsw_lib<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void hnsw_lib<T>::set_search_param(const search_param_base& param_)
+void hnsw_lib<T>::set_search_param(const search_param_base& param_, const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   auto param     = dynamic_cast<const search_param&>(param_);
   appr_alg_->ef_ = param.ef;
   num_threads_   = param.num_threads;
