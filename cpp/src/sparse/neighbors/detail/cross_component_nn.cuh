@@ -455,11 +455,11 @@ void cross_component_nn(
   raft::sparse::COO<value_t, value_idx, nnz_t>& out,
   const value_t* X,
   const value_idx* orig_colors,
-  size_t n_rows,
-  size_t n_cols,
+  value_idx n_rows,
+  value_idx n_cols,
   red_op reduction_op,
-  size_t row_batch_size,
-  size_t col_batch_size,
+  value_idx row_batch_size,
+  value_idx col_batch_size,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -510,7 +510,7 @@ void cross_component_nn(
    * Take the min for any duplicate colors
    */
   // Compute mask of duplicates
-  rmm::device_uvector<nnz_t> out_index(n_rows + 1, stream);
+  rmm::device_uvector<value_idx> out_index(n_rows + 1, stream);
   raft::sparse::op::compute_duplicates_mask(
     out_index.data(), colors.data(), nn_colors.data(), n_rows, stream);
 
@@ -520,9 +520,10 @@ void cross_component_nn(
                          out_index.data());
 
   // compute final size
-  nnz_t size = 0;
-  raft::update_host(&size, out_index.data() + (out_index.size() - 1), 1, stream);
+  value_idx size_int = 0;
+  raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
+  nnz_t size = static_cast<nnz_t>(size_int);
 
   size++;
 

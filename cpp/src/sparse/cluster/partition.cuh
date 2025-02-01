@@ -81,15 +81,16 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
  *  @param edgeCut On exit, weight of edges cut by partition.
  *  @param cost On exit, partition cost function.
  */
-template <typename vertex_t, typename weight_t>
-void analyzePartition(raft::resources const& handle,
-                      raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
-                      vertex_t nClusters,
-                      const vertex_t* __restrict__ clusters,
-                      weight_t& edgeCut,
-                      weight_t& cost)
+template <typename vertex_t, typename weight_t, typename nnz_t>
+void analyzePartition(
+  raft::resources const& handle,
+  raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t, nnz_t> const& csr_m,
+  vertex_t nClusters,
+  const vertex_t* __restrict__ clusters,
+  weight_t& edgeCut,
+  weight_t& cost)
 {
-  cuvs::spectral::detail::analyzePartition<vertex_t, weight_t>(
+  cuvs::spectral::detail::analyzePartition<vertex_t, weight_t, nnz_t>(
     handle, csr_m, nClusters, clusters, edgeCut, cost);
 }
 
