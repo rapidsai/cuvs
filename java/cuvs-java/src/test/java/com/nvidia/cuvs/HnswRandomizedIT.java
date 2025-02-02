@@ -121,7 +121,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
       String hnswIndexFileName = UUID.randomUUID().toString() + ".hnsw";
       index.serializeToHNSW(new FileOutputStream(hnswIndexFileName));   // fails here
 
-      HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder(resources)
+      HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder()
           .withVectorDimension(dimensions)
           .build();
       InputStream inputStreamHNSW = new FileInputStream(hnswIndexFileName);

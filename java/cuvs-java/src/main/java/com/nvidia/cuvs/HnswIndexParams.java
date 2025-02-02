@@ -107,7 +107,6 @@ public class HnswIndexParams {
    */
   public static class Builder {
 
-    private CuVSResources resources;
     private CuvsHnswHierarchy hierarchy = CuvsHnswHierarchy.NONE;
     private int efConstruction = 200;
     private int numThreads = 2;
@@ -115,12 +114,8 @@ public class HnswIndexParams {
 
     /**
      * Constructs this Builder with an instance of Arena.
-     *
-     * @param resources the {@link CuVSResources} instance to use
      */
-    public Builder(CuVSResources resources) {
-      this.resources = resources;
-    }
+    public Builder() { }
 
     /**
      * Sets the hierarchy for HNSW index when converting from CAGRA index.

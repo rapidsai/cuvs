@@ -100,7 +100,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
         String hnswIndexFileName = UUID.randomUUID().toString() + ".hnsw";
         index.serializeToHNSW(new FileOutputStream(hnswIndexFileName));
 
-        HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder(resources)
+        HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder()
             .withVectorDimension(2)
             .build();
         InputStream inputStreamHNSW = new FileInputStream(hnswIndexFileName);
