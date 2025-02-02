@@ -1010,7 +1010,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},  // team_size
