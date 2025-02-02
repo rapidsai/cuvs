@@ -100,6 +100,11 @@ void parse_build_param(const nlohmann::json& conf,
     param.intermediate_graph_degree = 128;
   }
   if (conf.contains("cagra_build_algo")) { param.cagra_build_algo = conf.at("cagra_build_algo"); }
+  if (conf.contains("nn_descent_niter")) {
+    param.nn_descent_niter = conf.at("nn_descent_niter");
+  } else {
+    param.nn_descent_niter = 20;
+  }
 }
 
 template <typename T>
