@@ -272,8 +272,13 @@ struct extend_params {
  * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
  * @{
  */
-struct merge_params : public index_params {
-  merge_params(const index_params& params) : index_params(params) {}
+struct merge_params {
+  merge_params() = default;
+
+  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
+
+  // Parameters for creating the output index
+  cagra::index_params output_index_params;
 };
 
 /**

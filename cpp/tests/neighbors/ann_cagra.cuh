@@ -955,6 +955,10 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
               graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
             break;
           }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
+            break;
+          }
           case graph_build_algo::AUTO:
             // do nothing
             break;

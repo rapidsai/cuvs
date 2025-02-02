@@ -97,6 +97,8 @@ index<T, IdxT> merge(raft::resources const& handle,
     }
   };
 
+  cagra::index_params output_index_params = params.output_index_params;
+
   if (dataset_on_device) {
     RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
 
@@ -106,8 +108,8 @@ index<T, IdxT> merge(raft::resources const& handle,
     merge_dataset(updated_dataset.data_handle());
 
     auto merged_index =
-      cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
-    if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
+      cagra::build(handle, output_index_params, raft::make_const_mdspan(updated_dataset.view()));
+    if (!merged_index.data().is_owning() && output_index_params.attach_dataset_on_build) {
       using matrix_t           = decltype(updated_dataset);
       using layout_t           = typename matrix_t::layout_type;
       using container_policy_t = typename matrix_t::container_policy_type;
@@ -127,8 +129,8 @@ index<T, IdxT> merge(raft::resources const& handle,
     merge_dataset(updated_dataset.data_handle());
 
     auto merged_index =
-      cagra::build(handle, params, raft::make_const_mdspan(updated_dataset.view()));
-    if (!merged_index.data().is_owning() && params.attach_dataset_on_build) {
+      cagra::build(handle, output_index_params, raft::make_const_mdspan(updated_dataset.view()));
+    if (!merged_index.data().is_owning() && output_index_params.attach_dataset_on_build) {
       using matrix_t           = decltype(updated_dataset);
       using layout_t           = typename matrix_t::layout_type;
       using container_policy_t = typename matrix_t::container_policy_type;
