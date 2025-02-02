@@ -21,64 +21,49 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.nio.file.Path;
 
 /**
  * A provider of low-level cuvs resources and builders.
  */
-public abstract class CuVSProvider {
+public interface CuVSProvider {
 
-  static final Path TMPDIR = Path.of(System.getProperty("java.io.tmpdir"));
+  Path TMPDIR = Path.of(System.getProperty("java.io.tmpdir"));
 
   /**
    * The temporary directory to use for intermediate operations.
    * Defaults to {@systemProperty java.io.tmpdir}.
    */
-  public static Path tempDirectory() {
+  static Path tempDirectory() {
     return TMPDIR;
   }
 
-  public abstract CuVSResources newCuVSResources(Path tempDirectory)
+  /**
+   * The directory where to extract and install the native library.
+   * Defaults to {@systemProperty java.io.tmpdir}.
+   */
+  default Path nativeLibraryPath() {
+    return TMPDIR;
+  }
+
+  /** Creates a new CuVSResources. */
+  CuVSResources newCuVSResources(Path tempDirectory)
       throws Throwable;
 
-  public abstract BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
+  /** Creates a new BruteForceIndex Builder. */
+  BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
-  public abstract CagraIndex.Builder newCagraIndexBuilder(CuVSResources cuVSResources)
+  /** Creates a new CagraIndex Builder. */
+  CagraIndex.Builder newCagraIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
-  public abstract HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
+  /** Creates a new HnswIndex Builder. */
+  HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
-  public static CuVSProvider provider() {
-        return CuVSProvider.Holder.INSTANCE;
-    }
-
-  private static class Holder {
-    static final CuVSProvider INSTANCE = provider();
-
-    static CuVSProvider provider() {
-      if (Runtime.version().feature() > 21 && isLinuxAmd64()) {
-        try {
-          var cls = Class.forName("com.nvidia.cuvs.spi.JDKProvider");
-          var ctr = MethodHandles.lookup().findConstructor(cls, MethodType.methodType(void.class));
-          return (CuVSProvider) ctr.invoke();
-        } catch (Throwable e) {
-          throw new AssertionError(e);
-        }
-      }
-      return new UnsupportedProvider();
-    }
-
-    /**
-     * Returns true iff the architecture is x64 (amd64) and the OS Linux
-     * (the * OS we currently support for the native lib).
-     */
-    static boolean isLinuxAmd64() {
-      String name = System.getProperty("os.name");
-      return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
-    }
+  /** Retrieves the system-wide provider. */
+  static CuVSProvider provider() {
+    return CuVSServiceProvider.Holder.INSTANCE;
   }
 }

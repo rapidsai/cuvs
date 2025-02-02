@@ -17,6 +17,7 @@
 package com.nvidia.cuvs.internal.common;
 
 import com.nvidia.cuvs.LibraryException;
+import com.nvidia.cuvs.spi.CuVSProvider;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -65,7 +66,7 @@ class LoaderUtils {
 
     // Prepare temporary file
     try {
-      Path temp = Files.createTempFile(prefix, suffix);
+      Path temp = Files.createTempFile(nativeLibraryPath(), prefix, suffix);
       temp.toFile().deleteOnExit();
       InputStream libraryStream = Util.class.getModule().getResourceAsStream(path);
       if (libraryStream == null) {
@@ -84,5 +85,16 @@ class LoaderUtils {
          var out = os) {
       in.transferTo(out);
     }
+  }
+
+  static Path nativeLibraryPath() {
+    Path p = CuVSProvider.provider().nativeLibraryPath().toAbsolutePath();
+    if (Files.notExists(p)) {
+      throw new LibraryException("non-existent path: " + p);
+    }
+    if (!Files.isDirectory(p)) {
+      throw new LibraryException("not a directory: " + p);
+    }
+    return p;
   }
 }

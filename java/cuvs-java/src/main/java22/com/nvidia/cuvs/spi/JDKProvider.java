@@ -29,7 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
-final class JDKProvider extends CuVSProvider {
+final class JDKProvider implements CuVSProvider {
 
   @Override
   public CuVSResources newCuVSResources(Path tempDirectory) throws Throwable {

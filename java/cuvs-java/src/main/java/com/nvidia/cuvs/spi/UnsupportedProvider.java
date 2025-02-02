@@ -26,7 +26,7 @@ import java.nio.file.Path;
 /**
  * A provider that unconditionally throws UnsupportedOperationException.
  */
-final class UnsupportedProvider extends CuVSProvider {
+final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public CuVSResources newCuVSResources(Path tempDirectory) {

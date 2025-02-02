@@ -17,4 +17,6 @@
 module com.nvidia.cuvs {
   exports com.nvidia.cuvs;
   exports com.nvidia.cuvs.spi;
+
+  uses com.nvidia.cuvs.spi.CuVSServiceProvider;
 }
