@@ -610,6 +610,8 @@ index<T, IdxT> build(
 
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
+  auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
+
   // Dispatch based on graph_build_params
   if (std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params)) {
