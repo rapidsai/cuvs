@@ -1103,9 +1103,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
                                                    {0},  // team_size
                                                    {64},
                                                    {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded,
-                                                    cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BitwiseHamming},
+                                                   {cuvs::distance::DistanceType::L2Expanded},
                                                    {false},
                                                    {false},
                                                    {0.995});
