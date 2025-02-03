@@ -92,7 +92,8 @@ def generate_ann_benchmark_like_data(
     d=32,
     centers=3,
     k=100,
-    metric='euclidean'
+    metric='euclidean',
+    dataset_path='test-data/'
 ):
     """
     Generate a synthetic dataset in HDF5 format with a structure
@@ -114,22 +115,30 @@ def generate_ann_benchmark_like_data(
         random_state=84
     )
 
+    test_data = test_data.astype(np.float32)
+    train_data = train_data.astype(np.float32)
+
     dist_matrix = cdist(test_data, train_data, metric=metric)
 
     actual_k = min(k, n_train)
     neighbors = np.argsort(dist_matrix, axis=1)[:, :actual_k].astype(np.int32)
-    distances = np.take_along_axis(dist_matrix, neighbors, axis=1)
+    distances = np.take_along_axis(dist_matrix, neighbors, axis=1).astype(np.float32)
 
-    with h5py.File(output_file, 'w') as f:
+    os.makedirs(dataset_path, exist_ok=True)
+    full_path = os.path.join(dataset_path, output_file)
+
+    with h5py.File(full_path, 'w') as f:
         # Datasets
         f.create_dataset('train', data=train_data)
         f.create_dataset('test', data=test_data)
         f.create_dataset('neighbors', data=neighbors)
         f.create_dataset('distances', data=distances)
 
-        f.attrs['metric'] = metric
+        f.attrs['distance'] = metric
 
-    print(f"Created {output_file} with:")
+    convert_hdf5_to_fbin(full_path, normalize=True)
+
+    print(f"Created {full_path} with:")
     print(f" - train shape = {train_data.shape}")
     print(f" - test shape = {test_data.shape}")
     print(f" - neighbors shape = {neighbors.shape}")
@@ -168,7 +177,7 @@ def main():
     )
     parser.add_argument(
         "--dataset-path",
-        help="path to download dataset",
+        help="path to save downloaded dataset",
         default=default_dataset_path,
     )
     parser.add_argument(
@@ -190,7 +199,8 @@ def main():
             d=args.test_data_dims,
             centers=3,
             k=args.test_data_k,
-            metric='euclidean'
+            metric='euclidean',
+            dataset_path=args.dataset_path
         )
     else:
         download(args.dataset, args.normalize, args.dataset_path)
