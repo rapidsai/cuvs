@@ -34,7 +34,7 @@
 #include <fstream>
 #include <type_traits>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /**
  * Save the index to file.
@@ -156,4 +156,4 @@ void serialize(raft::resources const& res,
   }
 }
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

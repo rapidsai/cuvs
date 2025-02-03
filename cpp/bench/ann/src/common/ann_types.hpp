@@ -37,6 +37,19 @@ enum class MemoryType {
   kHostMmap,
   kHostPinned,
   kDevice,
+  kManaged,
+};
+
+/** Request 2MB huge pages support for an allocation */
+enum class HugePages {
+  /** Don't use huge pages if possible. */
+  kDisable = 0,
+  /** Enable huge pages if possible, ignore otherwise. */
+  kAsk = 1,
+  /** Enable huge pages if possible, warn the user otherwise. */
+  kRequire = 2,
+  /** Force enable huge pages, throw an exception if not possible. */
+  kDemand = 3
 };
 
 enum class Metric {
@@ -65,6 +78,8 @@ inline auto parse_memory_type(const std::string& memory_type) -> MemoryType
     return MemoryType::kHostPinned;
   } else if (memory_type == "device") {
     return MemoryType::kDevice;
+  } else if (memory_type == "managed") {
+    return MemoryType::kManaged;
   } else {
     throw std::runtime_error("invalid memory type: '" + memory_type + "'");
   }
@@ -130,7 +145,7 @@ class algo : public algo_base {
 
   virtual void build(const T* dataset, size_t nrow) = 0;
 
-  virtual void set_search_param(const search_param& param) = 0;
+  virtual void set_search_param(const search_param& param, const void* filter_bitset) = 0;
   // TODO(snanditale): this assumes that an algorithm can always return k results.
   // This is not always possible.
   virtual void search(const T* queries,

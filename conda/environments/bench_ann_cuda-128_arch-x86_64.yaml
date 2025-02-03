@@ -18,15 +18,17 @@ dependencies:
 - cuda-nvtx-dev
 - cuda-profiler-api
 - cuda-python>=12.6.2,<13.0a0
-- cuda-version=12.5
+- cuda-version=12.8
 - cupy>=12.0.0
 - cuvs==25.2.*,>=0.0.0a0
 - cxx-compiler
 - cython>=3.0.0
 - dlpack>=0.8,<1.0
-- gcc_linux-aarch64=13.*
+- gcc_linux-64=13.*
 - glog>=0.6.0
 - h5py>=3.8.0
+- libaio
+- libboost-devel
 - libclang==16.0.6
 - libcublas-dev
 - libcurand-dev
@@ -35,6 +37,7 @@ dependencies:
 - libcuvs==25.2.*,>=0.0.0a0
 - librmm==25.2.*,>=0.0.0a0
 - matplotlib
+- mkl-devel
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2
@@ -44,6 +47,6 @@ dependencies:
 - pyyaml
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
 - setuptools
-- sysroot_linux-aarch64==2.28
+- sysroot_linux-64==2.28
 - wheel
-name: bench_ann_cuda-125_arch-aarch64
+name: bench_ann_cuda-128_arch-x86_64
