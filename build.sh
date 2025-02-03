@@ -448,13 +448,13 @@ if (( ${NUMARGS} == 0 )) || hasArg rust; then
     cargo test
 fi
 
-<<<<<<< HEAD
 # Build the cuvs Go bindings
 if (( ${NUMARGS} == 0 )) || hasArg go; then
     cd ${REPODIR}/go
     go build ./...
     go test ./...
-=======
+fi
+
 # Build the cuvs Java bindings
 if (( ${NUMARGS} == 0 )) || hasArg java; then
     if ! hasArg libcuvs; then
@@ -462,7 +462,6 @@ if (( ${NUMARGS} == 0 )) || hasArg java; then
     fi
     cd ${REPODIR}/java
     ./build.sh
->>>>>>> branch-25.02
 fi
 
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
