@@ -65,7 +65,7 @@ class diskann_memory : public algo<T> {
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -73,8 +73,8 @@ class diskann_memory : public algo<T> {
               algo_base::index_type* indices,
               float* distances) const override;
 
-  void save(const std::string& path_to_index) const override;
-  void load(const std::string& path_to_index) override;
+  void save(const std::string& index_file) const override;
+  void load(const std::string& index_file) override;
   diskann_memory(const diskann_memory<T>& other) = default;
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<diskann_memory<T>>(*this); }
 
@@ -139,11 +139,12 @@ void diskann_memory<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void diskann_memory<T>::set_search_param(const search_param_base& param_)
+void diskann_memory<T>::set_search_param(const search_param_base& param, const void* filter_bitset)
 {
-  auto param          = dynamic_cast<const search_param&>(param_);
-  L_search_           = param.L_search;
-  num_search_threads_ = param.num_threads;
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+  auto sp             = dynamic_cast<const search_param&>(param);
+  L_search_           = sp.L_search;
+  num_search_threads_ = sp.num_threads;
 
   // only latency mode supported. Use the num_threads search param to run search with multiple
   // threads
@@ -169,16 +170,16 @@ void diskann_memory<T>::search(
 }
 
 template <typename T>
-void diskann_memory<T>::save(const std::string& path_to_index) const
+void diskann_memory<T>::save(const std::string& index_file) const
 {
-  this->mem_index_->save(path_to_index.c_str());
+  this->mem_index_->save(index_file.c_str());
 }
 
 template <typename T>
-void diskann_memory<T>::load(const std::string& path_to_index)
+void diskann_memory<T>::load(const std::string& index_file)
 {
   // only save the index path prefix here
-  index_path_prefix_ = path_to_index;
+  index_path_prefix_ = index_file;
 }
 
 template <typename T>
@@ -191,8 +192,8 @@ class diskann_ssd : public algo<T> {
     float alpha               = 1.2;
     int num_threads           = omp_get_num_procs();
     uint32_t QD               = 192;
-    std::string dataset_file  = "";
-    std::string path_to_index = "";
+    std::string dataset_base_file  = "";
+    std::string index_file = "";
   };
   using search_param_base = typename algo<T>::search_param;
 
@@ -208,7 +209,7 @@ class diskann_ssd : public algo<T> {
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -216,8 +217,8 @@ class diskann_ssd : public algo<T> {
               algo_base::index_type* neighbors,
               float* distances) const override;
 
-  void save(const std::string& path_to_index) const override;
-  void load(const std::string& path_to_index) override;
+  void save(const std::string& index_file) const override;
+  void load(const std::string& index_file) override;
   diskann_ssd(const diskann_ssd<T>& other) = default;
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<diskann_ssd<T>>(*this); }
 
@@ -263,8 +264,8 @@ diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : 
     std::string(std::to_string(param.num_threads)) + " " + std::string(std::to_string(false)) +
     " " + std::string(std::to_string(false)) + " " + std::string(std::to_string(0)) + " " +
     std::string(std::to_string(param.QD));
-  base_file_         = param.dataset_file;
-  index_path_prefix_ = param.path_to_index;
+  base_file_         = param.dataset_base_file;
+  index_path_prefix_ = param.index_file;
 }
 
 template <typename T>
@@ -284,13 +285,14 @@ void diskann_ssd<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void diskann_ssd<T>::set_search_param(const search_param_base& param_)
+void diskann_ssd<T>::set_search_param(const search_param_base& param, const void* filter_bitset)
 {
-  auto param          = dynamic_cast<const search_param&>(param_);
-  L_search_           = param.L_search;
-  num_search_threads_ = param.num_threads;
-  num_nodes_to_cache_ = param.num_nodes_to_cache;
-  beam_width_         = param.beam_width;
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+  auto sp             = dynamic_cast<const search_param&>(param);
+  L_search_           = sp.L_search;
+  num_search_threads_ = sp.num_threads;
+  num_nodes_to_cache_ = sp.num_nodes_to_cache;
+  beam_width_         = sp.beam_width;
 
   // only latency mode supported with thread pool
   bench_mode_ = Mode::kLatency;
@@ -314,18 +316,18 @@ void diskann_ssd<T>::search(
 }
 
 template <typename T>
-void diskann_ssd<T>::save(const std::string& path_to_index) const
+void diskann_ssd<T>::save(const std::string& index_file) const
 {
   // Nothing to do here. Index already saved in build stage.
 }
 
 template <typename T>
-void diskann_ssd<T>::load(const std::string& path_to_index)
+void diskann_ssd<T>::load(const std::string& index_file)
 {
   reader.reset(new LinuxAlignedFileReader());
   p_flash_index_ =
     std::make_shared<diskann::PQFlashIndex<T>>(reader, parse_metric_to_diskann(this->metric_));
-  int result = p_flash_index_->load(num_search_threads_, path_to_index.c_str());
+  int result = p_flash_index_->load(num_search_threads_, index_file.c_str());
   std::vector<uint32_t> node_list;
   p_flash_index_->cache_bfs_levels(num_nodes_to_cache_, node_list);
   p_flash_index_->load_cache_list(node_list);

@@ -461,7 +461,8 @@ auto build(raft::resources const& res,
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<float, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<float, uint32_t>& index,
+               bool include_dataset = true);
 
 /**
  * Save the index to file.

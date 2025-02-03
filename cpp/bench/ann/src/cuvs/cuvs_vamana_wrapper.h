@@ -30,7 +30,7 @@ namespace cuvs::bench {
 template <typename T, typename IdxT>
 class cuvs_vamana : public algo<T>, public algo_gpu {
  public:
-  using build_param       = cuvs::neighbors::experimental::vamana::index_params;
+  using build_param       = cuvs::neighbors::vamana::index_params;
   using search_param_base = typename algo<T>::search_param;
   using search_param      = typename diskann_memory<T>::search_param;
 
@@ -38,7 +38,7 @@ class cuvs_vamana : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -65,7 +65,7 @@ class cuvs_vamana : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<cuvs_vamana<T, IdxT>>(*this); }
 
  private:
-  std::shared_ptr<cuvs::neighbors::experimental::vamana::index<T, IdxT>> vamana_index_;
+  std::shared_ptr<cuvs::neighbors::vamana::index<T, IdxT>> vamana_index_;
   std::shared_ptr<diskann_memory<T>> diskann_memory_search_;
   configured_raft_resources handle_{};
   build_param vamana_index_params_;
@@ -89,23 +89,24 @@ void cuvs_vamana<T, IdxT>::build(const T* dataset, size_t nrow)
     dataset, raft::make_extents<int64_t>(nrow, this->dim_));
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
 
-  vamana_index_ = std::make_shared<cuvs::neighbors::experimental::vamana::index<T, uint32_t>>(
-    std::move(dataset_is_on_host ? cuvs::neighbors::experimental::vamana::build(
-                                     handle_, vamana_index_params_, dataset_view_host)
-                                 : cuvs::neighbors::experimental::vamana::build(
-                                     handle_, vamana_index_params_, dataset_view_device)));
+  vamana_index_ = std::make_shared<cuvs::neighbors::vamana::index<T, uint32_t>>(std::move(
+    dataset_is_on_host
+      ? cuvs::neighbors::vamana::build(handle_, vamana_index_params_, dataset_view_host)
+      : cuvs::neighbors::vamana::build(handle_, vamana_index_params_, dataset_view_device)));
 }
 
 template <typename T, typename IdxT>
-void cuvs_vamana<T, IdxT>::set_search_param(const search_param_base& param_)
+void cuvs_vamana<T, IdxT>::set_search_param(const search_param_base& param,
+                                            const void* filter_bitset)
 {
-  diskann_memory_search_->set_search_param(param_);
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+  diskann_memory_search_->set_search_param(param, nullptr);
 }
 
 template <typename T, typename IdxT>
 void cuvs_vamana<T, IdxT>::save(const std::string& file) const
 {
-  cuvs::neighbors::experimental::vamana::serialize(handle_, file, *vamana_index_);
+  cuvs::neighbors::vamana::serialize(handle_, file, *vamana_index_);
 }
 
 template <typename T, typename IdxT>
