@@ -129,8 +129,9 @@ def generate_ann_benchmark_like_data(
     neighbors = np.argsort(dist_matrix, axis=1)[:, :actual_k].astype(np.int32)
     distances = np.take_along_axis(dist_matrix, neighbors, axis=1).astype(np.float32)
 
-    os.makedirs(dataset_path, exist_ok=True)
-    full_path = os.path.join(dataset_path, output_file)
+    full_path = os.path.join(dataset_path, "test-data")
+    os.makedirs(full_path, exist_ok=True)
+    full_path = os.path.join(full_path, output_file)
 
     with h5py.File(full_path, 'w') as f:
         # Datasets
@@ -182,7 +183,7 @@ def main():
     )
     parser.add_argument(
         "--dataset-path",
-        help="path to save download/generated dataset.",
+        help="path to download dataset",
         default=default_dataset_path,
     )
     parser.add_argument(
