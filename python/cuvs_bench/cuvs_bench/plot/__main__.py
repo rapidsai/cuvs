@@ -497,8 +497,9 @@ def load_all_results(
 )
 @click.option(
     "--mode",
+    "-m",
     type=click.Choice(["throughput", "latency"], case_sensitive=False),
-    default="throughput",
+    default="latency",
     help="Search mode whose Pareto frontier is used on the Y-axis.",
 )
 @click.option(
