@@ -22,7 +22,7 @@ import subprocess
 import sys
 from sklearn.datasets import make_blobs
 from scipy.spatial.distance import cdist
-from urllib.request import urlretrieve
+import requests
 
 
 def get_dataset_path(name, ann_bench_data_path):
@@ -34,7 +34,12 @@ def get_dataset_path(name, ann_bench_data_path):
 def download_dataset(url, path):
     if not os.path.exists(path):
         print(f"downloading {url} -> {path}...")
-        urlretrieve(url, path)
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
 
 
 def convert_hdf5_to_fbin(path, normalize):
@@ -177,7 +182,7 @@ def main():
     )
     parser.add_argument(
         "--dataset-path",
-        help="path to save downloaded dataset",
+        help="path to save download/generated dataset.",
         default=default_dataset_path,
     )
     parser.add_argument(
