@@ -543,6 +543,7 @@ dependencies:
           - matplotlib
           - pandas
           - pyyaml
+          - requests
   depends_on_libcuvs:
     common:
       - output_types: conda

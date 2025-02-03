@@ -63,6 +63,7 @@ requirements:
     - pandas
     - pyyaml
     - python
+    - requests
 about:
   home: https://rapids.ai/
   license: Apache-2.0

@@ -64,7 +64,7 @@ pytest \
  --cov=cuvs \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-bench-coverage.xml" \
  --cov-report=term \
- test
+ tests
 
 rapids-logger "cuvs-bench e2e test with synthetic data"
 python -m cuvs_bench.get_dataset --dataset test-data --dataset-path datasets
