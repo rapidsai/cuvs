@@ -80,9 +80,11 @@ void transform(raft::resources const& res,
  * Usage example:
  * @code{.cpp}
  * raft::handle_t handle;
- * auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(handle, samples,
- * features); cuvs::preprocessing::quantize::binary::transform(handle, dataset,
- * quantized_dataset.view());
+ * raft::device_matrix<float, uint64_t> dataset = read_dataset(filename);
+ * int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(int8_t) * 8);
+ * auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(
+ *    handle, dataset.extent(0), quantized_dim); 
+ *  cuvs::preprocessing::quantize::binary::transform(handle, dataset, quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
