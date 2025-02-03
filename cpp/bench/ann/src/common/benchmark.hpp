@@ -534,6 +534,11 @@ void dispatch_benchmark(std::string cmdline,
       log_warn("dataset file '%s' does not exist; benchmarking index building is impossible.",
                base_file.c_str());
     }
+    // transfer base file and index paths into build params to be consumed by certain algorithms
+    // in the build stage
+    index.build_param["dataset_file"]  = base_file;
+    index.build_param["path_to_index"] = combine_path(index_prefix, index.file);
+    
     std::vector<configuration::index> more_indices{};
     for (auto& index : indices) {
       for (auto param : apply_overrides(index.build_param, override_kv)) {
