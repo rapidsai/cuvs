@@ -150,7 +150,6 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_go.sh"
-  wheel-build-cuvs:
   wheel-build-libcuvs:
     needs: checks
     secrets: inherit
