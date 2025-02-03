@@ -14,15 +14,15 @@
 # limitations under the License.
 
 import argparse
-import ast
-import h5py
-import numpy as np
 import os
 import subprocess
 import sys
-from sklearn.datasets import make_blobs
-from scipy.spatial.distance import cdist
+
+import h5py
+import numpy as np
 import requests
+from scipy.spatial.distance import cdist
+from sklearn.datasets import make_blobs
 
 
 def get_dataset_path(name, ann_bench_data_path):
@@ -91,14 +91,14 @@ def download(name, normalize, ann_bench_data_path):
 
 
 def generate_ann_benchmark_like_data(
-    output_file='ann_benchmarks_like.hdf5',
+    output_file="ann_benchmarks_like.hdf5",
     n_train=1000,
     n_test=100,
     d=32,
     centers=3,
     k=100,
-    metric='euclidean',
-    dataset_path='test-data/'
+    metric="euclidean",
+    dataset_path="test-data/",
 ):
     """
     Generate a synthetic dataset in HDF5 format with a structure
@@ -107,17 +107,11 @@ def generate_ann_benchmark_like_data(
     """
 
     train_data, _ = make_blobs(
-        n_samples=n_train,
-        n_features=d,
-        centers=centers,
-        random_state=42
+        n_samples=n_train, n_features=d, centers=centers, random_state=42
     )
 
     test_data, _ = make_blobs(
-        n_samples=n_test,
-        n_features=d,
-        centers=centers,
-        random_state=84
+        n_samples=n_test, n_features=d, centers=centers, random_state=84
     )
 
     test_data = test_data.astype(np.float32)
@@ -127,20 +121,22 @@ def generate_ann_benchmark_like_data(
 
     actual_k = min(k, n_train)
     neighbors = np.argsort(dist_matrix, axis=1)[:, :actual_k].astype(np.int32)
-    distances = np.take_along_axis(dist_matrix, neighbors, axis=1).astype(np.float32)
+    distances = np.take_along_axis(dist_matrix, neighbors, axis=1).astype(
+        np.float32
+    )
 
     full_path = os.path.join(dataset_path, "test-data")
     os.makedirs(full_path, exist_ok=True)
     full_path = os.path.join(full_path, output_file)
 
-    with h5py.File(full_path, 'w') as f:
+    with h5py.File(full_path, "w") as f:
         # Datasets
-        f.create_dataset('train', data=train_data)
-        f.create_dataset('test', data=test_data)
-        f.create_dataset('neighbors', data=neighbors)
-        f.create_dataset('distances', data=distances)
+        f.create_dataset("train", data=train_data)
+        f.create_dataset("test", data=test_data)
+        f.create_dataset("neighbors", data=neighbors)
+        f.create_dataset("distances", data=distances)
 
-        f.attrs['distance'] = metric
+        f.attrs["distance"] = metric
 
     convert_hdf5_to_fbin(full_path, normalize=True)
 
@@ -151,7 +147,6 @@ def generate_ann_benchmark_like_data(
     print(f" - distances shape = {distances.shape}")
     print(f" - metric = {metric}")
     print(f" - neighbors per test sample = {actual_k}")
-
 
 
 def main():
@@ -179,7 +174,9 @@ def main():
         "--test-data-k", help="dataset to download", default=100
     )
     parser.add_argument(
-        "--test-data-output-file", help="dataset to download", default="ann_benchmarks_like.hdf5"
+        "--test-data-output-file",
+        help="dataset to download",
+        default="ann_benchmarks_like.hdf5",
     )
     parser.add_argument(
         "--dataset-path",
@@ -205,8 +202,8 @@ def main():
             d=args.test_data_dims,
             centers=3,
             k=args.test_data_k,
-            metric='euclidean',
-            dataset_path=args.dataset_path
+            metric="euclidean",
+            dataset_path=args.dataset_path,
         )
     else:
         download(args.dataset, args.normalize, args.dataset_path)

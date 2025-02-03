@@ -118,7 +118,8 @@ def test_load_algorithms_conf():
 )
 @patch("cuvs_bench.run.run.validate_algorithm", return_value=True)
 @patch(
-    "cuvs_bench.run.run.prepare_indexes", return_value=[{"index_key": "index_value"}]
+    "cuvs_bench.run.run.prepare_indexes",
+    return_value=[{"index_key": "index_value"}],
 )
 def test_prepare_executables(
     mock_prepare_indexes, mock_validate_algorithm, mock_find_executable
@@ -145,19 +146,20 @@ def test_prepare_executables(
     assert len(result[("executable", "path", "filename")]["index"]) == 1
 
 
-
-
 @patch("cuvs_bench.run.run.validate_constraints", return_value=True)
-@patch("cuvs_bench.run.run.validate_search_params", return_value=[{'sparam': 'dummy_value'}])
-def test_prepare_indexes_valid(mock_validate_search_params, mock_validate_constraints):
+@patch(
+    "cuvs_bench.run.run.validate_search_params",
+    return_value=[{"sparam": "dummy_value"}],
+)
+def test_prepare_indexes_valid(
+    mock_validate_search_params, mock_validate_constraints
+):
     group_conf = {
         "build": {
             "param1": [1, 2],
             "param2": [3, 4],
         },
-        "search": {
-            "sparam1": [True, False]
-        }
+        "search": {"sparam1": [True, False]},
     }
     algo = "algo1"
     group = "base"
@@ -169,7 +171,15 @@ def test_prepare_indexes_valid(mock_validate_search_params, mock_validate_constr
     batch_size = 32
 
     indexes = prepare_indexes(
-        group_conf, algo, group, conf_file, algos_conf, dataset_path, dataset, count, batch_size
+        group_conf,
+        algo,
+        group,
+        conf_file,
+        algos_conf,
+        dataset_path,
+        dataset,
+        count,
+        batch_size,
     )
 
     # There are 2 build parameters with 2 values each, so we expect 4 indexes.
@@ -183,20 +193,27 @@ def test_prepare_indexes_valid(mock_validate_search_params, mock_validate_constr
             if len(index["name"]) < 128
             else str(hash(index["name"]))
         )
-        expected_file = os.path.join(dataset_path, dataset, "index", expected_filename)
+        expected_file = os.path.join(
+            dataset_path, dataset, "index", expected_filename
+        )
         assert index["file"] == expected_file
         # Verify that our dummy search parameters were set.
-        assert index["search_params"] == [{'sparam': 'dummy_value'}]
+        assert index["search_params"] == [{"sparam": "dummy_value"}]
 
 
 @patch("cuvs_bench.run.run.validate_constraints", return_value=False)
-@patch("cuvs_bench.run.run.validate_search_params", return_value=[{'sparam': 'dummy_value'}])
-def test_prepare_indexes_invalid(mock_validate_search_params, mock_validate_constraints):
+@patch(
+    "cuvs_bench.run.run.validate_search_params",
+    return_value=[{"sparam": "dummy_value"}],
+)
+def test_prepare_indexes_invalid(
+    mock_validate_search_params, mock_validate_constraints
+):
     group_conf = {
         "build": {
             "param1": [1, 2],
         },
-        "search": {}
+        "search": {},
     }
     algo = "algo1"
     group = "base"
@@ -208,7 +225,15 @@ def test_prepare_indexes_invalid(mock_validate_search_params, mock_validate_cons
     batch_size = 32
 
     indexes = prepare_indexes(
-        group_conf, algo, group, conf_file, algos_conf, dataset_path, dataset, count, batch_size
+        group_conf,
+        algo,
+        group,
+        conf_file,
+        algos_conf,
+        dataset_path,
+        dataset,
+        count,
+        batch_size,
     )
 
     # Since constraints fail, no indexes should be created.
@@ -274,7 +299,9 @@ def test_validate_constraints(mock_import_module):
 
     # Test case 1: The constraint function returns True.
     mock_validator.constraint_func.return_value = True
-    algos_conf = {"algo1": {"constraints": {"build": "module.constraint_func"}}}
+    algos_conf = {
+        "algo1": {"constraints": {"build": "module.constraint_func"}}
+    }
     result = validate_constraints(
         algos_conf, "algo1", "build", {"param1": "value1"}, {}, 128, None, None
     )

@@ -347,7 +347,7 @@ def get_build_path(executable: str) -> Optional[str]:
     devcontainer_path = "/home/coder/cuvs/cpp/build/latest/bench/ann"
     if os.path.exists(devcontainer_path):
         devc_executable = os.path.join(devcontainer_path, executable)
-        print(f"-- Detected devcontainer artifact {devc_executable} in {devcontainer_path}.")
+        print(f"-- Detected devcontainer artifact {devc_executable}.")
         return devc_executable
 
     build_path = os.getenv("CUVS_HOME")
