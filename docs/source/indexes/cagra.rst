@@ -24,10 +24,9 @@ while the CPU can be leveraged for search.
 Filtering considerations
 ------------------------
 
-CAGRA supports filtered search which can work well for moderately small filters (such as filtering out only a small percentage of the vectors in the index (e.g. <<50%).
+CAGRA supports filtered search and has improved multi-CTA algorithm in branch-25.02 to provide reasonable recall and performance for filtering rate as high as 90% or more.
 
-When a filter is expected to remove 80%-99% of the vectors in the index, it is preferred to use brute-force with pre-filtering instead, as that will compute only those distances
-between the vectors not being filtered out. By default, CAGRA will pass the filter to the pre-filtered brute-force when the number of vevtors being filtered out is >90% of the vectors in the index.
+To obtain an appropriate recall in fitered search, it is necessary to set search parameters according to the filtering rate, but since it is difficult for users to to this, CAGRA automatically adjusts `itopk_size` internally according to the filtering rate on a heuristic basis. If you want to disable this automatic adjustment, set `filtering_rate`, one of the search parameters, to `0.0`, and `itopk_size` will not be adjusted automatically.
 
 Configuration parameters
 ------------------------
@@ -108,14 +107,14 @@ IVFPQ or NN-DESCENT can be used to build the graph (additions to the peak memory
 Dataset on device (graph on host):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Index memory footprint (device): :math:`n_index_vectors * n_dims * sizeof(T)`
+Index memory footprint (device): :math:`n\_index\_vectors * n\_dims * sizeof(T)`
 
-Index memory footprint (host): :math:`graph_degree * n_index_vectors * sizeof(T)``
+Index memory footprint (host): :math:`graph\_degree * n\_index\_vectors * sizeof(T)``
 
 Dataset on host (graph on host):
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Index memory footprint (host): :math:`n_index_vectors * n_dims * sizeof(T) + graph_degree * n_index_vectors * sizeof(T)`
+Index memory footprint (host): :math:`n\_index\_vectors * n\_dims * sizeof(T) + graph\_degree * n\_index\_vectors * sizeof(T)`
 
 Build peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -123,7 +122,7 @@ Build peak memory usage:
 When built using NN-descent / IVF-PQ, the build process consists of two phases: (1) building an initial/(intermediate) graph and then (2) optimizing the graph. Key input parameters are n_vectors, intermediate_graph_degree, graph_degree.
 The memory usage in the first phase (building) depends on the chosen method. The biggest allocation is the graph (n_vectors*intermediate_graph_degree), but it’s stored in the host memory.
 Usually, the second phase (optimize) uses the most device memory. The peak memory usage is achieved during the pruning step (graph_core.cuh/optimize)
-Optimize: formula for peak memory usage (device): :math:`n_vectors * (4 + (sizeof(IdxT) + 1) * intermediate_degree)``
+Optimize: formula for peak memory usage (device): :math:`n\_vectors * (4 + (sizeof(IdxT) + 1) * intermediate_degree)``
 
 Build with out-of-core IVF-PQ peak memory usage:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,14 +133,18 @@ IVF-PQ Build:
 
 .. math::
 
-   n_vectors / train_set_ratio * dim * sizeof(float)   // trainset, may be in managed mem
-   + n_vectors / train_set_ratio * sizeof(uint32_t)    // labels, may be in managed mem
-   + n_clusters * n_dim * sizeof(float)                // cluster centers
+   n\_vectors / train\_set\_ratio * dim * sizeof_{float}   // trainset, may be in managed mem
+
+   + n\_vectors / train\_set\_ratio * sizeof(uint32_t)    // labels, may be in managed mem
+
+   + n\_clusters * n\_dim * sizeof_{float}                // cluster centers
 
 IVF-PQ Search (max batch size 1024 vectors on device at a time):
 
 .. math::
 
-   [n_vectors * (pq_dim * pq_bits / 8 + sizeof(int64_t)) + O(n_clusters)]
-   + [batch_size * n_dim * sizeof(float)] + [batch_size * intermediate_degree * sizeof(uint32_t)] +
-   [batch_size * intermediate_degree * sizeof(float)]
+   [n\_vectors * (pq\_dim * pq\_bits / 8 + sizeof_{int64\_t}) + O(n\_clusters)]
+
+   + [batch\_size * n\_dim * sizeof_{float}] + [batch\_size * intermediate\_degree * sizeof_{uint32\_t}]
+
+   + [batch\_size * intermediate\_degree * sizeof_{float}]
