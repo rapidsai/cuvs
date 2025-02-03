@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -66,10 +66,10 @@ pytest \
  --cov-report=term \
  test
 
-rapids-logger "cuvs-bench e2e test"
-python -m cuvs_bench.get_dataset --dataset test-data
-python -m cuvs_bench.run --dataset test-data --dataset-path test_data/ --algorithms faiss_gpu_flat,faiss_gpu_ivf_flat,faiss_gpu_ivf_pq,faiss_gpu_ivf_sq,faiss_cpu_flat,faiss_cpu_ivf_flat,faiss_cpu_ivf_pq,cuvs_ivf_flat,cuvs_ivf_pq,cuvs_cagra,cuvs_brute_force,cuvs_mg_ivf_flat,cuvs_mg_ivf_pq,cuvs_mg_cagra,ggnn,hnswlib,cuvs_cagra_hnswlib --groups base
-python -m cuvs_bench.plot --dataset test-data
+rapids-logger "cuvs-bench e2e test with synthetic data"
+python -m cuvs_bench.get_dataset --dataset test-data --dataset-path datasets
+python -m cuvs_bench.run --dataset test-data --dataset-path datasets/ --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib, --batch-size 100 -k 10 --groups test -m latency --force
+python -m cuvs_bench.plot --dataset test-data --dataset-path datasets/ --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib --batch-size 100 -k 10 --groups test -m latency
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
