@@ -45,7 +45,7 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
   }
 
   void build(const T* dataset, size_t nrow) final;
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
   void search(const T* queries,
               int batch_size,
               int k,
@@ -91,8 +91,10 @@ void cuvs_mg_ivf_pq<T, IdxT>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T, typename IdxT>
-void cuvs_mg_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_mg_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param,
+                                               const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   auto sp = dynamic_cast<const search_param&>(param);
   // search_params_ = static_cast<mg::search_params<ivf_pq::search_params>>(sp.pq_param);
   ivf_pq::search_params* search_params_ptr_ = static_cast<ivf_pq::search_params*>(&search_params_);
