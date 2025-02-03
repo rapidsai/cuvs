@@ -116,12 +116,19 @@ void transform(raft::resources const& res,
   const uint32_t dataset_dim     = dataset.extent(1);
   const uint32_t out_dim         = out.extent(1);
   const size_t dataset_size      = dataset.extent(0);
+  const size_t out_dataset_size  = out.extent(0);
   const uint32_t minimul_out_dim = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
   RAFT_EXPECTS(out_dim >= minimul_out_dim,
                "The dimension of the quantized dataset is too small. It must be larger or equal to "
                "%u but is %u passed",
                minimul_out_dim,
                out_dim);
+  RAFT_EXPECTS(
+    out_dataset_size >= dataset_size,
+    "The number of vectors of the quantized dataset is too small. It must be larger or equal to "
+    "the input dataset size (%u) but is %u passed",
+    dataset_size,
+    out_dataset_size);
 
   constexpr uint32_t warp_size    = 32;
   constexpr uint32_t block_size   = 256;
@@ -147,12 +154,19 @@ void transform(raft::resources const& res,
   const uint32_t dataset_dim     = dataset.extent(1);
   const uint32_t out_dim         = out.extent(1);
   const size_t dataset_size      = dataset.extent(0);
+  const size_t out_dataset_size  = out.extent(0);
   const uint32_t minimul_out_dim = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
   RAFT_EXPECTS(out_dim >= minimul_out_dim,
                "The dimension of the quantized dataset is too small. It must be larger or equal to "
                "%u but is %u passed",
                minimul_out_dim,
                out_dim);
+  RAFT_EXPECTS(
+    out_dataset_size >= dataset_size,
+    "The number of vectors of the quantized dataset is too small. It must be larger or equal to "
+    "the input dataset size (%u) but is %u passed",
+    dataset_size,
+    out_dataset_size);
 
 #pragma omp parallel for collapse(2)
   for (size_t i = 0; i < dataset_size; ++i) {
