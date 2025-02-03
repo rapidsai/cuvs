@@ -134,7 +134,7 @@ def test_prefiltered_brute_force_knn(
     index = np.random.random_sample((n_index_rows, n_cols)).astype(dtype)
     queries = np.random.random_sample((n_query_rows, n_cols)).astype(dtype)
     bitmap = create_sparse_array(
-        (np.ceil(n_query_rows * n_index_rows / 32).astype(int)), sparsity
+        (np.ceil(n_query_rows * n_index_rows / 32).astype(np.uint32)), sparsity
     )
 
     is_min = metric != "inner_product"
