@@ -125,7 +125,7 @@ void transform(raft::resources const& res,
                out_dim);
   RAFT_EXPECTS(out_dataset_size >= dataset_size,
                "The quantized dataset size must be larger or equal to "
-               "the input dataset size (%u) but is %u passed",
+               "the input dataset size (%lu) but is %lu passed",
                dataset_size,
                out_dataset_size);
 
@@ -162,7 +162,7 @@ void transform(raft::resources const& res,
                out_dim);
   RAFT_EXPECTS(out_dataset_size >= dataset_size,
                "The quantized dataset size must be larger or equal to "
-               "the input dataset size (%u) but is %u passed",
+               "the input dataset size (%lu) but is %lu passed",
                dataset_size,
                out_dataset_size);
 
