@@ -107,9 +107,9 @@
 
 - name: test-data
   dims: 32
-  base_file: test-data/base.fbin
-  query_file: test-data/query.fbin
-  groundtruth_neighbors_file: test-data/groundtruth.neighbors.ibin
+  base_file: test-data/ann_benchmarks_like.base.fbin
+  query_file: test-data/ann_benchmarks_like.query.fbin
+  groundtruth_neighbors_file: test-data/ann_benchmarks_like.groundtruth.neighbors.ibin
   distance: euclidean
 
 - name: wiki_all_1M
