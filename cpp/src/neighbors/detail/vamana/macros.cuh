@@ -16,7 +16,7 @@
 
 #pragma once
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to compute the shared memory requirements for CUB primitives used by search and prune */
 #define COMPUTE_SMEM_SIZES(degree, visited_size, DEG, CANDS)                                     \
@@ -79,4 +79,4 @@ namespace cuvs::neighbors::experimental::vamana::detail {
   SEARCH_CALL_SORT(topk, 512);   \
   SEARCH_CALL_SORT(topk, 1024);
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

@@ -32,4 +32,3 @@ namespace *cuvs::stats*
     :project: cuvs
     :members:
     :content-only:
-

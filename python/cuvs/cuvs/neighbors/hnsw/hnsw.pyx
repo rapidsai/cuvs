@@ -52,12 +52,10 @@ cdef class IndexParams:
     ef_construction : int, default = 200 (optional)
         Maximum number of candidate list size used during construction
         when hierarchy is `cpu`.
-    num_threads : int, default = 2 (optional)
+    num_threads : int, default = 0 (optional)
         Number of CPU threads used to increase construction parallelism
-        when hierarchy is `cpu`.
-        NOTE: Constructing the hierarchy when converting from a CAGRA graph
-        is highly sensitive to parallelism, and increasing the number of
-        threads can reduce the quality of the index.
+        when hierarchy is `cpu`. When the value is 0, the number of threads is
+        automatically determined to the maximum number of threads available.
     """
 
     cdef cuvsHnswIndexParams* params
@@ -71,7 +69,7 @@ cdef class IndexParams:
     def __init__(self, *,
                  hierarchy="none",
                  ef_construction=200,
-                 num_threads=2):
+                 num_threads=0):
         if hierarchy == "none":
             self.params.hierarchy = cuvsHnswHierarchy.NONE
         elif hierarchy == "cpu":

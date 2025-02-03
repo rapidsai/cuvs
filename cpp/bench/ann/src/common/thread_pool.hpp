@@ -61,7 +61,7 @@ class fixed_thread_pool {
     finished_.store(true, std::memory_order_relaxed);
     for (unsigned i = 0; i < threads_.size(); ++i) {
       auto& task = tasks_[i];
-      std::lock_guard<std::mutex>(task.mtx);
+      std::lock_guard lock(task.mtx);
 
       task.cv.notify_one();
       threads_[i].join();

@@ -22,6 +22,7 @@ jobs:
       - conda-python-tests
       - docs-build
       - rust-build
+      - wheel-build-libcuvs
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
@@ -123,7 +124,7 @@ jobs:
       build_type: pull-request
       node_type: "gpu-v100-latest-1"
       arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
+      container_image: "rapidsai/ci-conda:cuda12.8.0-ubuntu24.04-py3.12"
       run_script: "ci/build_docs.sh"
   rust-build:
     needs: conda-cpp-build
@@ -135,8 +136,17 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_rust.sh"
-  wheel-build-cuvs:
+  wheel-build-libcuvs:
     needs: checks
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
+    with:
+      build_type: pull-request
+      script: ci/build_wheel_libcuvs.sh
+      # build for every combination of arch and CUDA version, but only for the latest Python
+      matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+  wheel-build-cuvs:
+    needs: wheel-build-libcuvs
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.02
     with:
@@ -155,7 +165,7 @@ jobs:
     uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@branch-25.02
     with:
       arch: '["amd64"]'
-      cuda: '["12.5"]'
+      cuda: '["12.8"]'
       build_command: |
         sccache -z;
         build-all --verbose;
