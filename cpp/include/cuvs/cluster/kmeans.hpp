@@ -17,6 +17,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/rng_state.hpp>
 #include <rapids_logger/logger.hpp>
