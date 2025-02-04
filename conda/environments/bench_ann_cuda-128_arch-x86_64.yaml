@@ -34,7 +34,7 @@ dependencies:
 - libcusparse-dev
 - libcuvs==25.2.*,>=0.0.0a0
 - librmm==25.2.*,>=0.0.0a0
-- matplotlib
+- matplotlib-base
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2

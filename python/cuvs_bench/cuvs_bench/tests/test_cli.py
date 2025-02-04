@@ -14,13 +14,10 @@
 # limitations under the License.
 #
 
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from pathlib import Path
-
-# Adjust the import to match where your CLI entry point is defined.
-# For example, if your __main__.py defines a `main()` function:
 from cuvs_bench.get_dataset.__main__ import main
 
 
@@ -34,8 +31,11 @@ def test_get_dataset_creates_expected_files(temp_datasets_dir: Path):
     dataset_path_arg = str(temp_datasets_dir)
 
     # Invoke the CLI command as if calling:
-    # python -m cuvs_bench.get_dataset --dataset test-data --dataset-path <temp_datasets_dir>
-    result = runner.invoke(main, ['--dataset', 'test-data', '--dataset-path', dataset_path_arg])
+    # python -m cuvs_bench.get_dataset --dataset test-data \
+    # --dataset-path <temp_datasets_dir>
+    result = runner.invoke(
+        main, ["--dataset", "test-data", "--dataset-path", dataset_path_arg]
+    )
 
     assert result.exit_code == 0, f"CLI call failed: {result.output}"
 
@@ -50,7 +50,9 @@ def test_get_dataset_creates_expected_files(temp_datasets_dir: Path):
     # Verify that each expected file exists in the datasets directory.
     for filename in expected_files:
         file_path = temp_datasets_dir / filename
-        assert file_path.exists(), f"Expected file {filename} was not generated."
+        assert (
+            file_path.exists()
+        ), f"Expected file {filename} was not generated."
 
 
 def test_run_command_creates_results(temp_datasets_dir: Path):
@@ -58,14 +60,12 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
     This test simulates running the command:
 
         python -m cuvs_bench.run --dataset test-data --dataset-path datasets/ \
-            --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib, \
+            --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,\
+            cuvs_cagra,ggnn,cuvs_cagra_hnswlib, \
             --batch-size 100 -k 10 --groups test -m latency --force
 
-    It then:
-      1. Checks that the output includes a benchmark table header and a line
-         matching a pattern for "faiss_gpu_ivf_flat_test.../process_time/real_time"
-         (allowing variable numeric values).
-      2. Verifies that a set of expected result files (both under result/build and result/search)
+    It then verifies that the set of expected result files
+         (both under result/build and result/search)
          are created under datasets/test-data/ and are not empty.
     """
 
@@ -75,17 +75,26 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
     runner = CliRunner()
     run_args = [
-        "--dataset", "test-data",
-        "--dataset-path", dataset_path_arg,
-        "--algorithms", "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,",
-        "--batch-size", "100",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency",
-        "--force"
+        "--dataset",
+        "test-data",
+        "--dataset-path",
+        dataset_path_arg,
+        "--algorithms",
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,",  # noqa: E501
+        "--batch-size",
+        "100",
+        "-k",
+        "10",
+        "--groups",
+        "test",
+        "-m",
+        "latency",
+        "--force",
     ]
     result = runner.invoke(run_main, run_args)
-    assert result.exit_code == 0, f"Run command failed with output:\n{result.output}"
+    assert (
+        result.exit_code == 0
+    ), f"Run command failed with output:\n{result.output}"
 
     # --- Verify that the expected result files exist and are not empty ---
     expected_files = [
@@ -99,8 +108,8 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/build/cuvs_ivf_flat,test.json",
         "test-data/result/build/faiss_gpu_ivf_flat,test.json",
         # Search files:
-        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,latency.csv",
-        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,throughput.csv",
+        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,latency.csv",  # noqa: E501
+        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,throughput.csv",  # noqa: E501
         "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,raw.csv",
         "test-data/result/search/cuvs_cagra,test,k10,bs100,latency.csv",
         "test-data/result/search/cuvs_cagra,test,k10,bs100,throughput.csv",
@@ -108,9 +117,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,latency.csv",
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,raw.csv",
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,throughput.csv",
-        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,latency.csv",
+        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,latency.csv",  # noqa: E501
         "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,raw.csv",
-        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,throughput.csv",
+        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,throughput.csv",  # noqa: E501
         "test-data/result/search/cuvs_cagra,test,k10,bs100.json",
         "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100.json",
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100.json",
@@ -120,7 +129,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
     for rel_path in expected_files:
         file_path = temp_datasets_dir / rel_path
         assert file_path.exists(), f"Expected file {file_path} does not exist."
-        assert file_path.stat().st_size > 0, f"Expected file {file_path} is empty."
+        assert (
+            file_path.stat().st_size > 0
+        ), f"Expected file {file_path} is empty."
 
 
 def test_plot_command_creates_png_files(temp_datasets_dir: Path):
@@ -128,10 +139,12 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
     This test simulates running the command:
 
       python -m cuvs_bench.plot --dataset test-data --dataset-path datasets/ \
-          --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib \
+          --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq, \
+          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib \
           --batch-size 100 -k 10 --groups test -m latency
 
-    and then verifies that the following files are produced in the working directory:
+    and then verifies that the following files are produced in the
+    working directory:
       - search-test-data-k10-batch_size100.png
       - build-test-data-k10-batch_size100.png
 
@@ -140,30 +153,41 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
     dataset_path_arg = str(temp_datasets_dir)
 
-    # Import the plot command's main function. Adjust the import path if needed.
     from cuvs_bench.plot.__main__ import main as plot_main
 
     runner = CliRunner()
     args = [
-        "--dataset", "test-data",
-        "--dataset-path", dataset_path_arg,
-        "--output-filepath", dataset_path_arg,
-        "--algorithms", "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib",
-        "--batch-size", "100",
-        "-k", "10",
-        "--groups", "test",
-        "-m", "latency"
+        "--dataset",
+        "test-data",
+        "--dataset-path",
+        dataset_path_arg,
+        "--output-filepath",
+        dataset_path_arg,
+        "--algorithms",
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib",  # noqa: E501
+        "--batch-size",
+        "100",
+        "-k",
+        "10",
+        "--groups",
+        "test",
+        "-m",
+        "latency",
     ]
     result = runner.invoke(plot_main, args)
-    assert result.exit_code == 0, f"Plot command failed with output:\n{result.output}"
+    assert (
+        result.exit_code == 0
+    ), f"Plot command failed with output:\n{result.output}"
 
     # Expected output file names.
     expected_files = [
         "search-test-data-k10-batch_size100.png",
-        "build-test-data-k10-batch_size100.png"
+        "build-test-data-k10-batch_size100.png",
     ]
 
     for filename in expected_files:
         file_path = temp_datasets_dir / filename
         assert file_path.exists(), f"Expected file {filename} does not exist."
-        assert file_path.stat().st_size > 0, f"Expected file {filename} is empty."
+        assert (
+            file_path.stat().st_size > 0
+        ), f"Expected file {filename} is empty."
