@@ -248,7 +248,8 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
-    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
+    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu
+    preprocessing/binary_quantization.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(
