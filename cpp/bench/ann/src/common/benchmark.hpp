@@ -519,7 +519,7 @@ void register_search(std::shared_ptr<const dataset<T>> dataset,
 
 template <typename T>
 void dispatch_benchmark(std::string cmdline,
-                        const configuration& conf,
+                        configuration& conf,
                         bool force_overwrite,
                         bool build_mode,
                         bool search_mode,
@@ -539,10 +539,12 @@ void dispatch_benchmark(std::string cmdline,
       ::benchmark::AddCustomContext(key, value);
     }
   }
-  const auto dataset_conf = conf.get_dataset_conf();
-  auto base_file          = combine_path(data_prefix, dataset_conf.base_file);
-  auto query_file         = combine_path(data_prefix, dataset_conf.query_file);
-  auto gt_file            = dataset_conf.groundtruth_neighbors_file;
+  auto& dataset_conf = conf.get_dataset_conf();
+  auto& base_file    = dataset_conf.base_file;
+  auto& query_file   = dataset_conf.query_file;
+  auto& gt_file      = dataset_conf.groundtruth_neighbors_file;
+  base_file          = combine_path(data_prefix, base_file);
+  query_file         = combine_path(data_prefix, query_file);
   if (gt_file.has_value()) { gt_file.emplace(combine_path(data_prefix, gt_file.value())); }
   auto dataset =
     std::make_shared<bench::dataset<T>>(dataset_conf.name,
@@ -555,7 +557,7 @@ void dispatch_benchmark(std::string cmdline,
                                         search_mode ? dataset_conf.filtering_rate : std::nullopt);
   ::benchmark::AddCustomContext("dataset", dataset_conf.name);
   ::benchmark::AddCustomContext("distance", dataset_conf.distance);
-  std::vector<configuration::index> indices = conf.get_indices();
+  std::vector<configuration::index>& indices = conf.get_indices();
   if (build_mode) {
     if (file_exists(base_file)) {
       log_info("Using the dataset file '%s'", base_file.c_str());
@@ -574,6 +576,7 @@ void dispatch_benchmark(std::string cmdline,
         more_indices.push_back(modified_index);
       }
     }
+    std::swap(more_indices, indices);  // update the config in case algorithms need to access it
     register_build<T>(dataset, more_indices, force_overwrite, no_lap_sync);
   } else if (search_mode) {
     if (file_exists(query_file)) {
@@ -726,7 +729,7 @@ inline auto run_main(int argc, char** argv) -> int
     log_warn("cudart library is not found, GPU-based indices won't work.");
   }
 
-  configuration conf(conf_stream);
+  auto& conf        = bench::configuration::initialize(conf_stream);
   std::string dtype = conf.get_dataset_conf().dtype;
 
   if (dtype == "float") {

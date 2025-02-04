@@ -57,6 +57,26 @@ class configuration {
     std::optional<double> filtering_rate{std::nullopt};
   };
 
+  [[nodiscard]] inline auto get_dataset_conf() const -> const dataset_conf&
+  {
+    return dataset_conf_;
+  }
+  [[nodiscard]] inline auto get_dataset_conf() -> dataset_conf& { return dataset_conf_; }
+  [[nodiscard]] inline auto get_indices() const -> const std::vector<index>& { return indices_; };
+  [[nodiscard]] inline auto get_indices() -> std::vector<index>& { return indices_; };
+
+  /** The benchmark initializes the configuration once and has a chance to modify it during the
+   * setup. */
+  static inline auto initialize(std::istream& conf_stream) -> configuration&
+  {
+    singleton_ = std::unique_ptr<configuration>(new configuration{conf_stream});
+    return *singleton_;
+  }
+
+  /** Any algorithm can access the benchmark configuration as an immutable context. */
+  [[nodiscard]] static inline auto singleton() -> const configuration& { return *singleton_; }
+
+ private:
   explicit inline configuration(std::istream& conf_stream)
   {
     // to enable comments in json
@@ -66,10 +86,6 @@ class configuration {
     parse_index(conf.at("index"), conf.at("search_basic_param"));
   }
 
-  [[nodiscard]] inline auto get_dataset_conf() const -> dataset_conf { return dataset_conf_; }
-  [[nodiscard]] inline auto get_indices() const -> std::vector<index> { return indices_; };
-
- private:
   inline void parse_dataset(const nlohmann::json& conf)
   {
     dataset_conf_.name       = conf.at("name");
@@ -147,6 +163,8 @@ class configuration {
 
   dataset_conf dataset_conf_;
   std::vector<index> indices_;
+
+  static inline std::unique_ptr<configuration> singleton_ = nullptr;
 };
 
 }  // namespace cuvs::bench
