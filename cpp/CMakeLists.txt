@@ -283,7 +283,11 @@ if(BUILD_SHARED_LIBS)
                INTERFACE_POSITION_INDEPENDENT_CODE ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
+  target_link_libraries(
+    cuvs-cagra-search
+    PUBLIC rapids_logger::rapids_logger
+    PRIVATE raft::raft
+  )
   target_include_directories(
     cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   )
