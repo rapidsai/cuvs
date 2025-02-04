@@ -178,7 +178,7 @@ cdef class Index:
 @auto_sync_resources
 def build(IndexParams index_params, dataset, graph=None, resources=None):
     """
-    Build the NN-Descent index from the dataset
+    Build KNN graph from the dataset
 
     Parameters
     ----------
