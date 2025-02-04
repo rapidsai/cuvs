@@ -22,7 +22,7 @@ CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
 LIBRMM_CHANNEL=$(_rapids-get-pr-artifact rmm 1808 cpp conda)
 PYLIBRMM_CHANNEL=$(_rapids-get-pr-artifact rmm 1808 python conda)
 LIBRAFT_CHANNEL=$(_rapids-get-pr-artifact raft 2566 cpp conda)
-PYLIBRAFT_CHANNEL=$(_rapids-get-pr-artifact raft 2566 cpp python)
+PYLIBRAFT_CHANNEL=$(_rapids-get-pr-artifact raft 2566 python conda)
 
 version=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION=${version}
