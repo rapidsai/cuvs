@@ -567,10 +567,6 @@ void dispatch_benchmark(std::string cmdline,
     }
     std::vector<configuration::index> more_indices{};
     for (auto& index : indices) {
-      // transfer base file and index paths into build params to be consumed by certain algorithms
-      // in the build stage
-      index.build_param["dataset_base_file"] = base_file.c_str();
-      index.build_param["index_file"]        = index.file;
       for (auto param : apply_overrides(index.build_param, override_kv)) {
         auto modified_index        = index;
         modified_index.build_param = param;
