@@ -185,6 +185,7 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
     index_params : :py:class:`cuvs.neighbors.nn_descent.IndexParams`
     dataset : Array interface compliant matrix, on either host or device memory
         Supported dtype [float, int8, uint8]
+    graph : Optional host matrix for storing output graph
     {resources_docstring}
 
     Returns
@@ -217,12 +218,17 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
+    cdef cydlpack.DLManagedTensor* graph_dlpack = NULL
+    if graph is not None:
+        graph_ai = wrap_array(graph)
+        graph_dlpack = cydlpack.dlpack_c(graph_ai)
+
     with cuda_interruptible():
         check_cuvs(cuvsNNDescentBuild(
             res,
             params,
             dataset_dlpack,
-            NULL,
+            graph_dlpack,
             idx.index
         ))
         idx.trained = True

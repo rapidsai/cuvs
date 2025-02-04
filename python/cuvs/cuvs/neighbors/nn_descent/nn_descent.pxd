@@ -37,11 +37,6 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
 
     ctypedef cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t
 
-    ctypedef struct cuvsNNDescentSearchParams:
-        uint32_t n_probes
-
-    ctypedef cuvsNNDescentSearchParams* cuvsNNDescentSearchParams_t
-
     ctypedef struct cuvsNNDescentIndex:
         uintptr_t addr
         DLDataType dtype

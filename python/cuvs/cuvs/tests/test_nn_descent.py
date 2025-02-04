@@ -25,18 +25,24 @@ from cuvs.tests.ann_utils import calc_recall
 @pytest.mark.parametrize("n_cols", [32, 64])
 @pytest.mark.parametrize("device_memory", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32])
-def test_nn_descent(n_rows, n_cols, device_memory, dtype):
+@pytest.mark.parametrize("inplace", [True, False])
+def test_nn_descent(n_rows, n_cols, device_memory, dtype, inplace):
     metric = "sqeuclidean"
     graph_degree = 64
 
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)
     input1_device = device_ndarray(input1)
+    graph = np.zeros((n_rows, graph_degree), dtype="uint32")
 
     params = nn_descent.IndexParams(metric=metric, graph_degree=graph_degree)
     index = nn_descent.build(
-        params, input1_device if device_memory else input1
+        params,
+        input1_device if device_memory else input1,
+        graph=graph if inplace else None,
     )
-    graph = index.graph
+
+    if not inplace:
+        graph = index.graph
 
     bfknn_index = brute_force.build(input1_device, metric=metric)
     _, bfknn_graph = brute_force.search(
