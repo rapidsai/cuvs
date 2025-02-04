@@ -9,7 +9,7 @@ RAPIDS_PY_WHEEL_NAME="libcuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-f
 RAPIDS_PY_WHEEL_NAME="cuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from-s3 python ./dist
 
 # echo to expand wildcard before adding `[extra]` requires for pip
-python -m pip install \
+rapids-pip-retry install \
     ./local-libcuvs-dep/libcuvs*.whl \
     "$(echo ./dist/cuvs*.whl)[test]"
 
