@@ -75,7 +75,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     Parameters
     ----------
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16]
     metric : Distance metric to use. Default is sqeuclidean
     metric_arg : value of 'p' for Minkowski distances
     {resources_docstring}
@@ -102,7 +102,9 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32')], exp_row_major=False)
+    _check_input_array(dataset_ai,
+                       [np.dtype('float32'), np.dtype('float16')],
+                       exp_row_major=False)
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
@@ -141,7 +143,7 @@ def search(Index index,
     index : Index
         Trained Brute Force index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16]
     k : int
         The number of neighbors.
     neighbors : Optional CUDA array interface compliant matrix shape
@@ -218,7 +220,9 @@ def search(Index index,
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32')], exp_row_major=False)
+    _check_input_array(queries_cai,
+                       [np.dtype('float32'), np.dtype('float16')],
+                       exp_row_major=False)
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 
