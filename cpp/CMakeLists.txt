@@ -173,6 +173,9 @@ include(cmake/modules/ConfigureCUDA.cmake)
 rapids_cpm_init()
 
 if(NOT BUILD_CPU_ONLY)
+  # We must find CCCL ourselves before raft so that we get the right version.
+  include(${rapids-cmake-dir}/cpm/cccl.cmake)
+  rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
 endif()
@@ -205,6 +208,9 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/cagra_search_int8.cu
     src/neighbors/cagra_search_uint8.cu
     src/neighbors/detail/cagra/compute_distance.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu
@@ -466,6 +472,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
+    src/preprocessing/quantize/binary.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
