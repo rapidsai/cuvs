@@ -16,6 +16,7 @@
 
 #include "../common/ann_types.hpp"
 #include "diskann_wrapper.h"
+#include "../common/conf.hpp"
 
 #define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
@@ -49,8 +50,12 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
-  if (conf.contains("dataset_base_file")) { param.dataset_base_file = conf.at("dataset_base_file"); }
-  if (conf.contains("index_file")) { param.index_file = conf.at("index_file"); }
+  param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
+  for (auto index : cuvs::bench::configuration::singleton().get_indices()) {
+    if (index.build_param == param) {
+      param.index_file = index.file;
+    }
+  })
 }
 
 template <typename T>
