@@ -126,14 +126,18 @@ extern "C" cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
 extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsNNDescentIndexParams{.metric                    = L2Expanded,
-                                           .metric_arg                = 2.0f,
-                                           .graph_degree              = 64,
-                                           .intermediate_graph_degree = 128,
-                                           .max_iterations            = 20,
-                                           .termination_threshold     = 0.0001,
-                                           .return_distances          = false,
-                                           .n_clusters                = 1};
+    // get defaults from cpp parameters struct
+    cuvs::neighbors::nn_descent::index_params cpp_params;
+
+    *params = new cuvsNNDescentIndexParams{
+      .metric                    = cpp_params.metric,
+      .metric_arg                = cpp_params.metric_arg,
+      .graph_degree              = cpp_params.graph_degree,
+      .intermediate_graph_degree = cpp_params.intermediate_graph_degree,
+      .max_iterations            = cpp_params.max_iterations,
+      .termination_threshold     = cpp_params.termination_threshold,
+      .return_distances          = cpp_params.return_distances,
+      .n_clusters                = cpp_params.n_clusters};
   });
 }
 

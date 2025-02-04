@@ -32,7 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
@@ -84,28 +84,33 @@ cdef class IndexParams:
         check_cuvs(cuvsNNDescentIndexParamsDestroy(self.params))
 
     def __init__(self, *,
-                 n_lists=1024,
-                 metric="sqeuclidean",
-                 metric_arg=2.0,
-                 graph_degree=64,
-                 intermediate_graph_degree=128,
-                 max_iterations=20,
-                 termination_threshold=0.0001,
-                 return_distances=False,
-                 n_clusters=1
+                 metric=None,
+                 metric_arg=None,
+                 graph_degree=None,
+                 intermediate_graph_degree=None,
+                 max_iterations=None,
+                 termination_threshold=None,
+                 return_distances=None,
+                 n_clusters=None
                  ):
-        self._metric = metric
-        self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
-        self.params.graph_degree = graph_degree
-        self.params.intermediate_graph_degree = intermediate_graph_degree
-        self.params.max_iterations = max_iterations
-        self.params.termination_threshold = termination_threshold
-        self.params.return_distances = return_distances
-        self.params.n_clusters = n_clusters
+        if metric is not None:
+            self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
+        if graph_degree is not None:
+            self.params.graph_degree = graph_degree
+        if intermediate_graph_degree is not None:
+            self.params.intermediate_graph_degree = intermediate_graph_degree
+        if max_iterations is not None:
+            self.params.max_iterations = max_iterations
+        if termination_threshold is not None:
+            self.params.termination_threshold = termination_threshold
+        if return_distances is not None:
+            self.params.return_distances = return_distances
+        if n_clusters is not None:
+            self.params.n_clusters = n_clusters
 
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def metric_arg(self):
