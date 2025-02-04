@@ -484,6 +484,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - go
+          - dlpack>=0.8,<1.0
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
