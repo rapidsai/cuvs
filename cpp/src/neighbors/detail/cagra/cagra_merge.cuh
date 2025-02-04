@@ -30,8 +30,6 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
-#include <cuvs/neighbors/nn_descent.hpp>
-
 #include <rmm/resource_ref.hpp>
 
 #include <chrono>
@@ -75,10 +73,6 @@ index<T, IdxT> merge(raft::resources const& handle,
 
   IdxT offset = 0;
 
-  // Allocate the new dataset on device
-  bool dataset_on_device = cuvs::neighbors::nn_descent::has_enough_device_memory(
-    handle, raft::make_extents<std::int64_t>(new_dataset_size, dim), sizeof(IdxT));
-
   auto merge_dataset = [&](T* dst) {
     for (auto index : indices) {
       using ds_idx_type  = decltype(index->data().n_rows());
@@ -99,9 +93,7 @@ index<T, IdxT> merge(raft::resources const& handle,
 
   cagra::index_params output_index_params = params.output_index_params;
 
-  if (dataset_on_device) {
-    RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
-
+  try {
     auto updated_dataset = raft::make_device_matrix<T, std::int64_t>(
       handle, std::int64_t(new_dataset_size), std::int64_t(dim));
 
@@ -118,9 +110,10 @@ index<T, IdxT> merge(raft::resources const& handle,
                                                   std::array<int64_t, 2>{stride, 1});
       merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
     }
+    RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
     return merged_index;
 
-  } else {
+  } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("cagra::merge: using host memory for merged dataset");
 
     auto updated_dataset =
