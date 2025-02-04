@@ -47,6 +47,10 @@ sccache --zero-stats
 # Build cuvs-bench for each cuda and python version
 rapids-conda-retry mambabuild \
   --no-test \
+  --channel "${LIBRMM_CHANNEL}" \
+  --channel "${LIBRAFT_CHANNEL}" \
+  --channel "${PYLIBRMM_CHANNEL}" \
+  --channel "${PYLIBRAFT_CHANNEL}" \
   --channel "${CPP_CHANNEL}" \
   --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
   conda/recipes/cuvs-bench
