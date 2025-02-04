@@ -70,8 +70,6 @@ cdef class IndexParams:
         More iterations produce a better quality graph at cost of performance
     termination_threshold : float
         The delta at which nn-descent will terminate its iterations
-    return_distances : bool
-        Whether or not to include distances in the output.
     """
 
     cdef cuvsNNDescentIndexParams* params
@@ -90,7 +88,6 @@ cdef class IndexParams:
                  intermediate_graph_degree=None,
                  max_iterations=None,
                  termination_threshold=None,
-                 return_distances=None,
                  n_clusters=None
                  ):
         if metric is not None:
@@ -103,10 +100,13 @@ cdef class IndexParams:
             self.params.max_iterations = max_iterations
         if termination_threshold is not None:
             self.params.termination_threshold = termination_threshold
-        if return_distances is not None:
-            self.params.return_distances = return_distances
         if n_clusters is not None:
             self.params.n_clusters = n_clusters
+
+        # setting this parameter to true will cause an exception in the c++
+        # api (`Using return_distances set to true requires distance view to
+        # be allocated.`) - so instead force to be false here
+        self.params.return_distances = False
 
     @property
     def metric(self):
@@ -131,10 +131,6 @@ cdef class IndexParams:
     @property
     def termination_threshold(self):
         return self.params.termination_threshold
-
-    @property
-    def return_distances(self):
-        return self.params.return_distances
 
     @property
     def n_clusters(self):
