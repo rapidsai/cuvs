@@ -101,7 +101,7 @@ public abstract class CuVSTestCase {
     }
   }
 
-  static boolean isLinuxAmd64() {
+  protected static boolean isLinuxAmd64() {
     String name = System.getProperty("os.name");
     return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
   }

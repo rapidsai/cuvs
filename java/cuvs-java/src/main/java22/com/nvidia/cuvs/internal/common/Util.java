@@ -67,6 +67,9 @@ public class Util {
   static String getLastErrorText() {
     try {
       MemorySegment seg = (MemorySegment) getLastErrorTextMethodHandle.invokeExact();
+      if (seg.equals(MemorySegment.NULL)) {
+        return "no last error text";
+      }
       return seg.reinterpret(MAX_ERROR_TEXT).getString(0L);
     } catch (Throwable t) {
       throw new RuntimeException(t);
