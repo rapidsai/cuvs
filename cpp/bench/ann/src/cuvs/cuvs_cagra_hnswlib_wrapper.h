@@ -47,7 +47,7 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -102,8 +102,10 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T, typename IdxT>
-void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_)
+void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_,
+                                                   const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   search_param_ = dynamic_cast<const search_param&>(param_);
 }
 

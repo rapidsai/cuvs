@@ -24,10 +24,9 @@ while the CPU can be leveraged for search.
 Filtering considerations
 ------------------------
 
-CAGRA supports filtered search which can work well for moderately small filters (such as filtering out only a small percentage of the vectors in the index (e.g. <<50%).
+CAGRA supports filtered search and has improved multi-CTA algorithm in branch-25.02 to provide reasonable recall and performance for filtering rate as high as 90% or more.
 
-When a filter is expected to remove 80%-99% of the vectors in the index, it is preferred to use brute-force with pre-filtering instead, as that will compute only those distances
-between the vectors not being filtered out. By default, CAGRA will pass the filter to the pre-filtered brute-force when the number of vevtors being filtered out is >90% of the vectors in the index.
+To obtain an appropriate recall in fitered search, it is necessary to set search parameters according to the filtering rate, but since it is difficult for users to to this, CAGRA automatically adjusts `itopk_size` internally according to the filtering rate on a heuristic basis. If you want to disable this automatic adjustment, set `filtering_rate`, one of the search parameters, to `0.0`, and `itopk_size` will not be adjusted automatically.
 
 Configuration parameters
 ------------------------
