@@ -111,7 +111,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  virtual void set_search_param(const search_param_base& param) {}
+  virtual void set_search_param(const search_param_base& param, const void* filter_bitset) {}
 
   void set_search_dataset(const T* dataset, size_t nrow) override { dataset_ = dataset; }
 
@@ -329,8 +329,9 @@ class faiss_gpu_ivf_flat : public faiss_gpu<T> {
       this->gpu_resource_.get(), dim, param.nlist, this->metric_type_, config);
   }
 
-  void set_search_param(const search_param_base& param) override
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
     int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
@@ -386,8 +387,9 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
                                                                config);
   }
 
-  void set_search_param(const search_param_base& param) override
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
     int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
@@ -449,8 +451,9 @@ class faiss_gpu_ivfsq : public faiss_gpu<T> {
       this->gpu_resource_.get(), dim, param.nlist, qtype, this->metric_type_, true, config);
   }
 
-  void set_search_param(const search_param_base& param) override
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
     int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
@@ -493,8 +496,9 @@ class faiss_gpu_flat : public faiss_gpu<T> {
     this->index_  = std::make_shared<faiss::gpu::GpuIndexFlat>(
       this->gpu_resource_.get(), dim, this->metric_type_, config);
   }
-  void set_search_param(const search_param_base& param) override
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp    = dynamic_cast<const typename faiss_gpu<T>::search_param&>(param);
     int nprobe = sp.nprobe;
     assert(nprobe <= this->nlist_);
@@ -548,8 +552,9 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
       this->gpu_resource_.get(), dim, parse_metric_faiss(this->metric_), config);
   }
 
-  void set_search_param(const search_param_base& param) override
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp              = static_cast<const typename faiss_gpu_cagra<T>::search_param&>(param);
     this->search_params_ = std::make_shared<faiss::gpu::SearchParametersCagra>(sp.p);
   }
