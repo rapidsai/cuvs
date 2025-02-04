@@ -67,9 +67,12 @@ class configuration {
 
   /** The benchmark initializes the configuration once and has a chance to modify it during the
    * setup. */
-  static inline auto initialize(std::istream& conf_stream) -> configuration&
+  static inline auto initialize(std::istream& conf_stream,
+                                std::string data_prefix,
+                                std::string index_prefix) -> configuration&
   {
-    singleton_ = std::unique_ptr<configuration>(new configuration{conf_stream});
+    singleton_ =
+      std::unique_ptr<configuration>(new configuration{conf_stream, data_prefix, index_prefix});
     return *singleton_;
   }
 
@@ -77,27 +80,30 @@ class configuration {
   [[nodiscard]] static inline auto singleton() -> const configuration& { return *singleton_; }
 
  private:
-  explicit inline configuration(std::istream& conf_stream)
+  explicit inline configuration(std::istream& conf_stream,
+                                std::string data_prefix,
+                                std::string index_prefix)
   {
     // to enable comments in json
     auto conf = nlohmann::json::parse(conf_stream, nullptr, true, true);
 
-    parse_dataset(conf.at("dataset"));
-    parse_index(conf.at("index"), conf.at("search_basic_param"));
+    parse_dataset(conf.at("dataset"), data_prefix);
+    parse_index(conf.at("index"), conf.at("search_basic_param"), index_prefix);
   }
 
-  inline void parse_dataset(const nlohmann::json& conf)
+  inline void parse_dataset(const nlohmann::json& conf, std::string data_prefix)
   {
     dataset_conf_.name       = conf.at("name");
-    dataset_conf_.base_file  = conf.at("base_file");
-    dataset_conf_.query_file = conf.at("query_file");
+    dataset_conf_.base_file  = combine_path(data_prefix, conf.at("base_file"));
+    dataset_conf_.query_file = combine_path(data_prefix, conf.at("query_file"));
     dataset_conf_.distance   = conf.at("distance");
     if (conf.contains("filtering_rate")) {
       dataset_conf_.filtering_rate.emplace(conf.at("filtering_rate"));
     }
 
     if (conf.contains("groundtruth_neighbors_file")) {
-      dataset_conf_.groundtruth_neighbors_file = conf.at("groundtruth_neighbors_file");
+      dataset_conf_.groundtruth_neighbors_file =
+        combine_path(data_prefix, conf.at("groundtruth_neighbors_file"));
     }
     if (conf.contains("subset_first_row")) {
       dataset_conf_.subset_first_row = conf.at("subset_first_row");
@@ -124,7 +130,9 @@ class configuration {
       }
     }
   }
-  inline void parse_index(const nlohmann::json& index_conf, const nlohmann::json& search_basic_conf)
+  inline void parse_index(const nlohmann::json& index_conf,
+                          const nlohmann::json& search_basic_conf,
+                          std::string index_prefix)
   {
     const int batch_size = search_basic_conf.at("batch_size");
     const int k          = search_basic_conf.at("k");
@@ -134,7 +142,7 @@ class configuration {
       index.name        = conf.at("name");
       index.algo        = conf.at("algo");
       index.build_param = conf.at("build_param");
-      index.file        = conf.at("file");
+      index.file        = combine_path(index_prefix, conf.at("file"));
       index.batch_size  = batch_size;
       index.k           = k;
 

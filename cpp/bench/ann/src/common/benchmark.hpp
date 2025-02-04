@@ -523,8 +523,6 @@ void dispatch_benchmark(std::string cmdline,
                         bool force_overwrite,
                         bool build_mode,
                         bool search_mode,
-                        std::string data_prefix,
-                        std::string index_prefix,
                         kv_series override_kv,
                         Mode metric_objective,
                         const std::vector<int>& threads,
@@ -540,12 +538,9 @@ void dispatch_benchmark(std::string cmdline,
     }
   }
   auto& dataset_conf = conf.get_dataset_conf();
-  auto& base_file    = dataset_conf.base_file;
-  auto& query_file   = dataset_conf.query_file;
-  auto& gt_file      = dataset_conf.groundtruth_neighbors_file;
-  base_file          = combine_path(data_prefix, base_file);
-  query_file         = combine_path(data_prefix, query_file);
-  if (gt_file.has_value()) { gt_file.emplace(combine_path(data_prefix, gt_file.value())); }
+  auto base_file     = dataset_conf.base_file;
+  auto query_file    = dataset_conf.query_file;
+  auto gt_file       = dataset_conf.groundtruth_neighbors_file;
   auto dataset =
     std::make_shared<bench::dataset<T>>(dataset_conf.name,
                                         base_file,
@@ -572,7 +567,6 @@ void dispatch_benchmark(std::string cmdline,
       for (auto param : apply_overrides(index.build_param, override_kv)) {
         auto modified_index        = index;
         modified_index.build_param = param;
-        modified_index.file        = combine_path(index_prefix, modified_index.file);
         more_indices.push_back(modified_index);
       }
     }
@@ -604,7 +598,6 @@ void dispatch_benchmark(std::string cmdline,
     }
     for (auto& index : indices) {
       index.search_params = apply_overrides(index.search_params, override_kv);
-      index.file          = combine_path(index_prefix, index.file);
     }
     register_search<T>(dataset, indices, metric_objective, threads, no_lap_sync);
   }
@@ -729,7 +722,7 @@ inline auto run_main(int argc, char** argv) -> int
     log_warn("cudart library is not found, GPU-based indices won't work.");
   }
 
-  auto& conf        = bench::configuration::initialize(conf_stream);
+  auto& conf        = bench::configuration::initialize(conf_stream, data_prefix, index_prefix);
   std::string dtype = conf.get_dataset_conf().dtype;
 
   if (dtype == "float") {
@@ -738,8 +731,6 @@ inline auto run_main(int argc, char** argv) -> int
                               force_overwrite,
                               build_mode,
                               search_mode,
-                              data_prefix,
-                              index_prefix,
                               override_kv,
                               metric_objective,
                               threads,
@@ -750,8 +741,6 @@ inline auto run_main(int argc, char** argv) -> int
                              force_overwrite,
                              build_mode,
                              search_mode,
-                             data_prefix,
-                             index_prefix,
                              override_kv,
                              metric_objective,
                              threads,
@@ -762,8 +751,6 @@ inline auto run_main(int argc, char** argv) -> int
                                      force_overwrite,
                                      build_mode,
                                      search_mode,
-                                     data_prefix,
-                                     index_prefix,
                                      override_kv,
                                      metric_objective,
                                      threads,
@@ -774,8 +761,6 @@ inline auto run_main(int argc, char** argv) -> int
                                     force_overwrite,
                                     build_mode,
                                     search_mode,
-                                    data_prefix,
-                                    index_prefix,
                                     override_kv,
                                     metric_objective,
                                     threads,
