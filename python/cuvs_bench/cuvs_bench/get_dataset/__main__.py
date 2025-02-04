@@ -14,15 +14,16 @@
 # limitations under the License.
 
 import argparse
+import ast
+import click
+import h5py
+import numpy as np
 import os
 import subprocess
 import sys
-
-import h5py
-import numpy as np
-import requests
-from scipy.spatial.distance import cdist
 from sklearn.datasets import make_blobs
+from scipy.spatial.distance import cdist
+import requests
 
 
 def get_dataset_path(name, ann_bench_data_path):
@@ -91,14 +92,14 @@ def download(name, normalize, ann_bench_data_path):
 
 
 def generate_ann_benchmark_like_data(
-    output_file="ann_benchmarks_like.hdf5",
+    output_file='ann_benchmarks_like.hdf5',
     n_train=1000,
     n_test=100,
     d=32,
     centers=3,
     k=100,
-    metric="euclidean",
-    dataset_path="test-data/",
+    metric='euclidean',
+    dataset_path='test-data/'
 ):
     """
     Generate a synthetic dataset in HDF5 format with a structure
@@ -107,11 +108,17 @@ def generate_ann_benchmark_like_data(
     """
 
     train_data, _ = make_blobs(
-        n_samples=n_train, n_features=d, centers=centers, random_state=42
+        n_samples=n_train,
+        n_features=d,
+        centers=centers,
+        random_state=42
     )
 
     test_data, _ = make_blobs(
-        n_samples=n_test, n_features=d, centers=centers, random_state=84
+        n_samples=n_test,
+        n_features=d,
+        centers=centers,
+        random_state=84
     )
 
     test_data = test_data.astype(np.float32)
@@ -121,22 +128,20 @@ def generate_ann_benchmark_like_data(
 
     actual_k = min(k, n_train)
     neighbors = np.argsort(dist_matrix, axis=1)[:, :actual_k].astype(np.int32)
-    distances = np.take_along_axis(dist_matrix, neighbors, axis=1).astype(
-        np.float32
-    )
+    distances = np.take_along_axis(dist_matrix, neighbors, axis=1).astype(np.float32)
 
     full_path = os.path.join(dataset_path, "test-data")
     os.makedirs(full_path, exist_ok=True)
     full_path = os.path.join(full_path, output_file)
 
-    with h5py.File(full_path, "w") as f:
+    with h5py.File(full_path, 'w') as f:
         # Datasets
-        f.create_dataset("train", data=train_data)
-        f.create_dataset("test", data=test_data)
-        f.create_dataset("neighbors", data=neighbors)
-        f.create_dataset("distances", data=distances)
+        f.create_dataset('train', data=train_data)
+        f.create_dataset('test', data=test_data)
+        f.create_dataset('neighbors', data=neighbors)
+        f.create_dataset('distances', data=distances)
 
-        f.attrs["distance"] = metric
+        f.attrs['distance'] = metric
 
     convert_hdf5_to_fbin(full_path, normalize=True)
 
@@ -149,64 +154,72 @@ def generate_ann_benchmark_like_data(
     print(f" - neighbors per test sample = {actual_k}")
 
 
-def main():
-    call_path = os.getcwd()
+def get_default_dataset_path():
     if "RAPIDS_DATASET_ROOT_DIR" in os.environ:
-        default_dataset_path = os.getenv("RAPIDS_DATASET_ROOT_DIR")
+        return os.getenv("RAPIDS_DATASET_ROOT_DIR")
     else:
-        default_dataset_path = os.path.join(call_path, "datasets/")
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "--dataset", help="dataset to download", default="glove-100-angular"
-    )
-    parser.add_argument(
-        "--test-data-n-train", help="dataset to download", default=10000
-    )
-    parser.add_argument(
-        "--test-data-n-test", help="dataset to download", default=1000
-    )
-    parser.add_argument(
-        "--test-data-dims", help="dataset to download", default=32
-    )
-    parser.add_argument(
-        "--test-data-k", help="dataset to download", default=100
-    )
-    parser.add_argument(
-        "--test-data-output-file",
-        help="dataset to download",
-        default="ann_benchmarks_like.hdf5",
-    )
-    parser.add_argument(
-        "--dataset-path",
-        help="path to download dataset",
-        default=default_dataset_path,
-    )
-    parser.add_argument(
-        "--normalize",
-        help="normalize cosine distance to inner product",
-        action="store_true",
-    )
+        return os.path.join(os.getcwd(), "datasets")
 
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(1)
-    args = parser.parse_args()
 
-    if args.dataset == "test-data":
+@click.command()
+@click.option(
+    "--dataset",
+    default="glove-100-angular",
+    help="Dataset to download.",
+)
+@click.option(
+    "--test-data-n-train",
+    default=10000,
+    help="Number of training examples for the test data.",
+)
+@click.option(
+    "--test-data-n-test",
+    default=1000,
+    help="Number of test examples for the test data.",
+)
+@click.option(
+    "--test-data-dims",
+    default=32,
+    help="Dimensionality for the test data.",
+)
+@click.option(
+    "--test-data-k",
+    default=100,
+    help="K value for the test data.",
+)
+@click.option(
+    "--test-data-output-file",
+    default="ann_benchmarks_like.hdf5",
+    help="Output file name for the test data.",
+)
+@click.option(
+    "--dataset-path",
+    default=None,
+    help="Path to download the dataset. If not provided, defaults to the value of RAPIDS_DATASET_ROOT_DIR or '<cwd>/datasets'.",
+)
+@click.option(
+    "--normalize",
+    is_flag=True,
+    help="Normalize cosine distance to inner product.",
+)
+def main(dataset, test_data_n_train, test_data_n_test, test_data_dims, test_data_k, test_data_output_file, dataset_path, normalize):
+    # Compute default dataset_path if not provided.
+    if dataset_path is None:
+        dataset_path = get_default_dataset_path()
+
+    if dataset == "test-data":
         generate_ann_benchmark_like_data(
-            output_file=args.test_data_output_file,
-            n_train=args.test_data_n_train,
-            n_test=args.test_data_n_test,
-            d=args.test_data_dims,
+            output_file=test_data_output_file,
+            n_train=test_data_n_train,
+            n_test=test_data_n_test,
+            d=test_data_dims,
             centers=3,
-            k=args.test_data_k,
-            metric="euclidean",
-            dataset_path=args.dataset_path,
+            k=test_data_k,
+            metric='euclidean',
+            dataset_path=dataset_path
         )
     else:
-        download(args.dataset, args.normalize, args.dataset_path)
+        download(dataset, normalize, dataset_path)
 
 
 if __name__ == "__main__":

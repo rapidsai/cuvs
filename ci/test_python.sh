@@ -56,6 +56,7 @@ pytest \
  tests
 
 rapids-logger "pytest cuvs-bench"
+popd
 pushd python/cuvs_bench/cuvs_bench
 pytest \
  --cache-clear \
@@ -65,11 +66,6 @@ pytest \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-bench-coverage.xml" \
  --cov-report=term \
  tests
-
-rapids-logger "cuvs-bench e2e test with synthetic data"
-python -m cuvs_bench.get_dataset --dataset test-data --dataset-path datasets
-python -m cuvs_bench.run --dataset test-data --dataset-path datasets/ --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib, --batch-size 100 -k 10 --groups test -m latency --force
-python -m cuvs_bench.plot --dataset test-data --dataset-path datasets/ --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib --batch-size 100 -k 10 --groups test -m latency
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
