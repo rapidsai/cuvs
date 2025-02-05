@@ -1044,6 +1044,7 @@ void build_hierarchical(const raft::resources& handle,
 
   // Need to use explicit managed_memory here since corresponding allocations
   // must be both host and device accessible.
+  // TODO: Remove the explicit managed memory- we shouldn't be creating this on the user's behalf.
   rmm::mr::managed_memory_resource managed_memory;
   rmm::device_async_resource_ref device_memory = raft::resource::get_large_workspace_resource(handle);
   auto [max_minibatch_size, mem_per_row] =
