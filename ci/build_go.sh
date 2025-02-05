@@ -30,11 +30,9 @@ export CC=clang
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
 
-# installing libcuvs/libraft will speed up the rust build substantially
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
-  libcuvs  \
-  libraft  \
-  cuvs
+  "libcuvs=${RAPIDS_VERSION}" \
+  "libraft=${RAPIDS_VERSION}"
 
 bash ./build.sh go
