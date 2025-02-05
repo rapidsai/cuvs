@@ -121,7 +121,7 @@ def run_cagra_build_search_test(
 
 
 @pytest.mark.parametrize("inplace", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("array_type", ["device", "host"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])

@@ -258,8 +258,9 @@ cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *        3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -314,6 +315,7 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
  *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *            or `kDLDataType.bits = 16`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
