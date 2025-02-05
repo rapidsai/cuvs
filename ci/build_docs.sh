@@ -7,7 +7,8 @@ rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
 
 RAPIDS_VERSION="$(rapids-version)"
-export RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
+RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
+export RAPIDS_VERSION_MAJOR_MINOR
 
 rapids-dependency-file-generator \
   --output conda \
@@ -34,7 +35,8 @@ rapids-mamba-retry install \
   "libcuvs=${RAPIDS_VERSION}" \
   "cuvs=${RAPIDS_VERSION}"
 
-export RAPIDS_DOCS_DIR="$(mktemp -d)"
+RAPIDS_DOCS_DIR="$(mktemp -d)"
+export RAPIDS_DOCS_DIR
 
 rapids-logger "Build CPP docs"
 pushd cpp/doxygen
@@ -43,7 +45,8 @@ popd
 
 rapids-logger "Build Rust docs"
 pushd rust
-export LIBCLANG_PATH=$(dirname $(find /opt/conda -name libclang.so | head -n 1))
+LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+export LIBCLANG_PATH
 cargo doc -p cuvs --no-deps
 popd
 
