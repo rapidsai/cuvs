@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,8 +53,10 @@ void parse_build_param(const nlohmann::json& conf,
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
   for (auto index : cuvs::bench::configuration::singleton().get_indices()) {
     index.build_param.erase("override_suffix");
+    // The nlohmann::json operator== comparator compares each key and value by content. Reference:
+    // https://json.nlohmann.me/api/basic_json/operator_eq/
     if (index.build_param == conf) {
-      param.index_file = index.file; 
+      param.index_file = index.file;
       break;
     }
   }
