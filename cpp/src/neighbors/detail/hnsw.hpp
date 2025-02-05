@@ -29,6 +29,11 @@
 
 namespace cuvs::neighbors::hnsw::detail {
 
+// This is needed as hnswlib hardcodes the distance type to float
+// or int32_t in certain places. However, we can solve uint8 or int8
+// natively with the pacth cuVS applies. We could potentially remove
+// all the hardcodes and propagate templates throughout hnswlib, but
+// as of now it's not needed.
 template <typename T>
 struct hnsw_dist_t {
   using type = void;
@@ -211,8 +216,9 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   return hnsw_index;
 }
 
-int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<float>* appr_algo,
-                             raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+template <typename T, typename DistT>
+int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
+                             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
                              int64_t real_index,
                              int curlevel)
 {
@@ -418,12 +424,7 @@ std::unique_ptr<index<T>> from_cagra(
   } else if (params.hierarchy == HnswHierarchy::CPU) {
     return from_cagra<T, HnswHierarchy::CPU>(res, params, cagra_index, dataset);
   } else if (params.hierarchy == HnswHierarchy::GPU) {
-    // brute force index does not support uint8_t or int8_t
-    if constexpr (std::is_same_v<T, float>) {
-      return from_cagra<T, HnswHierarchy::GPU>(res, params, cagra_index, dataset);
-    } else {
-      RAFT_FAIL("Unsupported data type for GPU hierarchy");
-    }
+    return from_cagra<T, HnswHierarchy::GPU>(res, params, cagra_index, dataset);
   } else {
     RAFT_FAIL("Unsupported hierarchy type");
   }
