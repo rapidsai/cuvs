@@ -188,12 +188,12 @@ class diskann_ssd : public algo<T> {
   struct build_param {
     uint32_t R;
     uint32_t L_build;
-    uint32_t build_pq_bytes   = 0;
-    float alpha               = 1.2;
-    int num_threads           = omp_get_num_procs();
-    uint32_t QD               = 192;
-    std::string dataset_base_file  = "";
-    std::string index_file = "";
+    uint32_t build_pq_bytes       = 0;
+    float alpha                   = 1.2;
+    int num_threads               = omp_get_num_procs();
+    uint32_t QD                   = 192;
+    std::string dataset_base_file = "";
+    std::string index_file        = "";
   };
   using search_param_base = typename algo<T>::search_param;
 
@@ -232,7 +232,6 @@ class diskann_ssd : public algo<T> {
 
  private:
   std::string index_build_params_str;
-  std::shared_ptr<diskann::PQFlashIndex<T, uint32_t>> p_flash_index_;
   int beam_width_;
   uint32_t num_nodes_to_cache_;
 
@@ -249,6 +248,7 @@ class diskann_ssd : public algo<T> {
   std::string base_file_;
   std::string index_path_prefix_;
   std::shared_ptr<AlignedFileReader> reader = nullptr;
+  std::shared_ptr<diskann::PQFlashIndex<T, uint32_t>> p_flash_index_;
 };
 
 template <typename T>
@@ -318,7 +318,10 @@ void diskann_ssd<T>::search(
 template <typename T>
 void diskann_ssd<T>::save(const std::string& index_file) const
 {
-  // Nothing to do here. Index already saved in build stage.
+  // Nothing to do here. Index already saved in build stage, but an empty file has to be created
+  // with the index filename.
+  std::ofstream of(index_file);
+  of.close();
 }
 
 template <typename T>

@@ -41,7 +41,7 @@ from cuvs.neighbors import brute_force, filters
 )
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("order", ["F", "C"])
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
 def test_brute_force_knn(
     n_index_rows, n_query_rows, n_cols, k, inplace, order, metric, dtype
 ):
@@ -58,7 +58,7 @@ def test_brute_force_knn(
         queries[queries >= 0.5] = 1.0
 
     indices = np.zeros((n_query_rows, k), dtype="int64")
-    distances = np.zeros((n_query_rows, k), dtype=dtype)
+    distances = np.zeros((n_query_rows, k), dtype="float32")
 
     index_device = device_ndarray(index)
     queries_device = device_ndarray(queries)
