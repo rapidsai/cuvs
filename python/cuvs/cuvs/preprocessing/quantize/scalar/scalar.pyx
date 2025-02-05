@@ -115,7 +115,10 @@ def train(QuantizerParams params, dataset, resources=None):
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
 
-    _check_input_array(dataset_ai, [np.dtype("float32"), np.dtype("float64")])
+    _check_input_array(dataset_ai,
+                       [np.dtype("float32"),
+                        np.dtype("float64"),
+                        np.dtype("float16")])
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
     cdef Quantizer ret = Quantizer()
@@ -160,7 +163,10 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
 
     dataset_ai = wrap_array(dataset)
 
-    _check_input_array(dataset_ai, [np.dtype("float32"), np.dtype("float64")])
+    _check_input_array(dataset_ai,
+                       [np.dtype("float32"),
+                        np.dtype("float64"),
+                        np.dtype("float16")])
 
     if output is None:
         on_device = hasattr(dataset, "__cuda_array_interface__")
@@ -219,7 +225,10 @@ def inverse_transform(Quantizer quantizer, dataset, output=None,
                                 dataset_ai.shape[1]), dtype="float32")
 
     output_ai = wrap_array(output)
-    _check_input_array(output_ai, [np.dtype("float32"), np.dtype("float64")])
+    _check_input_array(output_ai,
+                       [np.dtype("float32"),
+                        np.dtype("float64"),
+                        np.dtype("float16")])
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
