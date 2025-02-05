@@ -37,6 +37,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     ctypedef enum cuvsCagraGraphBuildAlgo:
         IVF_PQ
         NN_DESCENT
+        ITERATIVE_CAGRA_SEARCH
 
     ctypedef struct cuvsCagraCompressionParams:
         uint32_t pq_bits

@@ -49,7 +49,7 @@ def transform(dataset, output=None, resources=None):
     >>> from cuvs.preprocessing.quantize import binary
     >>> n_samples = 50000
     >>> n_features = 50
-    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    >>> dataset = cp.random.standard_normal((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> transformed = binary.transform(dataset)
     """
