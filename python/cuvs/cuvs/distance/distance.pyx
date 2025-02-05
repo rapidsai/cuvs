@@ -48,6 +48,8 @@ DISTANCE_TYPES = {
     "dice": cuvsDistanceType.DiceExpanded,
 }
 
+DISTANCE_NAMES = {v: k for k, v in DISTANCE_TYPES.items()}
+
 SUPPORTED_DISTANCES = ["euclidean", "l1", "cityblock", "l2", "inner_product",
                        "chebyshev", "minkowski", "canberra", "kl_divergence",
                        "correlation", "russellrao", "hellinger", "lp",
