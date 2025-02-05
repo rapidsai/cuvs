@@ -55,8 +55,12 @@ cdef class IndexParams:
         when hierarchy is `cpu`.
     num_threads : int, default = 0 (optional)
         Number of CPU threads used to increase construction parallelism
-        when hierarchy is `cpu`. When the value is 0, the number of threads is
-        automatically determined to the maximum number of threads available.
+        when hierarchy is `cpu` or `gpu`. When the value is 0, the number of
+        threads is automatically determined to the maximum number of threads
+        available.
+        NOTE: When hierarchy is `gpu`, while the majority of the work is done
+        on the GPU, initialization of the HNSW index itself and some other
+        work is parallelized with the help of CPU threads.
     """
 
     cdef cuvsHnswIndexParams* params

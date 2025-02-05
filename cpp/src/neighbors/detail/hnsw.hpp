@@ -179,24 +179,29 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   }
   appr_algo->base_layer_init = true;  // reset to true to allow addition of new points
 
-  // move cagra graph to host
-  auto graph = cagra_index.graph();
-  auto host_graph =
-    raft::make_host_matrix<uint32_t, int64_t, raft::row_major>(graph.extent(0), graph.extent(1));
-  raft::copy(host_graph.data_handle(),
-             graph.data_handle(),
-             graph.size(),
-             raft::resource::get_cuda_stream(res));
-  raft::resource::sync_stream(res);
+  // move cagra graph to host or access it from host if available
+  auto host_graph_view = cagra_index.graph();
+  auto host_graph      = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
+  if (!raft::is_host_accessible(raft::memory_type_from_pointer(host_graph_view.data_handle()))) {
+    // copy cagra graph to host
+    host_graph = raft::make_host_matrix<uint32_t, int64_t>(host_graph_view.extent(0),
+                                                           host_graph_view.extent(1));
+    raft::copy(host_graph.data_handle(),
+               host_graph_view.data_handle(),
+               host_graph_view.size(),
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    host_graph_view = host_graph.view();
+  }
 
 // copy cagra graph to hnswlib base layer
-#pragma omp parallel for
-  for (size_t i = 0; i < static_cast<size_t>(host_graph.extent(0)); ++i) {
+#pragma omp parallel for num_threads(num_threads)
+  for (size_t i = 0; i < static_cast<size_t>(host_graph_view.extent(0)); ++i) {
     auto hnsw_internal_id = appr_algo->label_lookup_.find(i)->second;
     auto ll_i             = appr_algo->get_linklist0(hnsw_internal_id);
-    appr_algo->setListCount(ll_i, host_graph.extent(1));
+    appr_algo->setListCount(ll_i, host_graph_view.extent(1));
     auto* data = (uint32_t*)(ll_i + 1);
-    for (size_t j = 0; j < static_cast<size_t>(host_graph.extent(1)); ++j) {
+    for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
       auto neighbor_internal_id = appr_algo->label_lookup_.find(host_graph(i, j))->second;
       data[j]                   = neighbor_internal_id;
     }
@@ -233,6 +238,20 @@ int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<float>* appr_algo,
   return cur_c;
 }
 
+template <typename T>
+void all_neighbors_graph(raft::resources const& res,
+                         raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
+                         raft::host_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+                         cuvs::distance::DistanceType metric)
+{
+  nn_descent::index_params nn_params;
+  nn_params.graph_degree              = neighbors.extent(1);
+  nn_params.intermediate_graph_degree = neighbors.extent(1) * 2;
+  nn_params.metric                    = metric;
+  nn_params.return_distances          = false;
+  auto nn_index                       = nn_descent::build(res, nn_params, dataset, neighbors);
+}
+
 template <typename T, HnswHierarchy hierarchy>
 std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> from_cagra(
   raft::resources const& res,
@@ -264,7 +283,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
 
   // initialize hnsw index
   auto hnsw_index =
-    std::make_unique<index_impl<T>>(cagra_index.dim(), cagra_index.metric(), hierarchy);
+    std::make_unique<index_impl<T>>(host_dataset_view.extent(1), cagra_index.metric(), hierarchy);
   auto appr_algo = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     hnsw_index->get_space(),
     host_dataset_view.extent(0),
@@ -275,7 +294,8 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   std::vector<size_t> levels(host_dataset_view.extent(0));
   std::vector<uint32_t> hnsw_internal_ids(host_dataset_view.extent(0));
 
-#pragma omp parallel for
+  auto num_threads = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+#pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
     levels[i] = appr_algo->getRandomLevel(appr_algo->mult_) + 1;
     hnsw_internal_ids[i] =
@@ -314,72 +334,40 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     auto start_idx     = offsets[pt_level - 1];
     auto end_idx       = offsets[hist.size() - 1];
     auto num_pts       = end_idx - start_idx;
-    auto neighbor_size = num_pts > appr_algo->M_ ? appr_algo->M_ : num_pts;
-    if (neighbor_size < 2) {
+    auto neighbor_size = num_pts > appr_algo->M_ ? appr_algo->M_ : num_pts - 1;
+    if (num_pts <= 1) {
       // this means only 1 point in the level
       continue;
     }
 
-    // gather points from dataset to form query set on device
-    auto query_set =
-      raft::make_device_matrix<T, int64_t>(res, num_pts, host_dataset_view.extent(1));
-    auto query_set_view = raft::make_device_matrix_view<const T, int64_t>(
-      query_set.data_handle(), query_set.extent(0), query_set.extent(1));
-    auto host_query_set =
-      raft::make_host_matrix<T, int64_t>(query_set.extent(0), query_set.extent(1));
-#pragma omp parallel for
+    // gather points from dataset to form query set on host
+    auto host_query_set = raft::make_host_matrix<T, int64_t>(num_pts, host_dataset_view.extent(1));
+    // TODO: Use `raft::matrix::gather` when available as a public API
+    // Issue: https://github.com/rapidsai/raft/issues/2572
+#pragma omp parallel for num_threads(num_threads)
     for (auto i = start_idx; i < end_idx; i++) {
       auto pt_id = order[i];
-      std::copy(host_dataset_view.data_handle() + pt_id * host_dataset_view.extent(1),
-                host_dataset_view.data_handle() + (pt_id + 1) * host_dataset_view.extent(1),
-                host_query_set.data_handle() + (i - start_idx) * host_dataset_view.extent(1));
+      std::copy(&host_dataset_view(pt_id, 0),
+                &host_dataset_view(pt_id + 1, 0),
+                &host_query_set(i - start_idx, 0));
     }
-    raft::copy(query_set.data_handle(),
-               host_query_set.data_handle(),
-               query_set.size(),
-               raft::resource::get_cuda_stream(res));
 
-    // initialize brute force index
-    auto bf_index = cuvs::neighbors::brute_force::build(
-      res, cuvs::neighbors::brute_force::index_params{}, query_set_view);
-
-    // search for nearest neighbors
-    auto neighbors = raft::make_device_matrix<int64_t, int64_t>(res, num_pts, neighbor_size);
-    auto distances = raft::make_device_matrix<float, int64_t>(res, num_pts, neighbor_size);
-    cuvs::neighbors::brute_force::search(res,
-                                         cuvs::neighbors::brute_force::search_params{},
-                                         bf_index,
-                                         query_set_view,
-                                         neighbors.view(),
-                                         distances.view());
-
-    auto host_neighbors_full =
-      raft::make_host_matrix<int64_t, int64_t>(neighbors.extent(0), neighbors.extent(1));
-    raft::copy(host_neighbors_full.data_handle(),
-               neighbors.data_handle(),
-               neighbors.size(),
-               raft::resource::get_cuda_stream(res));
-    raft::resource::sync_stream(res);
-
-    // Need to slice the first column of the neighbors matrix because it's the query point itself
-    auto host_neighbors =
-      raft::make_host_matrix<int64_t, int64_t>(neighbors.extent(0), neighbors.extent(1) - 1);
-#pragma omp parallel for
-    for (int64_t i = 0; i < host_neighbors.extent(0); i++) {
-      std::copy(host_neighbors_full.data_handle() + i * host_neighbors_full.extent(1) + 1,
-                host_neighbors_full.data_handle() + (i + 1) * host_neighbors_full.extent(1),
-                host_neighbors.data_handle() + i * host_neighbors.extent(1));
-    }
+    // find neighbors of the query set
+    auto host_neighbors = raft::make_host_matrix<uint32_t, int64_t>(num_pts, neighbor_size);
+    all_neighbors_graph(res,
+                        raft::make_const_mdspan(host_query_set.view()),
+                        host_neighbors.view(),
+                        cagra_index.metric());
 
     // add points to the HNSW index upper layers
-#pragma omp parallel for
+#pragma omp parallel for num_threads(num_threads)
     for (auto i = start_idx; i < end_idx; i++) {
       auto pt_id       = order[i];
       auto internal_id = hnsw_internal_ids[pt_id];
       auto ll_cur      = appr_algo->get_linklist(internal_id, pt_level);
       appr_algo->setListCount(ll_cur, host_neighbors.extent(1));
       auto* data     = (uint32_t*)(ll_cur + 1);
-      auto neighbors = host_neighbors.data_handle() + (i - start_idx) * host_neighbors.extent(1);
+      auto neighbors = &host_neighbors(i - start_idx, 0);
       for (auto j = 0; j < host_neighbors.extent(1); j++) {
         auto neighbor_id          = order[neighbors[j] + start_idx];
         auto neighbor_internal_id = hnsw_internal_ids[neighbor_id];
@@ -388,24 +376,29 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     }
   }
 
-  // move cagra graph to host
-  auto graph = cagra_index.graph();
-  auto host_graph =
-    raft::make_host_matrix<uint32_t, int64_t, raft::row_major>(graph.extent(0), graph.extent(1));
-  raft::copy(host_graph.data_handle(),
-             graph.data_handle(),
-             graph.size(),
-             raft::resource::get_cuda_stream(res));
-  raft::resource::sync_stream(res);
+  // move cagra graph to host or access it from host if available
+  auto host_graph_view = cagra_index.graph();
+  auto host_graph      = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
+  if (!raft::is_host_accessible(raft::memory_type_from_pointer(host_graph_view.data_handle()))) {
+    // copy cagra graph to host
+    host_graph = raft::make_host_matrix<uint32_t, int64_t>(host_graph_view.extent(0),
+                                                           host_graph_view.extent(1));
+    raft::copy(host_graph.data_handle(),
+               host_graph_view.data_handle(),
+               host_graph_view.size(),
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    host_graph_view = host_graph.view();
+  }
 
 // copy cagra graph to hnswlib base layer
-#pragma omp parallel for
-  for (size_t i = 0; i < static_cast<size_t>(host_graph.extent(0)); ++i) {
+#pragma omp parallel for num_threads(num_threads)
+  for (size_t i = 0; i < static_cast<size_t>(host_graph_view.extent(0)); ++i) {
     auto ll_i = appr_algo->get_linklist0(hnsw_internal_ids[i]);
-    appr_algo->setListCount(ll_i, host_graph.extent(1));
+    appr_algo->setListCount(ll_i, host_graph_view.extent(1));
     auto* data = (uint32_t*)(ll_i + 1);
-    for (size_t j = 0; j < static_cast<size_t>(host_graph.extent(1)); ++j) {
-      data[j] = hnsw_internal_ids[host_graph(i, j)];
+    for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
+      data[j] = hnsw_internal_ids[host_graph_view(i, j)];
     }
   }
 
@@ -464,11 +457,7 @@ void get_search_knn_results(hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::ty
                             uint64_t* indices,
                             float* distances)
 {
-  // try {
   auto result = idx->searchKnn(query, k);
-  // } catch (std::exception& e) {
-  //   std::cout << "Caught exception: " << e.what() << std::endl;
-  // }
   assert(result.size() >= static_cast<size_t>(k));
 
   for (int i = k - 1; i >= 0; --i) {
