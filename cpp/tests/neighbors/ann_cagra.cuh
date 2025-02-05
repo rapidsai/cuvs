@@ -944,8 +944,26 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {true},
     {0.995});
 
+  // Corner case for small dataset
+  auto inputs = raft::util::itertools::product<AnnCagraInputs>(
+    {2},
+    {3, 31, 32, 64, 101},
+    {1, 128},
+    {2, 3},  // k
+    {graph_build_algo::NN_DESCENT},
+    {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
+    {0},  // query size
+    {0},
+    {256},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {true},
+    {0.995});
+  inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+
   // Fixed dim, and changing neighbors and query size (output matrix size)
-  auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {1, 100},
     {1000},
     {8},

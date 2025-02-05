@@ -1242,8 +1242,10 @@ void optimize(
       }
       if (pk != output_graph_degree) {
         RAFT_LOG_DEBUG(
-          "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+          "Couldn't find the output_graph_degree (%lu vs pk: %lu) smallest detourable count nodes "
+          "for "
           "node %lu in the rank-based node reranking process",
+          pk,
           output_graph_degree,
           i);
         invalid_neighbor_list = true;
