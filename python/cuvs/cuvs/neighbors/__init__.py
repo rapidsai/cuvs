@@ -13,7 +13,14 @@
 # limitations under the License.
 
 
-from cuvs.neighbors import brute_force, cagra, filters, ivf_flat, ivf_pq
+from cuvs.neighbors import (
+    brute_force,
+    cagra,
+    filters,
+    ivf_flat,
+    ivf_pq,
+    nn_descent,
+)
 
 from .refine import refine
 
@@ -23,5 +30,6 @@ __all__ = [
     "filters",
     "ivf_flat",
     "ivf_pq",
+    "nn_descent",
     "refine",
 ]

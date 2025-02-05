@@ -695,6 +695,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/ivf_pq_c.cpp
       src/neighbors/cagra_c.cpp
       $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
+      src/neighbors/nn_descent_c.cpp
       src/neighbors/refine/refine_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
