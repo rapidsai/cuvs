@@ -51,7 +51,7 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
-  for (auto index : cuvs::bench::configuration::singleton().get_indices()) {
+  for (const auto& index : cuvs::bench::configuration::singleton().get_indices()) {
     index.build_param.erase("override_suffix");
     if (index.build_param == conf) {
       param.index_file = index.file; 
