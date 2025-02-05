@@ -52,7 +52,6 @@ void parse_build_param(const nlohmann::json& conf,
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
   for (const auto& index : cuvs::bench::configuration::singleton().get_indices()) {
-    index.build_param.erase("override_suffix");
     // The nlohmann::json operator== comparator compares each key and value by content. Reference:
     // https://json.nlohmann.me/api/basic_json/operator_eq/
     if (index.build_param == conf) {
