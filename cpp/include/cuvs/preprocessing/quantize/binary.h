@@ -25,7 +25,11 @@ extern "C" {
 #endif
 
 /**
- * @brief Applies binary quantization transform to given dataset
+ * @brief Applies binary quantization transform to the given dataset
+ *
+ * This applies binary quantization to a dataset, changing any positive
+ * values to a bitwise 1. This is useful for searching with the
+ * BitwiseHamming distance type.
  *
  * @param[in] res raft resource
  * @param[in] dataset a row-major host or device matrix to transform

@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from .binary import transform
+
+__all__ = ["transform"]
