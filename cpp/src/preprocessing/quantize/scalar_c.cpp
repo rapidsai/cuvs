@@ -161,6 +161,8 @@ extern "C" cuvsError_t cuvsScalarQuantizerTrain(cuvsResources_t res,
     auto dataset = dataset_tensor->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       _train<float>(res, *params, dataset_tensor, quantizer);
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      _train<half>(res, *params, dataset_tensor, quantizer);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
       _train<double>(res, *params, dataset_tensor, quantizer);
     } else {
@@ -180,6 +182,8 @@ extern "C" cuvsError_t cuvsScalarQuantizerTransform(cuvsResources_t res,
     auto dataset = dataset_tensor->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       _transform<float>(res, quantizer, dataset_tensor, out_tensor);
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      _transform<half>(res, quantizer, dataset_tensor, out_tensor);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
       _transform<double>(res, quantizer, dataset_tensor, out_tensor);
     } else {
@@ -199,6 +203,8 @@ cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
     auto dtype = out->dl_tensor.dtype;
     if (dtype.code == kDLFloat && dtype.bits == 32) {
       _inverse_transform<float>(res, quantizer, dataset, out);
+    } else if (dtype.code == kDLFloat && dtype.bits == 16) {
+      _inverse_transform<half>(res, quantizer, dataset, out);
     } else if (dtype.code == kDLFloat && dtype.bits == 64) {
       _inverse_transform<double>(res, quantizer, dataset, out);
     } else {
