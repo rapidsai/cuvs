@@ -254,6 +254,8 @@ enum class graph_build_algo {
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
   NN_DESCENT,
+  /* Experimental, iteratively execute CAGRA's search() and optimize() */
+  ITERATIVE_CAGRA_SEARCH,
   /* Choose default automatically */
   AUTO
 };
@@ -288,13 +290,14 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     switch (dist) {
       case InnerProduct: return "InnerProduct";
       case L2Expanded: return "L2";
+      case BitwiseHamming: return "BitwiseHamming";
       default: break;
     }
     return "Unknown";
   };
 
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
-  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "AUTO"};
+  std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
@@ -326,6 +329,18 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        ((!std::is_same_v<DataT, uint8_t>) ||
+         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+      GTEST_SKIP();
+    // If the dataset dimension is small and the dataset size is large, there can be a lot of
+    // dataset vectors that have the same distance to the query, especially in the binary Hamming
+    // distance, making it impossible to make a top-k ground truth.
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+      GTEST_SKIP();
+
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
     std::vector<IdxT> indices_naive(queries_size);
@@ -372,6 +387,10 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           case graph_build_algo::NN_DESCENT: {
             index_params.graph_build_params = graph_build_params::nn_descent_params(
               index_params.intermediate_graph_degree, index_params.metric);
+            break;
+          }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
           case graph_build_algo::AUTO:
@@ -501,6 +520,17 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
+    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        ((!std::is_same_v<DataT, uint8_t>) ||
+         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+      GTEST_SKIP();
+    // If the dataset dimension is small and the dataset size is large, there can be a lot of
+    // dataset vectors that have the same distance to the query, especially in the binary Hamming
+    // distance, making it impossible to make a top-k ground truth.
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -549,6 +579,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
           case graph_build_algo::NN_DESCENT: {
             index_params.graph_build_params =
               graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
           case graph_build_algo::AUTO:
@@ -696,6 +730,17 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
+    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        ((!std::is_same_v<DataT, uint8_t>) ||
+         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+      GTEST_SKIP();
+    // If the dataset dimension is small and the dataset size is large, there can be a lot of
+    // dataset vectors that have the same distance to the query, especially in the binary Hamming
+    // distance, making it impossible to make a top-k ground truth.
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -750,6 +795,10 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
           case graph_build_algo::NN_DESCENT: {
             index_params.graph_build_params =
               graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            break;
+          }
+          case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
+            index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
           case graph_build_algo::AUTO:
@@ -882,7 +931,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 8, 17},
     {16},  // k
-    {graph_build_algo::NN_DESCENT},
+    {graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},  // build algo. ITERATIVE_CAGRA_SEARCH is needed to
+                                                 // test BitwiseHamming
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 10},  // query size
     {0},
@@ -917,13 +968,17 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 1024},  // dim
     {16},                                                    // k
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
     {0.995});
@@ -935,7 +990,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0, 8, 16, 32},  // team_size
@@ -953,7 +1010,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},  // team_size
@@ -1033,21 +1092,21 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim, adding non_owning_memory_buffer_flag
-  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {1000},
-    {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
-    {10},
-    {graph_build_algo::IVF_PQ},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
-    {false},
-    {false},
-    {0.995});
+  inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {1000},
+                                                   {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
+                                                   {10},
+                                                   {graph_build_algo::IVF_PQ},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded},
+                                                   {false},
+                                                   {false},
+                                                   {0.995});
   for (auto input : inputs2) {
     input.non_owning_memory_buffer_flag = true;
     inputs.push_back(input);
@@ -1059,21 +1118,23 @@ inline std::vector<AnnCagraInputs> generate_inputs()
 inline std::vector<AnnCagraInputs> generate_addnode_inputs()
 {
   // changing dim
-  std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {1000},
-    {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
-    {16},                                 // k
-    {graph_build_algo::NN_DESCENT},
-    {search_algo::AUTO},
-    {10},
-    {0},
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
-    {false},
-    {true},
-    {0.995});
+  std::vector<AnnCagraInputs> inputs =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {1000},
+                                                   {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
+                                                   {16},                                 // k
+                                                   {graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::BitwiseHamming},
+                                                   {false},
+                                                   {true},
+                                                   {0.995});
 
   // testing host and device datasets
   auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
@@ -1130,7 +1191,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
-    {1, 8, 17},
+    {1, 8, 17, 102},
     {16},  // k
     {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
@@ -1138,7 +1199,9 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
     {0.995});
