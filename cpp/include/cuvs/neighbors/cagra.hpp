@@ -272,13 +272,63 @@ struct extend_params {
  * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
  * @{
  */
+
+/**
+ * @brief Determines the strategy for merging CAGRA graphs.
+ *
+ * @note Currently, only the PHYSICAL strategy is supported.
+ */
+enum MergeStrategy {
+  /**
+   * @brief Physical merge: Builds a new CAGRA graph from the union of dataset points
+   * in existing CAGRA graphs.
+   *
+   * This is expensive to build but does not impact search latency or quality.
+   * Preferred for many smaller CAGRA graphs.
+   *
+   * @note Currently, this is the only supported strategy.
+   */
+  PHYSICAL,
+
+  /**
+   * @brief Logical merge: Wraps a new index structure around existing CAGRA graphs
+   * and broadcasts the query to each of them.
+   *
+   * This is a fast merge but incurs a small hit in search latency.
+   * Preferred for fewer larger CAGRA graphs.
+   *
+   * @note Not supported yet.
+   */
+  LOGICAL,
+
+  /**
+   * @brief Smart merge: Overlaps dataset vectors across CAGRA graphs and merges
+   * the graphs into a single graph.
+   *
+   * This is suitable for many larger CAGRA graphs.
+   *
+   * @note Not supported yet.
+   */
+  SMART
+};
+
+/**
+ * @brief Parameters for merging CAGRA indexes.
+ */
 struct merge_params {
   merge_params() = default;
 
+  /**
+   * @brief Constructs merge parameters with given index parameters.
+   * @param params Parameters for creating the output index.
+   */
   explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
 
-  // Parameters for creating the output index
+  /// Parameters for creating the output index.
   cagra::index_params output_index_params;
+
+  /// Strategy for merging. Defaults to `MergeStrategy::PHYSICAL`.
+  MergeStrategy strategy = MergeStrategy::PHYSICAL;
 };
 
 /**
@@ -325,7 +375,7 @@ struct index : cuvs::neighbors::index {
     return data_rows > 0 ? data_rows : graph_view_.extent(0);
   }
 
-  /** dimension of the data. */
+  /** Dimensionality of the data. */
   [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dataset_->dim(); }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
