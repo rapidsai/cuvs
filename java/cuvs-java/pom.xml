@@ -154,6 +154,7 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+                    <mergeManifestMode>merge</mergeManifestMode>
                     <archiverConfig>
                         <duplicateBehavior>add</duplicateBehavior>
                     </archiverConfig>
