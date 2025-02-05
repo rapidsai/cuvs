@@ -945,7 +945,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0.995});
 
   // Corner case for small dataset
-  auto inputs = raft::util::itertools::product<AnnCagraInputs>(
+  auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {2},
     {3, 31, 32, 64, 101},
     {1, 128},
