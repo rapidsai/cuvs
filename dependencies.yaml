@@ -21,6 +21,7 @@ files:
       - rapids_build
       - run_py_cuvs
       - rust
+      - go
       - test_libcuvs
       - test_python_common
       - test_py_cuvs
@@ -81,6 +82,14 @@ files:
       - cuda_version
       - rapids_build
       - rust
+  go:
+    output: none
+    includes:
+      - clang
+      - cuda
+      - cuda_version
+      - rapids_build
+      - go
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
@@ -470,6 +479,12 @@ dependencies:
         packages:
           - make
           - rust
+  go:
+    common:
+      - output_types: [conda]
+        packages:
+          - go
+          - dlpack>=0.8,<1.0
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
