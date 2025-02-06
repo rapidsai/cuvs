@@ -288,28 +288,7 @@ enum MergeStrategy {
    *
    * @note Currently, this is the only supported strategy.
    */
-  PHYSICAL,
-
-  /**
-   * @brief Logical merge: Wraps a new index structure around existing CAGRA graphs
-   * and broadcasts the query to each of them.
-   *
-   * This is a fast merge but incurs a small hit in search latency.
-   * Preferred for fewer larger CAGRA graphs.
-   *
-   * @note Not supported yet.
-   */
-  LOGICAL,
-
-  /**
-   * @brief Smart merge: Overlaps dataset vectors across CAGRA graphs and merges
-   * the graphs into a single graph.
-   *
-   * This is suitable for many larger CAGRA graphs.
-   *
-   * @note Not supported yet.
-   */
-  SMART
+  PHYSICAL
 };
 
 /**
