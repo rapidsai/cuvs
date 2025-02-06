@@ -111,7 +111,7 @@ index<T, IdxT> merge(raft::resources const& handle,
       merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
     }
     RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
-    return std::move(merged_index);
+    return merged_index;
 
   } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("cagra::merge: using host memory for merged dataset");
@@ -132,7 +132,7 @@ index<T, IdxT> merge(raft::resources const& handle,
                                                   std::array<int64_t, 2>{stride, 1});
       merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
     }
-    return std::move(merged_index);
+    return merged_index;
   }
 }
 
