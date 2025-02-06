@@ -127,8 +127,9 @@
   distance: euclidean
 
 - name: deep-100M
-  base_file: deep-100M/base.1B.fbin
-  query_file: deep-100M/query.public.10K.fbin
   dims: 96
-  groundtruth_neighbors_file: deep-100M/groundtruth.public.10K.ibin
+  base_file: deep-100M/base.1B.fbin
   distance: euclidean
+  groundtruth_neighbors_file: deep-100M/groundtruth.public.10K.ibin
+  query_file: deep-100M/query.public.10K.fbin
+  subset_size: 100000000

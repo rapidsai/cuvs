@@ -5,57 +5,9 @@ constraints:
 groups:
   base:
     build:
-      nlist: [1024, 2048, 4096]
-      M: [96, 64]
-      ratio: [4]
-      usePrecomputed: [True]
-      useFloat16: [True]
-      use_cuvs: [False]
-      bitsPerCode: [8]
-    search:
-      nprobe: [10, 20, 50, 100, 200]
-      refine_ratio: [1, 2, 4]
-  basecuvs:
-    build:
-      nlist: [1024, 2048, 4096]
-      M: [96, 64]
-      ratio: [4]
-      usePrecomputed: [False]
-      useFloat16: [False]
-      use_cuvs: [True]
-      bitsPerCode: [8, 6, 5, 4]
-    search:
-      nprobe: [10, 20, 50, 100, 200]
-      refine_ratio: [1, 2, 4]
-  large:
-    build:
-      nlist: [8192, 16384, 32768]
-      M: [96, 48, 32]
-      ratio: [4]
-      usePrecomputed: [False]
-      useFloat16: [False, True]
-      use_cuvs: [False]
-      bitsPerCode: [8]
-    search:
-      nprobe: [20, 30, 50, 100, 200, 500, 1000]
-      refine_ratio: [1, 2, 4]
-  largecuvs:
-    build:
-      nlist: [8192, 16384, 32768]
-      M: [96, 48, 32]
-      ratio: [4]
-      usePrecomputed: [False]
-      useFloat16: [False]
-      use_cuvs: [True]
-      bitsPerCode: [8, 6, 5, 4]
-    search:
-      nprobe: [20, 30, 50, 100, 200, 500, 1000]
-      refine_ratio: [1, 2, 4]
-  100M:
-    build:
-      nlist: [100000]
-      M: [96, 64]
-      ratio: [4]
+      nlist: [50000, 100000]
+      M: [96, 48]
+      ratio: [10]
       usePrecomputed: [False, True]
       useFloat16: [True]
       use_cuvs: [False]
@@ -63,14 +15,14 @@ groups:
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]
       refine_ratio: [1, 2, 4]
-  100Mcuvs:
+  cuvs:
     build:
-      nlist: [100000]
-      M: [96, 64]
-      ratio: [4]
-      useFloat16: [False, True]
+      nlist: [50000, 100000]
+      M: [96, 48]
+      ratio: [10]
+      useFloat16: [False]
       use_cuvs: [True]
-      bitsPerCode: [8, 6, 5, 4]
+      bitsPerCode: [8, 6, 5]
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]
       refine_ratio: [1, 2, 4]

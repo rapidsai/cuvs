@@ -1455,6 +1455,7 @@ void extend(raft::resources const& handle,
             const IdxT* new_indices,
             IdxT n_rows)
 {
+  RAFT_LOG_INFO("inside extend execution");
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::extend(%zu, %u)", size_t(n_rows), index->dim());
 
@@ -1597,6 +1598,7 @@ void extend(raft::resources const& handle,
       // iteration if different streams are used for kernel and copy.
       raft::resource::sync_stream(handle);
     }
+    RAFT_LOG_INFO("finished extend execution");
   }
 
   auto list_sizes = index->list_sizes().data_handle();

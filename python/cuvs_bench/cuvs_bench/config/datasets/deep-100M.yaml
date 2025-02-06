@@ -1,7 +1,7 @@
 dataset:
   base_file: deep-100M/base.1B.fbin
   distance: euclidean
-  groundtruth_neighbors_file: deep-100M/groundtruth.neighbors.ibin
+  groundtruth_neighbors_file: deep-100M/groundtruth.public.10K.ibin
   name: deep-100M
   query_file: deep-100M/query.public.10K.fbin
   subset_size: 100000000
