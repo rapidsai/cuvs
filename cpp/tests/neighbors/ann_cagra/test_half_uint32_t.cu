@@ -23,6 +23,12 @@ namespace cuvs::neighbors::cagra {
 typedef AnnCagraTest<float, half, std::uint32_t> AnnCagraTestF16_U32;
 TEST_P(AnnCagraTestF16_U32, AnnCagra) { this->testCagra(); }
 
+typedef AnnCagraIndexMergeTest<float, half, std::uint32_t> AnnCagraIndexMergeTestF16_U32;
+TEST_P(AnnCagraIndexMergeTestF16_U32, AnnCagraIndexMerge) { this->testCagra(); }
+
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestF16_U32, ::testing::ValuesIn(inputs));
+INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,
+                        AnnCagraIndexMergeTestF16_U32,
+                        ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::cagra
