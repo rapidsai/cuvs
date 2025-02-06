@@ -71,9 +71,9 @@ requirements:
     {% endif %}
     - glog {{ glog_version }}
     - libaio
-    - libboost-devel
+    - libboost-devel=1.87
     - libcuvs {{ version }}
-    - mkl-devel  # [linux64]
+    - mkl-devel=2023  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     # rmm is needed to determine if package is gpu-enabled
