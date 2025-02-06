@@ -77,6 +77,7 @@
         </plugin>
         <plugin>
             <artifactId>maven-assembly-plugin</artifactId>
+            <version>3.4.2</version>
             <executions>
                <execution>
                   <id>make-jar-with-dependencies</id>
@@ -90,9 +91,10 @@
             </executions>
             <configuration>
                <archive>
-                  <manifest>
-                     <mainClass>com.nvidia.cuvs.examples.CagraExample</mainClass>
-                  </manifest>
+                   <manifestEntries>
+                       <Multi-Release>true</Multi-Release>
+                       <Main-Class>com.nvidia.cuvs.examples.CagraExample</Main-Class>
+                   </manifestEntries>
                </archive>
                <descriptorRefs>
                   <descriptorRef>jar-with-dependencies</descriptorRef>
