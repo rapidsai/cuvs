@@ -33,6 +33,8 @@ void parse_build_param(const nlohmann::json& conf,
       param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;
     } else if (conf.at("hierarchy") == "cpu") {
       param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
+    } else if (conf.at("hierarchy") == "gpu") {
+      param.hnsw_index_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
     } else {
       THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
     }
