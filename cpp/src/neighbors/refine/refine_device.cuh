@@ -84,12 +84,13 @@ void refine_device(
   cuvs::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
     handle, cuvs::distance::DistanceType(metric), n_queries, false, true, dim);
 
-  cuvs::neighbors::ivf_flat::detail::fill_refinement_index(handle,
-                                                           &refinement_index,
-                                                           dataset.data_handle(),
-                                                           neighbor_candidates.data_handle(),
-                                                           n_queries,
-                                                           n_candidates);
+  cuvs::neighbors::ivf_flat::detail::fill_refinement_index<data_t, idx_t>(
+    handle,
+    &refinement_index,
+    dataset.data_handle(),
+    neighbor_candidates.data_handle(),
+    static_cast<idx_t>(n_queries),
+    static_cast<uint32_t>(n_candidates));
   uint32_t grid_dim_x = 1;
 
   // the neighbor ids will be computed in uint32_t as offset

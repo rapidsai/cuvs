@@ -17,7 +17,9 @@
 
 #include "cuvs_cagra_wrapper.h"
 #include <cuvs/neighbors/hnsw.hpp>
+#include <raft/core/logger.hpp>
 
+#include <chrono>
 #include <memory>
 
 namespace cuvs::bench {
@@ -45,7 +47,7 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -90,13 +92,20 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
   auto host_dataset_view = raft::make_host_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
   auto opt_dataset_view =
     std::optional<raft::host_matrix_view<const T, int64_t>>(std::move(host_dataset_view));
-  hnsw_index_ = cuvs::neighbors::hnsw::from_cagra(
+  const auto start_clock = std::chrono::system_clock::now();
+  hnsw_index_            = cuvs::neighbors::hnsw::from_cagra(
     handle_, build_param_.hnsw_index_params, *cagra_index, opt_dataset_view);
+  int time =
+    std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start_clock)
+      .count();
+  RAFT_LOG_DEBUG("Graph saved to HNSW format in %d:%d min", time / 60, time % 60);
 }
 
 template <typename T, typename IdxT>
-void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_)
+void cuvs_cagra_hnswlib<T, IdxT>::set_search_param(const search_param_base& param_,
+                                                   const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   search_param_ = dynamic_cast<const search_param&>(param_);
 }
 

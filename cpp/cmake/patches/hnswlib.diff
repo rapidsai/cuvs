@@ -11,20 +11,20 @@ index bef0017..0ee7931 100644
 +    bool base_layer_init = true;
      static const tableint MAX_LABEL_OPERATION_LOCKS = 65536;
      static const unsigned char DELETE_MARK = 0x01;
- 
+
 @@ -1098,7 +1101,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
- 
+
          std::unique_lock <std::mutex> lock_el(link_list_locks_[cur_c]);
          int curlevel = getRandomLevel(mult_);
 -        if (level > 0)
 +        if (level > -1)
              curlevel = level;
- 
+
          element_levels_[cur_c] = curlevel;
 @@ -1116,6 +1119,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
          memcpy(getExternalLabeLp(cur_c), &label, sizeof(labeltype));
          memcpy(getDataByInternalId(cur_c), data_point, data_size_);
- 
+
 +        if (!base_layer_init && curlevel == 0)
 +            return cur_c;
 +
@@ -43,7 +43,7 @@ index bef0017..0ee7931 100644
 @@ -1188,28 +1194,41 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
          tableint currObj = enterpoint_node_;
          dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
- 
+
 -        for (int level = maxlevel_; level > 0; level--) {
 -            bool changed = true;
 -            while (changed) {
@@ -66,7 +66,7 @@ index bef0017..0ee7931 100644
 +                while (changed) {
 +                    changed = false;
 +                    unsigned int *data;
- 
+
 -                data = (unsigned int *) get_linklist(currObj, level);
 -                int size = getListCount(data);
 -                metric_hops++;
@@ -82,7 +82,7 @@ index bef0017..0ee7931 100644
 +                        if (static_cast<int>(cand) < 0 || cand > max_elements_)
 +                            throw std::runtime_error("cand error");
 +                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
- 
+
 -                tableint *datal = (tableint *) (data + 1);
 -                for (int i = 0; i < size; i++) {
 -                    tableint cand = datal[i];
@@ -109,7 +109,7 @@ index 834d19f..0c0af26 100644
 @@ -252,12 +252,13 @@ class L2Space : public SpaceInterface<float> {
      ~L2Space() {}
  };
- 
+
 +template <typename T>
  static int
  L2SqrI4x(const void *__restrict pVect1, const void *__restrict pVect2, const void *__restrict qty_ptr) {
@@ -119,13 +119,13 @@ index 834d19f..0c0af26 100644
 -    unsigned char *b = (unsigned char *) pVect2;
 +    T *a = (T *) pVect1;
 +    T *b = (T *) pVect2;
- 
+
      qty = qty >> 2;
      for (size_t i = 0; i < qty; i++) {
 @@ -277,11 +278,12 @@ L2SqrI4x(const void *__restrict pVect1, const void *__restrict pVect2, const voi
      return (res);
  }
- 
+
 +template <typename T>
  static int L2SqrI(const void* __restrict pVect1, const void* __restrict pVect2, const void* __restrict qty_ptr) {
      size_t qty = *((size_t*)qty_ptr);
@@ -134,13 +134,13 @@ index 834d19f..0c0af26 100644
 -    unsigned char* b = (unsigned char*)pVect2;
 +    T* a = (T*)pVect1;
 +    T* b = (T*)pVect2;
- 
+
      for (size_t i = 0; i < qty; i++) {
          res += ((*a) - (*b)) * ((*a) - (*b));
 @@ -291,6 +293,7 @@ static int L2SqrI(const void* __restrict pVect1, const void* __restrict pVect2,
      return (res);
  }
- 
+
 +template <typename T>
  class L2SpaceI : public SpaceInterface<int> {
      DISTFUNC<int> fstdistfunc_;

@@ -46,7 +46,10 @@ DISTANCE_TYPES = {
     "minkowski": cuvsDistanceType.LpUnexpanded,
     "russellrao": cuvsDistanceType.RusselRaoExpanded,
     "dice": cuvsDistanceType.DiceExpanded,
+    "bitwise_hamming": cuvsDistanceType.BitwiseHamming
 }
+
+DISTANCE_NAMES = {v: k for k, v in DISTANCE_TYPES.items()}
 
 SUPPORTED_DISTANCES = ["euclidean", "l1", "cityblock", "l2", "inner_product",
                        "chebyshev", "minkowski", "canberra", "kl_divergence",
@@ -56,7 +59,7 @@ SUPPORTED_DISTANCES = ["euclidean", "l1", "cityblock", "l2", "inner_product",
 
 @auto_sync_resources
 @auto_convert_output
-def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
+def pairwise_distance(X, Y, out=None, metric="euclidean", p=2.0,
                       resources=None):
     """
     Compute pairwise distances between X and Y
@@ -74,7 +77,7 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
     Y : CUDA array interface compliant matrix shape (n, k)
     out : Optional writable CUDA array interface matrix shape (m, n)
     metric : string denoting the metric type (default="euclidean")
-    metric_arg : metric parameter (currently used only for "minkowski")
+    p : metric parameter (currently used only for "minkowski")
     {resources_docstring}
 
     Examples
@@ -103,7 +106,9 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
         output_dtype = y_cai.dtype
         if np.issubdtype(y_cai.dtype, np.float16):
             output_dtype = np.float32
-        out = device_ndarray.empty((m, n), dtype=output_dtype)
+
+        order = "C" if getattr(X, "flags", X).c_contiguous else "F"
+        out = device_ndarray.empty((m, n), dtype=output_dtype, order=order)
     out_cai = wrap_array(out)
 
     x_k = x_cai.shape[1]
@@ -137,6 +142,6 @@ def pairwise_distance(X, Y, out=None, metric="euclidean", metric_arg=2.0,
                                     y_dlpack,
                                     out_dlpack,
                                     distance_type,
-                                    metric_arg))
+                                    p))
 
     return out

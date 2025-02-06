@@ -72,9 +72,7 @@ def faiss_gpu_ivf_pq_build(params, dims):
     ret = params["M"] <= dims and dims % params["M"] == 0
     if "use_cuvs" in params and params["use_cuvs"]:
         return ret
-    pq_bits = 8
-    if "bitsPerCode" in params:
-        pq_bits = params["bitsPerCode"]
+    pq_bits = params.get("bitsPerCode", 8)
     lookup_table_size = 4
     if "useFloat16" in params and params["useFloat16"]:
         lookup_table_size = 2

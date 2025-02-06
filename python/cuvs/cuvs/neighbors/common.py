@@ -14,11 +14,13 @@
 # limitations under the License.
 
 
-def _check_input_array(cai, exp_dt, exp_rows=None, exp_cols=None):
+def _check_input_array(
+    cai, exp_dt, exp_rows=None, exp_cols=None, exp_row_major=True
+):
     if cai.dtype not in exp_dt:
         raise TypeError("dtype %s not supported" % cai.dtype)
 
-    if not cai.c_contiguous:
+    if exp_row_major and not cai.c_contiguous:
         raise ValueError("Row major input is expected")
 
     if exp_cols is not None and cai.shape[1] != exp_cols:

@@ -169,6 +169,13 @@ void index<T, DistT>::update_dataset(
     return detail::build<T, DistT>(res, dataset, index_params.metric, index_params.metric_arg); \
   }                                                                                             \
   auto build(raft::resources const& res,                                                        \
+             const cuvs::neighbors::brute_force::index_params& index_params,                    \
+             raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)                 \
+    ->cuvs::neighbors::brute_force::index<T, DistT>                                             \
+  {                                                                                             \
+    return detail::build<T, DistT>(res, dataset, index_params.metric, index_params.metric_arg); \
+  }                                                                                             \
+  auto build(raft::resources const& res,                                                        \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,               \
              cuvs::distance::DistanceType metric,                                               \
              DistT metric_arg)                                                                  \

@@ -67,7 +67,7 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
   void set_search_dataset(const T* dataset, size_t nrow) override;
 
   void search(const T* queries,
@@ -110,6 +110,8 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
 
   std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, IdxT>> dynamic_batcher_;
   cuvs::neighbors::dynamic_batching::search_params dynamic_batcher_sp_{};
+
+  std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
 };
 
 template <typename T, typename IdxT>
@@ -144,8 +146,10 @@ std::unique_ptr<algo<T>> cuvs_ivf_pq<T, IdxT>::copy()
 }
 
 template <typename T, typename IdxT>
-void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param,
+                                            const void* filter_bitset)
 {
+  filter_        = make_cuvs_filter(filter_bitset, index_->size());
   auto sp        = dynamic_cast<const search_param&>(param);
   search_params_ = sp.pq_param;
   refine_ratio_  = sp.refine_ratio;
@@ -160,7 +164,8 @@ void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
                                                       sp.dynamic_batching_n_queues,
                                                       sp.dynamic_batching_conservative_dispatch},
       *index_,
-      search_params_);
+      search_params_,
+      filter_.get());
     dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
   } else {
     dynamic_batcher_.reset();
@@ -204,7 +209,7 @@ void cuvs_ivf_pq<T, IdxT>::search_base(
                                               distances_view);
   } else {
     cuvs::neighbors::ivf_pq::search(
-      handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
+      handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
   }
 
   if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {

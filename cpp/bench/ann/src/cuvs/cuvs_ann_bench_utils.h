@@ -275,4 +275,23 @@ void refine_helper(const raft::resources& res,
   }
 }
 
+/**
+ * Construct a cuVS-compatible bitset filter object from a raw pointer to the bitset.
+ *
+ * @param[in] filter_bitset a pointer to a pre-generated bitset
+ * @param[in] n_rows the number of elements in the bitset / dataset.
+ * @return a shared pointer to the filter object (doesn't own the bitset data!)
+ */
+inline auto make_cuvs_filter(const void* filter_bitset, int64_t n_rows)
+  -> std::shared_ptr<cuvs::neighbors::filtering::base_filter>
+{
+  if (filter_bitset != nullptr) {
+    return std::make_shared<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>(
+      raft::core::bitset_view<uint32_t, int64_t>(
+        const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(filter_bitset)), n_rows));
+  } else {
+    return std::make_shared<cuvs::neighbors::filtering::none_sample_filter>();
+  }
+}
+
 }  // namespace cuvs::bench
