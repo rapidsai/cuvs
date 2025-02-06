@@ -8,6 +8,7 @@ channels:
 - nvidia
 dependencies:
 - benchmark>=1.8.2
+- binutils_impl_linux-64=2.40
 - c-compiler
 - clang-tools==16.0.6
 - clang==16.0.6
