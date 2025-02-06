@@ -12,4 +12,5 @@
 # the License.
 # =============================================================================
 
+add_subdirectory(quantize/binary)
 add_subdirectory(quantize/scalar)
