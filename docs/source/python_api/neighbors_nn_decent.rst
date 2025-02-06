@@ -22,5 +22,3 @@ Index build
 ###########
 
 .. autofunction:: cuvs.neighbors.nn_descent.build
-
-
