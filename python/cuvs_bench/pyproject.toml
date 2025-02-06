@@ -20,7 +20,7 @@ requires-python = ">=3.10"
 dependencies = [
     "click",
     "cuvs==25.2.*,>=0.0.0a0",
-    "matplotlib-base",
+    "matplotlib",
     "pandas",
     "pyyaml",
     "requests",
