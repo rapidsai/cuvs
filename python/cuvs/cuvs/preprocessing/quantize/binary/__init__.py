@@ -12,18 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .scalar import (
-    Quantizer,
-    QuantizerParams,
-    inverse_transform,
-    train,
-    transform,
-)
+from .binary import transform
 
-__all__ = [
-    "Quantizer",
-    "QuantizerParams",
-    "inverse_transform",
-    "train",
-    "transform",
-]
+__all__ = ["transform"]

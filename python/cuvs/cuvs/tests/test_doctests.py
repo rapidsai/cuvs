@@ -23,7 +23,7 @@ import pytest
 
 import cuvs.distance
 import cuvs.neighbors
-import cuvs.preprocessing.quantize.scalar
+import cuvs.preprocessing.quantize
 
 # Code adapted from https://github.com/rapidsai/cudf/blob/branch-23.02/python/cudf/cudf/tests/test_doctests.py  # noqa
 
@@ -97,7 +97,7 @@ DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.brute_force))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.ivf_flat))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.common))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.distance))
-DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.preprocessing.quantize.scalar))
+DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.preprocessing.quantize))
 
 
 def _test_name_from_docstring(docstring):
