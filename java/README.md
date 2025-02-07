@@ -28,7 +28,7 @@ do `./build.sh java` in the top level directory or just do `./build.sh` in this 
 
 ## Examples
 
-For easy understanding we have provided starter examples for CAGRA, HNSW, and Bruteforce and these can be found in the `examples` directory.
+A few starter examples of CAGRA, HNSW, and Bruteforce index are provided in the `examples` directory.
 
 
 ## Javadocs
