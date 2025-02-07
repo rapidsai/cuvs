@@ -105,6 +105,13 @@
   groundtruth_neighbors_file: sift-128-euclidean/groundtruth.neighbors.ibin
   distance: euclidean
 
+- name: test-data
+  dims: 32
+  base_file: test-data/ann_benchmarks_like.base.fbin
+  query_file: test-data/ann_benchmarks_like.query.fbin
+  groundtruth_neighbors_file: test-data/ann_benchmarks_like.groundtruth.neighbors.ibin
+  distance: euclidean
+
 - name: wiki_all_1M
   dims: 768
   base_file: wiki_all_1M/base.1M.fbin
