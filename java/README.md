@@ -1,6 +1,6 @@
 # CuVS Java API
 
-CuVS Java API attempts to provide a Java based simple, efficient, and a robust vector search API.
+CuVS Java API provides a Java based simple, efficient, and a robust vector search API.
 
 > [!CAUTION]
 > This is an experimental release and updates to this API should be expected in the coming days.
