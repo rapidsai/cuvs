@@ -149,10 +149,7 @@ def generate_ann_benchmark_like_data(
 
 
 def get_default_dataset_path():
-    if "RAPIDS_DATASET_ROOT_DIR" in os.environ:
-        return os.getenv("RAPIDS_DATASET_ROOT_DIR")
-    else:
-        return os.path.join(os.getcwd(), "datasets")
+    return os.getenv("RAPIDS_DATASET_ROOT_DIR", os.path.join(os.getcwd(), "datasets"))
 
 
 @click.command()
