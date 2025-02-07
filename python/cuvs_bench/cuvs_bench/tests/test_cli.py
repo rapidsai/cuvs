@@ -16,6 +16,7 @@
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from click.testing import CliRunner
 from cuvs_bench.get_dataset.__main__ import main
@@ -96,42 +97,270 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         result.exit_code == 0
     ), f"Run command failed with output:\n{result.output}"
 
-    # --- Verify that the expected result files exist and are not empty ---
-    expected_files = [
-        # Build files:
-        "test-data/result/build/cuvs_ivf_flat,test.csv",
-        "test-data/result/build/cuvs_cagra_hnswlib,test.csv",
-        "test-data/result/build/faiss_gpu_ivf_flat,test.csv",
-        "test-data/result/build/cuvs_cagra,test.csv",
-        "test-data/result/build/cuvs_cagra,test.json",
-        "test-data/result/build/cuvs_cagra_hnswlib,test.json",
-        "test-data/result/build/cuvs_ivf_flat,test.json",
-        "test-data/result/build/faiss_gpu_ivf_flat,test.json",
-        # Search files:
-        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,latency.csv",  # noqa: E501
-        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,throughput.csv",  # noqa: E501
-        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,raw.csv",
-        "test-data/result/search/cuvs_cagra,test,k10,bs100,latency.csv",
-        "test-data/result/search/cuvs_cagra,test,k10,bs100,throughput.csv",
-        "test-data/result/search/cuvs_cagra,test,k10,bs100,raw.csv",
-        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,latency.csv",
-        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,raw.csv",
-        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,throughput.csv",
-        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,latency.csv",  # noqa: E501
-        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,raw.csv",
-        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,throughput.csv",  # noqa: E501
-        "test-data/result/search/cuvs_cagra,test,k10,bs100.json",
-        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100.json",
-        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100.json",
-        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100.json",
+    common_build_header = [
+        "algo_name",
+        "index_name",
+        "time",
+        "threads",
+        "cpu_time",
+        "GPU",
     ]
 
-    for rel_path in expected_files:
+    common_search_header = [
+        "algo_name",
+        "index_name",
+        "recall",
+        "throughput",
+        "latency",
+        "threads",
+        "cpu_time",
+        "GPU",
+    ]
+
+    # --- Verify that the expected result files exist and are not empty ---
+    expected_files = {
+        # Build files:
+        "test-data/result/build/cuvs_ivf_flat,test.csv": {
+            "header": common_build_header
+            + [
+                "niter",
+                "nlist",
+                "ratio",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/build/cuvs_cagra_hnswlib,test.csv": {
+            "header": common_build_header
+            + [
+                "ef_construction",
+                "graph_degree",
+                "intermediate_graph_degree",
+                "label",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/build/faiss_gpu_ivf_flat,test.csv": {
+            "header": common_build_header
+            + [
+                "nlist",
+                "ratio",
+                "use_cuvs",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/build/cuvs_cagra,test.csv": {
+            "header": common_build_header
+            + [
+                "graph_degree",
+                "intermediate_graph_degree",
+                "label",
+            ],
+            "rows": 1,
+        },
+        # Search files:
+        "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "ef",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "ef_construction",
+                "graph_degree",
+                "intermediate_graph_degree",
+                "label",
+            ],
+            "rows": 4,
+        },
+        "test-data/result/search/cuvs_cagra,test,k10,bs100,latency.csv": {
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "itopk",
+                "k",
+                "n_queries",
+                "search_width",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "graph_degree",
+                "intermediate_graph_degree",
+                "label",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_cagra,test,k10,bs100,throughput.csv": {
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "itopk",
+                "k",
+                "n_queries",
+                "search_width",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "graph_degree",
+                "intermediate_graph_degree",
+                "label",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_cagra,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "itopk",
+                "k",
+                "n_queries",
+                "search_width",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "graph_degree",
+                "intermediate_graph_degree",
+                "label",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,latency.csv": {
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "niter",
+                "nlist",
+                "ratio",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "niter",
+                "nlist",
+                "ratio",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,throughput.csv": {  # noqa: E501
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "niter",
+                "nlist",
+                "ratio",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,latency.csv": {  # noqa: E501
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "nlist",
+                "ratio",
+                "use_cuvs",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "nlist",
+                "ratio",
+                "use_cuvs",
+            ],
+            "rows": 2,
+        },
+        "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,throughput.csv": {  # noqa: E501
+            "header": common_search_header
+            + [
+                "end_to_end",
+                "k",
+                "n_queries",
+                "nprobe",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "nlist",
+                "ratio",
+                "use_cuvs",
+            ],
+            "rows": 2,
+        },
+    }
+
+    for rel_path, expectations in expected_files.items():
         file_path = temp_datasets_dir / rel_path
         assert file_path.exists(), f"Expected file {file_path} does not exist."
         assert (
             file_path.stat().st_size > 0
         ), f"Expected file {file_path} is empty."
+
+        df = pd.read_csv(file_path)
+
+        actual_header = list(df.columns)
+        actual_rows = len(df)
+
+        # breakpoint()
+        assert (
+            actual_header == expectations["header"]
+        ), f"Wrong header produced in file f{rel_path}"
+        assert actual_rows == expectations["rows"]
 
 
 def test_plot_command_creates_png_files(temp_datasets_dir: Path):
