@@ -558,6 +558,7 @@ dependencies:
           - pandas
           - pyyaml
           - requests
+          - scikit-learn
       - output_types: [conda]
         packages:
           - matplotlib-base
