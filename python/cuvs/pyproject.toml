@@ -115,7 +115,7 @@ regex = "(?P<value>.*)"
 
 [tool.rapids-build-backend]
 requires = [
-    "cmake>=3.26.4,!=3.30.0",
+    "cmake=3.26.4",
     "cuda-python",
     "cython>=3.0.0",
     "libcuvs==25.2.*,>=0.0.0a0",
