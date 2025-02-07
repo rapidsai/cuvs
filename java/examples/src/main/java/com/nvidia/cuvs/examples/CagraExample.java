@@ -4,12 +4,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 import com.nvidia.cuvs.SearchResults;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
@@ -21,7 +19,7 @@ import com.nvidia.cuvs.CuVSResources;
 
 public class CagraExample {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = Logger.getLogger(CagraExample.class.getName());
 
   public static void main(String[] args) throws Throwable {
 

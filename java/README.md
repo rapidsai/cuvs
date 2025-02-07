@@ -5,6 +5,7 @@ CuVS Java API attempts to provide a Java based simple, efficient, and a robust v
 > [!CAUTION]
 > This is an experimental release and updates to this API should be expected in the coming days.
 
+
 ## Prerequisites
 
 - gcc 11.4
@@ -24,9 +25,11 @@ do `./build.sh java` in the top level directory or just do `./build.sh` in this 
 
 :warning: If you notice the tests failing please replace `mvn verify` with `mvn clean package` in the `build.sh` script found in this directory and try again. This should build the API (and skip the tests).
 
+
 ## Examples
 
 For easy understanding we have provided starter examples for CAGRA, HNSW, and Bruteforce and these can be found in the `examples` directory.
+
 
 ## Javadocs
 
