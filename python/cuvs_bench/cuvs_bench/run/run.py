@@ -140,7 +140,7 @@ def gather_algorithm_configs(
     algos_conf_fs = [
         os.path.join(scripts_path, "../config", "algos", f)
         for f in algos_conf_fs
-        if ".json" not in f and "constraint" not in f and ".py" not in f
+        if f.endswith(".yaml")
     ]
 
     if configuration:
