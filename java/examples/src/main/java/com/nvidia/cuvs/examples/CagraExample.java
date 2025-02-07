@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
+import com.nvidia.cuvs.SearchResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +18,6 @@ import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.common.SearchResults;
 
 public class CagraExample {
 
@@ -40,10 +40,10 @@ public class CagraExample {
         { 0.05198065f, 0.5789965f }
        };
 
-    try (CuVSResources resources = new CuVSResources()) {
+    try (CuVSResources resources = CuVSResources.create()) {
 
       // Configure index parameters
-      CagraIndexParams indexParams = new CagraIndexParams.Builder(resources)
+      CagraIndexParams indexParams = new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
           .withGraphDegree(1)
           .withIntermediateGraphDegree(2)
@@ -51,7 +51,7 @@ public class CagraExample {
           .build();
 
       // Create the index with the dataset
-      CagraIndex index = new CagraIndex.Builder(resources)
+      CagraIndex index = CagraIndex.newBuilder(resources)
           .withDataset(dataset)
           .withIndexParams(indexParams)
           .build();
@@ -63,7 +63,7 @@ public class CagraExample {
       // Loading a CAGRA index from disk.
       File indexFile = new File(indexFileName);
       InputStream inputStream = new FileInputStream(indexFile);
-      CagraIndex loadedIndex = new CagraIndex.Builder(resources)
+      CagraIndex loadedIndex = CagraIndex.newBuilder(resources)
           .from(inputStream)
           .build();
 

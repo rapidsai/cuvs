@@ -46,7 +46,10 @@ DISTANCE_TYPES = {
     "minkowski": cuvsDistanceType.LpUnexpanded,
     "russellrao": cuvsDistanceType.RusselRaoExpanded,
     "dice": cuvsDistanceType.DiceExpanded,
+    "bitwise_hamming": cuvsDistanceType.BitwiseHamming
 }
+
+DISTANCE_NAMES = {v: k for k, v in DISTANCE_TYPES.items()}
 
 SUPPORTED_DISTANCES = ["euclidean", "l1", "cityblock", "l2", "inner_product",
                        "chebyshev", "minkowski", "canberra", "kl_divergence",

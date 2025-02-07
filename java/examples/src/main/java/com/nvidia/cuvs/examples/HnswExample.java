@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
+import com.nvidia.cuvs.SearchResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +20,6 @@ import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.HnswIndexParams;
 import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
-import com.nvidia.cuvs.HnswSearchResults;
 
 public class HnswExample {
 
@@ -42,10 +42,10 @@ public class HnswExample {
         { 0.05198065f, 0.5789965f }
        };
 
-    try (CuVSResources resources = new CuVSResources()) {
+    try (CuVSResources resources = CuVSResources.create()) {
 
       // Configure index parameters
-      CagraIndexParams indexParams = new CagraIndexParams.Builder(resources)
+      CagraIndexParams indexParams = new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.IVF_PQ)
           .withGraphDegree(64)
           .withIntermediateGraphDegree(128)
@@ -54,7 +54,7 @@ public class HnswExample {
           .build();
 
       // Create the index with the dataset
-      CagraIndex index = new CagraIndex.Builder(resources)
+      CagraIndex index = CagraIndex.newBuilder(resources)
           .withDataset(dataset)
           .withIndexParams(indexParams)
           .build();
@@ -63,18 +63,18 @@ public class HnswExample {
       String hnswIndexFileName = UUID.randomUUID().toString() + ".hnsw";
       index.serializeToHNSW(new FileOutputStream(hnswIndexFileName));
 
-      HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder(resources)
+      HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder()
           .withVectorDimension(2)
           .build();
       InputStream inputStreamHNSW = new FileInputStream(hnswIndexFileName);
       File hnswIndexFile = new File(hnswIndexFileName);
 
-      HnswIndex hnswIndex = new HnswIndex.Builder(resources)
+      HnswIndex hnswIndex = HnswIndex.newBuilder(resources)
           .from(inputStreamHNSW)
           .withIndexParams(hnswIndexParams)
           .build();
 
-      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder(resources)
+      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder()
           .build();
 
       HnswQuery hnswQuery = new HnswQuery.Builder()
@@ -83,7 +83,7 @@ public class HnswExample {
           .withTopK(3)
           .build();
 
-      HnswSearchResults results = hnswIndex.search(hnswQuery);
+      SearchResults results = hnswIndex.search(hnswQuery);
 
       // Check results
       log.info(results.getResults().toString());

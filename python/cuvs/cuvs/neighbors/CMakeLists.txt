@@ -18,6 +18,7 @@ add_subdirectory(hnsw)
 add_subdirectory(ivf_flat)
 add_subdirectory(ivf_pq)
 add_subdirectory(filters)
+add_subdirectory(nn_descent)
 
 # Set the list of Cython files to build
 set(cython_sources refine.pyx)
