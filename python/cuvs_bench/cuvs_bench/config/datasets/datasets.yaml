@@ -128,6 +128,7 @@
 
 - name: deep-100M
   dims: 96
+  subset_size: 100000000
   base_file: deep-100M/base.1B.fbin
   query_file: deep-100M/query.public.10K.fbin
   groundtruth_neighbors_file: deep-100M/groundtruth.public.10K.ibin
