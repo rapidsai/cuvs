@@ -1,8 +1,19 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3d3d2b8..3079d12 100644
+index 3d3d2b8..a007fa4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -145,62 +145,14 @@ if (MSVC)
+@@ -23,10 +23,6 @@ set(CMAKE_STANDARD 17)
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
+-if(NOT MSVC)
+-	set(CMAKE_CXX_COMPILER g++)
+-endif()
+-
+ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
+ 
+ # Install nuget packages for dependencies.
+@@ -145,62 +141,14 @@ if (MSVC)
          "${DISKANN_MKL_LIB_PATH}/mkl_intel_thread.lib")
  else()
      # expected path for manual intel mkl installs
@@ -48,7 +59,7 @@ index 3d3d2b8..3079d12 100644
 +    find_package(MKL CONFIG REQUIRED)
 +    include_directories($<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
 +    link_libraries($<LINK_ONLY:MKL::MKL>)
-
+ 
      # compile flags and link libraries
      add_compile_options(-m64 -Wl,--no-as-needed)
      if (NOT PYBIND)
@@ -67,8 +78,8 @@ index 3d3d2b8..3079d12 100644
 -        )
      endif()
  endif()
-
-@@ -286,7 +238,7 @@ if(MSVC)
+ 
+@@ -286,7 +234,7 @@ if(MSVC)
  	set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${PROJECT_SOURCE_DIR}/x64/Release)
  else()
      set(ENV{TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD} 500000000000)
@@ -77,15 +88,15 @@ index 3d3d2b8..3079d12 100644
      set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG")
      if (NOT PYBIND)
          set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG -Ofast")
-@@ -300,10 +252,6 @@ else()
+@@ -300,10 +248,6 @@ else()
  endif()
-
+ 
  add_subdirectory(src)
 -if (NOT PYBIND)
 -    add_subdirectory(apps)
 -    add_subdirectory(apps/utils)
 -endif()
-
+ 
  if (UNIT_TEST)
      enable_testing()
 diff --git a/include/ann_exception.h b/include/ann_exception.h
@@ -94,7 +105,7 @@ index 6b81373..a385198 100644
 +++ b/include/ann_exception.h
 @@ -2,6 +2,7 @@
  // Licensed under the MIT license.
-
+ 
  #pragma once
 +#include <cstdint>
  #include <string>
@@ -111,7 +122,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<int8_t>::compare;
      DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t length) const;
  };
-
+ 
 @@ -86,6 +87,7 @@ class DistanceL2Int8 : public Distance<int8_t>
      DistanceL2Int8() : Distance<int8_t>(diskann::Metric::L2)
      {
@@ -119,7 +130,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<int8_t>::compare;
      DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t size) const;
  };
-
+ 
 @@ -96,6 +98,7 @@ class AVXDistanceL2Int8 : public Distance<int8_t>
      AVXDistanceL2Int8() : Distance<int8_t>(diskann::Metric::L2)
      {
@@ -127,7 +138,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<int8_t>::compare;
      DISKANN_DLLEXPORT virtual float compare(const int8_t *a, const int8_t *b, uint32_t length) const;
  };
-
+ 
 @@ -105,6 +108,7 @@ class DistanceCosineFloat : public Distance<float>
      DistanceCosineFloat() : Distance<float>(diskann::Metric::COSINE)
      {
@@ -135,7 +146,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<float>::compare;
      DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
  };
-
+ 
 @@ -114,7 +118,7 @@ class DistanceL2Float : public Distance<float>
      DistanceL2Float() : Distance<float>(diskann::Metric::L2)
      {
@@ -152,7 +163,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<float>::compare;
      DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
  };
-
+ 
 @@ -146,6 +151,7 @@ class SlowDistanceCosineUInt8 : public Distance<uint8_t>
      SlowDistanceCosineUInt8() : Distance<uint8_t>(diskann::Metric::COSINE)
      {
@@ -160,7 +171,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<uint8_t>::compare;
      DISKANN_DLLEXPORT virtual float compare(const uint8_t *a, const uint8_t *b, uint32_t length) const;
  };
-
+ 
 @@ -155,6 +161,7 @@ class DistanceL2UInt8 : public Distance<uint8_t>
      DistanceL2UInt8() : Distance<uint8_t>(diskann::Metric::L2)
      {
@@ -168,7 +179,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<uint8_t>::compare;
      DISKANN_DLLEXPORT virtual float compare(const uint8_t *a, const uint8_t *b, uint32_t size) const;
  };
-
+ 
 @@ -198,6 +205,7 @@ class AVXDistanceInnerProductFloat : public Distance<float>
      AVXDistanceInnerProductFloat() : Distance<float>(diskann::Metric::INNER_PRODUCT)
      {
@@ -176,7 +187,7 @@ index f3b1de2..d4da72e 100644
 +    using Distance<float>::compare;
      DISKANN_DLLEXPORT virtual float compare(const float *a, const float *b, uint32_t length) const;
  };
-
+ 
 @@ -213,6 +221,7 @@ class AVXNormalizedCosineDistanceFloat : public Distance<float>
      AVXNormalizedCosineDistanceFloat() : Distance<float>(diskann::Metric::COSINE)
      {
@@ -194,7 +205,7 @@ index d3af5c3..417af31 100644
  #include "tag_uint128.h"
  #include <any>
 +#include <xmmintrin.h>
-
+ 
  #ifdef EXEC_ENV_OLS
  #include "content_buf.h"
 diff --git a/src/index.cpp b/src/index.cpp
@@ -204,13 +215,13 @@ index bf93344..9d8336c 100644
 @@ -17,9 +17,7 @@
  #include "gperftools/malloc_extension.h"
  #endif
-
+ 
 -#ifdef _WINDOWS
  #include <xmmintrin.h>
 -#endif
-
+ 
  #include "index.h"
-
+ 
 diff --git a/src/partition.cpp b/src/partition.cpp
 index 570d45c..fb54cbf 100644
 --- a/src/partition.cpp
@@ -222,7 +233,7 @@ index 570d45c..fb54cbf 100644
 -#ifdef _WINDOWS
  #include <xmmintrin.h>
 -#endif
-
+ 
  // block size for reading/ processing large files and matrices in blocks
  #define BLOCK_SIZE 5000000
 diff --git a/src/pq_flash_index.cpp b/src/pq_flash_index.cpp
@@ -234,6 +245,6 @@ index d9ad506..145a978 100644
  #include "pq_flash_index.h"
  #include "cosine_similarity.h"
 +#include <xmmintrin.h>
-
+ 
  #ifdef _WINDOWS
  #include "windows_aligned_file_reader.h"
