@@ -12,13 +12,16 @@ on:
       sha:
         required: true
         type: string
+      build_type:
+        type: string
+        default: nightly
 
 jobs:
   conda-cpp-checks:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@branch-25.02
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@branch-25.04
     with:
-      build_type: nightly
+      build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
@@ -26,25 +29,25 @@ jobs:
       symbol_exclusions: (void (thrust::|cub::))
   conda-cpp-tests:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@branch-25.02
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@branch-25.04
     with:
-      build_type: nightly
+      build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
   conda-python-tests:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@branch-25.02
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@branch-25.04
     with:
-      build_type: nightly
+      build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
   wheel-tests-cuvs:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@branch-25.02
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@branch-25.04
     with:
-      build_type: nightly
+      build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
