@@ -567,9 +567,16 @@ dependencies:
         packages:
           - click
           - cuvs==25.2.*,>=0.0.0a0
-          - matplotlib
           - pandas
           - pyyaml
+          - requests
+          - scikit-learn
+      - output_types: [conda]
+        packages:
+          - matplotlib-base
+      - output_types: [requirements, pyproject]
+        packages:
+          - matplotlib
   depends_on_libcuvs:
     common:
       - output_types: conda
