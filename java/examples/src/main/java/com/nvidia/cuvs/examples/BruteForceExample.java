@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
+import com.nvidia.cuvs.SearchResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +15,6 @@ import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
 import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.common.SearchResults;
 
 public class BruteForceExample {
 
@@ -37,7 +37,7 @@ public class BruteForceExample {
         { 0.05198065f, 0.5789965f }
        };
 
-    try (CuVSResources resources = new CuVSResources()) {
+    try (CuVSResources resources = CuVSResources.create()) {
 
       // Create a query object with the query vectors
       BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
@@ -50,7 +50,7 @@ public class BruteForceExample {
           .build();
 
       // Create the index with the dataset
-      BruteForceIndex index = new BruteForceIndex.Builder(resources)
+      BruteForceIndex index = BruteForceIndex.newBuilder(resources)
           .withDataset(dataset)
           .withIndexParams(indexParams)
           .build();
@@ -62,7 +62,7 @@ public class BruteForceExample {
       // Loading a BRUTEFORCE index from disk.
       File indexFile = new File(indexFileName);
       InputStream inputStream = new FileInputStream(indexFile);
-      BruteForceIndex loadedIndex = new BruteForceIndex.Builder(resources)
+      BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources)
           .from(inputStream)
           .build();
 

@@ -49,13 +49,18 @@ cdef class IndexParams:
         The hierarchy of the HNSW index. Valid values are ["none", "cpu"].
         - "none": No hierarchy is built.
         - "cpu": Hierarchy is built using CPU.
+        - "gpu": Hierarchy is built using GPU.
     ef_construction : int, default = 200 (optional)
         Maximum number of candidate list size used during construction
         when hierarchy is `cpu`.
     num_threads : int, default = 0 (optional)
         Number of CPU threads used to increase construction parallelism
-        when hierarchy is `cpu`. When the value is 0, the number of threads is
-        automatically determined to the maximum number of threads available.
+        when hierarchy is `cpu` or `gpu`. When the value is 0, the number of
+        threads is automatically determined to the maximum number of threads
+        available.
+        NOTE: When hierarchy is `gpu`, while the majority of the work is done
+        on the GPU, initialization of the HNSW index itself and some other
+        work is parallelized with the help of CPU threads.
     """
 
     cdef cuvsHnswIndexParams* params
@@ -74,6 +79,8 @@ cdef class IndexParams:
             self.params.hierarchy = cuvsHnswHierarchy.NONE
         elif hierarchy == "cpu":
             self.params.hierarchy = cuvsHnswHierarchy.CPU
+        elif hierarchy == "gpu":
+            self.params.hierarchy = cuvsHnswHierarchy.GPU
         else:
             raise ValueError("Invalid hierarchy type."
                              " Valid values are 'none' and 'cpu'.")
@@ -86,6 +93,8 @@ cdef class IndexParams:
             return "none"
         elif self.params.hierarchy == cuvsHnswHierarchy.CPU:
             return "cpu"
+        elif self.params.hierarchy == cuvsHnswHierarchy.GPU:
+            return "gpu"
 
     @property
     def ef_construction(self):

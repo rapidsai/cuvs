@@ -55,13 +55,19 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
         cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
       break;
     }
-    case cuvsCagraGraphBuildAlgo::NN_DESCENT:
+    case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
       cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
       nn_descent_params =
         cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
       nn_descent_params.max_iterations = params.nn_descent_niter;
       index_params.graph_build_params  = nn_descent_params;
       break;
+    }
+    case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
+      cuvs::neighbors::cagra::graph_build_params::iterative_search_params p;
+      index_params.graph_build_params = p;
+      break;
+    }
   };
 
   if (auto* cparams = params.compression; cparams != nullptr) {

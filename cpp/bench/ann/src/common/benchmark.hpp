@@ -571,7 +571,7 @@ void dispatch_benchmark(std::string cmdline,
       }
     }
     std::swap(more_indices, indices);  // update the config in case algorithms need to access it
-    register_build<T>(dataset, more_indices, force_overwrite, no_lap_sync);
+    register_build<T>(dataset, indices, force_overwrite, no_lap_sync);
   } else if (search_mode) {
     if (file_exists(query_file)) {
       log_info("Using the query file '%s'", query_file.c_str());

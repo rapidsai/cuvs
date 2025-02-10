@@ -91,12 +91,16 @@ void run_ivf_flat(int64_t n_rows,
   distances_tensor.dl_tensor.shape              = distances_shape;
   distances_tensor.dl_tensor.strides            = NULL;
 
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
   // search index
   cuvsIvfFlatSearchParams_t search_params;
   cuvsIvfFlatSearchParamsCreate(&search_params);
   search_params->n_probes = n_probes;
   cuvsIvfFlatSearch(
-    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
+    res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
 
   // de-allocate index and res
   cuvsIvfFlatSearchParamsDestroy(search_params);

@@ -19,3 +19,11 @@ from .scalar import (
     train,
     transform,
 )
+
+__all__ = [
+    "Quantizer",
+    "QuantizerParams",
+    "inverse_transform",
+    "train",
+    "transform",
+]
