@@ -973,7 +973,7 @@ int insert_to_ordered_list(InternalID_t<Index_t>* list,
   bool position_found = false;
   for (int i = 0; i < width; i++) {
     if (list[i].id() == neighb_id.id()) {
-      if (dist_list[i] == std::numeric_limits<DistData_t>::max() && dist != dist_list[i]) {
+      if (dist_list[i] == std::numeric_limits<DistData_t>::max()) {
         idx_insert   = i;
         dist_list[i] = dist;
       }
@@ -1050,30 +1050,34 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
-  const bool small_dataset = (nrow <= 4 * segment_size);
   for (size_t seg_idx = 0; seg_idx < static_cast<size_t>(num_segments); seg_idx++) {
     // random sequence (range: 0~nrow)
     // segment_x stores neighbors which id % num_segments == x
-    std::vector<Index_t> rand_seq(nrow / num_segments);
+    std::vector<Index_t> rand_seq((nrow + num_segments - 1) / num_segments);
     std::iota(rand_seq.begin(), rand_seq.end(), 0);
     auto gen = std::default_random_engine{seg_idx};
     std::shuffle(rand_seq.begin(), rand_seq.end(), gen);
 
 #pragma omp parallel for
     for (size_t i = 0; i < nrow; i++) {
-      size_t base_idx      = i * node_degree + seg_idx * segment_size;
-      auto h_neighbor_list = h_graph + base_idx;
-      auto h_dist_list     = h_dists.data_handle() + base_idx;
-      size_t idx           = base_idx;
+      size_t base_idx         = i * node_degree + seg_idx * segment_size;
+      auto h_neighbor_list    = h_graph + base_idx;
+      auto h_dist_list        = h_dists.data_handle() + base_idx;
+      size_t idx              = base_idx;
+      size_t self_in_this_seg = 0;
       for (size_t j = 0; j < static_cast<size_t>(segment_size); j++) {
         Index_t id = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
-        if ((size_t)id == i) {
-          idx = small_dataset ? (idx + 1) : (idx + segment_size);
-          id  = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
+        while ((size_t)id == i) {
+          idx++;
+          id               = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
+          self_in_this_seg = 1;
         }
 
-        h_neighbor_list[j].id_with_flag() = id;
-        h_dist_list[j]                    = std::numeric_limits<DistData_t>::max();
+        h_neighbor_list[j].id_with_flag() =
+          j < (rand_seq.size() - self_in_this_seg) && size_t(id) < nrow
+            ? id
+            : std::numeric_limits<Index_t>::max();
+        h_dist_list[j] = std::numeric_limits<DistData_t>::max();
         idx++;
       }
     }
