@@ -78,6 +78,11 @@ impl Index {
         distances: &ManagedTensor,
     ) -> Result<()> {
         unsafe {
+            let prefilter = ffi::cuvsFilter {
+                addr: 0,
+                type_: ffi::cuvsFilterType::NO_FILTER,
+            };
+
             check_cuvs(ffi::cuvsIvfFlatSearch(
                 res.0,
                 params.0,
@@ -85,6 +90,7 @@ impl Index {
                 queries.as_ptr(),
                 neighbors.as_ptr(),
                 distances.as_ptr(),
+                prefilter,
             ))
         }
     }

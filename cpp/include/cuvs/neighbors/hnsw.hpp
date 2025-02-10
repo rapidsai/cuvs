@@ -45,7 +45,8 @@ namespace cuvs::neighbors::hnsw {
  */
 enum class HnswHierarchy {
   NONE,  // base-layer-only index
-  CPU    // full index with CPU-built hierarchy
+  CPU,   // full index with CPU-built hierarchy
+  GPU    // full index with GPU-built hierarchy
 };
 
 struct index_params : cuvs::neighbors::index_params {
@@ -53,9 +54,12 @@ struct index_params : cuvs::neighbors::index_params {
   HnswHierarchy hierarchy = HnswHierarchy::NONE;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction = 200;
-  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU`
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` or `GPU`.
       When the value is 0, the number of threads is automatically determined to the
       maximum number of threads available.
+      NOTE: When hierarchy is `GPU`, while the majority of the work is done on the GPU,
+      initialization of the HNSW index itself and some other work
+      is parallelized with the help of CPU threads.
    */
   int num_threads = 0;
 };

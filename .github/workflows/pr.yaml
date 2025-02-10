@@ -22,16 +22,28 @@ jobs:
       - conda-python-tests
       - docs-build
       - rust-build
+      - go-build
       - wheel-build-libcuvs
       - wheel-build-cuvs
       - wheel-tests-cuvs
       - devcontainer
+      - telemetry-setup
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@branch-25.02
     if: always()
     with:
       needs: ${{ toJSON(needs) }}
+  telemetry-setup:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    env:
+      OTEL_SERVICE_NAME: 'pr-cuvs'
+    steps:
+      - name: Telemetry setup
+        if: ${{ vars.TELEMETRY_ENABLED == 'true' }}
+        uses: rapidsai/shared-actions/telemetry-dispatch-stash-base-env-vars@main
   check-nightly-ci:
+    needs: telemetry-setup
     # Switch to ubuntu-latest once it defaults to a version of Ubuntu that
     # provides at least Python 3.11 (see
     # https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)
@@ -44,6 +56,7 @@ jobs:
         with:
           repo: cuvs
   changed-files:
+    needs: telemetry-setup
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/changed-files.yaml@branch-25.02
     with:
@@ -58,6 +71,7 @@ jobs:
           - '!notebooks/**'
           - '!python/**'
           - '!rust/**'
+          - '!go/**'
           - '!thirdparty/LICENSES/**'
         test_notebooks:
           - '**'
@@ -65,6 +79,7 @@ jobs:
           - '!.pre-commit-config.yaml'
           - '!README.md'
           - '!rust/**'
+          - '!go/**'
           - '!thirdparty/LICENSES/**'
         test_python:
           - '**'
@@ -75,12 +90,15 @@ jobs:
           - '!img/**'
           - '!notebooks/**'
           - '!rust/**'
+          - '!go/**'
           - '!thirdparty/LICENSES/**'
   checks:
+    needs: telemetry-setup
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/checks.yaml@branch-25.02
     with:
       enable_check_generated_files: false
+      ignored_pr_jobs: "telemetry-summarize"
   conda-cpp-build:
     needs: checks
     secrets: inherit
@@ -136,6 +154,16 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_rust.sh"
+  go-build:
+    needs: conda-cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.02
+    with:
+      build_type: pull-request
+      node_type: "gpu-v100-latest-1"
+      arch: "amd64"
+      container_image: "rapidsai/ci-conda:latest"
+      run_script: "ci/build_go.sh"
   wheel-build-libcuvs:
     needs: checks
     secrets: inherit
@@ -162,6 +190,7 @@ jobs:
       script: ci/test_wheel_cuvs.sh
   devcontainer:
     secrets: inherit
+    needs: telemetry-setup
     uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@branch-25.02
     with:
       arch: '["amd64"]'
@@ -170,3 +199,13 @@ jobs:
         sccache -z;
         build-all --verbose;
         sccache -s;
+
+  telemetry-summarize:
+    # This job must use a self-hosted runner to record telemetry traces.
+    runs-on: linux-amd64-cpu4
+    needs: pr-builder
+    if: ${{ vars.TELEMETRY_ENABLED == 'true' && !cancelled() }}
+    continue-on-error: true
+    steps:
+      - name: Telemetry summarize
+        uses: rapidsai/shared-actions/telemetry-dispatch-summarize@main

@@ -34,7 +34,7 @@ dependencies:
 - libcusparse-dev
 - libcuvs==25.2.*,>=0.0.0a0
 - librmm==25.2.*,>=0.0.0a0
-- matplotlib
+- matplotlib-base
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2
@@ -43,6 +43,8 @@ dependencies:
 - pylibraft==25.2.*,>=0.0.0a0
 - pyyaml
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
+- requests
+- scikit-learn
 - setuptools
 - sysroot_linux-aarch64==2.28
 - wheel

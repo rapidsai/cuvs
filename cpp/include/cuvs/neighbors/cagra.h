@@ -42,7 +42,9 @@ enum cuvsCagraGraphBuildAlgo {
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
-  NN_DESCENT
+  NN_DESCENT,
+  /* Experimental, use iterative cagra search and optimize to build the knn graph */
+  ITERATIVE_CAGRA_SEARCH
 };
 
 /** Parameters for VPQ compression. */

@@ -145,11 +145,14 @@ cdef class IndexParams:
 
     build_algo: string denoting the graph building algorithm to use, \
                 default = "ivf_pq"
-        Valid values for algo: ["ivf_pq", "nn_descent"], where
+        Valid values for algo: ["ivf_pq", "nn_descent",
+                                "iterative_cagra_search"], where
             - ivf_pq will use the IVF-PQ algorithm for building the knn graph
             - nn_descent (experimental) will use the NN-Descent algorithm for
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
+            - iterative_cagra_search will iteratively build the knn graph using
+              CAGRA's search() and optimize()
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
         compression will be disabled.
@@ -184,6 +187,12 @@ cdef class IndexParams:
             self.params.build_algo = cuvsCagraGraphBuildAlgo.IVF_PQ
         elif build_algo == "nn_descent":
             self.params.build_algo = cuvsCagraGraphBuildAlgo.NN_DESCENT
+        elif build_algo == "iterative_cagra_search":
+            self.params.build_algo = \
+                cuvsCagraGraphBuildAlgo.ITERATIVE_CAGRA_SEARCH
+        else:
+            raise ValueError(f"Unknown build_algo '{build_algo}'")
+
         self.params.nn_descent_niter = nn_descent_niter
         if compression is not None:
             self.compression = compression
