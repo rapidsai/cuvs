@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["11.8", "12.5"]
+      cuda: ["11.8", "12.8"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -21,13 +21,14 @@ files:
       - rapids_build
       - run_py_cuvs
       - rust
+      - go
       - test_libcuvs
       - test_python_common
       - test_py_cuvs
   bench_ann:
     output: conda
     matrix:
-      cuda: ["11.8", "12.5"]
+      cuda: ["11.8", "12.8"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -81,6 +82,14 @@ files:
       - cuda_version
       - rapids_build
       - rust
+  go:
+    output: none
+    includes:
+      - clang
+      - cuda
+      - cuda_version
+      - rapids_build
+      - go
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
@@ -132,6 +141,7 @@ files:
     extras:
       table: project
     includes:
+      - depends_on_libcuvs
       - depends_on_pylibraft
       - run_py_cuvs
   py_test_cuvs:
@@ -318,6 +328,10 @@ dependencies:
               cuda: "12.5"
             packages:
               - cuda-version=12.5
+          - matrix:
+              cuda: "12.8"
+            packages:
+              - cuda-version=12.8
   cuda:
     specific:
       - output_types: conda
@@ -465,6 +479,12 @@ dependencies:
         packages:
           - make
           - rust
+  go:
+    common:
+      - output_types: [conda]
+        packages:
+          - go
+          - dlpack>=0.8,<1.0
   build_wheels:
     common:
       - output_types: [requirements, pyproject]
@@ -535,9 +555,16 @@ dependencies:
         packages:
           - click
           - cuvs==25.2.*,>=0.0.0a0
-          - matplotlib
           - pandas
           - pyyaml
+          - requests
+          - scikit-learn
+      - output_types: [conda]
+        packages:
+          - matplotlib-base
+      - output_types: [requirements, pyproject]
+        packages:
+          - matplotlib
   depends_on_libcuvs:
     common:
       - output_types: conda

@@ -18,6 +18,7 @@
 
 #include "detail/cagra/add_nodes.cuh"
 #include "detail/cagra/cagra_build.cuh"
+#include "detail/cagra/cagra_merge.cuh"
 #include "detail/cagra/cagra_search.cuh"
 #include "detail/cagra/graph_core.cuh"
 
@@ -336,11 +337,13 @@ void search(raft::resources const& res,
             const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
   try {
-    using none_filter_type  = cuvs::neighbors::filtering::none_sample_filter;
-    auto& sample_filter     = dynamic_cast<const none_filter_type&>(sample_filter_ref);
+    using none_filter_type    = cuvs::neighbors::filtering::none_sample_filter;
+    auto& sample_filter       = dynamic_cast<const none_filter_type&>(sample_filter_ref);
+    search_params params_copy = params;
+    if (params.filtering_rate < 0.0) { params_copy.filtering_rate = 0.0; }
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, none_filter_type>(
-      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+      res, params_copy, idx, queries, neighbors, distances, sample_filter_copy);
     return;
   } catch (const std::bad_cast&) {
   }
@@ -349,9 +352,18 @@ void search(raft::resources const& res,
     auto& sample_filter =
       dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
         sample_filter_ref);
+    search_params params_copy = params;
+    if (params.filtering_rate < 0.0) {
+      const auto num_set_bits = sample_filter.bitset_view_.count(res);
+      auto filtering_rate     = (float)(idx.data().n_rows() - num_set_bits) / idx.data().n_rows();
+      const float min_filtering_rate = 0.0;
+      const float max_filtering_rate = 0.999;
+      params_copy.filtering_rate =
+        std::min(std::max(filtering_rate, min_filtering_rate), max_filtering_rate);
+    }
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, decltype(sample_filter_copy)>(
-      res, params, idx, queries, neighbors, distances, sample_filter_copy);
+      res, params_copy, idx, queries, neighbors, distances, sample_filter_copy);
   } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type");
   }
@@ -367,6 +379,14 @@ void extend(
   std::optional<raft::device_matrix_view<IdxT, int64_t>> ngv)
 {
   cagra::extend_core<T, IdxT, Accessor>(handle, additional_dataset, index, params, ndv, ngv);
+}
+
+template <class T, class IdxT>
+index<T, IdxT> merge(raft::resources const& handle,
+                     const cagra::merge_params& params,
+                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
+{
+  return cagra::detail::merge<T, IdxT>(handle, params, indices);
 }
 
 /** @} */  // end group cagra

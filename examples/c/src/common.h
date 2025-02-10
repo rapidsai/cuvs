@@ -106,4 +106,3 @@ void print_results(int64_t * neighbor, float* distances,int n_rows, int n_cols) 
         printf("]\n");
     }
 }
-

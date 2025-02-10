@@ -28,6 +28,7 @@
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/common.h>
 
 #include <fstream>
 
@@ -54,13 +55,19 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
         cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
       break;
     }
-    case cuvsCagraGraphBuildAlgo::NN_DESCENT:
+    case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
       cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
       nn_descent_params =
         cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
       nn_descent_params.max_iterations = params.nn_descent_niter;
       index_params.graph_build_params  = nn_descent_params;
       break;
+    }
+    case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
+      cuvs::neighbors::cagra::graph_build_params::iterative_search_params p;
+      index_params.graph_build_params = p;
+      break;
+    }
   };
 
   if (auto* cparams = params.compression; cparams != nullptr) {
@@ -87,12 +94,50 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
 }
 
 template <typename T>
+void _extend(cuvsResources_t res,
+             cuvsCagraExtendParams params,
+             cuvsCagraIndex index,
+             DLManagedTensor* additional_dataset_tensor,
+             DLManagedTensor* return_tensor)
+{
+  auto dataset          = additional_dataset_tensor->dl_tensor;
+  auto return_dl_tensor = return_tensor->dl_tensor;
+  auto index_ptr        = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
+  auto res_ptr          = reinterpret_cast<raft::resources*>(res);
+
+  // TODO: use C struct here (see issue #487)
+  auto extend_params           = cuvs::neighbors::cagra::extend_params();
+  extend_params.max_chunk_size = params.max_chunk_size;
+
+  if (cuvs::core::is_dlpack_device_compatible(dataset) &&
+      cuvs::core::is_dlpack_device_compatible(return_dl_tensor)) {
+    using mdspan_type        = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+    using mdspan_return_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
+    auto mds                 = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
+    auto return_mds          = cuvs::core::from_dlpack<mdspan_return_type>(return_tensor);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, return_mds);
+  } else if (cuvs::core::is_dlpack_host_compatible(dataset) &&
+             cuvs::core::is_dlpack_host_compatible(return_dl_tensor)) {
+    using mdspan_type        = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    using mdspan_return_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
+    auto mds                 = cuvs::core::from_dlpack<mdspan_type>(additional_dataset_tensor);
+    auto return_mds          = cuvs::core::from_dlpack<mdspan_return_type>(return_tensor);
+    cuvs::neighbors::cagra::extend(*res_ptr, extend_params, mds, *index_ptr, return_mds);
+  } else {
+    RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+              dataset.dtype.code,
+              dataset.dtype.bits);
+  }
+}
+
+template <typename T>
 void _search(cuvsResources_t res,
              cuvsCagraSearchParams params,
              cuvsCagraIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
-             DLManagedTensor* distances_tensor)
+             DLManagedTensor* distances_tensor,
+             cuvsFilter filter)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
@@ -118,8 +163,26 @@ void _search(cuvsResources_t res,
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
   auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
-  cuvs::neighbors::cagra::search(
-    *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+  if (filter.type == NO_FILTER) {
+    cuvs::neighbors::cagra::search(
+      *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+  } else if (filter.type == BITSET) {
+    using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+    auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
+    auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
+    cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(
+      removed_indices, index_ptr->dataset().extent(0));
+    auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
+    cuvs::neighbors::cagra::search(*res_ptr,
+                                   search_params,
+                                   *index_ptr,
+                                   queries_mds,
+                                   neighbors_mds,
+                                   distances_mds,
+                                   bitset_filter_obj);
+  } else {
+    RAFT_FAIL("Unsupported filter type: BITMAP");
+  }
 }
 
 template <typename T>
@@ -197,10 +260,36 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
     index->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
+    } else {
+      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+                dataset.dtype.code,
+                dataset.dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                                       cuvsCagraExtendParams_t params,
+                                       DLManagedTensor* additional_dataset_tensor,
+                                       cuvsCagraIndex_t index_c_ptr,
+                                       DLManagedTensor* return_dataset_tensor)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto dataset = additional_dataset_tensor->dl_tensor;
+    auto index   = *index_c_ptr;
+
+    if ((dataset.dtype.code == kDLFloat) && (dataset.dtype.bits == 32)) {
+      _extend<float>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
+    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+      _extend<int8_t>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
+    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+      _extend<uint8_t>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -214,7 +303,8 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                                        cuvsCagraIndex_t index_c_ptr,
                                        DLManagedTensor* queries_tensor,
                                        DLManagedTensor* neighbors_tensor,
-                                       DLManagedTensor* distances_tensor)
+                                       DLManagedTensor* distances_tensor,
+                                       cuvsFilter filter)
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -237,11 +327,17 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
-      _search<float>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<float>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+    } else if (queries.dtype.code == kDLFloat && queries.dtype.bits == 16) {
+      _search<half>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
-      _search<int8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<int8_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
-      _search<uint8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+      _search<uint8_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,
@@ -281,6 +377,17 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionPara
 }
 
 extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { *params = new cuvsCagraExtendParams{.max_chunk_size = 0}; });
+}
+
+extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
@@ -337,6 +444,8 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize<float>(res, filename, index, include_dataset);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize<int8_t>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {

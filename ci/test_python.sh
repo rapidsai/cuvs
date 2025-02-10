@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -34,7 +34,8 @@ rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   --channel "${PYTHON_CHANNEL}" \
   "libcuvs=${RAPIDS_VERSION}" \
-  "cuvs=${RAPIDS_VERSION}"
+  "cuvs=${RAPIDS_VERSION}" \
+  "cuvs-bench=${RAPIDS_VERSION}"
 
 rapids-logger "Check GPU usage"
 nvidia-smi
@@ -52,7 +53,19 @@ pytest \
  --cov=cuvs \
  --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-coverage.xml" \
  --cov-report=term \
- test
+ tests
+
+rapids-logger "pytest cuvs-bench"
+popd
+pushd python/cuvs_bench/cuvs_bench
+pytest \
+ --cache-clear \
+ --junitxml="${RAPIDS_TESTS_DIR}/junit-cuvs.xml" \
+ --cov-config=../.coveragerc \
+ --cov=cuvs \
+ --cov-report=xml:"${RAPIDS_COVERAGE_DIR}/cuvs-bench-coverage.xml" \
+ --cov-report=term \
+ tests
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
