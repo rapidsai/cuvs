@@ -567,7 +567,6 @@ dependencies:
         packages:
           - click
           - cuvs==25.4.*,>=0.0.0a0
-          - matplotlib
           - pandas
           - pyyaml
           - requests

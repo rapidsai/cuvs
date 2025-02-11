@@ -36,7 +36,6 @@ dependencies:
 - libcusparse-dev
 - libcuvs==25.4.*,>=0.0.0a0
 - librmm==25.4.*,>=0.0.0a0
-- matplotlib
 - matplotlib-base
 - mkl-devel=2023
 - nccl>=2.19
