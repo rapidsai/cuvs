@@ -21,6 +21,7 @@ from libcpp cimport bool
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
+from cuvs.neighbors.filters.filters cimport cuvsFilter
 
 
 cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
@@ -71,7 +72,8 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
                                   cuvsIvfFlatIndex_t index,
                                   DLManagedTensor* queries,
                                   DLManagedTensor* neighbors,
-                                  DLManagedTensor* distances) except +
+                                  DLManagedTensor* distances,
+                                  cuvsFilter filter) except +
 
     cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
                                      const char * filename,

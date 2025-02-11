@@ -16,10 +16,6 @@
 
 package com.nvidia.cuvs;
 
-import java.lang.foreign.MemorySegment;
-
-import com.nvidia.cuvs.panama.CuVSCagraIndexParams;
-
 /**
  * Supplemental parameters to build CAGRA Index.
  *
@@ -29,8 +25,6 @@ public class CagraIndexParams {
 
   private final CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo;
   private final CuvsDistanceType cuvsDistanceType;
-  private final MemorySegment memorySegment;
-  private CuVSResources resources;
   private final int intermediateGraphDegree;
   private final int graphDegree;
   private final int nnDescentNiter;
@@ -164,28 +158,15 @@ public class CagraIndexParams {
 
   }
 
-  private CagraIndexParams(CuVSResources resources, int intermediateGraphDegree, int graphDegree,
+  private CagraIndexParams(int intermediateGraphDegree, int graphDegree,
       CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo, int nnDescentNiter, int writerThreads,
       CuvsDistanceType cuvsDistanceType) {
-    this.resources = resources;
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
     this.cuvsCagraGraphBuildAlgo = CuvsCagraGraphBuildAlgo;
     this.nnDescentNiter = nnDescentNiter;
     this.numWriterThreads = writerThreads;
     this.cuvsDistanceType = cuvsDistanceType;
-
-    this.memorySegment = initMemorySegment();
-  }
-
-  private MemorySegment initMemorySegment() {
-    MemorySegment indexParamsMemorySegment = CuVSCagraIndexParams.allocate(resources.arena);
-    CuVSCagraIndexParams.intermediate_graph_degree(indexParamsMemorySegment, intermediateGraphDegree);
-    CuVSCagraIndexParams.graph_degree(indexParamsMemorySegment, graphDegree);
-    CuVSCagraIndexParams.build_algo(indexParamsMemorySegment, cuvsCagraGraphBuildAlgo.value);
-    CuVSCagraIndexParams.nn_descent_niter(indexParamsMemorySegment, nnDescentNiter);
-    CuVSCagraIndexParams.metric(indexParamsMemorySegment, cuvsDistanceType.value);
-    return indexParamsMemorySegment;
   }
 
   /**
@@ -221,10 +202,6 @@ public class CagraIndexParams {
     return nnDescentNiter;
   }
 
-  protected MemorySegment getMemorySegment() {
-    return memorySegment;
-  }
-
   /**
    * Gets the {@link CuvsDistanceType} used to build the index.
    */
@@ -251,7 +228,6 @@ public class CagraIndexParams {
    */
   public static class Builder {
 
-    private CuVSResources resources;
     private CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo = CagraGraphBuildAlgo.NN_DESCENT;
     private CuvsDistanceType cuvsDistanceType = CuvsDistanceType.L2Expanded;
     private int intermediateGraphDegree = 128;
@@ -259,9 +235,7 @@ public class CagraIndexParams {
     private int nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
 
-    public Builder(CuVSResources resources) {
-      this.resources = resources;
-    }
+    public Builder() { }
 
     /**
      * Sets the degree of input graph for pruning.
@@ -337,7 +311,7 @@ public class CagraIndexParams {
      * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {
-      return new CagraIndexParams(resources, intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo,
+      return new CagraIndexParams(intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo,
           nnDescentNumIterations, numWriterThreads, cuvsDistanceType);
     }
   }

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -497,8 +497,9 @@ def load_all_results(
 )
 @click.option(
     "--mode",
+    "-m",
     type=click.Choice(["throughput", "latency"], case_sensitive=False),
-    default="throughput",
+    default="latency",
     help="Search mode whose Pareto frontier is used on the Y-axis.",
 )
 @click.option(
