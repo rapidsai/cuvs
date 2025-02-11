@@ -4,7 +4,7 @@
 set -euo pipefail
 
 mkdir -p ./dist
-RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen ${RAPIDS_CUDA_VERSION})"
+RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")"
 RAPIDS_PY_WHEEL_NAME="libcuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from-s3 cpp ./local-libcuvs-dep
 RAPIDS_PY_WHEEL_NAME="cuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from-s3 python ./dist
 
@@ -19,7 +19,7 @@ echo "raft-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo ${PYLIBRAFT_WHEEL_DIR}/raft_
 export PIP_CONSTRAINT="/tmp/constraints.txt"
 
 # echo to expand wildcard before adding `[extra]` requires for pip
-python -m pip install \
+rapids-pip-retry install \
     ./local-libcuvs-dep/libcuvs*.whl \
     "$(echo ./dist/cuvs*.whl)[test]"
 

@@ -24,7 +24,7 @@ from cuvs.preprocessing.quantize import scalar
 @pytest.mark.parametrize("n_cols", [10, 50])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("device_memory", [True, False])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
 def test_scalar_quantizer(n_rows, n_cols, inplace, device_memory, dtype):
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)
     output = np.zeros((n_rows, n_cols), dtype="int8") if inplace else None

@@ -287,7 +287,9 @@ def build(IndexParams index_params, dataset, resources=None):
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(dataset_ai, [np.dtype('float32'),
+                                    np.dtype('float16'),
+                                    np.dtype('byte'),
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
@@ -543,7 +545,9 @@ def search(SearchParams search_params,
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(queries_cai, [np.dtype('float32'),
+                                     np.dtype('float16'),
+                                     np.dtype('byte'),
                                      np.dtype('ubyte')])
 
     cdef uint32_t n_queries = queries_cai.shape[0]

@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .distance import DISTANCE_NAMES, DISTANCE_TYPES, pairwise_distance
 
-__all__ = ["DISTANCE_NAMES", "DISTANCE_TYPES", "pairwise_distance"]
+from .nn_descent import Index, IndexParams, build
+
+__all__ = [
+    "Index",
+    "IndexParams",
+    "build",
+]

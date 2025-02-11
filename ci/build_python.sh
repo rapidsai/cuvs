@@ -15,9 +15,6 @@ rapids-print-env
 
 rapids-logger "Begin py build"
 
-package_name="cuvs"
-package_dir="python"
-
 CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
 LIBRMM_CHANNEL=$(_rapids-get-pr-artifact rmm 1808 cpp conda)
 PYLIBRMM_CHANNEL=$(_rapids-get-pr-artifact rmm 1808 python conda)
