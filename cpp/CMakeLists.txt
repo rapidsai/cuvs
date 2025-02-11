@@ -172,9 +172,6 @@ include(cmake/modules/ConfigureCUDA.cmake)
 # add third party dependencies using CPM
 rapids_cpm_init()
 
-include(${rapids-cmake-dir}/cpm/rapids_logger.cmake)
-rapids_cpm_rapids_logger(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
-
 if(NOT BUILD_CPU_ONLY)
   # We must find CCCL ourselves before raft so that we get the right version.
   include(${rapids-cmake-dir}/cpm/cccl.cmake)
@@ -286,11 +283,7 @@ if(BUILD_SHARED_LIBS)
                INTERFACE_POSITION_INDEPENDENT_CODE ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(
-    cuvs-cagra-search
-    PUBLIC rapids_logger::rapids_logger
-    PRIVATE raft::raft
-  )
+  target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
   target_include_directories(
     cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   )
@@ -502,7 +495,7 @@ if(BUILD_SHARED_LIBS)
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
   target_link_libraries(
-    cuvs_objs PUBLIC raft::raft rmm::rmm rapids_logger::rapids_logger ${CUVS_CTK_MATH_DEPENDENCIES}
+    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
                      $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 
