@@ -27,7 +27,6 @@
 #include <cuvs/distance/distance.hpp>   // is_min_close, DistanceType
 #include <cuvs/selection/select_k.hpp>  // cuvs::selection::select_k
 #include <raft/core/error.hpp>
-#include <raft/core/logger-macros.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>   // raft::resources

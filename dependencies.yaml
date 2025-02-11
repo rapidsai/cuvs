@@ -115,6 +115,7 @@ files:
     includes:
       - cuda_wheels
       - depends_on_libraft
+      - depends_on_librmm
   py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
