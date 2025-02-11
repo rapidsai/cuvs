@@ -499,16 +499,14 @@ if(BUILD_SHARED_LIBS)
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
   target_link_libraries(
-    cuvs_objs
-    PUBLIC raft::raft rmm::rmm rmm::rmm_logger ${CUVS_CTK_MATH_DEPENDENCIES}
-           $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-    PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl
+    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 
-  add_library(cuvs SHARED $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+  add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
 
   if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
-    add_library(cuvs_static STATIC $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
   endif()
 
   target_compile_options(
@@ -731,7 +729,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft rmm::rmm_logger_impl raft::raft_logger_impl
+      PRIVATE raft::raft
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
