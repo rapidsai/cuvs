@@ -77,11 +77,11 @@ void cross_component_nn(
   raft::sparse::COO<value_t, value_idx>& out,
   const value_t* X,
   const value_idx* orig_colors,
-  size_t n_rows,
-  size_t n_cols,
+  value_idx n_rows,
+  value_idx n_cols,
   red_op reduction_op,
-  size_t row_batch_size               = 0,
-  size_t col_batch_size               = 0,
+  value_idx row_batch_size            = 0,
+  value_idx col_batch_size            = 0,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   detail::cross_component_nn(handle,
