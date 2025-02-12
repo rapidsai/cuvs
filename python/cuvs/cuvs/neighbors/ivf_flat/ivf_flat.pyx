@@ -34,6 +34,7 @@ from pylibraft.common.interruptible import cuda_interruptible
 
 from cuvs.distance import DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
+from cuvs.neighbors.filters import no_filter
 
 from libc.stdint cimport (
     int8_t,
@@ -274,7 +275,8 @@ def search(SearchParams search_params,
            k,
            neighbors=None,
            distances=None,
-           resources=None):
+           resources=None,
+           filter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -293,6 +295,8 @@ def search(SearchParams search_params,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    filter:     Optional cuvs.neighbors.cuvsFilter can be used to filter
+                neighbors based on a given bitset. (default None)
     {resources_docstring}
 
     Examples
@@ -339,6 +343,9 @@ def search(SearchParams search_params,
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
 
+    if filter is None:
+        filter = no_filter()
+
     cdef cuvsIvfFlatSearchParams* params = search_params.params
     cdef cuvsError_t search_status
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
@@ -356,7 +363,8 @@ def search(SearchParams search_params,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            filter.prefilter
         ))
 
     return (distances, neighbors)

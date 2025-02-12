@@ -28,6 +28,7 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
     ctypedef enum cuvsHnswHierarchy:
         NONE
         CPU
+        GPU
 
     ctypedef struct cuvsHnswIndexParams:
         cuvsHnswHierarchy hierarchy

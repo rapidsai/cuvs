@@ -67,8 +67,12 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
     search_params->n_probes = 50;
 
     // Search the `index` built using `ivfFlatBuild`
+    cuvsFilter filter;
+    filter.type = NO_FILTER;
+    filter.addr = (uintptr_t)NULL;
+
     cuvsError_t search_status = cuvsIvfFlatSearch(*res, search_params, index,
-     queries_tensor, &neighbors_tensor, &distances_tensor);
+     queries_tensor, &neighbors_tensor, &distances_tensor, filter);
     if (build_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
     }
@@ -165,8 +169,11 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
     search_params->n_probes = 10;
 
     // Search the `index` built using `ivfFlatBuild`
+    cuvsFilter filter;
+    filter.type = NO_FILTER;
+    filter.addr = (uintptr_t)NULL;
     cuvsError_t search_status = cuvsIvfFlatSearch(*res, search_params, index,
-     queries_tensor, &neighbors_tensor, &distances_tensor);
+     queries_tensor, &neighbors_tensor, &distances_tensor, filter);
     if (search_status != CUVS_SUCCESS) {
         printf("%s.\n", cuvsGetLastErrorText());
         exit(-1);

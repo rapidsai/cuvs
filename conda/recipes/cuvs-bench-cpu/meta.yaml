@@ -56,11 +56,12 @@ requirements:
     - click
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
-    - matplotlib
+    - matplotlib-base
     - numpy >=1.23,<3.0a0
     - pandas
     - pyyaml
     - python
+    - requests
 about:
   home: https://rapids.ai/
   license: Apache-2.0
