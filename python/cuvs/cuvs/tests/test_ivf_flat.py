@@ -20,7 +20,11 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
 from cuvs.neighbors import ivf_flat
-from cuvs.tests.ann_utils import calc_recall, generate_data
+from cuvs.tests.ann_utils import (
+    calc_recall,
+    generate_data,
+    run_filtered_search_test,
+)
 
 
 def run_ivf_flat_build_search_test(
@@ -129,3 +133,8 @@ def test_extend(dtype):
         dtype=dtype,
         add_data_on_build=False,
     )
+
+
+@pytest.mark.parametrize("sparsity", [0.5, 0.7, 1.0])
+def test_filtered_ivf_flat(sparsity):
+    run_filtered_search_test(ivf_flat, sparsity)
