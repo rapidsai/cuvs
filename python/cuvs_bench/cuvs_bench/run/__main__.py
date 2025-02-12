@@ -80,6 +80,14 @@ from .run import run_benchmark
     "RAPIDS_DATASET_ROOT_DIR if defined, otherwise a datasets "
     "subdirectory from the calling directory.",
 )
+@click.option(
+    "--executable-dir",
+    default=None,
+    show_default=True,
+    prompt="Enter the name of the folder that contains the executables",
+    help="Path to executable folder, by default we will look in "
+    "$CUVS_HOME/cpp/build/release and $CONDA_PREFIX/bin/ann.",
+)
 @click.option("--build", is_flag=True, help="Build the index")
 @click.option("--search", is_flag=True, help="Perform the search")
 @click.option(
@@ -158,6 +166,7 @@ def main(
     configuration: Optional[str],
     dataset: str,
     dataset_path: str,
+    executable_dir: str,
     build: bool,
     search: bool,
     algorithms: Optional[str],

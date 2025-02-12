@@ -211,6 +211,7 @@ def prepare_executables(
     algos_yaml: dict,
     gpu_present: bool,
     conf_file: dict,
+    executable_dir: str,
     dataset_path: str,
     dataset: str,
     count: int,
@@ -249,7 +250,7 @@ def prepare_executables(
         validate_algorithm(algos_yaml, algo, gpu_present)
         for group, group_conf in algo_conf["groups"].items():
             executable = find_executable(
-                algos_yaml, algo, group, count, batch_size
+                algos_yaml, algo, group, count, batch_size, executable_dir
             )
             if executable not in executables_to_run:
                 executables_to_run[executable] = {"index": []}
@@ -296,7 +297,7 @@ def validate_algorithm(algos_conf: dict, algo: str, gpu_present: bool) -> bool:
 
 
 def find_executable(
-    algos_conf: dict, algo: str, group: str, k: int, batch_size: int
+    algos_conf: dict, algo: str, group: str, k: int, batch_size: int, executable_dir: str
 ) -> Tuple[str, str, Tuple[str, str]]:
     """
     Find the executable for the given algorithm and group.
@@ -322,13 +323,13 @@ def find_executable(
     """
     executable = algos_conf[algo]["executable"]
     file_name = (f"{algo},{group}", f"{algo},{group},k{k},bs{batch_size}")
-    build_path = get_build_path(executable)
+    build_path = get_build_path(executable, executable_dir)
     if build_path:
         return executable, build_path, file_name
     raise FileNotFoundError(executable)
 
 
-def get_build_path(executable: str) -> Optional[str]:
+def get_build_path(executable: str, executable_dir: str) -> Optional[str]:
     """
     Get the build path for the given executable.
 
@@ -342,6 +343,11 @@ def get_build_path(executable: str) -> Optional[str]:
     Optional[str]
         The build path for the executable, if found.
     """
+    if executable_dir is not None:
+        build_path = os.path.join(executable_dir, executable)
+        if os.path.exists(build_path):
+            print(f"-- Using cuVS bench from {build_path}.")
+            return build_path
 
     devcontainer_path = "/home/coder/cuvs/cpp/build/latest/bench/ann"
     if os.path.exists(devcontainer_path):
@@ -354,7 +360,7 @@ def get_build_path(executable: str) -> Optional[str]:
             build_path, "cpp", "build", "release", executable
         )
         if os.path.exists(build_path):
-            print(f"-- Using RAFT bench from repository in {build_path}.")
+            print(f"-- Using cuVS bench from repository in {build_path}.")
             return build_path
 
     conda_path = os.getenv("CONDA_PREFIX")
@@ -576,6 +582,7 @@ def run_benchmark(
     configuration: Optional[str],
     dataset: str,
     dataset_path: str,
+    executable_dir: str,
     build: Optional[bool],
     search: Optional[bool],
     algorithms: Optional[str],
@@ -664,6 +671,7 @@ def run_benchmark(
         ),
         gpu_present,
         conf_file,
+        executable_dir,
         dataset_path,
         dataset,
         count,
