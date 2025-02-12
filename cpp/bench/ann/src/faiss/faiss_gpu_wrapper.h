@@ -541,6 +541,8 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     config.graph_degree              = param.graph_degree;
     config.intermediate_graph_degree = param.intermediate_graph_degree;
     config.device                    = this->device_;
+    // The dataset is serialized along with then HNSW index. No need to store it in the index.
+    config.store_dataset = false;
     if (param.cagra_build_algo == "IVF_PQ") {
       config.build_algo = faiss::gpu::graph_build_algo::IVF_PQ;
     } else {
