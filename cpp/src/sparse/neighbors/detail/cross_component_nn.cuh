@@ -449,17 +449,17 @@ void min_components_by_color(raft::sparse::COO<value_t, value_idx>& coo,
  * is done
  * @param[in] metric distance metric
  */
-template <typename value_idx, typename value_t, typename red_op>
+template <typename value_idx, typename value_t, typename red_op, typename nnz_t = size_t>
 void cross_component_nn(
   raft::resources const& handle,
-  raft::sparse::COO<value_t, value_idx>& out,
+  raft::sparse::COO<value_t, value_idx, nnz_t>& out,
   const value_t* X,
   const value_idx* orig_colors,
-  size_t n_rows,
-  size_t n_cols,
+  value_idx n_rows,
+  value_idx n_cols,
   red_op reduction_op,
-  size_t row_batch_size,
-  size_t col_batch_size,
+  value_idx row_batch_size,
+  value_idx col_batch_size,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -520,13 +520,14 @@ void cross_component_nn(
                          out_index.data());
 
   // compute final size
-  value_idx size = 0;
-  raft::update_host(&size, out_index.data() + (out_index.size() - 1), 1, stream);
+  value_idx size_int = 0;
+  raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
+  nnz_t size = static_cast<nnz_t>(size_int);
 
   size++;
 
-  raft::sparse::COO<value_t, value_idx> min_edges(stream);
+  raft::sparse::COO<value_t, value_idx, nnz_t> min_edges(stream);
   min_edges.allocate(size, n_rows, n_rows, true, stream);
 
   min_components_by_color(
