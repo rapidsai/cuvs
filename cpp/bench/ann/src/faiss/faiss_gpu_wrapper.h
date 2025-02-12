@@ -563,7 +563,13 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
 
   void save(const std::string& file) const override
   {
-    this->template save_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
+    omp_single_thread_scope omp_single_thread;
+
+    auto cpu_hnsw_index = std::make_unique<faiss::IndexHNSWCagra>();
+    // Only add the base HNSW layer to serialize the CAGRA index.
+    cpu_hnsw_index->base_level_only = true;
+    this->index_->copyTo(cpu_hnsw_index.get());
+    faiss::write_index(cpu_hnsw_index.get(), file.c_str());
   }
   void load(const std::string& file) override
   {
