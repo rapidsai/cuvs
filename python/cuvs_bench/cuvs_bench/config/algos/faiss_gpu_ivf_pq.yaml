@@ -74,3 +74,15 @@ groups:
     search:
       nprobe: [20, 30, 40, 50, 100, 200, 500, 1000]
       refine_ratio: [1, 2, 4]
+  test:
+    build:
+      nlist: [1024]
+      M: [96]
+      ratio: [4]
+      usePrecomputed: [True]
+      useFloat16: [True]
+      use_cuvs: [False]
+      bitsPerCode: [8]
+    search:
+      nprobe: [10]
+      refine_ratio: [1, 2]
