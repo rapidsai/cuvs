@@ -298,7 +298,12 @@ def validate_algorithm(algos_conf: dict, algo: str, gpu_present: bool) -> bool:
 
 
 def find_executable(
-    algos_conf: dict, algo: str, group: str, k: int, batch_size: int, executable_dir: str
+    algos_conf: dict,
+    algo: str,
+    group: str,
+    k: int,
+    batch_size: int,
+    executable_dir: str,
 ) -> Tuple[str, str, Tuple[str, str]]:
     """
     Find the executable for the given algorithm and group.

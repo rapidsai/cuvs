@@ -223,7 +223,7 @@ The usage of `python -m cuvs_bench.split_groundtruth` is:
 Testing on new datasets
 -----------------------
 
-To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that datase. 
+To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that datase.
 Descriptors for several popular datasets are already available in `datasets.yaml <https://github.com/rapidsai/cuvs/blob/branch-25.04/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml>``.
 
 Let's consider how to test on a new dataset. First we create a descriptor `mydataset.yaml`
@@ -237,7 +237,7 @@ Let's consider how to test on a new dataset. First we create a descriptor `mydat
       groundtruth_neighbors_file: mydata-1M/groundtruth.neighbors.ibin
       distance: euclidean
 
-Here `name` can be chosen arbitrarily. We pass `name` as the `--dataset` argument for the benchmark. The file names are relative to the path given by `--dataset-path` argument. 
+Here `name` can be chosen arbitrarily. We pass `name` as the `--dataset` argument for the benchmark. The file names are relative to the path given by `--dataset-path` argument.
 The `subset_size`` field is optional. This argument defines how many vectors to use from the dataset file, the first `subset_size` vectors will be used.
 This way you can define benchmarks on multiple subsets of the same dataset without duplicating the dataset vectors.
 Note that the ground truth vectors have to be generated for each subset separately.
@@ -245,7 +245,7 @@ Note that the ground truth vectors have to be generated for each subset separate
 To run the benchmark on the newly defined `mydata-1M` dataset, you can use the following command line:
 
 .. code-black: bash
-  python -m cuvs_bench.run --dataset mydata-1M --dataset-path=/path/to/data/folder --dataset-configuration=mydataset.yaml  --algorithms=cuvs_cagra 
+  python -m cuvs_bench.run --dataset mydata-1M --dataset-path=/path/to/data/folder --dataset-configuration=mydataset.yaml  --algorithms=cuvs_cagra
 
 Running with Docker containers
 ------------------------------
