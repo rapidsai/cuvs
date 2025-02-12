@@ -67,7 +67,8 @@ void _search(cuvsResources_t res,
              cuvsIvfFlatIndex index,
              DLManagedTensor* queries_tensor,
              DLManagedTensor* neighbors_tensor,
-             DLManagedTensor* distances_tensor)
+             DLManagedTensor* distances_tensor,
+             cuvsFilter filter)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_flat::index<T, IdxT>*>(index.addr);
@@ -82,8 +83,27 @@ void _search(cuvsResources_t res,
   auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
 
-  cuvs::neighbors::ivf_flat::search(
-    *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+  if (filter.type == NO_FILTER) {
+    cuvs::neighbors::ivf_flat::search(
+      *res_ptr, search_params, *index_ptr, queries_mds, neighbors_mds, distances_mds);
+  } else if (filter.type == BITSET) {
+    using filter_mdspan_type    = raft::device_vector_view<std::uint32_t, int64_t, raft::row_major>;
+    auto removed_indices_tensor = reinterpret_cast<DLManagedTensor*>(filter.addr);
+    auto removed_indices = cuvs::core::from_dlpack<filter_mdspan_type>(removed_indices_tensor);
+    cuvs::core::bitset_view<std::uint32_t, int64_t> removed_indices_bitset(removed_indices,
+                                                                           index_ptr->size());
+    auto bitset_filter_obj = cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset);
+    cuvs::neighbors::ivf_flat::search(*res_ptr,
+                                      search_params,
+                                      *index_ptr,
+                                      queries_mds,
+                                      neighbors_mds,
+                                      distances_mds,
+                                      bitset_filter_obj);
+
+  } else {
+    RAFT_FAIL("Unsupported filter type: BITMAP");
+  }
 }
 
 template <typename T, typename IdxT>
@@ -179,7 +199,9 @@ extern "C" cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
                                          cuvsIvfFlatIndex_t index_c_ptr,
                                          DLManagedTensor* queries_tensor,
                                          DLManagedTensor* neighbors_tensor,
-                                         DLManagedTensor* distances_tensor)
+                                         DLManagedTensor* distances_tensor,
+                                         cuvsFilter filter)
+
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries   = queries_tensor->dl_tensor;
@@ -203,13 +225,13 @@ extern "C" cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _search<float, int64_t>(
-        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
       _search<int8_t, int64_t>(
-        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
       _search<uint8_t, int64_t>(
-        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else {
       RAFT_FAIL("Unsupported queries DLtensor dtype: %d and bits: %d",
                 queries.dtype.code,

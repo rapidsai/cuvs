@@ -85,7 +85,7 @@ def run_hnsw_build_search_test(
 @pytest.mark.parametrize("num_threads", [2, 4])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-@pytest.mark.parametrize("hierarchy", ["none", "cpu"])
+@pytest.mark.parametrize("hierarchy", ["none", "cpu", "gpu"])
 def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
@@ -111,6 +111,7 @@ def run_hnsw_extend_test(
     intermediate_graph_degree=128,
     graph_degree=64,
     search_params={},
+    hierarchy="cpu",
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     add_dataset = generate_data((add_rows, n_cols), dtype)
@@ -135,7 +136,7 @@ def run_hnsw_extend_test(
 
     assert index.trained
 
-    hnsw_params = hnsw.IndexParams(hierarchy="cpu")
+    hnsw_params = hnsw.IndexParams(hierarchy=hierarchy)
     hnsw_index = hnsw.from_cagra(hnsw_params, index)
     hnsw.extend(hnsw.ExtendParams(), hnsw_index, add_dataset)
 
@@ -167,7 +168,8 @@ def run_hnsw_extend_test(
 @pytest.mark.parametrize("num_threads", [2, 4])
 @pytest.mark.parametrize("metric", ["sqeuclidean"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-def test_hnsw_extend(dtype, k, ef, num_threads, metric, build_algo):
+@pytest.mark.parametrize("hierarchy", ["cpu", "gpu"])
+def test_hnsw_extend(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_hnsw_extend_test(
@@ -176,4 +178,5 @@ def test_hnsw_extend(dtype, k, ef, num_threads, metric, build_algo):
         metric=metric,
         build_algo=build_algo,
         search_params={"ef": ef, "num_threads": num_threads},
+        hierarchy=hierarchy,
     )
