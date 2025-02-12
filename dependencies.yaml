@@ -571,6 +571,16 @@ dependencies:
       - output_types: [requirements, pyproject]
         packages:
           - matplotlib
+  depends_on_cuvs:
+    common:
+      - output_types: conda
+        packages:
+          - cuvs==25.4.*,>=0.0.0a0
+  depends_on_cuvs_bench:
+    common:
+      - output_types: conda
+        packages:
+          - cuvs-bench==25.4.*,>=0.0.0a0
   depends_on_libcuvs:
     common:
       - output_types: conda
@@ -595,16 +605,6 @@ dependencies:
             packages:
               - libcuvs-cu11==25.4.*,>=0.0.0a0
           - {matrix: null, packages: [*libcuvs_unsuffixed]}
-  depends_on_cuvs:
-    common:
-      - output_types: conda
-        packages:
-          - cuvs==25.4.*,>=0.0.0a0
-  depends_on_cuvs_bench:
-    common:
-      - output_types: conda
-        packages:
-          - cuvs-bench==25.4.*,>=0.0.0a0
   depends_on_libcuvs_tests:
     common:
       - output_types: conda
