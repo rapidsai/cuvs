@@ -81,10 +81,10 @@ template<>
 inline float euclidean_distance_squared<distance_comp_l2, float, float>(
   float const* a, float const* b, size_t n) {
 
-  int n_rounded = n - (n % 4);
+  size_t n_rounded = n - (n % 4);
 
   float32x4_t vreg_dsum = vdupq_n_f32(0.f);
-  for (int i = 0; i < n_rounded; i += 4) {
+  for (size_t i = 0; i < n_rounded; i += 4) {
     float32x4_t vreg_a = vld1q_f32(&a[i]);
     float32x4_t vreg_b = vld1q_f32(&b[i]);
     float32x4_t vreg_d = vsubq_f32(vreg_a, vreg_b);
@@ -92,7 +92,7 @@ inline float euclidean_distance_squared<distance_comp_l2, float, float>(
   }
 
   float dsum = vaddvq_f32(vreg_dsum);
-  for (int i = n_rounded; i < n; ++i) {
+  for (size_t i = n_rounded; i < n; ++i) {
       float d = a[i] - b[i];
       dsum += d * d;
   }
@@ -104,7 +104,7 @@ template<>
 inline float euclidean_distance_squared<distance_comp_l2, float, ::std::int8_t>(
   ::std::int8_t const* a, ::std::int8_t const* b, size_t n) {
 
-  int n_rounded = n - (n % 16);
+  size_t n_rounded = n - (n % 16);
   float dsum = 0.f;
 
   if (n_rounded > 0) {
@@ -113,7 +113,7 @@ inline float euclidean_distance_squared<distance_comp_l2, float, ::std::int8_t>(
     float32x4_t vreg_dsum_fp32_2 = vreg_dsum_fp32_0;
     float32x4_t vreg_dsum_fp32_3 = vreg_dsum_fp32_0;
 
-    for (int i = 0; i < n_rounded; i += 16) {
+    for (size_t i = 0; i < n_rounded; i += 16) {
       int8x16_t vreg_a = vld1q_s8(&a[i]);
       int16x8_t vreg_a_s16_0 = vmovl_s8(vget_low_s8(vreg_a));
       int16x8_t vreg_a_s16_1 = vmovl_s8(vget_high_s8(vreg_a));
@@ -143,7 +143,7 @@ inline float euclidean_distance_squared<distance_comp_l2, float, ::std::int8_t>(
     dsum = vaddvq_f32(vreg_dsum_fp32_0); // faddp
   }
 
-  for (int i = n_rounded; i < n; ++i) {
+  for (size_t i = n_rounded; i < n; ++i) {
       float d = a[i] - b[i];
       dsum += d * d; // [nvc++] faddp, [clang] fadda, [gcc] vecsum+fadda
   }
@@ -155,7 +155,7 @@ template<>
 inline float euclidean_distance_squared<distance_comp_l2, float, ::std::uint8_t>(
   ::std::uint8_t const* a, ::std::uint8_t const* b, size_t n) {
 
-  int n_rounded = n - (n % 16);
+  size_t n_rounded = n - (n % 16);
   float dsum = 0.f;
 
   if (n_rounded > 0) {
@@ -164,7 +164,7 @@ inline float euclidean_distance_squared<distance_comp_l2, float, ::std::uint8_t>
     float32x4_t vreg_dsum_fp32_2 = vreg_dsum_fp32_0;
     float32x4_t vreg_dsum_fp32_3 = vreg_dsum_fp32_0;
 
-    for (int i = 0; i < n_rounded; i += 16) {
+    for (size_t i = 0; i < n_rounded; i += 16) {
       uint8x16_t vreg_a = vld1q_u8(&a[i]);
       uint16x8_t vreg_a_u16_0 = vmovl_u8(vget_low_u8(vreg_a));
       uint16x8_t vreg_a_u16_1 = vmovl_u8(vget_high_u8(vreg_a));
@@ -199,7 +199,7 @@ inline float euclidean_distance_squared<distance_comp_l2, float, ::std::uint8_t>
     dsum = vaddvq_f32(vreg_dsum_fp32_0); // faddp
   }
 
-  for (int i = n_rounded; i < n; ++i) {
+  for (size_t i = n_rounded; i < n; ++i) {
       float d = a[i] - b[i];
       dsum += d * d; // [nvc++] faddp, [clang] fadda, [gcc] vecsum+fadda
   }
@@ -211,10 +211,10 @@ template<>
 inline float euclidean_distance_squared<distance_comp_inner, float, float>(
   float const* a, float const* b, size_t n) {
 
-  int n_rounded = n - (n % 4);
+  size_t n_rounded = n - (n % 4);
 
   float32x4_t vreg_dsum = vdupq_n_f32(0.f);
-  for (int i = 0; i < n_rounded; i += 4) {
+  for (size_t i = 0; i < n_rounded; i += 4) {
     float32x4_t vreg_a = vld1q_f32(&a[i]);
     float32x4_t vreg_b = vld1q_f32(&b[i]);
     vreg_a = vnegq_f32(vreg_a);
@@ -222,7 +222,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, float>(
   }
 
   float dsum = vaddvq_f32(vreg_dsum);
-  for (int i = n_rounded; i < n; ++i) {
+  for (size_t i = n_rounded; i < n; ++i) {
       dsum += -a[i] * b[i];
   }
 
@@ -233,7 +233,7 @@ template<>
 inline float euclidean_distance_squared<distance_comp_inner, float, ::std::int8_t>(
   ::std::int8_t const* a, ::std::int8_t const* b, size_t n) {
 
-  int n_rounded = n - (n % 16);
+  size_t n_rounded = n - (n % 16);
   float dsum = 0.f;
 
   if (n_rounded > 0) {
@@ -242,7 +242,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::int8_
     float32x4_t vreg_dsum_fp32_2 = vreg_dsum_fp32_0;
     float32x4_t vreg_dsum_fp32_3 = vreg_dsum_fp32_0;
 
-    for (int i = 0; i < n_rounded; i += 16) {
+    for (size_t i = 0; i < n_rounded; i += 16) {
       int8x16_t vreg_a = vld1q_s8(&a[i]);
       int16x8_t vreg_a_s16_0 = vmovl_s8(vget_low_s8(vreg_a));
       int16x8_t vreg_a_s16_1 = vmovl_s8(vget_high_s8(vreg_a));
@@ -272,7 +272,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::int8_
     dsum = vaddvq_f32(vreg_dsum_fp32_0); // faddp
   }
 
-  for (int i = n_rounded; i < n; ++i) {
+  for (size_t i = n_rounded; i < n; ++i) {
       dsum += -a[i] * b[i];
   }
 
@@ -281,7 +281,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::int8_
 
 template<>
 inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8_t>(::std::uint8_t const* a, ::std::uint8_t const* b, size_t n) {
-  int n_rounded = n - (n % 16);
+  size_t n_rounded = n - (n % 16);
   float dsum = 0.f;
 
   if (n_rounded > 0) {
@@ -290,7 +290,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8
     float32x4_t vreg_dsum_fp32_2 = vreg_dsum_fp32_0;
     float32x4_t vreg_dsum_fp32_3 = vreg_dsum_fp32_0;
 
-    for (int i = 0; i < n_rounded; i += 16) {
+    for (size_t i = 0; i < n_rounded; i += 16) {
       uint8x16_t vreg_a = vld1q_u8(&a[i]);
       uint16x8_t vreg_a_u16_0 = vmovl_u8(vget_low_u8(vreg_a));
       uint16x8_t vreg_a_u16_1 = vmovl_u8(vget_high_u8(vreg_a));
@@ -320,7 +320,7 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8
     dsum = vaddvq_f32(vreg_dsum_fp32_0); // faddp
   }
 
-  for (int i = n_rounded; i < n; ++i) {
+  for (size_t i = n_rounded; i < n; ++i) {
       dsum += -a[i] * b[i];
   }
 
