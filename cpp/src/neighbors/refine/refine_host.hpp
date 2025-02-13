@@ -39,17 +39,14 @@ namespace detail {
 
 template <typename DC, typename DistanceT, typename DataT>
 DistanceT euclidean_distance_squared_generic(DataT const* a, DataT const* b, size_t n) {
-  // vector register capacity in elements
-  size_t constexpr vreg_len = (128 / 8) / sizeof(DistanceT);
-  // unroll factor = vector register capacity * number of ports;
-  size_t constexpr unroll_factor = vreg_len * 4;
+  size_t constexpr max_vreg_len = 512 / (8 * sizeof(DistanceT));
 
-  // unroll factor is a power of two
-  size_t n_rounded = n & (0xFFFFFFFF ^ (unroll_factor - 1));
-  DistanceT distance[unroll_factor] = {0};
+  // max_vreg_len is a power of two
+  size_t n_rounded = n & (0xFFFFFFFF ^ (max_vreg_len - 1));
+  DistanceT distance[max_vreg_len] = {0};
 
-  for (size_t i = 0; i < n_rounded; i += unroll_factor) {
-    for (size_t j = 0; j < unroll_factor; ++j) {
+  for (size_t i = 0; i < n_rounded; i += max_vreg_len) {
+    for (size_t j = 0; j < max_vreg_len; ++j) {
       distance[j] += DC::template eval<DistanceT>(a[i + j], b[i + j]);
     }
   }
@@ -58,7 +55,7 @@ DistanceT euclidean_distance_squared_generic(DataT const* a, DataT const* b, siz
     distance[i] += DC::template eval<DistanceT>(a[i], b[i]);
   }
 
-  for (size_t i = 1; i < unroll_factor; ++i) {
+  for (size_t i = 1; i < max_vreg_len; ++i) {
     distance[0] += distance[i];
   }
 
