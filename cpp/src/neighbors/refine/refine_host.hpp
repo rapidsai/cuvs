@@ -251,7 +251,6 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::int8_
       int16x8_t vreg_b_s16_0 = vmovl_s8(vget_low_s8(vreg_b));
       int16x8_t vreg_b_s16_1 = vmovl_s8(vget_high_s8(vreg_b));
 
-      # if 1
       vreg_a_s16_0 = vmulq_s16(vreg_a_s16_0, vreg_b_s16_0);
       vreg_a_s16_1 = vmulq_s16(vreg_a_s16_1, vreg_b_s16_1);
 
@@ -264,24 +263,6 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::int8_
       vreg_dsum_fp32_1 = vsubq_f32(vreg_dsum_fp32_1, vreg_res_fp32_1);
       vreg_dsum_fp32_2 = vsubq_f32(vreg_dsum_fp32_2, vreg_res_fp32_2);
       vreg_dsum_fp32_3 = vsubq_f32(vreg_dsum_fp32_3, vreg_res_fp32_3);
-      #else
-      // TODO: WILL BE REMOVED BEFORE MERGE
-      vreg_a_s16_0 = vnegq_s16(vreg_a_s16_0);
-      vreg_a_s16_1 = vnegq_s16(vreg_a_s16_1);
-
-      float32x4_t vreg_a_fp32_0 = vcvtq_f32_s32(vmovl_s16(vget_low_s16(vreg_a_s16_0)));
-      float32x4_t vreg_b_fp32_0 = vcvtq_f32_s32(vmovl_s16(vget_low_s16(vreg_b_s16_0)));
-      vreg_dsum_fp32_0 = vfmaq_f32(vreg_dsum_fp32_0, vreg_a_fp32_0, vreg_b_fp32_0);
-      float32x4_t vreg_a_fp32_1 = vcvtq_f32_s32(vmovl_s16(vget_high_s16(vreg_a_s16_0)));
-      float32x4_t vreg_b_fp32_1 = vcvtq_f32_s32(vmovl_s16(vget_high_s16(vreg_b_s16_0)));
-      vreg_dsum_fp32_1 = vfmaq_f32(vreg_dsum_fp32_1, vreg_a_fp32_1, vreg_b_fp32_1);
-      float32x4_t vreg_a_fp32_2 = vcvtq_f32_s32(vmovl_s16(vget_low_s16(vreg_a_s16_1)));
-      float32x4_t vreg_b_fp32_2 = vcvtq_f32_s32(vmovl_s16(vget_low_s16(vreg_b_s16_1)));
-      vreg_dsum_fp32_2 = vfmaq_f32(vreg_dsum_fp32_2, vreg_a_fp32_2, vreg_b_fp32_2);
-      float32x4_t vreg_a_fp32_3 = vcvtq_f32_s32(vmovl_s16(vget_high_s16(vreg_a_s16_1)));
-      float32x4_t vreg_b_fp32_3 = vcvtq_f32_s32(vmovl_s16(vget_high_s16(vreg_b_s16_1)));
-      vreg_dsum_fp32_3 = vfmaq_f32(vreg_dsum_fp32_3, vreg_a_fp32_3, vreg_b_fp32_3);
-      #endif
     }
 
     vreg_dsum_fp32_0 = vaddq_f32(vreg_dsum_fp32_0, vreg_dsum_fp32_1);
