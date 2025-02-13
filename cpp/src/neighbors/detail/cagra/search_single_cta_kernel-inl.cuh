@@ -28,7 +28,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
@@ -64,7 +64,6 @@
 
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
-using raft::RAFT_NAME;  // TODO: this is required for RAFT_LOG_XXX messages.
 
 // #define _CLK_BREAKDOWN
 
@@ -622,7 +621,9 @@ __device__ void search_core(
                                            local_seed_ptr,
                                            num_seeds,
                                            local_visited_hashmap_ptr,
-                                           hash_bitlen);
+                                           hash_bitlen,
+                                           (INDEX_T*)nullptr,
+                                           0);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
@@ -749,6 +750,8 @@ __device__ void search_core(
                                             graph_degree,
                                             local_visited_hashmap_ptr,
                                             hash_bitlen,
+                                            (INDEX_T*)nullptr,
+                                            0,
                                             parent_list_buffer,
                                             result_indices_buffer,
                                             search_width);

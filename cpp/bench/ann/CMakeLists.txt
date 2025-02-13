@@ -20,6 +20,7 @@ list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA "Include faiss' cagra algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
        ON
@@ -126,9 +127,11 @@ function(ConfigureAnnBench)
     PRIVATE ${ConfigureAnnBench_LINKS}
             nlohmann_json::nlohmann_json
             Threads::Threads
+            $<TARGET_NAME_IF_EXISTS:raft::raft_logger>
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
+            $<TARGET_NAME_IF_EXISTS:cuvs_bench_logger>
   )
 
   set_target_properties(
@@ -173,6 +176,13 @@ function(ConfigureAnnBench)
 
   add_dependencies(CUVS_ANN_BENCH_ALL ${BENCH_NAME})
 endfunction()
+
+if(CUVS_FAISS_ENABLE_GPU OR CUVS_ANN_BENCH_SINGLE_EXE)
+  add_library(cuvs_bench_logger OBJECT)
+  target_link_libraries(
+    cuvs_bench_logger PRIVATE rmm::rmm_logger_impl $<TARGET_NAME_IF_EXISTS:raft::raft_logger>
+  )
+endif()
 
 # ##################################################################################################
 # * Configure benchmark targets -------------------------------------------------------------
@@ -266,18 +276,28 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_PQ PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA AND CUVS_FAISS_ENABLE_GPU)
+  ConfigureAnnBench(
+    NAME FAISS_GPU_CAGRA PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
   )
 endif()
 
@@ -297,8 +317,14 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
 
   target_link_libraries(
     ANN_BENCH
-    PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl fmt::fmt-header-only
-            spdlog::spdlog_header_only $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
+    PRIVATE raft::raft
+            nlohmann_json::nlohmann_json
+            benchmark::benchmark
+            dl
+            fmt::fmt-header-only
+            spdlog::spdlog_header_only
+            $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
+            cuvs_bench_logger
   )
   set_target_properties(
     ANN_BENCH

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -110,7 +110,8 @@ def clean_algo_name(algo_name):
         Cleaned algorithm name.
     """
 
-    return algo_name[0] if "base" in algo_name[1] else "_".join(algo_name)
+    name = algo_name[0] if "base" in algo_name[1] else "_".join(algo_name)
+    return name.removesuffix(".json")
 
 
 def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
@@ -138,6 +139,7 @@ def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
             "time": df["real_time"],
         }
     )
+
     # Add extra columns if provided
     if extra_columns:
         for col in extra_columns:
@@ -256,11 +258,13 @@ def create_pointset(data, xn, yn):
         Filtered list of data points sorted by x and y metrics.
     """
     xm, ym = metrics[xn], metrics[yn]
+    y_col = 4 if yn == "latency" else 3
+
     rev_x, rev_y = (-1 if xm["worst"] < 0 else 1), (
         -1 if ym["worst"] < 0 else 1
     )
     # Sort data based on x and y metrics
-    data.sort(key=lambda t: (rev_y * t[4], rev_x * t[2]))
+    data.sort(key=lambda t: (rev_y * t[y_col], rev_x * t[2]))
     lines = []
     last_x = xm["worst"]
     comparator = (

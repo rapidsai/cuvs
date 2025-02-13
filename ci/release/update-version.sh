@@ -28,6 +28,7 @@ NEXT_UCXX_SHORT_TAG="$(curl -sL https://version.gpuci.io/rapids/${NEXT_SHORT_TAG
 # Need to distutils-normalize the original version
 NEXT_SHORT_TAG_PEP440=$(python -c "from packaging.version import Version; print(Version('${NEXT_SHORT_TAG}'))")
 NEXT_UCXX_SHORT_TAG_PEP440=$(python -c "from packaging.version import Version; print(Version('${NEXT_UCXX_SHORT_TAG}'))")
+PATCH_PEP440=$(python -c "from packaging.version import Version; print(Version('${NEXT_PATCH}'))")
 
 echo "Preparing release $CURRENT_TAG => $NEXT_FULL_TAG"
 
@@ -44,8 +45,10 @@ echo "${NEXT_FULL_TAG}" > VERSION
 DEPENDENCIES=(
   dask-cuda
   cuvs
-  pylibraft
+  libcuvs
+  libraft
   librmm
+  pylibraft
   rmm
   rapids-dask-dependency
 )
@@ -76,6 +79,10 @@ done
 sed_runner "/rapidsai\/raft/ s|branch-[0-9][0-9].[0-9][0-9]|branch-${NEXT_SHORT_TAG}|g" docs/source/developer_guide.md
 
 sed_runner "s|=[0-9][0-9].[0-9][0-9]|=${NEXT_SHORT_TAG}|g" README.md
+sed_runner "s|branch-[0-9][0-9].[0-9][0-9]|branch-${NEXT_SHORT_TAG}|g" README.md
+
+# references to license files
+sed_runner "s|branch-[0-9][0-9].[0-9][0-9]|branch-${NEXT_SHORT_TAG}|g" python/cuvs_bench/cuvs_bench/plot/__main__.py
 
 # rust can't handle leading 0's in the major/minor/patch version - remove
 NEXT_FULL_RUST_TAG=$(printf "%d.%d.%d" $((10#$NEXT_MAJOR)) $((10#$NEXT_MINOR)) $((10#$NEXT_PATCH)))
@@ -89,4 +96,11 @@ find .devcontainer/ -type f -name devcontainer.json -print0 | while IFS= read -r
     sed_runner "s@rapidsai/devcontainers/features/cuda:[0-9.]*@rapidsai/devcontainers/features/cuda:${NEXT_SHORT_TAG_PEP440}@" "${filename}"
     sed_runner "s@rapidsai/devcontainers/features/rapids-build-utils:[0-9.]*@rapidsai/devcontainers/features/rapids-build-utils:${NEXT_SHORT_TAG_PEP440}@" "${filename}"
     sed_runner "s@rapids-\${localWorkspaceFolderBasename}-${CURRENT_SHORT_TAG}@rapids-\${localWorkspaceFolderBasename}-${NEXT_SHORT_TAG}@g" "${filename}"
+done
+
+# Update Java API version
+NEXT_FULL_JAVA_TAG="${NEXT_SHORT_TAG}.${PATCH_PEP440}"
+sed_runner "s/VERSION=\".*\"/VERSION=\"${NEXT_FULL_JAVA_TAG}\"/g" java/build.sh
+for FILE in java/*/pom.xml; do
+  sed_runner "/<!--CUVS_JAVA#VERSION_UPDATE_MARKER_START-->.*<!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->/s//<!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>${NEXT_FULL_JAVA_TAG}<\/version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->/g" "${FILE}"
 done

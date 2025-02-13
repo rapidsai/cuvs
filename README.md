@@ -29,9 +29,9 @@ cuVS contains state-of-the-art implementations of several algorithms for running
 
 Vector search is an information retrieval method that has been growing in popularity over the past few  years, partly because of the rising importance of multimedia embeddings created from unstructured data and the need to perform semantic search on the embeddings to find items which are semantically similar to each other.
 
-Vector search is also used in _data mining and machine learning_ tasks and comprises an important step in many _clustering_ and _visualization_ algorithms like [UMAP](https://arxiv.org/abs/2008.00325), [t-SNE](https://lvdmaaten.github.io/tsne/), K-means, and [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html). 
+Vector search is also used in _data mining and machine learning_ tasks and comprises an important step in many _clustering_ and _visualization_ algorithms like [UMAP](https://arxiv.org/abs/2008.00325), [t-SNE](https://lvdmaaten.github.io/tsne/), K-means, and [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html).
 
-Finally, faster vector search enables interactions between dense vectors and graphs. Converting a pile of dense vectors into nearest neighbors graphs unlocks the entire world of graph analysis algorithms, such as those found in [GraphBLAS](https://graphblas.org/) and [cuGraph](https://github.com/rapidsai/cugraph). 
+Finally, faster vector search enables interactions between dense vectors and graphs. Converting a pile of dense vectors into nearest neighbors graphs unlocks the entire world of graph analysis algorithms, such as those found in [GraphBLAS](https://graphblas.org/) and [cuGraph](https://github.com/rapidsai/cugraph).
 
 Below are some common use-cases for vector search
 
@@ -45,7 +45,7 @@ Below are some common use-cases for vector search
   - Audio search
   - Molecular search
   - Model training
-  
+
 
 - ### Data mining
   - Clustering algorithms
@@ -67,11 +67,11 @@ There are several benefits to using cuVS and GPUs for vector search, including
 6. Multiple language support
 7. Building blocks for composing new or accelerating existing algorithms
 
-In addition to the items above, cuVS takes on the burden of keeping non-trivial accelerated code up to date as new NVIDIA architectures and CUDA versions are released. This provides a deslightful development experimence, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale. 
+In addition to the items above, cuVS takes on the burden of keeping non-trivial accelerated code up to date as new NVIDIA architectures and CUDA versions are released. This provides a delightful development experience, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale.
 
 ## cuVS Technology Stack
 
-cuVS is built on top of the RAPIDS RAFT library of high performance machine learning primitives and provides all the necessary routines for vector search and clustering on the GPU. 
+cuVS is built on top of the RAPIDS RAFT library of high performance machine learning primitives and provides all the necessary routines for vector search and clustering on the GPU.
 
 ![cuVS is built on top of low-level CUDA libraries and provides many important routines that enable vector search and clustering on the GPU](img/tech_stack.png "cuVS Technology Stack")
 
@@ -103,13 +103,13 @@ pip install cuvs-cu11 --extra-index-url=https://pypi.nvidia.com
 And CUDA 12 packages:
 ```bash
 pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
-```    
+```
 
 ### Nightlies
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
 
 ```bash
-conda install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=24.12
+conda install -c conda-forge -c nvidia -c rapidsai-nightly cuvs=25.02
 ```
 
 cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
@@ -169,7 +169,7 @@ cuvsCagraIndexParamsDestroy(index_params);
 cuvsResourcesDestroy(res);
 ```
 
-For more code examples of the C APIs, including drop-in Cmake project templates, please refer to the [C examples](https://github.com/rapidsai/cuvs/tree/branch-24.10/examples/c)
+For more code examples of the C APIs, including drop-in Cmake project templates, please refer to the [C examples](https://github.com/rapidsai/cuvs/tree/branch-25.02/examples/c)
 
 ### Rust API
 
@@ -232,7 +232,7 @@ fn cagra_example() -> Result<()> {
 }
 ```
 
-For more code examples of the Rust APIs, including a drop-in project templates, please refer to the [Rust examples](https://github.com/rapidsai/cuvs/tree/branch-24.10/examples/rust).
+For more code examples of the Rust APIs, including a drop-in project templates, please refer to the [Rust examples](https://github.com/rapidsai/cuvs/tree/branch-25.02/examples/rust).
 
 ## Contributing
 
@@ -240,7 +240,7 @@ If you are interested in contributing to the cuVS library, please read our [Cont
 
 ## References
 
-For the interested reader, many of the accelerated implementations in cuVS are also based on research papers which can provide a lot more background. We also ask you to please cite the corresponding algorithms by referencing them in your own research. 
+For the interested reader, many of the accelerated implementations in cuVS are also based on research papers which can provide a lot more background. We also ask you to please cite the corresponding algorithms by referencing them in your own research.
 - [CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search](https://arxiv.org/abs/2308.15136)
 - [Top-K Algorithms on GPU: A Comprehensive Study and New Methods](https://dl.acm.org/doi/10.1145/3581784.3607062)
 - [Fast K-NN Graph Construction by GPU Based NN-Descent](https://dl.acm.org/doi/abs/10.1145/3459637.3482344?casa_token=O_nan1B1F5cAAAAA:QHWDEhh0wmd6UUTLY9_Gv6c3XI-5DXM9mXVaUXOYeStlpxTPmV3nKvABRfoivZAaQ3n8FWyrkWw>)

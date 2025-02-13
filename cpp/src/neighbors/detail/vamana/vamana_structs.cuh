@@ -29,12 +29,12 @@
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <cuvs/distance/distance.hpp>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /* @defgroup vamana_structures vamana structures
  * @{
@@ -170,7 +170,7 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
     temp_dst[0] = dst_vec->coords[i];
     if (i + 32 < src_vec->Dim) temp_dst[1] = dst_vec->coords[i + 32];
     if (i + 64 < src_vec->Dim) temp_dst[2] = dst_vec->coords[i + 64];
-    if (i + 92 < src_vec->Dim) temp_dst[3] = dst_vec->coords[i + 96];
+    if (i + 96 < src_vec->Dim) temp_dst[3] = dst_vec->coords[i + 96];
 
     partial_sum[0] = fmaf(
       (src_vec[0].coords[i] - temp_dst[0]), (src_vec[0].coords[i] - temp_dst[0]), partial_sum[0]);
@@ -182,7 +182,7 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
       partial_sum[2] = fmaf((src_vec[0].coords[i + 64] - temp_dst[2]),
                             (src_vec[0].coords[i + 64] - temp_dst[2]),
                             partial_sum[2]);
-    if (i + 92 < src_vec->Dim)
+    if (i + 96 < src_vec->Dim)
       partial_sum[3] = fmaf((src_vec[0].coords[i + 96] - temp_dst[3]),
                             (src_vec[0].coords[i + 96] - temp_dst[3]),
                             partial_sum[3]);
@@ -192,6 +192,7 @@ __device__ SUMTYPE l2_ILP4(Point<T, SUMTYPE>* src_vec, Point<T, SUMTYPE>* dst_ve
   for (int offset = 16; offset > 0; offset /= 2) {
     partial_sum[0] += __shfl_down_sync(FULL_BITMASK, partial_sum[0], offset);
   }
+
   return partial_sum[0];
 }
 
@@ -419,22 +420,24 @@ __global__ void populate_reverse_list_struct(QueryCandidates<IdxT, accT>* revers
                                              int* unique_indices,
                                              int unique_dests,
                                              int total_edges,
-                                             int N)
+                                             int N,
+                                             int rev_start,
+                                             int reverse_batch)
 {
-  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < unique_dests;
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < reverse_batch;
        i += blockDim.x * gridDim.x) {
-    reverse_list[i].queryId = edge_dest[unique_indices[i]];
-    if (i == unique_dests - 1) {
-      reverse_list[i].size = total_edges - unique_indices[i];
+    reverse_list[i].queryId = edge_dest[unique_indices[i + rev_start]];
+    if (rev_start + i == unique_dests - 1) {
+      reverse_list[i].size = total_edges - unique_indices[i + rev_start];
     } else {
-      reverse_list[i].size = unique_indices[i + 1] - unique_indices[i];
+      reverse_list[i].size = unique_indices[i + rev_start + 1] - unique_indices[i + rev_start];
     }
     if (reverse_list[i].size > reverse_list[i].maxSize) {
       reverse_list[i].size = reverse_list[i].maxSize;
     }
 
     for (int j = 0; j < reverse_list[i].size; j++) {
-      reverse_list[i].ids[j] = edge_src[unique_indices[i] + j];
+      reverse_list[i].ids[j] = edge_src[unique_indices[i + rev_start] + j];
     }
     for (int j = reverse_list[i].size; j < reverse_list[i].maxSize; j++) {
       reverse_list[i].ids[j]   = raft::upper_bound<IdxT>();
@@ -475,4 +478,4 @@ __global__ void recompute_reverse_dists(
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

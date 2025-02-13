@@ -39,18 +39,18 @@ function(find_and_configure_raft)
     # Invoke CPM find_package()
     #-----------------------------------------------------
     rapids_cpm_find(raft ${PKG_VERSION}
-            GLOBAL_TARGETS      raft::raft
+            GLOBAL_TARGETS      raft::raft raft::raft_logger raft::raft_logger_impl
             BUILD_EXPORT_SET    cuvs-exports
             INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
+              EXCLUDE_FROM_ALL TRUE
               GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
               GIT_TAG               ${PKG_PINNED_TAG}
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"
               "BUILD_PRIMS_BENCH OFF"
-              "BUILD_ANN_BENCH OFF"
               "RAFT_NVTX ${PKG_ENABLE_NVTX}"
               "RAFT_COMPILE_LIBRARY OFF"
             )

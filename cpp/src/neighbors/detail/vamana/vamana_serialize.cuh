@@ -20,7 +20,7 @@
 
 #include <cuvs/neighbors/vamana.hpp>
 #include <raft/core/host_mdarray.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/nvtx.hpp>
@@ -34,7 +34,7 @@
 #include <fstream>
 #include <type_traits>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /**
  * Save the index to file.
@@ -117,4 +117,4 @@ void serialize(raft::resources const& res,
   if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
 }
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

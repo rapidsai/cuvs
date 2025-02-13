@@ -37,10 +37,8 @@ build:
   number: {{ GIT_DESCRIBE_NUMBER }}
   string: cuda{{ cuda_major }}_py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
   ignore_run_exports_from:
-    {% if cuda_major == "11" %}
-    - {{ compiler('cuda11') }}
-    {% else %}
     - {{ compiler('cuda') }}
+    {% if cuda_major != "11" %}
     - cuda-cudart-dev
     - libcublas-dev
     {% endif %}
@@ -50,7 +48,7 @@ requirements:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
     {% if cuda_major == "11" %}
-    - {{ compiler('cuda11') }} ={{ cuda_version }}
+    - {{ compiler('cuda') }} ={{ cuda_version }}
     {% else %}
     - {{ compiler('cuda') }}
     {% endif %}
@@ -79,6 +77,7 @@ requirements:
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
     - rmm ={{ minor_version }}
+    - setuptools>=64.0.0
 
   run:
     - benchmark
@@ -94,12 +93,13 @@ requirements:
     - glog {{ glog_version }}
     - cuvs {{ version }}
     - h5py {{ h5py_version }}
-    - matplotlib
+    - matplotlib-base
     - pandas
     - pyyaml
     # rmm is needed to determine if package is gpu-enabled
     - pylibraft ={{ minor_version }}
     - python
+    - requests
     - rmm ={{ minor_version }}
 about:
   home: https://rapids.ai/

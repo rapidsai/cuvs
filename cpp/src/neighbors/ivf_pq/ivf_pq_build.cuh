@@ -30,7 +30,7 @@
 #include "../../cluster/kmeans_balanced.cuh"
 
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -68,7 +68,6 @@
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
-using raft::RAFT_NAME;                       // TODO: this is required for RAFT_LOG_XXX messages.
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
@@ -1697,7 +1696,7 @@ auto build(raft::resources const& handle,
                 "Unsupported data type");
 
   std::cout << "using ivf_pq::index_params nrows " << (int)dataset.extent(0) << ", dim "
-            << (int)dataset.extent(1) << ", n_lits " << (int)params.n_lists << ", pq_dim "
+            << (int)dataset.extent(1) << ", n_lists " << (int)params.n_lists << ", pq_dim "
             << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");

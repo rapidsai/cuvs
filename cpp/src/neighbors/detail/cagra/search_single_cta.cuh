@@ -26,7 +26,7 @@
 #include "utils.hpp"
 
 #include <raft/core/device_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
@@ -94,9 +94,10 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
          search_params params,
          const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
          int64_t dim,
+         int64_t dataset_size,
          int64_t graph_degree,
          uint32_t topk)
-    : base_type(res, params, dataset_desc, dim, graph_degree, topk)
+    : base_type(res, params, dataset_desc, dim, dataset_size, graph_degree, topk)
   {
     set_params(res);
   }

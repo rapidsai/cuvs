@@ -18,7 +18,6 @@
 #include <raft/core/logger.hpp>
 
 namespace cuvs::neighbors::mg {
-using raft::RAFT_NAME;
 
 void check_omp_threads(const int requirements)
 {

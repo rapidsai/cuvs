@@ -84,7 +84,7 @@ void l2_distance_calc(int64_t n_cols,float x[], float y[], float *ret) {
   DLManagedTensor y_tensor;
   int64_t y_shape[2] = {N_ROWS, n_cols};
   tensor_initialize(y_d, y_shape, &y_tensor);
-  
+
   DLManagedTensor dist_tensor;
   int64_t distances_shape[2] = {N_ROWS, N_ROWS};
   tensor_initialize(distance_d, distances_shape, &dist_tensor);
@@ -93,7 +93,7 @@ void l2_distance_calc(int64_t n_cols,float x[], float y[], float *ret) {
   cuvsPairwiseDistance(res, &x_tensor, &y_tensor, &dist_tensor, L2SqrtUnexpanded, 2.0);
 
   cudaMemcpy(ret, distance_d, sizeof(float) * N_ROWS * N_ROWS, cudaMemcpyDefault);
-  
+
   cuvsRMMFree(res, distance_d, sizeof(float) * N_ROWS * N_ROWS);
   cuvsRMMFree(res, x_d, sizeof(float) * N_ROWS * n_cols);
   cuvsRMMFree(res, y_d, sizeof(float) * N_ROWS * n_cols);
@@ -106,12 +106,12 @@ int euclidean_distance_calculation_example() {
 
   outputVector((float *)PointA);
   outputVector((float *)PointB);
-  
+
   float ret;
-  
+
   l2_distance_calc(DIM, (float *)PointA, (float *)PointB, &ret);
   printf("L2 distance is %f.\n", ret);
-  
+
   cuvsResourcesDestroy(res);
 
   return 0;

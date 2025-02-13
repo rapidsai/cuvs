@@ -26,7 +26,7 @@
 #include "utils.hpp"
 
 #include <raft/core/device_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resources.hpp>
@@ -54,54 +54,76 @@ namespace multi_cta_search {
 
 // #define _CLK_BREAKDOWN
 
-template <class INDEX_T>
-RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parents(
-  INDEX_T* const next_parent_indices,  // [search_width]
-  const uint32_t search_width,
-  INDEX_T* const itopk_indices,  // [num_itopk]
-  const size_t num_itopk,
-  uint32_t* const terminate_flag)
+template <class INDEX_T, class DISTANCE_T>
+RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parent(
+  INDEX_T* const next_parent_indices,
+  INDEX_T* const itopk_indices,       // [itopk_size * 2]
+  DISTANCE_T* const itopk_distances,  // [itopk_size * 2]
+  INDEX_T* const hash_ptr,
+  const uint32_t hash_bitlen)
 {
+  constexpr uint32_t itopk_size      = 32;
   constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-  const unsigned warp_id             = threadIdx.x / 32;
+  constexpr INDEX_T invalid_index    = ~static_cast<INDEX_T>(0);
+
+  const unsigned warp_id = threadIdx.x / 32;
   if (warp_id > 0) { return; }
-  const unsigned lane_id = threadIdx.x % 32;
-  for (uint32_t i = lane_id; i < search_width; i += 32) {
-    next_parent_indices[i] = utils::get_max_value<INDEX_T>();
-  }
-  uint32_t max_itopk = num_itopk;
-  if (max_itopk % 32) { max_itopk += 32 - (max_itopk % 32); }
-  uint32_t num_new_parents = 0;
-  for (uint32_t j = lane_id; j < max_itopk; j += 32) {
-    INDEX_T index;
-    int new_parent = 0;
-    if (j < num_itopk) {
-      index = itopk_indices[j];
-      if ((index & index_msb_1_mask) == 0) {  // check if most significant bit is set
-        new_parent = 1;
-      }
+  if (threadIdx.x == 0) { next_parent_indices[0] = invalid_index; }
+  __syncwarp();
+
+  int j = -1;
+  for (unsigned i = threadIdx.x; i < itopk_size * 2; i += 32) {
+    INDEX_T index    = itopk_indices[i];
+    int is_invalid   = 0;
+    int is_candidate = 0;
+    if (index == invalid_index) {
+      is_invalid = 1;
+    } else if (index & index_msb_1_mask) {
+    } else {
+      is_candidate = 1;
     }
-    const uint32_t ballot_mask = __ballot_sync(0xffffffff, new_parent);
-    if (new_parent) {
-      const auto i = __popc(ballot_mask & ((1 << lane_id) - 1)) + num_new_parents;
-      if (i < search_width) {
-        next_parent_indices[i] = j;
-        itopk_indices[j] |= index_msb_1_mask;  // set most significant bit as used node
+
+    const auto ballot_mask  = __ballot_sync(0xffffffff, is_candidate);
+    const auto candidate_id = __popc(ballot_mask & ((1 << threadIdx.x) - 1));
+    for (int k = 0; k < __popc(ballot_mask); k++) {
+      int flag_done = 0;
+      if (is_candidate && candidate_id == k) {
+        is_candidate = 0;
+        if (hashmap::insert<INDEX_T, 1>(hash_ptr, hash_bitlen, index)) {
+          // Use this candidate as next parent
+          index |= index_msb_1_mask;  // set most significant bit as used node
+          if (i < itopk_size) {
+            next_parent_indices[0] = i;
+            itopk_indices[i]       = index;
+          } else {
+            next_parent_indices[0] = j;
+            // Move the next parent node from i-th position to j-th position
+            itopk_indices[j]   = index;
+            itopk_distances[j] = itopk_distances[i];
+            itopk_indices[i]   = invalid_index;
+            itopk_distances[i] = utils::get_max_value<DISTANCE_T>();
+          }
+          flag_done = 1;
+        } else {
+          // Deactivate the node since it has been used by other CTA.
+          itopk_indices[i]   = invalid_index;
+          itopk_distances[i] = utils::get_max_value<DISTANCE_T>();
+          is_invalid         = 1;
+        }
       }
+      if (__any_sync(0xffffffff, (flag_done > 0))) { return; }
     }
-    num_new_parents += __popc(ballot_mask);
-    if (num_new_parents >= search_width) { break; }
+    if (i < itopk_size) {
+      j = 31 - __clz(__ballot_sync(0xffffffff, is_invalid));
+      if (j < 0) { return; }
+    }
   }
-  if (threadIdx.x == 0 && (num_new_parents == 0)) { *terminate_flag = 1; }
 }
 
 template <unsigned MAX_ELEMENTS, class INDEX_T>
-RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(
-  float* distances,  // [num_elements]
-  INDEX_T* indices,  // [num_elements]
-  const uint32_t num_elements,
-  const uint32_t num_itopk  // num_itopk <= num_elements
-)
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num_elements]
+                                                      INDEX_T* indices,  // [num_elements]
+                                                      const uint32_t num_elements)
 {
   const unsigned warp_id = threadIdx.x / 32;
   if (warp_id > 0) { return; }
@@ -116,15 +138,15 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(
       val[i] = indices[j];
     } else {
       key[i] = utils::get_max_value<float>();
-      val[i] = utils::get_max_value<INDEX_T>();
+      val[i] = ~static_cast<INDEX_T>(0);
     }
   }
   /* Warp Sort */
   bitonic::warp_sort<float, INDEX_T, N>(key, val);
-  /* Store itopk sorted results */
+  /* Store sorted results */
   for (unsigned i = 0; i < N; i++) {
     unsigned j = (N * lane_id) + i;
-    if (j < num_itopk) {
+    if (j < num_elements) {
       distances[j] = key[i];
       indices[j]   = val[i];
     }
@@ -148,11 +170,11 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const uint64_t rand_xor_mask,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* seed_ptr,  // [num_queries, num_seeds]
   const uint32_t num_seeds,
+  const uint32_t visited_hash_bitlen,
   typename DATASET_DESCRIPTOR_T::INDEX_T* const
-    visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
-  const uint32_t hash_bitlen,
+    traversed_hashmap_ptr,  // [num_queries, 1 << traversed_hash_bitlen]
+  const uint32_t traversed_hash_bitlen,
   const uint32_t itopk_size,
-  const uint32_t search_width,
   const uint32_t min_iteration,
   const uint32_t max_iteration,
   uint32_t* const num_executed_iterations, /* stats */
@@ -185,12 +207,12 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   extern __shared__ uint8_t smem[];
 
   // Layout of result_buffer
-  // +----------------+------------------------------+---------+
-  // | internal_top_k | neighbors of parent nodes    | padding |
-  // | <itopk_size>   | <search_width * graph_degree> | upto 32 |
-  // +----------------+------------------------------+---------+
-  // |<---          result_buffer_size           --->|
-  const auto result_buffer_size    = itopk_size + (search_width * graph_degree);
+  // +----------------+---------+---------------------------+
+  // | internal_top_k | padding | neighbors of parent nodes |
+  // | <itopk_size>   | upto 32 | <graph_degree>            |
+  // +----------------+---------+---------------------------+
+  // |<---        result_buffer_size_32                 --->|
+  const auto result_buffer_size    = itopk_size + graph_degree;
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
   assert(result_buffer_size_32 <= MAX_ELEMENTS);
 
@@ -201,22 +223,23 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     reinterpret_cast<INDEX_T*>(smem + dataset_desc->smem_ws_size_in_bytes());
   auto* __restrict__ result_distances_buffer =
     reinterpret_cast<DISTANCE_T*>(result_indices_buffer + result_buffer_size_32);
-  auto* __restrict__ parent_indices_buffer =
+  auto* __restrict__ local_visited_hashmap_ptr =
     reinterpret_cast<INDEX_T*>(result_distances_buffer + result_buffer_size_32);
-  auto* __restrict__ terminate_flag =
-    reinterpret_cast<uint32_t*>(parent_indices_buffer + search_width);
+  auto* __restrict__ parent_indices_buffer =
+    reinterpret_cast<INDEX_T*>(local_visited_hashmap_ptr + hashmap::get_size(visited_hash_bitlen));
+  auto* __restrict__ result_position = reinterpret_cast<int*>(parent_indices_buffer + 1);
 
-#if 0
-    /* debug */
-    for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
-        result_indices_buffer[i] = utils::get_max_value<INDEX_T>();
-        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
-    }
-#endif
+  INDEX_T* const local_traversed_hashmap_ptr =
+    traversed_hashmap_ptr + (hashmap::get_size(traversed_hash_bitlen) * query_id);
 
-  if (threadIdx.x == 0) { terminate_flag[0] = 0; }
-  INDEX_T* const local_visited_hashmap_ptr =
-    visited_hashmap_ptr + (hashmap::get_size(hash_bitlen) * query_id);
+  constexpr INDEX_T invalid_index    = ~static_cast<INDEX_T>(0);
+  constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
+
+  for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
+    result_indices_buffer[i]   = invalid_index;
+    result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+  }
+  hashmap::init<INDEX_T>(local_visited_hashmap_ptr, visited_hash_bitlen);
   __syncthreads();
   _CLK_REC(clk_init);
 
@@ -229,13 +252,15 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   device::compute_distance_to_random_nodes(result_indices_buffer,
                                            result_distances_buffer,
                                            *dataset_desc,
-                                           result_buffer_size,
+                                           graph_degree,
                                            num_distilation,
                                            rand_xor_mask,
                                            local_seed_ptr,
                                            num_seeds,
                                            local_visited_hashmap_ptr,
-                                           hash_bitlen,
+                                           visited_hash_bitlen,
+                                           local_traversed_hashmap_ptr,
+                                           traversed_hash_bitlen,
                                            block_id,
                                            num_blocks);
   __syncthreads();
@@ -243,50 +268,90 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
 
   uint32_t iter = 0;
   while (1) {
-    // topk with bitonic sort
     _CLK_START();
-    topk_by_bitonic_sort<MAX_ELEMENTS, INDEX_T>(result_distances_buffer,
-                                                result_indices_buffer,
-                                                itopk_size + (search_width * graph_degree),
-                                                itopk_size);
+    if (threadIdx.x < 32) {
+      // [1st warp] Topk with bitonic sort
+      topk_by_bitonic_sort<MAX_ELEMENTS, INDEX_T>(
+        result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+    }
+    __syncthreads();
     _CLK_REC(clk_topk);
 
-    if (iter + 1 == max_iteration) {
-      __syncthreads();
-      break;
-    }
+    if (iter + 1 >= max_iteration) { break; }
 
-    // pick up next parents
     _CLK_START();
-    pickup_next_parents<INDEX_T>(
-      parent_indices_buffer, search_width, result_indices_buffer, itopk_size, terminate_flag);
+    if (threadIdx.x < 32) {
+      // [1st warp] Pick up a next parent
+      pickup_next_parent<INDEX_T, DISTANCE_T>(parent_indices_buffer,
+                                              result_indices_buffer,
+                                              result_distances_buffer,
+                                              local_traversed_hashmap_ptr,
+                                              traversed_hash_bitlen);
+    } else {
+      // [Other warps] Reset visited hashmap
+      hashmap::init<INDEX_T>(local_visited_hashmap_ptr, visited_hash_bitlen, 32);
+    }
+    __syncthreads();
     _CLK_REC(clk_pickup_parents);
 
-    __syncthreads();
-    if (*terminate_flag && iter >= min_iteration) { break; }
+    if ((parent_indices_buffer[0] == invalid_index) && (iter >= min_iteration)) { break; }
 
-    // compute the norms between child nodes and query node
     _CLK_START();
-    device::compute_distance_to_child_nodes(result_indices_buffer + itopk_size,
-                                            result_distances_buffer + itopk_size,
-                                            *dataset_desc,
-                                            knn_graph,
-                                            graph_degree,
-                                            local_visited_hashmap_ptr,
-                                            hash_bitlen,
-                                            parent_indices_buffer,
-                                            result_indices_buffer,
-                                            search_width);
-    _CLK_REC(clk_compute_distance);
+    for (unsigned i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
+      INDEX_T index = result_indices_buffer[i];
+      if (index == invalid_index) { continue; }
+      if ((i >= itopk_size) && (index & index_msb_1_mask)) {
+        // Remove nodes kicked out of the itopk list from the traversed hash table.
+        hashmap::remove<INDEX_T>(
+          local_traversed_hashmap_ptr, traversed_hash_bitlen, index & ~index_msb_1_mask);
+        result_indices_buffer[i]   = invalid_index;
+        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+      } else {
+        // Restore visited hashmap by putting nodes on result buffer in it.
+        index &= ~index_msb_1_mask;
+        hashmap::insert(local_visited_hashmap_ptr, visited_hash_bitlen, index);
+      }
+    }
+    // Initialize buffer for compute_distance_to_child_nodes.
+    if (threadIdx.x == blockDim.x - 1) { result_position[0] = result_buffer_size_32; }
     __syncthreads();
+
+    // Compute the norms between child nodes and query node
+    device::compute_distance_to_child_nodes<INDEX_T, DISTANCE_T, DATASET_DESCRIPTOR_T, 0>(
+      result_indices_buffer,
+      result_distances_buffer,
+      *dataset_desc,
+      knn_graph,
+      graph_degree,
+      local_visited_hashmap_ptr,
+      visited_hash_bitlen,
+      local_traversed_hashmap_ptr,
+      traversed_hash_bitlen,
+      parent_indices_buffer,
+      result_indices_buffer,
+      1,
+      result_position,
+      result_buffer_size_32);
+    // __syncthreads();
+
+    // Check the state of the nodes in the result buffer which were not updated
+    // by the compute_distance_to_child_nodes above, and if it cannot be used as
+    // a parent node, it is deactivated.
+    for (uint32_t i = threadIdx.x; i < result_position[0]; i += blockDim.x) {
+      INDEX_T index = result_indices_buffer[i];
+      if (index == invalid_index || index & index_msb_1_mask) { continue; }
+      if (hashmap::search<INDEX_T, 1>(local_traversed_hashmap_ptr, traversed_hash_bitlen, index)) {
+        result_indices_buffer[i]   = invalid_index;
+        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+      }
+    }
+    __syncthreads();
+    _CLK_REC(clk_compute_distance);
 
     // Filtering
     if constexpr (!std::is_same<SAMPLE_FILTER_T,
                                 cuvs::neighbors::filtering::none_sample_filter>::value) {
-      constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-      const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
-
-      for (unsigned p = threadIdx.x; p < search_width; p += blockDim.x) {
+      for (unsigned p = threadIdx.x; p < 1; p += blockDim.x) {
         if (parent_indices_buffer[p] != invalid_index) {
           const auto parent_id =
             result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
@@ -303,36 +368,64 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     iter++;
   }
 
-  // Post process for filtering
+  // Filtering
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
                               cuvs::neighbors::filtering::none_sample_filter>::value) {
-    constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-    const INDEX_T invalid_index        = utils::get_max_value<INDEX_T>();
-
-    for (unsigned i = threadIdx.x; i < itopk_size + search_width * graph_degree; i += blockDim.x) {
-      const auto node_id = result_indices_buffer[i] & ~index_msb_1_mask;
-      if (node_id != (invalid_index & ~index_msb_1_mask) && !sample_filter(query_id, node_id)) {
-        // If the parent must not be in the resulting top-k list, remove from the parent list
-        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
+    for (uint32_t i = threadIdx.x; i < result_buffer_size_32; i += blockDim.x) {
+      INDEX_T index = result_indices_buffer[i];
+      if (index == invalid_index) { continue; }
+      index &= ~index_msb_1_mask;
+      if (!sample_filter(query_id, index)) {
         result_indices_buffer[i]   = invalid_index;
+        result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
       }
     }
-
-    __syncthreads();
-    topk_by_bitonic_sort<MAX_ELEMENTS, INDEX_T>(result_distances_buffer,
-                                                result_indices_buffer,
-                                                itopk_size + (search_width * graph_degree),
-                                                itopk_size);
     __syncthreads();
   }
 
-  for (uint32_t i = threadIdx.x; i < itopk_size; i += blockDim.x) {
-    uint32_t j = i + (itopk_size * (cta_id + (num_cta_per_query * query_id)));
-    if (result_distances_ptr != nullptr) { result_distances_ptr[j] = result_distances_buffer[i]; }
-    constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
-
-    result_indices_ptr[j] =
-      result_indices_buffer[i] & ~index_msb_1_mask;  // clear most significant bit
+  // Output search results (1st warp only).
+  if (threadIdx.x < 32) {
+    uint32_t offset = 0;
+    for (uint32_t i = threadIdx.x; i < result_buffer_size_32; i += 32) {
+      INDEX_T index = result_indices_buffer[i];
+      bool is_valid = false;
+      if (index != invalid_index) {
+        if (index & index_msb_1_mask) {
+          is_valid = true;
+          index &= ~index_msb_1_mask;
+        } else if ((offset < itopk_size) &&
+                   hashmap::insert<INDEX_T, 1>(
+                     local_traversed_hashmap_ptr, traversed_hash_bitlen, index)) {
+          // If a node that is not used as a parent can be inserted into
+          // the traversed hash table, it is considered a valid result.
+          is_valid = true;
+        }
+      }
+      const auto mask = __ballot_sync(0xffffffff, is_valid);
+      if (is_valid) {
+        const auto j = offset + __popc(mask & ((1 << threadIdx.x) - 1));
+        if (j < itopk_size) {
+          uint32_t k            = j + (itopk_size * (cta_id + (num_cta_per_query * query_id)));
+          result_indices_ptr[k] = index & ~index_msb_1_mask;
+          if (result_distances_ptr != nullptr) {
+            result_distances_ptr[k] = result_distances_buffer[i];
+          }
+        } else {
+          // If it is valid and registered in the traversed hash table but is
+          // not output as a result, it is removed from the hash table.
+          hashmap::remove<INDEX_T>(local_traversed_hashmap_ptr, traversed_hash_bitlen, index);
+        }
+      }
+      offset += __popc(mask);
+    }
+    // If the number of outputs is insufficient, fill in with invalid results.
+    for (uint32_t i = offset + threadIdx.x; i < itopk_size; i += 32) {
+      uint32_t k            = i + (itopk_size * (cta_id + (num_cta_per_query * query_id)));
+      result_indices_ptr[k] = invalid_index;
+      if (result_distances_ptr != nullptr) {
+        result_distances_ptr[k] = utils::get_max_value<DISTANCE_T>();
+      }
+    }
   }
 
   if (threadIdx.x == 0 && cta_id == 0 && num_executed_iterations != nullptr) {
@@ -427,8 +520,9 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     uint32_t block_size,  //
                     uint32_t result_buffer_size,
                     uint32_t smem_size,
-                    int64_t hash_bitlen,
-                    IndexT* hashmap_ptr,
+                    uint32_t visited_hash_bitlen,
+                    int64_t traversed_hash_bitlen,
+                    IndexT* traversed_hashmap_ptr,
                     uint32_t num_cta_per_query,
                     uint32_t num_seeds,
                     SampleFilterT sample_filter,
@@ -441,9 +535,13 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
   RAFT_CUDA_TRY(
     cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
   // Initialize hash table
-  const uint32_t hash_size = hashmap::get_size(hash_bitlen);
-  set_value_batch(
-    hashmap_ptr, hash_size, utils::get_max_value<IndexT>(), hash_size, num_queries, stream);
+  const uint32_t traversed_hash_size = hashmap::get_size(traversed_hash_bitlen);
+  set_value_batch(traversed_hashmap_ptr,
+                  traversed_hash_size,
+                  ~static_cast<IndexT>(0),
+                  traversed_hash_size,
+                  num_queries,
+                  stream);
 
   dim3 block_dims(block_size, 1, 1);
   dim3 grid_dims(num_cta_per_query, num_queries, 1);
@@ -463,10 +561,10 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        ps.rand_xor_mask,
                                                        dev_seed_ptr,
                                                        num_seeds,
-                                                       hashmap_ptr,
-                                                       hash_bitlen,
+                                                       visited_hash_bitlen,
+                                                       traversed_hashmap_ptr,
+                                                       traversed_hash_bitlen,
                                                        ps.itopk_size,
-                                                       ps.search_width,
                                                        ps.min_iterations,
                                                        ps.max_iterations,
                                                        num_executed_iterations,

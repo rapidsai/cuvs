@@ -23,7 +23,7 @@ function(find_and_configure_faiss)
     HEADER_NAMES  faiss/IndexFlat.h
     LIBRARY_NAMES faiss
     )
-  
+
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/faiss_override.json")
 
@@ -55,6 +55,7 @@ function(find_and_configure_faiss)
     EXCLUDE_FROM_ALL ${exclude}
     OPTIONS
     "FAISS_ENABLE_GPU ${PKG_ENABLE_GPU}"
+    "FAISS_ENABLE_CUVS ${PKG_ENABLE_GPU}"
     "FAISS_ENABLE_PYTHON OFF"
     "FAISS_OPT_LEVEL ${CUVS_FAISS_OPT_LEVEL}"
     "FAISS_USE_CUDA_TOOLKIT_STATIC ${CUDA_STATIC_RUNTIME}"
@@ -62,7 +63,7 @@ function(find_and_configure_faiss)
     "CMAKE_MESSAGE_LOG_LEVEL VERBOSE"
     )
 
-  
+
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(faiss)
 

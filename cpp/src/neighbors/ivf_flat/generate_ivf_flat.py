@@ -136,7 +136,7 @@ build_macro = """
   {                                                                                  \\
     cuvs::neighbors::ivf_flat::detail::extend(                                       \\
       handle, new_vectors, new_indices, idx);                                        \\
-  }                    
+  }
 """
 
 search_macro = """
