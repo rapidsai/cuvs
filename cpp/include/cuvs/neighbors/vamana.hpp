@@ -457,13 +457,15 @@ auto build(raft::resources const& res,
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
  * @param[in] include_dataset whether or not to serialize the dataset
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<float, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               bool sector_aligned  = false);
 
 /**
  * Save the index to file.
@@ -486,12 +488,14 @@ void serialize(raft::resources const& handle,
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
  * @param[in] include_dataset whether or not to serialize the dataset
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               bool sector_aligned  = false);
 
 /**
  * Save the index to file.
@@ -514,12 +518,14 @@ void serialize(raft::resources const& handle,
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
  * @param[in] include_dataset whether or not to serialize the dataset
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               bool sector_aligned  = false);
 
 /**
  * @}
