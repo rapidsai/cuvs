@@ -34,7 +34,200 @@
 #include <fstream>
 #include <type_traits>
 
+#define DIV_ROUND_UP(X, Y) (((uint64_t)(X) + (Y)-1) / (Y))
+#define ROUND_UP(X, Y)     (((uint64_t)(X) + (Y)-1) / (Y) * (Y))
+
 namespace cuvs::neighbors::vamana::detail {
+
+/**
+ * Save the index to file with sector alignment.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @param[in] res the raft resource handle
+ * @param[in] h_graph the host matrix representation of the VAMANA index
+ * @param[in] dataset the raw dataset from which the VAMANA index is built
+ * @param[in] medoid the medoid
+ * @param[out] output_writer the stream object for writing the output file
+ *
+ */
+template <typename T, typename IdxT, typename HostMatT>
+void serialize_sector_aligned(raft::resources const& res,
+                              const HostMatT& h_graph,
+                              const cuvs::neighbors::dataset<int64_t>& dataset,
+                              const uint64_t medoid,
+                              std::ofstream& output_writer)
+{
+  if constexpr (!std::is_same_v<IdxT, uint32_t>) {
+    RAFT_FAIL("serialization is only implemented for uint32_t graph");
+  }
+
+  const uint64_t sector_len = 4096;
+
+  const uint64_t npts(dataset.n_rows()), ndims(dataset.dim());
+
+  // stats for metadata and logging
+  uint32_t max_degree = 0;
+  size_t index_size   = 24;  // Starting metadata in Vamana file
+  size_t total_edges  = 0;
+  size_t num_sparse   = 0;
+  size_t num_single   = 0;
+  for (uint32_t i = 0; i < h_graph.extent(0); i++) {
+    uint32_t node_edges = 0;
+    for (; node_edges < h_graph.extent(1); node_edges++) {
+      if (h_graph(i, node_edges) == raft::upper_bound<IdxT>()) { break; }
+    }
+
+    if (node_edges < 3) num_sparse++;
+    if (node_edges < 2) num_single++;
+    total_edges += node_edges;
+
+    max_degree = max(max_degree, node_edges);
+    index_size += sizeof(uint32_t) * (node_edges + 1);
+  }
+
+  const uint64_t max_node_len =
+    ((static_cast<uint64_t>(max_degree) + 1) * sizeof(IdxT)) + (ndims * sizeof(T));
+  const uint64_t nnodes_per_sector = sector_len / max_node_len;  // 0 if max_node_len > sector_len
+
+  // copy dataset to host
+  auto dataset_strided =
+    dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(&dataset);
+  if (!dataset_strided) { RAFT_FAIL("Invalid dataset"); }
+  auto d_data = dataset_strided->view();
+  auto h_data = raft::make_host_matrix<T, IdxT>(npts, ndims);
+  auto stride = dataset_strided->stride();
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_data.data_handle(),
+                                  sizeof(T) * ndims,
+                                  d_data.data_handle(),
+                                  sizeof(T) * stride,
+                                  sizeof(T) * ndims,
+                                  npts,
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
+  raft::resource::sync_stream(res);
+
+  // buffers
+  std::unique_ptr<char[]> sector_buf = std::make_unique<char[]>(sector_len);
+  std::unique_ptr<char[]> multisector_buf =
+    std::make_unique<char[]>(ROUND_UP(max_node_len, sector_len));
+  std::unique_ptr<char[]> node_buf = std::make_unique<char[]>(max_node_len);
+  IdxT& nnbrs                      = *(IdxT*)(node_buf.get() + ndims * sizeof(T));
+  IdxT* const nhood_buf            = (IdxT*)(node_buf.get() + (ndims * sizeof(T)) + sizeof(IdxT));
+
+  const uint64_t n_sectors = nnodes_per_sector > 0 ? DIV_ROUND_UP(npts, nnodes_per_sector)
+                                                   : npts * DIV_ROUND_UP(max_node_len, sector_len);
+  // metadata
+  const uint64_t disk_index_file_size = (n_sectors + 1) * sector_len;
+  const uint64_t vamana_frozen_num{}, vamana_frozen_loc{};
+  const bool append_reorder_data = false;
+  std::vector<uint64_t> output_meta;
+  output_meta.push_back(npts);
+  output_meta.push_back(ndims);
+  output_meta.push_back(medoid);
+  output_meta.push_back(max_node_len);
+  output_meta.push_back(nnodes_per_sector);
+  output_meta.push_back(vamana_frozen_num);
+  output_meta.push_back(vamana_frozen_loc);
+  output_meta.push_back(static_cast<uint64_t>(append_reorder_data));
+  output_meta.push_back(disk_index_file_size);
+
+  // zero out first sector of output file
+  output_writer.seekp(0, output_writer.beg);
+  output_writer.write(sector_buf.get(), sector_len);
+  // write metadata to first sector
+  output_writer.seekp(0, output_writer.beg);
+  const int metadata_size  = static_cast<int>(output_meta.size());
+  const int metadata_ndims = 1;
+  output_writer.write((char*)&metadata_size, sizeof(int));
+  output_writer.write((char*)&metadata_ndims, sizeof(int));
+  output_writer.write((char*)output_meta.data(), sizeof(uint64_t) * output_meta.size());
+  output_writer.seekp(sector_len, output_writer.beg);
+
+  if (nnodes_per_sector > 0) {
+    uint64_t cur_node_id = 0;
+    // Write multiple nodes per sector
+    for (uint64_t sector = 0; sector < n_sectors; sector++) {
+      if (sector && sector % 100000 == 0)
+        std::cout << "Sector #" << sector << " written" << std::endl;
+      memset(sector_buf.get(), 0, sector_len);
+      for (uint64_t sector_node_id = 0; sector_node_id < nnodes_per_sector && cur_node_id < npts;
+           sector_node_id++) {
+        memset(node_buf.get(), 0, max_node_len);
+        // copy node coords to buffer
+        memcpy(node_buf.get(), &h_data(cur_node_id, uint64_t(0)), ndims * sizeof(T));
+
+        IdxT node_edges = 0;
+        for (; node_edges < h_graph.extent(1); node_edges++) {
+          if (h_graph(cur_node_id, node_edges) == raft::upper_bound<IdxT>()) { break; }
+        }
+        // write nnbrs to buffer
+        nnbrs = node_edges;
+
+        // sanity checks on nnbrs
+        assert(nnbrs > 0);
+        assert(nnbrs <= max_degree);
+
+        // copy neighbors to buffer
+        memcpy(nhood_buf, &h_graph(cur_node_id, 0), nnbrs * sizeof(IdxT));
+
+        // get offset into sector_buf
+        char* sector_node_buf = sector_buf.get() + (sector_node_id * max_node_len);
+
+        // copy node buf into sector_node_buf
+        memcpy(sector_node_buf, node_buf.get(), max_node_len);
+        cur_node_id++;
+      }
+      // write sector to disk
+      output_writer.write(sector_buf.get(), sector_len);
+    }
+  } else {
+    // Write multi-sector nodes
+    uint64_t nsectors_per_node = DIV_ROUND_UP(max_node_len, sector_len);
+    for (uint64_t cur_node_id = 0; cur_node_id < npts; cur_node_id++) {
+      if (cur_node_id && (cur_node_id * nsectors_per_node) % 100000 == 0)
+        std::cout << "Sector #" << cur_node_id * nsectors_per_node << " written" << std::endl;
+      memset(multisector_buf.get(), 0, nsectors_per_node * sector_len);
+      // copy node coords to buffer
+      memcpy(multisector_buf.get(), &h_data(cur_node_id, uint64_t(0)), ndims * sizeof(T));
+
+      IdxT node_edges = 0;
+      for (; node_edges < h_graph.extent(1); node_edges++) {
+        if (h_graph(cur_node_id, node_edges) == raft::upper_bound<IdxT>()) { break; }
+      }
+      // write nnbrs to buffer
+      nnbrs = node_edges;
+
+      // sanity checks on nnbrs
+      assert(nnbrs > 0);
+      assert(nnbrs <= max_degree);
+
+      // copy neighbors to buffer
+      memcpy(nhood_buf, &h_graph(cur_node_id, 0), nnbrs * sizeof(IdxT));
+
+      // write nnbrs to buffer
+      *(IdxT*)(multisector_buf.get() + ndims * sizeof(T)) = nnbrs;
+
+      // copy neighbors to buffer
+      memcpy(multisector_buf.get() + ndims * sizeof(T) + sizeof(IdxT),
+             &h_graph(cur_node_id, 0),
+             nnbrs * sizeof(IdxT));
+
+      // write sectors to disk
+      output_writer.write(multisector_buf.get(), nsectors_per_node * sector_len);
+    }
+  }
+
+  RAFT_LOG_DEBUG(
+    "Wrote file out, index size:%lu, max_degree:%u, num_sparse:%ld, num_single:%ld, total "
+    "edges:%ld, avg degree:%f",
+    index_size,
+    max_degree,
+    num_sparse,
+    num_single,
+    total_edges,
+    (float)total_edges / (float)h_graph.extent(0));
+}
 
 /**
  * Save the index to file.
@@ -52,11 +245,29 @@ template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_name,
                const index<T, IdxT>& index_,
-               bool include_dataset)
+               bool include_dataset,
+               bool sector_aligned)
 {
   // Write graph to first index file (format from MSFT DiskANN OSS)
   std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
   if (!index_of) { RAFT_FAIL("Cannot open file %s", file_name.c_str()); }
+
+  auto d_graph = index_.graph();
+  auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
+  raft::copy(h_graph.data_handle(),
+             d_graph.data_handle(),
+             d_graph.size(),
+             raft::resource::get_cuda_stream(res));
+  raft::resource::sync_stream(res);
+
+  // if requested, write sector-aligned file and return
+  if (sector_aligned) {
+    serialize_sector_aligned<T, IdxT>(
+      res, h_graph, index_.data(), static_cast<uint64_t>(index_.medoid()), index_of);
+    index_of.close();
+    if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
+    return;
+  }
 
   size_t file_offset = 0;
   index_of.seekp(file_offset, index_of.beg);
@@ -70,14 +281,6 @@ void serialize(raft::resources const& res,
   index_of.write((char*)&max_observed_degree, sizeof(uint32_t));
   index_of.write((char*)&start, sizeof(uint32_t));
   index_of.write((char*)&num_frozen_points, sizeof(size_t));
-
-  auto d_graph = index_.graph();
-  auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
-  raft::copy(h_graph.data_handle(),
-             d_graph.data_handle(),
-             d_graph.size(),
-             raft::resource::get_cuda_stream(res));
-  raft::resource::sync_stream(res);
 
   size_t total_edges = 0;
   size_t num_sparse  = 0;
