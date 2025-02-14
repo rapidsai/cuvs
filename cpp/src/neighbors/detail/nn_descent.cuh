@@ -1269,7 +1269,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   graph_.nrow         = nrow;
   graph_.bloom_filter.set_nrow(nrow);
   update_counter_ = 0;
-  graph_.h_graph      = (InternalID_t<Index_t>*)output_graph;
+  graph_.h_graph  = (InternalID_t<Index_t>*)output_graph;
 
   cudaPointerAttributes data_ptr_attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));
