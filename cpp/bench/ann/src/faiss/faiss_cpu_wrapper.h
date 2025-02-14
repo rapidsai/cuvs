@@ -20,6 +20,7 @@
 #include "../common/util.hpp"
 
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
 #include <faiss/IndexRefine.h>
@@ -325,6 +326,47 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   {
     return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
   }
+};
+
+template <typename T>
+class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
+ public:
+  struct build_param : public faiss_cpu<T>::build_param {
+    int M;
+    int efConstruction;
+  };
+  struct search_param : public faiss_cpu<T>::search_param {
+    faiss::SearchParametersHNSW p;
+  };
+  faiss_cpu_hnsw_flat(Metric metric, int dim, const build_param& param)
+    : faiss_cpu<T>(metric, dim, param)
+  {
+    this->index_ = std::make_shared<faiss::IndexHNSWFlat>(dim, param.M, this->metric_type_);
+    faiss::IndexHNSWFlat* hnsw_index = static_cast<faiss::IndexHNSWFlat*>(this->index_.get());
+    hnsw_index->hnsw.efConstruction  = param.efConstruction;
+  }
+
+  void set_search_param(const typename algo<T>::search_param& param,
+                        const void* filter_bitset) override
+  {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+    auto sp              = static_cast<const typename faiss_cpu_hnsw_flat<T>::search_param&>(param);
+    this->search_params_ = sp.p;
+  };
+
+  void save(const std::string& file) const override
+  {
+    this->template save_<faiss::IndexHNSWFlat>(file);
+  }
+  void load(const std::string& file) override { this->template load_<faiss::IndexHNSWFlat>(file); }
+
+  std::unique_ptr<algo<T>> copy()
+  {
+    return std::make_unique<faiss_cpu_hnsw_flat<T>>(*this);  // use copy constructor
+  }
+
+ private:
+  faiss::SearchParametersHNSW search_params_;
 };
 
 }  // namespace cuvs::bench

@@ -100,6 +100,20 @@ void parse_build_param(const nlohmann::json& conf,
     param.intermediate_graph_degree = 128;
   }
   if (conf.contains("cagra_build_algo")) { param.cagra_build_algo = conf.at("cagra_build_algo"); }
+  if (conf.contains("nn_descent_niter")) {
+    param.nn_descent_niter = conf.at("nn_descent_niter");
+  } else {
+    param.nn_descent_niter = 20;
+  }
+}
+
+template <typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::faiss_gpu_cagra_hnsw<T>::build_param& param)
+{
+  typename cuvs::bench::faiss_gpu_cagra<T>::build_param p;
+  parse_build_param<T>(conf, p);
+  param.p = p;
 }
 
 template <typename T>
@@ -131,7 +145,13 @@ void parse_search_param(const nlohmann::json& conf,
       THROW("Invalid value for algo: %s", tmp.c_str());
     }
   }
-  if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
+}
+
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::faiss_gpu_cagra_hnsw<T>::search_param& param)
+{
+  if (conf.contains("efSearch")) { param.p.efSearch = conf.at("efSearch"); }
 }
 
 template <typename T, template <typename> class Algo>
@@ -163,6 +183,8 @@ auto create_algo(const std::string& algo_name,
       a = std::make_unique<cuvs::bench::faiss_gpu_flat<T>>(metric, dim);
     } else if (algo_name == "faiss_gpu_cagra") {
       a = make_algo<T, cuvs::bench::faiss_gpu_cagra>(metric, dim, conf);
+    } else if (algo_name == "faiss_gpu_cagra_hnsw") {
+      a = make_algo<T, cuvs::bench::faiss_gpu_cagra_hnsw>(metric, dim, conf);
     }
   }
 
@@ -185,6 +207,10 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
     return param;
   } else if (algo_name == "faiss_gpu_cagra") {
     auto param = std::make_unique<typename cuvs::bench::faiss_gpu_cagra<T>::search_param>();
+    parse_search_param<T>(conf, *param);
+    return param;
+  } else if (algo_name == "faiss_gpu_cagra_hnsw") {
+    auto param = std::make_unique<typename cuvs::bench::faiss_gpu_cagra_hnsw<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
   }

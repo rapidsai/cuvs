@@ -1,0 +1,8 @@
+name: faiss_cpu_hnsw_flat
+groups:
+  base:
+    build:
+      M: [16, 32]
+      efConstruction: [64, 128, 256, 512]
+    search:
+      efSearch: [40, 60, 80, 200, 400, 600, 800]
