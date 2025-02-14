@@ -327,8 +327,6 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                      {false, true},
                                                      {0.90});
 
-// TODO : Investigate why this test is failing Reference issue https
-// :  // github.com/rapidsai/raft/issues/2450
 const std::vector<AnnNNDescentBatchInputs> inputsBatch =
   raft::util::itertools::product<AnnNNDescentBatchInputs>(
     {std::make_pair(0.9, 3lu), std::make_pair(0.9, 2lu)},  // min_recall, n_clusters
