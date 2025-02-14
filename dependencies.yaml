@@ -78,6 +78,8 @@ files:
       - py_version
       - rapids_build
       - rust
+      - depends_on_libcuvs
+      - depends_on_cuvs
   rust:
     output: none
     includes:
@@ -95,6 +97,8 @@ files:
       - cuda_version
       - rapids_build
       - go
+      - depends_on_libcuvs
+      - depends_on_libraft
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
