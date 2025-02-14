@@ -50,8 +50,7 @@ index<T, IdxT> merge(raft::resources const& handle,
   for (auto index : indices) {
     RAFT_EXPECTS(index != nullptr,
                  "Null pointer detected in 'indices'. Ensure all elements are valid before usage.");
-    using ds_idx_type = decltype(index->data().n_rows());
-    if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
+    if (auto* strided_dset = dynamic_cast<const strided_dataset<T, int64_t>*>(&index->data());
         strided_dset != nullptr) {
       if (dim == 0) {
         dim    = index->dim();
@@ -75,8 +74,7 @@ index<T, IdxT> merge(raft::resources const& handle,
 
   auto merge_dataset = [&](T* dst) {
     for (auto index : indices) {
-      using ds_idx_type  = decltype(index->data().n_rows());
-      auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
+      auto* strided_dset = dynamic_cast<const strided_dataset<T, int64_t>*>(&index->data());
 
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst + offset * dim,
                                       sizeof(T) * dim,
