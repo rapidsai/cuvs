@@ -952,6 +952,9 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
+    // Avoid splitting datasets with a size of 0
+    if (ps.n_rows <= 3) GTEST_SKIP();
+
     // IVF_PQ requires the `n_rows >= n_lists`.
     if (ps.n_rows < 8 && ps.build_algo == graph_build_algo::IVF_PQ) GTEST_SKIP();
 

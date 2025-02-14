@@ -972,13 +972,7 @@ int insert_to_ordered_list(InternalID_t<Index_t>* list,
   int idx_insert      = width;
   bool position_found = false;
   for (int i = 0; i < width; i++) {
-    if (list[i].id() == neighb_id.id()) {
-      if (dist_list[i] == std::numeric_limits<DistData_t>::max()) {
-        idx_insert   = i;
-        dist_list[i] = dist;
-      }
-      return idx_insert;
-    }
+    if (list[i].id() == neighb_id.id()) { return width; }
     if (!position_found && dist_list[i] > dist) {
       idx_insert     = i;
       position_found = true;
