@@ -1361,11 +1361,8 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     }
 
     update_and_sample_thread.join();
-    std::cout << "iter " << it + 1 << "inside the loop, before hitting update counter "
-              << update_counter_.load() << std::endl;
+
     if (update_counter_ == -1) { break; }
-    std::cout << "iter " << it + 1 << "inside the loop, after hitting update counter "
-              << update_counter_.load() << std::endl;
     raft::copy(graph_host_buffer_.data_handle(),
                graph_buffer_.data_handle(),
                nrow_ * DEGREE_ON_DEVICE,
