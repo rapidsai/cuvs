@@ -223,7 +223,6 @@ void get_inverted_indices(raft::resources const& res,
   for (size_t i = 1; i < n_clusters; i++) {
     offset(i) = offset(i - 1) + cluster_size(i - 1);
   }
-
   for (size_t i = 0; i < num_rows; i++) {
     for (size_t j = 0; j < k; j++) {
       IdxT cluster_id = global_nearest_cluster(i, j);
@@ -385,9 +384,7 @@ void build_and_merge(raft::resources const& res,
                      IdxT* batch_indices_h,
                      IdxT* batch_indices_d,
                      float* batch_distances_d,
-                     GNND<const T, int>& nnd,
-                     size_t cluster_id,
-                     size_t num_cols)
+                     GNND<const T, int>& nnd)
 {
   nnd.build(cluster_data, num_data_in_cluster, int_graph, true, batch_distances_d);
 
@@ -514,9 +511,7 @@ void cluster_nnd(raft::resources const& res,
                              batch_indices_h,
                              batch_indices_d,
                              batch_distances_d,
-                             nnd,
-                             cluster_id,
-                             num_cols);
+                             nnd);
     nnd.reset(res);
   }
 }
@@ -577,9 +572,7 @@ void cluster_nnd(raft::resources const& res,
                              batch_indices_h,
                              batch_indices_d,
                              batch_distances_d,
-                             nnd,
-                             cluster_id,
-                             num_cols);
+                             nnd);
     nnd.reset(res);
   }
 }
@@ -619,7 +612,6 @@ void batch_build(raft::resources const& res,
   auto offset           = raft::make_host_vector<IdxT, IdxT, raft::row_major>(params.n_clusters);
 
   size_t max_cluster_size, min_cluster_size;
-
   get_inverted_indices(res,
                        params.n_clusters,
                        max_cluster_size,
