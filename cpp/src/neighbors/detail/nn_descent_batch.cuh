@@ -171,7 +171,7 @@ void get_global_nearest_k(
       if (i == num_batches - 1) { batch_size_ = num_rows - batch_size * i; }
       thrust::copy(raft::resource::get_thrust_policy(res),
                    nearest_clusters_idx.data_handle() + i * batch_size * k,
-                   nearest_clusters_idx.data_handle() + (i + 1) * batch_size * k,
+                   nearest_clusters_idx.data_handle() + (i * batch_size + batch_size_) * k,
                    nearest_clusters_idxt.data_handle());
       raft::copy(global_nearest_cluster.data_handle() + i * batch_size * k,
                  nearest_clusters_idxt.data_handle(),
