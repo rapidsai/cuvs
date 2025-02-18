@@ -28,6 +28,8 @@ import java.lang.foreign.SequenceLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -59,7 +61,7 @@ public class BruteForceIndexImpl implements BruteForceIndex{
       FunctionDescriptor.of(ADDRESS, ADDRESS, C_LONG, C_LONG, ADDRESS, ADDRESS, C_INT));
 
   private static final MethodHandle searchMethodHandle = downcallHandle("search_brute_force_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG, C_LONG));
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG));
 
   private static final MethodHandle destroyIndexMethodHandle = downcallHandle("destroy_brute_force_index",
       FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
@@ -169,16 +171,29 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long numQueries = cuvsQuery.getQueryVectors().length;
     long numBlocks = cuvsQuery.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? cuvsQuery.getQueryVectors()[0].length : 0;
-    long prefilterDataLength = cuvsQuery.getPrefilter() != null ? cuvsQuery.getPrefilter().length : 0;
     long numRows = dataset != null ? dataset.length : 0;
 
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
     MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
-    MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
-            ? Util.buildMemorySegment(resources.getArena(), cuvsQuery.getPrefilter())
-            : MemorySegment.NULL;
+
+    // prepare the prefiltering data
+    long prefilterDataLength = 0;
+    MemorySegment prefilterDataMemorySegment = MemorySegment.NULL;
+    BitSet[] prefilters = cuvsQuery.getPrefilters();
+    if (prefilters != null && prefilters.length > 0) {
+      BitSet concatenatedFilters = Util.concatenate(prefilters);
+      byte[] paddedFilterBytes = new byte[Util.roundUp(concatenatedFilters.toByteArray().length, 4)];
+      int pad = paddedFilterBytes.length - concatenatedFilters.toByteArray().length;
+      for (int i=0; i<concatenatedFilters.toByteArray().length; i++) {
+        paddedFilterBytes[pad+i] = concatenatedFilters.toByteArray()[i];
+      }
+      for (int i=0; i<pad; i++) paddedFilterBytes[i] = 0;
+      prefilterDataMemorySegment = Util.buildMemorySegment(resources.getArena(), paddedFilterBytes);
+      prefilterDataLength = paddedFilterBytes.length;
+    }
+
     MemorySegment querySeg = Util.buildMemorySegment(resources.getArena(), cuvsQuery.getQueryVectors());
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
@@ -193,7 +208,7 @@ public class BruteForceIndexImpl implements BruteForceIndex{
         distancesMemorySegment,
         returnValue,
         prefilterDataMemorySegment,
-        prefilterDataLength, numRows
+        prefilterDataLength
       );
       checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
     }

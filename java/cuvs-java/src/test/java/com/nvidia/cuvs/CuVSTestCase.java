@@ -101,6 +101,34 @@ public abstract class CuVSTestCase {
     }
   }
 
+  protected static void checkResults(List<Map<Integer, Float>> expected, List<Map<Integer, Float>> actual) {
+    List<Map<Integer, Float>> sortedExpected = new ArrayList<Map<Integer,Float>>();
+    List<Map<Integer, Float>> sortedActual   = new ArrayList<Map<Integer,Float>>();
+    for (Map<Integer, Float> map: expected) {
+      sortedExpected.add(new TreeMap<Integer, Float>(map) {
+        @Override
+        public boolean equals(Object o) {
+          Map<Integer, Float> map = (Map<Integer, Float>) o;
+          if (this.size() != map.size()) return false;
+          for (Integer key: map.keySet()) {
+            try {
+              if (Math.abs((float)map.get(key) - ((float)get(key))) < 0.0001f == false) {
+                return false;
+              }
+            } catch (Exception ex) {
+              return false;
+            }
+          }
+          return true;
+        }
+      });
+    }
+    for (Map<Integer, Float> map: actual) {
+      sortedActual.add(new TreeMap<Integer, Float>(map));
+    }
+    assertEquals(sortedExpected, sortedActual);
+  }
+
   protected static boolean isLinuxAmd64() {
     String name = System.getProperty("os.name");
     return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
