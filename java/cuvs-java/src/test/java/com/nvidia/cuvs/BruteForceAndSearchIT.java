@@ -67,7 +67,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
     };
 
     // Expected search results
-    final List<Map<Integer, Float>> expectedResults = Arrays.asList(
+    List<Map<Integer, Float>> expectedResults = Arrays.asList(
         Map.of(3, 0.038782537f, 2, 0.35904616f, 0, 0.83774555f),
         Map.of(0, 0.12472606f, 2, 0.21700788f, 1, 0.3191862f),
         Map.of(3, 0.047766685f, 2, 0.20332813f, 0, 0.48305476f),
