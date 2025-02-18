@@ -453,7 +453,8 @@ struct blob_mmap {
           size_t size = data_end - data_start;
           mmap_owner owner{size, flags};
           std::fseek(file_.descriptor().value(), data_start, SEEK_SET);
-          size_t n_elems = file_.rows_limit() * file_.n_cols();
+          auto n_elems =
+            static_cast<size_t>(file_.rows_limit()) * static_cast<size_t>(file_.n_cols());
           if (std::fread(owner.data(), sizeof(T), n_elems, file_.descriptor().value()) != n_elems) {
             throw std::runtime_error{"cuvs::bench::blob_mmap() fread " + file_.path() + " failed"};
           }
