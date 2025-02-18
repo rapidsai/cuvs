@@ -20,18 +20,20 @@
 
 namespace cuvs::preprocessing::quantize::binary {
 
-#define CUVS_INST_QUANTIZATION(T, QuantI)                            \
-  void transform(raft::resources const& res,                         \
-                 raft::device_matrix_view<const T, int64_t> dataset, \
-                 raft::device_matrix_view<QuantI, int64_t> out)      \
-  {                                                                  \
-    detail::transform(res, dataset, out);                            \
-  }                                                                  \
-  void transform(raft::resources const& res,                         \
-                 raft::host_matrix_view<const T, int64_t> dataset,   \
-                 raft::host_matrix_view<QuantI, int64_t> out)        \
-  {                                                                  \
-    detail::transform(res, dataset, out);                            \
+#define CUVS_INST_QUANTIZATION(T, QuantI)                              \
+  void transform(raft::resources const& res,                           \
+                 cuvs::preprocessing::quantize::binary::params params, \
+                 raft::device_matrix_view<const T, int64_t> dataset,   \
+                 raft::device_matrix_view<QuantI, int64_t> out)        \
+  {                                                                    \
+    detail::transform(res, params, dataset, out);                      \
+  }                                                                    \
+  void transform(raft::resources const& res,                           \
+                 cuvs::preprocessing::quantize::binary::params params, \
+                 raft::host_matrix_view<const T, int64_t> dataset,     \
+                 raft::host_matrix_view<QuantI, int64_t> out)          \
+  {                                                                    \
+    detail::transform(res, params, dataset, out);                      \
   }
 
 CUVS_INST_QUANTIZATION(double, uint8_t);

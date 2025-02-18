@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/preprocessing/quantize/scalar.hpp>
+#include <cuvs/preprocessing/quantize/binary.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/random/rng.cuh>
@@ -42,6 +42,7 @@ _RAFT_HOST_DEVICE bool is_positive<half>(const half& a)
 template <class T, uint32_t block_size, class pack_t = uint8_t>
 RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
                                        const uint32_t ldi,
+                                       const T* const threshold_ptr,
                                        const size_t dataset_size,
                                        const uint32_t dataset_dim,
                                        pack_t* const out_ptr,
@@ -71,7 +72,8 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
     for (uint32_t bit_offset = 0; bit_offset < bits_per_pack; bit_offset++) {
       const auto j = j_offset + lane_id + bit_offset * warp_size;
       if (j < dataset_dim) {
-        const auto v = in_ptr[vector_id * ldi + j];
+        auto v = in_ptr[vector_id * ldi + j];
+        if (threshold_ptr != nullptr) { v -= threshold_ptr[j]; }
         if (is_positive(v)) { pack |= (1u << bit_offset); }
       }
     }
@@ -108,6 +110,7 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
 
 template <typename T, typename QuantI = uint8_t>
 void transform(raft::resources const& res,
+               cuvs::preprocessing::quantize::binary::params params,
                raft::device_matrix_view<const T, int64_t> dataset,
                raft::device_matrix_view<QuantI, int64_t> out)
 {
@@ -129,6 +132,18 @@ void transform(raft::resources const& res,
                dataset_size,
                out_dataset_size);
 
+  auto mr = raft::resource::get_workspace_resource(res);
+  auto threshold_vec =
+    raft::make_device_mdarray<T, std::int64_t>(res, mr, raft::make_extents<std::int64_t>(0));
+
+  T* threshold_ptr = nullptr;
+
+  if (0) {
+    threshold_vec = raft::make_device_mdarray<T, std::int64_t>(
+      res, mr, raft::make_extents<std::int64_t>(dataset_dim));
+    threshold_ptr = threshold_vec.data_handle();
+  }
+
   constexpr uint32_t warp_size    = 32;
   constexpr uint32_t block_size   = 256;
   constexpr uint32_t vecs_per_cta = block_size / warp_size;
@@ -138,6 +153,7 @@ void transform(raft::resources const& res,
   binary_quantization_kernel<T, block_size>
     <<<grid_size, block_size, 0, stream>>>(dataset.data_handle(),
                                            dataset.stride(0),
+                                           threshold_ptr,
                                            dataset_size,
                                            dataset_dim,
                                            out.data_handle(),
@@ -146,6 +162,7 @@ void transform(raft::resources const& res,
 
 template <typename T, typename QuantI = uint8_t>
 void transform(raft::resources const& res,
+               cuvs::preprocessing::quantize::binary::params params,
                raft::host_matrix_view<const T, int64_t> dataset,
                raft::host_matrix_view<QuantI, int64_t> out)
 {
