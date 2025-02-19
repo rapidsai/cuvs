@@ -55,7 +55,7 @@ public abstract class CuVSTestCase {
     List<List<Integer>> neighborsResult = new ArrayList<>();
     int dimensions = dataset[0].length;
 
-    for (int q=0; q<queries.length; q++) {
+    for (int q = 0; q < queries.length; q++) {
       float[] query = queries[q];
       Map<Integer, Double> distances = new TreeMap<>();
       for (int j = 0; j < dataset.length; j++) {

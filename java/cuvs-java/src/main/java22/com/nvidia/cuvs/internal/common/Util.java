@@ -214,13 +214,13 @@ public class Util {
 
   public static BitSet concatenate(BitSet[] arr, int maxSizeOfEachBitSet) {
     BitSet ret = new BitSet(maxSizeOfEachBitSet * arr.length);
-    for (int i=0; i<arr.length; i++) {
+    for (int i = 0; i < arr.length; i++) {
       BitSet b = arr[i];
       if (b == null || b.length() == 0) {
-        ret.set(i*maxSizeOfEachBitSet, (i+1)*maxSizeOfEachBitSet);
+        ret.set(i * maxSizeOfEachBitSet, (i + 1) * maxSizeOfEachBitSet);
       } else {
-        for (int j=0; j<maxSizeOfEachBitSet; j++) {
-          ret.set(i*maxSizeOfEachBitSet + j, b.get(j));
+        for (int j = 0; j < maxSizeOfEachBitSet; j++) {
+          ret.set(i * maxSizeOfEachBitSet + j, b.get(j));
         }
       }
     }

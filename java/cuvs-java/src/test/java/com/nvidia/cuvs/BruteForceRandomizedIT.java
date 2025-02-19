@@ -67,15 +67,14 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     BitSet[] prefilters = null;
     if (usePrefilter) {
       prefilters = new BitSet[numQueries];
-      for (int i=0; i<numQueries; i++) {
+      for (int i = 0; i < numQueries; i++) {
         BitSet randomFilter = new BitSet(datasetSize);
-        for (int j=0; j<datasetSize; j++) {
+        for (int j = 0; j < datasetSize; j++) {
           randomFilter.set(j, random.nextBoolean());
         }
         prefilters[i] = randomFilter;
       }
     }
-
 
     // Generate a random dataset
     float[][] dataset = generateData(random, datasetSize, dimensions);
