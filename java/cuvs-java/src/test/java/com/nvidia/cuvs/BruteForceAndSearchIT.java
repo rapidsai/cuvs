@@ -130,7 +130,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         // search the loaded index
         SearchResults results = loadedIndex.search(cuvsQuery);
         checkResults(expectedResults, results.getResults());
-        
+
         // search the first index
         results = index.search(cuvsQuery);
         checkResults(expectedResults, results.getResults());
@@ -138,7 +138,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         // search with pre-filtering
         results = index.search(cuvsQueryWithFiltering);
         checkResults(expectedResultsWithFiltering, results.getResults());
-        
+
         // Cleanup
         index.destroyIndex();
         loadedIndex.destroyIndex();
