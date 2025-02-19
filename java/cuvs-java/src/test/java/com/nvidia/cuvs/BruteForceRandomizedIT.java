@@ -17,6 +17,8 @@
 package com.nvidia.cuvs;
 
 import java.lang.invoke.MethodHandles;
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 import org.junit.Before;
@@ -58,9 +60,22 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     int dimensions = random.nextInt(DIMENSIONS_LIMIT) + 1;
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
-
+    boolean usePrefilter = random.nextBoolean();
     if (datasetSize < topK)
       datasetSize = topK;
+
+    BitSet[] prefilters = null;
+    if (usePrefilter) {
+      prefilters = new BitSet[numQueries];
+      for (int i=0; i<numQueries; i++) {
+        BitSet randomFilter = new BitSet(datasetSize);
+        for (int j=0; j<datasetSize; j++) {
+          randomFilter.set(j, random.nextBoolean());
+        }
+        prefilters[i] = randomFilter;
+      }
+    }
+
 
     // Generate a random dataset
     float[][] dataset = generateData(random, datasetSize, dimensions);
@@ -90,7 +105,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, prefilters, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
@@ -98,6 +113,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
       BruteForceQuery query = new BruteForceQuery.Builder()
           .withTopK(topK)
           .withQueryVectors(queries)
+          .withPrefilter(prefilters, dataset.length)
           .build();
 
       BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()

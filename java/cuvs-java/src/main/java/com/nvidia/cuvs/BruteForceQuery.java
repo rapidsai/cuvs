@@ -30,6 +30,7 @@ public class BruteForceQuery {
   private List<Integer> mapping;
   private float[][] queryVectors;
   private BitSet[] prefilters;
+  private int numDocs = -1;
   private int topK;
 
   /**
@@ -41,12 +42,15 @@ public class BruteForceQuery {
    * @param topK         the top k results to return
    * @param prefilter    the prefilter data to use while searching the BRUTEFORCE
    *                     index
+   * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
+   *                     Used only when prefilter(s) is/are passed.
    */
-  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters) {
+  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
     this.prefilters = prefilters;
+    this.numDocs = numDocs;
   }
 
   /**
@@ -85,6 +89,15 @@ public class BruteForceQuery {
     return prefilters;
   }
 
+  /**
+   * Gets the number of documents supposed to be in this index, as used for prefilters
+   *
+   * @return number of documents as an integer
+   */
+  public int getNumDocs() {
+    return numDocs;
+  }
+
   @Override
   public String toString() {
     return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", prefilter="
@@ -98,6 +111,7 @@ public class BruteForceQuery {
 
     private float[][] queryVectors;
     private BitSet[] prefilters;
+    private int numDocs;
     private List<Integer> mapping;
     private int topK = 2;
 
@@ -141,8 +155,9 @@ public class BruteForceQuery {
      *        many bits as there are vectors in the index
      * @return an instance of this Builder
      */
-    public Builder withPrefilter(BitSet[] prefilters) {
+    public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
       this.prefilters = prefilters;
+      this.numDocs = numDocs;
       return this;
     }
 
@@ -152,7 +167,7 @@ public class BruteForceQuery {
      * @return an instance of {@link BruteForceQuery}
      */
     public BruteForceQuery build() {
-      return new BruteForceQuery(queryVectors, mapping, topK, prefilters);
+      return new BruteForceQuery(queryVectors, mapping, topK, prefilters, numDocs);
     }
   }
 }

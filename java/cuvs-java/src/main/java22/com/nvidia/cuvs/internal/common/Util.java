@@ -212,30 +212,19 @@ public class Util {
     return dataMemorySegment;
   }
 
-  public static BitSet concatenate(BitSet[] arr) {
-    // compute the size of the largest bitset
-    int size = -1;
-    for (BitSet b: arr) {
-      if (b == null) continue;
-      if (size == -1) size = Math.max(size, b.length());
-    }
-    if (size == -1) throw new RuntimeException("No valid bitset present in the array");
-    BitSet ret = new BitSet(size * arr.length);
+  public static BitSet concatenate(BitSet[] arr, int maxSizeOfEachBitSet) {
+    BitSet ret = new BitSet(maxSizeOfEachBitSet * arr.length);
     for (int i=0; i<arr.length; i++) {
       BitSet b = arr[i];
       if (b == null || b.length() == 0) {
-        ret.set(i*size, (i+1)*size);
+        ret.set(i*maxSizeOfEachBitSet, (i+1)*maxSizeOfEachBitSet);
       } else {
-        for (int j=0; j<size; j++) {
-          ret.set(i*size + j, b.get(j));
+        for (int j=0; j<maxSizeOfEachBitSet; j++) {
+          ret.set(i*maxSizeOfEachBitSet + j, b.get(j));
         }
       }
     }
     return ret;
-  }
-
-  public static int roundUp(int value, int multiplier) {
-    return (value + multiplier - 1) / multiplier * multiplier;
   }
 
 }

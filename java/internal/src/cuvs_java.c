@@ -266,7 +266,7 @@ cuvsBruteForceIndex_t build_brute_force_index(float *dataset, long rows, long di
  * @param[in] n_rows number of rows in the dataset
  */
 void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int topk, long n_queries, int dimensions,
-    cuvsResources_t cuvs_resources, int64_t *neighbors_h, float *distances_h, int *return_value, unsigned char *prefilter_data,
+    cuvsResources_t cuvs_resources, int64_t *neighbors_h, float *distances_h, int *return_value, uint32_t *prefilter_data,
     long prefilter_data_length) {
 
   cudaStream_t stream;
@@ -296,16 +296,10 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
     prefilter.addr = (uintptr_t)NULL;
   } else {
     // Parse the filters data
-    uint32_t *prefilters = (uint32_t*) malloc(prefilter_data_length);
-    int num_integers = prefilter_data_length / sizeof(uint32_t);
-    for (int i=0; i<num_integers; i++) {
-      *(prefilters + i) = (uint32_t)prefilter_data[4*i + 1] << 24 |
-            (uint32_t)prefilter_data[4*i + 0] << 16 |
-            (uint32_t)prefilter_data[4*i + 3] << 8  |
-            (uint32_t)prefilter_data[4*i + 2];
-    }
-    int64_t prefilter_shape[1] = {prefilter_data_length};
-    DLManagedTensor prefilter_tensor = prepare_tensor(prefilters, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
+    int num_integers = (prefilter_data_length+63)/64 * 2;
+    int extraPaddingByteExists = prefilter_data_length % 64 > 32? 0: 1;
+    int64_t prefilter_shape[1] = {(prefilter_data_length + 31) / 32};
+    DLManagedTensor prefilter_tensor = prepare_tensor(prefilter_data, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
     prefilter.type = BITMAP;
     prefilter.addr = (uintptr_t)&prefilter_tensor;
   }
