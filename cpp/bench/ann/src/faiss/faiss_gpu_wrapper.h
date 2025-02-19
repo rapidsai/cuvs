@@ -579,6 +579,8 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
   }
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
+
+  std::shared_ptr<faiss::gpu::GpuIndex> faiss_index() { return this->index_; }
 };
 
 template <typename T>
@@ -586,6 +588,7 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
  public:
   struct build_param : public faiss_gpu<T>::build_param {
     typename faiss_gpu_cagra<T>::build_param p;
+    bool base_level_only = true;
   };
   using typename faiss_gpu<T>::search_param_base;
   struct search_param : public faiss_gpu<T>::search_param {
@@ -598,10 +601,15 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
     this->build_index_  = std::make_shared<faiss_gpu_cagra<T>>(metric, dim, param.p);
     this->search_index_ = std::make_shared<faiss::IndexHNSWCagra>(
       dim, int(param.p.graph_degree / 2), this->metric_type_);
-    this->search_index_->base_level_only = true;
+    this->search_index_->base_level_only = param.base_level_only;
   }
 
-  void build(const T* dataset, size_t nrow) override { this->build_index_->build(dataset, nrow); }
+  void build(const T* dataset, size_t nrow) override
+  {
+    this->build_index_->build(dataset, nrow);
+    static_cast<faiss::gpu::GpuIndexCagra*>((build_index_->faiss_index()).get())
+      ->copyTo(search_index_.get());
+  }
 
   void set_search_param(const search_param_base& param, const void* filter_bitset) override
   {
@@ -624,12 +632,14 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
                           this->search_params_.get());
   }
 
-  void save(const std::string& file) const override { this->build_index_->save(file); }
+  void save(const std::string& file) const override
+  {
+    faiss::write_index(search_index_.get(), file.c_str());
+  }
   void load(const std::string& file) override
   {
     omp_single_thread_scope omp_single_thread;
     this->search_index_.reset(static_cast<faiss::IndexHNSWCagra*>(faiss::read_index(file.c_str())));
-    this->search_index_->base_level_only = true;
   }
   std::unique_ptr<algo<T>> copy() override
   {

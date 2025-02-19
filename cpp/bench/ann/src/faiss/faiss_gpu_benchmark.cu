@@ -114,6 +114,7 @@ void parse_build_param(const nlohmann::json& conf,
   typename cuvs::bench::faiss_gpu_cagra<T>::build_param p;
   parse_build_param<T>(conf, p);
   param.p = p;
+  if (conf.contains("base_level_only")) { param.base_level_only = conf.at("base_level_only"); }
 }
 
 template <typename T>

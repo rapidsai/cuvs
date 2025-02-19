@@ -89,11 +89,11 @@ class faiss_cpu : public algo<T> {
 
   // TODO(snanditale): if the number of results is less than k, the remaining elements of
   // 'neighbors' will be filled with (size_t)-1
-  void search(const T* queries,
-              int batch_size,
-              int k,
-              algo_base::index_type* neighbors,
-              float* distances) const final;
+  virtual void search(const T* queries,
+                      int batch_size,
+                      int k,
+                      algo_base::index_type* neighbors,
+                      float* distances) const;
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -351,7 +351,7 @@ class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
   {
     if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto sp              = static_cast<const typename faiss_cpu_hnsw_flat<T>::search_param&>(param);
-    this->search_params_ = sp.p;
+    this->search_params_ = std::make_shared<faiss::SearchParametersHNSW>(sp.p);
   };
 
   void save(const std::string& file) const override
@@ -365,8 +365,24 @@ class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
     return std::make_unique<faiss_cpu_hnsw_flat<T>>(*this);  // use copy constructor
   }
 
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override
+  {
+    static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
+                  "sizes of size_t and faiss::idx_t are different");
+    this->index_->search(batch_size,
+                         queries,
+                         k,
+                         distances,
+                         reinterpret_cast<faiss::idx_t*>(neighbors),
+                         search_params_.get());
+  }
+
  private:
-  faiss::SearchParametersHNSW search_params_;
+  std::shared_ptr<faiss::SearchParameters> search_params_;
 };
 
 }  // namespace cuvs::bench

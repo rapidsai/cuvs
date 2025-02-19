@@ -93,11 +93,13 @@ template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::faiss_cpu_hnsw_flat<T>::search_param& param)
 {
-  if (conf.contains("efSearch")) { param.p.efSearch = conf.at("efSearch"); }
+  faiss::SearchParametersHNSW p;
+  if (conf.contains("efSearch")) { p.efSearch = conf.at("efSearch"); }
   if (conf.contains("check_relative_distance")) {
-    param.p.check_relative_distance = conf.at("check_relative_distance");
+    p.check_relative_distance = conf.at("check_relative_distance");
   }
-  if (conf.contains("bounded_queue")) { param.p.bounded_queue = conf.at("bounded_queue"); }
+  if (conf.contains("bounded_queue")) { p.bounded_queue = conf.at("bounded_queue"); }
+  param.p = p;
 }
 
 template <typename T, template <typename> class Algo>
