@@ -49,7 +49,6 @@ function(ConfigureTest)
     PRIVATE cuvs
             cuvs::cuvs
             raft::raft
-            test_rmm_logger
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
@@ -87,9 +86,6 @@ function(ConfigureTest)
     INSTALL_COMPONENT_SET testing
   )
 endfunction()
-
-add_library(test_rmm_logger OBJECT)
-target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
 
 # ##################################################################################################
 # test sources ##################################################################################
@@ -248,7 +244,8 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
-    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu GPUS 1 PERCENT 100
+    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu
+    preprocessing/binary_quantization.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(

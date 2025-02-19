@@ -18,6 +18,7 @@ add_subdirectory(hnsw)
 add_subdirectory(ivf_flat)
 add_subdirectory(ivf_pq)
 add_subdirectory(filters)
+add_subdirectory(nn_descent)
 
 # Set the list of Cython files to build
 set(cython_sources refine.pyx)
@@ -29,7 +30,3 @@ rapids_cython_create_modules(
   SOURCE_FILES "${cython_sources}"
   LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_refine_
 )
-
-foreach(tgt IN LISTS RAPIDS_CYTHON_CREATED_TARGETS)
-  target_link_libraries(${tgt} PRIVATE cuvs_rmm_logger)
-endforeach()

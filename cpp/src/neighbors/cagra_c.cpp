@@ -55,13 +55,19 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
         cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
       break;
     }
-    case cuvsCagraGraphBuildAlgo::NN_DESCENT:
+    case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
       cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
       nn_descent_params =
         cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
       nn_descent_params.max_iterations = params.nn_descent_niter;
       index_params.graph_build_params  = nn_descent_params;
       break;
+    }
+    case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
+      cuvs::neighbors::cagra::graph_build_params::iterative_search_params p;
+      index_params.graph_build_params = p;
+      break;
+    }
   };
 
   if (auto* cparams = params.compression; cparams != nullptr) {
@@ -254,6 +260,8 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
     index->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
@@ -320,6 +328,9 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _search<float>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+    } else if (queries.dtype.code == kDLFloat && queries.dtype.bits == 16) {
+      _search<half>(
         res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
       _search<int8_t>(
@@ -433,6 +444,8 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize<float>(res, filename, index, include_dataset);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize<int8_t>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {

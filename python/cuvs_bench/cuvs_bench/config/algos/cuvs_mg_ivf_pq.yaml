@@ -39,3 +39,15 @@ groups:
       internalDistanceDtype: ["float"]
       smemLutDtype: ["float", "fp8", "half"]
       refine_ratio: [1]
+  test:
+    build:
+      nlist: [1024]
+      pq_dim: [64]
+      pq_bits: [8]
+      ratio: [10]
+      niter: [25]
+    search:
+      nprobe: [1]
+      internalDistanceDtype: ["float"]
+      smemLutDtype: ["float", "fp8", "half"]
+      refine_ratio: [1]

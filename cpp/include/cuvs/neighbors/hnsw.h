@@ -42,7 +42,9 @@ enum cuvsHnswHierarchy {
   /* Flat hierarchy, search is base-layer only */
   NONE,
   /* Full hierarchy is built using the CPU */
-  CPU
+  CPU,
+  /* Full hierarchy is built using the GPU */
+  GPU
 };
 
 struct cuvsHnswIndexParams {
@@ -50,9 +52,12 @@ struct cuvsHnswIndexParams {
   enum cuvsHnswHierarchy hierarchy;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction;
-  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU`
-      When the value is 0, the number of threads is automatically determined to the maximum
-      number of threads available.
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` or `GPU`.
+      When the value is 0, the number of threads is automatically determined to the
+      maximum number of threads available.
+      NOTE: When hierarchy is `GPU`, while the majority of the work is done on the GPU,
+      initialization of the HNSW index itself and some other work
+      is parallelized with the help of CPU threads.
   */
   int num_threads;
 };

@@ -281,6 +281,13 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(half (&x)[4], uint32_t addr)
                : "r"(addr));
 }
 
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint8_t& x, uint32_t addr)
+{
+  uint32_t res;
+  asm volatile("ld.shared.u8 {%0}, [%1];" : "=r"(res) : "r"(addr));
+  x = static_cast<uint32_t>(res);
+}
+
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, uint32_t addr)
 {
   asm volatile("ld.shared.u32 {%0}, [%1];" : "=r"(x) : "r"(addr));

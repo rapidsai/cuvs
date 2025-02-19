@@ -42,7 +42,9 @@ enum cuvsCagraGraphBuildAlgo {
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
-  NN_DESCENT
+  NN_DESCENT,
+  /* Experimental, use iterative cagra search and optimize to build the knn graph */
+  ITERATIVE_CAGRA_SEARCH
 };
 
 /** Parameters for VPQ compression. */
@@ -333,8 +335,9 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *        3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -421,8 +424,9 @@ cuvsError_t cuvsCagraExtend(cuvsResources_t res,
  * queries.dl_tensor.dtype.code` Types for input are:
  *        1. `queries`:
  *          a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *          b. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *          c. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *          b. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *          c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *          d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
