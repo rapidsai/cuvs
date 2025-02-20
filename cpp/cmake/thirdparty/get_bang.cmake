@@ -41,7 +41,7 @@ function(find_and_configure_bang)
 
 endfunction()
 
-find_and_configure_nlohmann_json(VERSION  0
+find_and_configure_bang(VERSION  0
         FORK             tarang-jain
         PINNED_TAG       rapids
         )
