@@ -29,6 +29,17 @@ namespace cuvs::neighbors::cagra {
   {                                                                                \
     cuvs::neighbors::cagra::search<T, IdxT>(                                       \
       handle, params, index, queries, neighbors, distances, sample_filter);        \
+  };                                                                               \
+  void search(raft::resources const& handle,                                       \
+              cuvs::neighbors::cagra::search_params const& params,                 \
+              const cuvs::neighbors::cagra::composite_index<T, IdxT>& index,       \
+              raft::device_matrix_view<const T, int64_t, raft::row_major> queries, \
+              raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,  \
+              raft::device_matrix_view<float, int64_t, raft::row_major> distances, \
+              const cuvs::neighbors::filtering::base_filter& sample_filter)        \
+  {                                                                                \
+    cuvs::neighbors::cagra::search<T, IdxT>(                                       \
+      handle, params, index, queries, neighbors, distances, sample_filter);        \
   }
 
 CUVS_INST_CAGRA_SEARCH(int8_t, uint32_t);
