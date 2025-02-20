@@ -24,11 +24,12 @@ function(find_and_configure_bang)
 
   rapids_cpm_find(
     bang ${version}
+    GLOBAL_TARGETS bang bang::bang
     CPM_ARGS
     GIT_REPOSITORY https://github.com/${PKG_FORK}/BANG-Billion-Scale-ANN.git
     GIT_TAG ${tag}
     GIT_SHALLOW ${shallow}
-    )
+  )
 
   if(TARGET bang AND NOT TARGET bang::bang)
     add_library(bang::bang ALIAS bang)
