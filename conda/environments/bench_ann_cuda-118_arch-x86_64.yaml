@@ -40,7 +40,8 @@ dependencies:
 - libcuvs==25.4.*,>=0.0.0a0
 - librmm==25.4.*,>=0.0.0a0
 - matplotlib-base
-- mkl-devel=2023
+- mkl-devel=2022.2.1
+- mkl=2022.2.1
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2
