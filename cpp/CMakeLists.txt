@@ -636,6 +636,7 @@ SECTIONS
   if(CUVS_NVTX)
     # This enables NVTX within the project with no option to disable it downstream.
     target_link_libraries(cuvs PUBLIC CUDA::nvtx3)
+    target_compile_definitions(cuvs_objs PUBLIC NVTX_ENABLED)
     target_compile_definitions(cuvs PUBLIC NVTX_ENABLED)
 
     target_link_libraries(cuvs-cagra-search PUBLIC CUDA::nvtx3)
