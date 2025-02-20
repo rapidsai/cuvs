@@ -32,9 +32,16 @@ namespace cuvs::preprocessing::quantize::binary {
  */
 
 /**
+ * @brief quantizer algorithms
+ */
+enum class threshold_mode { zero, mean, sampling_median };
+
+/**
  * @brief quantizer parameters.
  */
-struct params {};
+struct params {
+  threshold_mode threshold = threshold_mode::zero;
+};
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,

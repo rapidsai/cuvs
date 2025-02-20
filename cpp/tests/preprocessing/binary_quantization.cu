@@ -58,11 +58,15 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
     {
       static_assert(std::is_same_v<QuantI, uint8_t>);
 
+      cuvs::preprocessing::quantize::binary::params params;
+
       const auto col_quantized = raft::div_rounding_up_safe(cols_, 8);
       auto quantized_input_h   = raft::make_host_matrix<QuantI, int64_t>(rows_, cols_);
       auto quantized_input_d   = raft::make_device_matrix<QuantI, int64_t>(handle, rows_, cols_);
-      cuvs::preprocessing::quantize::binary::transform(handle, dataset, quantized_input_d.view());
-      cuvs::preprocessing::quantize::binary::transform(handle, dataset_h, quantized_input_h.view());
+      cuvs::preprocessing::quantize::binary::transform(
+        handle, params, dataset, quantized_input_d.view());
+      cuvs::preprocessing::quantize::binary::transform(
+        handle, params, dataset_h, quantized_input_h.view());
 
       ASSERT_TRUE(devArrMatchHost(quantized_input_h.data_handle(),
                                   quantized_input_d.data_handle(),
