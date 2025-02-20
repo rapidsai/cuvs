@@ -46,8 +46,8 @@ requirements:
   host:
     - benchmark
     - glog {{ glog_version }}
-    - libaio
-    - libboost-devel=1.87
+    - libaio  # [linux64]
+    - libboost-devel=1.87  # [linux64]
     - mkl-devel=2023  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
