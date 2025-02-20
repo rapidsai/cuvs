@@ -20,13 +20,14 @@ function(find_and_configure_bang)
             "${multiValueArgs}" ${ARGN} )
 
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(bang version repository tag)
+  rapids_cpm_package_details(bang version repository tag shallow exclude)
 
-  rapids_cpm_find(bang ${version}
-    GLOBAL_TARGETS bang bang::bang
+  rapids_cpm_find(
+    bang ${version}
     CPM_ARGS
     GIT_REPOSITORY https://github.com/${PKG_FORK}/BANG-Billion-Scale-ANN.git
     GIT_TAG ${tag}
+    GIT_SHALLOW ${shallow}
     )
 
   if(TARGET bang AND NOT TARGET bang::bang)
