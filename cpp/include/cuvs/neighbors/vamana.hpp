@@ -456,6 +456,7 @@ auto build(raft::resources const& res,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
  *
  */
 
@@ -484,6 +485,7 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
  *
  */
 void serialize(raft::resources const& handle,
@@ -511,6 +513,7 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
  *
  */
 void serialize(raft::resources const& handle,
