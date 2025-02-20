@@ -105,7 +105,7 @@ repos:
         hooks:
               - id: check-json
       - repo: https://github.com/rapidsai/pre-commit-hooks
-        rev: v0.4.0
+        rev: v0.6.0
         hooks:
           - id: verify-copyright
             files: |
@@ -119,6 +119,8 @@ repos:
                   docs/source/sphinxext/github_link\.py|
                   cpp/cmake/modules/FindAVX\.cmake|
           - id: verify-alpha-spec
+          - id: verify-codeowners
+            args: [--fix, --project-prefix=cuvs]
       - repo: https://github.com/rapidsai/dependency-file-generator
         rev: v1.17.0
         hooks:
