@@ -27,6 +27,11 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 
+#include <optional>
+#include <tuple>
+#include <variant>
+#include <vector>
+
 namespace cuvs::neighbors::ivf_pq {
 
 /**
@@ -181,6 +186,21 @@ struct search_params : cuvs::neighbors::search_params {
    * performance if tweaked incorrectly.
    */
   double preferred_shmem_carveout = 1.0;
+  /**
+   * [Experimental] The data type to use as the GEMM element type when searching the clusters to
+   * probe.
+   *
+   * Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].
+   *
+   * - Legacy default: CUDA_R_32F (float)
+   * - Recommended for performance: CUDA_R_16F (half)
+   * - Experimental/low-precision: CUDA_R_8I (int8_t)
+   */
+  cudaDataType_t coarse_search_dtype = CUDA_R_32F;
+  /**
+   * Set the internal batch size to improve GPU utilization at the cost of larger memory footprint.
+   */
+  uint32_t max_internal_batch_size = 4096;
 };
 /**
  * @}
@@ -427,6 +447,11 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept;
 
+  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> rotation_matrix_int8(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const half, uint32_t, raft::row_major> rotation_matrix_half(
+    const raft::resources& res) const;
+
   /**
    * Accumulated list sizes, sorted in descending order [n_lists + 1].
    * The last value contains the total length of the index.
@@ -446,6 +471,11 @@ struct index : cuvs::neighbors::index {
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+
+  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
+    const raft::resources& res) const;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
@@ -484,6 +514,14 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
+
+  // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
+  // These are never serialized and not touched during build/extend.
+  mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>> centers_int8_;
+  mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> centers_half_;
+  mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>>
+    rotation_matrix_int8_;
+  mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> rotation_matrix_half_;
 
   // Computed members for accelerating search.
   raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;

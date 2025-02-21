@@ -239,6 +239,10 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
   auto stream         = raft::resource::get_cuda_stream(handle);
   auto* device_memory = raft::resource::get_workspace_resource(handle);
 
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    index->centers().data_handle(), index->centers().size(), stream);
   // combine cluster_centers and their norms
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
                                   sizeof(float) * index->dim_ext(),
