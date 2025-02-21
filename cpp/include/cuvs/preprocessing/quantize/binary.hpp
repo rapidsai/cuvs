@@ -34,13 +34,15 @@ namespace cuvs::preprocessing::quantize::binary {
 /**
  * @brief quantizer algorithms
  */
-enum class threshold_mode { zero, mean, sampling_median };
+enum class set_bit_threshold { zero, mean, sampling_median };
 
 /**
  * @brief quantizer parameters.
  */
 struct params {
-  threshold_mode threshold = threshold_mode::zero;
+  set_bit_threshold threshold = set_bit_threshold::zero;
+
+  float sampling_ratio = 0.1;
 };
 
 /**

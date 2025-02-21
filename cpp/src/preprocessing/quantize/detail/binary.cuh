@@ -32,16 +32,16 @@ template <typename T>
 RAFT_KERNEL sample_and_transpose_dataset_kernel(const T* const in_ptr,
                                                 const uint32_t ldi,
                                                 const size_t dataset_size,
-                                                const uint32_t chunk_dim,
+                                                const uint32_t dim_chunk,
                                                 const size_t num_samples,
-                                                const size_t prime,
+                                                const size_t stride,
                                                 T* const out_ptr,
                                                 const uint32_t ldo)
 {
   const auto tid = threadIdx.x + blockDim.x * blockIdx.x;
-  for (size_t i = tid; i < num_samples * chunk_dim; i += gridDim.x * blockDim.x) {
+  for (size_t i = tid; i < num_samples * dim_chunk; i += gridDim.x * blockDim.x) {
     const auto sampled_mat_i = i % num_samples;
-    const auto in_mat_i      = (sampled_mat_i * prime) % dataset_size;
+    const auto in_mat_i      = (sampled_mat_i * stride) % dataset_size;
     const auto mat_j         = i / num_samples;
 
     out_ptr[sampled_mat_i + mat_j * ldo] = in_ptr[in_mat_i * ldi + mat_j];
@@ -52,7 +52,7 @@ template <typename T>
 inline void sample_and_transpose_dataset(const T* const in_ptr,
                                          const uint32_t ldi,
                                          const size_t dataset_size,
-                                         const uint32_t chunk_dim,
+                                         const uint32_t dim_chunk,
                                          const size_t num_samples,
                                          T* const out_ptr,
                                          const uint32_t ldo,
@@ -60,18 +60,18 @@ inline void sample_and_transpose_dataset(const T* const in_ptr,
 {
   constexpr uint32_t block_size = 256;
   const auto grid_size =
-    std::min(raft::div_rounding_up_safe<size_t>(num_samples * chunk_dim, block_size), 2048lu);
+    std::min(raft::div_rounding_up_safe<size_t>(num_samples * dim_chunk, block_size), 2048lu);
 
   // Note that one of the candidates must be prime to the dataset size because the product of the
   // prime candidates exceeds the maximum of U64.
-  size_t prime_list[] = {611323lu, 611333lu, 611389lu, 611393};
-  uint32_t prime_i    = 0;
-  while (dataset_size % prime_list[prime_i] == 0) {
+  size_t stride_prime_list[] = {611323lu, 611333lu, 611389lu, 611393};
+  uint32_t prime_i           = 0;
+  while (dataset_size % stride_prime_list[prime_i] == 0) {
     prime_i++;
   }
 
   sample_and_transpose_dataset_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
-    in_ptr, ldi, dataset_size, chunk_dim, num_samples, prime_list[prime_i], out_ptr, ldo);
+    in_ptr, ldi, dataset_size, dim_chunk, num_samples, stride_prime_list[prime_i], out_ptr, ldo);
 }
 
 template <class T>
@@ -185,14 +185,15 @@ void transform(raft::resources const& res,
 
   T* threshold_ptr = nullptr;
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::threshold_mode::mean ||
-      params.threshold == cuvs::preprocessing::quantize::binary::threshold_mode::sampling_median) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean ||
+      params.threshold ==
+        cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
     threshold_vec = raft::make_device_mdarray<T, std::int64_t>(
       res, mr, raft::make_extents<std::int64_t>(dataset_dim));
     threshold_ptr = threshold_vec.data_handle();
   }
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::threshold_mode::mean) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean) {
     raft::stats::mean(
       res,
       dataset,
@@ -200,14 +201,18 @@ void transform(raft::resources const& res,
       false);
   }
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::threshold_mode::sampling_median) {
-    // The num samples is odd
+  if (params.threshold ==
+      cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+    // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
-      std::max(raft::div_rounding_up_safe(static_cast<size_t>(dataset_size * 0.1), 2lu) * 2lu,
-               2lu) -
+      std::max(
+        raft::div_rounding_up_safe(static_cast<size_t>(dataset_size * params.sampling_ratio), 2lu) *
+          2lu,
+        2lu) -
       1;
     const uint32_t max_dim_chunk = 128;
-    auto sampled_dataset_chunk   = raft::make_device_mdarray<T, int64_t>(
+
+    auto sampled_dataset_chunk = raft::make_device_mdarray<T, int64_t>(
       res, mr, raft::make_extents<int64_t>(max_dim_chunk, num_sampls));
     for (uint32_t dim_offset = 0; dim_offset < dataset_dim; dim_offset += max_dim_chunk) {
       const auto dim_chunk = std::min(max_dim_chunk, dataset_dim - dim_offset);
@@ -222,12 +227,12 @@ void transform(raft::resources const& res,
                                       raft::resource::get_cuda_stream(res));
 
       for (uint32_t i = 0; i < dim_chunk; i++) {
-        thrust::sort(sampled_dataset_chunk.data_handle() + i * num_sampls,
-                     sampled_dataset_chunk.data_handle() + (i + 1) * num_sampls);
+        auto start_ptr = sampled_dataset_chunk.data_handle() + i * num_sampls;
+        thrust::sort(thrust::device, start_ptr, start_ptr + num_sampls);
       }
 
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(threshold_ptr + dim_offset,
-                                      dataset_dim * sizeof(T),
+                                      sizeof(T),
                                       sampled_dataset_chunk.data_handle() + (num_sampls - 1) / 2,
                                       num_sampls * sizeof(T),
                                       sizeof(T),
