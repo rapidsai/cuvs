@@ -45,6 +45,7 @@
 #include <cuda.h>
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
+#include <thrust/iterator/transform_iterator.h>
 
 #include <algorithm>
 #include <cmath>
@@ -199,8 +200,7 @@ void computeClusterCost(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  cub::TransformInputIterator<OutputT, MainOpT, InputT*> itr(minClusterDistance.data_handle(),
-                                                             main_op);
+  thrust::transform_iterator<MainOpT, InputT*> itr(minClusterDistance.data_handle(), main_op);
 
   size_t temp_storage_bytes = 0;
   RAFT_CUDA_TRY(cub::DeviceReduce::Reduce(nullptr,
@@ -659,9 +659,8 @@ void countSamplesInCluster(raft::resources const& handle,
   // and converting them to just return the Key to be used in reduce_rows_by_key
   // prims
   cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
-  cub::TransformInputIterator<IndexT,
-                              cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
-                              raft::KeyValuePair<IndexT, DataT>*>
+  thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
+                             raft::KeyValuePair<IndexT, DataT>*>
     itr(minClusterAndDistance.data_handle(), conversion_op);
 
   // count # of samples in each cluster
