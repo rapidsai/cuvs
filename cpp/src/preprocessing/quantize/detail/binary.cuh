@@ -119,7 +119,7 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
     for (uint32_t bit_offset = 0; bit_offset < bits_per_pack; bit_offset++) {
       const auto j = j_offset + lane_id + bit_offset * warp_size;
       if (j < dataset_dim) {
-        auto v = in_ptr[vector_id * ldi + j];
+        auto v = in_ptr[static_cast<size_t>(vector_id) * ldi + j];
         if (threshold_ptr != nullptr) { v -= threshold_ptr[j]; }
         if (is_positive(v)) { pack |= (1u << bit_offset); }
       }
