@@ -1,8 +1,27 @@
-Building and Running
---------------------
+# CuVS Java API Examples
 
-Make sure to have JDK 22 and Maven 3.9.6+.
+This maven project contains examples for CAGRA, HNSW, and Bruteforce algorithms.
 
-    mvn clean compile assembly:single
+## Prerequisites
+- [CuVS libraries](https://docs.rapids.ai/api/cuvs/stable/build/#build-from-source)
+- Build the CuVS-Java API
 
-    java --enable-native-access=ALL-UNNAMED -jar ./target/cagra-sample-1.0-SNAPSHOT-jar-with-dependencies.jar
+## Run Examples
+
+### CAGRA Example
+In the current directory do:
+```
+mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.02.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.02.0/cuvs-java-25.02.0.jar com.nvidia.cuvs.examples.CagraExample
+```
+
+### HNSW Example
+In the current directory do:
+```
+mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.02.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.02.0/cuvs-java-25.02.0.jar com.nvidia.cuvs.examples.HnswExample
+```
+
+### Bruteforce Example
+In the current directory do:
+```
+mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.02.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.02.0/cuvs-java-25.02.0.jar com.nvidia.cuvs.examples.BruteForceExample
+```
