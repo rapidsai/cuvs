@@ -272,6 +272,8 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
 
   int64_t *neighbors;
   float *distances, *queries_d;
+  uint32_t *prefilter_d = NULL;
+  int64_t prefilter_len = 0;
 
   cuvsRMMAlloc(cuvs_resources, (void**) &queries_d, sizeof(float) * n_queries * dimensions);
   cuvsRMMAlloc(cuvs_resources, (void**) &neighbors, sizeof(int64_t) * n_queries * topk);
@@ -289,6 +291,7 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
   DLManagedTensor distances_tensor = prepare_tensor(distances, distances_shape, kDLFloat, 32, 2, kDLCUDA);
 
   cuvsFilter prefilter;
+  DLManagedTensor prefilter_tensor;
   if (prefilter_data == NULL) {
     prefilter.type = NO_FILTER;
     prefilter.addr = (uintptr_t)NULL;
@@ -297,7 +300,12 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
     int num_integers = (prefilter_data_length+63)/64 * 2;
     int extraPaddingByteExists = prefilter_data_length % 64 > 32? 0: 1;
     int64_t prefilter_shape[1] = {(prefilter_data_length + 31) / 32};
-    DLManagedTensor prefilter_tensor = prepare_tensor(prefilter_data, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
+
+	prefilter_len = prefilter_shape[0];
+    cuvsRMMAlloc(cuvs_resources, (void**) &prefilter_d, sizeof(uint32_t) * prefilter_len);
+	cudaMemcpy(prefilter_d, prefilter_data, sizeof(uint32_t) * prefilter_len, cudaMemcpyHostToDevice);
+
+    prefilter_tensor = prepare_tensor(prefilter_d, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
     prefilter.type = BITMAP;
     prefilter.addr = (uintptr_t)&prefilter_tensor;
   }
@@ -311,6 +319,9 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
   cuvsRMMFree(cuvs_resources, neighbors, sizeof(int64_t) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, distances, sizeof(float) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
+  if(prefilter_d != NULL) {
+    cuvsRMMFree(cuvs_resources, prefilter_d, sizeof(uint32_t) * prefilter_len);
+  }
 }
 
 /**
