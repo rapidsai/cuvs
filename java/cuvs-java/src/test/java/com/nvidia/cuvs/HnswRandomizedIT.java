@@ -97,7 +97,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, null, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
