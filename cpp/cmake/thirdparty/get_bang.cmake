@@ -18,9 +18,9 @@ function(find_and_configure_bang)
   set(oneValueArgs VERSION FORK PINNED_TAG)
   cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
-  
+
   include(${rapids-cmake-dir}/cpm/package_override.cmake)
-  
+
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/bang_override.json")
 
@@ -34,7 +34,7 @@ function(find_and_configure_bang)
     bang ${version}
     GLOBAL_TARGETS bang
     CPM_ARGS
-    GIT_REPOSITORY ${repository} 
+    GIT_REPOSITORY ${repository}
     SOURCE_SUBDIR BANG_Base
     GIT_TAG ${tag}
     GIT_SHALLOW ${shallow}

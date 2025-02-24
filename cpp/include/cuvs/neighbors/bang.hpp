@@ -17,8 +17,8 @@
 #pragma once
 
 #include "cuvs/neighbors/common.hpp"
-#include <cstdint>
 #include <bang.h>
+#include <cstdint>
 
 namespace cuvs::neighbors::experimental::bang {
 
@@ -27,25 +27,26 @@ namespace cuvs::neighbors::experimental::bang {
  * @{
  */
 struct search_params : cuvs::neighbors::search_params {
-    int worklist_length = 0;  // worklist length for greedy search
+  int worklist_length = 0;  // worklist length for greedy search
 };
 
 template <typename T>
 struct index : cuvs::neighbors::index {
-    index(raft::resources const& res,
-          const std::string& disk_index_path,
-          cuvs::distance::DistanceType metric);
+  index(raft::resources const& res,
+        const std::string& disk_index_path,
+        cuvs::distance::DistanceType metric);
 
-    BANGSearch<T> bang_instance;
-    /** Distance metric used for clustering. */
-    [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
-    {
-        return metric_;
-    }
-    private:
-        cuvs::distance::DistanceType metric_;
+  BANGSearch<T> bang_instance;
+  /** Distance metric used for clustering. */
+  [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
+  {
+    return metric_;
+  }
+
+ private:
+  cuvs::distance::DistanceType metric_;
 };
-    
+
 template <typename T>
 void search(raft::resources const& handle,
             const search_params& params,

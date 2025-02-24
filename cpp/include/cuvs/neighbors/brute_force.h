@@ -226,5 +226,6 @@ cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
 /**
  * @}
  */
-
-}  // namespace cuvs::neighbors::bang
+#ifdef __cplusplus
+}
+#endif
