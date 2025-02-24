@@ -25,6 +25,8 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
@@ -184,6 +186,14 @@ public class Util {
     return dataMemorySegment;
   }
 
+  public static MemorySegment buildMemorySegment(Arena arena, byte[] data) {
+    int cells = data.length;
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(cells, C_CHAR);
+    MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+    MemorySegment.copy(data, 0, dataMemorySegment, C_CHAR, 0, cells);
+    return dataMemorySegment;
+  }
+
   /**
    * A utility method for building a {@link MemorySegment} for a 2D float array.
    *
@@ -201,4 +211,20 @@ public class Util {
     }
     return dataMemorySegment;
   }
+
+  public static BitSet concatenate(BitSet[] arr, int maxSizeOfEachBitSet) {
+    BitSet ret = new BitSet(maxSizeOfEachBitSet * arr.length);
+    for (int i = 0; i < arr.length; i++) {
+      BitSet b = arr[i];
+      if (b == null || b.length() == 0) {
+        ret.set(i * maxSizeOfEachBitSet, (i + 1) * maxSizeOfEachBitSet);
+      } else {
+        for (int j = 0; j < maxSizeOfEachBitSet; j++) {
+          ret.set(i * maxSizeOfEachBitSet + j, b.get(j));
+        }
+      }
+    }
+    return ret;
+  }
+
 }
