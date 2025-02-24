@@ -178,6 +178,8 @@ void transform(raft::resources const& res,
                "the input dataset size (%lu) but is %lu passed",
                dataset_size,
                out_dataset_size);
+  RAFT_EXPECTS(!(std::is_same_v<T, half> && params.threshold == binary::set_bit_threshold::mean),
+               "binary::transform does not support threshold == mean for FP16 dataset");
 
   auto mr = raft::resource::get_workspace_resource(res);
   auto threshold_vec =
@@ -228,7 +230,6 @@ void transform(raft::resources const& res,
                                       sampled_dataset_chunk.data_handle(),
                                       num_sampls,
                                       raft::resource::get_cuda_stream(res));
-
       for (uint32_t i = 0; i < dim_chunk; i++) {
         auto start_ptr = sampled_dataset_chunk.data_handle() + i * num_sampls;
         thrust::sort(thrust::device, start_ptr, start_ptr + num_sampls);
@@ -299,14 +300,29 @@ void transform(raft::resources const& res,
     for (uint32_t j = 0; j < dataset_dim; j++) {
       threshold_ptr[j] = 0;
     }
-#pragma omp parallel for
-    for (size_t i = 0; i < dataset_size; i++) {
-      for (uint32_t j = 0; j < dataset_dim; j++) {
-        threshold_ptr[j] += dataset.data_handle()[i * dataset_dim + j];
+    if constexpr (!std::is_same_v<T, half>) {
+#pragma omp parallel for reduction(+ : threshold_ptr[ : dataset_dim])
+      for (size_t i = 0; i < dataset_size; i++) {
+        for (uint32_t j = 0; j < dataset_dim; j++) {
+          threshold_ptr[j] += dataset.data_handle()[i * dataset_dim + j];
+        }
       }
-    }
-    for (uint32_t j = 0; j < dataset_dim; j++) {
-      threshold_ptr[j] /= dataset_size;
+      for (uint32_t j = 0; j < dataset_dim; j++) {
+        threshold_ptr[j] /= dataset_size;
+      }
+    } else {
+      // Use f32 array to compute the mean since omp reduction does not support f16
+      auto threshold_vec_f32 = raft::make_host_vector<float, int64_t>(dataset_dim);
+      auto threshold_f32_ptr = threshold_vec_f32.data_handle();
+#pragma omp parallel for reduction(+ : threshold_f32_ptr[ : dataset_dim])
+      for (size_t i = 0; i < dataset_size; i++) {
+        for (uint32_t j = 0; j < dataset_dim; j++) {
+          threshold_f32_ptr[j] += static_cast<float>(dataset.data_handle()[i * dataset_dim + j]);
+        }
+      }
+      for (uint32_t j = 0; j < dataset_dim; j++) {
+        threshold_ptr[j] = static_cast<half>(threshold_f32_ptr[j] / dataset_size);
+      }
     }
   }
 
