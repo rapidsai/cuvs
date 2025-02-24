@@ -25,9 +25,25 @@ extern "C" {
 #endif
 
 /**
+ * @brief Enum to denote which threshold is used to set a bit in cuvsBinaryQuantizerTransform
+ *
+ */
+enum cuvsBinaryQuantizerThreshold { ZERO, MEAN, SAMPLING_MEDIAN };
+
+/**
  * @brief Scalar quantizer parameters.
  */
-struct cuvsBinaryQuantizerParams {};
+struct cuvsBinaryQuantizerParams {
+  /*
+   * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform
+   */
+  cuvsBinaryQuantizerThreshold threshold = ZERO;
+
+  /*
+   * specifies the sampling ratio
+   */
+  float sampling_ratio = 0.1;
+};
 
 typedef struct cuvsBinaryQuantizerParams* cuvsBinaryQuantizerParams_t;
 

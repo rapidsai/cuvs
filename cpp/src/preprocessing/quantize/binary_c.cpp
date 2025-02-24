@@ -34,6 +34,18 @@ void _transform(cuvsResources_t res,
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
   cuvs::preprocessing::quantize::binary::params _params;
+  switch (params->threshold) {
+    case ZERO:
+      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::zero;
+      break;
+    case MEAN:
+      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::mean;
+      break;
+    case SAMPLING_MEDIAN:
+      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median;
+      break;
+  }
+  _params.sampling_ratio = params->sampling_ratio;
 
   auto dataset = dataset_tensor->dl_tensor;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
