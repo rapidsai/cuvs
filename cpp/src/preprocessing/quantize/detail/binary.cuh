@@ -178,6 +178,7 @@ void transform(raft::resources const& res,
                "the input dataset size (%lu) but is %lu passed",
                dataset_size,
                out_dataset_size);
+  // stats::mean does not support F16
   RAFT_EXPECTS(!(std::is_same_v<T, half> && params.threshold == binary::set_bit_threshold::mean),
                "binary::transform does not support threshold == mean for FP16 dataset");
 
@@ -196,11 +197,14 @@ void transform(raft::resources const& res,
   }
 
   if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean) {
-    raft::stats::mean(
-      res,
-      dataset,
-      raft::make_device_vector_view<T, int64_t>(threshold_vec.data_handle(), dataset_dim),
-      false);
+    // stats::mean does not support F16
+    if constexpr (!std::is_same_v<T, half>) {
+      raft::stats::mean(
+        res,
+        dataset,
+        raft::make_device_vector_view<T, int64_t>(threshold_vec.data_handle(), dataset_dim),
+        false);
+    }
   }
 
   if (params.threshold ==
