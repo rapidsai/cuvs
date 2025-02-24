@@ -284,6 +284,69 @@ void transform(raft::resources const& res,
                dataset_size,
                out_dataset_size);
 
+  auto threshold_vec = raft::make_host_vector<T, int64_t>(0);
+
+  T* threshold_ptr = nullptr;
+
+  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean ||
+      params.threshold ==
+        cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+    threshold_vec = raft::make_host_vector<T, int64_t>(dataset_dim);
+    threshold_ptr = threshold_vec.data_handle();
+  }
+
+  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean) {
+    for (uint32_t j = 0; j < dataset_dim; j++) {
+      threshold_ptr[j] = 0;
+    }
+#pragma omp parallel for
+    for (size_t i = 0; i < dataset_size; i++) {
+      for (uint32_t j = 0; j < dataset_dim; j++) {
+        threshold_ptr[j] += dataset.data_handle()[i * dataset_dim + j];
+      }
+    }
+    for (uint32_t j = 0; j < dataset_dim; j++) {
+      threshold_ptr[j] /= dataset_size;
+    }
+  }
+
+  if (params.threshold ==
+      cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+    // Make the number of samples odd so that the median is calculated by only sort and memcpy
+    const size_t num_sampls =
+      std::max(
+        raft::div_rounding_up_safe(static_cast<size_t>(dataset_size * params.sampling_ratio), 2lu) *
+          2lu,
+        2lu) -
+      1;
+
+    // Calculate stride
+    size_t stride_prime_list[] = {611323lu, 611333lu, 611389lu, 611393};
+    uint32_t prime_i           = 0;
+    while (dataset_size % stride_prime_list[prime_i] == 0) {
+      prime_i++;
+    }
+    const auto stride = stride_prime_list[prime_i];
+
+    // Transposed
+    auto sampled_dataset = raft::make_host_matrix<T, int64_t>(dataset_dim, num_sampls);
+#pragma omp parallel for
+    for (size_t out_i = 0; out_i < num_sampls; out_i++) {
+      const auto in_i = (out_i * stride) % dataset_size;
+      for (uint32_t j = 0; j < dataset_dim; j++) {
+        sampled_dataset.data_handle()[j * num_sampls + out_i] =
+          dataset.data_handle()[in_i * dataset_dim + j];
+      }
+    }
+
+#pragma omp parallel for
+    for (uint32_t j = 0; j < dataset_dim; j++) {
+      auto start_ptr = sampled_dataset.data_handle() + j * num_sampls;
+      std::sort(start_ptr, start_ptr + num_sampls);
+      threshold_ptr[j] = start_ptr[(num_sampls - 1) / 2];
+    }
+  }
+
 #pragma omp parallel for collapse(2)
   for (size_t i = 0; i < dataset_size; ++i) {
     for (uint32_t out_j = 0; out_j < minimul_out_dim; ++out_j) {
@@ -291,7 +354,11 @@ void transform(raft::resources const& res,
       for (uint32_t pack_j = 0; pack_j < bits_per_pack; ++pack_j) {
         const uint32_t in_j = out_j * bits_per_pack + pack_j;
         if (in_j < dataset_dim) {
-          if (is_positive(dataset(i, in_j))) { pack |= (1u << pack_j); }
+          if (threshold_ptr == nullptr) {
+            if (is_positive(dataset(i, in_j))) { pack |= (1u << pack_j); }
+          } else {
+            if (is_positive(dataset(i, in_j) - threshold_ptr[in_j])) { pack |= (1u << pack_j); }
+          }
         }
       }
       out(i, out_j) = pack;
