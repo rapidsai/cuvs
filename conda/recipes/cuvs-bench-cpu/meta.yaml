@@ -62,6 +62,7 @@ requirements:
     - pyyaml
     - python
     - requests
+    - sklearn>=1.5
 about:
   home: https://rapids.ai/
   license: Apache-2.0
