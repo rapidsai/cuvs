@@ -31,13 +31,20 @@ struct search_params : cuvs::neighbors::search_params {
 };
 
 template <typename T>
-struct index {
+struct index : cuvs::neighbors::index {
     index(raft::resources const& res,
           const std::string& disk_index_path,
           cuvs::distance::DistanceType metric);
 
-    bang::BangSearch<T> bang_instance;
-}
+    BANGSearch<T> bang_instance;
+    /** Distance metric used for clustering. */
+    [[nodiscard]] constexpr inline auto metric() const noexcept -> cuvs::distance::DistanceType
+    {
+        return metric_;
+    }
+    private:
+        cuvs::distance::DistanceType metric_;
+};
     
 template <typename T>
 void search(raft::resources const& handle,

@@ -41,24 +41,26 @@ index<T>::index(raft::resources const& res,
   : cuvs::neighbors::index(),
     metric_(metric)
 {
-    bang_search_instance.bang_load(disk_index_path);
+    bang_instance.bang_load(disk_index_path);
 }
 
 #define CUVS_INST_BANG(T)                                           
-                                                                                
+
+template <typename T>                                                                                
   void search(raft::resources const& res,                                      
-              const search_params& params,                                    
+              const search_params& params,        
+              const index<T>& index,                            
               raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
               raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors, 
               raft::device_matrix_view<float, int64_t, raft::row_major> distances)   
   {
     int numQueries = static_cast<int>(queries.extent(0));
     int k = static_cast<int>(neighbors.extent(1));
-    auto metric_enum = metric_ == cuvs::distance::DistanceType::L2Expanded ? Metric::L2 : Metric::MIPS;                                                                                  
-    bang_set_searchparams(k, params.workslist_length, Metric::L2Expanded);                                  
-    bang_search_instance.bang_alloc<T>(res, numQueries);                                                 
-    bang_search_instance.bang_init<T>(res, numQueries);
-    bang_search_instance.bang_query(res, queries, queries.extent(0),                                
+    auto metric_enum = index.metric() == cuvs::distance::DistanceType::L2Expanded ? Metric::L2 : Metric::MIPS;                                                                                  
+    index.bang_search_instance.bang_set_searchparams(k, params.worklist_length, metric_enum);                                  
+    index.bang_search_instance.bang_alloc(res, numQueries);                                                 
+    index.bang_search_instance.bang_init(res, numQueries);
+    index.bang_search_instance.bang_query(res, queries, queries.extent(0),                                
           neighbors.data_handle(),                                                   
 					distances.data_handle());
     // bang_search_instance.bang_free();
