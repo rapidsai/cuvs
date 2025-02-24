@@ -210,7 +210,10 @@ void transform(raft::resources const& res,
           2lu,
         2lu) -
       1;
-    const uint32_t max_dim_chunk = 128;
+    const size_t data_size_per_vector = sizeof(T) * dataset_dim;
+    const uint32_t max_dim_chunk =
+      std::min(std::max(1lu, raft::resource::get_workspace_free_bytes(res) / data_size_per_vector),
+               static_cast<std::size_t>(dataset_dim));
 
     auto sampled_dataset_chunk = raft::make_device_mdarray<T, int64_t>(
       res, mr, raft::make_extents<int64_t>(max_dim_chunk, num_sampls));
