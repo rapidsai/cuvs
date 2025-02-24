@@ -54,7 +54,6 @@ function(find_and_configure_faiss)
     GIT_SHALLOW ${shallow} ${patch_command}
     EXCLUDE_FROM_ALL ${exclude}
     OPTIONS
-    "BLA_VENDOR Intel10_64ilp"
     "FAISS_ENABLE_GPU ${PKG_ENABLE_GPU}"
     "FAISS_ENABLE_CUVS ${PKG_ENABLE_GPU}"
     "FAISS_ENABLE_PYTHON OFF"

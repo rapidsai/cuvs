@@ -73,7 +73,8 @@ requirements:
     - libaio  # [linux64]
     - libboost-devel=1.87  # [linux64]
     - libcuvs {{ version }}
-    - mkl-devel=2023  # [linux64]
+    - mkl-devel=2022.2.1  # [linux64]
+    - mkl=2022.2.1  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     # rmm is needed to determine if package is gpu-enabled

@@ -95,12 +95,12 @@ if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_ggnn)
 endif()
 
-if(CUVS_ANN_BENCH_USE_FAISS)
-  include(cmake/thirdparty/get_faiss)
-endif()
-
 if(CUVS_ANN_BENCH_USE_DISKANN OR CUVS_ANN_BENCH_USE_CUVS_VAMANA)
   include(cmake/thirdparty/get_diskann)
+endif()
+
+if(CUVS_ANN_BENCH_USE_FAISS)
+  include(cmake/thirdparty/get_faiss)
 endif()
 
 # ##################################################################################################
