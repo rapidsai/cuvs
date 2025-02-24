@@ -17,6 +17,8 @@
 #include "./detail/knn_brute_force.cuh"
 
 #include <cuvs/neighbors/brute_force.hpp>
+#include <raft/core/resources.hpp>
+#include <cuvs/neighbors/bang.hpp>
 
 #include <raft/core/copy.hpp>
 
@@ -42,7 +44,7 @@ index<T>::index(raft::resources const& res,
     bang_search_instance.bang_load(disk_index_path);
 }
 
-#define CUVS_INST_BANG(T, DistT)                                           
+#define CUVS_INST_BANG(T)                                           
                                                                                 
   void search(raft::resources const& res,                                      
               const search_params& params,                                    

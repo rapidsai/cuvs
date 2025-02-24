@@ -384,7 +384,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
-    src/neighbors/bang.cpp
+    src/neighbors/bang.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
@@ -503,7 +503,7 @@ if(BUILD_SHARED_LIBS)
   )
   target_link_libraries(
     cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
-                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> bang::bang
   )
 
   add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)

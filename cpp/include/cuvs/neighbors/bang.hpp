@@ -18,6 +18,7 @@
 
 #include "cuvs/neighbors/common.hpp"
 #include <cstdint>
+#include <bang.h>
 
 namespace cuvs::neighbors::experimental::bang {
 
