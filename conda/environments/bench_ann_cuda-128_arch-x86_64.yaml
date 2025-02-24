@@ -12,7 +12,7 @@ dependencies:
 - clang-tools==16.0.6
 - clang==16.0.6
 - click
-- cmake>=3.26.4,!=3.30.0
+- cmake>=3.30.4
 - cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
