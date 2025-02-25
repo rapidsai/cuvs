@@ -66,13 +66,13 @@ class hnsw_lib : public algo<T> {
   struct build_param {
     int m;
     int ef_construction;
-    int num_threads = omp_get_num_procs();
+    int num_threads = omp_get_max_threads();
   };
 
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
     int ef;
-    int num_threads = 1;
+    int num_threads = omp_get_max_threads();
   };
 
   hnsw_lib(Metric metric, int dim, const build_param& param);
@@ -175,12 +175,7 @@ void hnsw_lib<T>::set_search_param(const search_param_base& param_, const void* 
   auto param     = dynamic_cast<const search_param&>(param_);
   appr_alg_->ef_ = param.ef;
   num_threads_   = param.num_threads;
-  // bench_mode_ = param.metric_objective;
   bench_mode_ = Mode::kLatency;  // TODO(achirkin): pass the benchmark mode in the algo parameters
-
-  // Create a pool if multiple query threads have been set and the pool hasn't been created already
-  bool create_pool = (bench_mode_ == Mode::kLatency && num_threads_ > 1 && !thread_pool_);
-  if (create_pool) { thread_pool_ = std::make_shared<fixed_thread_pool>(num_threads_); }
 }
 
 template <typename T>
@@ -192,7 +187,10 @@ void hnsw_lib<T>::search(
     get_search_knn_results(query + i * dim_, k, indices + i * k, distances + i * k);
   };
   if (bench_mode_ == Mode::kLatency && num_threads_ > 1) {
-    thread_pool_->submit(f, batch_size);
+#pragma omp parallel for num_threads(num_threads_)
+    for (int i = 0; i < batch_size; i++) {
+      f(i);
+    }
   } else {
     for (int i = 0; i < batch_size; i++) {
       f(i);
