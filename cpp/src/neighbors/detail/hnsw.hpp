@@ -491,7 +491,7 @@ void search(raft::resources const& res,
       idx.get_index());
   auto num_threads = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
 
-#pragma omp parallel for num_threads(params.num_threads)
+#pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < queries.extent(0); ++i) {
     get_search_knn_results(hnswlib_index,
                            queries.data_handle() + i * queries.extent(1),
