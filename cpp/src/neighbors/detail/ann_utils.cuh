@@ -195,6 +195,22 @@ struct mapping {
   /** @} */
 };
 
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const uint8_t& x) const -> int8_t
+{
+  // Avoid overflows when converting uint8_t -> int_8
+  return static_cast<int8_t>(x >> 1);
+}
+
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
+{
+  // Carefully clamp floats if out-of-bounds.
+  return static_cast<int8_t>(std::clamp<float>(x * 128.0f, -128.0f, 127.0f));
+}
+
 /**
  * @brief Sets the first num bytes of the block of memory pointed by ptr to the specified value.
  *
