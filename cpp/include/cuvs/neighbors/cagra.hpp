@@ -337,6 +337,8 @@ struct index : cuvs::neighbors::index {
   using search_params_type = cagra::search_params;
   using index_type         = IdxT;
   using value_type         = T;
+  using dataset_index_type = int64_t;
+
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
@@ -510,14 +512,14 @@ struct index : cuvs::neighbors::index {
    */
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
-    -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<int64_t>, DatasetT>>
+    -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_ = std::make_unique<DatasetT>(std::move(dataset));
   }
 
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
-    -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<int64_t>, DatasetT>>
+    -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_ = std::move(dataset);
   }
@@ -561,7 +563,7 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
-  std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
 };
 /**
  * @}
