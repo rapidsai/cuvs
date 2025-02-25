@@ -119,6 +119,9 @@ void batched_insert_vamana(
     visited_size = power;
   }
 
+  auto start_t = std::chrono::system_clock::now();
+
+
   // create gpu graph and set to all -1s
   auto d_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph.extent(0), graph.extent(1));
   raft::linalg::map(res, d_graph.view(), raft::const_op<IdxT>{raft::upper_bound<IdxT>()});
@@ -149,6 +152,13 @@ void batched_insert_vamana(
                                                                     (int)max_batchsize,
                                                                     visited_size);
 
+  auto topk_pq_mem =
+        raft::make_device_mdarray<Node<accT>>(res,
+             raft::resource::get_large_workspace_resource(res),
+             raft::make_extents<int64_t>(max_batchsize, visited_size));
+
+
+
   // Create random permutation for order of node inserts into graph
   std::vector<IdxT> insert_order;
   create_insert_permutation<IdxT>(insert_order, (uint32_t)N);
@@ -157,26 +167,48 @@ void batched_insert_vamana(
   int search_smem_sort_size = 0;
   int prune_smem_sort_size  = 0;
   SELECT_SMEM_SIZES(degree, visited_size);  // Sets above 2 variables to appropriate sizes
+  prune_smem_sort_size=0;
 
   // Total dynamic shared memory used by GreedySearch
   int align_padding          = raft::alignTo(dim, 16) - dim;
   int search_smem_total_size = static_cast<int>(
-    search_smem_sort_size + (dim + align_padding) * sizeof(T) + visited_size * sizeof(Node<accT>) +
+   // search_smem_sort_size + 
+    (dim + align_padding) * sizeof(T) + //visited_size * sizeof(Node<accT>) +
     degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
   int prune_smem_total_size = prune_smem_sort_size + (dim + align_padding) * sizeof(T) +
-                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+                              (degree) * sizeof(DistPair<IdxT, accT>);
+//                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
 
   RAFT_LOG_DEBUG("Dynamic shared memory usage (bytes): GreedySearch: %d, RobustPrune: %d",
                  search_smem_total_size,
                  prune_smem_total_size);
 
+  printf("Dynamic shared memory usage (bytes): GreedySearch: %d, segment sort: %d, RobustPrune: %d\n",
+                 search_smem_total_size,
+		 search_smem_sort_size,
+                 prune_smem_total_size);
+
+  /*
   if (prune_smem_sort_size == 0) {  // If sizes not supported, smem sizes will be 0
     RAFT_FAIL("Vamana graph parameters not supported: graph_degree=%d, visited_size:%d\n",
               degree,
               visited_size);
   }
+  */
+
+
+    auto end_t   = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end_t - start_t;
+  double alloc_time = elapsed_seconds.count();
+
+  double search_time = 0.0;
+  double segment_sort_time = 0.0;
+  double prune1_time = 0.0;
+  double write1_time = 0.0;
+  double rev_time =0.0;
+  double batch_prune = 0.0;
 
   // Random medoid has minor impact on recall
   // TODO: use heuristic for better medoid selection, issue:
@@ -189,6 +221,9 @@ void batched_insert_vamana(
   for (int iter = 0; iter < insert_iters; iter++) {
     // Loop through batches and call the insert and prune kernels
     for (int start = 0; start < N;) {
+start_t = std::chrono::system_clock::now();
+
+
       if (start + step_size > N) {
         int new_size = N - start;
         step_size    = new_size;
@@ -212,7 +247,24 @@ void batched_insert_vamana(
                                                                  visited_size,
                                                                  metric,
                                                                  queue_size,
-                                                                 search_smem_sort_size);
+								 topk_pq_mem.data_handle());
+                                                                 //search_smem_sort_size);
+cudaDeviceSynchronize();
+end_t   = std::chrono::system_clock::now();
+elapsed_seconds = end_t - start_t;
+search_time += elapsed_seconds.count();
+start_t = std::chrono::system_clock::now();
+
+// SEGMENTED SORT ON QUERY_LIST
+TestSortKernel<T, accT, IdxT, Accessor>
+	<<<num_blocks, blockD, search_smem_sort_size, stream>>>(query_list_ptr.data_handle(), step_size, visited_size);
+cudaDeviceSynchronize();
+
+end_t   = std::chrono::system_clock::now();
+elapsed_seconds = end_t - start_t;
+segment_sort_time += elapsed_seconds.count();
+start_t = std::chrono::system_clock::now();
+
       // Run on candidates of vectors being inserted
       RobustPruneKernel<T, accT, IdxT>
         <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
@@ -223,10 +275,21 @@ void batched_insert_vamana(
                                                                 metric,
                                                                 alpha,
                                                                 prune_smem_sort_size);
+cudaDeviceSynchronize();
+end_t   = std::chrono::system_clock::now();
+elapsed_seconds = end_t - start_t;
+prune1_time += elapsed_seconds.count();
+start_t = std::chrono::system_clock::now();
 
       // Write results from first prune to graph edge list
       write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
         d_graph.view(), query_list_ptr.data_handle(), degree, step_size);
+
+      cudaDeviceSynchronize();
+end_t   = std::chrono::system_clock::now();
+elapsed_seconds = end_t - start_t;
+write1_time += elapsed_seconds.count();
+start_t = std::chrono::system_clock::now();
 
       // compute prefix sums of query_list sizes - TODO parallelize prefix sums
       auto d_total_edges = raft::make_device_mdarray<int>(
@@ -237,6 +300,17 @@ void batched_insert_vamana(
       int total_edges;
       raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
       RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+
+      /*
+      auto edge_dist_pair = raft::make_device_mdarray<DistPair<IdxT, accT>>(
+        res,
+        raft::resource::get_large_workspace_resource(res),
+        raft::make_extents<int64_t>(total_edges));
+	*/
+      DistPair<IdxT,accT>* edge_dist_pair;
+      cudaMalloc(&edge_dist_pair, total_edges*sizeof(DistPair<IdxT,accT>));
+//      custom_memory_resource mr;
+//      rmm::device_buffer edge_dist_pair(total_edges*sizeof(int64_t), stream, &s);
 
       auto edge_dest =
         raft::make_device_mdarray<IdxT>(res,
@@ -253,7 +327,49 @@ void batched_insert_vamana(
                                             step_size,
                                             degree,
                                             edge_src.data_handle(),
-                                            edge_dest.data_handle());
+                                            edge_dist_pair);
+                                            //edge_dist_pair.data_handle());
+
+
+      {
+      // Sort by dists first so final edge lists are each sorted by dist
+      void* d_temp_storage      = nullptr;
+      size_t temp_storage_bytes = 0;
+
+      cub::DeviceMergeSort::SortPairs(d_temp_storage,
+                                      temp_storage_bytes,
+                                      edge_dist_pair,
+                                      //edge_dist_pair.data_handle(),
+                                      edge_src.data_handle(),
+                                      total_edges,
+                                      CmpDist<IdxT,accT>(),
+                                      stream);
+
+      RAFT_LOG_DEBUG("Temp storage needed for sorting dist (bytes): %lu", temp_storage_bytes);
+
+      auto temp_sort_storage = raft::make_device_mdarray<IdxT>(
+        res,
+        raft::resource::get_large_workspace_resource(res),
+        raft::make_extents<int64_t>(temp_storage_bytes / sizeof(IdxT)));
+
+      // Sort to group reverse edges by destination
+      cub::DeviceMergeSort::SortPairs(temp_sort_storage.data_handle(),
+                                      temp_storage_bytes,
+                                      edge_dist_pair,
+                                      //edge_dist_pair.data_handle(),
+                                      edge_src.data_handle(),
+                                      total_edges,
+                                      CmpDist<IdxT,accT>(),
+                                      stream);
+
+      }
+
+      DistPair<IdxT,accT>* temp_ptr = edge_dist_pair;
+      //DistPair<IdxT,accT>* temp_ptr = edge_dist_pair.data_handle();
+      raft::linalg::map_offset(res, edge_dest.view(), [temp_ptr] __device__(size_t i) {
+                      return temp_ptr[i].idx;
+      });
+
 
       void* d_temp_storage      = nullptr;
       size_t temp_storage_bytes = 0;
@@ -297,6 +413,12 @@ void batched_insert_vamana(
 
       edge_dest_vec.clear();
       edge_dest_vec.shrink_to_fit();
+
+      cudaDeviceSynchronize();
+end_t   = std::chrono::system_clock::now();
+elapsed_seconds = end_t - start_t;
+rev_time += elapsed_seconds.count();
+start_t = std::chrono::system_clock::now();
 
       // Batch execution of reverse edge creation/application
       reverse_batch = params.reverse_batchsize;
@@ -363,6 +485,11 @@ void batched_insert_vamana(
           d_graph.view(), reverse_list_ptr.data_handle(), degree, reverse_batch);
       }
 
+cudaDeviceSynchronize();
+end_t   = std::chrono::system_clock::now();
+elapsed_seconds = end_t - start_t;
+batch_prune += elapsed_seconds.count();      
+
       start += step_size;
       step_size *= base;
       if (step_size > max_batchsize) step_size = max_batchsize;
@@ -370,6 +497,8 @@ void batched_insert_vamana(
     }  // Batch of inserts
 
   }  // insert iterations
+
+  printf("intro:%lf\ngreedy:%lf\nseg_sort:%lf\nprune1:%lf\nwrite1:%lf\nrev:%lf\nbatch_prune:%lf\n", alloc_time, search_time, segment_sort_time, prune1_time, write1_time, rev_time, batch_prune);
 
   raft::copy(graph.data_handle(), d_graph.data_handle(), d_graph.size(), stream);
 

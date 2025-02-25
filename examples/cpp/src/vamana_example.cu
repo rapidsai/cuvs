@@ -60,13 +60,13 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
   // Output index to file
-  serialize(dev_resources, out_fname, index);
+//  serialize(dev_resources, out_fname, index);
 }
 
 void usage()
 {
   printf(
-    "Usage: ./vamana_example <data filename> <output filename> <graph "
+    "Usage: ./vamana_example <data filename> <output filename> <dtype> <graph "
     "degree> <visited_size> <max_fraction> <iterations> \n");
   printf("Input file expected to be binary file of fp32 vectors.\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
@@ -93,24 +93,43 @@ int main(int argc, char* argv[])
   // limit. raft::resource::set_workspace_to_pool_resource(dev_resources, 2 *
   // 1024 * 1024 * 1024ull);
 
-  if (argc != 7) usage();
+  if (argc != 8) usage();
 
   std::string data_fname = (std::string)(argv[1]);  // Input filename
   std::string out_fname  = (std::string)argv[2];    // Output index filename
-  int degree             = atoi(argv[3]);
-  int max_visited        = atoi(argv[4]);
-  float max_fraction     = atof(argv[5]);
-  int iters              = atoi(argv[6]);
+  std::string dtype      = (std::string)argv[3];
+  int degree             = atoi(argv[4]);
+  int max_visited        = atoi(argv[5]);
+  float max_fraction     = atof(argv[6]);
+  int iters              = atoi(argv[7]);
 
-  // Read in binary dataset file
-  auto dataset = read_bin_dataset<uint8_t, int64_t>(dev_resources, data_fname, INT_MAX);
+  if(dtype == "uint8") {
+    // Read in binary dataset file
+    auto dataset = read_bin_dataset<uint8_t, int64_t>(dev_resources, data_fname, INT_MAX);
 
-  // Simple build example to create graph and write to a file
-  vamana_build_and_write<uint8_t>(dev_resources,
+    // Simple build example to create graph and write to a file
+    vamana_build_and_write<uint8_t>(dev_resources,
                                   raft::make_const_mdspan(dataset.view()),
                                   out_fname,
                                   degree,
                                   max_visited,
                                   max_fraction,
                                   iters);
+  }
+  else if(dtype == "float") {
+    // Read in binary dataset file
+    auto dataset = read_bin_dataset<float, int64_t>(dev_resources, data_fname, INT_MAX);
+
+    // Simple build example to create graph and write to a file
+    vamana_build_and_write<float>(dev_resources,
+                                  raft::make_const_mdspan(dataset.view()),
+                                  out_fname,
+                                  degree,
+                                  max_visited,
+                                  max_fraction,
+                                  iters);
+  }
+  else {
+    usage();
+  }
 }

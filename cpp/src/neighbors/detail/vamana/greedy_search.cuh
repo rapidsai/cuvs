@@ -52,7 +52,7 @@ __forceinline__ __device__ void sort_visited(
   }
 
   __syncthreads();
-  BlockSortT(*sort_mem).Sort(tmp, CmpDist());
+  BlockSortT(*sort_mem).Sort(tmp, CmpDist2());
   __syncthreads();
 
   for (int i = 0; i < ELTS; i++) {
@@ -63,6 +63,27 @@ __forceinline__ __device__ void sort_visited(
 }
 
 namespace {
+
+template <typename T,
+          typename accT,
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+__global__ void TestSortKernel(void* query_list_ptr, int num_queries, int topk) {
+
+  union ShmemLayout {
+    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
+  };
+  extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
+  
+  QueryCandidates<IdxT, accT>* query_list =
+    static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
+
+  for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
+    __syncthreads();
+    SEARCH_SELECT_SORT(topk);
+  }
+}
 
 /********************************************************************************************
   GPU kernel to perform a batched GreedySearch on a graph. Since this is used for
@@ -87,7 +108,7 @@ __global__ void GreedySearchKernel(
   int topk,
   cuvs::distance::DistanceType metric,
   int max_queue_size,
-  int sort_smem_size)
+  Node<accT>* topk_pq_mem)
 {
   int n      = dataset.extent(0);
   int dim    = dataset.extent(1);
@@ -105,9 +126,9 @@ __global__ void GreedySearchKernel(
 
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
-    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
+//    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
     T coords;
-    Node<accT> topk_pq;
+//    Node<accT> topk_pq;
     int neighborhood_arr;
     DistPair<IdxT, accT> candidate_queue;
   };
@@ -117,13 +138,15 @@ __global__ void GreedySearchKernel(
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-  size_t smem_offset = sort_smem_size;  // temp sorting memory takes first chunk
+//  size_t smem_offset = sort_smem_size;  // temp sorting memory takes first chunk
+  size_t smem_offset = 0;
 
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
   smem_offset += (dim + align_padding) * sizeof(T);
 
-  Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]);
-  smem_offset += topk * sizeof(Node<accT>);
+  Node<accT>* topk_pq = &topk_pq_mem[blockIdx.x*topk];
+//  Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]);
+//  smem_offset += topk * sizeof(Node<accT>);
 
   int* neighbor_array = reinterpret_cast<int*>(&smem[smem_offset]);
   smem_offset += degree * sizeof(int);
@@ -273,7 +296,7 @@ __global__ void GreedySearchKernel(
     __syncthreads();
     if (self_found) query_list[i].size--;
 
-    SEARCH_SELECT_SORT(topk);
+//    SEARCH_SELECT_SORT(topk);
   }
 
   return;
