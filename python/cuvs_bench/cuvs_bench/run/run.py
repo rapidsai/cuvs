@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -245,6 +245,7 @@ def prepare_executables(
         configurations.
     """
     executables_to_run = {}
+
     for algo, algo_conf in algos_conf.items():
         validate_algorithm(algos_yaml, algo, gpu_present)
         for group, group_conf in algo_conf["groups"].items():
@@ -345,8 +346,9 @@ def get_build_path(executable: str) -> Optional[str]:
 
     devcontainer_path = "/home/coder/cuvs/cpp/build/latest/bench/ann"
     if os.path.exists(devcontainer_path):
-        print(f"-- Detected devcontainer artifacts in {devcontainer_path}.")
-        return devcontainer_path
+        devc_executable = os.path.join(devcontainer_path, executable)
+        print(f"-- Detected devcontainer artifact {devc_executable}.")
+        return devc_executable
 
     build_path = os.getenv("CUVS_HOME")
     if build_path:
@@ -354,7 +356,7 @@ def get_build_path(executable: str) -> Optional[str]:
             build_path, "cpp", "build", "release", executable
         )
         if os.path.exists(build_path):
-            print(f"-- Using RAFT bench from repository in {build_path}.")
+            print(f"-- Using cuVS bench from repository in {build_path}.")
             return build_path
 
     conda_path = os.getenv("CONDA_PREFIX")
@@ -586,7 +588,6 @@ def run_benchmark(
     search_threads: int,
     dry_run: bool,
     data_export: bool,
-    raft_log_level: int,
 ) -> None:
     """
     Runs a benchmarking process based on the provided configurations.
@@ -625,8 +626,6 @@ def run_benchmark(
         The number of threads to use for searching.
     dry_run : bool
         Whether to perform a dry run without actual execution.
-    raft_log_level : int
-        The logging level for the RAFT library.
 
     Returns
     -------
@@ -689,5 +688,4 @@ def run_benchmark(
         batch_size,
         search_threads,
         search_mode,
-        raft_log_level,
     )

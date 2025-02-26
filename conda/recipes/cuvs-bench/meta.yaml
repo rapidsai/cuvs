@@ -93,13 +93,15 @@ requirements:
     - glog {{ glog_version }}
     - cuvs {{ version }}
     - h5py {{ h5py_version }}
-    - matplotlib
+    - matplotlib-base
     - pandas
     - pyyaml
     # rmm is needed to determine if package is gpu-enabled
     - pylibraft ={{ minor_version }}
     - python
+    - requests
     - rmm ={{ minor_version }}
+    - sklearn>=1.5
 about:
   home: https://rapids.ai/
   license: Apache-2.0

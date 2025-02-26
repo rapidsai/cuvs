@@ -10,7 +10,7 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
-cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 include(../rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
@@ -173,6 +173,9 @@ include(cmake/modules/ConfigureCUDA.cmake)
 rapids_cpm_init()
 
 if(NOT BUILD_CPU_ONLY)
+  # We must find CCCL ourselves before raft so that we get the right version.
+  include(${rapids-cmake-dir}/cpm/cccl.cmake)
+  rapids_cpm_cccl(BUILD_EXPORT_SET cuvs-exports INSTALL_EXPORT_SET cuvs-exports)
   include(cmake/thirdparty/get_raft.cmake)
   include(cmake/thirdparty/get_cutlass.cmake)
 endif()
@@ -205,6 +208,9 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/cagra_search_int8.cu
     src/neighbors/cagra_search_uint8.cu
     src/neighbors/detail/cagra/compute_distance.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_BitwiseHamming_u8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu
@@ -389,6 +395,10 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/cagra_serialize_half.cu
     src/neighbors/cagra_serialize_int8.cu
     src/neighbors/cagra_serialize_uint8.cu
+    src/neighbors/cagra_merge_float.cu
+    src/neighbors/cagra_merge_half.cu
+    src/neighbors/cagra_merge_int8.cu
+    src/neighbors/cagra_merge_uint8.cu
     src/neighbors/iface/iface_cagra_float_uint32_t.cu
     src/neighbors/iface/iface_cagra_half_uint32_t.cu
     src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
@@ -465,6 +475,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
+    src/preprocessing/quantize/binary.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
@@ -487,16 +498,14 @@ if(BUILD_SHARED_LIBS)
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
   target_link_libraries(
-    cuvs_objs
-    PUBLIC raft::raft rmm::rmm rmm::rmm_logger ${CUVS_CTK_MATH_DEPENDENCIES}
-           $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-    PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl
+    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 
-  add_library(cuvs SHARED $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+  add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
 
   if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
-    add_library(cuvs_static STATIC $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
   endif()
 
   target_compile_options(
@@ -627,6 +636,7 @@ SECTIONS
   if(CUVS_NVTX)
     # This enables NVTX within the project with no option to disable it downstream.
     target_link_libraries(cuvs PUBLIC CUDA::nvtx3)
+    target_compile_definitions(cuvs_objs PUBLIC NVTX_ENABLED)
     target_compile_definitions(cuvs PUBLIC NVTX_ENABLED)
 
     target_link_libraries(cuvs-cagra-search PUBLIC CUDA::nvtx3)
@@ -684,7 +694,9 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/ivf_pq_c.cpp
       src/neighbors/cagra_c.cpp
       $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
+      src/neighbors/nn_descent_c.cpp
       src/neighbors/refine/refine_c.cpp
+      src/preprocessing/quantize/binary_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
     )
@@ -718,7 +730,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft rmm::rmm_logger_impl raft::raft_logger_impl
+      PRIVATE raft::raft
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -798,7 +810,7 @@ endif()
 if(BUILD_TESTS)
   enable_testing()
   add_subdirectory(internal)
-  add_subdirectory(test)
+  add_subdirectory(tests)
 endif()
 
 # ##################################################################################################

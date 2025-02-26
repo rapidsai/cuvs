@@ -36,7 +36,7 @@ void build(const raft::device_resources& handle,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset)
 {
-  std::lock_guard(*interface.mutex_);
+  std::lock_guard lock(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx = cuvs::neighbors::ivf_flat::build(
@@ -62,7 +62,7 @@ void extend(
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices)
 {
-  std::lock_guard(*interface.mutex_);
+  std::lock_guard lock(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     auto idx =
@@ -141,7 +141,7 @@ void serialize(const raft::device_resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os)
 {
-  std::lock_guard(*interface.mutex_);
+  std::lock_guard lock(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::serialize(handle, os, interface.index_.value());
@@ -157,7 +157,7 @@ void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is)
 {
-  std::lock_guard(*interface.mutex_);
+  std::lock_guard lock(*interface.mutex_);
 
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
@@ -179,7 +179,7 @@ void deserialize(const raft::device_resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename)
 {
-  std::lock_guard(*interface.mutex_);
+  std::lock_guard lock(*interface.mutex_);
 
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
