@@ -456,38 +456,14 @@ auto build(raft::resources const& res,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<float, uint32_t>& index);
-
-/**
- * Save the index to file.
- *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
- *
- * @code{.cpp}
- *   #include <raft/core/resources.hpp>
- *   #include <cuvs/neighbors/vamana.hpp>
- *
- *   raft::resources handle;
- *
- *   // create a string with a filepath
- *   std::string file_prefix("/path/to/index/prefix");
- *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
- *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
- * @endcode
- *
- * @param[in] handle the raft handle
- * @param[in] file_prefix prefix of path and name of index files
- * @param[in] index Vamana index
- *
- */
-void serialize(raft::resources const& handle,
-               const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<float, uint32_t>& index,
+               const bool sector_aligned = false);
 
 /**
  * Save the index to file.
@@ -509,11 +485,41 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
+               const bool sector_aligned = false);
+
+/**
+ * Save the index to file.
+ *
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/neighbors/vamana.hpp>
+ *
+ *   raft::resources handle;
+ *
+ *   // create a string with a filepath
+ *   std::string file_prefix("/path/to/index/prefix");
+ *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+ *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] file_prefix prefix of path and name of index files
+ * @param[in] index Vamana index
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
+ *
+ */
+void serialize(raft::resources const& handle,
+               const std::string& file_prefix,
+               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
+               const bool sector_aligned = false);
 
 /**
  * @}

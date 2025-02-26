@@ -59,8 +59,11 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-  // Output index to file
+  // Output index to file (in-memory format)
   serialize(dev_resources, out_fname, index);
+
+  // Output index to file (sector-aligned format)
+  serialize(dev_resources, out_fname + ".sector_aligned", index, true);
 }
 
 void usage()
