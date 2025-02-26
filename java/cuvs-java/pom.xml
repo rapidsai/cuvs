@@ -24,6 +24,64 @@
     <!-- NOTE: The version automatically gets updated when ci/release/update-version.sh is invoked. -->
     <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.02.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
     <name>cuvs-java</name>
+    <description>
+        This project provides Java bindings for cuVS, enabling approximate nearest neighbors search and clustering
+        on the GPU. As this is still under development, some APIs may change until the 1.0 release.
+    </description>
+    <url>http://ai.rapids</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+    <scm>
+        <connection>scm:git:https://github.com/rapidsai/cuvs.git</connection>
+        <developerConnection>scm:git:git@github.com:rapidsai/cuvs.git</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/rapidsai/cuvs</url>
+    </scm>
+    <developers>
+        <developer>
+            <id>ChrisHegarty</id>
+            <name>Chris Hegarty</name>
+            <email>62058229+ChrisHegarty@users.noreply.github.com</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+            <timezone>-6</timezone>
+        </developer>
+        <developer>
+            <id>chatman</id>
+            <name>Ishan Chattopadhyaya</name>
+            <email>ishan@apache.org</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+            <timezone>+6</timezone>
+        </developer>
+        <developer>
+            <id>narangvivek10</id>
+            <name>Vivek Narang</name>
+            <email>vivek@searchscale.com</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+            <timezone>-3</timezone>
+        </developer>
+        <developer>
+            <id>rhdong</id>
+            <name>Haidong Rong</name>
+            <email>hrong@nvidia.com</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+            <timezone>-8</timezone>
+        </developer>
+    </developers>
     <packaging>jar</packaging>
 
     <properties>
