@@ -20,6 +20,26 @@ from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 
 
 cdef extern from "cuvs/preprocessing/quantize/binary.h" nogil:
-    cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
-                                             DLManagedTensor* dataset,
-                                             DLManagedTensor* out)
+
+    ctypedef enum cuvsBinaryQuantizerThreshold:
+        ZERO
+        MEAN
+        SAMPLING_MEDIAN
+
+    ctypedef struct cuvsBinaryQuantizerParams:
+        cuvsBinaryQuantizerThreshold threshold
+        float sampling_ratio
+
+    ctypedef cuvsBinaryQuantizerParams* cuvsBinaryQuantizerParams_t
+
+    cuvsError_t cuvsBinaryQuantizerParamsCreate(
+        cuvsBinaryQuantizerParams_t* params)
+
+    cuvsError_t cuvsBinaryQuantizerParamsDestroy(
+        cuvsBinaryQuantizerParams_t params)
+
+    cuvsError_t cuvsBinaryQuantizerTransform(
+        cuvsResources_t res,
+        cuvsBinaryQuantizerParams_t params,
+        DLManagedTensor* dataset,
+        DLManagedTensor* out)
