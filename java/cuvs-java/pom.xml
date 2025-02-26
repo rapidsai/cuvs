@@ -44,44 +44,6 @@
         <tag>HEAD</tag>
         <url>https://github.com/rapidsai/cuvs</url>
     </scm>
-    <developers>
-        <developer>
-            <id>ChrisHegarty</id>
-            <name>Chris Hegarty</name>
-            <email>chegar@apache.org</email>
-            <roles>
-                <role>Committer</role>
-            </roles>
-            <timezone>-6</timezone>
-        </developer>
-        <developer>
-            <id>chatman</id>
-            <name>Ishan Chattopadhyaya</name>
-            <email>ishan@apache.org</email>
-            <roles>
-                <role>Committer</role>
-            </roles>
-            <timezone>+6</timezone>
-        </developer>
-        <developer>
-            <id>narangvivek10</id>
-            <name>Vivek Narang</name>
-            <email>vivek@searchscale.com</email>
-            <roles>
-                <role>Committer</role>
-            </roles>
-            <timezone>-3</timezone>
-        </developer>
-        <developer>
-            <id>rhdong</id>
-            <name>Haidong Rong</name>
-            <email>hrong@nvidia.com</email>
-            <roles>
-                <role>Committer</role>
-            </roles>
-            <timezone>-8</timezone>
-        </developer>
-    </developers>
     <packaging>jar</packaging>
 
     <properties>
