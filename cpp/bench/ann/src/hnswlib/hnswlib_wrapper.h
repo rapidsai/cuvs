@@ -16,7 +16,6 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "../common/thread_pool.hpp"
 #include "../common/util.hpp"
 
 #include <hnswlib/hnswlib.h>
@@ -114,7 +113,6 @@ class hnsw_lib : public algo<T> {
   int ef_construction_;
   int m_;
   int num_threads_;
-  std::shared_ptr<fixed_thread_pool> thread_pool_;
   Mode bench_mode_;
 };
 
@@ -150,22 +148,10 @@ void hnsw_lib<T>::build(const T* dataset, size_t nrow)
   appr_alg_ = std::make_shared<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     space_.get(), nrow, m_, ef_construction_);
 
-  thread_pool_                  = std::make_shared<fixed_thread_pool>(num_threads_);
-  const size_t items_per_thread = nrow / (num_threads_ + 1);
-
-  thread_pool_->submit(
-    [&](size_t i) {
-      if (i < items_per_thread && i % 10000 == 0) {
-        char buf[20];
-        std::time_t now = std::time(nullptr);
-        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-        printf("%s building %zu / %zu\n", buf, i, items_per_thread);
-        fflush(stdout);
-      }
-
-      appr_alg_->addPoint(dataset + i * dim_, i);
-    },
-    nrow);
+#pragma omp parallel for num_threads(num_threads_)
+  for (size_t i = 0; i < nrow; i++) {
+    appr_alg_->addPoint(dataset + i * dim_, i);
+  }
 }
 
 template <typename T>
