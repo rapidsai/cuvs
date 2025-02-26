@@ -688,6 +688,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     add_library(
       cuvs_c SHARED
       src/core/c_api.cpp
+      src/cluster/kmeans_c.cpp
       src/neighbors/brute_force_c.cpp
       src/neighbors/ivf_flat_c.cpp
       src/neighbors/ivf_pq_c.cpp
