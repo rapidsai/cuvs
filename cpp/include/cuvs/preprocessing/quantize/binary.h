@@ -37,7 +37,7 @@ struct cuvsBinaryQuantizerParams {
   /*
    * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform
    */
-  cuvsBinaryQuantizerThreshold threshold = ZERO;
+  cuvsBinaryQuantizerThreshold threshold = MEAN;
 
   /*
    * specifies the sampling ratio

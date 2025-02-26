@@ -40,7 +40,7 @@ enum class set_bit_threshold { zero, mean, sampling_median };
  * @brief quantizer parameters.
  */
 struct params {
-  set_bit_threshold threshold = set_bit_threshold::zero;
+  set_bit_threshold threshold = set_bit_threshold::mean;
 
   float sampling_ratio = 0.1;
 };
