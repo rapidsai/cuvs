@@ -26,9 +26,9 @@
     <name>cuvs-java</name>
     <description>
         This project provides Java bindings for cuVS, enabling approximate nearest neighbors search and clustering
-        on the GPU. As this is still under development, some APIs may change until the 1.0 release.
+        on the GPU. As this is experimental, some APIs may change.
     </description>
-    <url>http://ai.rapids</url>
+    <url>https://rapids.ai</url>
 
     <licenses>
         <license>
@@ -44,6 +44,17 @@
         <tag>HEAD</tag>
         <url>https://github.com/rapidsai/cuvs</url>
     </scm>
+    <developers>
+        <developer>
+            <id>rapidsai</id>
+            <name>rapidsai</name>
+            <email>cuvs@rapids.ai</email>
+            <roles>
+                <role>Maintainer</role>
+                <role>Committer</role>
+            </roles>
+        </developer>
+    </developers>
     <packaging>jar</packaging>
 
     <properties>
