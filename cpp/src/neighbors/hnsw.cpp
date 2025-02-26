@@ -15,20 +15,22 @@
  */
 
 #include "detail/hnsw.hpp"
+#include "../core/nvtx.hpp"
 #include <cstdint>
 #include <cuvs/neighbors/hnsw.hpp>
 #include <sys/types.h>
 
 namespace cuvs::neighbors::hnsw {
 
-#define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \
-  std::unique_ptr<index<T>> from_cagra(                                               \
-    raft::resources const& res,                                                       \
-    const index_params& params,                                                       \
-    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,                    \
-    std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset) \
-  {                                                                                   \
-    return detail::from_cagra<T>(res, params, cagra_index, dataset);                  \
+#define CUVS_INST_HNSW_FROM_CAGRA(T)                                                           \
+  std::unique_ptr<index<T>> from_cagra(                                                        \
+    raft::resources const& res,                                                                \
+    const index_params& params,                                                                \
+    const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,                             \
+    std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)          \
+  {                                                                                            \
+    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra"); \
+    return detail::from_cagra<T>(res, params, cagra_index, dataset);                           \
   }
 
 CUVS_INST_HNSW_FROM_CAGRA(float);
