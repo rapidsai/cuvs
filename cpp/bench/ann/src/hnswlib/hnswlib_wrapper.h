@@ -20,6 +20,8 @@
 
 #include <hnswlib/hnswlib.h>
 
+#include <omp.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cassert>
