@@ -252,11 +252,12 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
     auto mr = get_mr(graph_mem_);
 
     // Create a new graph, then copy, and __only then__ replace the shared pointer.
-    // We shouldn't use index_->graph() here, because it may be just a view of graph_.
-    auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(handle_, mr, graph_->extents());
+    auto old_graph =
+      index_->graph();  // view of graph_ if it exists, of an internal index member otherwise
+    auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(handle_, mr, old_graph.extents());
     raft::copy(new_graph.data_handle(),
-               graph_->data_handle(),
-               graph_->size(),
+               old_graph.data_handle(),
+               old_graph.size(),
                raft::resource::get_cuda_stream(handle_));
     raft::resource::sync_stream(handle_);
     *graph_ = std::move(new_graph);
