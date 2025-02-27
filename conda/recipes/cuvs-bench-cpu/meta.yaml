@@ -65,8 +65,6 @@ requirements:
     - pyyaml
     - python
     - requests
-    - libboost-devel=1.87  # [linux64]
-    - mkl-devel=2023  # [linux64]
     - sklearn>=1.5
 about:
   home: https://rapids.ai/
