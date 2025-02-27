@@ -37,6 +37,98 @@
 #define DIV_ROUND_UP(X, Y) (((uint64_t)(X) + (Y)-1) / (Y))
 #define ROUND_UP(X, Y)     (((uint64_t)(X) + (Y)-1) / (Y) * (Y))
 
+namespace {
+
+/**
+ * Parse quantizer file.
+ *
+ * Experimental, both the API and the file format are subject to change.
+ *
+ * @param[in] path the path of the DiskANN quantizer file
+ *
+ * @return the PQ encoding table as std::vector<float> and the OPQ matrix as std::vector<float>
+ */
+
+std::pair<std::vector<float>, std::vector<float>> parse_opq_file(const std::string& path,
+                                                                 const uint32_t vector_dim,
+                                                                 const uint32_t pq_dim,
+                                                                 const uint32_t pq_codebook_size)
+{
+  std::ifstream opq_if(path, std::ios::in | std::ios::binary);
+  if (!opq_if) { RAFT_FAIL("Cannot open file %s", path.c_str()); }
+
+  // check file size
+  opq_if.ignore(std::numeric_limits<std::streamsize>::max());
+  uint32_t length = opq_if.gcount();
+  uint32_t length_expected =
+    14 + (4 * vector_dim * pq_codebook_size) + (4 * vector_dim * vector_dim);
+  if (length != length_expected) {
+    RAFT_FAIL("OPQ file doesn't have expected size. Expected: %s Actual: %s",
+              std::to_string(length_expected).c_str(),
+              std::to_string(length).c_str());
+  }
+  opq_if.clear();  // Since ignore will have set eof.
+  opq_if.seekg(0, std::ios_base::beg);
+
+  // check metadata
+  unsigned char quantizerType, reconstructType;
+  int32_t numCodebooks, entriesPerCodebook, codebookDim;
+
+  opq_if.read((char*)&quantizerType, 1);
+  if (quantizerType != 2) {
+    RAFT_FAIL("Expected quantizer type 2; parsed: %s", std::to_string(quantizerType).c_str());
+  }
+
+  opq_if.read((char*)&reconstructType, 1);
+  if (reconstructType != 0) {
+    RAFT_FAIL("Expected reconstruct type 0; parsed: %s", std::to_string(reconstructType).c_str());
+  }
+
+  opq_if.read((char*)&numCodebooks, 4);
+  if ((uint32_t)numCodebooks != pq_dim) {
+    RAFT_FAIL("PQDim mismatch. Expected: %s Actual: %s",
+              std::to_string(pq_dim).c_str(),
+              std::to_string(numCodebooks).c_str());
+  }
+
+  opq_if.read((char*)&entriesPerCodebook, 4);
+  if ((uint32_t)entriesPerCodebook != pq_codebook_size) {
+    RAFT_FAIL("PQCodebookSize mismatch. Expected: %s Actual: %s",
+              std::to_string(pq_codebook_size).c_str(),
+              std::to_string(entriesPerCodebook).c_str());
+  }
+
+  opq_if.read((char*)&codebookDim, 4);
+  if ((uint32_t)codebookDim != vector_dim / pq_dim) {
+    RAFT_FAIL("Codebook dim mismatch. Expected: %s Actual: %s",
+              std::to_string(vector_dim / pq_dim).c_str(),
+              std::to_string(codebookDim).c_str());
+  }
+
+  // parse PQEncodingTable
+  std::vector<float> PQEncodingTable;
+  PQEncodingTable.reserve(vector_dim * pq_codebook_size);
+  for (int i = 0; (uint32_t)i < vector_dim * pq_codebook_size; i++) {
+    opq_if.read((char*)&PQEncodingTable[i],
+                4);  // Reconstruct type of the overall quantizer is int8 but because it's OPQ, need
+                     // to read it as float
+  }
+
+  // parse OPQMatrix
+  std::vector<float> OPQMatrix;
+  OPQMatrix.reserve(vector_dim * vector_dim);
+  // Need to transpose the matrix during ingestion to get the right semantics
+  for (int iRow = 0; (uint32_t)iRow < vector_dim; iRow++) {
+    for (int iCol = 0; (uint32_t)iCol < vector_dim; iCol++) {
+      opq_if.read((char*)&OPQMatrix[iCol * vector_dim + iRow], 4);
+    }
+  }
+
+  return std::make_pair(PQEncodingTable, OPQMatrix);
+}
+
+}  // namespace
+
 namespace cuvs::neighbors::vamana::detail {
 
 /**
@@ -259,6 +351,8 @@ void serialize(raft::resources const& res,
              d_graph.size(),
              raft::resource::get_cuda_stream(res));
   raft::resource::sync_stream(res);
+
+  // parse OPQ file if specified
 
   // if requested, write sector-aligned file and return
   if (sector_aligned) {
