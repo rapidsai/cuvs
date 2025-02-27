@@ -565,8 +565,7 @@ dependencies:
           - matrix:
               arch: x86_64
             packages:
-              - mkl=2022.2.1
-              - mkl-devel=2022.2.1
+              - mkl-devel=2023
               - libaio
               - libboost-devel=1.87
           - matrix:

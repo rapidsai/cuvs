@@ -48,8 +48,7 @@ requirements:
     - glog {{ glog_version }}
     - libaio  # [linux64]
     - libboost-devel=1.87  # [linux64]
-    - mkl-devel=2022.2.1  # [linux64]
-    - mkl=2022.2.1  # [linux64]
+    - mkl-devel=2023  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     - python
@@ -66,6 +65,9 @@ requirements:
     - pyyaml
     - python
     - requests
+    - libaio  # [linux64]
+    - libboost-devel=1.87  # [linux64]
+    - mkl-devel=2023  # [linux64]
 about:
   home: https://rapids.ai/
   license: Apache-2.0
