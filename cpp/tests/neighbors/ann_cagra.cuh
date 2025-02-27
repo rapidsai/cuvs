@@ -952,6 +952,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
 
+    // Avoid splitting datasets with a size of 0
+    if (ps.n_rows <= 3) GTEST_SKIP();
+
+    // IVF_PQ requires the `n_rows >= n_lists`.
+    if (ps.n_rows < 8 && ps.build_algo == graph_build_algo::IVF_PQ) GTEST_SKIP();
+
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
     std::vector<IdxT> indices_naive(queries_size);
@@ -1156,6 +1162,24 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {256},
     {1},
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {false},
+    {true},
+    {0.995});
+  inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
+
+  // Corner cases for small datasets
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {2},
+    {3, 5, 31, 32, 64, 101},
+    {1, 10},
+    {2},  // k
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
+    {0},  // query size
+    {0},
+    {256},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
     {0.995});
