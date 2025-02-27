@@ -65,7 +65,6 @@ requirements:
     - pyyaml
     - python
     - requests
-    - libaio  # [linux64]
     - libboost-devel=1.87  # [linux64]
     - mkl-devel=2023  # [linux64]
     - sklearn>=1.5
