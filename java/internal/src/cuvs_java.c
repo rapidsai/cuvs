@@ -96,7 +96,6 @@ cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, c
   cuvsStreamGet(cuvs_resources, &stream);
 
   omp_set_num_threads(n_writer_threads);
-  cuvsRMMPoolMemoryResourceEnable(95, 95, false);
 
   int64_t dataset_shape[2] = {rows, dimensions};
   DLManagedTensor dataset_tensor = prepare_tensor(dataset, dataset_shape, kDLFloat, 32, 2, kDLCUDA);
@@ -226,7 +225,6 @@ cuvsBruteForceIndex_t build_brute_force_index(float *dataset, long rows, long di
   int *return_value, int n_writer_threads) {
 
   omp_set_num_threads(n_writer_threads);
-  cuvsRMMPoolMemoryResourceEnable(95, 95, false);
 
   cudaStream_t stream;
   cuvsStreamGet(cuvs_resources, &stream);
@@ -266,26 +264,22 @@ cuvsBruteForceIndex_t build_brute_force_index(float *dataset, long rows, long di
  * @param[in] n_rows number of rows in the dataset
  */
 void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int topk, long n_queries, int dimensions,
-    cuvsResources_t cuvs_resources, int64_t *neighbors_h, float *distances_h, int *return_value, long *prefilter_data,
-    long prefilter_data_length, long n_rows) {
+    cuvsResources_t cuvs_resources, int64_t *neighbors_h, float *distances_h, int *return_value, uint32_t *prefilter_data,
+    long prefilter_data_length) {
 
   cudaStream_t stream;
   cuvsStreamGet(cuvs_resources, &stream);
 
   int64_t *neighbors;
   float *distances, *queries_d;
-  long *prefilter_data_d;
-
-  long prefilter_data_32_size = sizeof(uint32_t) * prefilter_data_length * 2;
-  uint32_t *prefilter_data_32 = (uint32_t *)malloc(prefilter_data_32_size);
+  uint32_t *prefilter_d = NULL;
+  int64_t prefilter_len = 0;
 
   cuvsRMMAlloc(cuvs_resources, (void**) &queries_d, sizeof(float) * n_queries * dimensions);
   cuvsRMMAlloc(cuvs_resources, (void**) &neighbors, sizeof(int64_t) * n_queries * topk);
   cuvsRMMAlloc(cuvs_resources, (void**) &distances, sizeof(float) * n_queries * topk);
-  cuvsRMMAlloc(cuvs_resources, (void**) &prefilter_data_d, prefilter_data_32_size);
 
   cudaMemcpy(queries_d, queries, sizeof(float) * n_queries * dimensions, cudaMemcpyDefault);
-  cudaMemcpy(prefilter_data_d, prefilter_data_32, prefilter_data_32_size, cudaMemcpyDefault);
 
   int64_t queries_shape[2] = {n_queries, dimensions};
   DLManagedTensor queries_tensor = prepare_tensor(queries_d, queries_shape, kDLFloat, 32, 2, kDLCUDA);
@@ -296,20 +290,22 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
   int64_t distances_shape[2] = {n_queries, topk};
   DLManagedTensor distances_tensor = prepare_tensor(distances, distances_shape, kDLFloat, 32, 2, kDLCUDA);
 
-  // unpack the incoming long into two 32bit ints
-  for (long i = 0; i < prefilter_data_length; i++) {
-    *(prefilter_data_32 + (2 * i)) = (int)(*(prefilter_data + i) >> 32);
-    *(prefilter_data_32 + ((2 * i) + 1)) = (int)*(prefilter_data + i);
-    //long l = (((long)*(prefilter_data_32 + (2 * i))) << 32) | (*(prefilter_data_32 + ((2 * i) + 1)) & 0xffffffffL);
-  }
-
   cuvsFilter prefilter;
+  DLManagedTensor prefilter_tensor;
   if (prefilter_data == NULL) {
     prefilter.type = NO_FILTER;
     prefilter.addr = (uintptr_t)NULL;
   } else {
-    int64_t prefilter_shape[1] = {(n_queries * n_rows + 31) / 32};
-    DLManagedTensor prefilter_tensor = prepare_tensor(prefilter_data_d, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
+    // Parse the filters data
+    int num_integers = (prefilter_data_length+63)/64 * 2;
+    int extraPaddingByteExists = prefilter_data_length % 64 > 32? 0: 1;
+    int64_t prefilter_shape[1] = {(prefilter_data_length + 31) / 32};
+
+	prefilter_len = prefilter_shape[0];
+    cuvsRMMAlloc(cuvs_resources, (void**) &prefilter_d, sizeof(uint32_t) * prefilter_len);
+	cudaMemcpy(prefilter_d, prefilter_data, sizeof(uint32_t) * prefilter_len, cudaMemcpyHostToDevice);
+
+    prefilter_tensor = prepare_tensor(prefilter_d, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
     prefilter.type = BITMAP;
     prefilter.addr = (uintptr_t)&prefilter_tensor;
   }
@@ -323,6 +319,9 @@ void search_brute_force_index(cuvsBruteForceIndex_t index, float *queries, int t
   cuvsRMMFree(cuvs_resources, neighbors, sizeof(int64_t) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, distances, sizeof(float) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
+  if(prefilter_d != NULL) {
+    cuvsRMMFree(cuvs_resources, prefilter_d, sizeof(uint32_t) * prefilter_len);
+  }
 }
 
 /**
