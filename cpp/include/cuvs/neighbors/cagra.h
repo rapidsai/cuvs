@@ -258,9 +258,9 @@ struct cuvsCagraSearchParams {
   uint64_t rand_xor_mask;
 
   /** Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) */
-  bool persistent = false;
+  bool persistent;
   /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
-  float persistent_lifetime = 2;
+  float persistent_lifetime;
   /**
    * Set the fraction of maximum grid size used by persistent kernel.
    * Value 1.0 means the kernel grid size is maximum possible for the selected device.
