@@ -104,7 +104,7 @@ struct cuvsKMeansParams {
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;
 
 /**
- * @brief Allocate Scalar Quantizer params, and populate with default values
+ * @brief Allocate KMeans params, and populate with default values
  *
  * @param[in] params cuvsKMeansParams_t to allocate
  * @return cuvsError_t
@@ -112,7 +112,7 @@ typedef struct cuvsKMeansParams* cuvsKMeansParams_t;
 cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 
 /**
- * @brief De-allocate Scalar Quantizer params
+ * @brief De-allocate KMeans params
  *
  * @param[in] params
  * @return cuvsError_t

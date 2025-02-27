@@ -253,6 +253,7 @@ def cluster_cost(X, centroids, resources=None):
         cydlpack.dlpack_c(centroids_ai)
 
     cdef double inertia = 0
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     with cuda_interruptible():
         check_cuvs(cuvsKMeansClusterCost(

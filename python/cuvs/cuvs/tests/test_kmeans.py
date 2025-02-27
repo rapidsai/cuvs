@@ -21,6 +21,7 @@ from cuvs.cluster.kmeans import KMeansParams, cluster_cost, fit
 from cuvs.distance import pairwise_distance
 
 
+@pytest.mark.parametrize("n_rows", [100])
 @pytest.mark.parametrize("n_cols", [5, 25])
 @pytest.mark.parametrize("n_clusters", [5, 15])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
@@ -33,7 +34,7 @@ def test_kmeans_fit(n_rows, n_cols, n_clusters, dtype):
     # compute the inertia, before fitting centroids
     original_inertia = cluster_cost(X, centroids)
 
-    params = KMeansParams(n_clusters=n_clusters, seed=42)
+    params = KMeansParams(n_clusters=n_clusters)
 
     # fit the centroids, make sure inertia has gone down
     centroids, inertia, n_iter = fit(params, X, centroids)

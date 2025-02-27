@@ -313,6 +313,7 @@ if(BUILD_SHARED_LIBS)
   add_library(
     cuvs_objs OBJECT
     src/cluster/kmeans_balanced_fit_float.cu
+    src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
     src/cluster/kmeans_fit_double.cu

@@ -63,3 +63,8 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
                                   DLManagedTensor * labels,
                                   bool normalize_weight,
                                   double * inertia)
+
+    cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
+                                      DLManagedTensor* X,
+                                      DLManagedTensor* centroids,
+                                      double* cost)
