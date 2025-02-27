@@ -43,14 +43,16 @@ index<T, IdxT> merge(raft::resources const& handle,
                      const cagra::merge_params& params,
                      std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
 {
+  using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
+  using ds_idx_type   = typename cagra_index_t::dataset_index_type;
+
   std::size_t dim              = 0;
   std::size_t new_dataset_size = 0;
   int64_t stride               = -1;
 
-  for (auto index : indices) {
+  for (cagra_index_t* index : indices) {
     RAFT_EXPECTS(index != nullptr,
                  "Null pointer detected in 'indices'. Ensure all elements are valid before usage.");
-    using ds_idx_type = decltype(index->data().n_rows());
     if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
         strided_dset != nullptr) {
       if (dim == 0) {
@@ -74,8 +76,7 @@ index<T, IdxT> merge(raft::resources const& handle,
   IdxT offset = 0;
 
   auto merge_dataset = [&](T* dst) {
-    for (auto index : indices) {
-      using ds_idx_type  = decltype(index->data().n_rows());
+    for (cagra_index_t* index : indices) {
       auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
 
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst + offset * dim,
