@@ -97,6 +97,7 @@ requirements:
     - cuvs {{ version }}
     - h5py {{ h5py_version }}
     - matplotlib-base
+    - mkl =2023  # [linux64]
     - pandas
     - pyyaml
     # rmm is needed to determine if package is gpu-enabled
@@ -104,9 +105,6 @@ requirements:
     - python
     - requests
     - rmm ={{ minor_version }}
-    - libaio  # [linux64]
-    - libboost-devel=1.87  # [linux64]
-    - mkl-devel=2023  # [linux64]
     - sklearn>=1.5
 about:
   home: https://rapids.ai/
