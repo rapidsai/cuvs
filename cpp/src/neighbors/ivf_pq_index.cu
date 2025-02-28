@@ -16,6 +16,14 @@
 
 #include <cuvs/neighbors/ivf_pq.hpp>
 
+#include "detail/ann_utils.cuh"
+
+#include <raft/core/operators.hpp>
+#include <raft/linalg/map.cuh>
+#include <raft/linalg/reduce.cuh>
+
+#include <raft/util/cudart_utils.hpp>
+
 namespace cuvs::neighbors::ivf_pq {
 index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
                                         cuvs::distance::DistanceType metric)
@@ -337,6 +345,76 @@ uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
     r = r << 1;
   }
   return r;
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index<IdxT>::rotation_matrix_int8(
+  const raft::resources& res) const
+{
+  if (!rotation_matrix_int8_.has_value()) {
+    rotation_matrix_int8_.emplace(
+      raft::make_device_mdarray<int8_t, uint32_t>(res, rotation_matrix().extents()));
+    raft::linalg::map(res,
+                      rotation_matrix_int8_->view(),
+                      cuvs::spatial::knn::detail::utils::mapping<int8_t>{},
+                      rotation_matrix());
+  }
+  return rotation_matrix_int8_->view();
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index<IdxT>::centers_int8(
+  const raft::resources& res) const
+{
+  if (!centers_int8_.has_value()) {
+    uint32_t n_lists      = this->n_lists();
+    uint32_t dim          = this->dim();
+    uint32_t dim_ext      = this->dim_ext();
+    uint32_t dim_ext_int8 = raft::round_up_safe(dim + 2, 16u);
+    centers_int8_.emplace(raft::make_device_matrix<int8_t, uint32_t>(res, n_lists, dim_ext_int8));
+    auto* inputs = centers().data_handle();
+
+    // NB: we use all available spare slots between dim and dim_ext to improve precision
+    raft::linalg::map_offset(
+      res, centers_int8_->view(), [dim, dim_ext, dim_ext_int8, inputs] __device__(uint32_t ix) {
+        uint32_t col = ix % dim_ext_int8;
+        uint32_t row = ix / dim_ext_int8;
+        if (col < dim) {
+          return static_cast<int8_t>(
+            std::clamp(inputs[col + row * dim_ext] * 128.0f, -128.0f, 127.f));
+        }
+        auto x = inputs[row * dim_ext + dim];
+        auto c = 64.0f / static_cast<float>(dim_ext_int8 - dim - 1);
+        auto y = std::clamp(x * c, -128.0f, 127.f);
+        auto z = std::clamp((y - std::round(y)) * 128.0f, -128.0f, 127.f);
+        if (col > dim) { return static_cast<int8_t>(std::round(y)); }
+        return static_cast<int8_t>(z);
+      });
+  }
+  return centers_int8_->view();
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::rotation_matrix_half(
+  const raft::resources& res) const
+{
+  if (!rotation_matrix_half_.has_value()) {
+    rotation_matrix_half_.emplace(
+      raft::make_device_mdarray<half, uint32_t>(res, rotation_matrix().extents()));
+    raft::linalg::map(res, rotation_matrix_half_->view(), raft::cast_op<half>{}, rotation_matrix());
+  }
+  return rotation_matrix_half_->view();
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::centers_half(
+  const raft::resources& res) const
+{
+  if (!centers_half_.has_value()) {
+    centers_half_.emplace(raft::make_device_mdarray<half, uint32_t>(res, centers().extents()));
+    raft::linalg::map(res, centers_half_->view(), raft::cast_op<half>{}, centers());
+  }
+  return centers_half_->view();
 }
 
 template struct index<int64_t>;
