@@ -172,6 +172,8 @@ include(cmake/modules/ConfigureCUDA.cmake)
 # add third party dependencies using CPM
 rapids_cpm_init()
 
+include(cmake/thirdparty/get_bang.cmake)
+
 if(NOT BUILD_CPU_ONLY)
   # We must find CCCL ourselves before raft so that we get the right version.
   include(${rapids-cmake-dir}/cpm/cccl.cmake)
@@ -382,6 +384,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
+    src/neighbors/bang.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
@@ -500,7 +503,7 @@ if(BUILD_SHARED_LIBS)
   )
   target_link_libraries(
     cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
-                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> bang::bang
   )
 
   add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
