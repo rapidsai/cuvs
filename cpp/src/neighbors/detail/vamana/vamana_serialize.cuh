@@ -127,10 +127,6 @@ std::pair<std::vector<float>, std::vector<float>> parse_opq_file(const std::stri
   return std::make_pair(PQEncodingTable, OPQMatrix);
 }
 
-}  // namespace
-
-namespace cuvs::neighbors::vamana::detail {
-
 /**
  * Save the index to file with sector alignment.
  *
@@ -320,6 +316,10 @@ void serialize_sector_aligned(raft::resources const& res,
     total_edges,
     (float)total_edges / (float)h_graph.extent(0));
 }
+
+}  // namespace
+
+namespace cuvs::neighbors::vamana::detail {
 
 /**
  * Save the index to file.
