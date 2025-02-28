@@ -1612,12 +1612,12 @@ void deserialize(raft::resources const& handle,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
@@ -1634,12 +1634,12 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
@@ -1656,12 +1656,12 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index_params configure the index building
  * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
  *
@@ -1680,13 +1680,13 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_flat::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
@@ -1704,13 +1704,13 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_flat::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
@@ -1728,13 +1728,13 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_flat::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
  * @param[in] new_indices optional vector on host [n_rows],
@@ -1754,7 +1754,7 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params;
@@ -1762,7 +1762,7 @@ void extend(const raft::resources& clique,
  * distances);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -1784,7 +1784,7 @@ void search(
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params;
@@ -1792,7 +1792,7 @@ void search(
  * distances);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -1814,7 +1814,7 @@ void search(
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg::search_params<ivf_flat::search_params> search_params;
@@ -1822,7 +1822,7 @@ void search(
  * distances);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] search_params configure the index search
  * @param[in] queries a row-major matrix on host [n_rows, dim]
@@ -1846,14 +1846,14 @@ void search(
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_flat::serialize(clique, index, filename);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
@@ -1869,14 +1869,14 @@ void serialize(
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_flat::serialize(clique, index, filename);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
@@ -1892,14 +1892,14 @@ void serialize(
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_flat::serialize(clique, index, filename);
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] index the pre-built index
  * @param[in] filename path to the file to be serialized
  *
@@ -1915,7 +1915,7 @@ void serialize(
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::mg::index_params<ivf_flat::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
@@ -1924,7 +1924,7 @@ void serialize(
  *
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] filename path to the file to be deserialized
  *
  */
@@ -1941,7 +1941,7 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
  *
  * Usage example:
  * @code{.cpp}
- * raft::device_resources_snmg clique;
+ * raft::resources clique;
  * cuvs::neighbors::ivf_flat::index_params index_params;
  * auto index = cuvs::neighbors::ivf_flat::build(clique, index_params, index_dataset);
  * const std::string filename = "local_index.cuvs";
@@ -1950,7 +1950,7 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
  *
  * @endcode
  *
- * @param[in] clique a `raft::device_resources_snmg` object specifying the NCCL clique configuration
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
  * @param[in] filename path to the file to be deserialized : a local index
  *
  */
