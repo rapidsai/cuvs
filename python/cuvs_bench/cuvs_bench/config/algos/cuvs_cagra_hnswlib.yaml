@@ -8,7 +8,7 @@ groups:
       graph_degree: [32, 64, 96, 128]
       intermediate_graph_degree: [32, 64, 96, 128]
       graph_build_algo: ["NN_DESCENT"]
-      hierarchy: ["none", "cpu"]
+      hierarchy: ["none", "cpu", "gpu"]
       ef_construction: [64, 128, 256, 512]
     search:
       ef: [10, 20, 40, 60, 80, 120, 200, 400, 600, 800]
