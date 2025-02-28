@@ -91,11 +91,9 @@ index<T, IdxT> build(
 template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_prefix,
-               const index<T, IdxT>& index_,
-               bool sector_aligned = false)
+               const index<T, IdxT>& index_)
 {
-  cuvs::neighbors::vamana::detail::serialize<T, IdxT>(
-    res, file_prefix, index_, true, sector_aligned);
+  cuvs::neighbors::vamana::detail::serialize<T, IdxT>(res, file_prefix, index_);
 }
 
 /** @} */  // end group vamana
