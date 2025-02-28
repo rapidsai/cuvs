@@ -19,8 +19,8 @@
 #include <cuvs/preprocessing/quantize/scalar.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/linalg/unary_op.cuh>
+#include <raft/matrix/sample_rows.cuh>
 #include <raft/random/rng.cuh>
-#include <raft/random/sample_without_replacement.cuh>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 #include <thrust/system/omp/execution_policy.h>
@@ -87,10 +87,11 @@ std::tuple<T, T> quantile_min_max(raft::resources const& res,
   raft::random::RngState rng(seed);
   size_t n_elements  = dataset.extent(0) * dataset.extent(1);
   size_t subset_size = std::min(max_num_samples, n_elements);
-  auto subset        = raft::make_device_vector<T>(res, subset_size);
-  auto dataset_view  = raft::make_device_vector_view<const T>(dataset.data_handle(), n_elements);
-  raft::random::sample_without_replacement(
-    res, rng, dataset_view, std::nullopt, subset.view(), std::nullopt);
+
+  // select subsample element-wise
+  auto dataset_view =
+    raft::make_device_matrix_view<const T>(dataset.data_handle(), n_elements, 1UL);
+  auto subset = raft::matrix::sample_rows(res, rng, dataset_view, subset_size);
 
   // quantile / sort and pick for now
   thrust::sort(raft::resource::get_thrust_policy(res),
@@ -105,7 +106,6 @@ std::tuple<T, T> quantile_min_max(raft::resources const& res,
   raft::update_host(&(minmax_h[0]), subset.data_handle() + pos_min, 1, stream);
   raft::update_host(&(minmax_h[1]), subset.data_handle() + pos_max, 1, stream);
   raft::resource::sync_stream(res);
-
   return {minmax_h[0], minmax_h[1]};
 }
 
