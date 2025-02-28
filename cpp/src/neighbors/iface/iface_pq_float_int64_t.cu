@@ -38,54 +38,54 @@ namespace cuvs::neighbors {
                                              raft::memory_type::host>;                            \
                                                                                                   \
   template void build(                                                                            \
-    const raft::device_resources& handle,                                                         \
+    const raft::resources& handle,                                                                \
     cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                              \
     const cuvs::neighbors::index_params* index_params,                                            \
     raft::mdspan<const T, matrix_extent<int64_t>, row_major, T_ha> index_dataset);                \
                                                                                                   \
   template void build(                                                                            \
-    const raft::device_resources& handle,                                                         \
+    const raft::resources& handle,                                                                \
     cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                              \
     const cuvs::neighbors::index_params* index_params,                                            \
     raft::mdspan<const T, matrix_extent<int64_t>, row_major, T_da> index_dataset);                \
                                                                                                   \
   template void extend(                                                                           \
-    const raft::device_resources& handle,                                                         \
+    const raft::resources& handle,                                                                \
     cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                              \
     raft::mdspan<const T, matrix_extent<int64_t>, row_major, T_ha> new_vectors,                   \
     std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, IdxT_ha>> \
       new_indices);                                                                               \
                                                                                                   \
   template void extend(                                                                           \
-    const raft::device_resources& handle,                                                         \
+    const raft::resources& handle,                                                                \
     cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                              \
     raft::mdspan<const T, matrix_extent<int64_t>, row_major, T_da> new_vectors,                   \
     std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, IdxT_da>> \
       new_indices);                                                                               \
                                                                                                   \
-  template void search(const raft::device_resources& handle,                                      \
+  template void search(const raft::resources& handle,                                             \
                        const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,     \
                        const cuvs::neighbors::search_params* search_params,                       \
                        raft::device_matrix_view<const T, int64_t, row_major> queries,             \
                        raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,              \
                        raft::device_matrix_view<float, int64_t, row_major> distances);            \
                                                                                                   \
-  template void search(const raft::device_resources& handle,                                      \
+  template void search(const raft::resources& handle,                                             \
                        const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,     \
                        const cuvs::neighbors::search_params* search_params,                       \
                        raft::host_matrix_view<const T, int64_t, row_major> h_queries,             \
                        raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,            \
                        raft::device_matrix_view<float, int64_t, row_major> d_distances);          \
                                                                                                   \
-  template void serialize(const raft::device_resources& handle,                                   \
+  template void serialize(const raft::resources& handle,                                          \
                           const cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,  \
                           std::ostream& os);                                                      \
                                                                                                   \
-  template void deserialize(const raft::device_resources& handle,                                 \
+  template void deserialize(const raft::resources& handle,                                        \
                             cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,      \
                             std::istream& is);                                                    \
                                                                                                   \
-  template void deserialize(const raft::device_resources& handle,                                 \
+  template void deserialize(const raft::resources& handle,                                        \
                             cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,      \
                             const std::string& filename);
 CUVS_INST_MG_PQ(float, int64_t);

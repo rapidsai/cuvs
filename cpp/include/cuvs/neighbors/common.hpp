@@ -756,21 +756,21 @@ struct iface {
 };
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
-void build(const raft::device_resources& handle,
+void build(const raft::resources& handle,
            cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
 void extend(
-  const raft::device_resources& handle,
+  const raft::resources& handle,
   cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
   raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(const raft::device_resources& handle,
+void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::device_matrix_view<const T, int64_t, row_major> h_queries,
@@ -778,17 +778,17 @@ void search(const raft::device_resources& handle,
             raft::device_matrix_view<float, int64_t, row_major> d_distances);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(const raft::device_resources& handle,
+void serialize(const raft::resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename);
 
