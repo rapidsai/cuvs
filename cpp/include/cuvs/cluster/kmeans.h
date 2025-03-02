@@ -154,7 +154,7 @@ cuvsError_t cuvsKMeansFit(cuvsResources_t res,
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
  *
- * @param[in]     handle           The raft handle.
+ * @param[in]     res              opaque C handle
  * @param[in]     params           Parameters for KMeans model.
  * @param[in]     X                New data to predict.
  *                                 [dim = n_samples x n_features]
@@ -182,7 +182,7 @@ cuvsError_t cuvsKMeansPredict(cuvsResources_t res,
 /**
  * @brief Compute cluster cost
  *
- * @param[in]  handle         The raft handle
+ * @param[in]  res            opaque C handle
  * @param[in]  X              Training instances to cluster. The data must
  *                            be in row-major format.
  *                            [dim = n_samples x n_features]
