@@ -34,6 +34,6 @@ CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
 rapids-mamba-retry install \
   --channel "${CPP_CHANNEL}" \
   "libcuvs=${RAPIDS_VERSION}" \
-  "libraft=${RAPIDS_VERSION}"
+  "libraft=$(rapids-version-major-minor)"
 
 bash ./build.sh go
