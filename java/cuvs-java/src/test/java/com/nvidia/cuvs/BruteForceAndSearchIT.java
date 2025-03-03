@@ -16,12 +16,15 @@
 
 package com.nvidia.cuvs;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,9 +33,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertEquals;
 
 public class BruteForceAndSearchIT extends CuVSTestCase{
 
@@ -57,14 +57,14 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         { 0.03902049f, 0.9689629f },
         { 0.92514056f, 0.4463501f },
         { 0.6673192f, 0.10993068f }
-      };
+    };
     List<Integer> map = List.of(0, 1, 2, 3);
     float[][] queries = {
         { 0.48216683f, 0.0428398f },
         { 0.5084142f, 0.6545497f },
         { 0.51260436f, 0.2643005f },
         { 0.05198065f, 0.5789965f }
-      };
+    };
 
     // Expected search results
     List<Map<Integer, Float>> expectedResults = Arrays.asList(
@@ -72,18 +72,25 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         Map.of(0, 0.12472606f, 2, 0.21700788f, 1, 0.3191862f),
         Map.of(3, 0.047766685f, 2, 0.20332813f, 0, 0.48305476f),
         Map.of(1, 0.15224183f, 0, 0.5906347f, 3, 0.5986643f)
-      );
+        );
+
+    // pre-filtering
+    BitSet prefilter = new BitSet();
+    prefilter.set(0);
+    prefilter.set(1);
+    prefilter.clear(2);
+    prefilter.set(3);
+
+    final List<Map<Integer, Float>> expectedResultsWithFiltering = Arrays.asList(
+        Map.of(0, 0.83774555f, 1, 1.0540828f, 3, 0.038782537f),
+        Map.of(0, 0.12472606f, 1, 0.3191862f, 3, 0.32186073f),
+        Map.of(0, 0.48305476f, 1, 0.7208309f, 3, 0.047766685f),
+        Map.of(0, 0.5906347f, 1, 0.15224195f, 3, 0.5986643f)
+        );
 
     for (int j = 0; j < 10; j++) {
 
       try (CuVSResources resources = CuVSResources.create()) {
-
-        // Create a query object with the query vectors
-        BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
-            .withTopK(3)
-            .withQueryVectors(queries)
-            .withMapping(map)
-            .build();
 
         // Set index parameters
         BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
@@ -108,18 +115,29 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
             .build();
 
         // Perform the search
-        SearchResults resultsFromLoadedIndex = loadedIndex.search(cuvsQuery);
+        BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
+            .withTopK(3)
+            .withQueryVectors(queries)
+            .withMapping(map)
+            .build();
+        BruteForceQuery cuvsQueryWithFiltering = new BruteForceQuery.Builder()
+            .withTopK(3)
+            .withQueryVectors(queries)
+            .withPrefilter(new BitSet[] {prefilter, prefilter, prefilter, prefilter}, dataset.length)
+            .withMapping(map)
+            .build();
 
-        // Check results
-        log.info(resultsFromLoadedIndex.getResults().toString());
-        assertEquals(expectedResults, resultsFromLoadedIndex.getResults());
+        // search the loaded index
+        SearchResults results = loadedIndex.search(cuvsQuery);
+        checkResults(expectedResults, results.getResults());
 
-        // Perform the search
-        SearchResults results = index.search(cuvsQuery);
+        // search the first index
+        results = index.search(cuvsQuery);
+        checkResults(expectedResults, results.getResults());
 
-        // Check results
-        log.info(results.getResults().toString());
-        assertEquals(expectedResults, results.getResults());
+        // search with pre-filtering
+        results = index.search(cuvsQueryWithFiltering);
+        checkResults(expectedResultsWithFiltering, results.getResults());
 
         // Cleanup
         index.destroyIndex();
