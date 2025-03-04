@@ -72,10 +72,11 @@ struct quantize_op {
   }
 };
 
-template <typename T>
-std::tuple<T, T> quantile_min_max(raft::resources const& res,
-                                  raft::device_matrix_view<const T, int64_t> dataset,
-                                  double quantile)
+template <typename T, typename IdxT = int64_t, typename accessor>
+std::tuple<T, T> quantile_min_max(
+  raft::resources const& res,
+  raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset,
+  double quantile)
 {
   // settings for quantile approximation
   constexpr size_t max_num_samples = 1000000;
@@ -85,15 +86,15 @@ std::tuple<T, T> quantile_min_max(raft::resources const& res,
 
   // select subsample
   raft::random::RngState rng(seed);
-  size_t n_elements  = dataset.extent(0) * dataset.extent(1);
-  size_t subset_size = std::min(max_num_samples, n_elements);
+  size_t n_rows        = dataset.extent(0);
+  size_t dim           = dataset.extent(1);
+  size_t n_sample_rows = std::min<size_t>(std::ceil(max_num_samples / dim), n_rows);
 
-  // select subsample element-wise
-  auto dataset_view =
-    raft::make_device_matrix_view<const T>(dataset.data_handle(), n_elements, 1UL);
-  auto subset = raft::matrix::sample_rows(res, rng, dataset_view, subset_size);
+  // select subsample rows (this returns device data for both device and host input)
+  auto subset = raft::matrix::sample_rows(res, rng, dataset, (IdxT)n_sample_rows);
 
-  // quantile / sort and pick for now
+  // quantile / sort element-wise and pick for now
+  size_t subset_size = n_sample_rows * dim;
   thrust::sort(raft::resource::get_thrust_policy(res),
                subset.data_handle(),
                subset.data_handle() + subset_size);
@@ -107,35 +108,6 @@ std::tuple<T, T> quantile_min_max(raft::resources const& res,
   raft::update_host(&(minmax_h[1]), subset.data_handle() + pos_max, 1, stream);
   raft::resource::sync_stream(res);
   return {minmax_h[0], minmax_h[1]};
-}
-
-template <typename T>
-std::tuple<T, T> quantile_min_max(raft::resources const& res,
-                                  raft::host_matrix_view<const T, int64_t> dataset,
-                                  double quantile)
-{
-  // settings for quantile approximation
-  constexpr size_t max_num_samples = 1000000;
-  constexpr int seed               = 137;
-
-  // select subsample
-  std::mt19937 rng(seed);
-  size_t n_elements  = dataset.extent(0) * dataset.extent(1);
-  size_t subset_size = std::min(max_num_samples, n_elements);
-  std::vector<T> subset;
-  std::sample(dataset.data_handle(),
-              dataset.data_handle() + n_elements,
-              std::back_inserter(subset),
-              subset_size,
-              rng);
-
-  // quantile / sort and pick for now
-  thrust::sort(thrust::omp::par, subset.data(), subset.data() + subset_size, fp_lt<T>);
-  double half_quantile_pos = (0.5 + 0.5 * quantile) * subset_size;
-  int pos_max              = std::ceil(half_quantile_pos) - 1;
-  int pos_min              = subset_size - pos_max - 1;
-
-  return {subset[pos_min], subset[pos_max]};
 }
 
 template <typename T>
