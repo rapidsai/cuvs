@@ -3,15 +3,18 @@
 
 set -euo pipefail
 
+rapids-logger "Downloading artifacts from previous jobs"
+CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
+
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
-
-RAPIDS_VERSION="$(rapids-version)"
 
 rapids-dependency-file-generator \
   --output conda \
   --file-key rust \
-  --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" | tee env.yaml
+  --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" \
+  --prepend-channel "${CPP_CHANNEL}" \
+  | tee env.yaml
 
 rapids-mamba-retry env create --yes -f env.yaml -n rust
 
@@ -28,14 +31,5 @@ rapids-print-env
 LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
 export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
-
-rapids-logger "Downloading artifacts from previous jobs"
-CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
-
-# installing libcuvs/libraft will speed up the rust build substantially
-rapids-mamba-retry install \
-  --channel "${CPP_CHANNEL}" \
-  "libcuvs=${RAPIDS_VERSION}" \
-  "libraft=${RAPIDS_VERSION}"
 
 bash ./build.sh rust

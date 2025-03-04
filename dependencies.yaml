@@ -89,6 +89,8 @@ files:
       - cuda_version
       - rapids_build
       - rust
+      - depends_on_libcuvs
+      - depends_on_libraft
   go:
     output: none
     includes:
