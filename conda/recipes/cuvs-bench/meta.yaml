@@ -105,7 +105,7 @@ requirements:
     - python
     - requests
     - rmm ={{ minor_version }}
-    - sklearn>=1.5
+    - scikit-learn>=1.5
 about:
   home: https://rapids.ai/
   license: Apache-2.0
