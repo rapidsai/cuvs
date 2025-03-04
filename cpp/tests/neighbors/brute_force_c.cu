@@ -39,6 +39,7 @@ extern "C" void run_brute_force(int64_t n_rows,
                                 float* index_data,
                                 float* query_data,
                                 uint32_t* prefilter_data,
+                                enum cuvsFilterType filter_type,
                                 float* distances_data,
                                 int64_t* neighbors_data,
                                 cuvsDistanceType metric);
@@ -78,6 +79,35 @@ index_t create_sparse_matrix(index_t m, index_t n, float sparsity, std::vector<b
     }
   }
   return nnz;
+}
+
+template <typename bitset_t = uint32_t>
+void repeat_cpu_bitset(std::vector<bitset_t>& input,
+                       size_t input_bits,
+                       size_t repeat,
+                       std::vector<bitset_t>& output)
+{
+  const size_t output_bits  = input_bits * repeat;
+  const size_t output_units = (output_bits + sizeof(bitset_t) * 8 - 1) / (sizeof(bitset_t) * 8);
+
+  std::memset(output.data(), 0, output_units * sizeof(bitset_t));
+
+  size_t output_bit_index = 0;
+
+  for (size_t r = 0; r < repeat; ++r) {
+    for (size_t i = 0; i < input_bits; ++i) {
+      size_t input_unit_index = i / (sizeof(bitset_t) * 8);
+      size_t input_bit_offset = i % (sizeof(bitset_t) * 8);
+      bool bit                = (input[input_unit_index] >> input_bit_offset) & 1;
+
+      size_t output_unit_index = output_bit_index / (sizeof(bitset_t) * 8);
+      size_t output_bit_offset = output_bit_index % (sizeof(bitset_t) * 8);
+
+      output[output_unit_index] |= (static_cast<bitset_t>(bit) << output_bit_offset);
+
+      ++output_bit_index;
+    }
+  }
 }
 
 template <typename index_t, typename bitmap_t = uint32_t>
@@ -205,10 +235,11 @@ void cpu_select_k(const std::vector<index_t>& indptr_h,
   }
 }
 
-template <typename value_t, typename index_t, typename bitmap_t = uint32_t>
+template <typename value_t, typename index_t, typename bits_t = uint32_t>
 void cpu_brute_force_with_filter(value_t* query_data,
                                  value_t* index_data,
-                                 std::vector<bitmap_t>& filter,
+                                 std::vector<bits_t>& filter,
+                                 enum cuvsFilterType filter_type,
                                  std::vector<index_t>& out_indices_h,
                                  std::vector<value_t>& out_values_h,
                                  size_t n_queries,
@@ -219,11 +250,21 @@ void cpu_brute_force_with_filter(value_t* query_data,
                                  bool select_min,
                                  cuvsDistanceType metric)
 {
-  std::vector<value_t> values_h(nnz);
-  std::vector<index_t> indices_h(nnz);
+  size_t actual_nnz = nnz;
+  size_t element    = raft::ceildiv(n_queries * n_dataset, size_t(sizeof(bits_t) * 8));
+
+  std::vector<bits_t> filter_repeat_h(element);
+  if (filter_type == BITSET) {
+    actual_nnz = nnz * n_queries;
+    repeat_cpu_bitset(filter, n_dataset, n_queries, filter_repeat_h);
+  } else {
+    filter_repeat_h = filter;
+  }
+  std::vector<value_t> values_h(actual_nnz);
+  std::vector<index_t> indices_h(actual_nnz);
   std::vector<index_t> indptr_h(n_queries + 1);
 
-  cpu_convert_to_csr(filter, (index_t)n_queries, (index_t)n_dataset, indices_h, indptr_h);
+  cpu_convert_to_csr(filter_repeat_h, (index_t)n_queries, (index_t)n_dataset, indices_h, indptr_h);
 
   cpu_sddmm(query_data,
             index_data,
@@ -302,10 +343,11 @@ void recall_eval(T* query_data,
                                                min_recall));
 };
 
-template <typename T, typename IdxT, typename bitmap_t = uint32_t>
+template <typename T, typename IdxT, typename bits_t = uint32_t>
 void recall_eval_with_filter(T* query_data,
                              T* index_data,
-                             std::vector<bitmap_t>& filter_h,
+                             std::vector<bits_t>& filter_h,
+                             enum cuvsFilterType filter_type,
                              IdxT* neighbors_d,
                              T* distances_d,
                              std::vector<T>& distances_ref_h,
@@ -337,6 +379,7 @@ void recall_eval_with_filter(T* query_data,
   cpu_brute_force_with_filter(queries_h.data(),
                               indices_h.data(),
                               filter_h,
+                              filter_type,
                               neighbors_ref_h,
                               distances_ref_h,
                               n_queries,
@@ -388,6 +431,7 @@ TEST(BruteForceC, BuildSearch)
                   index_data.data(),
                   query_data.data(),
                   filter_data,
+                  NO_FILTER,
                   distances_data.data(),
                   neighbors_data.data(),
                   metric);
@@ -404,20 +448,20 @@ TEST(BruteForceC, BuildSearch)
               metric);
 }
 
-TEST(BruteForceC, BuildSearchWithFilter)
+void run_test_with_filter(int64_t n_samples,
+                          int64_t n_queries,
+                          int64_t n_dim,
+                          uint32_t n_neighbors,
+                          enum cuvsFilterType filter_type)
 {
-  int64_t n_rows       = 8096;
-  int64_t n_queries    = 128;
-  int64_t n_dim        = 32;
-  uint32_t n_neighbors = 8;
-
   raft::resources handle;
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  float sparsity   = 0.2;
-  int64_t n_filter = (n_queries * n_rows + 31) / 32;
+  float sparsity        = 0.2;
+  int64_t n_rows_filter = (filter_type == BITMAP ? n_queries : 1);
+  int64_t n_filter      = (n_rows_filter * n_samples + 31) / 32;
   std::vector<uint32_t> filter_h(n_filter);
-  int64_t nnz = create_sparse_matrix(n_queries, n_rows, sparsity, filter_h);
+  int64_t nnz = create_sparse_matrix(n_rows_filter, n_samples, sparsity, filter_h);
 
   cuvsDistanceType metric = L2Expanded;
   bool select_min         = cuvs::distance::is_min_close(metric);
@@ -427,7 +471,7 @@ TEST(BruteForceC, BuildSearchWithFilter)
     select_min ? std::numeric_limits<float>::infinity() : std::numeric_limits<float>::lowest());
   std::vector<int64_t> neighbors_ref_h(n_queries * n_neighbors, static_cast<int64_t>(0));
 
-  rmm::device_uvector<float> index_data(n_rows * n_dim, stream);
+  rmm::device_uvector<float> index_data(n_samples * n_dim, stream);
   rmm::device_uvector<float> query_data(n_queries * n_dim, stream);
   rmm::device_uvector<int64_t> neighbors_data(n_queries * n_neighbors, stream);
   rmm::device_uvector<float> distances_data(n_queries * n_neighbors, stream);
@@ -436,18 +480,19 @@ TEST(BruteForceC, BuildSearchWithFilter)
   raft::copy(neighbors_data.data(), neighbors_ref_h.data(), n_queries * n_neighbors, stream);
   raft::copy(distances_data.data(), distances_ref_h.data(), n_queries * n_neighbors, stream);
 
-  generate_random_data(index_data.data(), n_rows * n_dim);
+  generate_random_data(index_data.data(), n_samples * n_dim);
   generate_random_data(query_data.data(), n_queries * n_dim);
 
   raft::copy(filter_data.data(), filter_h.data(), n_filter, stream);
 
-  run_brute_force(n_rows,
+  run_brute_force(n_samples,
                   n_queries,
                   n_dim,
                   n_neighbors,
                   index_data.data(),
                   query_data.data(),
                   filter_data.data(),
+                  filter_type,
                   distances_data.data(),
                   neighbors_data.data(),
                   metric);
@@ -455,14 +500,34 @@ TEST(BruteForceC, BuildSearchWithFilter)
   recall_eval_with_filter(query_data.data(),
                           index_data.data(),
                           filter_h,
+                          filter_type,
                           neighbors_data.data(),
                           distances_data.data(),
                           distances_ref_h,
                           neighbors_ref_h,
                           n_queries,
-                          n_rows,
+                          n_samples,
                           n_dim,
                           n_neighbors,
                           nnz,
                           metric);
+}
+TEST(BruteForceC, BuildSearchWithBitmapFilter)
+{
+  int64_t n_rows       = 8096;
+  int64_t n_queries    = 128;
+  int64_t n_dim        = 32;
+  uint32_t n_neighbors = 8;
+
+  run_test_with_filter(n_rows, n_queries, n_dim, n_neighbors, BITMAP);
+}
+
+TEST(BruteForceC, BuildSearchWithBitsetFilter)
+{
+  int64_t n_rows       = 2000;
+  int64_t n_queries    = 100;
+  int64_t n_dim        = 128;
+  uint32_t n_neighbors = 100;
+
+  run_test_with_filter(n_rows, n_queries, n_dim, n_neighbors, BITSET);
 }
