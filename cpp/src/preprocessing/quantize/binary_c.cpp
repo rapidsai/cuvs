@@ -26,9 +26,26 @@
 namespace {
 
 template <typename T, typename OutputT = uint8_t>
-void _transform(cuvsResources_t res, DLManagedTensor* dataset_tensor, DLManagedTensor* out_tensor)
+void _transform(cuvsResources_t res,
+                cuvsBinaryQuantizerParams_t params,
+                DLManagedTensor* dataset_tensor,
+                DLManagedTensor* out_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+  cuvs::preprocessing::quantize::binary::params _params;
+  switch (params->threshold) {
+    case ZERO:
+      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::zero;
+      break;
+    case MEAN:
+      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::mean;
+      break;
+    case SAMPLING_MEDIAN:
+      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median;
+      break;
+  }
+  _params.sampling_ratio = params->sampling_ratio;
 
   auto dataset = dataset_tensor->dl_tensor;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
@@ -37,6 +54,7 @@ void _transform(cuvsResources_t res, DLManagedTensor* dataset_tensor, DLManagedT
 
     cuvs::preprocessing::quantize::binary::transform(
       *res_ptr,
+      _params,
       cuvs::core::from_dlpack<mdspan_type>(dataset_tensor),
       cuvs::core::from_dlpack<out_mdspan_type>(out_tensor));
 
@@ -46,6 +64,7 @@ void _transform(cuvsResources_t res, DLManagedTensor* dataset_tensor, DLManagedT
 
     cuvs::preprocessing::quantize::binary::transform(
       *res_ptr,
+      _params,
       cuvs::core::from_dlpack<mdspan_type>(dataset_tensor),
       cuvs::core::from_dlpack<out_mdspan_type>(out_tensor));
   } else {
@@ -56,17 +75,18 @@ void _transform(cuvsResources_t res, DLManagedTensor* dataset_tensor, DLManagedT
 }  // namespace
 
 extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
+                                                    cuvsBinaryQuantizerParams_t params,
                                                     DLManagedTensor* dataset_tensor,
                                                     DLManagedTensor* out_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _transform<float>(res, dataset_tensor, out_tensor);
+      _transform<float>(res, params, dataset_tensor, out_tensor);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
-      _transform<half>(res, dataset_tensor, out_tensor);
+      _transform<half>(res, params, dataset_tensor, out_tensor);
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 64) {
-      _transform<double>(res, dataset_tensor, out_tensor);
+      _transform<double>(res, params, dataset_tensor, out_tensor);
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,

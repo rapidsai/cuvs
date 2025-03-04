@@ -22,10 +22,13 @@ from cuvs.preprocessing.quantize import binary
 
 @pytest.mark.parametrize("n_rows", [50, 100])
 @pytest.mark.parametrize("n_cols", [10, 50])
+@pytest.mark.parametrize("threshold", ["zero", "mean", "sampling_median"])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("device_memory", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
-def test_binary_quantizer(n_rows, n_cols, inplace, device_memory, dtype):
+def test_binary_quantizer(
+    n_rows, n_cols, threshold, inplace, device_memory, dtype
+):
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)
 
     output_cols = int(np.ceil(n_cols / 8))
@@ -36,7 +39,10 @@ def test_binary_quantizer(n_rows, n_cols, inplace, device_memory, dtype):
     input1_device = device_ndarray(input1)
     output_device = device_ndarray(output) if inplace else None
 
+    params = binary.QuantizerParams(threshold=threshold)
+
     transformed = binary.transform(
+        params,
         input1_device if device_memory else input1,
         output=(output_device if device_memory else output)
         if inplace
