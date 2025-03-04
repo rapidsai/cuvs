@@ -29,6 +29,17 @@
 
 #ifdef CUVS_BUILD_MG_ALGOS
 #include <cuvs/neighbors/mg.hpp>
+#else
+namespace cuvs::neighbors::mg {
+template <typename Upstream>
+struct index_params;
+
+template <typename Upstream>
+struct search_params;
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct index;
+}  // namespace cuvs::neighbors::mg
 #endif
 
 namespace cuvs::neighbors::ivf_pq {
@@ -1732,8 +1743,6 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
-#ifdef CUVS_BUILD_MG_ALGOS
-
 /// \defgroup mg_cpp_index_build ANN MG index build
 
 /// \ingroup mg_cpp_index_build
@@ -2176,8 +2185,6 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
 template <typename T, typename IdxT>
 auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg::index<ivf_pq::index<IdxT>, T, IdxT>;
-
-#endif
 
 namespace helpers {
 /**
