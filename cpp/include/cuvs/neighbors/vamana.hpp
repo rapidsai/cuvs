@@ -72,6 +72,8 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t queue_size = 127;
   /** Max batchsize of reverse edge processing (reduces memory footprint) */
   uint32_t reverse_batchsize = 1000000;
+  /** Path to quantizer file */
+  std::string quantizer_file = "";
 };
 
 /**
@@ -124,7 +126,15 @@ struct index : cuvs::neighbors::index {
   /** Dataset [size, dim] */
   [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
   {
+    RAFT_EXPECTS(dataset_, "Invalid dataset");
     return *dataset_;
+  }
+
+  /** Quantized dataset [size, codes_rowlen] */
+  [[nodiscard]] inline auto quantized_data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
+  {
+    RAFT_EXPECTS(dataset_, "Invalid quantized dataset");
+    return *quantized_dataset_;
   }
 
   /** vamana graph [size, graph-degree] */
@@ -212,11 +222,27 @@ struct index : cuvs::neighbors::index {
     graph_view_ = graph_.view();
   }
 
+  /**
+   * Replace the quantized dataset with a new dataset.
+   *
+   * If `force_ownership` is set, we create a copy of the quantized dataset on the device,
+   * and the index manages the lifetime of this copy.
+   * Otherwise, we store a reference to the device data in `new_quantized_dataset`, and it
+   * is the caller's responsibility to ensure that the data stays alive as long as the index.
+   */
+  void update_quantized_dataset(raft::resources const& res,
+                    raft::device_matrix_view<uint8_t, int64_t, raft::row_major> new_quantized_dataset,
+                    bool force_ownership)
+  {
+    quantized_dataset_ = make_aligned_dataset(res, new_quantized_dataset, 16, force_ownership);
+  }
+
  private:
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  std::unique_ptr<neighbors::dataset<int64_t>> quantized_dataset_;
   IdxT medoid_id_;
 };
 /**
