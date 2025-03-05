@@ -120,7 +120,7 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     python -m cuvs_bench.run --dataset deep-image-96-inner --algorithms cuvs_cagra --batch-size 10 -k 10
 
     # (3) export data
-    python -m cuvs_bench.data_export --dataset deep-image-96-inner
+    python -m cuvs_bench.run.data_export --dataset deep-image-96-inner
 
     # (4) plot results
     python -m cuvs_bench.plot --dataset deep-image-96-inner
@@ -204,7 +204,7 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
     python -m cuvs_bench.run --dataset deep-1B --algorithms cuvs_cagra --batch-size 10 -k 10
 
     # (3) export data
-    python -m cuvs_bench.data_export --dataset deep-1B
+    python -m cuvs_bench.run.data_export --dataset deep-1B
 
     # (4) plot results
     python -m cuvs_bench.plot --dataset deep-1B

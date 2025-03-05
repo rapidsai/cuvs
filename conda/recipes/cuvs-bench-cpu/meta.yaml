@@ -72,10 +72,11 @@ test:
   # test that the package is installable and these modules are importable
   imports:
     - cuvs_bench
-    - cuvs_bench.data_export
+    - cuvs_bench.generate_groundtruth
     - cuvs_bench.get_dataset
     - cuvs_bench.plot
     - cuvs_bench.run
+    - cuvs_bench.run.data_export
     - cuvs_bench.split_groundtruth
 
 about:
