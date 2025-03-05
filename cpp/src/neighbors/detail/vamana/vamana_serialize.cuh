@@ -37,94 +37,56 @@
 #define DIV_ROUND_UP(X, Y) (((uint64_t)(X) + (Y)-1) / (Y))
 #define ROUND_UP(X, Y)     (((uint64_t)(X) + (Y)-1) / (Y) * (Y))
 
-namespace {
+namespace cuvs::neighbors::vamana::detail {
 
 /**
- * Parse quantizer file.
+ * Save the dataset to file.
  *
- * Experimental, both the API and the file format are subject to change.
+ * Experimental, both the API and the serialization format are subject to change.
  *
- * @param[in] path the path of the DiskANN quantizer file
+ * @param[in] res the raft resource handle
+ * @param[in] dataset the raw dataset from which the VAMANA index is built, or the quantized dataset
+ * @param[out] dataset_base_file the path for writing the output file
  *
- * @return the PQ encoding table as std::vector<float> and the OPQ matrix as std::vector<float>
  */
-
-std::pair<std::vector<float>, std::vector<float>> parse_opq_file(const std::string& path,
-                                                                 const uint32_t vector_dim,
-                                                                 const uint32_t pq_dim,
-                                                                 const uint32_t pq_codebook_size)
+template <typename T>
+void serialize_dataset(raft::resources const& res,
+                       const cuvs::neighbors::dataset<int64_t>* dataset,
+                       const std::string& dataset_base_file)
 {
-  std::ifstream opq_if(path, std::ios::in | std::ios::binary);
-  if (!opq_if) { RAFT_FAIL("Cannot open file %s", path.c_str()); }
-
-  // check file size
-  opq_if.ignore(std::numeric_limits<std::streamsize>::max());
-  uint32_t length = opq_if.gcount();
-  uint32_t length_expected =
-    14 + (4 * vector_dim * pq_codebook_size) + (4 * vector_dim * vector_dim);
-  if (length != length_expected) {
-    RAFT_FAIL("OPQ file doesn't have expected size. Expected: %s Actual: %s",
-              std::to_string(length_expected).c_str(),
-              std::to_string(length).c_str());
-  }
-  opq_if.clear();  // Since ignore will have set eof.
-  opq_if.seekg(0, std::ios_base::beg);
-
-  // check metadata
-  unsigned char quantizerType, reconstructType;
-  int32_t numCodebooks, entriesPerCodebook, codebookDim;
-
-  opq_if.read((char*)&quantizerType, 1);
-  if (quantizerType != 2) {
-    RAFT_FAIL("Expected quantizer type 2; parsed: %s", std::to_string(quantizerType).c_str());
-  }
-
-  opq_if.read((char*)&reconstructType, 1);
-  if (reconstructType != 0) {
-    RAFT_FAIL("Expected reconstruct type 0; parsed: %s", std::to_string(reconstructType).c_str());
-  }
-
-  opq_if.read((char*)&numCodebooks, 4);
-  if ((uint32_t)numCodebooks != pq_dim) {
-    RAFT_FAIL("PQDim mismatch. Expected: %s Actual: %s",
-              std::to_string(pq_dim).c_str(),
-              std::to_string(numCodebooks).c_str());
-  }
-
-  opq_if.read((char*)&entriesPerCodebook, 4);
-  if ((uint32_t)entriesPerCodebook != pq_codebook_size) {
-    RAFT_FAIL("PQCodebookSize mismatch. Expected: %s Actual: %s",
-              std::to_string(pq_codebook_size).c_str(),
-              std::to_string(entriesPerCodebook).c_str());
-  }
-
-  opq_if.read((char*)&codebookDim, 4);
-  if ((uint32_t)codebookDim != vector_dim / pq_dim) {
-    RAFT_FAIL("Codebook dim mismatch. Expected: %s Actual: %s",
-              std::to_string(vector_dim / pq_dim).c_str(),
-              std::to_string(codebookDim).c_str());
-  }
-
-  // parse PQEncodingTable
-  std::vector<float> PQEncodingTable;
-  PQEncodingTable.reserve(vector_dim * pq_codebook_size);
-  for (int i = 0; (uint32_t)i < vector_dim * pq_codebook_size; i++) {
-    opq_if.read((char*)&PQEncodingTable[i],
-                4);  // Reconstruct type of the overall quantizer is int8 but because it's OPQ, need
-                     // to read it as float
-  }
-
-  // parse OPQMatrix
-  std::vector<float> OPQMatrix;
-  OPQMatrix.reserve(vector_dim * vector_dim);
-  // Need to transpose the matrix during ingestion to get the right semantics
-  for (int iRow = 0; (uint32_t)iRow < vector_dim; iRow++) {
-    for (int iCol = 0; (uint32_t)iCol < vector_dim; iCol++) {
-      opq_if.read((char*)&OPQMatrix[iCol * vector_dim + iRow], 4);
+  // try allocating a buffer for the dataset on host
+  try {
+    const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
+      dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(dataset);
+    if (strided_dataset == nullptr) {
+      RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
+    } else {
+      auto h_dataset =
+        raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
+      raft::copy(h_dataset.data_handle(),
+                 strided_dataset->view().data_handle(),
+                 strided_dataset->n_rows() * strided_dataset->dim(),
+                 raft::resource::get_cuda_stream(res));
+      std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
+      if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
+      size_t dataset_file_offset = 0;
+      int size                   = static_cast<int>(strided_dataset->n_rows());
+      int dim                    = static_cast<int>(strided_dataset->dim());
+      dataset_of.seekp(dataset_file_offset, dataset_of.beg);
+      dataset_of.write((char*)&size, sizeof(int));
+      dataset_of.write((char*)&dim, sizeof(int));
+      for (int i = 0; i < size; i++) {
+        dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
+                         dim * sizeof(T));
+      }
+      dataset_of.close();
+      if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
     }
+  } catch (std::bad_alloc& e) {
+    RAFT_LOG_INFO("Failed to serialize dataset");
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_INFO("Failed to serialize dataset");
   }
-
-  return std::make_pair(PQEncodingTable, OPQMatrix);
 }
 
 /**
@@ -183,7 +145,7 @@ void serialize_sector_aligned(raft::resources const& res,
     dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(&dataset);
   if (!dataset_strided) { RAFT_FAIL("Invalid dataset"); }
   auto d_data = dataset_strided->view();
-  auto h_data = raft::make_host_matrix<T, IdxT>(npts, ndims);
+  auto h_data = raft::make_host_matrix<T, int64_t>(npts, ndims);
   auto stride = dataset_strided->stride();
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(h_data.data_handle(),
                                   sizeof(T) * ndims,
@@ -317,10 +279,6 @@ void serialize_sector_aligned(raft::resources const& res,
     (float)total_edges / (float)h_graph.extent(0));
 }
 
-}  // namespace
-
-namespace cuvs::neighbors::vamana::detail {
-
 /**
  * Save the index to file.
  *
@@ -330,6 +288,7 @@ namespace cuvs::neighbors::vamana::detail {
  * @param[in] file_name the path and name of the DiskAN index file generated
  * @param[in] index_ VAMANA index
  * @param[in] include_dataset whether to include the dataset in the serialized output
+ * @param[in] sector_aligned whether to align output file to SSD sectors
  *
  */
 
@@ -352,14 +311,15 @@ void serialize(raft::resources const& res,
              raft::resource::get_cuda_stream(res));
   raft::resource::sync_stream(res);
 
-  // parse OPQ file if specified
-
   // if requested, write sector-aligned file and return
   if (sector_aligned) {
     serialize_sector_aligned<T, IdxT>(
       res, h_graph, index_.data(), static_cast<uint64_t>(index_.medoid()), index_of);
     index_of.close();
     if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
+
+    if (include_dataset) { serialize_dataset<T>(res, &index_.data(), file_name + ".data"); }
+    serialize_dataset<uint8_t>(res, &index_.quantized_data(), file_name + ".quantized_data");
     return;
   }
 
@@ -416,43 +376,7 @@ void serialize(raft::resources const& res,
   index_of.close();
   if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
 
-  if (include_dataset) {
-    // try allocating a buffer for the dataset on host
-    try {
-      const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
-        dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
-          const_cast<cuvs::neighbors::dataset<int64_t>*>(&index_.data()));
-      if (strided_dataset == nullptr) {
-        RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
-      } else {
-        auto h_dataset =
-          raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
-        raft::copy(h_dataset.data_handle(),
-                   strided_dataset->view().data_handle(),
-                   strided_dataset->n_rows() * strided_dataset->dim(),
-                   raft::resource::get_cuda_stream(res));
-        std::string dataset_base_file = file_name + ".data";
-        std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
-        if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
-        size_t dataset_file_offset = 0;
-        int size                   = static_cast<int>(index_.size());
-        int dim                    = static_cast<int>(index_.dim());
-        dataset_of.seekp(dataset_file_offset, dataset_of.beg);
-        dataset_of.write((char*)&size, sizeof(int));
-        dataset_of.write((char*)&dim, sizeof(int));
-        for (int i = 0; i < size; i++) {
-          dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
-                           dim * sizeof(T));
-        }
-        dataset_of.close();
-        if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
-      }
-    } catch (std::bad_alloc& e) {
-      RAFT_LOG_INFO("Failed to serialize dataset");
-    } catch (raft::logic_error& e) {
-      RAFT_LOG_INFO("Failed to serialize dataset");
-    }
-  }
+  if (include_dataset) { serialize_dataset<T>(res, &index_.data(), file_name + ".data"); }
 }
 
 }  // namespace cuvs::neighbors::vamana::detail

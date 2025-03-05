@@ -206,10 +206,11 @@ inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value
  * @param[in] res raft resources handle
  * @param[in] src the source mdarray or mdspan
  * @param[in] required_stride the leading dimension (in elements)
+ * @param[in] force_ownership force an owning_dataset to be returned (default: false)
  * @return maybe owning current-device-accessible strided matrix
  */
 template <typename SrcT>
-auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t required_stride)
+auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t required_stride, bool force_ownership = false)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
   using extents_type = typename SrcT::extents_type;
@@ -231,13 +232,13 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   const bool row_major         = src.stride(1) <= 1;
   const bool stride_matches    = required_stride == src_stride;
 
-  if (device_accessible && row_major && stride_matches) {
+  if (device_accessible && row_major && stride_matches && !force_ownership) {
     // Everything matches: make a non-owning dataset
     return std::make_unique<non_owning_dataset<value_type, index_type>>(
       raft::make_device_strided_matrix_view<const value_type, index_type>(
         device_ptr, src.extent(0), src.extent(1), required_stride));
   }
-  // Something is wrong: have to make a copy and produce an owning dataset
+  // Something is wrong (or force_ownership = true): have to make a copy and produce an owning dataset
   auto out_layout =
     raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
   auto out_array =
@@ -347,10 +348,11 @@ auto make_strided_dataset(
  * @param[in] res raft resources handle
  * @param[in] src the source mdarray or mdspan
  * @param[in] align_bytes the required byte alignment for the dataset rows.
+ * @param[in] force_ownership force an owning_dataset to be returned (default: false)
  * @return maybe owning current-device-accessible strided matrix
  */
 template <typename SrcT>
-auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
+auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_bytes = 16, bool force_ownership = false)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
   using source_type      = std::remove_cv_t<std::remove_reference_t<SrcT>>;
@@ -358,7 +360,7 @@ auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_b
   constexpr size_t kSize = sizeof(value_type);
   uint32_t required_stride =
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
-  return make_strided_dataset(res, std::forward<SrcT>(src), required_stride);
+  return make_strided_dataset(res, std::forward<SrcT>(src), required_stride, force_ownership);
 }
 /**
  * @brief VPQ compressed dataset.
