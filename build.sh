@@ -332,8 +332,10 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims; then
     COMPILE_LIBRARY=ON
+fi
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
         CMAKE_TARGET="${CMAKE_TARGET};"
     else
