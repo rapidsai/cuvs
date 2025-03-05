@@ -7,7 +7,7 @@ The SNMG (single-node multi-GPUs) ANN API provides a set of functions to deploy 
    :language: c++
    :class: highlight
 
-``#include <cuvs/neighbors/mg.hpp>``
+``#include <cuvs/neighbors/common.hpp>``
 
 namespace *cuvs::neighbors::mg*
 
