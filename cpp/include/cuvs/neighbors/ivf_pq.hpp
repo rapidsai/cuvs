@@ -27,21 +27,6 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 
-#ifdef CUVS_BUILD_MG_ALGOS
-#include <cuvs/neighbors/mg.hpp>
-#else
-namespace cuvs::neighbors::mg {
-template <typename Upstream>
-struct index_params;
-
-template <typename Upstream>
-struct search_params;
-
-template <typename AnnIndexType, typename T, typename IdxT>
-struct index;
-}  // namespace cuvs::neighbors::mg
-#endif
-
 namespace cuvs::neighbors::ivf_pq {
 
 /**
@@ -1752,7 +1737,7 @@ void deserialize(raft::resources const& handle,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -1763,9 +1748,9 @@ void deserialize(raft::resources const& handle,
  * @return the constructed IVF-PQ MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>;
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>;
 
 /// \ingroup mg_cpp_index_build
 /**
@@ -1774,7 +1759,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -1785,9 +1770,9 @@ auto build(const raft::resources& clique,
  * @return the constructed IVF-PQ MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>;
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>;
 
 /// \ingroup mg_cpp_index_build
 /**
@@ -1796,7 +1781,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -1807,9 +1792,9 @@ auto build(const raft::resources& clique,
  * @return the constructed IVF-PQ MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>;
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>;
 
 /// \ingroup mg_cpp_index_build
 /**
@@ -1818,7 +1803,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -1829,9 +1814,9 @@ auto build(const raft::resources& clique,
  * @return the constructed IVF-PQ MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<ivf_pq::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
 
 /// \defgroup mg_cpp_index_extend ANN MG index extend
 
@@ -1842,7 +1827,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -1855,7 +1840,7 @@ auto build(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>& index,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
@@ -1866,7 +1851,7 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -1879,7 +1864,7 @@ void extend(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>& index,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>& index,
             raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
@@ -1890,7 +1875,7 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -1903,7 +1888,7 @@ void extend(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
@@ -1914,7 +1899,7 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -1927,7 +1912,7 @@ void extend(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
 
@@ -1940,9 +1925,9 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
  * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -1956,8 +1941,8 @@ void extend(const raft::resources& clique,
  *
  */
 void search(const raft::resources& clique,
-            const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>& index,
-            const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -1969,9 +1954,9 @@ void search(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
  * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -1985,8 +1970,8 @@ void search(const raft::resources& clique,
  *
  */
 void search(const raft::resources& clique,
-            const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>& index,
-            const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const half, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -1998,9 +1983,9 @@ void search(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
  * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -2014,8 +1999,8 @@ void search(const raft::resources& clique,
  *
  */
 void search(const raft::resources& clique,
-            const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
-            const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -2027,9 +2012,9 @@ void search(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
  * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -2043,8 +2028,8 @@ void search(const raft::resources& clique,
  *
  */
 void search(const raft::resources& clique,
-            const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
-            const cuvs::neighbors::mg::search_params<ivf_pq::search_params>& search_params,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
             raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -2058,7 +2043,7 @@ void search(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
@@ -2070,7 +2055,7 @@ void search(const raft::resources& clique,
  *
  */
 void serialize(const raft::resources& clique,
-               const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, float, int64_t>& index,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
                const std::string& filename);
 
 /// \ingroup mg_cpp_serialize
@@ -2080,7 +2065,7 @@ void serialize(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
@@ -2092,7 +2077,7 @@ void serialize(const raft::resources& clique,
  *
  */
 void serialize(const raft::resources& clique,
-               const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, half, int64_t>& index,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>& index,
                const std::string& filename);
 
 /// \ingroup mg_cpp_serialize
@@ -2102,7 +2087,7 @@ void serialize(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
@@ -2114,7 +2099,7 @@ void serialize(const raft::resources& clique,
  *
  */
 void serialize(const raft::resources& clique,
-               const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
                const std::string& filename);
 
 /// \ingroup mg_cpp_serialize
@@ -2124,7 +2109,7 @@ void serialize(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
@@ -2136,7 +2121,7 @@ void serialize(const raft::resources& clique,
  *
  */
 void serialize(const raft::resources& clique,
-               const cuvs::neighbors::mg::index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
                const std::string& filename);
 
 /// \ingroup mg_cpp_deserialize
@@ -2146,7 +2131,7 @@ void serialize(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<ivf_pq::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
  * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
@@ -2159,7 +2144,7 @@ void serialize(const raft::resources& clique,
  */
 template <typename T, typename IdxT>
 auto deserialize(const raft::resources& clique, const std::string& filename)
-  -> cuvs::neighbors::mg::index<ivf_pq::index<IdxT>, T, IdxT>;
+  -> cuvs::neighbors::mg_index<ivf_pq::index<IdxT>, T, IdxT>;
 
 /// \defgroup mg_cpp_distribute ANN MG local index distribution
 
@@ -2184,7 +2169,7 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
  */
 template <typename T, typename IdxT>
 auto distribute(const raft::resources& clique, const std::string& filename)
-  -> cuvs::neighbors::mg::index<ivf_pq::index<IdxT>, T, IdxT>;
+  -> cuvs::neighbors::mg_index<ivf_pq::index<IdxT>, T, IdxT>;
 
 namespace helpers {
 /**

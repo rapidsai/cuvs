@@ -18,7 +18,7 @@
 
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_ivf_pq_wrapper.h"
-#include <cuvs/neighbors/mg.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_resources_snmg.hpp>
 
 namespace cuvs::bench {
@@ -30,10 +30,10 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
   using search_param_base = typename algo<T>::search_param;
   using algo<T>::dim_;
 
-  using build_param = cuvs::neighbors::mg::index_params<ivf_pq::index_params>;
+  using build_param = cuvs::neighbors::mg_index_params<ivf_pq::index_params>;
 
   struct search_param : public cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param {
-    cuvs::neighbors::mg::sharded_merge_mode merge_mode;
+    cuvs::neighbors::sharded_merge_mode merge_mode;
   };
 
   cuvs_mg_ivf_pq(Metric metric, int dim, const build_param& param)
@@ -75,8 +75,8 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
  private:
   raft::device_resources_snmg clique_;
   build_param index_params_;
-  cuvs::neighbors::mg::search_params<ivf_pq::search_params> search_params_;
-  std::shared_ptr<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>> index_;
+  cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params_;
+  std::shared_ptr<cuvs::neighbors::mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>> index_;
 };
 
 template <typename T, typename IdxT>
@@ -86,7 +86,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::build(const T* dataset, size_t nrow)
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(dataset, IdxT(nrow), IdxT(dim_));
   auto idx = cuvs::neighbors::ivf_pq::build(clique_, index_params_, dataset_view);
   index_ =
-    std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
+    std::make_shared<cuvs::neighbors::mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
       std::move(idx));
 }
 
@@ -95,8 +95,7 @@ void cuvs_mg_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param,
                                                const void* filter_bitset)
 {
   if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
-  auto sp = dynamic_cast<const search_param&>(param);
-  // search_params_ = static_cast<mg::search_params<ivf_pq::search_params>>(sp.pq_param);
+  auto sp                                   = dynamic_cast<const search_param&>(param);
   ivf_pq::search_params* search_params_ptr_ = static_cast<ivf_pq::search_params*>(&search_params_);
   *search_params_ptr_                       = sp.pq_param;
   search_params_.merge_mode                 = sp.merge_mode;
@@ -113,7 +112,7 @@ template <typename T, typename IdxT>
 void cuvs_mg_ivf_pq<T, IdxT>::load(const std::string& file)
 {
   index_ =
-    std::make_shared<cuvs::neighbors::mg::index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
+    std::make_shared<cuvs::neighbors::mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>>(
       std::move(cuvs::neighbors::ivf_pq::deserialize<T, IdxT>(clique_, file)));
 }
 

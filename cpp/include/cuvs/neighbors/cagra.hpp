@@ -31,21 +31,6 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
-#ifdef CUVS_BUILD_MG_ALGOS
-#include <cuvs/neighbors/mg.hpp>
-#else
-namespace cuvs::neighbors::mg {
-template <typename Upstream>
-struct index_params;
-
-template <typename Upstream>
-struct search_params;
-
-template <typename AnnIndexType, typename T, typename IdxT>
-struct index;
-}  // namespace cuvs::neighbors::mg
-#endif
-
 #include <optional>
 #include <variant>
 
@@ -2013,7 +1998,7 @@ auto merge(raft::resources const& res,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -2024,9 +2009,9 @@ auto merge(raft::resources const& res,
  * @return the constructed CAGRA MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<cagra::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<cagra::index<float, uint32_t>, float, uint32_t>;
+  -> cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>;
 
 /// \ingroup mg_cpp_index_build
 /**
@@ -2035,7 +2020,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -2046,9 +2031,9 @@ auto build(const raft::resources& clique,
  * @return the constructed CAGRA MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<cagra::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<cagra::index<half, uint32_t>, half, uint32_t>;
+  -> cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>;
 
 /// \ingroup mg_cpp_index_build
 /**
@@ -2057,7 +2042,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -2068,9 +2053,9 @@ auto build(const raft::resources& clique,
  * @return the constructed CAGRA MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<cagra::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
+  -> cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
 
 /// \ingroup mg_cpp_index_build
 /**
@@ -2079,7 +2064,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
  *
@@ -2090,9 +2075,9 @@ auto build(const raft::resources& clique,
  * @return the constructed CAGRA MG index
  */
 auto build(const raft::resources& clique,
-           const cuvs::neighbors::mg::index_params<cagra::index_params>& index_params,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
            raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
-  -> cuvs::neighbors::mg::index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
+  -> cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
 
 /// \defgroup mg_cpp_index_extend ANN MG index extend
 
@@ -2103,7 +2088,7 @@ auto build(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -2116,7 +2101,7 @@ auto build(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
@@ -2127,7 +2112,7 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -2140,7 +2125,7 @@ void extend(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+            cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
             raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
@@ -2151,7 +2136,7 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -2164,7 +2149,7 @@ void extend(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+            cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
             raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
@@ -2175,7 +2160,7 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
  * @endcode
@@ -2188,7 +2173,7 @@ void extend(const raft::resources& clique,
  *
  */
 void extend(const raft::resources& clique,
-            cuvs::neighbors::mg::index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+            cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
             raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
             std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
 
@@ -2201,9 +2186,9 @@ void extend(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
  * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -2217,8 +2202,8 @@ void extend(const raft::resources& clique,
  *
  */
 void search(const raft::resources& clique,
-            const cuvs::neighbors::mg::index<cagra::index<float, uint32_t>, float, uint32_t>& index,
-            const cuvs::neighbors::mg::search_params<cagra::search_params>& search_params,
+            const cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -2230,9 +2215,9 @@ void search(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
  * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -2246,8 +2231,8 @@ void search(const raft::resources& clique,
  *
  */
 void search(const raft::resources& clique,
-            const cuvs::neighbors::mg::index<cagra::index<half, uint32_t>, half, uint32_t>& index,
-            const cuvs::neighbors::mg::search_params<cagra::search_params>& search_params,
+            const cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+            const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const half, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -2259,9 +2244,9 @@ void search(const raft::resources& clique,
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
  * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -2276,8 +2261,8 @@ void search(const raft::resources& clique,
  */
 void search(
   const raft::resources& clique,
-  const cuvs::neighbors::mg::index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
-  const cuvs::neighbors::mg::search_params<cagra::search_params>& search_params,
+  const cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
   raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
   raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
   raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -2289,9 +2274,9 @@ void search(
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
- * cuvs::neighbors::mg::search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
  * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
  * distances);
  * @endcode
@@ -2306,8 +2291,8 @@ void search(
  */
 void search(
   const raft::resources& clique,
-  const cuvs::neighbors::mg::index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
-  const cuvs::neighbors::mg::search_params<cagra::search_params>& search_params,
+  const cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
   raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
   raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
   raft::host_matrix_view<float, int64_t, row_major> distances);
@@ -2321,7 +2306,7 @@ void search(
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::cagra::serialize(clique, index, filename);
@@ -2334,7 +2319,7 @@ void search(
  */
 void serialize(
   const raft::resources& clique,
-  const cuvs::neighbors::mg::index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+  const cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
   const std::string& filename);
 
 /// \ingroup mg_cpp_serialize
@@ -2344,7 +2329,29 @@ void serialize(
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(const raft::resources& clique,
+               const cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+               const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::resources clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::cagra::serialize(clique, index, filename);
@@ -2357,7 +2364,7 @@ void serialize(
  */
 void serialize(
   const raft::resources& clique,
-  const cuvs::neighbors::mg::index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+  const cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
   const std::string& filename);
 
 /// \ingroup mg_cpp_serialize
@@ -2367,7 +2374,7 @@ void serialize(
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::cagra::serialize(clique, index, filename);
@@ -2380,30 +2387,7 @@ void serialize(
  */
 void serialize(
   const raft::resources& clique,
-  const cuvs::neighbors::mg::index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
-  const std::string& filename);
-
-/// \ingroup mg_cpp_serialize
-/**
- * @brief Serializes a multi-GPU index
- *
- * Usage example:
- * @code{.cpp}
- * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
- * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
- * const std::string filename = "mg_index.cuvs";
- * cuvs::neighbors::cagra::serialize(clique, index, filename);
- * @endcode
- *
- * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
- * @param[in] index the pre-built index
- * @param[in] filename path to the file to be serialized
- *
- */
-void serialize(
-  const raft::resources& clique,
-  const cuvs::neighbors::mg::index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
   const std::string& filename);
 
 /// \defgroup mg_cpp_deserialize ANN MG index deserialization
@@ -2415,7 +2399,7 @@ void serialize(
  * Usage example:
  * @code{.cpp}
  * raft::resources clique;
- * cuvs::neighbors::mg::index_params<cagra::index_params> index_params;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
  * cuvs::neighbors::cagra::serialize(clique, index, filename);
@@ -2429,7 +2413,7 @@ void serialize(
  */
 template <typename T, typename IdxT>
 auto deserialize(const raft::resources& clique, const std::string& filename)
-  -> cuvs::neighbors::mg::index<cagra::index<T, IdxT>, T, IdxT>;
+  -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 /// \defgroup mg_cpp_distribute ANN MG local index distribution
 
@@ -2455,6 +2439,6 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
  */
 template <typename T, typename IdxT>
 auto distribute(const raft::resources& clique, const std::string& filename)
-  -> cuvs::neighbors::mg::index<cagra::index<T, IdxT>, T, IdxT>;
+  -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::cagra

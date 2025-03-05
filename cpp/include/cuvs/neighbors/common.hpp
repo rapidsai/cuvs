@@ -793,3 +793,86 @@ void deserialize(const raft::resources& handle,
                  const std::string& filename);
 
 };  // namespace cuvs::neighbors
+
+/// \defgroup mg_cpp_index_params ANN MG index build parameters
+
+namespace cuvs::neighbors {
+/** Distribution mode */
+/// \ingroup mg_cpp_index_params
+enum distribution_mode {
+  /** Index is replicated on each device, favors throughput */
+  REPLICATED,
+  /** Index is split on several devices, favors scaling */
+  SHARDED
+};
+
+/// \defgroup mg_cpp_search_params ANN MG search parameters
+
+/** Search mode when using a replicated index */
+/// \ingroup mg_cpp_search_params
+enum replicated_search_mode {
+  /** Search queries are splited to maintain equal load on GPUs */
+  LOAD_BALANCER,
+  /** Each search query is processed by a single GPU in a round-robin fashion */
+  ROUND_ROBIN
+};
+
+/** Merge mode when using a sharded index */
+/// \ingroup mg_cpp_search_params
+enum sharded_merge_mode {
+  /** Search batches are merged on the root rank */
+  MERGE_ON_ROOT_RANK,
+  /** Search batches are merged in a tree reduction fashion */
+  TREE_MERGE
+};
+
+/** Build parameters */
+/// \ingroup mg_cpp_index_params
+template <typename Upstream>
+struct mg_index_params : public Upstream {
+  mg_index_params() : mode(SHARDED) {}
+
+  mg_index_params(const Upstream& sp) : Upstream(sp), mode(SHARDED) {}
+
+  /** Distribution mode */
+  cuvs::neighbors::distribution_mode mode = SHARDED;
+};
+
+/** Search parameters */
+/// \ingroup mg_cpp_search_params
+template <typename Upstream>
+struct mg_search_params : public Upstream {
+  mg_search_params() : search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE) {}
+
+  mg_search_params(const Upstream& sp)
+    : Upstream(sp), search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE)
+  {
+  }
+
+  /** Replicated search mode */
+  cuvs::neighbors::replicated_search_mode search_mode = LOAD_BALANCER;
+  /** Sharded merge mode */
+  cuvs::neighbors::sharded_merge_mode merge_mode = TREE_MERGE;
+  /** Number of rows per batch */
+  int64_t n_rows_per_batch = 1 << 20;
+};
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct mg_index {
+  mg_index(const raft::resources& clique, distribution_mode mode);
+  mg_index(const raft::resources& clique, const std::string& filename);
+
+  mg_index(const mg_index&)                    = delete;
+  mg_index(mg_index&&)                         = default;
+  auto operator=(const mg_index&) -> mg_index& = delete;
+  auto operator=(mg_index&&) -> mg_index&      = default;
+
+  distribution_mode mode_;
+  int num_ranks_;
+  std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
+
+  // for load balancing mechanism
+  std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
+};
+
+}  // namespace cuvs::neighbors

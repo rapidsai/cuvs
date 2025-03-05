@@ -104,7 +104,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       else
         d_mode = distribution_mode::SHARDED;
 
-      mg::index_params<ivf_flat::index_params> index_params;
+      mg_index_params<ivf_flat::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
       index_params.adaptive_centers         = ps.adaptive_centers;
@@ -113,7 +113,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
       index_params.mode                     = d_mode;
 
-      mg::search_params<ivf_flat::search_params> search_params;
+      mg_search_params<ivf_flat::search_params> search_params;
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = LOAD_BALANCER;
 
@@ -166,7 +166,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       else
         d_mode = distribution_mode::SHARDED;
 
-      mg::index_params<ivf_pq::index_params> index_params;
+      mg_index_params<ivf_pq::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
       index_params.add_data_on_build        = false;
@@ -174,7 +174,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
       index_params.mode                     = d_mode;
 
-      mg::search_params<ivf_pq::search_params> search_params;
+      mg_search_params<ivf_pq::search_params> search_params;
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = LOAD_BALANCER;
 
@@ -227,12 +227,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       else
         d_mode = distribution_mode::SHARDED;
 
-      mg::index_params<cagra::index_params> index_params;
+      mg_index_params<cagra::index_params> index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
       index_params.mode = d_mode;
 
-      mg::search_params<cagra::search_params> search_params;
+      mg_search_params<cagra::search_params> search_params;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
@@ -282,7 +282,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.kmeans_trainset_fraction = 1.0;
       index_params.metric_arg               = 0;
 
-      mg::search_params<ivf_flat::search_params> search_params;
+      mg_search_params<ivf_flat::search_params> search_params;
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = LOAD_BALANCER;
 
@@ -331,7 +331,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.kmeans_trainset_fraction = 1.0;
       index_params.metric_arg               = 0;
 
-      mg::search_params<ivf_pq::search_params> search_params;
+      mg_search_params<ivf_pq::search_params> search_params;
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = LOAD_BALANCER;
 
@@ -377,7 +377,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
 
-      mg::search_params<cagra::search_params> search_params;
+      mg_search_params<cagra::search_params> search_params;
 
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -420,7 +420,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     if (ps.algo == algo_t::IVF_FLAT && ps.d_mode == d_mode_t::ROUND_ROBIN) {
       ASSERT_TRUE(ps.num_queries <= 4);
 
-      mg::index_params<ivf_flat::index_params> index_params;
+      mg_index_params<ivf_flat::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
       index_params.adaptive_centers         = ps.adaptive_centers;
@@ -429,7 +429,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
       index_params.mode                     = REPLICATED;
 
-      mg::search_params<ivf_flat::search_params> search_params;
+      mg_search_params<ivf_flat::search_params> search_params;
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = ROUND_ROBIN;
 
@@ -486,7 +486,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     if (ps.algo == algo_t::IVF_PQ && ps.d_mode == d_mode_t::ROUND_ROBIN) {
       ASSERT_TRUE(ps.num_queries <= 4);
 
-      mg::index_params<ivf_pq::index_params> index_params;
+      mg_index_params<ivf_pq::index_params> index_params;
       index_params.n_lists                  = ps.nlist;
       index_params.metric                   = ps.metric;
       index_params.add_data_on_build        = false;
@@ -494,7 +494,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       index_params.metric_arg               = 0;
       index_params.mode                     = REPLICATED;
 
-      mg::search_params<ivf_pq::search_params> search_params;
+      mg_search_params<ivf_pq::search_params> search_params;
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = ROUND_ROBIN;
 
@@ -551,12 +551,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     if (ps.algo == algo_t::CAGRA && ps.d_mode == d_mode_t::ROUND_ROBIN) {
       ASSERT_TRUE(ps.num_queries <= 4);
 
-      mg::index_params<cagra::index_params> index_params;
+      mg_index_params<cagra::index_params> index_params;
       index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
         raft::matrix_extent<int64_t>(ps.num_db_vecs, ps.dim));
       index_params.mode = REPLICATED;
 
-      mg::search_params<cagra::search_params> search_params;
+      mg_search_params<cagra::search_params> search_params;
       search_params.search_mode = ROUND_ROBIN;
 
       auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
