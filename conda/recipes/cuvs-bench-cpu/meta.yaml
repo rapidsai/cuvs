@@ -76,7 +76,6 @@ test:
     - cuvs_bench.get_dataset
     - cuvs_bench.plot
     - cuvs_bench.run
-    - cuvs_bench.run.data_export
     - cuvs_bench.split_groundtruth
 
 about:
