@@ -53,9 +53,9 @@ groups:
       refine_ratio: [1, 2, 4]
   100M:
     build:
-      nlist: [100000]
-      M: [96, 64]
-      ratio: [4]
+      nlist: [8192, 16384, 32768]
+      M: [96, 48]
+      ratio: [10]
       usePrecomputed: [False, True]
       useFloat16: [True]
       use_cuvs: [False]
@@ -65,9 +65,9 @@ groups:
       refine_ratio: [1, 2, 4]
   100Mcuvs:
     build:
-      nlist: [100000]
-      M: [96, 64]
-      ratio: [4]
+      nlist: [8192, 16384, 50000, 100000]
+      M: [96, 48]
+      ratio: [10]
       useFloat16: [False, True]
       use_cuvs: [True]
       bitsPerCode: [8, 6, 5, 4]
