@@ -118,7 +118,7 @@ inline auto parse_algo_property(algo_property prop, const nlohmann::json& conf) 
 template <typename T>
 void bench_build(::benchmark::State& state,
                  std::shared_ptr<const dataset<T>> dataset,
-                 configuration::index index,
+                 const configuration::index& index,
                  bool force_overwrite,
                  bool no_lap_sync)
 {
@@ -185,7 +185,7 @@ void bench_build(::benchmark::State& state,
 
 template <typename T>
 void bench_search(::benchmark::State& state,
-                  configuration::index index,
+                  const configuration::index& index,
                   std::size_t search_param_ix,
                   std::shared_ptr<const dataset<T>> dataset,
                   bool no_lap_sync)
@@ -469,11 +469,11 @@ inline void printf_usage()
 
 template <typename T>
 void register_build(std::shared_ptr<const dataset<T>> dataset,
-                    std::vector<configuration::index> indices,
+                    std::vector<configuration::index>& indices,
                     bool force_overwrite,
                     bool no_lap_sync)
 {
-  for (auto index : indices) {
+  for (auto& index : indices) {
     auto suf      = static_cast<std::string>(index.build_param["override_suffix"]);
     auto file_suf = suf;
     index.build_param.erase("override_suffix");
@@ -489,12 +489,12 @@ void register_build(std::shared_ptr<const dataset<T>> dataset,
 
 template <typename T>
 void register_search(std::shared_ptr<const dataset<T>> dataset,
-                     std::vector<configuration::index> indices,
+                     std::vector<configuration::index>& indices,
                      Mode metric_objective,
                      const std::vector<int>& threads,
                      bool no_lap_sync)
 {
-  for (auto index : indices) {
+  for (auto& index : indices) {
     for (std::size_t i = 0; i < index.search_params.size(); i++) {
       auto suf = static_cast<std::string>(index.search_params[i]["override_suffix"]);
       index.search_params[i].erase("override_suffix");

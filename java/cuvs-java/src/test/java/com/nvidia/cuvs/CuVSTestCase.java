@@ -21,6 +21,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -50,16 +51,21 @@ public abstract class CuVSTestCase {
     return data;
   }
 
-  protected List<List<Integer>> generateExpectedResults(int topK, float[][] dataset, float[][] queries, Logger log) {
+  protected List<List<Integer>> generateExpectedResults(int topK, float[][] dataset, float[][] queries, BitSet[] prefilters, Logger log) {
     List<List<Integer>> neighborsResult = new ArrayList<>();
     int dimensions = dataset[0].length;
 
-    for (float[] query : queries) {
+    for (int q = 0; q < queries.length; q++) {
+      float[] query = queries[q];
       Map<Integer, Double> distances = new TreeMap<>();
       for (int j = 0; j < dataset.length; j++) {
         double distance = 0;
-        for (int k = 0; k < dimensions; k++) {
-          distance += (query[k] - dataset[j][k]) * (query[k] - dataset[j][k]);
+        if (prefilters != null && prefilters[q].get(j) == false) {
+          distance = Double.POSITIVE_INFINITY;
+        } else {
+          for (int k = 0; k < dimensions; k++) {
+            distance += (query[k] - dataset[j][k]) * (query[k] - dataset[j][k]);
+          }
         }
         distances.put(j, Math.sqrt(distance));
       }
@@ -85,7 +91,6 @@ public abstract class CuVSTestCase {
     // actual vs. expected results
     for (int i = 0; i < results.getResults().size(); i++) {
       Map<Integer, Float> result = results.getResults().get(i);
-      assertEquals("TopK mismatch for query.", Math.min(topK, datasetSize), result.size());
 
       // Sort result by values (distances) and extract keys
       List<Integer> sortedResultKeys = result.entrySet().stream().sorted(Map.Entry.comparingByValue())
@@ -99,6 +104,34 @@ public abstract class CuVSTestCase {
             expected.get(i).contains(sortedResultKeys.get(j)));
       }
     }
+  }
+
+  protected static void checkResults(List<Map<Integer, Float>> expected, List<Map<Integer, Float>> actual) {
+    List<Map<Integer, Float>> sortedExpected = new ArrayList<Map<Integer,Float>>();
+    List<Map<Integer, Float>> sortedActual   = new ArrayList<Map<Integer,Float>>();
+    for (Map<Integer, Float> map: expected) {
+      sortedExpected.add(new TreeMap<Integer, Float>(map) {
+        @Override
+        public boolean equals(Object o) {
+          Map<Integer, Float> map = (Map<Integer, Float>) o;
+          if (this.size() != map.size()) return false;
+          for (Integer key: map.keySet()) {
+            try {
+              if (Math.abs((float)map.get(key) - ((float)get(key))) < 0.0001f == false) {
+                return false;
+              }
+            } catch (Exception ex) {
+              return false;
+            }
+          }
+          return true;
+        }
+      });
+    }
+    for (Map<Integer, Float> map: actual) {
+      sortedActual.add(new TreeMap<Integer, Float>(map));
+    }
+    assertEquals(sortedExpected, sortedActual);
   }
 
   protected static boolean isLinuxAmd64() {

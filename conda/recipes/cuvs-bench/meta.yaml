@@ -70,7 +70,10 @@ requirements:
     - libcublas-dev
     {% endif %}
     - glog {{ glog_version }}
+    - libaio  # [linux64]
+    - libboost-devel=1.87  # [linux64]
     - libcuvs {{ version }}
+    - mkl-devel=2023  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     # rmm is needed to determine if package is gpu-enabled
@@ -94,6 +97,7 @@ requirements:
     - cuvs {{ version }}
     - h5py {{ h5py_version }}
     - matplotlib-base
+    - mkl =2023  # [linux64]
     - pandas
     - pyyaml
     # rmm is needed to determine if package is gpu-enabled
@@ -101,6 +105,7 @@ requirements:
     - python
     - requests
     - rmm ={{ minor_version }}
+    - scikit-learn>=1.5
 about:
   home: https://rapids.ai/
   license: Apache-2.0
