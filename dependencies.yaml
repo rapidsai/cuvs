@@ -89,6 +89,8 @@ files:
       - cuda_version
       - rapids_build
       - rust
+      - depends_on_libcuvs
+      - depends_on_libraft
   go:
     output: none
     includes:
@@ -212,7 +214,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - &cmake_ver cmake>=3.26.4,!=3.30.0
+          - &cmake_ver cmake>=3.30.4
           - ninja
       - output_types: [conda]
         packages:
@@ -559,6 +561,18 @@ dependencies:
           - h5py>=3.8.0
           - benchmark>=1.8.2
           - openblas
+    specific:
+      - output_types: conda
+        matrices:
+          - matrix:
+              arch: x86_64
+            packages:
+              - mkl-devel=2023
+              - libaio
+              - libboost-devel=1.87
+          - matrix:
+              arch: aarch64
+            packages: null
   bench_python:
     common:
       - output_types: [conda, pyproject, requirements]

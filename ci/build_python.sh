@@ -25,7 +25,7 @@ sccache --zero-stats
 
 # TODO: Remove `--no-test` flags once importing on a CPU
 # node works correctly
-rapids-conda-retry mambabuild \
+rapids-conda-retry build \
   --no-test \
   --channel "${CPP_CHANNEL}" \
   conda/recipes/cuvs
@@ -34,7 +34,7 @@ sccache --show-adv-stats
 sccache --zero-stats
 
 # Build cuvs-bench for each cuda and python version
-rapids-conda-retry mambabuild \
+rapids-conda-retry build \
   --no-test \
   --channel "${CPP_CHANNEL}" \
   --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
@@ -47,8 +47,7 @@ sccache --zero-stats
 # version
 RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
-  rapids-conda-retry mambabuild \
-  --no-test \
+  rapids-conda-retry build \
   --channel "${CPP_CHANNEL}" \
   --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
   conda/recipes/cuvs-bench-cpu
