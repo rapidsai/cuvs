@@ -1997,7 +1997,7 @@ auto merge(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
@@ -2019,7 +2019,7 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
@@ -2041,7 +2041,7 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
@@ -2063,7 +2063,7 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * @endcode
@@ -2087,7 +2087,7 @@ auto build(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
@@ -2111,7 +2111,7 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
@@ -2135,7 +2135,7 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
@@ -2159,7 +2159,7 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
@@ -2185,7 +2185,7 @@ void extend(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
@@ -2214,7 +2214,7 @@ void search(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
@@ -2243,7 +2243,7 @@ void search(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
@@ -2273,7 +2273,7 @@ void search(
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
@@ -2305,7 +2305,7 @@ void search(
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
@@ -2328,7 +2328,7 @@ void serialize(
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
@@ -2350,7 +2350,7 @@ void serialize(const raft::resources& clique,
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
@@ -2373,7 +2373,7 @@ void serialize(
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
@@ -2398,7 +2398,7 @@ void serialize(
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "mg_index.cuvs";
@@ -2424,7 +2424,7 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
  *
  * Usage example:
  * @code{.cpp}
- * raft::resources clique;
+ * raft::device_resources_snmg clique;
  * cuvs::neighbors::cagra::index_params index_params;
  * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
  * const std::string filename = "local_index.cuvs";
