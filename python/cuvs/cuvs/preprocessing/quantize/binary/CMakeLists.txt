@@ -20,5 +20,5 @@ rapids_cython_create_modules(
   CXX
   SOURCE_FILES "${cython_sources}"
   LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX
-                   preprocessing_quantize_scalar_
+                   preprocessing_quantize_binary_
 )
