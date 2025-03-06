@@ -437,7 +437,7 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
-if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
     python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi
 
