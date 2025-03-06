@@ -81,6 +81,7 @@ cache:
           - libcusolver-dev
           - libcusparse-dev
       # These are used for bench-ann
+      - openblas
       - if: linux64
         then:
           - libaio
