@@ -348,10 +348,12 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - cuda-version =${{ cuda_version }}
         - openblas # required by some CPU algos in benchmarks
-        - libaio
-        - libboost-devel =1.87
         - libgomp
-        - mkl-devel =2023
+        - if: linux64
+          then:
+            - libaio
+            - libboost-devel =1.87
+            - mkl-devel =2023
         - if: cuda_major == "11"
           then:
             - cuda-profiler-api =${{ cuda11_cuda_profiler_api_host_version }}
