@@ -131,6 +131,7 @@ outputs:
       run:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
+        - nccl
         - if: cuda_major == "11"
           then:
             - cuda-cudart
@@ -197,6 +198,7 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
+        - nccl
         - if: cuda_major == "11"
           then:
             - cuda-cudart
@@ -294,6 +296,7 @@ outputs:
       run:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
+        - nccl
         - if: cuda_major == "11"
           then: cudatoolkit
           else:
@@ -377,6 +380,7 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
+        - nccl
         - if: cuda_major == "11"
           then:
             - cuda-cudart
