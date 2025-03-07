@@ -27,33 +27,14 @@ build:
 
 requirements:
   host:
-    - benchmark
     - cuda-version =${{ cuda_version }}
-    - glog ${{ glog_version }}
     - libcuvs =${{ version }}
     - libcuvs-bench-ann =${{ version }}
-    - nlohmann_json ${{ nlohmann_json_version }}
-    - openblas
     - python =${{ py_version }}
     - pip
     - rapids-build-backend >=0.3.0,<0.4.0.dev0
-    # rmm is needed to determine if package is gpu-enabled
     - rmm =${{ minor_version }}
     - setuptools >=64.0.0
-    - if: linux64
-      then:
-        - libaio
-        - libboost-devel =1.87
-        - mkl-devel =2023
-    - if: cuda_major == "11"
-      then:
-        - cuda-profiler-api ${{ cuda11_cuda_profiler_api_run_version }}
-        - libcublas ${{ cuda11_libcublas_host_version }}
-        - libcublas-dev ${{ cuda11_libcublas_host_version }}
-      else:
-        - cuda-cudart-dev
-        - cuda-profiler-api
-        - libcublas-dev
   run:
     - benchmark
     - click
