@@ -330,10 +330,11 @@ outputs:
         content: |
           cmake --install cpp/build --component ann_bench
 
-          # Need this so from the diskann compile, but there isn't a
-          # component associated with it. Probably a better way to do this.
-          cp cpp/build/_deps/diskann-build/src/libdiskann.so $PREFIX/lib/
-
+          if [ "$RAPIDS_CONDA_ARCH" != "aarch64" ]; then
+            # Need this so from the diskann compile, but there isn't a
+            # component associated with it. Probably a better way to do this.
+            cp cpp/build/_deps/diskann-build/src/libdiskann.so $PREFIX/lib/
+          fi
       string: cuda${{ cuda_major }}_${{ date_string }}_${{ head_rev }}
       dynamic_linking:
         overlinking_behavior: "error"
