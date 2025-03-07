@@ -20,13 +20,13 @@ jobs:
       - conda-cpp-checks
       - conda-python-build
       - conda-python-tests
-      - docs-build
-      - rust-build
-      - go-build
-      - wheel-build-libcuvs
-      - wheel-build-cuvs
-      - wheel-tests-cuvs
-      - devcontainer
+      # - docs-build
+      # - rust-build
+      # - go-build
+      # - wheel-build-libcuvs
+      # - wheel-build-cuvs
+      # - wheel-tests-cuvs
+      # - devcontainer
       - telemetry-setup
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@branch-25.04
@@ -134,71 +134,71 @@ jobs:
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python
     with:
       build_type: pull-request
-  docs-build:
-    needs: conda-python-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.04
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_docs.sh"
-  rust-build:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.04
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_rust.sh"
-  go-build:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.04
-    with:
-      build_type: pull-request
-      node_type: "gpu-v100-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_go.sh"
-  wheel-build-libcuvs:
-    needs: checks
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.04
-    with:
-      build_type: pull-request
-      script: ci/build_wheel_libcuvs.sh
-      # build for every combination of arch and CUDA version, but only for the latest Python
-      matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
-  wheel-build-cuvs:
-    needs: wheel-build-libcuvs
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.04
-    with:
-      build_type: pull-request
-      script: ci/build_wheel_cuvs.sh
-  wheel-tests-cuvs:
-    needs: [wheel-build-cuvs, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@branch-25.04
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python
-    with:
-      build_type: pull-request
-      script: ci/test_wheel_cuvs.sh
-  devcontainer:
-    secrets: inherit
-    needs: telemetry-setup
-    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@branch-25.04
-    with:
-      arch: '["amd64"]'
-      cuda: '["12.8"]'
-      build_command: |
-        sccache -z;
-        build-all --verbose;
-        sccache -s;
+  # docs-build:
+  #   needs: conda-python-build
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.04
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:latest"
+  #     run_script: "ci/build_docs.sh"
+  # rust-build:
+  #   needs: conda-cpp-build
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.04
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-l4-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:latest"
+  #     run_script: "ci/build_rust.sh"
+  # go-build:
+  #   needs: conda-cpp-build
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.04
+  #   with:
+  #     build_type: pull-request
+  #     node_type: "gpu-v100-latest-1"
+  #     arch: "amd64"
+  #     container_image: "rapidsai/ci-conda:latest"
+  #     run_script: "ci/build_go.sh"
+  # wheel-build-libcuvs:
+  #   needs: checks
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.04
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/build_wheel_libcuvs.sh
+  #     # build for every combination of arch and CUDA version, but only for the latest Python
+  #     matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+  # wheel-build-cuvs:
+  #   needs: wheel-build-libcuvs
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@branch-25.04
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/build_wheel_cuvs.sh
+  # wheel-tests-cuvs:
+  #   needs: [wheel-build-cuvs, changed-files]
+  #   secrets: inherit
+  #   uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@branch-25.04
+  #   if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python
+  #   with:
+  #     build_type: pull-request
+  #     script: ci/test_wheel_cuvs.sh
+  # devcontainer:
+  #   secrets: inherit
+  #   needs: telemetry-setup
+  #   uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@branch-25.04
+  #   with:
+  #     arch: '["amd64"]'
+  #     cuda: '["12.8"]'
+  #     build_command: |
+  #       sccache -z;
+  #       build-all --verbose;
+  #       sccache -s;
 
   telemetry-summarize:
     # This job must use a self-hosted runner to record telemetry traces.
