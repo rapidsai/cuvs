@@ -29,7 +29,7 @@ cache:
         export CXXFLAGS=$(echo $CXXFLAGS | sed -E 's@\-fdebug\-prefix\-map[^ ]*@@g')
         set +x
 
-        ./build.sh libcuvs bench-ann --allgpuarch --build-metrics=compile_lib --incl-cache-stats --no-nvtx -n
+        ./build.sh libcuvs bench-ann tests --allgpuarch --build-metrics=compile_lib --incl-cache-stats --no-nvtx -n
 
       secrets:
         - AWS_ACCESS_KEY_ID
