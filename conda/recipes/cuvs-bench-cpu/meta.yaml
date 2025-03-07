@@ -60,13 +60,24 @@ requirements:
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib-base
-    - mkl =2023
+    - mkl =2023  # [linux64]
     - numpy >=1.23,<3.0a0
     - pandas
     - pyyaml
     - python
     - requests
     - scikit-learn>=1.5
+
+test:
+  # test that the package is installable and these modules are importable
+  imports:
+    - cuvs_bench
+    - cuvs_bench.generate_groundtruth
+    - cuvs_bench.get_dataset
+    - cuvs_bench.plot
+    - cuvs_bench.run
+    - cuvs_bench.split_groundtruth
+
 about:
   home: https://rapids.ai/
   license: Apache-2.0
