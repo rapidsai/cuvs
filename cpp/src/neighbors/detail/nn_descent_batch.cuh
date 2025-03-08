@@ -650,7 +650,8 @@ void batch_build(raft::resources const& res,
                            .internal_node_degree  = extended_intermediate_degree,
                            .max_iterations        = params.max_iterations,
                            .termination_threshold = params.termination_threshold,
-                           .output_graph_degree   = graph_degree};
+                           .output_graph_degree   = graph_degree,
+                           .metric                = params.metric};
 
   auto global_indices_h   = raft::make_managed_matrix<IdxT, int64_t>(res, num_rows, graph_degree);
   auto global_distances_h = raft::make_managed_matrix<float, int64_t>(res, num_rows, graph_degree);
