@@ -36,17 +36,18 @@ requirements:
     - rmm =${{ minor_version }}
     - setuptools >=64.0.0
   run:
+    - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
     - benchmark
     - click
-    - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
-    - glog ${{ glog_version }}
     - cuvs =${{ version }}
+    - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
+    - libcuvs-bench-ann =${{ version }}
     - matplotlib-base
     - pandas
-    - pyyaml
     - pylibraft =${{ minor_version }}
     - python
+    - pyyaml
     - requests
     # rmm is needed to determine if package is gpu-enabled
     - rmm =${{ minor_version }}
