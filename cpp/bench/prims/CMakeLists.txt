@@ -1,0 +1,189 @@
+# =============================================================================
+# Copyright (c) 2025, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+# =============================================================================
+
+# ##################################################################################################
+# * compiler function -----------------------------------------------------------------------------
+
+function(ConfigureBench)
+
+  set(options OPTIONAL LIB EXPLICIT_INSTANTIATE_ONLY)
+  set(oneValueArgs NAME)
+  set(multiValueArgs PATH TARGETS CONFIGURATIONS)
+
+  cmake_parse_arguments(ConfigureBench "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  set(BENCH_NAME ${ConfigureBench_NAME})
+
+  add_executable(${BENCH_NAME} ${ConfigureBench_PATH})
+
+  target_link_libraries(
+    ${BENCH_NAME}
+    PRIVATE #raft::raft
+    #raft_internal
+            #$<$<BOOL:${ConfigureBench_LIB}>:cuvs::compiled>
+            #benchmark::benchmark
+            Threads::Threads
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+            $<TARGET_NAME_IF_EXISTS:conda_env>
+  )
+
+  set_target_properties(
+    ${BENCH_NAME}
+    PROPERTIES # set target compile options
+               INSTALL_RPATH "\$ORIGIN"
+               CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+               POSITION_INDEPENDENT_CODE ON
+               INTERFACE_POSITION_INDEPENDENT_CODE ON
+  )
+
+  target_compile_options(
+    ${BENCH_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+    "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+  )
+
+  if(ConfigureTest_EXPLICIT_INSTANTIATE_ONLY)
+    target_compile_definitions(${BENCH_NAME} PRIVATE "CUVS_EXPLICIT_INSTANTIATE_ONLY")
+  endif()
+
+  target_include_directories(
+    ${BENCH_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/bench/prims>"
+  )
+
+  install(
+    TARGETS ${BENCH_NAME}
+    COMPONENT prims_bench
+    DESTINATION bin/prims
+    EXCLUDE_FROM_ALL
+  )
+
+endfunction()
+
+if(BUILD_PRIMS_BENCH)
+  #  ConfigureBench(
+  #  NAME
+  #  CORE_BENCH
+  #  PATH
+  #  core/bitset.cu
+  #  core/copy.cu
+  #  main.cpp
+  #)
+
+  #ConfigureBench(
+  #  NAME
+  #  UTIL_BENCH
+  #  PATH
+  #  util/popc.cu
+  #  main.cpp
+  #)
+
+  #ConfigureBench(
+  #  NAME CLUSTER_BENCH PATH cluster/kmeans_balanced.cu cluster/kmeans.cu
+  #  main.cpp OPTIONAL LIB EXPLICIT_INSTANTIATE_ONLY
+  #)
+
+  #ConfigureBench(
+  #  NAME TUNE_DISTANCE PATH distance/tune_pairwise/kernel.cu
+  #  distance/tune_pairwise/bench.cu main.cpp
+  #)
+
+  ConfigureBench(
+    NAME
+    DISTANCE_BENCH
+    PATH
+    #  distance/distance_cosine.cu
+    #distance/distance_exp_l2.cu
+    #distance/distance_l1.cu
+    #distance/distance_unexp_l2.cu
+    distance/fused_l2_nn.cu
+    #distance/masked_nn.cu
+    #distance/kernels.cu
+    main.cpp
+    OPTIONAL
+    LIB
+    EXPLICIT_INSTANTIATE_ONLY
+  )
+
+  #ConfigureBench(
+  #  NAME
+  #  LINALG_BENCH
+  #  PATH
+  #  linalg/add.cu
+  #  linalg/map_then_reduce.cu
+  #  linalg/masked_matmul.cu
+  #  linalg/matrix_vector_op.cu
+  #  linalg/norm.cu
+  #  linalg/normalize.cu
+  #  linalg/reduce_cols_by_key.cu
+  #  linalg/reduce_rows_by_key.cu
+  #  linalg/reduce.cu
+  #  linalg/sddmm.cu
+  #  linalg/transpose.cu
+  #  main.cpp
+  #)
+
+  #ConfigureBench(
+  #  NAME MATRIX_BENCH PATH matrix/argmin.cu matrix/gather.cu
+  #  matrix/select_k.cu main.cpp OPTIONAL LIB EXPLICIT_INSTANTIATE_ONLY
+  #)
+  #
+  #ConfigureBench(
+  #  NAME RANDOM_BENCH PATH random/make_blobs.cu random/permute.cu
+  # random/rng.cu random/subsample.cu main.cpp
+  #)
+
+  #ConfigureBench(
+  #  NAME
+  #  SPARSE_BENCH
+  #  PATH
+  #  sparse/bitmap_to_csr.cu
+  #  sparse/convert_csr.cu
+  #  sparse/select_k_csr.cu
+  #  main.cpp
+  #)
+
+  #ConfigureBench(
+  #  NAME
+  #  NEIGHBORS_BENCH
+  #  PATH
+  #  neighbors/knn/brute_force_float_int64_t.cu
+  #  neighbors/knn/brute_force_float_uint32_t.cu
+  #  neighbors/knn/cagra_float_uint32_t.cu
+  #  neighbors/knn/ivf_flat_filter_float_int64_t.cu
+  #  neighbors/knn/ivf_flat_float_int64_t.cu
+  #  neighbors/knn/ivf_flat_int8_t_int64_t.cu
+  #  neighbors/knn/ivf_flat_uint8_t_int64_t.cu
+  #  neighbors/knn/ivf_pq_float_int64_t.cu
+  #  neighbors/knn/ivf_pq_filter_float_int64_t.cu
+  #  neighbors/knn/ivf_pq_int8_t_int64_t.cu
+  #  neighbors/knn/ivf_pq_uint8_t_int64_t.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_search_filtering_float_int64_t.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_float_half_bitset64.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_half_fp8_false_bitset64.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_half_fp8_true_bitset64.cu
+  #  ${RAFT_SOURCE_DIR}/src/neighbors/detail/ivf_pq_compute_similarity_half_half_bitset64.cu
+  #  neighbors/refine_float_int64_t.cu
+  #  neighbors/refine_uint8_t_int64_t.cu
+  #  main.cpp
+  #  OPTIONAL
+  #  LIB
+  #  EXPLICIT_INSTANTIATE_ONLY
+  #)
+
+endif()
