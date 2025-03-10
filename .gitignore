@@ -81,7 +81,7 @@ ivf_flat_index
 ivf_pq_index
 
 # cuvs_bench
-datasets/
+#datasets/
 !python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml
 /*.json
 
