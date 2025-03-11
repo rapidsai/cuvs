@@ -150,6 +150,11 @@ struct index_params : cuvs::neighbors::index_params {
    * @endcode
    */
   bool attach_dataset_on_build = true;
+
+  /**
+   * Whether to deactivate the duplicate nodes.
+   */
+  bool deactivate_duplicate_nodes = false;
 };
 
 /**

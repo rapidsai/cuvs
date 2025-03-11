@@ -262,7 +262,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                            local_traversed_hashmap_ptr,
                                            traversed_hash_bitlen,
                                            block_id,
-                                           num_blocks);
+                                           num_blocks,
+                                           knn_graph,
+                                           graph_degree);
   __syncthreads();
   _CLK_REC(clk_compute_1st_distance);
 
