@@ -84,6 +84,14 @@ requirements:
     - if: linux64
       then:
         - mkl =2023
+  ignore_run_exports:
+    by_name:
+      - glog
+      - libaio
+      - libboost
+      - libcublas
+      - mkl  # relaxes pin from host `mkl-devel`
+
 
 tests:
   - python:
