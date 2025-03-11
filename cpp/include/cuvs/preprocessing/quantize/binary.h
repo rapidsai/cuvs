@@ -81,8 +81,8 @@ cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
 /**
  * @brief Applies binary quantization transform to the given dataset
  *
- * This applies binary quantization to a dataset, changing any positive
- * values to a bitwise 1. This is useful for searching with the
+ * This applies binary quantization to a dataset, changing any values that are larger than the
+ * threshold specified in the param to a bitwise 1. This is useful for searching with the
  * BitwiseHamming distance type.
  *
  * @param[in] res raft resource

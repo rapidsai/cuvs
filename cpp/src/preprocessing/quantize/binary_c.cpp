@@ -107,6 +107,5 @@ extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
     cuvsBinaryQuantizerTransformWithParams(res, params, dataset_tensor, out_tensor);
 
   cuvsBinaryQuantizerParamsDestroy(params);
-
   return result;
 }
