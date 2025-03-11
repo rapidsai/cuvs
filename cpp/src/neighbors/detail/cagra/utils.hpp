@@ -309,4 +309,44 @@ void copy_with_padding(
                                     raft::resource::get_cuda_stream(res)));
   }
 }
+
+//
+template <typename IdxT>
+void bitset_set(uint32_t* array, IdxT index, bool value)
+{
+  const IdxT pos      = index / 32;
+  const uint32_t mask = (uint32_t)1 << (index % 32);
+  if (value) {
+    array[pos] |= mask;
+  } else {
+    array[pos] &= ~mask;
+  }
+}
+
+//
+template <typename IdxT>
+bool bitset_test(const uint32_t* array, IdxT index)
+{
+  const IdxT pos      = index / 32;
+  const uint32_t mask = (uint32_t)1 << (index % 32);
+  return ((array[pos] & mask) > 0);
+}
+
+//
+template <typename IdxT>
+IdxT bitset_count(const uint32_t* array, IdxT num)
+{
+  IdxT count = 0;
+  for (IdxT pos = 0; pos < (num + 31) / 32; pos++) {
+    IdxT val = array[pos];
+    val      = (val & 0x55555555) + ((val & 0xaaaaaaaa) >> 1);
+    val      = (val & 0x33333333) + ((val & 0xcccccccc) >> 2);
+    val      = (val & 0x0f0f0f0f) + ((val & 0xf0f0f0f0) >> 4);
+    val      = (val & 0x00ff00ff) + ((val & 0xff00ff00) >> 8);
+    val      = (val & 0x0000ffff) + ((val & 0xffff0000) >> 16);
+    count += val;
+  }
+  return count;
+}
+
 }  // namespace cuvs::neighbors::cagra::detail
