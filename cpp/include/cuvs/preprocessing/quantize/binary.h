@@ -71,14 +71,29 @@ cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)
  * BitwiseHamming distance type.
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
  * @param[in] dataset a row-major host or device matrix to transform
  * @param[out] out a row-major host or device matrix to store transformed data
  */
 cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
-                                         cuvsBinaryQuantizerParams_t params,
                                          DLManagedTensor* dataset,
                                          DLManagedTensor* out);
+
+/**
+ * @brief Applies binary quantization transform to the given dataset
+ *
+ * This applies binary quantization to a dataset, changing any positive
+ * values to a bitwise 1. This is useful for searching with the
+ * BitwiseHamming distance type.
+ *
+ * @param[in] res raft resource
+ * @param[in] params quantization params
+ * @param[in] dataset a row-major host or device matrix to transform
+ * @param[out] out a row-major host or device matrix to store transformed data
+ */
+cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
+                                                   cuvsBinaryQuantizerParams_t params,
+                                                   DLManagedTensor* dataset,
+                                                   DLManagedTensor* out);
 
 #ifdef __cplusplus
 }

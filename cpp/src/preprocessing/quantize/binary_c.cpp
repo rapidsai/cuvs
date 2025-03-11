@@ -74,10 +74,10 @@ void _transform(cuvsResources_t res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
-                                                    cuvsBinaryQuantizerParams_t params,
-                                                    DLManagedTensor* dataset_tensor,
-                                                    DLManagedTensor* out_tensor)
+extern "C" cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
+                                                              cuvsBinaryQuantizerParams_t params,
+                                                              DLManagedTensor* dataset_tensor,
+                                                              DLManagedTensor* out_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -93,4 +93,20 @@ extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
                 dataset.dtype.bits);
     }
   });
+}
+
+extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
+                                                    DLManagedTensor* dataset_tensor,
+                                                    DLManagedTensor* out_tensor)
+{
+  cuvsBinaryQuantizerParams_t params;
+  cuvsBinaryQuantizerParamsCreate(&params);
+  params->threshold = MEAN;
+
+  const auto result =
+    cuvsBinaryQuantizerTransformWithParams(res, params, dataset_tensor, out_tensor);
+
+  cuvsBinaryQuantizerParamsDestroy(params);
+
+  return result;
 }

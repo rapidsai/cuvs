@@ -27,51 +27,9 @@ from cuvs.common.resources import auto_sync_resources
 from cuvs.neighbors.common import _check_input_array
 
 
-cdef class QuantizerParams:
-    """
-    Parameters for binary quantization
-
-    Parameters
-    ----------
-    threshold: string denoting the threshold type, default="mean"
-    sampling_ratio: float
-        specifies how many dataset vectors are sampled
-        needs to be within range of (0, 1]
-    """
-
-    cdef cuvsBinaryQuantizerParams * params
-
-    def __cinit__(self):
-        check_cuvs(cuvsBinaryQuantizerParamsCreate(&self.params))
-
-    def __dealloc__(self):
-        check_cuvs(cuvsBinaryQuantizerParamsDestroy(self.params))
-
-    def __init__(self, *, threshold="mean", sampling_ratio=0.1):
-        self.params.sampling_ratio=sampling_ratio
-
-        if threshold == "zero":
-            self.params.threshold = cuvsBinaryQuantizerThreshold.ZERO
-        elif threshold == "mean":
-            self.params.threshold = cuvsBinaryQuantizerThreshold.MEAN
-        elif threshold == "sampling_median":
-            self.params.threshold = \
-                cuvsBinaryQuantizerThreshold.SAMPLING_MEDIAN
-        else:
-            raise ValueError(f"Unknown threshold '{threshold}'")
-
-    @property
-    def threshold(self):
-        return self.params.threshold
-
-    @property
-    def sampling_ratio(self):
-        return self.params.sampling_ratio
-
-
 @auto_sync_resources
 @auto_convert_output
-def transform(QuantizerParams params, dataset, output=None, resources=None):
+def transform(dataset, output=None, resources=None):
     """
     Applies binary quantization transform to given dataset
 
@@ -81,7 +39,6 @@ def transform(QuantizerParams params, dataset, output=None, resources=None):
 
     Parameters
     ----------
-    params : binary quantization params
     dataset : row major host or device dataset to transform
     output : optional preallocated output memory, on host or device memory
     {resources_docstring}
@@ -99,8 +56,7 @@ def transform(QuantizerParams params, dataset, output=None, resources=None):
     >>> n_features = 50
     >>> dataset = cp.random.standard_normal((n_samples, n_features),
     ...                                   dtype=cp.float32)
-    >>> params = binary.QuantizerParams(threshold="mean")
-    >>> transformed = binary.transform(params, dataset)
+    >>> transformed = binary.transform(dataset)
     >>>
     >>> # build a cagra index on the binarized data
     >>> params = cagra.IndexParams(metric="bitwise_hamming",
@@ -132,7 +88,6 @@ def transform(QuantizerParams params, dataset, output=None, resources=None):
         cydlpack.dlpack_c(output_ai)
 
     check_cuvs(cuvsBinaryQuantizerTransform(res,
-                                            params.params,
                                             dataset_dlpack,
                                             output_dlpack))
 
