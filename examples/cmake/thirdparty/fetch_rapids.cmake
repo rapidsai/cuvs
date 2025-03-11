@@ -12,6 +12,10 @@
 # the License.
 
 # Use this variable to update RAPIDS and cuVS versions
+
+set(rapids-cmake-repo bdice/rapids-cmake)
+set(rapids-cmake-branch cccl-2.8.0)
+
 set(RAPIDS_VERSION "25.04")
 
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/CUVS_RAPIDS.cmake)
