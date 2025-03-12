@@ -133,7 +133,8 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl
         - if: cuda_major == "11"
-          then:
+          then: cudatoolkit
+          else:
             - cuda-cudart
             - libcublas
             - libcurand
@@ -177,7 +178,7 @@ outputs:
         - nccl ${{ nccl_version }}
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - cuda-version =${{ cuda_version }}
-        - openblas # required by some CPU algos in benchmarks
+        - openblas  # required by some CPU algos in benchmarks
         - if: cuda_major == "11"
           then:
             - cuda-profiler-api =${{ cuda11_cuda_profiler_api_host_version }}
@@ -202,7 +203,8 @@ outputs:
         - libraft-headers =${{ minor_version }}
         - nccl
         - if: cuda_major == "11"
-          then:
+          then: cudatoolkit
+          else:
             - cuda-cudart
             - libcublas
             - libcurand
@@ -384,9 +386,11 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
+        - mkl =2023
         - nccl
         - if: cuda_major == "11"
-          then:
+          then: cudatoolkit
+          else:
             - cuda-cudart
             - libcublas
             - libcurand
@@ -401,6 +405,7 @@ outputs:
           - libcusolver
           - libcusparse
           - librmm
+          - mkl
           - nccl
     about:
       homepage: ${{ load_from_file("python/cuvs_bench/pyproject.toml").project.urls.Homepage }}
