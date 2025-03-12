@@ -72,7 +72,7 @@ function(ConfigureBench)
 
 endfunction()
 
-if(BUILD_PRIMS_BENCH)
+#if(BUILD_PRIMS_BENCH)
   #  ConfigureBench(
   #  NAME
   #  CORE_BENCH
@@ -99,7 +99,7 @@ if(BUILD_PRIMS_BENCH)
   #  NAME TUNE_DISTANCE PATH distance/tune_pairwise/kernel.cu
   #  distance/tune_pairwise/bench.cu main.cpp
   #)
-
+  message("Hello World")
   ConfigureBench(
     NAME
     DISTANCE_BENCH
@@ -111,7 +111,7 @@ if(BUILD_PRIMS_BENCH)
     distance/fused_l2_nn.cu
     #distance/masked_nn.cu
     #distance/kernels.cu
-    main.cpp
+    #main.cpp
     OPTIONAL
     LIB
     EXPLICIT_INSTANTIATE_ONLY
@@ -186,4 +186,4 @@ if(BUILD_PRIMS_BENCH)
   #  EXPLICIT_INSTANTIATE_ONLY
   #)
 
-endif()
+  #endif()

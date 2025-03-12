@@ -819,6 +819,6 @@ endif()
 # * build ann benchmark executable -----------------------------------------------
 
 if(BUILD_CUVS_BENCH)
+  #add_subdirectory(bench/prims/)
   add_subdirectory(bench/ann/)
-  add_subdirectory(bench/prims/)
 endif()

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <common/benchmark.hpp>
+//#include <common/benchmark.hpp>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/distance/fused_l2_nn.cuh>
@@ -22,7 +22,8 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
-
+#include <rmm/device_uvector.hpp>
+/*
 namespace raft::bench::distance {
 
 struct fusedl2nn_inputs {
@@ -160,4 +161,4 @@ FUSEDL2NN_BENCH(double, int64_t, double);
 FUSEDL2NN_BENCH(float, int64_t, (raft::KeyValuePair<int64_t, float>));
 FUSEDL2NN_BENCH(double, int64_t, (raft::KeyValuePair<int64_t, double>));
 
-}  // namespace raft::bench::distance
+}*/  // namespace raft::bench::distance
