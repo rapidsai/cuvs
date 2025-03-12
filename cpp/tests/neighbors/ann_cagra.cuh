@@ -1202,7 +1202,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim and build algo.
