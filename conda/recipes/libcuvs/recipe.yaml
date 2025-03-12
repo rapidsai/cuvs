@@ -386,8 +386,9 @@ outputs:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
-        - mkl =2023
         - nccl
+        - if: linux64
+          then: mkl =2023
         - if: cuda_major == "11"
           then: cudatoolkit
           else:
