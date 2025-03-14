@@ -489,6 +489,10 @@ void sort_knn_graph(
 {
   RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                "dataset size is expected to have the same number of graph index size");
+  RAFT_EXPECTS(metric == cuvs::distance::DistanceType::InnerProduct ||
+                 metric == cuvs::distance::DistanceType::CosineExpanded ||
+                 metric == cuvs::distance::DistanceType::L2Expanded,
+               "metric only supports InnerProduct, CosineExpanded, and L2Expanded")
   const uint64_t dataset_size = dataset.extent(0);
   const uint64_t dataset_dim  = dataset.extent(1);
   const DataT* dataset_ptr    = dataset.data_handle();
