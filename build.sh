@@ -195,6 +195,37 @@ function buildMetrics {
     fi
 }
 
+function gpuArch {
+    # Check if both --gpu-arch and --allgpuarch are specified
+    if hasArg --allgpuarch && [[ -n $(echo $ARGS | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
+        echo "Error: Cannot specify both --gpu-arch and --allgpuarch"
+        echo "Use either:"
+        echo "  --gpu-arch=\"80-real;90-real\"    (for specific architectures)"
+        echo "  --allgpuarch        (for all supported architectures)"
+        exit 1
+    fi
+
+    # Check for multiple gpu-arch options
+    if [[ $(echo $ARGS | { grep -Eo "\-\-gpu\-arch" || true; } | wc -l ) -gt 1 ]]; then
+        echo "Error: Multiple --gpu-arch options were provided. Please combine architectures into a single option."
+        echo "Instead of: --gpu-arch=80-real --gpu-arch=90-real"
+        echo "Use:       --gpu-arch=\"80-real;90-real\""
+        exit 1
+    fi
+
+    # Check for gpu-arch option
+    if [[ -n $(echo $ARGS | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
+        GPU_ARCH_ARG=$(echo $ARGS | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
+        if [[ -n ${GPU_ARCH_ARG} ]]; then
+            # Remove the full argument from ARGS
+            ARGS=${ARGS//$GPU_ARCH_ARG/}
+            # Extract just the architecture value
+            CUVS_CMAKE_CUDA_ARCHITECTURES=$(echo $GPU_ARCH_ARG | sed -e 's/--gpu-arch=//' -e 's/ .*//')
+            echo "Building for specified GPU architectures: ${CUVS_CMAKE_CUDA_ARCHITECTURES}"
+        fi
+    fi
+}
+
 if hasArg -h || hasArg --help; then
     echo "${HELP}"
     exit 0
@@ -207,6 +238,7 @@ if (( ${NUMARGS} != 0 )); then
     limitTests
     limitAnnBench
     buildMetrics
+    gpuArch
     for a in ${ARGS}; do
         if ! (echo " ${VALIDARGS} " | grep -q " ${a} "); then
             echo "Invalid option: ${a}"
@@ -265,10 +297,6 @@ if hasArg -g; then
     BUILD_TYPE=Debug
 fi
 
-if hasArg --allgpuarch; then
-    BUILD_ALL_GPU_ARCH=1
-fi
-
 if hasArg --no-mg; then
     BUILD_MG_ALGOS=OFF
 fi
@@ -312,6 +340,7 @@ fi
 if hasArg --incl-cache-stats; then
     BUILD_REPORT_INCL_CACHE_STATS=ON
 fi
+
 if [[ ${CMAKE_TARGET} == "" ]]; then
     CMAKE_TARGET="all"
 fi
@@ -340,18 +369,21 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
         CMAKE_TARGET="${CMAKE_TARGET};cuvs"
     fi
 
-    if (( ${BUILD_ALL_GPU_ARCH} == 0 )); then
-        CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
-        echo "Building for the architecture of the GPU in the system..."
-    else
-        CUVS_CMAKE_CUDA_ARCHITECTURES="RAPIDS"
-        echo "Building for *ALL* supported GPU architectures..."
-    fi
-
     # get the current count before the compile starts
     CACHE_TOOL=${CACHE_TOOL:-sccache}
     if [[ "$BUILD_REPORT_INCL_CACHE_STATS" == "ON" && -x "$(command -v ${CACHE_TOOL})" ]]; then
         "${CACHE_TOOL}" --zero-stats
+    fi
+
+    # Set default GPU architecture if not already set by gpuArch function
+    if [[ -z "${CUVS_CMAKE_CUDA_ARCHITECTURES}" ]]; then
+        if hasArg --allgpuarch; then
+            CUVS_CMAKE_CUDA_ARCHITECTURES="RAPIDS"
+            echo "Building for *ALL* supported GPU architectures..."
+        else
+            CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
+            echo "Building for the architecture of the GPU in the system..."
+        fi
     fi
 
     mkdir -p ${LIBCUVS_BUILD_DIR}
