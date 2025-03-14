@@ -96,6 +96,8 @@ outputs:
       string: cuda${{ cuda_major }}_${{ date_string }}_${{ head_rev }}
       dynamic_linking:
         overlinking_behavior: "error"
+      prefix_detection:
+        ignore_binary_files: True
       script:
         content: |
           cmake --install cpp/build --component cuvs
@@ -168,6 +170,8 @@ outputs:
       string: cuda${{ cuda_major }}_${{ date_string }}_${{ head_rev }}
       dynamic_linking:
         overlinking_behavior: "error"
+      prefix_detection:
+        ignore_binary_files: True
     requirements:
       build:
         - cmake ${{ cmake_version }}
@@ -237,6 +241,8 @@ outputs:
       string: cuda${{ cuda_major }}_${{ date_string }}_${{ head_rev }}
       dynamic_linking:
         overlinking_behavior: "error"
+      prefix_detection:
+        ignore_binary_files: True
       script:
         content: |
           # Remove `-fdebug-prefix-map` line from CFLAGS and CXXFLAGS so the
@@ -347,6 +353,8 @@ outputs:
       string: cuda${{ cuda_major }}_${{ date_string }}_${{ head_rev }}
       dynamic_linking:
         overlinking_behavior: "error"
+      prefix_detection:
+        ignore_binary_files: True
     requirements:
       build:
         - cmake ${{ cmake_version }}
