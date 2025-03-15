@@ -967,33 +967,22 @@ int insert_to_ordered_list(InternalID_t<Index_t>* list,
                            DistData_t* dist_list,
                            const int width,
                            const InternalID_t<Index_t> neighb_id,
-                           const DistData_t dist,
-                           bool do_print)
+                           const DistData_t dist)
 {
   if (dist > dist_list[width - 1]) { return width; }
 
   int idx_insert      = width;
   bool position_found = false;
   for (int i = 0; i < width; i++) {
-    if (do_print) {
-      std::cout << "\tposition found: " << position_found << " dist list " << i << " has idx "
-                << list[i].id() << " is distance " << dist_list[i] << std::endl;
-    }
-    // already have this in the list
     if (list[i].id() == neighb_id.id() && dist_list[i] == dist) {
-      if (do_print) { std::cout << "ended up returning here\n"; }
+      // already have this in the list
       return width;
     }
     if (!position_found && dist_list[i] > dist) {
       idx_insert     = i;
       position_found = true;
     }
-    // if (position_found && list[i].id() == neighb_id.id()) {
-    //   // same index with max distance (random initialized) is in the same segment
-    //   list[i].id_with_flag() = std::numeric_limits<Index_t>::max();
-    // }
   }
-  if (do_print) { std::cout << "\tind insert: " << idx_insert << std::endl; }
   if (idx_insert == width) return idx_insert;
 
   memmove(list + idx_insert + 1, list + idx_insert, sizeof(*list) * (width - idx_insert - 1));
@@ -1162,34 +1151,14 @@ void GnndGraph<Index_t>::update_graph(const InternalID_t<Index_t>* new_neighbors
     for (size_t j = 0; j < width; j++) {
       auto new_neighb_id = new_neighbors[i * width + j];
       auto new_dist      = new_dists[i * width + j];
-      if (i == 1876 && new_neighb_id.id() == 177) {
-        std::cout << "in update graph function, distance is: " << new_dist << std::endl;
-      }
+
       if (new_dist == std::numeric_limits<DistData_t>::max()) break;
       if ((size_t)new_neighb_id.id() == i) continue;
       int seg_idx    = new_neighb_id.id() % num_segments;
       auto list      = h_graph + i * node_degree + seg_idx * segment_size;
       auto dist_list = h_dists.data_handle() + i * node_degree + seg_idx * segment_size;
-      int insert_pos = insert_to_ordered_list(list,
-                                              dist_list,
-                                              segment_size,
-                                              new_neighb_id,
-                                              new_dist,
-                                              i == 1876 && new_neighb_id.id() == 177);
-      if (i == 1876 && new_neighb_id.id() == 177) {
-        std::cout << "in update graph function, after insert to ordered lis " << insert_pos
-                  << " seg idx is: " << seg_idx << " seg size: " << segment_size
-                  << " num segments: " << num_segments << std::endl;
-        raft::print_host_vector("h_dists after inserting",
-                                h_dists.data_handle() + node_degree * 1876,
-                                node_degree,
-                                std::cout);
-        std::cout << "h_graph after inserting: [";
-        for (size_t p = 0; p < node_degree; p++) {
-          std::cout << (h_graph + i * node_degree)[p].id() << ", ";
-        }
-        std::cout << "]\n";
-      }
+      int insert_pos =
+        insert_to_ordered_list(list, dist_list, segment_size, new_neighb_id, new_dist);
       if (i % counter_interval == 0 && insert_pos != segment_size) { update_counter++; }
     }
   }
@@ -1203,22 +1172,8 @@ void GnndGraph<Index_t>::sort_lists()
     std::vector<std::pair<DistData_t, Index_t>> new_list;
     std::set<Index_t> neighbors_already_included;
     for (size_t j = 0; j < node_degree; j++) {
-      if (i == 1876 && h_graph[i * node_degree + j].id() == 177) {
-        std::cout << "in this case the hdists is " << h_dists.data_handle()[i * node_degree + j]
-                  << std::endl;
-      }
-      // if (nrow == 1876) {
-      //   std::cout << "sorting lists: " << j << " for index " << h_graph[i * node_degree + j].id()
-      //   << " dist is " << h_dists.data_handle()[i * node_degree + j] << std::endl;
-      // }
-      // we check for duplicates here, because we might have the same neighbor id for the same row
-      // one with a proper distance, and another with a max_float distance which is initialized
-      // randomly at beginning if (neighbors_already_included.find(h_graph[i * node_degree +
-      // j].id()) != neighbors_already_included.end()) { index not included yet
       new_list.emplace_back(h_dists.data_handle()[i * node_degree + j],
                             h_graph[i * node_degree + j].id());
-      // neighbors_already_included.insert(h_graph[i * node_degree + j].id());
-      // }
     }
     std::sort(new_list.begin(), new_list.end());
     for (size_t j = 0; j < node_degree; j++) {
@@ -1456,7 +1411,6 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                       DEGREE_ON_DEVICE,
                       update_counter_);
   raft::resource::sync_stream(res);
-  std::cout << "right before sort lists\n";
   graph_.sort_lists();
 
   // Reuse graph_.h_dists as the buffer for shrink the lists in graph
@@ -1465,10 +1419,6 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   if (return_distances) {
     auto graph_d_dists = raft::make_device_matrix<DistData_t, int64_t, raft::row_major>(
       res, nrow_, build_config_.node_degree);
-    raft::print_host_vector("host distances inside here",
-                            graph_.h_dists.data_handle() + 1876 * build_config_.node_degree,
-                            build_config_.node_degree,
-                            std::cout);
     raft::copy(graph_d_dists.data_handle(),
                graph_.h_dists.data_handle(),
                nrow_ * build_config_.node_degree,
