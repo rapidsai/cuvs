@@ -308,6 +308,19 @@ RAFT_KERNEL merge_subgraphs(IdxT* cluster_data_indices,
       }
     }
 
+    if (batch_row == 1876 && threadIdx.x == 16) {
+      // should be first
+      printf("thread key value key: %f, %f, %f, %f\nindices: %u, %u, %u, %u\n",
+             threadKeyValuePair[0].key,
+             threadKeyValuePair[1].key,
+             threadKeyValuePair[2].key,
+             threadKeyValuePair[3].key,
+             threadKeyValuePair[0].value,
+             threadKeyValuePair[1].value,
+             threadKeyValuePair[2].value,
+             threadKeyValuePair[3].value);
+    }
+
     __syncthreads();
 
     BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, CustomKeyComparator<float, IdxT>{});
@@ -320,6 +333,18 @@ RAFT_KERNEL merge_subgraphs(IdxT* cluster_data_indices,
         blockKeys[colId]   = threadKeyValuePair[i].key;
         blockValues[colId] = threadKeyValuePair[i].value;
       }
+    }
+    if (batch_row == 1876 && threadIdx.x == 0) {
+      // should be first
+      printf("block key value key: %f, %f, %f, %f\nindices: %u, %u, %u, %u\n",
+             blockKeys[0],
+             blockKeys[1],
+             blockKeys[2],
+             blockKeys[3],
+             blockValues[0],
+             blockValues[1],
+             blockValues[2],
+             blockValues[3]);
     }
 
     __syncthreads();
@@ -388,6 +413,10 @@ void build_and_merge(raft::resources const& res,
 {
   nnd.build(cluster_data, num_data_in_cluster, int_graph, true, batch_distances_d);
 
+  raft::print_host_vector(
+    "indices from nnd build", int_graph + int_graph_node_degree * 1876, graph_degree, std::cout);
+  raft::print_device_vector(
+    "distances from nnd build", batch_distances_d + graph_degree * 1876, graph_degree, std::cout);
   // remap indices
 #pragma omp parallel for
   for (size_t i = 0; i < num_data_in_cluster; i++) {
@@ -397,6 +426,11 @@ void build_and_merge(raft::resources const& res,
     }
   }
 
+  raft::print_host_vector("batch_indices_h from nnd build",
+                          batch_indices_h + graph_degree * 1876,
+                          graph_degree,
+                          std::cout);
+
   raft::copy(batch_indices_d,
              batch_indices_h,
              num_data_in_cluster * graph_degree,
@@ -405,6 +439,14 @@ void build_and_merge(raft::resources const& res,
   size_t num_elems     = graph_degree * 2;
   size_t sharedMemSize = num_elems * (sizeof(float) + sizeof(IdxT) + sizeof(int16_t));
 
+  raft::print_device_vector("before merging, global indices",
+                            global_indices_d + graph_degree * 1876,
+                            graph_degree,
+                            std::cout);
+  raft::print_device_vector("before merging, global distances",
+                            global_distances_d + graph_degree * 1876,
+                            graph_degree,
+                            std::cout);
   if (num_elems <= 128) {
     merge_subgraphs<IdxT, 32, 4>
       <<<num_data_in_cluster, 32, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
@@ -450,6 +492,15 @@ void build_and_merge(raft::resources const& res,
     RAFT_FAIL("The degree of knn is too large (%lu). It must be smaller than 1024", graph_degree);
   }
   raft::resource::sync_stream(res);
+
+  raft::print_device_vector("after merging, global indices",
+                            global_indices_d + graph_degree * 1876,
+                            graph_degree,
+                            std::cout);
+  raft::print_device_vector("after merging, global distances",
+                            global_distances_d + graph_degree * 1876,
+                            graph_degree,
+                            std::cout);
 }
 
 //
@@ -637,9 +688,9 @@ void batch_build(raft::resources const& res,
   }
 
   size_t extended_graph_degree =
-    align32::roundUp(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
+    align32::roundUp(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.5)));
   size_t extended_intermediate_degree = align32::roundUp(
-    static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
+    static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.5)));
 
   auto int_graph = raft::make_host_matrix<int, int64_t, row_major>(
     max_cluster_size, static_cast<int64_t>(extended_graph_degree));
