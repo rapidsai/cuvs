@@ -19,6 +19,7 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -378,6 +379,12 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
 
+cuvsError_t cuvsCagraBuildWithIVFPQ(cuvsResources_t res,
+                                    cuvsCagraIndexParams_t params,
+                                    DLManagedTensor* dataset,
+                                    cuvsCagraIndex_t index,
+                                    cuvsIvfPqIndexParams_t ivf_pq_build_params,
+                                    cuvsIvfPqSearchParams_t ivf_pq_search_params);
 /**
  * @}
  */
