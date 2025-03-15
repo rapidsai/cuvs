@@ -45,13 +45,14 @@ requirements:
 
   host:
     - benchmark
-    - fmt {{ fmt_version }}
     - glog {{ glog_version }}
+    - libaio  # [linux64]
+    - libboost-devel=1.87  # [linux64]
+    - mkl-devel=2023  # [linux64]
     - nlohmann_json {{ nlohmann_json_version }}
     - openblas
     - python
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
-    - spdlog {{ spdlog_version }}
 
   run:
     - benchmark
@@ -59,12 +60,24 @@ requirements:
     - glog {{ glog_version }}
     - h5py {{ h5py_version }}
     - matplotlib-base
+    - mkl =2023  # [linux64]
     - numpy >=1.23,<3.0a0
     - pandas
     - pyyaml
     - python
     - requests
-    - sklearn>=1.5
+    - scikit-learn>=1.5
+
+test:
+  # test that the package is installable and these modules are importable
+  imports:
+    - cuvs_bench
+    - cuvs_bench.generate_groundtruth
+    - cuvs_bench.get_dataset
+    - cuvs_bench.plot
+    - cuvs_bench.run
+    - cuvs_bench.split_groundtruth
+
 about:
   home: https://rapids.ai/
   license: Apache-2.0

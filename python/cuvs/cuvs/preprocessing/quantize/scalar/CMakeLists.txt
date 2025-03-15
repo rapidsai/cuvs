@@ -22,7 +22,3 @@ rapids_cython_create_modules(
   LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX
                    preprocessing_quantize_scalar_
 )
-
-foreach(tgt IN LISTS RAPIDS_CYTHON_CREATED_TARGETS)
-  target_link_libraries(${tgt} PRIVATE cuvs_rmm_logger)
-endforeach()
