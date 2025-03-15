@@ -388,6 +388,7 @@ void build_and_merge(raft::resources const& res,
 {
   nnd.build(cluster_data, num_data_in_cluster, int_graph, true, batch_distances_d);
 
+  // remap indices
 #pragma omp parallel for
   for (size_t i = 0; i < num_data_in_cluster; i++) {
     for (size_t j = 0; j < graph_degree; j++) {

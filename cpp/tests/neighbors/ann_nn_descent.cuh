@@ -326,19 +326,11 @@ const std::vector<AnnNNDescentInputs> inputs =
 
 const std::vector<AnnNNDescentBatchInputs> inputsBatch =
   raft::util::itertools::product<AnnNNDescentBatchInputs>(
-    {std::make_pair(0.9, 2lu)},  // min_recall, n_clusters
-    {4000},                      // n_rows
-    {512},                       // dim
-    {64},                        // graph_degree
+    {std::make_pair(0.9, 3lu), std::make_pair(0.9, 2lu)},  // min_recall, n_clusters
+    {4000, 5000},                                          // n_rows
+    {192, 512},                                            // dim
+    {32, 64},                                              // graph_degree
     {cuvs::distance::DistanceType::L2Expanded},
     {false, true});
-//  const std::vector<AnnNNDescentBatchInputs> inputsBatch =
-//  raft::util::itertools::product<AnnNNDescentBatchInputs>(
-//    {std::make_pair(0.9, 3lu), std::make_pair(0.9, 2lu)},  // min_recall, n_clusters
-//    {4000, 5000},                                          // n_rows
-//    {192, 512},                                            // dim
-//    {32, 64},                                              // graph_degree
-//    {cuvs::distance::DistanceType::L2Expanded},
-//    {false, true});
 
 }  // namespace cuvs::neighbors::nn_descent
