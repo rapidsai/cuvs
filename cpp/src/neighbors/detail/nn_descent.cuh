@@ -1151,7 +1151,6 @@ void GnndGraph<Index_t>::update_graph(const InternalID_t<Index_t>* new_neighbors
     for (size_t j = 0; j < width; j++) {
       auto new_neighb_id = new_neighbors[i * width + j];
       auto new_dist      = new_dists[i * width + j];
-
       if (new_dist == std::numeric_limits<DistData_t>::max()) break;
       if ((size_t)new_neighb_id.id() == i) continue;
       int seg_idx    = new_neighb_id.id() % num_segments;
@@ -1170,7 +1169,6 @@ void GnndGraph<Index_t>::sort_lists()
 #pragma omp parallel for
   for (size_t i = 0; i < nrow; i++) {
     std::vector<std::pair<DistData_t, Index_t>> new_list;
-    std::set<Index_t> neighbors_already_included;
     for (size_t j = 0; j < node_degree; j++) {
       new_list.emplace_back(h_dists.data_handle()[i * node_degree + j],
                             h_graph[i * node_degree + j].id());

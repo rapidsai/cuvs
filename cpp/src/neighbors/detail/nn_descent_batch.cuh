@@ -388,12 +388,6 @@ void build_and_merge(raft::resources const& res,
 {
   nnd.build(cluster_data, num_data_in_cluster, int_graph, true, batch_distances_d);
 
-  // raft::print_host_vector(
-  //   "indices from nnd build", int_graph + int_graph_node_degree * 1876, graph_degree, std::cout);
-  // raft::print_device_vector(
-  //   "distances from nnd build", batch_distances_d + graph_degree * 1876, graph_degree,
-  //   std::cout);
-  // remap indices
 #pragma omp parallel for
   for (size_t i = 0; i < num_data_in_cluster; i++) {
     for (size_t j = 0; j < graph_degree; j++) {
@@ -410,14 +404,6 @@ void build_and_merge(raft::resources const& res,
   size_t num_elems     = graph_degree * 2;
   size_t sharedMemSize = num_elems * (sizeof(float) + sizeof(IdxT) + sizeof(int16_t));
 
-  //   raft::print_device_vector("before merging, global indices",
-  //     global_indices_d + graph_degree * 1876,
-  //     graph_degree,
-  //     std::cout);
-  // raft::print_device_vector("before merging, global distances",
-  //     global_distances_d + graph_degree * 1876,
-  //     graph_degree,
-  //     std::cout);
   if (num_elems <= 128) {
     merge_subgraphs<IdxT, 32, 4>
       <<<num_data_in_cluster, 32, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
@@ -463,15 +449,6 @@ void build_and_merge(raft::resources const& res,
     RAFT_FAIL("The degree of knn is too large (%lu). It must be smaller than 1024", graph_degree);
   }
   raft::resource::sync_stream(res);
-
-  //   raft::print_device_vector("after merging, global indices",
-  //     global_indices_d + graph_degree * 1876,
-  //     graph_degree,
-  //     std::cout);
-  // raft::print_device_vector("after merging, global distances",
-  //     global_distances_d + graph_degree * 1876,
-  //     graph_degree,
-  //     std::cout);
 }
 
 //
