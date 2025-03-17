@@ -47,7 +47,7 @@ build:
       SCCACHE_REGION: ${{ env.get("SCCACHE_REGION") }}
       SCCACHE_S3_USE_SSL: ${{ env.get("SCCACHE_S3_USE_SSL") }}
       SCCACHE_S3_NO_CREDENTIALS: ${{ env.get("SCCACHE_S3_NO_CREDENTIALS") }}
-      SCCACHE_S3_KEY_PREFIX: libcuvs-${{ env.get("RAPIDS_CONDA_ARCH") }}
+      SCCACHE_S3_KEY_PREFIX: cuvs-bench-cpu/${{ env.get("RAPIDS_CONDA_ARCH") }}
 
 requirements:
   build:
