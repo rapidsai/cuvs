@@ -40,6 +40,7 @@
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/integer_utils.hpp>
+#include <raft/util/pow2_utils.cuh>
 
 #include <rmm/cuda_stream.hpp>
 #include <rmm/device_uvector.hpp>
@@ -516,7 +517,7 @@ template <unsigned MAX_ITOPK,
           class DATASET_DESCRIPTOR_T,
           class SAMPLE_FILTER_T>
 __device__ void search_core(
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const result_indices_ptr,       // [num_queries, top_k]
+  uintptr_t result_indices_ptr,                                           // [num_queries, top_k]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, top_k]
   const std::uint32_t top_k,
   const DATASET_DESCRIPTOR_T* dataset_desc,
@@ -863,6 +864,27 @@ __device__ void search_core(
     __syncthreads();
   }
 
+  // NB: tag the indices pointer with its element size.
+  //     This allows us to avoid multiplying kernel instantiations
+  //     and any costs for extra registers in the kernel signature.
+  const uint32_t index_element_size = 1u << (result_indices_ptr & 0x111);
+  result_indices_ptr &= ~uintptr_t(0x111);
+  auto write_indices =
+    index_element_size == 3
+      ? [](uintptr_t ptr,
+           uint32_t i,
+           INDEX_T x) { reinterpret_cast<uint64_t*>(ptr)[i] = static_cast<uint64_t>(x); }
+    : index_element_size == 2
+      ? [](uintptr_t ptr,
+           uint32_t i,
+           INDEX_T x) { reinterpret_cast<uint32_t*>(ptr)[i] = static_cast<uint32_t>(x); }
+    : index_element_size == 1
+      ? [](uintptr_t ptr,
+           uint32_t i,
+           INDEX_T x) { reinterpret_cast<uint16_t*>(ptr)[i] = static_cast<uint16_t>(x); }
+      : [](uintptr_t ptr, uint32_t i, INDEX_T x) {
+          reinterpret_cast<uint8_t*>(ptr)[i] = static_cast<uint8_t>(x);
+        };
   for (std::uint32_t i = threadIdx.x; i < top_k; i += blockDim.x) {
     unsigned j  = i + (top_k * query_id);
     unsigned ii = i;
@@ -870,8 +892,9 @@ __device__ void search_core(
     if (result_distances_ptr != nullptr) { result_distances_ptr[j] = result_distances_buffer[ii]; }
     constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
 
-    result_indices_ptr[j] =
-      result_indices_buffer[ii] & ~index_msb_1_mask;  // clear most significant bit
+    write_indices(result_indices_ptr,
+                  j,
+                  result_indices_buffer[ii] & ~index_msb_1_mask);  // clear most significant bit
   }
   if (threadIdx.x == 0 && num_executed_iterations != nullptr) {
     num_executed_iterations[query_id] = iter + 1;
@@ -910,7 +933,7 @@ template <unsigned MAX_ITOPK,
           class DATASET_DESCRIPTOR_T,
           class SAMPLE_FILTER_T>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
-  typename DATASET_DESCRIPTOR_T::INDEX_T* const result_indices_ptr,       // [num_queries, top_k]
+  uintptr_t result_indices_ptr,                                           // [num_queries, top_k]
   typename DATASET_DESCRIPTOR_T::DISTANCE_T* const result_distances_ptr,  // [num_queries, top_k]
   const std::uint32_t top_k,
   const DATASET_DESCRIPTOR_T* dataset_desc,
@@ -979,7 +1002,7 @@ struct alignas(kCacheLineBytes) job_desc_t {
   using data_type     = typename DATASET_DESCRIPTOR_T::DATA_T;
   // The algorithm input parameters
   struct value_t {
-    index_type* result_indices_ptr;       // [num_queries, top_k]
+    uintptr_t result_indices_ptr;         // [num_queries, top_k]
     distance_type* result_distances_ptr;  // [num_queries, top_k]
     const data_type* queries_ptr;         // [num_queries, dataset_dim]
     uint32_t top_k;
@@ -1082,7 +1105,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
     if (worker_data.handle == kNoMoreWork) { break; }
 
     // reading phase
-    auto* result_indices_ptr   = job_descriptor.value.result_indices_ptr;
+    auto result_indices_ptr    = job_descriptor.value.result_indices_ptr;
     auto* result_distances_ptr = job_descriptor.value.result_distances_ptr;
     auto* queries_ptr          = job_descriptor.value.queries_ptr;
     auto top_k                 = job_descriptor.value.top_k;
@@ -1806,7 +1829,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     auto* job_descriptors_ptr     = job_descriptors.data();
     for (uint32_t i = 0; i < kMaxJobsNum; i++) {
       auto& jd                = job_descriptors_ptr[i].input.value;
-      jd.result_indices_ptr   = nullptr;
+      jd.result_indices_ptr   = 0;
       jd.result_distances_ptr = nullptr;
       jd.queries_ptr          = nullptr;
       jd.top_k                = 0;
@@ -1880,7 +1903,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     RAFT_LOG_INFO("Destroyed the persistent runner.");
   }
 
-  void launch(index_type* result_indices_ptr,       // [num_queries, top_k]
+  void launch(uintptr_t result_indices_ptr,         // [num_queries, top_k]
               distance_type* result_distances_ptr,  // [num_queries, top_k]
               const data_type* queries_ptr,         // [num_queries, dataset_dim]
               uint32_t num_queries,
@@ -2022,7 +2045,7 @@ auto get_runner(Args... args) -> std::shared_ptr<RunnerT>
 template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
 void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
-                    IndexT* topk_indices_ptr,       // [num_queries, topk]
+                    uintptr_t topk_indices_ptr,     // [num_queries, topk]
                     DistanceT* topk_distances_ptr,  // [num_queries, topk]
                     const DataT* queries_ptr,       // [num_queries, dataset_dim]
                     uint32_t num_queries,

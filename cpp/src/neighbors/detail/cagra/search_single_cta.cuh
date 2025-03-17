@@ -36,6 +36,7 @@
 
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>  // RAFT_CUDA_TRY_NOT_THROW is used TODO(tfeher): consider moving this to cuda_rt_essentials.hpp
+#include <raft/util/pow2_utils.cuh>
 
 #include <algorithm>
 #include <cassert>
@@ -47,9 +48,13 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-template <typename DataT, typename IndexT, typename DistanceT, typename SAMPLE_FILTER_T>
-struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
-  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T>;
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SAMPLE_FILTER_T,
+          typename OutputIndexT = IndexT>
+struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT> {
+  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -217,7 +222,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
 
   void operator()(raft::resources const& res,
                   raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  INDEX_T* const result_indices_ptr,       // [num_queries, topk]
+                  OutputIndexT* const result_indices_ptr,  // [num_queries, topk]
                   DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
                   const std::uint32_t num_queries,
@@ -229,7 +234,11 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
     select_and_run(dataset_desc,
                    graph,
-                   result_indices_ptr,
+                   // NB: tag the indices pointer with its element size.
+                   //     This allows us to avoid multiplying kernel instantiations
+                   //     and any costs for extra registers in the kernel signature.
+                   reinterpret_cast<uintptr_t>(result_indices_ptr) |
+                     raft::Pow2<sizeof(result_indices_ptr)>::Log2,
                    result_distances_ptr,
                    queries_ptr,
                    num_queries,
