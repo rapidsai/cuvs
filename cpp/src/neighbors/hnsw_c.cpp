@@ -47,9 +47,8 @@ void _from_cagra(cuvsResources_t res,
   cpp_params.num_threads     = params->num_threads;
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset;
   if (dataset_tensor.has_value()) {
-    using dataset_mdspan_type =
-      raft::host_matrix_view<T const, int64_t, raft::row_major>;
-     dataset = cuvs::core::from_dlpack<dataset_mdspan_type>(*dataset_tensor);
+    using dataset_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    dataset                   = cuvs::core::from_dlpack<dataset_mdspan_type>(*dataset_tensor);
   } else {
     dataset = std::nullopt;
   }
