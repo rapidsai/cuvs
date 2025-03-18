@@ -10,7 +10,7 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
-cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 include(../rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
@@ -499,16 +499,14 @@ if(BUILD_SHARED_LIBS)
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
   target_link_libraries(
-    cuvs_objs
-    PUBLIC raft::raft rmm::rmm rmm::rmm_logger ${CUVS_CTK_MATH_DEPENDENCIES}
-           $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-    PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl
+    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 
-  add_library(cuvs SHARED $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+  add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
 
   if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
-    add_library(cuvs_static STATIC $<FILTER:$<TARGET_OBJECTS:cuvs_objs>,EXCLUDE,rmm.*logger>)
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
   endif()
 
   target_compile_options(
@@ -638,6 +636,7 @@ SECTIONS
   if(CUVS_NVTX)
     # This enables NVTX within the project with no option to disable it downstream.
     target_link_libraries(cuvs PUBLIC CUDA::nvtx3)
+    target_compile_definitions(cuvs_objs PUBLIC NVTX_ENABLED)
     target_compile_definitions(cuvs PUBLIC NVTX_ENABLED)
 
     target_link_libraries(cuvs-cagra-search PUBLIC CUDA::nvtx3)
@@ -731,7 +730,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft rmm::rmm_logger_impl raft::raft_logger_impl
+      PRIVATE raft::raft
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries

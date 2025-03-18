@@ -66,10 +66,14 @@ namespace detail {
  *    performed.
  *  @return statistics: number of eigensolver iterations, .
  */
-template <typename vertex_t, typename weight_t, typename EigenSolver, typename ClusterSolver>
+template <typename vertex_t,
+          typename weight_t,
+          typename nnz_t,
+          typename EigenSolver,
+          typename ClusterSolver>
 std::tuple<vertex_t, weight_t, vertex_t> partition(
   raft::resources const& handle,
-  raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
+  raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t, nnz_t> const& csr_m,
   EigenSolver const& eigen_solver,
   ClusterSolver const& cluster_solver,
   vertex_t* __restrict__ clusters,
@@ -97,7 +101,7 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
 
   // Initialize Laplacian
   /// sparse_matrix_t<vertex_t, weight_t> A{handle, graph};
-  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> L{handle, csr_m};
+  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t, nnz_t> L{handle, csr_m};
 
   auto eigen_config = eigen_solver.get_config();
   auto nEigVecs     = eigen_config.n_eigVecs;
@@ -135,13 +139,14 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
  *  @param cost On exit, partition cost function.
  *  @return error flag.
  */
-template <typename vertex_t, typename weight_t>
-void analyzePartition(raft::resources const& handle,
-                      raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t> const& csr_m,
-                      vertex_t nClusters,
-                      const vertex_t* __restrict__ clusters,
-                      weight_t& edgeCut,
-                      weight_t& cost)
+template <typename vertex_t, typename weight_t, typename nnz_t>
+void analyzePartition(
+  raft::resources const& handle,
+  raft::spectral::matrix::sparse_matrix_t<vertex_t, weight_t, nnz_t> const& csr_m,
+  vertex_t nClusters,
+  const vertex_t* __restrict__ clusters,
+  weight_t& edgeCut,
+  weight_t& cost)
 {
   RAFT_EXPECTS(clusters != nullptr, "Null clusters buffer.");
 
@@ -163,7 +168,7 @@ void analyzePartition(raft::resources const& handle,
 
   // Initialize Laplacian
   /// sparse_matrix_t<vertex_t, weight_t> A{handle, graph};
-  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t> L{handle, csr_m};
+  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t, nnz_t> L{handle, csr_m};
 
   // Initialize output
   cost    = 0;
