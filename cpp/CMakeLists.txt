@@ -396,6 +396,10 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/cagra_serialize_half.cu
     src/neighbors/cagra_serialize_int8.cu
     src/neighbors/cagra_serialize_uint8.cu
+    src/neighbors/cagra_merge_float.cu
+    src/neighbors/cagra_merge_half.cu
+    src/neighbors/cagra_merge_int8.cu
+    src/neighbors/cagra_merge_uint8.cu
     src/neighbors/iface/iface_cagra_float_uint32_t.cu
     src/neighbors/iface/iface_cagra_half_uint32_t.cu
     src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu

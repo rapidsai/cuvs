@@ -60,9 +60,8 @@ class fixed_thread_pool {
 
     finished_.store(true, std::memory_order_relaxed);
     for (unsigned i = 0; i < threads_.size(); ++i) {
+      // NB: don't lock the task mutex here, may deadlock on .join() otherwise
       auto& task = tasks_[i];
-      std::lock_guard lock(task.mtx);
-
       task.cv.notify_one();
       threads_[i].join();
     }
@@ -105,8 +104,7 @@ class fixed_thread_pool {
       IdxT start = i * items_per_thread;
       auto& task = tasks_[i];
       {
-        std::lock_guard lock(task.mtx);
-        (void)lock;  // stop nvcc warning
+        [[maybe_unused]] std::lock_guard lock(task.mtx);
         task.task = std::packaged_task<void()>([=] { wrapped_f(start, start + items_per_thread); });
         futures.push_back(task.task.get_future());
         task.has_task = true;

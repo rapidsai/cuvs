@@ -264,6 +264,51 @@ struct extend_params {
    * 0. */
   uint32_t max_chunk_size = 0;
 };
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
+ * @{
+ */
+
+/**
+ * @brief Determines the strategy for merging CAGRA graphs.
+ *
+ * @note Currently, only the PHYSICAL strategy is supported.
+ */
+enum MergeStrategy {
+  /**
+   * @brief Physical merge: Builds a new CAGRA graph from the union of dataset points
+   * in existing CAGRA graphs.
+   *
+   * This is expensive to build but does not impact search latency or quality.
+   * Preferred for many smaller CAGRA graphs.
+   *
+   * @note Currently, this is the only supported strategy.
+   */
+  PHYSICAL
+};
+
+/**
+ * @brief Parameters for merging CAGRA indexes.
+ */
+struct merge_params {
+  merge_params() = default;
+
+  /**
+   * @brief Constructs merge parameters with given index parameters.
+   * @param params Parameters for creating the output index.
+   */
+  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
+
+  /// Parameters for creating the output index.
+  cagra::index_params output_index_params;
+
+  /// Strategy for merging. Defaults to `MergeStrategy::PHYSICAL`.
+  MergeStrategy strategy = MergeStrategy::PHYSICAL;
+};
 
 /**
  * @}
@@ -1794,6 +1839,150 @@ void serialize_to_hnswlib(
   std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
     std::nullopt);
 
+/**
+ * @defgroup cagra_cpp_index_merge CAGRA index build functions
+ * @{
+ */
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<float, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<float, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<float, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<half, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<half, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<half, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<int8_t, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<int8_t, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<int8_t, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<uint8_t, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<uint8_t, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<uint8_t, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
  */

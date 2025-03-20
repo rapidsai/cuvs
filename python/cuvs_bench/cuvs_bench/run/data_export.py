@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -110,7 +110,8 @@ def clean_algo_name(algo_name):
         Cleaned algorithm name.
     """
 
-    return algo_name[0] if "base" in algo_name[1] else "_".join(algo_name)
+    name = algo_name[0] if "base" in algo_name[1] else "_".join(algo_name)
+    return name.removesuffix(".json")
 
 
 def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
@@ -138,6 +139,7 @@ def write_csv(file, algo_name, df, extra_columns=None, skip_cols=None):
             "time": df["real_time"],
         }
     )
+
     # Add extra columns if provided
     if extra_columns:
         for col in extra_columns:

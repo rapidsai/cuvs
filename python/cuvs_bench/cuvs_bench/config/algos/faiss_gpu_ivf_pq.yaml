@@ -26,3 +26,15 @@ groups:
     search:
       nprobe: [1000, 2000, 3000, 5000]
       refine_ratio: [1, 2, 4]
+  test:
+    build:
+      nlist: [1024]
+      M: [96]
+      ratio: [4]
+      usePrecomputed: [True]
+      useFloat16: [True]
+      use_cuvs: [False]
+      bitsPerCode: [8]
+    search:
+      nprobe: [10]
+      refine_ratio: [1, 2]
