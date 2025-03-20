@@ -5,6 +5,8 @@ set -euo pipefail
 
 package_dir="python/cuvs"
 
+wheel_dir=${RAPIDS_WHEEL_BLD_OUTPUT_DIR}
+
 RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")"
 
 # Downloads libcuvs wheels from this current build,
@@ -17,4 +19,4 @@ echo "libcuvs-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo /tmp/libcuvs_dist/libcuvs
 export PIP_CONSTRAINT="/tmp/constraints.txt"
 
 ci/build_wheel.sh cuvs ${package_dir} python
-ci/validate_wheel.sh ${package_dir} final_dist
+ci/validate_wheel.sh ${package_dir} "${wheel_dir}"
