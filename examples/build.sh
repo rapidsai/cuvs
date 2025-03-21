@@ -7,6 +7,9 @@
 # Abort script on first error
 set -e
 
+function hasArg {
+    (( NUMARGS != 0 )) && (echo " ${ARGS} " | grep -q " $1 ")
+}
 
 PARALLEL_LEVEL=${PARALLEL_LEVEL:=`nproc`}
 
