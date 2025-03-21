@@ -244,6 +244,8 @@ class BloomFilter {
     }
   }
 
+  void set_nrow(size_t nrow) { nrow_ = nrow; }
+
   bool check(size_t list_id, Index_t key)
   {
     bool is_present       = true;
@@ -1047,24 +1049,32 @@ void GnndGraph<Index_t>::init_random_graph()
   for (size_t seg_idx = 0; seg_idx < static_cast<size_t>(num_segments); seg_idx++) {
     // random sequence (range: 0~nrow)
     // segment_x stores neighbors which id % num_segments == x
-    std::vector<Index_t> rand_seq(nrow / num_segments);
+    std::vector<Index_t> rand_seq((nrow + num_segments - 1) / num_segments);
     std::iota(rand_seq.begin(), rand_seq.end(), 0);
     auto gen = std::default_random_engine{seg_idx};
     std::shuffle(rand_seq.begin(), rand_seq.end(), gen);
 
 #pragma omp parallel for
     for (size_t i = 0; i < nrow; i++) {
-      size_t base_idx      = i * node_degree + seg_idx * segment_size;
-      auto h_neighbor_list = h_graph + base_idx;
-      auto h_dist_list     = h_dists.data_handle() + base_idx;
+      size_t base_idx         = i * node_degree + seg_idx * segment_size;
+      auto h_neighbor_list    = h_graph + base_idx;
+      auto h_dist_list        = h_dists.data_handle() + base_idx;
+      size_t idx              = base_idx;
+      size_t self_in_this_seg = 0;
       for (size_t j = 0; j < static_cast<size_t>(segment_size); j++) {
-        size_t idx = base_idx + j;
         Index_t id = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
         if ((size_t)id == i) {
-          id = rand_seq[(idx + segment_size) % rand_seq.size()] * num_segments + seg_idx;
+          idx++;
+          id               = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
+          self_in_this_seg = 1;
         }
-        h_neighbor_list[j].id_with_flag() = id;
-        h_dist_list[j]                    = std::numeric_limits<DistData_t>::max();
+
+        h_neighbor_list[j].id_with_flag() =
+          j < (rand_seq.size() - self_in_this_seg) && size_t(id) < nrow
+            ? id
+            : std::numeric_limits<Index_t>::max();
+        h_dist_list[j] = std::numeric_limits<DistData_t>::max();
+        idx++;
       }
     }
   }
@@ -1265,7 +1275,9 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
   nrow_               = nrow;
   graph_.nrow         = nrow;
-  graph_.h_graph      = (InternalID_t<Index_t>*)output_graph;
+  graph_.bloom_filter.set_nrow(nrow);
+  update_counter_ = 0;
+  graph_.h_graph  = (InternalID_t<Index_t>*)output_graph;
 
   cudaPointerAttributes data_ptr_attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));

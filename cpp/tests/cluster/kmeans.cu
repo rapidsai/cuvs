@@ -28,6 +28,7 @@
 #include <rmm/device_uvector.hpp>
 
 #include <thrust/fill.h>
+#include <thrust/iterator/transform_iterator.h>
 
 #include <gtest/gtest.h>
 
@@ -201,9 +202,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //      params.batch_centroids,
   //      workspace);
   //    raft::cluster::kmeans::KeyValueIndexOp<int, T> conversion_op;
-  //    cub::TransformInputIterator<int,
-  //                                raft::cluster::kmeans::KeyValueIndexOp<int, T>,
-  //                                raft::KeyValuePair<int, T>*>
+  //    thrust::transform_iterator<raft::cluster::kmeans::KeyValueIndexOp<int, T>,
+  //                               raft::KeyValuePair<int, T>*>
   //      itr(minClusterAndDistance.data_handle(), conversion_op);
   //
   //    auto sampleCountInCluster = raft::make_device_vector<T, int>(handle, params.n_clusters);
