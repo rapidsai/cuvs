@@ -99,6 +99,9 @@ inline auto operator<<(std::ostream& os, const ivf_pq_inputs& p) -> std::ostream
   PRINT_DIFF_V(.search_params.lut_dtype, cuvs::neighbors::print_dtype{p.search_params.lut_dtype});
   PRINT_DIFF_V(.search_params.internal_distance_dtype,
                cuvs::neighbors::print_dtype{p.search_params.internal_distance_dtype});
+  PRINT_DIFF_V(.search_params.coarse_search_dtype,
+               cuvs::neighbors::print_dtype{p.search_params.coarse_search_dtype});
+  PRINT_DIFF(.search_params.max_internal_batch_size);
   os << "}";
   return os;
 }
@@ -853,7 +856,10 @@ inline auto enum_variety() -> test_cases_t
   });
   ADD_CASE({
     x.search_params.coarse_search_dtype = CUDA_R_8I;
-    x.min_recall                        = 0.86;
+    // 8-bit coarse search is experimental and there's no go guarantee of any recall
+    // if the data is not normalized. Especially for L2, because we store vector norms alongside the
+    // cluster centers.
+    x.min_recall = 0.2;
   });
 
   ADD_CASE({
