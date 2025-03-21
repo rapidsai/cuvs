@@ -29,6 +29,20 @@
 
 namespace cuvs::bench {
 
+nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
+                                        const std::string& prefix,
+                                        bool remove_prefix = true)
+{
+  nlohmann::json out;
+  for (auto& i : conf.items()) {
+    if (i.key().compare(0, prefix.size(), prefix) == 0) {
+      auto new_key = remove_prefix ? i.key().substr(prefix.size()) : i.key();
+      out[new_key] = i.value();
+    }
+  }
+  return out;
+}
+
 template <typename T>
 void parse_base_build_param(const nlohmann::json& conf,
                             typename cuvs::bench::faiss_gpu<T>::build_param& param)
@@ -104,6 +118,24 @@ void parse_build_param(const nlohmann::json& conf,
     param.nn_descent_niter = conf.at("nn_descent_niter");
   } else {
     param.nn_descent_niter = 20;
+  }
+  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "b_");
+  if (!ivf_pq_build_conf.empty()) {
+    faiss::gpu::IVFPQBuildCagraConfig ivf_pq_build_p;
+    ivf_pq_build_p.pq_dim = ivf_pq_build_conf.at("pq_dim");
+    ivf_pq_build_p.pq_bits = ivf_pq_build_conf.at("pq_bits");
+    ivf_pq_build_p.kmeans_trainset_fraction = 0.1;
+    ivf_pq_build_p.kmeans_n_iters = ivf_pq_build_conf.at("kmeans_n_iters");
+    ivf_pq_build_p.n_lists = ivf_pq_build_conf.at("n_lists");
+    param.ivf_pq_build_params = std::make_shared<faiss::gpu::IVFPQBuildCagraConfig>(ivf_pq_build_p);
+  }
+  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "s_");
+  if (!ivf_pq_search_conf.empty()) {
+    faiss::gpu::IVFPQSearchCagraConfig ivf_pq_search_p;
+    ivf_pq_search_p.lut_dtype = CUDA_R_8U;
+    ivf_pq_search_p.internal_distance_dtype = CUDA_R_32F;
+    ivf_pq_search_p.n_probes = ivf_pq_search_conf.at("n_probes");
+    param.ivf_pq_search_params = std::make_shared<faiss::gpu::IVFPQSearchCagraConfig>(ivf_pq_search_p);
   }
 }
 

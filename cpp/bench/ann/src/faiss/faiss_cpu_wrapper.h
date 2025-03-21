@@ -147,6 +147,7 @@ void faiss_cpu<T>::build(const T* dataset, size_t nrow)
     index_ivf->cp.max_points_per_centroid = max_ppc;
     index_ivf->cp.min_points_per_centroid = min_ppc;
   }
+  faiss::IndexHNSWFlat* hnsw_index = dynamic_cast<faiss::IndexHNSWFlat*>(index_.get());
   index_->train(nrow, dataset);  // faiss::IndexFlat::train() will do nothing
   assert(index_->is_trained);
   index_->add(nrow, dataset);
@@ -177,12 +178,8 @@ void faiss_cpu<T>::search(
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
 
-  thread_pool_->submit(
-    [&](int i) {
-      // Use thread pool for batch size = 1. FAISS multi-threads internally for batch size > 1.
-      index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
-    },
-    1);
+  // Use thread pool for batch size = 1. FAISS multi-threads internally for batch size > 1.
+  index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
 }
 
 template <typename T>
@@ -373,6 +370,7 @@ class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
   {
     static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                   "sizes of size_t and faiss::idx_t are different");
+
     this->index_->search(batch_size,
                          queries,
                          k,
