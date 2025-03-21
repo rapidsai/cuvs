@@ -1211,8 +1211,6 @@ void search(raft::resources const& res,
               cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
- * @defgroup cagra_cpp_index_search CAGRA search functions
- * @{
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
