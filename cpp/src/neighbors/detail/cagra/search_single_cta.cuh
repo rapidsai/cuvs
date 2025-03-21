@@ -232,30 +232,30 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
                   SAMPLE_FILTER_T sample_filter)
   {
     cudaStream_t stream = raft::resource::get_cuda_stream(res);
-    select_and_run(dataset_desc,
-                   graph,
-                   // NB: tag the indices pointer with its element size.
-                   //     This allows us to avoid multiplying kernel instantiations
-                   //     and any costs for extra registers in the kernel signature.
-                   reinterpret_cast<uintptr_t>(result_indices_ptr) |
-                     raft::Pow2<sizeof(result_indices_ptr)>::Log2,
-                   result_distances_ptr,
-                   queries_ptr,
-                   num_queries,
-                   dev_seed_ptr,
-                   num_executed_iterations,
-                   *this,
-                   topk,
-                   num_itopk_candidates,
-                   static_cast<uint32_t>(thread_block_size),
-                   smem_size,
-                   hash_bitlen,
-                   hashmap.data(),
-                   small_hash_bitlen,
-                   small_hash_reset_interval,
-                   num_seeds,
-                   sample_filter,
-                   stream);
+    select_and_run(
+      dataset_desc,
+      graph,
+      // NB: tag the indices pointer with its element size.
+      //     This allows us to avoid multiplying kernel instantiations
+      //     and any costs for extra registers in the kernel signature.
+      reinterpret_cast<uintptr_t>(result_indices_ptr) | raft::Pow2<sizeof(OutputIndexT)>::Log2,
+      result_distances_ptr,
+      queries_ptr,
+      num_queries,
+      dev_seed_ptr,
+      num_executed_iterations,
+      *this,
+      topk,
+      num_itopk_candidates,
+      static_cast<uint32_t>(thread_block_size),
+      smem_size,
+      hash_bitlen,
+      hashmap.data(),
+      small_hash_bitlen,
+      small_hash_reset_interval,
+      num_seeds,
+      sample_filter,
+      stream);
   }
 };
 

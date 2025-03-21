@@ -867,18 +867,18 @@ __device__ void search_core(
   // NB: tag the indices pointer with its element size.
   //     This allows us to avoid multiplying kernel instantiations
   //     and any costs for extra registers in the kernel signature.
-  const uint32_t index_element_size = 1u << (result_indices_ptr & 0x7);
+  const uint32_t index_element_tag = result_indices_ptr & 0x7;
   result_indices_ptr &= ~uintptr_t(0x7);
   auto write_indices =
-    index_element_size == 3
+    index_element_tag == 3
       ? [](uintptr_t ptr,
            uint32_t i,
            INDEX_T x) { reinterpret_cast<uint64_t*>(ptr)[i] = static_cast<uint64_t>(x); }
-    : index_element_size == 2
+    : index_element_tag == 2
       ? [](uintptr_t ptr,
            uint32_t i,
            INDEX_T x) { reinterpret_cast<uint32_t*>(ptr)[i] = static_cast<uint32_t>(x); }
-    : index_element_size == 1
+    : index_element_tag == 1
       ? [](uintptr_t ptr,
            uint32_t i,
            INDEX_T x) { reinterpret_cast<uint16_t*>(ptr)[i] = static_cast<uint16_t>(x); }
