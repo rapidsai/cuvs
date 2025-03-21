@@ -32,7 +32,7 @@ dtype_sizes = {
 
 def cuvs_cagra_build(params, dims):
     if "graph_degree" in params and "intermediate_graph_degree" in params:
-        return params["graph_degree"] <= params["intermediate_graph_degree"]
+        return 2*params["graph_degree"] == params["intermediate_graph_degree"]
     return True
 
 

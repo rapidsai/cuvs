@@ -411,7 +411,6 @@ struct batch_load_iterator {
       If there's no stream order guarantee, we must synchronize with the stream before the batch is
       destroyed to make sure all GPU operations in that stream finish earlier.
       */
-      RAFT_LOG_INFO("inside batch destructor");
       if (!does_copy()) { RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream_)); }
     }
 

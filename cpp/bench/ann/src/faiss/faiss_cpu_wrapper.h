@@ -20,6 +20,7 @@
 #include "../common/util.hpp"
 
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
 #include <faiss/IndexRefine.h>
@@ -88,11 +89,11 @@ class faiss_cpu : public algo<T> {
 
   // TODO(snanditale): if the number of results is less than k, the remaining elements of
   // 'neighbors' will be filled with (size_t)-1
-  void search(const T* queries,
-              int batch_size,
-              int k,
-              algo_base::index_type* neighbors,
-              float* distances) const final;
+  virtual void search(const T* queries,
+                      int batch_size,
+                      int k,
+                      algo_base::index_type* neighbors,
+                      float* distances) const;
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -146,6 +147,7 @@ void faiss_cpu<T>::build(const T* dataset, size_t nrow)
     index_ivf->cp.max_points_per_centroid = max_ppc;
     index_ivf->cp.min_points_per_centroid = min_ppc;
   }
+  faiss::IndexHNSWFlat* hnsw_index = dynamic_cast<faiss::IndexHNSWFlat*>(index_.get());
   index_->train(nrow, dataset);  // faiss::IndexFlat::train() will do nothing
   assert(index_->is_trained);
   index_->add(nrow, dataset);
@@ -176,12 +178,8 @@ void faiss_cpu<T>::search(
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
 
-  thread_pool_->submit(
-    [&](int i) {
-      // Use thread pool for batch size = 1. FAISS multi-threads internally for batch size > 1.
-      index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
-    },
-    1);
+  // Use thread pool for batch size = 1. FAISS multi-threads internally for batch size > 1.
+  index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
 }
 
 template <typename T>
@@ -325,6 +323,64 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   {
     return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
   }
+};
+
+template <typename T>
+class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
+ public:
+  struct build_param : public faiss_cpu<T>::build_param {
+    int M;
+    int efConstruction;
+  };
+  struct search_param : public faiss_cpu<T>::search_param {
+    faiss::SearchParametersHNSW p;
+  };
+  faiss_cpu_hnsw_flat(Metric metric, int dim, const build_param& param)
+    : faiss_cpu<T>(metric, dim, param)
+  {
+    this->index_ = std::make_shared<faiss::IndexHNSWFlat>(dim, param.M, this->metric_type_);
+    faiss::IndexHNSWFlat* hnsw_index = static_cast<faiss::IndexHNSWFlat*>(this->index_.get());
+    hnsw_index->hnsw.efConstruction  = param.efConstruction;
+  }
+
+  void set_search_param(const typename algo<T>::search_param& param,
+                        const void* filter_bitset) override
+  {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+    auto sp              = static_cast<const typename faiss_cpu_hnsw_flat<T>::search_param&>(param);
+    this->search_params_ = std::make_shared<faiss::SearchParametersHNSW>(sp.p);
+  };
+
+  void save(const std::string& file) const override
+  {
+    this->template save_<faiss::IndexHNSWFlat>(file);
+  }
+  void load(const std::string& file) override { this->template load_<faiss::IndexHNSWFlat>(file); }
+
+  std::unique_ptr<algo<T>> copy()
+  {
+    return std::make_unique<faiss_cpu_hnsw_flat<T>>(*this);  // use copy constructor
+  }
+
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override
+  {
+    static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
+                  "sizes of size_t and faiss::idx_t are different");
+
+    this->index_->search(batch_size,
+                         queries,
+                         k,
+                         distances,
+                         reinterpret_cast<faiss::idx_t*>(neighbors),
+                         search_params_.get());
+  }
+
+ private:
+  std::shared_ptr<faiss::SearchParameters> search_params_;
 };
 
 }  // namespace cuvs::bench

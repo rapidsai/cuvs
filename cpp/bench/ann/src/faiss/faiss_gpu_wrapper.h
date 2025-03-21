@@ -109,7 +109,7 @@ class faiss_gpu : public algo<T>, public algo_gpu {
     cudaGetDevice(&device_);
   }
 
-  void build(const T* dataset, size_t nrow) final;
+  virtual void build(const T* dataset, size_t nrow);
 
   virtual void set_search_param(const search_param_base& param, const void* filter_bitset) {}
 
@@ -117,11 +117,11 @@ class faiss_gpu : public algo<T>, public algo_gpu {
 
   // TODO(snanditale): if the number of results is less than k, the remaining elements of
   // 'neighbors' will be filled with (size_t)-1
-  void search(const T* queries,
+  virtual void search(const T* queries,
               int batch_size,
               int k,
               algo_base::index_type* neighbors,
-              float* distances) const final;
+              float* distances) const;
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
@@ -290,7 +290,11 @@ void faiss_gpu<T>::save_(const std::string& file) const
   omp_single_thread_scope omp_single_thread;
 
   auto cpu_index = std::make_unique<CpuIndex>();
-  dynamic_cast<GpuIndex*>(index_.get())->copyTo(cpu_index.get());
+  auto hnsw_index = dynamic_cast<faiss::IndexHNSWCagra*>(cpu_index.get());
+  if (hnsw_index) {
+    hnsw_index->base_level_only = true;
+  }
+  static_cast<GpuIndex*>(index_.get())->copyTo(cpu_index.get());
   faiss::write_index(cpu_index.get(), file.c_str());
 }
 
@@ -528,6 +532,10 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     std::string cagra_build_algo;
     /// Number of Iterations to run if building with NN_DESCENT
     size_t nn_descent_niter;
+
+    std::shared_ptr<faiss::gpu::IVFPQBuildCagraConfig> ivf_pq_build_params = nullptr;
+
+    std::shared_ptr<faiss::gpu::IVFPQSearchCagraConfig> ivf_pq_search_params = nullptr;
   };
   using typename faiss_gpu<T>::search_param_base;
   struct search_param : public faiss_gpu<T>::search_param {
@@ -541,8 +549,14 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     config.graph_degree              = param.graph_degree;
     config.intermediate_graph_degree = param.intermediate_graph_degree;
     config.device                    = this->device_;
+    config.store_dataset = false;
     if (param.cagra_build_algo == "IVF_PQ") {
       config.build_algo = faiss::gpu::graph_build_algo::IVF_PQ;
+      this->ivf_pq_build_params_ = param.ivf_pq_build_params;
+      config.ivf_pq_params = this->ivf_pq_build_params_;
+      this->ivf_pq_search_params_ = param.ivf_pq_search_params;
+      config.ivf_pq_search_params = this->ivf_pq_search_params_;
+      config.refine_rate = 1.0;
     } else {
       config.build_algo = faiss::gpu::graph_build_algo::NN_DESCENT;
     }
@@ -568,6 +582,76 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
   }
   std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
+
+  std::shared_ptr<faiss::gpu::GpuIndex> faiss_index() {
+    return this->index_;
+  }
+
+  private:
+    std::shared_ptr<faiss::gpu::IVFPQBuildCagraConfig> ivf_pq_build_params_;
+    std::shared_ptr<faiss::gpu::IVFPQSearchCagraConfig> ivf_pq_search_params_;
+};
+
+template <typename T>
+class faiss_gpu_cagra_hnsw : public faiss_gpu<T>{
+ public:
+  struct build_param : public faiss_gpu<T>::build_param {
+    typename faiss_gpu_cagra<T>::build_param p;
+    bool base_level_only = true;
+  };
+  using typename faiss_gpu<T>::search_param_base;
+  struct search_param : public faiss_gpu<T>::search_param {
+    faiss::SearchParametersHNSW p;
+  };
+
+  faiss_gpu_cagra_hnsw(Metric metric, int dim, const build_param& param)
+    : faiss_gpu<T>(metric, dim, param)
+  {
+    this->build_index_ = std::make_shared<faiss_gpu_cagra<T>>(metric, dim, param.p);
+    this->search_index_ = std::make_shared<faiss::IndexHNSWCagra>(dim, int(param.p.graph_degree / 2), this->metric_type_);
+    this->search_index_->base_level_only = param.base_level_only;
+  }
+
+  void build(const T* dataset, size_t nrow) override {
+    this->build_index_->build(dataset, nrow);
+    static_cast<faiss::gpu::GpuIndexCagra*>((build_index_->faiss_index()).get())->copyTo(search_index_.get());
+  }
+
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
+  {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+    auto sp              = static_cast<const typename faiss_gpu_cagra_hnsw<T>::search_param&>(param);
+    this->search_params_ = std::make_shared<faiss::SearchParametersHNSW>(sp.p);
+  }
+
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override {
+                search_index_->search(batch_size,
+                   queries,
+                   k,
+                   distances,
+                   reinterpret_cast<faiss::idx_t*>(neighbors),
+                   this->search_params_.get());
+              }
+
+  void save(const std::string& file) const override
+  {
+    faiss::write_index(search_index_.get(), file.c_str());
+  }
+  void load(const std::string& file) override
+  {
+    omp_single_thread_scope omp_single_thread;
+    this->search_index_.reset(static_cast<faiss::IndexHNSWCagra*>(faiss::read_index(file.c_str())));
+    this->search_index_->num_base_level_search_entrypoints = 64;
+  }
+  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra_hnsw<T>>(*this); };
+
+  private:
+    std::shared_ptr<faiss_gpu_cagra<T>> build_index_;
+    std::shared_ptr<faiss::IndexHNSWCagra> search_index_;
 };
 
 }  // namespace cuvs::bench
