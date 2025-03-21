@@ -35,7 +35,7 @@
 namespace {
 
 template <typename T>
-void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor, std::optional<cuvsIvfPqIndexParams> ivf_pq_build_params, std::optional<cuvsIvfPqSearchParams> ivf_pq_search_params)
+void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto dataset = dataset_tensor->dl_tensor;
 
@@ -53,6 +53,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
       auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
       auto pq_params =
         cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
+      auto ivf_pq_build_params = params.graph_build_params->ivf_pq_build_params;
+      auto ivf_pq_search_params = params.graph_build_params->ivf_pq_search_params;
       if (ivf_pq_build_params) {
         pq_params.build_params.add_data_on_build = ivf_pq_build_params->add_data_on_build;
         pq_params.build_params.n_lists = ivf_pq_build_params->n_lists;
@@ -278,39 +280,13 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
     auto dataset = dataset_tensor->dl_tensor;
     index->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor, std::nullopt, std::nullopt));
+      index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor, std::nullopt, std::nullopt));
+      index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor, std::nullopt, std::nullopt));
+      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor, std::nullopt, std::nullopt));
-    } else {
-      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
-                dataset.dtype.code,
-                dataset.dtype.bits);
-    }
-  });
-}
-
-extern "C" cuvsError_t cuvsCagraBuildWithIVFPQ(cuvsResources_t res,
-                                               cuvsCagraIndexParams_t params,
-                                               DLManagedTensor* dataset_tensor,
-                                               cuvsCagraIndex_t index,
-                                               cuvsIvfPqIndexParams_t ivf_pq_build_params,
-                                               cuvsIvfPqSearchParams_t ivf_pq_search_params)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto dataset = dataset_tensor->dl_tensor;
-    index->dtype = dataset.dtype;
-    if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, *params, dataset_tensor, *ivf_pq_build_params, *ivf_pq_search_params));
-    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<half>(res, *params, dataset_tensor, *ivf_pq_build_params, *ivf_pq_search_params));
-    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor, *ivf_pq_build_params, *ivf_pq_search_params));
-    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor, *ivf_pq_build_params, *ivf_pq_search_params));
+      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
@@ -399,12 +375,13 @@ extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params
                                        .graph_degree              = 64,
                                        .build_algo                = IVF_PQ,
                                        .nn_descent_niter          = 20};
+    (*params)->graph_build_params = new cuvsIvfPqParams{nullptr, nullptr};
   });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
 {
-  return cuvs::core::translate_exceptions([=] { delete params; });
+  return cuvs::core::translate_exceptions([=] { delete params->graph_build_params; delete params; });
 }
 
 extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params)

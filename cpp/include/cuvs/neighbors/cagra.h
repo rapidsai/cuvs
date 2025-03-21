@@ -87,6 +87,13 @@ struct cuvsCagraCompressionParams {
 
 typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
 
+struct cuvsIvfPqParams {
+  cuvsIvfPqIndexParams_t ivf_pq_build_params;
+  cuvsIvfPqSearchParams_t ivf_pq_search_params;
+};
+
+typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
+
 /**
  * @brief Supplemental parameters to build CAGRA Index
  *
@@ -108,6 +115,10 @@ struct cuvsCagraIndexParams {
    * NOTE: this is experimental new API, consider it unsafe.
    */
   cuvsCagraCompressionParams_t compression;
+  /**
+   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   */
+  cuvsIvfPqParams_t graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -379,12 +390,6 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                            DLManagedTensor* dataset,
                            cuvsCagraIndex_t index);
 
-cuvsError_t cuvsCagraBuildWithIVFPQ(cuvsResources_t res,
-                                    cuvsCagraIndexParams_t params,
-                                    DLManagedTensor* dataset,
-                                    cuvsCagraIndex_t index,
-                                    cuvsIvfPqIndexParams_t ivf_pq_build_params,
-                                    cuvsIvfPqSearchParams_t ivf_pq_search_params);
 /**
  * @}
  */
