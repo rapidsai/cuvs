@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,16 +31,27 @@
 #include <optional>
 #include <variant>
 
-namespace cuvs::neighbors::experimental::vamana {
+namespace cuvs::neighbors::vamana {
+
 /**
  * @defgroup vamana_cpp_index_params Vamana index build parameters
  * @{
  */
 
 /**
- * @brief ANN parameters used by VAMANA to build index
+ * @brief Parameters used to build DiskANN index
  *
+ * `graph_degree`: Maximum degree of graph; correspods to the R parameter of
+ * Vamana algorithm in the literature.
+ * `visited_size`: Maximum number of visited nodes per search during Vamana algorithm.
+ * Loosely corresponds to the L parameter in the literature.
+ * `vamana_iters`: The number of times all vectors are inserted into the graph. If > 1,
+ * all vectors are re-inserted to improve graph quality.
+ * `max_fraction`: The maximum batch size is this fraction of the total dataset size. Larger
+ * gives faster build but lower graph quality.
+ * `alpha`: Used to determine how aggressive the pruning will be.
  */
+
 struct index_params : cuvs::neighbors::index_params {
   /** Maximum degree of output graph corresponds to the R parameter in the original Vamana
    * literature. */
@@ -55,10 +66,12 @@ struct index_params : cuvs::neighbors::index_params {
   /** Maximum fraction of dataset inserted per batch.              *
    * Larger max batch decreases graph quality, but improves speed */
   float max_fraction = 0.06;
-  /** Base of growth rate of batch sies **/
+  /** Base of growth rate of batch sizes **/
   float batch_base = 2;
   /** Size of candidate queue structure - should be (2^x)-1 */
   uint32_t queue_size = 127;
+  /** Max batchsize of reverse edge processing (reduces memory footprint) */
+  uint32_t reverse_batchsize = 1000000;
 };
 
 /**
@@ -215,61 +228,301 @@ struct index : cuvs::neighbors::index {
  * @{
  */
 /**
- * @brief Build the index from the dataset for efficient search.
+ * @brief Build the index from the dataset for efficient DiskANN search.
  *
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
+ * performing a greedy search for each vector to be inserted, and inserting it with edges to
+ * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
+ * to improve graph quality. The index_params struct controls the degree of the final graph.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters;
+ *   vamana::index_params index_params;
+ *   // create and fill index from a [N, D] dataset;
+ *   auto index = vamana::build(res, index_params, dataset);
+ *   // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+ * search) vamana::serialize(res, filename, index);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed vamana index
  */
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<float, uint32_t>;
+  -> cuvs::neighbors::vamana::index<float, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+/**
+ * @brief Build the index from the dataset for efficient DiskANN search.
+ *
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
+ * performing a greedy search for each vector to be inserted, and inserting it with edges to
+ * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
+ * to improve graph quality. The index_params struct controls the degree of the final graph.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters;
+ *   vamana::index_params index_params;
+ *   // create and fill index from a [N, D] dataset;
+ *   auto index = vamana::build(res, index_params, dataset);
+ *   // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+ * search) vamana::serialize(res, filename, index);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed vamana index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<float, uint32_t>;
+  -> cuvs::neighbors::vamana::index<float, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+/**
+ * @brief Build the index from the dataset for efficient DiskANN search.
+ *
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
+ * performing a greedy search for each vector to be inserted, and inserting it with edges to
+ * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
+ * to improve graph quality. The index_params struct controls the degree of the final graph.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters;
+ *   vamana::index_params index_params;
+ *   // create and fill index from a [N, D] dataset;
+ *   auto index = vamana::build(res, index_params, dataset);
+ *   // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+ * search) vamana::serialize(res, filename, index);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed vamana index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<int8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+/**
+ * @brief Build the index from the dataset for efficient DiskANN search.
+ *
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
+ * performing a greedy search for each vector to be inserted, and inserting it with edges to
+ * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
+ * to improve graph quality. The index_params struct controls the degree of the final graph.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters;
+ *   vamana::index_params index_params;
+ *   // create and fill index from a [N, D] dataset;
+ *   auto index = vamana::build(res, index_params, dataset);
+ *   // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+ * search) vamana::serialize(res, filename, index);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed vamana index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<int8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+/**
+ * @brief Build the index from the dataset for efficient DiskANN search.
+ *
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
+ * performing a greedy search for each vector to be inserted, and inserting it with edges to
+ * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
+ * to improve graph quality. The index_params struct controls the degree of the final graph.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters;
+ *   vamana::index_params index_params;
+ *   // create and fill index from a [N, D] dataset;
+ *   auto index = vamana::build(res, index_params, dataset);
+ *   // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+ * search) vamana::serialize(res, filename, index);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed vamana index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::vamana::index_params& params,
+/**
+ * @brief Build the index from the dataset for efficient DiskANN search.
+ *
+ * The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
+ * starts with an empty graph and iteratively iserts batches of nodes. Each batch involves
+ * performing a greedy search for each vector to be inserted, and inserting it with edges to
+ * all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
+ * to improve graph quality. The index_params struct controls the degree of the final graph.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters;
+ *   vamana::index_params index_params;
+ *   // create and fill index from a [N, D] dataset;
+ *   auto index = vamana::build(res, index_params, dataset);
+ *   // write index to file to be used by CPU-based DiskANN search (cuVS does not yet support
+ * search) vamana::serialize(res, filename, index);
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed vamana index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::vamana::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>;
+  -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 
 /**
  * @defgroup vamana_cpp_serialize Vamana serialize functions
  * @{
  */
+
 /**
  * Save the index to file.
+ *
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/neighbors/vamana.hpp>
+ *
+ *   raft::resources handle;
+ *
+ *   // create a string with a filepath
+ *   std::string file_prefix("/path/to/index/prefix");
+ *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+ *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] file_prefix prefix of path and name of index files
+ * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
+ *
  */
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<float, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<float, uint32_t>& index,
+               bool include_dataset = true);
 
+/**
+ * Save the index to file.
+ *
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/neighbors/vamana.hpp>
+ *
+ *   raft::resources handle;
+ *
+ *   // create a string with a filepath
+ *   std::string file_prefix("/path/to/index/prefix");
+ *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+ *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] file_prefix prefix of path and name of index files
+ * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
+ *
+ */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<int8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
+               bool include_dataset = true);
 
+/**
+ * Save the index to file.
+ *
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/neighbors/vamana.hpp>
+ *
+ *   raft::resources handle;
+ *
+ *   // create a string with a filepath
+ *   std::string file_prefix("/path/to/index/prefix");
+ *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+ *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] file_prefix prefix of path and name of index files
+ * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
+ *
+ */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::experimental::vamana::index<uint8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
+               bool include_dataset = true);
 
 /**
  * @}
  */
 
-}  // namespace cuvs::neighbors::experimental::vamana
+}  // namespace cuvs::neighbors::vamana

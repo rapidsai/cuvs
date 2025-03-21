@@ -1,21 +1,20 @@
 #!/bin/bash
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION.
 
 set -euo pipefail
 
 package_dir="python/cuvs"
 
-case "${RAPIDS_CUDA_VERSION}" in
-  12.*)
-    EXTRA_CMAKE_ARGS=";-DUSE_CUDA_MATH_WHEELS=ON"
-  ;;
-  11.*)
-    EXTRA_CMAKE_ARGS=";-DUSE_CUDA_MATH_WHEELS=OFF"
-  ;;
-esac
+RAPIDS_PY_CUDA_SUFFIX="$(rapids-wheel-ctk-name-gen "${RAPIDS_CUDA_VERSION}")"
 
-# Set up skbuild options. Enable sccache in skbuild config options
-export SKBUILD_CMAKE_ARGS="-DDETECT_CONDA_ENV=OFF;-DFIND_CUVS_CPP=OFF${EXTRA_CMAKE_ARGS}"
+# Downloads libcuvs wheels from this current build,
+# then ensures 'cuvs' wheel builds always use the 'libcuvs' just built in the same CI run.
+#
+# Using env variable PIP_CONSTRAINT is necessary to ensure the constraints
+# are used when creating the isolated build environment.
+RAPIDS_PY_WHEEL_NAME="libcuvs_${RAPIDS_PY_CUDA_SUFFIX}" rapids-download-wheels-from-s3 cpp /tmp/libcuvs_dist
+echo "libcuvs-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo /tmp/libcuvs_dist/libcuvs_*.whl)" > /tmp/constraints.txt
+export PIP_CONSTRAINT="/tmp/constraints.txt"
 
-ci/build_wheel.sh cuvs ${package_dir}
+ci/build_wheel.sh cuvs ${package_dir} python
 ci/validate_wheel.sh ${package_dir} final_dist

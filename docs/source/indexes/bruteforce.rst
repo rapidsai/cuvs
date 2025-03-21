@@ -12,7 +12,7 @@ Brute-force can also be a good choice for heavily filtered queries where other a
 when filtering out 90%-95% of the vectors from a search, the IVF methods could struggle to return anything at all with smaller number of probes and
 graph-based algorithms with limited hash table memory could end up skipping over important unfiltered entries.
 
-[ :doc:`C API <../c_api/neighbors_bruteforce_c>` | :doc:`C++ API <../cpp_api/neighbors_bruteforce>` | :doc:`Python API <../python_api/neighbors_bruteforce>` | :doc:`Rust API <../rust_api/index>` ]
+[ :doc:`C API <../c_api/neighbors_bruteforce_c>` | :doc:`C++ API <../cpp_api/neighbors_bruteforce>` | :doc:`Python API <../python_api/neighbors_brute_force>` | :doc:`Rust API <../rust_api/index>` ]
 
 Filtering considerations
 ------------------------
@@ -57,6 +57,6 @@ Memory footprint
 Index footprint
 ~~~~~~~~~~~~~~~
 
-Raw vectors: :math:`n_vectors * n_dimensions * precision`
+Raw vectors: :math:`n\_vectors * n\_dimensions * precision`
 
-Vector norms (for distances which require them): :math:`n_vectors * precision`
+Vector norms (for distances which require them): :math:`n\_vectors * precision`

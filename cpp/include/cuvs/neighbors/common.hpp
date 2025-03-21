@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdspan.hpp>
@@ -456,8 +457,16 @@ inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
 
 namespace filtering {
 
+/**
+ * @defgroup neighbors_filtering Filtering for ANN Types
+ * @{
+ */
+
+enum class FilterType { None, Bitmap, Bitset };
+
 struct base_filter {
-  virtual ~base_filter() = default;
+  virtual ~base_filter()                     = default;
+  virtual FilterType get_filter_type() const = 0;
 };
 
 /* A filter that filters nothing. This is the default behavior. */
@@ -475,6 +484,8 @@ struct none_sample_filter : public base_filter {
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return FilterType::None; }
 };
 
 /**
@@ -513,15 +524,24 @@ struct ivf_to_sample_filter {
  */
 template <typename bitmap_t, typename index_t>
 struct bitmap_filter : public base_filter {
-  // View of the bitset to use as a filter
-  const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_view_;
+  using view_t = cuvs::core::bitmap_view<bitmap_t, index_t>;
 
-  bitmap_filter(const cuvs::core::bitmap_view<bitmap_t, index_t> bitmap_for_filtering);
+  // View of the bitset to use as a filter
+  const view_t bitmap_view_;
+
+  bitmap_filter(const view_t bitmap_for_filtering);
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return FilterType::Bitmap; }
+
+  view_t view() const { return bitmap_view_; }
+
+  template <typename csr_matrix_t>
+  void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
 
 /**
@@ -532,16 +552,27 @@ struct bitmap_filter : public base_filter {
  */
 template <typename bitset_t, typename index_t>
 struct bitset_filter : public base_filter {
-  // View of the bitset to use as a filter
-  const cuvs::core::bitset_view<bitset_t, index_t> bitset_view_;
+  using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
 
-  bitset_filter(const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering);
+  // View of the bitset to use as a filter
+  const view_t bitset_view_;
+
+  bitset_filter(const view_t bitset_for_filtering);
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return FilterType::Bitset; }
+
+  view_t view() const { return bitset_view_; }
+
+  template <typename csr_matrix_t>
+  void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
+
+/** @} */  // end group neighbors_filtering
 
 /**
  * If the filtering depends on the index of a sample, then the following

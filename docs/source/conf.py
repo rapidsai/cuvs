@@ -198,7 +198,7 @@ def setup(app):
 linkcode_resolve = make_linkcode_resolve(
     "cuvs",
     "https://github.com/rapidsai/cuvs/"
-    "blob/{revision}/python/cuvs/cuvs/"
+    "blob/{revision}/python/cuvs/"
     "{package}/{path}#L{lineno}",
 )
 

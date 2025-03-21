@@ -42,18 +42,23 @@ enum cuvsHnswHierarchy {
   /* Flat hierarchy, search is base-layer only */
   NONE,
   /* Full hierarchy is built using the CPU */
-  CPU
+  CPU,
+  /* Full hierarchy is built using the GPU */
+  GPU
 };
 
 struct cuvsHnswIndexParams {
   /* hierarchy of the hnsw index */
-  cuvsHnswHierarchy hierarchy;
+  enum cuvsHnswHierarchy hierarchy;
   /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
   int ef_construction;
-  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU`
-  NOTE: Constructing the hierarchy when converting from a CAGRA graph is highly sensitive
-  to parallelism, and increasing the number of threads can reduce the quality of the index.
-   */
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` or `GPU`.
+      When the value is 0, the number of threads is automatically determined to the
+      maximum number of threads available.
+      NOTE: When hierarchy is `GPU`, while the majority of the work is done on the GPU,
+      initialization of the HNSW index itself and some other work
+      is parallelized with the help of CPU threads.
+  */
   int num_threads;
 };
 
@@ -158,8 +163,8 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
  * NOTE: When hierarchy is:
  *       1. `NONE`: This method uses the filesystem to write the CAGRA index in
  * `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary
- * file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as
- * the format is not compatible with the original hnswlib.
+ * file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS,
+ * as the format is not compatible with the original hnswlib.
  *       2. `CPU`: The returned index is mutable and can be extended with additional vectors. The
  * serialized index is also compatible with the original hnswlib library.
  *
@@ -364,10 +369,10 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
 
 /**
  * @brief Serialize a CAGRA index to a file as an hnswlib index
- * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
- * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
- * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
- * library.
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by
+ * the hnswlib wrapper in cuVS, as the serialization format is not compatible with the original
+ * hnswlib. However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the
+ * original hnswlib library.
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file to save the index
@@ -406,8 +411,8 @@ cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHns
 /**
  * Load hnswlib index from file which was serialized from a HNSW index.
  * NOTE: When hierarchy is `NONE`, the loaded hnswlib index is immutable, and only be read by the
- * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
- * Experimental, both the API and the serialization format are subject to change.
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original
+ * hnswlib. Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}
  * #include <cuvs/core/c_api.h>

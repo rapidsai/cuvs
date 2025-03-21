@@ -28,14 +28,14 @@ namespace cuvs::distance::detail::ops {
  * for round-off error tolerance.
  * @tparam DataT
  */
-template <typename DataT>
-__device__ constexpr DataT get_clamp_precision()
+template <typename DataT, typename AccT>
+__device__ constexpr AccT get_clamp_precision()
 {
   switch (sizeof(DataT)) {
-    case 2: return 1e-3;
-    case 4: return 1e-6;
-    case 8: return 1e-15;
-    default: return 0;
+    case 2: return AccT{1e-3};
+    case 4: return AccT{1e-6};
+    case 8: return AccT{1e-15};
+    default: return AccT{0};
   }
 }
 
@@ -46,19 +46,27 @@ struct l2_exp_cutlass_op {
 
   __device__ l2_exp_cutlass_op() noexcept : sqrt(false) {}
   __device__ l2_exp_cutlass_op(bool isSqrt) noexcept : sqrt(isSqrt) {}
-  inline __device__ AccT operator()(DataT aNorm, DataT bNorm, DataT accVal) const noexcept
+  inline __device__ AccT operator()(AccT aNorm, AccT bNorm, AccT accVal) const noexcept
   {
-    AccT outVal = aNorm + bNorm - DataT(2.0) * accVal;
+    AccT outVal = aNorm + bNorm - AccT(2.0) * accVal;
 
     /**
      * Self-neighboring points should have (aNorm == bNorm) == accVal and the dot product (accVal)
      * can sometimes have round-off errors, which will cause (aNorm == bNorm) ~ accVal instead.
      */
-    outVal = outVal * AccT(!((outVal * outVal < get_clamp_precision<AccT>()) * (aNorm == bNorm)));
+    outVal =
+      outVal * AccT(!((outVal * outVal < get_clamp_precision<DataT, AccT>()) * (aNorm == bNorm)));
     return sqrt ? raft::sqrt(outVal * static_cast<AccT>(outVal > AccT(0))) : outVal;
   }
 
-  __device__ AccT operator()(DataT aData) const noexcept { return aData; }
+  __device__ AccT operator()(DataT aData) const noexcept
+  {
+    if constexpr (std::is_same_v<DataT, half> && std::is_same_v<AccT, float>) {
+      return __half2float(aData);
+    } else {
+      return aData;
+    }
+  }
 };
 
 /**
@@ -121,9 +129,9 @@ struct l2_exp_distance_op {
          * (accVal) can sometimes have round-off errors, which will cause (aNorm == bNorm) ~ accVal
          * instead.
          */
-        acc[i][j] =
-          val * static_cast<AccT>((val > AccT(0))) *
-          static_cast<AccT>(!((val * val < get_clamp_precision<AccT>()) * (regxn[i] == regyn[j])));
+        acc[i][j] = val * static_cast<AccT>((val > AccT(0))) *
+                    static_cast<AccT>(
+                      !((val * val < get_clamp_precision<DataT, AccT>()) * (regxn[i] == regyn[j])));
       }
     }
     if (sqrt) {

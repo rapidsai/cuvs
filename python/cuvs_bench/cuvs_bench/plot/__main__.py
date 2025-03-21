@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 # 1: https://github.com/erikbern/ann-benchmarks/blob/main/plot.py
 # 2: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/utils.py  # noqa: E501
 # 3: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/metrics.py  # noqa: E501
-# License: https://github.com/rapidsai/cuvs/blob/branch-24.10/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
+# License: https://github.com/rapidsai/cuvs/blob/branch-25.04/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
 
 import itertools
 import os
@@ -497,8 +497,9 @@ def load_all_results(
 )
 @click.option(
     "--mode",
+    "-m",
     type=click.Choice(["throughput", "latency"], case_sensitive=False),
-    default="throughput",
+    default="latency",
     help="Search mode whose Pareto frontier is used on the Y-axis.",
 )
 @click.option(

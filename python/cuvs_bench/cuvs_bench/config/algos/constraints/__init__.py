@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,9 +72,7 @@ def faiss_gpu_ivf_pq_build(params, dims):
     ret = params["M"] <= dims and dims % params["M"] == 0
     if "use_cuvs" in params and params["use_cuvs"]:
         return ret
-    pq_bits = 8
-    if "bitsPerCode" in params:
-        pq_bits = params["bitsPerCode"]
+    pq_bits = params.get("bitsPerCode", 8)
     lookup_table_size = 4
     if "useFloat16" in params and params["useFloat16"]:
         lookup_table_size = 2
@@ -99,3 +97,24 @@ def faiss_gpu_ivf_pq_search(params, build_params, k, batch_size):
 def hnswlib_search(params, build_params, k, batch_size):
     if "ef" in params:
         return params["ef"] >= k
+
+
+###############################################################################
+#                              DiskANN constraints                            #
+###############################################################################
+
+
+def diskann_memory_build(params, dim):
+    ret = True
+    if "R" in params and "L_build" in params:
+        ret = params["R"] <= params["L_build"]
+    return ret
+
+
+def diskann_ssd_build(params, dim):
+    ret = True
+    if "R" in params and "L_build" in params:
+        ret = params["R"] <= params["L_build"]
+    if "QD" in params:
+        ret = params["QD"] <= dim
+    return ret

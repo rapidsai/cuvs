@@ -16,8 +16,8 @@
 
 #include "vamana_serialize.cuh"
 
-namespace cuvs::neighbors::experimental::vamana {
+namespace cuvs::neighbors::vamana {
 
 CUVS_INST_VAMANA_SERIALIZE(float);
 
-}  // namespace cuvs::neighbors::experimental::vamana
+}  // namespace cuvs::neighbors::vamana

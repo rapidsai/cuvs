@@ -10,6 +10,9 @@ faiss_gpu_ivf_pq:
 faiss_gpu_ivf_sq:
   executable: FAISS_GPU_IVF_PQ_ANN_BENCH
   requires_gpu: true
+faiss_gpu_cagra:
+  executable: FAISS_GPU_CAGRA_ANN_BENCH
+  requires_gpu: true
 faiss_cpu_flat:
   executable: FAISS_CPU_FLAT_ANN_BENCH
   requires_gpu: false
@@ -48,4 +51,13 @@ hnswlib:
   requires_gpu: false
 cuvs_cagra_hnswlib:
   executable: CUVS_CAGRA_HNSWLIB_ANN_BENCH
+  requires_gpu: true
+diskann_memory:
+  executable: DISKANN_MEMORY_ANN_BENCH
+  requires_gpu: false
+diskann_ssd:
+  executable: DISKANN_SSD_ANN_BENCH
+  requires_gpu: false
+cuvs_vamana:
+  executable: CUVS_VAMANA_ANN_BENCH
   requires_gpu: true

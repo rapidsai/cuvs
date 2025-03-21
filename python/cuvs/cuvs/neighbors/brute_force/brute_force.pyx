@@ -75,7 +75,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     Parameters
     ----------
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16]
     metric : Distance metric to use. Default is sqeuclidean
     metric_arg : value of 'p' for Minkowski distances
     {resources_docstring}
@@ -102,7 +102,9 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32')], exp_row_major=False)
+    _check_input_array(dataset_ai,
+                       [np.dtype('float32'), np.dtype('float16')],
+                       exp_row_major=False)
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
@@ -141,7 +143,7 @@ def search(Index index,
     index : Index
         Trained Brute Force index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16]
     k : int
         The number of neighbors.
     neighbors : Optional CUDA array interface compliant matrix shape
@@ -150,12 +152,15 @@ def search(Index index,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
-    prefilter : Optional cuvs.neighbors.cuvsFilter can be used to filter
-                queries and neighbors based on a given bitmap. The filter
-                function should have a row-major layout and logical shape
-                [n_queries, n_samples], using the first n_samples bits to
-                indicate whether queries[0] should compute the distance with
-                index.
+    prefilter : Optional, cuvs.neighbors.cuvsFilter
+                An optional filter to exclude certain query-neighbor
+                pairs using a bitmap or bitset. The filter function should
+                have a row-major layout with logical shape
+                `(n_prefilter_rows, n_samples)`, where:
+                - `n_prefilter_rows == n_queries` when using a bitmap filter.
+                - `n_prefilter_rows == 1` when using a bitset prefilter.
+                Each bit in `n_samples` determines whether `queries[i]`
+                should be considered for distance computation with the index.
         (default None)
     {resources_docstring}
 
@@ -201,14 +206,21 @@ def search(Index index,
     >>> # Build filters
     >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
     >>> # Create your own bitmap as the filter by replacing the random one.
-    >>> bitmap = cp.random.randint(1, 1000, size=(n_bitmap,), dtype=cp.uint32)
-    >>> prefilter = filters.from_bitmap(bitmap)
+    >>> bitmap = cp.random.randint(1, 100, size=(n_bitmap,), dtype=cp.uint32)
+    >>> bitmap_prefilter = filters.from_bitmap(bitmap)
+    >>>
+    >>> # or Build bitset prefilter:
+    >>> # n_bitset = np.ceil(n_samples * 1 / 32).astype(int)
+    >>> # # Create your own bitset as the filter by replacing the random one.
+    >>> # bitset = cp.random.randint(1, 100, size=(n_bitset,), dtype=cp.uint32)
+    >>> # bitset_prefilter = filters.from_bitset(bitset)
+    >>>
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
     >>> distances, neighbors = brute_force.search(index, queries, k,
-    ...                                           prefilter=prefilter)
+    ...                                           prefilter=bitmap_prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
@@ -218,7 +230,9 @@ def search(Index index,
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32')], exp_row_major=False)
+    _check_input_array(queries_cai,
+                       [np.dtype('float32'), np.dtype('float16')],
+                       exp_row_major=False)
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 

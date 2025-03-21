@@ -20,9 +20,5 @@ set(linked_libraries cuvs::cuvs cuvs::c_api)
 rapids_cython_create_modules(
   CXX
   SOURCE_FILES "${cython_sources}"
-  LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX neighbors_hnsw_
+  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_hnsw_
 )
-
-foreach(tgt IN LISTS RAPIDS_CYTHON_CREATED_TARGETS)
-  target_link_libraries(${tgt} PRIVATE cuvs_rmm_logger)
-endforeach()

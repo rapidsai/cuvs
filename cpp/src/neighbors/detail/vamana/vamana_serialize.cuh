@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@
 #include <fstream>
 #include <type_traits>
 
-namespace cuvs::neighbors::experimental::vamana::detail {
+namespace cuvs::neighbors::vamana::detail {
 
 /**
  * Save the index to file.
@@ -44,13 +44,15 @@ namespace cuvs::neighbors::experimental::vamana::detail {
  * @param[in] res the raft resource handle
  * @param[in] file_name the path and name of the DiskAN index file generated
  * @param[in] index_ VAMANA index
+ * @param[in] include_dataset whether to include the dataset in the serialized output
  *
  */
 
 template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& file_name,
-               const index<T, IdxT>& index_)
+               const index<T, IdxT>& index_,
+               bool include_dataset)
 {
   // Write graph to first index file (format from MSFT DiskANN OSS)
   std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
@@ -75,6 +77,7 @@ void serialize(raft::resources const& res,
              d_graph.data_handle(),
              d_graph.size(),
              raft::resource::get_cuda_stream(res));
+  raft::resource::sync_stream(res);
 
   size_t total_edges = 0;
   size_t num_sparse  = 0;
@@ -115,6 +118,44 @@ void serialize(raft::resources const& res,
 
   index_of.close();
   if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
+
+  if (include_dataset) {
+    // try allocating a buffer for the dataset on host
+    try {
+      const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
+        dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
+          const_cast<cuvs::neighbors::dataset<int64_t>*>(&index_.data()));
+      if (strided_dataset == nullptr) {
+        RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
+      } else {
+        auto h_dataset =
+          raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
+        raft::copy(h_dataset.data_handle(),
+                   strided_dataset->view().data_handle(),
+                   strided_dataset->n_rows() * strided_dataset->dim(),
+                   raft::resource::get_cuda_stream(res));
+        std::string dataset_base_file = file_name + ".data";
+        std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
+        if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
+        size_t dataset_file_offset = 0;
+        int size                   = static_cast<int>(index_.size());
+        int dim                    = static_cast<int>(index_.dim());
+        dataset_of.seekp(dataset_file_offset, dataset_of.beg);
+        dataset_of.write((char*)&size, sizeof(int));
+        dataset_of.write((char*)&dim, sizeof(int));
+        for (int i = 0; i < size; i++) {
+          dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
+                           dim * sizeof(T));
+        }
+        dataset_of.close();
+        if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
+      }
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_INFO("Failed to serialize dataset");
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_INFO("Failed to serialize dataset");
+    }
+  }
 }
 
-}  // namespace cuvs::neighbors::experimental::vamana::detail
+}  // namespace cuvs::neighbors::vamana::detail

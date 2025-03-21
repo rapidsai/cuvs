@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -26,6 +26,8 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
                       around the C++ code.
    python           - build the cuvs Python package
    rust             - build the cuvs Rust bindings
+   go               - build the cuvs Go bindings
+   java             - build the cuvs Java bindings
    docs             - build the documentation
    tests            - build the tests
    bench-ann        - build end-to-end ann benchmarks
@@ -36,7 +38,6 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    -g                          - build for debug
    -n                          - no install step
    --uninstall                 - uninstall files for specified targets which were built and installed prior
-   --compile-static-lib        - compile static library for all components
    --cpu-only                  - build CPU only components without CUDA. Currently only applies to bench-ann.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
@@ -61,7 +62,8 @@ SPHINX_BUILD_DIR=${REPODIR}/docs
 DOXYGEN_BUILD_DIR=${REPODIR}/cpp/doxygen
 PYTHON_BUILD_DIR=${REPODIR}/python/cuvs/_skbuild
 RUST_BUILD_DIR=${REPODIR}/rust/target
-BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR} ${RUST_BUILD_DIR}"
+JAVA_BUILD_DIR=${REPODIR}/java/cuvs-java/target
+BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR} ${RUST_BUILD_DIR} ${JAVA_BUILD_DIR}"
 
 # Set defaults for vars modified by flags to this script
 CMAKE_LOG_LEVEL=""
@@ -313,12 +315,6 @@ if [[ ${CMAKE_TARGET} == "" ]]; then
     CMAKE_TARGET="all"
 fi
 
-
-SKBUILD_EXTRA_CMAKE_ARGS="${EXTRA_CMAKE_ARGS}"
-if [[ "${EXTRA_CMAKE_ARGS}" != *"DFIND_CUVS_CPP"* ]]; then
-    SKBUILD_EXTRA_CMAKE_ARGS="${SKBUILD_EXTRA_CMAKE_ARGS};-DFIND_CUVS_CPP=ON"
-fi
-
 # If clean given, run it prior to any other steps
 if (( ${CLEAN} == 1 )); then
     # If the dirs to clean are mounted dirs in a container, the
@@ -335,7 +331,7 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
     if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
         CMAKE_TARGET="${CMAKE_TARGET};"
@@ -434,13 +430,13 @@ fi
 
 # Build and (optionally) install the cuvs Python package
 if (( ${NUMARGS} == 0 )) || hasArg python; then
-    SKBUILD_CMAKE_ARGS="${SKBUILD_EXTRA_CMAKE_ARGS}" \
+    SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
         python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
-if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
     python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi
 
@@ -449,6 +445,22 @@ if (( ${NUMARGS} == 0 )) || hasArg rust; then
     cd ${REPODIR}/rust
     cargo build --examples --lib
     cargo test
+fi
+
+# Build the cuvs Go bindings
+if (( ${NUMARGS} == 0 )) || hasArg go; then
+    cd ${REPODIR}/go
+    go build ./...
+    go test ./...
+fi
+
+# Build the cuvs Java bindings
+if (( ${NUMARGS} == 0 )) || hasArg java; then
+    if ! hasArg libcuvs; then
+        echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
+    fi
+    cd ${REPODIR}/java
+    ./build.sh
 fi
 
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
