@@ -153,7 +153,7 @@ void build_knn_graph(
 
   RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
   pq.build_params.metric = cuvs::distance::DistanceType::L2Expanded;
-  auto index = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
+  auto index             = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
 
   //
   // search top (k + 1) neighbors

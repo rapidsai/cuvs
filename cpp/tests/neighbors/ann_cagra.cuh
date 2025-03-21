@@ -304,7 +304,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
      << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
      << ", build_algo=" << build_algo.at((int)p.build_algo);
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
-     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
+    os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
   }
   if (p.compression.has_value()) {
     auto vpq = p.compression.value();
@@ -1282,7 +1282,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false},
     {true},
     {0.7},
-    {4});                      // don't demand high recall without refinement
+    {4});                        // don't demand high recall without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
     for (uint32_t vq_n_centers : {100}) {
       for (auto input : inputs2) {
