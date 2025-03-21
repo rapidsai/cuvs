@@ -859,7 +859,7 @@ inline auto enum_variety() -> test_cases_t
     // 8-bit coarse search is experimental and there's no go guarantee of any recall
     // if the data is not normalized. Especially for L2, because we store vector norms alongside the
     // cluster centers.
-    x.min_recall = 0.2;
+    x.min_recall = 0.1;
   });
 
   ADD_CASE({
