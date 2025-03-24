@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .binary import QuantizerParams, transform
+from .binary import transform
 
 __all__ = [
-    "QuantizerParams",
     "transform",
 ]
