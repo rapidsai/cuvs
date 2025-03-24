@@ -92,7 +92,10 @@ files:
       - depends_on_libcuvs
       - depends_on_libraft
   go:
-    output: none
+    output: conda
+    matrix:
+      cuda: ["11.8", "12.8"]
+      arch: [x86_64, aarch64]
     includes:
       - clang
       - cuda
