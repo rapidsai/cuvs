@@ -81,7 +81,9 @@ ivf_flat_index
 ivf_pq_index
 
 # cuvs_bench
-datasets/
+# Leading slash to only ignore top-level `datasets/ directory -- otherwise
+# `python/cuvs_bench/cuvs_bench/config/datasets/` also gets ignored
+/datasets/
 /*.json
 
 # java

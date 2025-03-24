@@ -23,22 +23,39 @@ echo "${version}" > VERSION
 
 sccache --zero-stats
 
-# TODO: Remove `--no-test` flags once importing on a CPU
-# node works correctly
-rapids-conda-retry build \
-  --no-test \
-  --channel "${CPP_CHANNEL}" \
-  conda/recipes/cuvs
+
+# populates `RATTLER_CHANNELS` array
+source rapids-rattler-channel-string
+
+rapids-logger "Prepending channel ${CPP_CHANNEL} to RATTLER_CHANNELS"
+
+RATTLER_CHANNELS=("--channel" "${CPP_CHANNEL}" "${RATTLER_CHANNELS[@]}")
+
+sccache --zero-stats
+
+rapids-logger "Building cuvs"
+
+# --no-build-id allows for caching with `sccache`
+# more info is available at
+# https://rattler.build/latest/tips_and_tricks/#using-sccache-or-ccache-with-rattler-build
+rattler-build build --recipe conda/recipes/cuvs \
+                    --experimental \
+                    --no-build-id \
+                    --channel-priority disabled \
+                    --output-dir "$RAPIDS_CONDA_BLD_OUTPUT_DIR" \
+                    --test skip \
+                    "${RATTLER_CHANNELS[@]}"
 
 sccache --show-adv-stats
 sccache --zero-stats
 
-# Build cuvs-bench for each cuda and python version
-rapids-conda-retry build \
-  --no-test \
-  --channel "${CPP_CHANNEL}" \
-  --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
-  conda/recipes/cuvs-bench
+rattler-build build --recipe conda/recipes/cuvs-bench \
+                    --experimental \
+                    --no-build-id \
+                    --channel-priority disabled \
+                    --output-dir "$RAPIDS_CONDA_BLD_OUTPUT_DIR" \
+                    --test skip \
+                    "${RATTLER_CHANNELS[@]}"
 
 sccache --show-adv-stats
 sccache --zero-stats
@@ -47,11 +64,12 @@ sccache --zero-stats
 # version
 RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
-  rapids-conda-retry build \
-  --channel "${CPP_CHANNEL}" \
-  --channel "${RAPIDS_CONDA_BLD_OUTPUT_DIR}" \
-  conda/recipes/cuvs-bench-cpu
-
+  rattler-build build --recipe conda/recipes/cuvs-bench-cpu \
+                      --experimental \
+                      --no-build-id \
+                      --channel-priority disabled \
+                      --output-dir "$RAPIDS_CONDA_BLD_OUTPUT_DIR" \
+                      "${RATTLER_CHANNELS[@]}"
   sccache --show-adv-stats
 fi
 
