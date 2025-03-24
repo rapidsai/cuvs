@@ -1116,7 +1116,7 @@ void extend(
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
- * @param[in] idx cagra index
+ * @param[in] index cagra index
  * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
  * [n_queries, k]
@@ -1217,7 +1217,7 @@ void search(raft::resources const& res,
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
- * @param[in] idx cagra index
+ * @param[in] index cagra index
  * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
  * [n_queries, k]
