@@ -92,14 +92,20 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
   // Compute distance from a src node to its neighbors
   for (int k = 0; k < graph_degree; k++) {
     const IdxT dstNode = knn_graph[k + static_cast<uint64_t>(graph_degree) * srcNode];
-    float dist         = 0.0;
+    float dist         = 0;
+    float norm2_dst    = 0;
     if (metric == cuvs::distance::DistanceType::InnerProduct ||
         metric == cuvs::distance::DistanceType::CosineExpanded) {
       for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
+        auto elem_b = cuvs::spatial::knn::detail::utils::mapping<float>{}(
+          dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
         dist -= cuvs::spatial::knn::detail::utils::mapping<float>{}(
                   dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) *
-                cuvs::spatial::knn::detail::utils::mapping<float>{}(
-                  dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
+                elem_b;
+
+        if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+          norm2_dst += elem_b * elem_b;
+        }
       }
     } else {
       // L2Expanded
@@ -116,6 +122,16 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
     dist += __shfl_xor_sync(0xffffffff, dist, 4);
     dist += __shfl_xor_sync(0xffffffff, dist, 8);
     dist += __shfl_xor_sync(0xffffffff, dist, 16);
+
+    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 1);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 2);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 4);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 8);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 16);
+      if (lane_id == (k % raft::WarpSize)) { dist /= sqrt(norm2_dst); }
+    }
+
     if (lane_id == (k % raft::WarpSize)) {
       my_keys[k / raft::WarpSize] = dist;
       my_vals[k / raft::WarpSize] = dstNode;
