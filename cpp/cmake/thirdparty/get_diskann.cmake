@@ -36,7 +36,8 @@ function(find_and_configure_diskann)
           "PYBIND OFF"
           "UNIT_TEST OFF"
           "RESTAPI OFF"
-          "PORTABLE OFF")
+          "PORTABLE OFF"
+          "LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE ON")
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(diskann)
