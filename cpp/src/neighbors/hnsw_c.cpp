@@ -36,7 +36,8 @@ template <typename T>
 void _from_cagra(cuvsResources_t res,
                  cuvsHnswIndexParams_t params,
                  cuvsCagraIndex_t cagra_index,
-                 cuvsHnswIndex_t hnsw_index)
+                 cuvsHnswIndex_t hnsw_index,
+                 std::optional<DLManagedTensor*> dataset_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(cagra_index->addr);
@@ -44,7 +45,13 @@ void _from_cagra(cuvsResources_t res,
   cpp_params.hierarchy       = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
   cpp_params.ef_construction = params->ef_construction;
   cpp_params.num_threads     = params->num_threads;
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset = std::nullopt;
+  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset;
+  if (dataset_tensor.has_value()) {
+    using dataset_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    dataset                   = cuvs::core::from_dlpack<dataset_mdspan_type>(*dataset_tensor);
+  } else {
+    dataset = std::nullopt;
+  }
 
   auto hnsw_index_unique_ptr =
     cuvs::neighbors::hnsw::from_cagra(*res_ptr, cpp_params, *index, dataset);
@@ -175,11 +182,32 @@ extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
     auto index        = *cagra_index;
     hnsw_index->dtype = index.dtype;
     if (index.dtype.code == kDLFloat) {
-      _from_cagra<float>(res, params, cagra_index, hnsw_index);
+      _from_cagra<float>(res, params, cagra_index, hnsw_index, std::nullopt);
     } else if (index.dtype.code == kDLUInt) {
-      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index);
+      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index, std::nullopt);
     } else if (index.dtype.code == kDLInt) {
-      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index);
+      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index, std::nullopt);
+    } else {
+      RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
+                                                    cuvsHnswIndexParams_t params,
+                                                    cuvsCagraIndex_t cagra_index,
+                                                    cuvsHnswIndex_t hnsw_index,
+                                                    DLManagedTensor* dataset_tensor)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index        = *cagra_index;
+    hnsw_index->dtype = index.dtype;
+    if (index.dtype.code == kDLFloat) {
+      _from_cagra<float>(res, params, cagra_index, hnsw_index, dataset_tensor);
+    } else if (index.dtype.code == kDLUInt) {
+      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index, dataset_tensor);
+    } else if (index.dtype.code == kDLInt) {
+      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index, dataset_tensor);
     } else {
       RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
     }
