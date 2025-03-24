@@ -74,6 +74,16 @@ void _transform(cuvsResources_t res,
 
 }  // namespace
 
+extern "C" cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] { *params = new cuvsBinaryQuantizerParams; });
+}
+
+extern "C" cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
 extern "C" cuvsError_t cuvsBinaryQuantizerTransformWithParams(cuvsResources_t res,
                                                               cuvsBinaryQuantizerParams_t params,
                                                               DLManagedTensor* dataset_tensor,
