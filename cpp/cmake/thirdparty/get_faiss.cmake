@@ -31,7 +31,7 @@ function(find_and_configure_faiss)
   rapids_cpm_package_details(faiss version repository tag shallow exclude)
 
   include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(faiss ${version} patch_command)
+  rapids_cpm_generate_patch_command(faiss ${version} patch_command build_patch_only)
 
   set(BUILD_SHARED_LIBS ON)
   if (PKG_BUILD_STATIC_LIBS)
@@ -46,7 +46,7 @@ function(find_and_configure_faiss)
     set(CUVS_FAISS_OPT_LEVEL "avx2")
   endif()
 
-  rapids_cpm_find(faiss ${version}
+  rapids_cpm_find(faiss ${version} ${build_patch_only}
     GLOBAL_TARGETS faiss faiss_avx2 faiss_gpu_objs faiss::faiss faiss::faiss_avx2
     CPM_ARGS
     GIT_REPOSITORY ${repository}
