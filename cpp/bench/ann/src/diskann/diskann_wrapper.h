@@ -118,6 +118,25 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
 template <typename T>
 void diskann_memory<T>::initialize_index_(size_t max_points)
 {
+  cuvs::neighbors::cagra::index_params cagra_index_params;
+    cagra_index_params.attach_dataset_on_build = false;
+    cagra_index_params.graph_degree = diskann_index_write_params_->max_degree;
+    cagra_index_params.intermediate_graph_degree = 2 * cagra_index_params.graph_degree;
+    cagra_index_params.guarantee_connectivity = true;
+    cuvs::neighbors::ivf_pq::index_params ivf_pq_index_params;
+    ivf_pq_index_params.kmeans_n_iters = 10;
+    ivf_pq_index_params.n_lists = 1024;
+    ivf_pq_index_params.pq_dim = 384;
+    ivf_pq_index_params.kmeans_trainset_fraction = 0.1;
+    ivf_pq_index_params.pq_bits = 8;
+    cuvs::neighbors::ivf_pq::search_params ivf_pq_search_params;
+    ivf_pq_search_params.lut_dtype = CUDA_R_16F;
+    ivf_pq_search_params.n_probes = 20;
+    cuvs::neighbors::cagra::graph_build_params::ivf_pq_params ivf_pq_params;
+    ivf_pq_params.build_params = ivf_pq_index_params;
+    ivf_pq_params.search_params = ivf_pq_search_params;
+    ivf_pq_params.refinement_rate = 2.0;
+    std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_params = std::make_shared<cuvs::neighbors::cagra::index_params>(cagra_index_params);
   this->mem_index_ = std::make_shared<diskann::Index<T>>(parse_metric_to_diskann(this->metric_),
                                                          this->dim_,
                                                          max_points,
@@ -130,7 +149,9 @@ void diskann_memory<T>::initialize_index_(size_t max_points)
                                                          build_pq_bytes_ > 0,
                                                          build_pq_bytes_,
                                                          false,
-                                                         false);
+                                                         false,
+                                                         true,
+                                                         cagra_params);
 }
 template <typename T>
 void diskann_memory<T>::build(const T* dataset, size_t nrow)
