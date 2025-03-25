@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -38,7 +38,6 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    -g                          - build for debug
    -n                          - no install step
    --uninstall                 - uninstall files for specified targets which were built and installed prior
-   --compile-static-lib        - compile static library for all components
    --cpu-only                  - build CPU only components without CUDA. Currently only applies to bench-ann.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
@@ -361,7 +360,7 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
     if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
         CMAKE_TARGET="${CMAKE_TARGET};"
@@ -469,7 +468,7 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
-if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
     python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi
 
