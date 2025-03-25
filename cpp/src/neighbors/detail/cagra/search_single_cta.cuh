@@ -231,31 +231,38 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
                   uint32_t topk,
                   SAMPLE_FILTER_T sample_filter)
   {
-    cudaStream_t stream = raft::resource::get_cuda_stream(res);
-    select_and_run(
-      dataset_desc,
-      graph,
-      // NB: tag the indices pointer with its element size.
-      //     This allows us to avoid multiplying kernel instantiations
-      //     and any costs for extra registers in the kernel signature.
-      reinterpret_cast<uintptr_t>(result_indices_ptr) | raft::Pow2<sizeof(OutputIndexT)>::Log2,
-      result_distances_ptr,
-      queries_ptr,
-      num_queries,
-      dev_seed_ptr,
-      num_executed_iterations,
-      *this,
-      topk,
-      num_itopk_candidates,
-      static_cast<uint32_t>(thread_block_size),
-      smem_size,
-      hash_bitlen,
-      hashmap.data(),
-      small_hash_bitlen,
-      small_hash_reset_interval,
-      num_seeds,
-      sample_filter,
-      stream);
+    cudaStream_t stream                 = raft::resource::get_cuda_stream(res);
+    constexpr uintptr_t kOutputIndexTag = raft::Pow2<sizeof(OutputIndexT)>::Log2;
+    const auto result_indices_uintptr   = reinterpret_cast<uintptr_t>(result_indices_ptr);
+    static_assert(kOutputIndexTag <= 3, "OutputIndexT can't be more than 8 bytes");
+    if constexpr (kOutputIndexTag <= 1) {
+      // NB: there's no need for runtime check here for larger OutputIndexT naturally aligned
+      RAFT_EXPECTS((result_indices_uintptr & 0x3) == 0,
+                   "result_indices_ptr must be at least 2-byte aligned");
+    }
+    select_and_run(dataset_desc,
+                   graph,
+                   // NB: tag the indices pointer with its element size.
+                   //     This allows us to avoid multiplying kernel instantiations
+                   //     and any costs for extra registers in the kernel signature.
+                   result_indices_uintptr | kOutputIndexTag,
+                   result_distances_ptr,
+                   queries_ptr,
+                   num_queries,
+                   dev_seed_ptr,
+                   num_executed_iterations,
+                   *this,
+                   topk,
+                   num_itopk_candidates,
+                   static_cast<uint32_t>(thread_block_size),
+                   smem_size,
+                   hash_bitlen,
+                   hashmap.data(),
+                   small_hash_bitlen,
+                   small_hash_reset_interval,
+                   num_seeds,
+                   sample_filter,
+                   stream);
   }
 };
 
