@@ -238,7 +238,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     if constexpr (kOutputIndexTag <= 1) {
       // NB: there's no need for runtime check here for larger OutputIndexT naturally aligned
       RAFT_EXPECTS((result_indices_uintptr & 0x3) == 0,
-                   "result_indices_ptr must be at least 2-byte aligned");
+                   "result_indices_ptr must be at least 4-byte aligned");
     }
     select_and_run(dataset_desc,
                    graph,
