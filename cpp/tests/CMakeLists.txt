@@ -186,6 +186,18 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME
+    NEIGHBORS_BATCH_ANN_TEST
+    PATH
+    neighbors/batch_ann/test_float.cu
+    GPUS
+    1
+    PERCENT
+    100
+    ADDITIONAL_DEP nccl
+  )
+
+  ConfigureTest(
+    NAME
     NEIGHBORS_DYNAMIC_BATCHING_TEST
     PATH
     neighbors/dynamic_batching/test_brute_force.cu
