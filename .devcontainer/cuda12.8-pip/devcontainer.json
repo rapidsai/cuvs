@@ -15,14 +15,14 @@
   ],
   "hostRequirements": {"gpu": "optional"},
   "features": {
-    "ghcr.io/rapidsai/devcontainers/features/cuda:25.6": {
+    "ghcr.io/rapidsai/devcontainers/features/cuda:25.4": {
       "version": "12.8",
       "installcuBLAS": true,
       "installcuSOLVER": true,
       "installcuRAND": true,
       "installcuSPARSE": true
     },
-    "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils:25.6": {}
+    "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils:25.4": {}
   },
   "overrideFeatureInstallOrder": [
     "ghcr.io/rapidsai/devcontainers/features/ucx",
