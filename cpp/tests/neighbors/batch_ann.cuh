@@ -17,37 +17,27 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
-#include <cstdint>
+#include "naive_knn.cuh"
+#include <cstddef>
+#include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/batch_ann.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/nn_descent.hpp>
+#include <gtest/gtest.h>
+#include <iostream>
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resource/comms.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
-#include <raft/random/make_blobs.cuh>
-#include <sys/mman.h>
-
-#include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/nn_descent.hpp>
-
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/nccl_clique.hpp>
+#include <raft/core/resources.hpp>
+#include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/itertools.hpp>
 #include <rapids_logger/logger.hpp>
 #include <rmm/device_uvector.hpp>
-
-#include "naive_knn.cuh"
-#include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_mdspan.hpp>
-#include <raft/core/host_mdarray.hpp>
-#include <raft/core/resources.hpp>
-
-#include <cuvs/neighbors/batch_ann.hpp>
-#include <gtest/gtest.h>
-
-#include <cstddef>
-#include <iostream>
-#include <string>
 #include <vector>
 
 namespace cuvs::neighbors::batch_ann {
