@@ -25,10 +25,13 @@ ivf_pq_params::ivf_pq_params(raft::matrix_extent<int64_t> dataset_extents,
 {
   build_params = cuvs::neighbors::ivf_pq::index_params::from_dataset(dataset_extents, metric);
 
-  search_params                         = cuvs::neighbors::ivf_pq::search_params{};
-  search_params.n_probes                = std::max<uint32_t>(10, build_params.n_lists * 0.01);
-  search_params.lut_dtype               = CUDA_R_16F;
-  search_params.internal_distance_dtype = CUDA_R_16F;
+  search_params          = cuvs::neighbors::ivf_pq::search_params{};
+  search_params.n_probes = std::max<uint32_t>(10, build_params.n_lists * 0.01);
+  // [Note] FP16 is fast when used, but we found that overflows occur in IVF-PQ
+  // distance calculation for some datasets, such as sift. To address this problem,
+  // FP32 is used for building the initial knn graph.
+  search_params.lut_dtype               = CUDA_R_32F;
+  search_params.internal_distance_dtype = CUDA_R_32F;
 
   refinement_rate = 2;
 }
