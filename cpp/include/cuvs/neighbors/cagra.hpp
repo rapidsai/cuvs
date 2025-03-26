@@ -328,7 +328,8 @@ static_assert(std::is_aggregate_v<search_params>);
  * The index stores the dataset and a kNN graph in device memory.
  *
  * @tparam T data element type
- * @tparam IdxT type of the vector indices (represent dataset.extent(0))
+ * @tparam IdxT the data type used to store the neighbor indices in the  search graph.
+ *              It must be large enough to represent values up to dataset.extent(0).
  *
  */
 template <typename T, typename IdxT>
