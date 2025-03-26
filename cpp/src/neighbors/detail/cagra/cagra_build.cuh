@@ -368,7 +368,8 @@ void build_knn_graph(
       nn_descent_idx.graph().extent(0),
       nn_descent_idx.graph().extent(1));
 
-  cuvs::neighbors::cagra::detail::graph::sort_knn_graph(res, dataset, knn_graph_internal);
+  cuvs::neighbors::cagra::detail::graph::sort_knn_graph(
+    res, build_params.metric, dataset, knn_graph_internal);
 }
 
 template <
