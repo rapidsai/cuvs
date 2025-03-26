@@ -864,7 +864,8 @@ __device__ void search_core(
     __syncthreads();
   }
 
-  // NB: tag the indices pointer with its element size.
+  // NB: The indices pointer is tagged with its element size.
+  //     Here we select the correct conversion operator at runtime.
   //     This allows us to avoid multiplying kernel instantiations
   //     and any costs for extra registers in the kernel signature.
   const uint32_t index_element_tag = result_indices_ptr & 0x3;
