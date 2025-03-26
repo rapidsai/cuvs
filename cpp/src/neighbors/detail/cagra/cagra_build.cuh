@@ -494,6 +494,16 @@ bool check_if_same_vector(
   return true;
 }
 
+template <typename IdxT = uint32_t>
+IdxT get_small_node(raft::host_vector_view<IdxT, int64_t> small_node, IdxT i)
+{
+  IdxT si = i;
+  while (si != small_node(si)) {
+    si = small_node(si);
+  }
+  return si;
+}
+
 template <typename T,
           typename IdxT     = uint32_t,
           typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
@@ -505,26 +515,48 @@ void deactivate_duplicate_nodes(
 {
   if (bitset_ptr == nullptr) return;
 
-  // If there are nodes with the same vector, the one with the large ID
-  // is deactivated as a duplicate node.
+  // If there are multiple nodes with an identical vector, the one with the
+  // smallest ID is kept active and the others are deactivated as duplicate
+  // nodes.
+
+  // If there are 3 or more vectors that are identical and they are not
+  // all-to-all connected in the graph, it may not be possible to select
+  // one of the vectors with the smallest ID among the identical vectors
+  // if decision is made by an edge-by-edege basis.
+  // An array 'small_node', which managed which vector has the smallest
+  // ID among the identical vectors, is used to address this problem.
+  auto small_node = raft::make_host_vector<IdxT, int64_t>(graph.extent(0));
+#pragma omp parallel for
+  for (IdxT i = 0; i < graph.extent(0); i++) {
+    small_node(i) = i;
+  }
+
+#pragma omp parallel for
+  for (IdxT i = 0; i < graph.extent(0); i++) {
+    auto si = get_small_node(small_node.view(), i);
+    for (uint32_t k = 0; k < graph.extent(1); k++) {
+      auto j = graph(i, k);
+      if (!check_if_same_vector(dataset, i, j)) { break; }
+      auto sj = get_small_node(small_node.view(), j);
+      if (si == sj) { continue; }
+      if (si > sj) {
+        auto tmp = si;
+        si       = sj;
+        sj       = tmp;
+      }
+#pragma omp critical
+      {
+        cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, sj, true);
+        small_node(sj) = si;
+      }
+      break;
+    }
+  }
+
   uint64_t count = 0;
 #pragma omp parallel for schedule(static, 32) reduction(+ : count)
   for (IdxT i = 0; i < graph.extent(0); i++) {
-    if (cuvs::neighbors::cagra::detail::bitset_test(bitset_ptr, i)) {
-      count += 1;
-      continue;
-    }
-    for (uint32_t k = 0; k < graph.extent(1); k++) {
-      auto j = graph(i, k);
-      if (i <= j) { continue; }
-      if (!check_if_same_vector(dataset, i, j)) { break; }
-      // Although "omp critical" is originally required here, it is made
-      // unnecessary by setting the unit of iteration allocation to each
-      // thread to 32 by "schedule(static, 32)".
-      cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, i, true);
-      count += 1;
-      break;
-    }
+    if (cuvs::neighbors::cagra::detail::bitset_test(bitset_ptr, i)) { count += 1; }
   }
   if (count > 0) {
     RAFT_LOG_INFO("Duplicate nodes were found (# deactivated nodes: %lu / %lu (%.2lf%%))",
