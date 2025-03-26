@@ -42,6 +42,13 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
+   --gpu-arch=\"<arch>\"        - build for specific GPU architectures (e.g. \"80-real;90-real\")
+                                Values from this flag are passed to CUDA_ARCHITECTURES in cmake.
+                                See https://cmake.org/cmake/help/latest/prop_tgt/CUDA_ARCHITECTURES.html
+                                for more details.
+                                To summarize, specifying \"80-virtual\" would generate PTX for compute capability 8.0
+                                whereas \"80-real\" will generate SASS.
+                                If you are unsure which to do, use -real suffix --gpu-arch=\"80-real;90-real\"
    --no-mg                     - disable multi-GPU support
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
