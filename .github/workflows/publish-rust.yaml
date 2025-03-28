@@ -8,9 +8,9 @@ on:
 
 jobs:
   rust-publish:
-    secrets: inherit
     runs-on: ubuntu-latest
-    container: rapidsai/ci-conda:latest
+    container:
+      image: rapidsai/ci-conda:latest
     steps:
       - uses: actions/checkout@v4
       - name: Check if release build
