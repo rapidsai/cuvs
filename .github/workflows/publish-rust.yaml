@@ -2,6 +2,9 @@ name: publish
 
 on:
   workflow_call:
+  push:
+    branches:
+      - "pull-request/[0-9]+"
 
 jobs:
   rust-publish:

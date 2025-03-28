@@ -1,5 +1,5 @@
 [package]
-name = "cuvs"
+name = "jawe-cuvs"
 description = "RAPIDS vector search library"
 version.workspace = true
 edition.workspace = true
