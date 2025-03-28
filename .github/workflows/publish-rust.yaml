@@ -1,0 +1,32 @@
+name: publish
+
+on:
+  workflow_call:
+
+jobs:
+  rust-publish:
+    secrets: inherit
+    runs-on: ubuntu-latest
+    container: rapidsai/ci-conda:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if release build
+        id: check_release
+        run: |
+          if rapids-is-release-build; then
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Install Rust
+        if: steps.check_release.outputs.is_release == 'true'
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+      - name: Publish to crates.io
+        if: steps.check_release.outputs.is_release == 'true'
+        working-directory: ./rust
+        run: |
+          cargo publish --token ${GPUTESTER_CRATES_TOKEN}
+        env:
+          GPUTESTER_CRATES_TOKEN: ${{ secrets.GPUTESTER_CRATES_TOKEN }}
