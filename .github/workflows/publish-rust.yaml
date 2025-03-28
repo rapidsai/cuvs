@@ -30,6 +30,6 @@ jobs:
         if: steps.check_release.outputs.is_release == 'true'
         working-directory: ./rust
         run: |
-          cargo publish --token ${GPUTESTER_CRATES_TOKEN} --package jawe-cuvs
+          cargo publish --token ${CARGO_REGISTRY_TOKEN} --package jawe-cuvs
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.GPUTESTER_CRATES_TOKEN }}
