@@ -29,7 +29,7 @@ template <typename T>
 struct BinaryQuantizationInputs {
   int rows;
   int cols;
-  cuvs::preprocessing::quantize::binary::set_bit_threshold threshold;
+  cuvs::preprocessing::quantize::binary::bit_threshold threshold;
 };
 
 template <typename T>
@@ -38,9 +38,9 @@ std::ostream& operator<<(std::ostream& os, const BinaryQuantizationInputs<T>& in
   os << "> dataset_size:" << inputs.rows << " dataset_dim:" << inputs.cols;
   os << " threshold: ";
   switch (inputs.threshold) {
-    case set_bit_threshold::zero: os << "zero"; break;
-    case set_bit_threshold::mean: os << "mean"; break;
-    case set_bit_threshold::sampling_median: os << "sampling_median"; break;
+    case bit_threshold::zero: os << "zero"; break;
+    case bit_threshold::mean: os << "mean"; break;
+    case bit_threshold::sampling_median: os << "sampling_median"; break;
     default: os << "unknown"; break;
   }
   return os;
@@ -59,7 +59,8 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
  protected:
   void testBinaryQuantization()
   {
-    if (std::is_same_v<T, half> && params_.threshold == set_bit_threshold::mean) { GTEST_SKIP(); }
+    // TODO (enp1s0): Enable the (half, mean) test once transform is supported on the GPU.
+    if (std::is_same_v<T, half> && params_.threshold == bit_threshold::mean) { GTEST_SKIP(); }
     // dataset identical on host / device
     auto dataset = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
       (const T*)(input_.data()), rows_, cols_);
@@ -124,9 +125,9 @@ const std::vector<BinaryQuantizationInputs<T>> generate_inputs()
   const auto inputs = raft::util::itertools::product<BinaryQuantizationInputs<T>>(
     {5, 100, 1000},
     {7, 128, 1999},
-    {cuvs::preprocessing::quantize::binary::set_bit_threshold::zero,
-     cuvs::preprocessing::quantize::binary::set_bit_threshold::mean,
-     cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median});
+    {cuvs::preprocessing::quantize::binary::bit_threshold::zero,
+     cuvs::preprocessing::quantize::binary::bit_threshold::mean,
+     cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median});
   return inputs;
 }
 

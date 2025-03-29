@@ -179,7 +179,7 @@ void transform(raft::resources const& res,
                dataset_size,
                out_dataset_size);
   // stats::mean does not support F16
-  RAFT_EXPECTS(!(std::is_same_v<T, half> && params.threshold == binary::set_bit_threshold::mean),
+  RAFT_EXPECTS(!(std::is_same_v<T, half> && params.threshold == binary::bit_threshold::mean),
                "binary::transform does not support threshold == mean for FP16 dataset");
 
   auto mr = raft::resource::get_workspace_resource(res);
@@ -188,15 +188,14 @@ void transform(raft::resources const& res,
 
   T* threshold_ptr = nullptr;
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean ||
-      params.threshold ==
-        cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean ||
+      params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
     threshold_vec = raft::make_device_mdarray<T, std::int64_t>(
       res, mr, raft::make_extents<std::int64_t>(dataset_dim));
     threshold_ptr = threshold_vec.data_handle();
   }
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean) {
     // stats::mean does not support F16
     if constexpr (!std::is_same_v<T, half>) {
       raft::stats::mean(
@@ -207,8 +206,7 @@ void transform(raft::resources const& res,
     }
   }
 
-  if (params.threshold ==
-      cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
       std::max(
@@ -294,14 +292,13 @@ void transform(raft::resources const& res,
   auto threshold_vec       = raft::make_host_vector<compute_t, int64_t>(0);
   compute_t* threshold_ptr = nullptr;
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean ||
-      params.threshold ==
-        cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean ||
+      params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
     threshold_vec = raft::make_host_vector<compute_t, int64_t>(dataset_dim);
     threshold_ptr = threshold_vec.data_handle();
   }
 
-  if (params.threshold == cuvs::preprocessing::quantize::binary::set_bit_threshold::mean) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean) {
     for (uint32_t j = 0; j < dataset_dim; j++) {
       threshold_ptr[j] = 0;
     }
@@ -316,8 +313,7 @@ void transform(raft::resources const& res,
     }
   }
 
-  if (params.threshold ==
-      cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median) {
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
       std::max(

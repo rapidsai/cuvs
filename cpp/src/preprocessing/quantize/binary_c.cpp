@@ -36,13 +36,13 @@ void _transform(cuvsResources_t res,
   cuvs::preprocessing::quantize::binary::params _params;
   switch (params->threshold) {
     case ZERO:
-      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::zero;
+      _params.threshold = cuvs::preprocessing::quantize::binary::bit_threshold::zero;
       break;
     case MEAN:
-      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::mean;
+      _params.threshold = cuvs::preprocessing::quantize::binary::bit_threshold::mean;
       break;
     case SAMPLING_MEDIAN:
-      _params.threshold = cuvs::preprocessing::quantize::binary::set_bit_threshold::sampling_median;
+      _params.threshold = cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median;
       break;
   }
   _params.sampling_ratio = params->sampling_ratio;
