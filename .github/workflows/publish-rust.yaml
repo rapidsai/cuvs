@@ -21,11 +21,23 @@ jobs:
           else
             echo "is_release=true" >> $GITHUB_OUTPUT
           fi
-      - name: Install Rust
+      - name: Setup environment
         if: steps.check_release.outputs.is_release == 'true'
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+          . /opt/conda/etc/profile.d/conda.sh
+
+          rapids-dependency-file-generator \
+            --output conda \
+            --file-key rust \
+            --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" \
+            | tee env.yaml
+
+          rapids-mamba-retry env create --yes -f env.yaml -n rust
+
+          set +eu
+          conda activate rust
+          set -eu
+
       - name: Publish sys crate
         if: steps.check_release.outputs.is_release == 'true'
         working-directory: ./rust/cuvs-sys
