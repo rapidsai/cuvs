@@ -48,6 +48,5 @@ def test_binary_quantizer(n_rows, n_cols, inplace, device_memory, dtype):
     else:
         actual = transformed if not inplace else output
 
-    mean = np.mean(input1, axis=1, keepdims=True)
-    expected = np.packbits(input1 > mean, axis=-1, bitorder="little")
+    expected = np.packbits(input1 > 0, axis=-1, bitorder="little")
     assert np.all(actual == expected)

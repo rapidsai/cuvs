@@ -111,7 +111,7 @@ extern "C" cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
 {
   cuvsBinaryQuantizerParams_t params;
   cuvsBinaryQuantizerParamsCreate(&params);
-  params->threshold = MEAN;
+  params->threshold = ZERO;
 
   const auto result =
     cuvsBinaryQuantizerTransformWithParams(res, params, dataset_tensor, out_tensor);
