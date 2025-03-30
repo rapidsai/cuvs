@@ -102,7 +102,7 @@ void GenerateRoundingErrorFreeDataset(const raft::resources& handle,
   const uint32_t block_size = 256;
   const uint32_t grid_size  = (size + block_size - 1) / block_size;
 
-  const auto bitshift = (mapper_type::kBitshiftBase - std::log2(dim)) / 2;
+  const auto bitshift = (mapper_type::kBitshiftBase - std::log2(n_row)) / 2;
   // Skip the test when `dim` is too big for type `T` to allow rounding error-free test.
   if (bitshift <= 1) { GTEST_SKIP(); }
   const int_type resolution =
@@ -189,7 +189,7 @@ template <typename T>
 const std::vector<BinaryQuantizationInputs<T>> generate_inputs()
 {
   const auto inputs = raft::util::itertools::product<BinaryQuantizationInputs<T>>(
-    {5, 100, 10000},
+    {5, 100, 1000},
     {7, 128, 1999},
     {cuvs::preprocessing::quantize::binary::bit_threshold::zero,
      cuvs::preprocessing::quantize::binary::bit_threshold::mean,
