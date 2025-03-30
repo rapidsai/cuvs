@@ -52,19 +52,23 @@ struct fpi_mapper {};
 template <>
 struct fpi_mapper<double> {
   using type                         = int64_t;
+  using mean_compute_t               = double;
   static constexpr int kBitshiftBase = 53;
 };
 
 template <>
 struct fpi_mapper<float> {
   using type                         = int32_t;
+  using mean_compute_t               = float;
   static constexpr int kBitshiftBase = 24;
 };
 
 template <>
 struct fpi_mapper<half> {
-  using type                         = int16_t;
-  static constexpr int kBitshiftBase = 11;
+  using type = int16_t;
+  // F32 is used for mean computation in the test for half
+  using mean_compute_t               = float;
+  static constexpr int kBitshiftBase = 24;
 };
 
 // Generate dataset to ensure no rounding error occurs in the norm computation of any two vectors.
@@ -84,26 +88,25 @@ RAFT_KERNEL GenerateRoundingErrorFreeDataset_kernel(T* const ptr,
 }
 
 template <typename T>
-void GenerateRoundingErrorFreeDataset(
-  const raft::resources& handle,
-  T* const ptr,
-  const uint32_t n_row,
-  const uint32_t dim,
-  raft::random::RngState& rng,
-  const bool diff_flag  // true if compute the norm between two vectors
-)
+void GenerateRoundingErrorFreeDataset(const raft::resources& handle,
+                                      T* const ptr,
+                                      const uint32_t n_row,
+                                      const uint32_t dim,
+                                      raft::random::RngState& rng)
 {
   using mapper_type         = fpi_mapper<T>;
+  using mean_compute_t      = typename mapper_type::mean_compute_t;
   using int_type            = typename mapper_type::type;
   auto cuda_stream          = raft::resource::get_cuda_stream(handle);
   const uint32_t size       = n_row * dim;
   const uint32_t block_size = 256;
   const uint32_t grid_size  = (size + block_size - 1) / block_size;
 
-  const auto bitshift = (mapper_type::kBitshiftBase - std::log2(dim) - (diff_flag ? 1 : 0)) / 2;
+  const auto bitshift = (mapper_type::kBitshiftBase - std::log2(dim)) / 2;
   // Skip the test when `dim` is too big for type `T` to allow rounding error-free test.
   if (bitshift <= 1) { GTEST_SKIP(); }
-  const int_type resolution = int_type{1} << static_cast<unsigned>(std::floor(bitshift));
+  const int_type resolution =
+    int_type{1} << std::min(static_cast<uint64_t>(std::floor(bitshift)), sizeof(int_type) * 8 - 1);
   raft::random::uniformInt<int_type>(
     handle, rng, reinterpret_cast<int_type*>(ptr), size, -resolution, resolution - 1);
 
@@ -164,7 +167,7 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
     // random input
     unsigned long long int seed = 1234ULL;
     raft::random::RngState r(seed);
-    GenerateRoundingErrorFreeDataset(handle, input_.data(), rows_, cols_, r, false);
+    GenerateRoundingErrorFreeDataset(handle, input_.data(), rows_, cols_, r);
 
     raft::update_host(host_input_.data(), input_.data(), input_.size(), stream);
 
@@ -186,7 +189,7 @@ template <typename T>
 const std::vector<BinaryQuantizationInputs<T>> generate_inputs()
 {
   const auto inputs = raft::util::itertools::product<BinaryQuantizationInputs<T>>(
-    {5, 100, 1000},
+    {5, 100, 10000},
     {7, 128, 1999},
     {cuvs::preprocessing::quantize::binary::bit_threshold::zero,
      cuvs::preprocessing::quantize::binary::bit_threshold::mean,
