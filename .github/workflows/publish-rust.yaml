@@ -52,14 +52,16 @@ jobs:
           echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 
           # Publish sys crate first
-          cd ./rust/cuvs-sys
+          pushd ./rust/cuvs-sys
           cargo publish --token ${CARGO_REGISTRY_TOKEN}
+          popd
 
           # Wait for crates.io index update
           sleep 30
 
           # Publish main crate
-          cd ..
-          cargo publish --token ${CARGO_REGISTRY_TOKEN} --package jawe-cuvs
+          pushd ./rust/cuvs
+          cargo publish --token ${CARGO_REGISTRY_TOKEN}
+          popd
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.GPUTESTER_CRATES_TOKEN }}

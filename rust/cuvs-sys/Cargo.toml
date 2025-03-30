@@ -1,5 +1,5 @@
 [package]
-name = "jawe-cuvs-sys-ii"
+name = "jawe-cuvs-sys-iii"
 description = "Low-level rust bindings to libcuvs"
 links = "cuvs"
 version.workspace = true
