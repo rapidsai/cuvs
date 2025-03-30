@@ -155,6 +155,64 @@ RAFT_KERNEL binary_quantization_kernel(const T* const in_ptr,
   }
 }
 
+RAFT_KERNEL mean_f16_in_f32_kernel_sum(float* const result_ptr,
+                                       const half* const src_ptr,
+                                       const uint32_t ld,
+                                       const uint32_t dataset_dim,
+                                       const size_t dataset_size,
+                                       const size_t dataset_size_per_cta)
+{
+  const auto dim_i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (dim_i >= dataset_dim) { return; }
+
+  const auto start_dataset_index = blockIdx.y * dataset_size_per_cta;
+  const auto end_dataset_index   = std::min((blockIdx.y + 1) * dataset_size_per_cta, dataset_size);
+
+  if (start_dataset_index >= dataset_size) { return; }
+
+  float sum = 0;
+  for (size_t dataset_index = start_dataset_index; dataset_index < end_dataset_index;
+       dataset_index++) {
+    sum += static_cast<float>(src_ptr[dim_i + dataset_index * ld]);
+  }
+  atomicAdd(result_ptr + dim_i, sum);
+}
+
+RAFT_KERNEL mean_f16_in_f32_kernel_div(half* const result_ptr,
+                                       const float* const src_ptr,
+                                       const uint32_t dataset_dim,
+                                       const size_t dataset_size)
+{
+  const auto dim_i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (dim_i >= dataset_dim) { return; }
+
+  result_ptr[dim_i] = src_ptr[dim_i] / dataset_size;
+}
+
+void mean_f16_in_f32(raft::resources const& res,
+                     half* const result_ptr,
+                     const half* const src_ptr,
+                     const uint32_t ld,
+                     const uint32_t dataset_dim,
+                     const size_t dataset_size,
+                     cudaStream_t cuda_stream)
+{
+  auto mr = raft::resource::get_workspace_resource(res);
+  auto f32_result_vec =
+    raft::make_device_mdarray<float, int64_t>(res, mr, raft::make_extents<int64_t>(dataset_dim));
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(f32_result_vec.data_handle(), 0, sizeof(float) * dataset_dim, cuda_stream));
+
+  constexpr uint32_t dataset_size_per_cta = 2048;
+  constexpr uint32_t block_size           = 256;
+  const dim3 grid_size(raft::div_rounding_up_safe<size_t>(dataset_dim, block_size),
+                       raft::div_rounding_up_safe<size_t>(dataset_size, dataset_size_per_cta));
+  mean_f16_in_f32_kernel_sum<<<grid_size, block_size, 0, cuda_stream>>>(
+    f32_result_vec.data_handle(), src_ptr, ld, dataset_dim, dataset_size, dataset_size_per_cta);
+  mean_f16_in_f32_kernel_div<<<grid_size.x, block_size, 0, cuda_stream>>>(
+    result_ptr, f32_result_vec.data_handle(), dataset_dim, dataset_size);
+}
+
 template <typename T, typename QuantI = uint8_t>
 void transform(raft::resources const& res,
                cuvs::preprocessing::quantize::binary::params params,
@@ -178,10 +236,6 @@ void transform(raft::resources const& res,
                "the input dataset size (%lu) but is %lu passed",
                dataset_size,
                out_dataset_size);
-  // stats::mean does not support F16
-  RAFT_EXPECTS(!(std::is_same_v<T, half> && params.threshold == binary::bit_threshold::mean),
-               "binary::transform does not support threshold == mean for FP16 dataset");
-
   auto mr = raft::resource::get_workspace_resource(res);
   auto threshold_vec =
     raft::make_device_mdarray<T, int64_t>(res, mr, raft::make_extents<int64_t>(0));
@@ -203,6 +257,16 @@ void transform(raft::resources const& res,
         dataset,
         raft::make_device_vector_view<T, int64_t>(threshold_vec.data_handle(), dataset_dim),
         false);
+    } else {
+      // Use a custom CUDA kernel because 1) raft::stats::mean does not support f16 and 2) it is
+      // better to use f32 in accumulation data type for a large dataset.
+      mean_f16_in_f32(res,
+                      threshold_ptr,
+                      dataset.data_handle(),
+                      dataset_dim,
+                      dataset_dim,
+                      dataset_size,
+                      raft::resource::get_cuda_stream(res));
     }
   }
 
