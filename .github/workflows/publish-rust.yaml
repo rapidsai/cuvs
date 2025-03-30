@@ -6,6 +6,10 @@ on:
     branches:
       - "pull-request/[0-9]+"
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   rust-publish:
     runs-on: ubuntu-latest
@@ -42,6 +46,10 @@ jobs:
           set +eu
           conda activate rust
           set -eu
+
+          LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+          export LIBCLANG_PATH
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 
       - name: Publish sys crate
         if: steps.check_release.outputs.is_release == 'true'
