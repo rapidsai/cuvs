@@ -137,6 +137,7 @@ void transform(raft::resources const& res,
  * @endcode
  *
  * @param[in] res raft resource
+ * @param[in] params quantization params
  * @param[in] dataset a row-major matrix view on host
  * @param[out] out a row-major matrix view on host
  *
