@@ -476,6 +476,7 @@ RAFT_KERNEL preprocess_data_kernel(
   __syncthreads();
 
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
     int lane_id = threadIdx.x % raft::warp_size();
     for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
@@ -502,7 +503,7 @@ RAFT_KERNEL preprocess_data_kernel(
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         output_data[list_id * dim + idx] =
           (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
-      } else {
+      } else {  // L2Expanded or L2SqrtExpanded
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
       }
@@ -845,10 +846,13 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
-      } else {
+      } else {  // L2Expanded and L2SqrtExpanded
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
+        if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          s_distances[i] = sqrtf(s_distances[i]);
+        }
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -926,10 +930,13 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
-      } else {
+      } else {  // L2Expanded and L2SqrtExpanded
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
+        if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          s_distances[i] = sqrtf(s_distances[i]);
+        }
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -1214,7 +1221,8 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
   raft::matrix::fill(res, graph_buffer_view, std::numeric_limits<Index_t>::max());
   raft::matrix::fill(res, d_locks_.view(), 0);
 
-  if (build_config.metric == cuvs::distance::DistanceType::L2Expanded) {
+  if (build_config.metric == cuvs::distance::DistanceType::L2Expanded ||
+      build_config.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     l2_norms_ = raft::make_device_vector<DistData_t, size_t>(res, nrow_);
   }
 };
@@ -1453,10 +1461,12 @@ void build(raft::resources const& res,
                "The dataset size for GNND should be less than %d",
                std::numeric_limits<int>::max() - 1);
   auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                          params.metric == cuvs::distance::DistanceType::CosineExpanded ||
                          params.metric == cuvs::distance::DistanceType::InnerProduct;
   RAFT_EXPECTS(allowed_metrics,
-               "The metric for NN Descent should be L2Expanded, CosineExpanded or InnerProduct");
+               "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded or "
+               "InnerProduct");
   RAFT_EXPECTS(
     idx.metric() == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");
