@@ -27,6 +27,14 @@ namespace cuvs::neighbors::batch_ann {
                                   bool return_distances)                                    \
   {                                                                                         \
     return batch_ann::detail::build<T, IdxT>(handle, dataset, k, params, return_distances); \
+  }                                                                                         \
+                                                                                            \
+  void build(const raft::resources& handle,                                                 \
+             raft::host_matrix_view<const T, IdxT, row_major> dataset,                      \
+             const index_params& params,                                                    \
+             batch_ann::index<IdxT, T>& idx)                                                \
+  {                                                                                         \
+    return batch_ann::detail::build<T, IdxT>(handle, dataset, params, idx);                 \
   }
 
 CUVS_INST_BATCH_KNN(float, int64_t);

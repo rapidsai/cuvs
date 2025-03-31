@@ -45,16 +45,10 @@ struct index : cuvs::neighbors::index {
    * @param n_rows number of rows in knn-graph
    * @param k number of nearest neighbors in knn-graph
    * @param return_distances whether to return distances
-   * @param metric distance metric to use
    */
-  index(raft::resources const& res,
-        int64_t n_rows,
-        int64_t k,
-        bool return_distances               = false,
-        cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+  index(raft::resources const& res, int64_t n_rows, int64_t k, bool return_distances = false)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{metric},
       k_{k},
       graph_{raft::make_host_matrix<IdxT, IdxT, raft::row_major>(n_rows, k)},
       graph_view_{graph_.view()},
@@ -76,16 +70,13 @@ struct index : cuvs::neighbors::index {
    * @param graph_view raft::host_matrix_view<IdxT, IdxT, raft::row_major> for storing knn-graph
    * @param distances_view optional raft::device_matrix_view<DistT, IdxT, row_major> for storing
    * distances
-   * @param metric distance metric to use
    */
   index(
     raft::resources const& res,
     raft::host_matrix_view<IdxT, IdxT, raft::row_major> graph_view,
-    std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view = std::nullopt,
-    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+    std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view = std::nullopt)
     : cuvs::neighbors::index(),
       res_{res},
-      metric_{metric},
       k_{graph_view.extent(1)},
       graph_{raft::make_host_matrix<IdxT, IdxT, raft::row_major>(0, 0)},
       graph_view_{graph_view},
@@ -93,8 +84,6 @@ struct index : cuvs::neighbors::index {
       return_distances_{distances_view.has_value()}
   {
   }
-
-  auto metric() { return metric_; }
 
   bool return_distances() { return return_distances_; }
 
@@ -122,7 +111,6 @@ struct index : cuvs::neighbors::index {
 
  private:
   raft::resources const& res_;
-  cuvs::distance::DistanceType metric_;
   int64_t k_;
   bool return_distances_;
   raft::host_matrix<IdxT, IdxT, raft::row_major> graph_;
@@ -154,7 +142,6 @@ using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
  * n_nearest_clusters: number of nearest clusters each data point will be assigned to in
  * the batching algorithm
  * n_clusters: number of total clusters (aka batches) to split the data into
- * metric: distance metric to use
  *
  */
 struct index_params : cuvs::neighbors::index_params {
@@ -198,5 +185,10 @@ auto build(const raft::resources& handle,
            int64_t k,
            const index_params& params,
            bool return_distances = false) -> index<int64_t, float>;
+
+void build(const raft::resources& handle,
+           raft::host_matrix_view<const float, int64_t, row_major> dataset,
+           const index_params& params,
+           index<int64_t, float>& idx);
 
 }  // namespace cuvs::neighbors::batch_ann

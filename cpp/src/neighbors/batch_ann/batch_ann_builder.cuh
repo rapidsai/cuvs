@@ -479,9 +479,10 @@ struct batch_ann_builder_nn_descent : public batch_ann_builder<T, IdxT> {
     size_t intermediate_degree = nnd_params.intermediate_graph_degree;
     size_t graph_degree        = nnd_params.graph_degree;
 
-    if (graph_degree != this->k) {
+    if (graph_degree < this->k) {
       RAFT_LOG_WARN(
-        "NN Descent's graph degree (%lu) has to be equal to k. Setting graph_degree to k (%lu).",
+        "NN Descent's graph degree (%lu) has to be larger than or equal to k. Setting graph_degree "
+        "to k (%lu).",
         graph_degree,
         this->k);
       graph_degree = this->k;
@@ -506,7 +507,7 @@ struct batch_ann_builder_nn_descent : public batch_ann_builder<T, IdxT> {
     build_config.internal_node_degree  = extended_intermediate_degree;
     build_config.max_iterations        = nnd_params.max_iterations;
     build_config.termination_threshold = nnd_params.termination_threshold;
-    build_config.output_graph_degree   = graph_degree;
+    build_config.output_graph_degree   = this->k;
     build_config.metric                = this->metric;
 
     nnd_builder.emplace(this->res, build_config);
