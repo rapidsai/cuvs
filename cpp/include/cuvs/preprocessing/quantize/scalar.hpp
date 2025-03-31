@@ -64,8 +64,7 @@ struct quantizer {
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::scalar::params params;
- * auto quantizer = cuvs::preprocessing::quantize::scalar::train<double, int8_t>(handle, params,
- * dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -85,8 +84,7 @@ quantizer<double> train(raft::resources const& res,
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::scalar::params params;
- * auto quantizer = cuvs::preprocessing::quantize::scalar::train<double, int8_t>(handle, params,
- * dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -207,8 +205,7 @@ void inverse_transform(raft::resources const& res,
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::scalar::params params;
- * auto quantizer = cuvs::preprocessing::quantize::scalar::train<float, int8_t>(handle, params,
- * dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -228,8 +225,7 @@ quantizer<float> train(raft::resources const& res,
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::scalar::params params;
- * auto quantizer = cuvs::preprocessing::quantize::scalar::train<float, int8_t>(handle, params,
- * dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -349,8 +345,7 @@ void inverse_transform(raft::resources const& res,
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::scalar::params params;
- * auto quantizer = cuvs::preprocessing::quantize::scalar::train<half, int8_t>(handle, params,
- * dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -370,8 +365,7 @@ quantizer<half> train(raft::resources const& res,
  * @code{.cpp}
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::scalar::params params;
- * auto quantizer = cuvs::preprocessing::quantize::scalar::train<half, int8_t>(handle, params,
- * dataset);
+ * auto quantizer = cuvs::preprocessing::quantize::scalar::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
