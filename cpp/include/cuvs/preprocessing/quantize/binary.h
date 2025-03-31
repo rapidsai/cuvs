@@ -128,7 +128,7 @@ cuvsError_t cuvsBinaryQuantizerTransform(cuvsResources_t res,
  * BitwiseHamming distance type.
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer binary quantizer
  * @param[in] dataset a row-major host or device matrix to transform
  * @param[out] out a row-major host or device matrix to store transformed data
  */
