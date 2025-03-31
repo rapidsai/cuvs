@@ -50,7 +50,7 @@ jobs:
   rust-publish:
     needs: rust-build
     secrets: inherit
-    uses: ./.github/workflows/publish.yaml
+    uses: ./.github/workflows/publish-rust.yaml
   go-build:
     needs: cpp-build
     secrets: inherit

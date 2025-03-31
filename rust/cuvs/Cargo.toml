@@ -1,5 +1,5 @@
 [package]
-name = "jawe-cuvs-iii"
+name = "cuvs"
 description = "RAPIDS vector search library"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-ffi = { package = "jawe-cuvs-sys-iii", path = "../cuvs-sys", version = "25.4.0" }
+ffi = { package = "cuvs-sys", path = "../cuvs-sys", version = "25.4.0" }
 ndarray = "0.15"
 
 [dev-dependencies]
