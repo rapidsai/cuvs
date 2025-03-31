@@ -195,6 +195,7 @@ struct search_params : cuvs::neighbors::search_params {
    * - Legacy default: CUDA_R_32F (float)
    * - Recommended for performance: CUDA_R_16F (half)
    * - Experimental/low-precision: CUDA_R_8I (int8_t)
+   *    (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional)
    */
   cudaDataType_t coarse_search_dtype = CUDA_R_32F;
   /**

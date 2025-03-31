@@ -79,6 +79,8 @@ void _search(cuvsResources_t res,
   search_params.lut_dtype                = params.lut_dtype;
   search_params.internal_distance_dtype  = params.internal_distance_dtype;
   search_params.preferred_shmem_carveout = params.preferred_shmem_carveout;
+  search_params.coarse_search_dtype      = params.coarse_search_dtype;
+  search_params.max_internal_batch_size  = params.max_internal_batch_size;
 
   using queries_mdspan_type   = raft::device_matrix_view<const T, IdxT, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, IdxT, raft::row_major>;
@@ -246,6 +248,8 @@ extern "C" cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* para
     *params = new cuvsIvfPqSearchParams{.n_probes                 = 20,
                                         .lut_dtype                = CUDA_R_32F,
                                         .internal_distance_dtype  = CUDA_R_32F,
+                                        .coarse_search_dtype      = CUDA_R_32F,
+                                        .max_internal_batch_size  = 4096,
                                         .preferred_shmem_carveout = 1.0};
   });
 }
