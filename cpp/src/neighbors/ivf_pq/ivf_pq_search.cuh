@@ -216,8 +216,9 @@ void select_clusters(raft::resources const& handle,
       uint32_t row = ix / dim_ext;
       if (col < dim) { return utils::mapping<int8_t>{}(queries[col + dim * row]); }
       auto m = dim_ext - dim;
-      if (m == 1 || col > dim) { return norm_factor; }
-      return static_cast<int8_t>(1 - m);
+      // see 'NOTE: maximizing the range and the precision of int8_t GEMM' in ivf_pq_index.cu
+      if (m == 1 || col > dim) { return norm_factor; }  // times `y` (higher bits)
+      return static_cast<int8_t>(1 - m);                // times `z` (lower bits)
     });
 
   using dist_type = int32_t;

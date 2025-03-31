@@ -373,8 +373,41 @@ raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index<IdxT>::c
     uint32_t dim_ext_int8 = raft::round_up_safe(dim + 2, 16u);
     centers_int8_.emplace(raft::make_device_matrix<int8_t, uint32_t>(res, n_lists, dim_ext_int8));
     auto* inputs = centers().data_handle();
+    /* NOTE: maximizing the range and the precision of int8_t GEMM
 
-    // NB: we use all available spare slots between dim and dim_ext to improve precision
+    int8_t has a very limited range [-128, 127], which is problematic when storing both vectors and
+    their squared norms in one place.
+
+    We map all dimensions by multiplying by 128. But that means we need to multiply the squared norm
+    component by `128^2`, which we cannot afford, since it most likely overflows.
+    So, a naive mapping would be:
+    ```
+      [c_1 * 128, c_2, * 128, ...., c_(dim-1) * 128,  n2 * 128 * 128, 0 ... 0]
+      • [q_1 * 128, q_2 * 128, ..., q_(dim-1)*128, -0.5, 0, ... 0]
+    ```
+
+    Which is at first can be improved by moving one 128 to the query side:
+    ```
+      [c_1 * 128, c_2, * 128, ...., c_(dim-1) * 128,  n2 * 128, 0 ... 0]
+      • [q_1 * 128, q_2 * 128, ..., q_(dim-1)*128, -64, 0, ... 0]
+    ```
+
+    Yet this still only works for vectors with L2 norms not bigger than one and has a rather awful
+    granularity of 64. To improve both the range and the precision, we count the number of available
+    slots `m > 2` and decompose the squared norm, such that:
+    ```
+      0.5 * 128 * n2 = 64 * n2 = 128 * z + (m - 1) * y
+    ```
+    where `y` maximizes the available range while `z` encodes the rounding error.
+    Then we get following dot product during the coarse search:
+    ```
+      [c_1 * 128, c_2, * 128, ...., c_(dim-1) * 128,  z, y, ... y]
+      • [q_1 * 128, q_2 * 128, ..., q_(dim-1)*128, 1 - m,  -128, ... -128]
+    ```
+    `m` is maximum 16, so we get the coefficient much lower than the naive 64 on the query side; and
+    it is limited by the range we can cover (the squared norm must be within `m * 2` before
+    normalization).
+    */
     raft::linalg::map_offset(
       res, centers_int8_->view(), [dim, dim_ext, dim_ext_int8, inputs] __device__(uint32_t ix) {
         uint32_t col = ix % dim_ext_int8;
