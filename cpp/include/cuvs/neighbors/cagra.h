@@ -428,6 +428,7 @@ cuvsError_t cuvsCagraExtend(cuvsResources_t res,
  *          c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
  *          d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+ *                     or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
  * @code {.c}
