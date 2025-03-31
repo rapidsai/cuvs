@@ -172,7 +172,7 @@ void build_knn_graph(
  *   // build KNN graph not using `cagra::build_knn_graph`
  *   // build(knn_graph, dataset, ...);
  *   // sort graph index
- *   sort_knn_graph(res, dataset.view(), knn_graph.view());
+ *   sort_knn_graph(res, build_params.metric, dataset.view(), knn_graph.view());
  *   // optimize graph
  *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
  *   // Construct an index from dataset and optimized knn_graph
@@ -184,6 +184,7 @@ void build_knn_graph(
  * @tparam IdxT type of the dataset vector indices
  *
  * @param[in] res raft resources
+ * @param[in] metric metric
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[in,out] knn_graph a matrix view (host or device) of the input knn graph [n_rows,
  * knn_graph_degree]
@@ -197,6 +198,7 @@ template <
     raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
+  cuvs::distance::DistanceType metric,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor> dataset,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph)
 {
@@ -215,7 +217,7 @@ void sort_knn_graph(
     raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  cagra::detail::graph::sort_knn_graph(res, dataset_internal, knn_graph_internal);
+  cagra::detail::graph::sort_knn_graph(res, metric, dataset_internal, knn_graph_internal);
 }
 
 /**
