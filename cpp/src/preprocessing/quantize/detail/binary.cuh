@@ -213,50 +213,29 @@ void mean_f16_in_f32(raft::resources const& res,
     result_ptr, f32_result_vec.data_handle(), dataset_dim, dataset_size);
 }
 
-template <typename T, typename QuantI = uint8_t>
-void transform(raft::resources const& res,
-               cuvs::preprocessing::quantize::binary::params params,
-               raft::device_matrix_view<const T, int64_t> dataset,
-               raft::device_matrix_view<QuantI, int64_t> out)
+template <typename T>
+auto train(raft::resources const& res,
+           const cuvs::preprocessing::quantize::binary::params& params,
+           raft::device_matrix_view<const T, int64_t> dataset)
+  -> cuvs::preprocessing::quantize::binary::quantizer<T>
 {
-  cudaStream_t stream            = raft::resource::get_cuda_stream(res);
-  const uint32_t bits_per_pack   = sizeof(QuantI) * 8;
-  const uint32_t dataset_dim     = dataset.extent(1);
-  const uint32_t out_dim         = out.extent(1);
-  const size_t dataset_size      = dataset.extent(0);
-  const size_t out_dataset_size  = out.extent(0);
-  const uint32_t minimul_out_dim = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
-  RAFT_EXPECTS(out_dim >= minimul_out_dim,
-               "The quantized dataset dimension must be larger or equal to "
-               "%u but is %u passed",
-               minimul_out_dim,
-               out_dim);
-  RAFT_EXPECTS(out_dataset_size >= dataset_size,
-               "The quantized dataset size must be larger or equal to "
-               "the input dataset size (%lu) but is %lu passed",
-               dataset_size,
-               out_dataset_size);
-  auto mr = raft::resource::get_workspace_resource(res);
-  auto threshold_vec =
-    raft::make_device_mdarray<T, int64_t>(res, mr, raft::make_extents<int64_t>(0));
-
-  T* threshold_ptr = nullptr;
-
-  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean ||
-      params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
-    threshold_vec = raft::make_device_mdarray<T, std::int64_t>(
-      res, mr, raft::make_extents<std::int64_t>(dataset_dim));
-    threshold_ptr = threshold_vec.data_handle();
+  cuvs::preprocessing::quantize::binary::quantizer<T> quantizer(res);
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::zero) {
+    quantizer.threshold = raft::make_device_vector<T, int64_t>(res, 0);
+    return quantizer;
   }
+
+  const size_t dataset_size  = dataset.extent(0);
+  const uint32_t dataset_dim = dataset.extent(1);
+
+  quantizer.threshold = raft::make_device_vector<T, int64_t>(res, dataset_dim);
+  auto threshold_ptr  = quantizer.threshold.data_handle();
 
   if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean) {
     // stats::mean does not support F16
     if constexpr (!std::is_same_v<T, half>) {
       raft::stats::mean(
-        res,
-        dataset,
-        raft::make_device_vector_view<T, int64_t>(threshold_vec.data_handle(), dataset_dim),
-        false);
+        res, dataset, raft::make_device_vector_view<T, int64_t>(threshold_ptr, dataset_dim), false);
     } else {
       // Use a custom CUDA kernel because 1) raft::stats::mean does not support f16 and 2) it is
       // better to use f32 in accumulation data type for a large dataset.
@@ -268,9 +247,8 @@ void transform(raft::resources const& res,
                       dataset_size,
                       raft::resource::get_cuda_stream(res));
     }
-  }
-
-  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
+  } else if (params.threshold ==
+             cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
       std::max(
@@ -283,6 +261,7 @@ void transform(raft::resources const& res,
       std::min(std::max(1lu, raft::resource::get_workspace_free_bytes(res) / data_size_per_vector),
                static_cast<std::size_t>(dataset_dim));
 
+    auto mr                    = raft::resource::get_workspace_resource(res);
     auto sampled_dataset_chunk = raft::make_device_mdarray<T, int64_t>(
       res, mr, raft::make_extents<int64_t>(max_dim_chunk, num_sampls));
     for (uint32_t dim_offset = 0; dim_offset < dataset_dim; dim_offset += max_dim_chunk) {
@@ -311,56 +290,28 @@ void transform(raft::resources const& res,
                                       raft::resource::get_cuda_stream(res)));
     }
   }
-
-  constexpr uint32_t warp_size    = 32;
-  constexpr uint32_t block_size   = 256;
-  constexpr uint32_t vecs_per_cta = block_size / warp_size;
-  const auto grid_size =
-    raft::div_rounding_up_safe(dataset_size, static_cast<size_t>(vecs_per_cta));
-
-  binary_quantization_kernel<T, block_size>
-    <<<grid_size, block_size, 0, stream>>>(dataset.data_handle(),
-                                           dataset.stride(0),
-                                           threshold_ptr,
-                                           dataset_size,
-                                           dataset_dim,
-                                           out.data_handle(),
-                                           out.stride(0));
+  return quantizer;
 }
 
-template <typename T, typename QuantI = uint8_t>
-void transform(raft::resources const& res,
-               cuvs::preprocessing::quantize::binary::params params,
-               raft::host_matrix_view<const T, int64_t> dataset,
-               raft::host_matrix_view<QuantI, int64_t> out)
+template <typename T>
+auto train(raft::resources const& res,
+           const cuvs::preprocessing::quantize::binary::params& params,
+           raft::host_matrix_view<const T, int64_t> dataset)
+  -> cuvs::preprocessing::quantize::binary::quantizer<T>
 {
-  const uint32_t bits_per_pack   = sizeof(QuantI) * 8;
-  const uint32_t dataset_dim     = dataset.extent(1);
-  const uint32_t out_dim         = out.extent(1);
-  const size_t dataset_size      = dataset.extent(0);
-  const size_t out_dataset_size  = out.extent(0);
-  const uint32_t minimul_out_dim = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
-  RAFT_EXPECTS(out_dim >= minimul_out_dim,
-               "The quantized dataset dimension must be larger or equal to "
-               "%u but is %u passed",
-               minimul_out_dim,
-               out_dim);
-  RAFT_EXPECTS(out_dataset_size >= dataset_size,
-               "The quantized dataset size must be larger or equal to "
-               "the input dataset size (%lu) but is %lu passed",
-               dataset_size,
-               out_dataset_size);
-
-  // Use `float` for computation when T == half because a runtime error occurs with CUDA 11.8
-  using compute_t          = std::conditional_t<std::is_same_v<half, T>, float, T>;
-  auto threshold_vec       = raft::make_host_vector<compute_t, int64_t>(0);
-  compute_t* threshold_ptr = nullptr;
-
-  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean ||
-      params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
-    threshold_vec = raft::make_host_vector<compute_t, int64_t>(dataset_dim);
-    threshold_ptr = threshold_vec.data_handle();
+  cuvs::preprocessing::quantize::binary::quantizer<T> quantizer(res);
+  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::zero) {
+    quantizer.threshold = raft::make_device_vector<T, int64_t>(res, 0);
+    return quantizer;
   }
+
+  const uint32_t dataset_dim = dataset.extent(1);
+  const size_t dataset_size  = dataset.extent(0);
+  quantizer.threshold        = raft::make_device_vector<T, int64_t>(res, dataset_dim);
+
+  using compute_t = std::conditional_t<std::is_same_v<half, T>, float, T>;
+  std::vector<compute_t> host_threshold_vec(dataset_dim);
+  auto threshold_ptr = host_threshold_vec.data();
 
   if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean) {
     for (uint32_t j = 0; j < dataset_dim; j++) {
@@ -375,9 +326,8 @@ void transform(raft::resources const& res,
     for (uint32_t j = 0; j < dataset_dim; j++) {
       threshold_ptr[j] /= dataset_size;
     }
-  }
-
-  if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
+  } else if (params.threshold ==
+             cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
       std::max(
@@ -410,6 +360,119 @@ void transform(raft::resources const& res,
       auto start_ptr = sampled_dataset.data_handle() + j * num_sampls;
       std::sort(start_ptr, start_ptr + num_sampls);
       threshold_ptr[j] = start_ptr[(num_sampls - 1) / 2];
+    }
+  }
+
+  if constexpr (std::is_same_v<T, compute_t>) {
+    raft::copy(quantizer.threshold.data_handle(),
+               host_threshold_vec.data(),
+               dataset_dim,
+               raft::resource::get_cuda_stream(res));
+  } else {
+    auto mr         = raft::resource::get_workspace_resource(res);
+    auto casted_vec = raft::make_device_mdarray<compute_t, int64_t>(
+      res, mr, raft::make_extents<int64_t>(dataset_dim));
+    raft::copy(casted_vec.data_handle(),
+               host_threshold_vec.data(),
+               dataset_dim,
+               raft::resource::get_cuda_stream(res));
+    raft::linalg::map(res,
+                      quantizer.threshold.view(),
+                      raft::cast_op<T>{},
+                      raft::make_const_mdspan(casted_vec.view()));
+  }
+  return quantizer;
+}
+
+template <typename T, typename QuantI>
+void transform(raft::resources const& res,
+               const cuvs::preprocessing::quantize::binary::quantizer<T>& quantizer,
+               raft::device_matrix_view<const T, int64_t> dataset,
+               raft::device_matrix_view<QuantI, int64_t> out)
+{
+  cudaStream_t stream            = raft::resource::get_cuda_stream(res);
+  const uint32_t bits_per_pack   = sizeof(QuantI) * 8;
+  const uint32_t dataset_dim     = dataset.extent(1);
+  const uint32_t out_dim         = out.extent(1);
+  const size_t dataset_size      = dataset.extent(0);
+  const size_t out_dataset_size  = out.extent(0);
+  const uint32_t minimul_out_dim = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
+  RAFT_EXPECTS(out_dim >= minimul_out_dim,
+               "The quantized dataset dimension must be larger or equal to "
+               "%u but is %u passed",
+               minimul_out_dim,
+               out_dim);
+  RAFT_EXPECTS(out_dataset_size >= dataset_size,
+               "The quantized dataset size must be larger or equal to "
+               "the input dataset size (%lu) but is %lu passed",
+               dataset_size,
+               out_dataset_size);
+  const T* threshold_ptr = nullptr;
+  if (quantizer.threshold.size() != 0) { threshold_ptr = quantizer.threshold.data_handle(); }
+
+  constexpr uint32_t warp_size    = 32;
+  constexpr uint32_t block_size   = 256;
+  constexpr uint32_t vecs_per_cta = block_size / warp_size;
+  const auto grid_size =
+    raft::div_rounding_up_safe(dataset_size, static_cast<size_t>(vecs_per_cta));
+
+  binary_quantization_kernel<T, block_size>
+    <<<grid_size, block_size, 0, stream>>>(dataset.data_handle(),
+                                           dataset.stride(0),
+                                           threshold_ptr,
+                                           dataset_size,
+                                           dataset_dim,
+                                           out.data_handle(),
+                                           out.stride(0));
+}
+
+template <typename T, typename QuantI>
+void transform(raft::resources const& res,
+               const cuvs::preprocessing::quantize::binary::quantizer<T>& quantizer,
+               raft::host_matrix_view<const T, int64_t> dataset,
+               raft::host_matrix_view<QuantI, int64_t> out)
+{
+  const uint32_t bits_per_pack   = sizeof(QuantI) * 8;
+  const uint32_t dataset_dim     = dataset.extent(1);
+  const uint32_t out_dim         = out.extent(1);
+  const size_t dataset_size      = dataset.extent(0);
+  const size_t out_dataset_size  = out.extent(0);
+  const uint32_t minimul_out_dim = raft::div_rounding_up_safe(dataset_dim, bits_per_pack);
+  RAFT_EXPECTS(out_dim >= minimul_out_dim,
+               "The quantized dataset dimension must be larger or equal to "
+               "%u but is %u passed",
+               minimul_out_dim,
+               out_dim);
+  RAFT_EXPECTS(out_dataset_size >= dataset_size,
+               "The quantized dataset size must be larger or equal to "
+               "the input dataset size (%lu) but is %lu passed",
+               dataset_size,
+               out_dataset_size);
+
+  // Use `float` for computation when T == half because a runtime error occurs with CUDA 11.8
+  using compute_t          = std::conditional_t<std::is_same_v<half, T>, float, T>;
+  auto threshold_vec       = raft::make_host_vector<compute_t, int64_t>(0);
+  compute_t* threshold_ptr = nullptr;
+
+  if (quantizer.threshold.size() != 0) {
+    threshold_vec = raft::make_host_vector<compute_t, int64_t>(dataset_dim);
+    threshold_ptr = threshold_vec.data_handle();
+
+    if constexpr (std::is_same_v<compute_t, T>) {
+      raft::copy(threshold_ptr,
+                 quantizer.threshold.data_handle(),
+                 dataset_dim,
+                 raft::resource::get_cuda_stream(res));
+    } else {
+      auto mr         = raft::resource::get_workspace_resource(res);
+      auto casted_vec = raft::make_device_mdarray<float, int64_t>(
+        res, mr, raft::make_extents<int64_t>(dataset_dim));
+      raft::linalg::map(res,
+                        casted_vec.view(),
+                        raft::cast_op<compute_t>{},
+                        raft::make_const_mdspan(quantizer.threshold.view()));
+      raft::copy(
+        threshold_ptr, casted_vec.data_handle(), dataset_dim, raft::resource::get_cuda_stream(res));
     }
   }
 

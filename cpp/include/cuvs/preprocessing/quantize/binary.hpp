@@ -46,6 +46,59 @@ struct params {
 };
 
 /**
+ * @brief
+ *
+ * @tparam T data element type
+ *
+ */
+template <typename T>
+struct quantizer {
+  raft::device_vector<T, int64_t> threshold;
+
+  quantizer(raft::resources const& res) : threshold(raft::make_device_vector<T, int64_t>(res, 0)) {}
+};
+
+/**
+ * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantize::binary::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure binary quantizer, e.g. threshold
+ * @param[in] dataset a row-major matrix view on device
+ *
+ * @return quantizer
+ */
+quantizer<double> train(raft::resources const& res,
+                        const params params,
+                        raft::device_matrix_view<const double, int64_t> dataset);
+
+/**
+ * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantize::binary::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure binary quantizer, e.g. threshold
+ * @param[in] dataset a row-major matrix view on host
+ *
+ * @return quantizer
+ */
+quantizer<double> train(raft::resources const& res,
+                        const params params,
+                        raft::host_matrix_view<const double, int64_t> dataset);
+
+/**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
  * set the corresponding bit to 1.
  *
@@ -59,13 +112,13 @@ struct params {
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer a binary quantizer
  * @param[in] dataset a row-major matrix view on device
  * @param[out] out a row-major matrix view on device
  *
  */
 void transform(raft::resources const& res,
-               const params params,
+               const quantizer<double>& quantize,
                raft::device_matrix_view<const double, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
@@ -83,15 +136,55 @@ void transform(raft::resources const& res,
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer a binary quantizer
  * @param[in] dataset a row-major matrix view on host
  * @param[out] out a row-major matrix view on host
  *
  */
 void transform(raft::resources const& res,
-               const params params,
+               const quantizer<double>& quantize,
                raft::host_matrix_view<const double, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantize::binary::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure binary quantizer, e.g. threshold
+ * @param[in] dataset a row-major matrix view on device
+ *
+ * @return quantizer
+ */
+quantizer<float> train(raft::resources const& res,
+                       const params params,
+                       raft::device_matrix_view<const float, int64_t> dataset);
+
+/**
+ * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantize::binary::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure binary quantizer, e.g. threshold
+ * @param[in] dataset a row-major matrix view on host
+ *
+ * @return quantizer
+ */
+quantizer<float> train(raft::resources const& res,
+                       const params params,
+                       raft::host_matrix_view<const float, int64_t> dataset);
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -110,13 +203,13 @@ void transform(raft::resources const& res,
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer a binary quantizer
  * @param[in] dataset a row-major matrix view on device
  * @param[out] out a row-major matrix view on device
  *
  */
 void transform(raft::resources const& res,
-               const params params,
+               const quantizer<float>& quantize,
                raft::device_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
@@ -137,15 +230,55 @@ void transform(raft::resources const& res,
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer a binary quantizer
  * @param[in] dataset a row-major matrix view on host
  * @param[out] out a row-major matrix view on host
  *
  */
 void transform(raft::resources const& res,
-               const params params,
+               const quantizer<float>& quantize,
                raft::host_matrix_view<const float, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantize::binary::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure binary quantizer, e.g. threshold
+ * @param[in] dataset a row-major matrix view on device
+ *
+ * @return quantizer
+ */
+quantizer<half> train(raft::resources const& res,
+                      const params params,
+                      raft::device_matrix_view<const half, int64_t> dataset);
+
+/**
+ * @brief Initializes a binary quantizer to be used later for quantizing the dataset.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::handle_t handle;
+ * cuvs::preprocessing::quantize::binary::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] params configure binary quantizer, e.g. threshold
+ * @param[in] dataset a row-major matrix view on host
+ *
+ * @return quantizer
+ */
+quantizer<half> train(raft::resources const& res,
+                      const params params,
+                      raft::host_matrix_view<const half, int64_t> dataset);
 
 /**
  * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
@@ -163,13 +296,13 @@ void transform(raft::resources const& res,
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer a binary quantizer
  * @param[in] dataset a row-major matrix view on device
  * @param[out] out a row-major matrix view on device
  *
  */
 void transform(raft::resources const& res,
-               const params params,
+               const quantizer<half>& quantize,
                raft::device_matrix_view<const half, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
@@ -189,13 +322,13 @@ void transform(raft::resources const& res,
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] params quantization params
+ * @param[in] quantizer a binary quantizer
  * @param[in] dataset a row-major matrix view on host
  * @param[out] out a row-major matrix view on host
  *
  */
 void transform(raft::resources const& res,
-               const params params,
+               const quantizer<half>& quantize,
                raft::host_matrix_view<const half, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
 

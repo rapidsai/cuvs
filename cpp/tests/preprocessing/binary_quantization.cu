@@ -30,6 +30,7 @@ struct BinaryQuantizationInputs {
   int rows;
   int cols;
   cuvs::preprocessing::quantize::binary::bit_threshold threshold;
+  bool train_host;
 };
 
 template <typename T>
@@ -43,6 +44,7 @@ std::ostream& operator<<(std::ostream& os, const BinaryQuantizationInputs<T>& in
     case bit_threshold::sampling_median: os << "sampling_median"; break;
     default: os << "unknown"; break;
   }
+  os << " train_host_dataset: " << inputs.train_host;
   return os;
 }
 
@@ -142,10 +144,18 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
       const auto col_quantized = raft::div_rounding_up_safe(cols_, 8);
       auto quantized_input_h   = raft::make_host_matrix<QuantI, int64_t>(rows_, cols_);
       auto quantized_input_d   = raft::make_device_matrix<QuantI, int64_t>(handle, rows_, cols_);
+
+      cuvs::preprocessing::quantize::binary::quantizer<T> quantizer(handle);
+      if (train_host_) {
+        quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset_h);
+      } else {
+        quantizer = cuvs::preprocessing::quantize::binary::train(handle, params, dataset);
+      }
+
       cuvs::preprocessing::quantize::binary::transform(
-        handle, params, dataset, quantized_input_d.view());
+        handle, quantizer, dataset, quantized_input_d.view());
       cuvs::preprocessing::quantize::binary::transform(
-        handle, params, dataset_h, quantized_input_h.view());
+        handle, quantizer, dataset_h, quantized_input_h.view());
 
       ASSERT_TRUE(devArrMatchHost(quantized_input_h.data_handle(),
                                   quantized_input_d.data_handle(),
@@ -163,6 +173,8 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
     int n_elements = rows_ * cols_;
     input_.resize(n_elements, stream);
     host_input_.resize(n_elements);
+
+    train_host_ = params_.train_host;
 
     // random input
     unsigned long long int seed = 1234ULL;
@@ -183,6 +195,7 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
   int cols_;
   rmm::device_uvector<T> input_;
   std::vector<T> host_input_;
+  bool train_host_;
 };
 
 template <typename T>
@@ -193,7 +206,8 @@ const std::vector<BinaryQuantizationInputs<T>> generate_inputs()
     {7, 128, 1999},
     {cuvs::preprocessing::quantize::binary::bit_threshold::zero,
      cuvs::preprocessing::quantize::binary::bit_threshold::mean,
-     cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median});
+     cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median},
+    {true, false});
   return inputs;
 }
 
