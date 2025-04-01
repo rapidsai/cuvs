@@ -504,7 +504,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
     search_queries.resize(ps.num_queries * ps.dim, stream_);
 
     raft::random::RngState r(1234ULL);
-    if constexpr (std::is_same<DataT, float>{}) {
+    if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
       raft::random::uniform(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
