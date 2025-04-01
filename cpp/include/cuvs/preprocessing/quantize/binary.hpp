@@ -32,9 +32,8 @@ namespace cuvs::preprocessing::quantize::binary {
  */
 
 /**
- * @brief quantizer algorithms. In the binary::transform function, a bit is set if the corresponding
- * element in the dataset vector is greater than the corresponding element in the threshold vector.
- * The mean and sampling_median thresholds are calculated separately for each dimension.
+ * @brief quantizer algorithms. The mean and sampling_median thresholds are calculated separately
+ * for each dimension.
  */
 enum class bit_threshold { zero, mean, sampling_median };
 
@@ -51,7 +50,9 @@ struct params {
 };
 
 /**
- * @brief
+ * @brief Store the threshold vector for quantization. In the binary::transform function, a bit is
+ * set if the corresponding element in the dataset vector is greater than the corresponding element
+ * in the threshold vector.
  *
  * @tparam T data element type
  *
