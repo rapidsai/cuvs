@@ -180,12 +180,65 @@ struct index_params : cuvs::neighbors::index_params {
   size_t n_clusters         = 4;
 };
 
+/**
+ * @brief Build a new all-neighbors index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   batch_ann::index_params index_params;
+ *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
+ *   auto index = batch_ann::build(res, dataset, k, index_params);
+ *   // index.graph() provides a raft::host_matrix_view of an
+ *   // all-neighbors knn graph of dimensions [N, k] of the input
+ *   // dataset.
+ *   // index.distances() provides a raft::device_matrix_view of the corresponding distances
+ * @endcode
+ *
+ * @param[in] handle raft::resources is an object mangaging resources
+ * @param[in] dataset raft::host_matrix_view input dataset expected to be located
+ *                in host memory
+ * @param[in] k number of nearest neighbors in the resulting knn graph
+ * @param[in] params an instance of batch_ann::index_params that are parameters
+ *               to run the batched all-neighbors algorithm
+ * @param[in] return_distances boolean for whether to return the distances matrix as part of the
+ * index
+ * @return index<IdxT> index containing all-neighbors knn graph in host memory (and the
+ * corresponding distances in device memory if return_distances = true)
+ */
 auto build(const raft::resources& handle,
            raft::host_matrix_view<const float, int64_t, row_major> dataset,
            int64_t k,
            const index_params& params,
            bool return_distances = false) -> index<int64_t, float>;
 
+/**
+ * @brief Build a new all-neighbors index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   batch_ann::index_params index_params;
+ *   //
+ *   batch_ann::index<IdxT, T> index{handle, dataset.extent(0), k, return_distances};
+ *   // fill the index from a [N, D] raft::host_matrix_view dataset
+ *   batch_ann::build(res, dataset, index_params, index);
+ *   // index.graph() provides a raft::host_matrix_view of an
+ *   // all-neighbors knn graph of dimensions [N, k] of the input
+ *   // dataset
+ *   // index.distances() provides a raft::device_matrix_view of the corresponding distances
+ * @endcode
+ *
+ * @param[in] handle raft::resources is an object mangaging resources
+ * @param[in] dataset raft::host_matrix_view input dataset expected to be located
+ *                in host memory
+ * @param[in] params an instance of batch_ann::index_params that are parameters
+ *               to run the batched all-neighbors algorithm
+ * @param[out] idx batch_ann::index type holding the all-neighbors graph in host memory (and the
+ * corresponding distances in device memory if return_distances = true)
+ */
 void build(const raft::resources& handle,
            raft::host_matrix_view<const float, int64_t, row_major> dataset,
            const index_params& params,
