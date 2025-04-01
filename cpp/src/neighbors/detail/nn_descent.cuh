@@ -31,6 +31,7 @@
 #include <raft/core/pinned_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/slice.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
@@ -846,13 +847,10 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
-      } else {  // L2Expanded and L2SqrtExpanded
+      } else {  // L2Expanded or L2SqrtExpanded
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
-        if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-          s_distances[i] = sqrtf(s_distances[i]);
-        }
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -930,13 +928,10 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
-      } else {  // L2Expanded and L2SqrtExpanded
+      } else {  // L2Expanded or L2SqrtExpanded
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
-        if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-          s_distances[i] = sqrtf(s_distances[i]);
-        }
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -1419,6 +1414,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                                            static_cast<int64_t>(build_config_.output_graph_degree)};
     raft::matrix::slice<DistData_t, int64_t, raft::row_major>(
       res, raft::make_const_mdspan(graph_d_dists.view()), output_dist_view, coords);
+
+    if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+      raft::linalg::map(
+        res, output_dist_view, raft::sqrt_op{}, raft::make_const_mdspan(output_dist_view));
+    }
     raft::resource::sync_stream(res);
   }
 
