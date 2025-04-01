@@ -2,9 +2,6 @@ name: publish
 
 on:
   workflow_call:
-  push:
-    branches:
-      - "pull-request/[0-9]+"
 
 defaults:
   run:
@@ -23,7 +20,7 @@ jobs:
           if rapids-is-release-build; then
             echo "is_release=true" >> $GITHUB_OUTPUT
           else
-            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
           fi
       - name: Setup and publish crates
         if: steps.check_release.outputs.is_release == 'true'
