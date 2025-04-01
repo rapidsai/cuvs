@@ -352,6 +352,90 @@ void transform(raft::resources const& res,
                raft::host_matrix_view<const half, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
 
+/**
+ * @brief [deprecated] Applies binary quantization transform to given dataset. If a dataset element
+ * is positive, set the corresponding bit to 1.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
+ *
+ */
+[[deprecated("please create and specify a quantizer")]] void transform(
+  raft::resources const& res,
+  raft::device_matrix_view<const double, int64_t> dataset,
+  raft::device_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief [deprecated] Applies binary quantization transform to given dataset. If a dataset element
+ * is positive, set the corresponding bit to 1.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on host
+ * @param[out] out a row-major matrix view on host
+ *
+ */
+[[deprecated("please create and specify a quantizer")]] void transform(
+  raft::resources const& res,
+  raft::host_matrix_view<const double, int64_t> dataset,
+  raft::host_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief [deprecated] Applies binary quantization transform to given dataset. If a dataset element
+ * is positive, set the corresponding bit to 1.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
+ *
+ */
+[[deprecated("please create and specify a quantizer")]] void transform(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, int64_t> dataset,
+  raft::device_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief [deprecated] Applies binary quantization transform to given dataset. If a dataset element
+ * is positive, set the corresponding bit to 1.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on host
+ * @param[out] out a row-major matrix view on host
+ *
+ */
+[[deprecated("please create and specify a quantizer")]] void transform(
+  raft::resources const& res,
+  raft::host_matrix_view<const float, int64_t> dataset,
+  raft::host_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief [deprecated] Applies binary quantization transform to given dataset. If a dataset element
+ * is positive, set the corresponding bit to 1.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
+ *
+ */
+[[deprecated("please create and specify a quantizer")]] void transform(
+  raft::resources const& res,
+  raft::device_matrix_view<const half, int64_t> dataset,
+  raft::device_matrix_view<uint8_t, int64_t> out);
+
+/**
+ * @brief [deprecated] Applies binary quantization transform to given dataset. If a dataset element
+ * is positive, set the corresponding bit to 1.
+ *
+ * @param[in] res raft resource
+ * @param[in] dataset a row-major matrix view on host
+ * @param[out] out a row-major matrix view on host
+ *
+ */
+[[deprecated("please create and specify a quantizer")]] void transform(
+  raft::resources const& res,
+  raft::host_matrix_view<const half, int64_t> dataset,
+  raft::host_matrix_view<uint8_t, int64_t> out);
+
 /** @} */  // end of group binary
 
 }  // namespace cuvs::preprocessing::quantize::binary
