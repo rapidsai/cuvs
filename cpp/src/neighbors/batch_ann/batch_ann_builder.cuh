@@ -25,6 +25,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/kvp.hpp>
 #include <raft/core/managed_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -36,18 +37,11 @@ using namespace cuvs::neighbors;
 using align32 = raft::Pow2<32>;
 
 template <typename KeyType, typename ValueType>
-struct KeyValuePair {
-  KeyType key;
-  ValueType value;
-};
-
-template <typename KeyType, typename ValueType>
-struct CustomKeyComparator {
-  __device__ bool operator()(const KeyValuePair<KeyType, ValueType>& a,
-                             const KeyValuePair<KeyType, ValueType>& b) const
+struct CustomComparator {
+  __device__ bool operator()(const raft::KeyValuePair<KeyType, ValueType>& a,
+                             const raft::KeyValuePair<KeyType, ValueType>& b) const
   {
-    if (a.key == b.key) { return a.value < b.value; }
-    return a.key < b.key;
+    return a < b;
   }
 };
 
@@ -61,10 +55,11 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
                                    IdxT* batch_indices)
 {
   size_t batch_row = blockIdx.x;
-  typedef cub::BlockMergeSort<KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>
+  typedef cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>
     BlockMergeSortType;
-  __shared__ typename cub::BlockMergeSort<KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>::
-    TempStorage tmpSmem;
+  __shared__ typename cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>,
+                                          BLOCK_SIZE,
+                                          ITEMS_PER_THREAD>::TempStorage tmpSmem;
 
   extern __shared__ char sharedMem[];
   float* blockKeys  = reinterpret_cast<float*>(sharedMem);
@@ -76,7 +71,7 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
     // load batch or global depending on threadIdx
     size_t global_row = cluster_data_indices[batch_row];
 
-    KeyValuePair<float, IdxT> threadKeyValuePair[ITEMS_PER_THREAD];
+    raft::KeyValuePair<float, IdxT> threadKeyValuePair[ITEMS_PER_THREAD];
 
     size_t halfway   = BLOCK_SIZE / 2;
     size_t do_global = threadIdx.x < halfway;
@@ -108,7 +103,7 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
 
     __syncthreads();
 
-    BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, CustomKeyComparator<float, IdxT>{});
+    BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, CustomComparator<float, IdxT>{});
 
     // load sorted result into shared memory to get unique values
     idxBase = threadIdx.x * ITEMS_PER_THREAD;
