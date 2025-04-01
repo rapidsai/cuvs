@@ -132,8 +132,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
                    int batch_size,
                    int k,
                    algo_base::index_type* neighbors,
-                   float* distances,
-                   IdxT* neighbors_idx_t) const;
+                   float* distances) const;
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
@@ -181,7 +180,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
   std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
 
-  std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, IdxT>> dynamic_batcher_;
+  std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, algo_base::index_type>>
+    dynamic_batcher_;
   cuvs::neighbors::dynamic_batching::search_params dynamic_batcher_sp_{};
   int64_t dynamic_batching_max_batch_size_;
   size_t dynamic_batching_n_queues_;
@@ -292,16 +292,18 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
   // dynamic batching
   if (sp.dynamic_batching) {
     if (!dynamic_batcher_ || needs_dynamic_batcher_update) {
-      dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
-        handle_,
-        cuvs::neighbors::dynamic_batching::index_params{{},
-                                                        sp.dynamic_batching_k,
-                                                        sp.dynamic_batching_max_batch_size,
-                                                        sp.dynamic_batching_n_queues,
-                                                        sp.dynamic_batching_conservative_dispatch},
-        *index_,
-        search_params_,
-        filter_.get());
+      dynamic_batcher_ =
+        std::make_shared<cuvs::neighbors::dynamic_batching::index<T, algo_base::index_type>>(
+          handle_,
+          cuvs::neighbors::dynamic_batching::index_params{
+            {},
+            sp.dynamic_batching_k,
+            sp.dynamic_batching_max_batch_size,
+            sp.dynamic_batching_n_queues,
+            sp.dynamic_batching_conservative_dispatch},
+          *index_,
+          search_params_,
+          filter_.get());
     }
     dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
   } else {
@@ -359,24 +361,16 @@ std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
 }
 
 template <typename T, typename IdxT>
-void cuvs_cagra<T, IdxT>::search_base(const T* queries,
-                                      int batch_size,
-                                      int k,
-                                      algo_base::index_type* neighbors,
-                                      float* distances,
-                                      IdxT* neighbors_idx_t) const
+void cuvs_cagra<T, IdxT>::search_base(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
 
-  if constexpr (sizeof(IdxT) == sizeof(algo_base::index_type)) {
-    neighbors_idx_t = reinterpret_cast<IdxT*>(neighbors);
-  }
-
   auto queries_view =
     raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, dimension_);
   auto neighbors_view =
-    raft::make_device_matrix_view<IdxT, int64_t>(neighbors_idx_t, batch_size, k);
+    raft::make_device_matrix_view<algo_base::index_type, int64_t>(neighbors, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   if (dynamic_batcher_) {
@@ -390,26 +384,6 @@ void cuvs_cagra<T, IdxT>::search_base(const T* queries,
     cuvs::neighbors::cagra::search(
       handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
   }
-
-  if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
-    if (raft::get_device_for_address(neighbors) < 0 &&
-        raft::get_device_for_address(neighbors_idx_t) < 0) {
-      // Both pointers on the host, let's use host-side mapping
-      if (uses_stream()) {
-        // Need to wait for GPU to finish filling source
-        raft::resource::sync_stream(handle_);
-      }
-      for (int i = 0; i < batch_size * k; i++) {
-        neighbors[i] = algo_base::index_type(neighbors_idx_t[i]);
-      }
-    } else {
-      raft::linalg::unaryOp(neighbors,
-                            neighbors_idx_t,
-                            batch_size * k,
-                            raft::cast_op<algo_base::index_type>(),
-                            raft::resource::get_cuda_stream(handle_));
-    }
-  }
 }
 
 template <typename T, typename IdxT>
@@ -418,7 +392,6 @@ void cuvs_cagra<T, IdxT>::search(
 {
   static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
-  constexpr bool kNeedsIoMapping = sizeof(IdxT) != sizeof(algo_base::index_type);
 
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);
   const bool disable_refinement = k0 <= static_cast<size_t>(k);
@@ -434,9 +407,8 @@ void cuvs_cagra<T, IdxT>::search(
                                                dynamic_batching_max_batch_size_, batch_size) *
                                                dynamic_batching_n_queues_
                                            : 1;
-  auto tmp_buf_size = ((disable_refinement ? 0 : (sizeof(float) + sizeof(algo_base::index_type))) +
-                       (kNeedsIoMapping ? sizeof(IdxT) : 0)) *
-                      batch_size * k0;
+  auto tmp_buf_size =
+    ((disable_refinement ? 0 : (sizeof(float) + sizeof(algo_base::index_type)))) * batch_size * k0;
   auto& tmp_buf = get_tmp_buffer_from_global_pool(tmp_buf_size * max_dyn_grouping);
   thread_local static int64_t group_id = 0;
   auto* candidates_ptr                 = reinterpret_cast<algo_base::index_type*>(
@@ -444,13 +416,11 @@ void cuvs_cagra<T, IdxT>::search(
   group_id = (group_id + 1) % max_dyn_grouping;
   auto* candidate_dists_ptr =
     reinterpret_cast<float*>(candidates_ptr + (disable_refinement ? 0 : batch_size * k0));
-  auto* neighbors_idx_t =
-    reinterpret_cast<IdxT*>(candidate_dists_ptr + (disable_refinement ? 0 : batch_size * k0));
 
   if (disable_refinement) {
-    search_base(queries, batch_size, k, neighbors, distances, neighbors_idx_t);
+    search_base(queries, batch_size, k, neighbors, distances);
   } else {
-    search_base(queries, batch_size, k0, candidates_ptr, candidate_dists_ptr, neighbors_idx_t);
+    search_base(queries, batch_size, k0, candidates_ptr, candidate_dists_ptr);
 
     if (mem_type == MemoryType::kHostPinned && uses_stream()) {
       // If the algorithm uses a stream to synchronize (non-persistent kernel), but the data is in
