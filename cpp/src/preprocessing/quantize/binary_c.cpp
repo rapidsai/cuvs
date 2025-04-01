@@ -70,6 +70,19 @@ void* _train(cuvsResources_t res,
 
   auto quantizer_params           = cuvs::preprocessing::quantize::binary::params();
   quantizer_params.sampling_ratio = params->sampling_ratio;
+  switch (params->threshold) {
+    case ZERO:
+      quantizer_params.threshold = cuvs::preprocessing::quantize::binary::bit_threshold::zero;
+      break;
+    case MEAN:
+      quantizer_params.threshold = cuvs::preprocessing::quantize::binary::bit_threshold::mean;
+      break;
+    case SAMPLING_MEDIAN:
+      quantizer_params.threshold =
+        cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median;
+      break;
+    default: RAFT_FAIL("Unsupported threshold");
+  }
 
   auto ret = new cuvs::preprocessing::quantize::binary::quantizer<T>(*res_ptr);
 
