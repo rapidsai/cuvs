@@ -78,6 +78,9 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
         pq_params.search_params.preferred_shmem_carveout =
           ivf_pq_search_params->preferred_shmem_carveout;
       }
+      if (params.graph_build_params.refinement_rate > 1) {
+        pq_params.refinement_rate = params.graph_build_params.refinement_rate;
+      }
       index_params.graph_build_params = pq_params;
       break;
     }
@@ -380,7 +383,7 @@ extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params
                                                              .graph_degree              = 64,
                                                              .build_algo                = IVF_PQ,
                                                              .nn_descent_niter          = 20};
-    (*params)->graph_build_params = new cuvsIvfPqParams{nullptr, nullptr};
+    (*params)->graph_build_params = new cuvsIvfPqParams{nullptr, nullptr, 1};
   });
 }
 

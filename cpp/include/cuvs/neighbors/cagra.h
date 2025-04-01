@@ -90,6 +90,7 @@ typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
 struct cuvsIvfPqParams {
   cuvsIvfPqIndexParams_t ivf_pq_build_params;
   cuvsIvfPqSearchParams_t ivf_pq_search_params;
+  float refinement_rate;
 };
 
 typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
