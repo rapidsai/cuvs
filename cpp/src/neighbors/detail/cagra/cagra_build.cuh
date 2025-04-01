@@ -533,21 +533,21 @@ void deactivate_duplicate_nodes(
 
 #pragma omp parallel for
   for (IdxT i = 0; i < graph.extent(0); i++) {
-    auto si = get_small_node(small_node.view(), i);
     for (uint32_t k = 0; k < graph.extent(1); k++) {
       auto j = graph(i, k);
       if (!check_if_same_vector(dataset, i, j)) { break; }
+      auto si = get_small_node(small_node.view(), i);
       auto sj = get_small_node(small_node.view(), j);
       if (si == sj) { continue; }
-      if (si > sj) {
-        auto tmp = si;
-        si       = sj;
-        sj       = tmp;
-      }
 #pragma omp critical
       {
-        cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, sj, true);
-        small_node(sj) = si;
+        if (si > sj) {
+          cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, si, true);
+          small_node(si) = sj;
+        } else {
+          cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, sj, true);
+          small_node(sj) = si;
+        }
       }
       break;
     }
