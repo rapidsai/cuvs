@@ -15,31 +15,23 @@
  */
 
 #pragma once
-#include "../detail/ann_utils.cuh"
-#include "cuvs/neighbors/common.hpp"
-#include "cuvs/neighbors/ivf_pq.hpp"
+#include "batch_ann_builder.cuh"
 #include <cstddef>
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/batch_ann.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/managed_mdarray.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
-#include <rmm/mr/device/statistics_resource_adaptor.hpp>
-
-#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/managed_mdspan.hpp>
+#include <raft/core/resource/nccl_clique.hpp>
 #include <raft/matrix/sample_rows.cuh>
-
-#include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
-
-#include "batch_ann_builder.cuh"
-#include <cuvs/neighbors/batch_ann.hpp>
 
 namespace cuvs::neighbors::batch_ann::detail {
 using namespace cuvs::neighbors;
@@ -374,7 +366,6 @@ void build(const raft::resources& handle,
            const index_params& batch_params,
            batch_ann::index<IdxT, T>& index)
 {
-  auto start      = raft::curTimeMillis();
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
