@@ -249,6 +249,8 @@ auto train(raft::resources const& res,
     }
   } else if (params.threshold ==
              cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
+    RAFT_EXPECTS(params.sampling_ratio > 0 && params.sampling_ratio <= 1,
+                 "The sampling ratio must be within the range (0, 1].");
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
       std::max(
@@ -328,6 +330,9 @@ auto train(raft::resources const& res,
     }
   } else if (params.threshold ==
              cuvs::preprocessing::quantize::binary::bit_threshold::sampling_median) {
+    RAFT_EXPECTS(params.sampling_ratio > 0 && params.sampling_ratio <= 1,
+                 "The sampling ratio must be within the range (0, 1].");
+
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
     const size_t num_sampls =
       std::max(

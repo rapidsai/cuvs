@@ -32,7 +32,9 @@ namespace cuvs::preprocessing::quantize::binary {
  */
 
 /**
- * @brief quantizer algorithms
+ * @brief quantizer algorithms. In the binary::transform function, a bit is set if the corresponding
+ * element in the dataset vector is greater than the corresponding element in the threshold vector.
+ * The mean and sampling_median thresholds are calculated separately for each dimension.
  */
 enum class bit_threshold { zero, mean, sampling_median };
 
@@ -42,6 +44,9 @@ enum class bit_threshold { zero, mean, sampling_median };
 struct params {
   bit_threshold threshold = bit_threshold::mean;
 
+  /*
+   * specifies the sampling ratio
+   */
   float sampling_ratio = 0.1;
 };
 
@@ -107,8 +112,11 @@ quantizer<double> train(raft::resources const& res,
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::binary::params params;
  * auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(handle, samples,
- * features); cuvs::preprocessing::quantize::binary::transform(handle, params, dataset,
- * quantized_dataset.view());
+ * features);
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+ * raft::make_const_mdspan(dataset.view()));
+ * cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+ * raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -118,7 +126,7 @@ quantizer<double> train(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<double>& quantize,
+               const quantizer<double>& quantizer,
                raft::device_matrix_view<const double, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
@@ -131,8 +139,11 @@ void transform(raft::resources const& res,
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::binary::params params;
  * auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(handle, samples,
- * features); cuvs::preprocessing::quantize::binary::transform(handle, params, dataset,
- * quantized_dataset.view());
+ * features);
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+ * raft::make_const_mdspan(dataset.view()));
+ * cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+ * raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -142,7 +153,7 @@ void transform(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<double>& quantize,
+               const quantizer<double>& quantizer,
                raft::host_matrix_view<const double, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
 
@@ -198,8 +209,10 @@ quantizer<float> train(raft::resources const& res,
  * int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
  * auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(
  *    handle, dataset.extent(0), quantized_dim);
- *  cuvs::preprocessing::quantize::binary::transform(handle, params, dataset,
- * quantized_dataset.view());
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+ * raft::make_const_mdspan(dataset.view()));
+ * cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+ * raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -209,7 +222,7 @@ quantizer<float> train(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<float>& quantize,
+               const quantizer<float>& quantizer,
                raft::device_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
@@ -226,7 +239,10 @@ void transform(raft::resources const& res,
  * int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
  * auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(
  *    handle, params, dataset.extent(0), quantized_dim);
- *  cuvs::preprocessing::quantize::binary::transform(handle, dataset, quantized_dataset.view());
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+ * raft::make_const_mdspan(dataset.view()));
+ * cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+ * raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -236,7 +252,7 @@ void transform(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<float>& quantize,
+               const quantizer<float>& quantizer,
                raft::host_matrix_view<const float, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
 
@@ -281,8 +297,7 @@ quantizer<half> train(raft::resources const& res,
                       raft::host_matrix_view<const half, int64_t> dataset);
 
 /**
- * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
- * set the corresponding bit to 1.
+ * @brief Applies binary quantization transform to given dataset.
  *
  * Usage example:
  * @code{.cpp}
@@ -292,7 +307,10 @@ quantizer<half> train(raft::resources const& res,
  * int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
  * auto quantized_dataset = raft::make_device_matrix<uint8_t, int64_t>(
  *    handle, params, dataset.extent(0), quantized_dim);
- *  cuvs::preprocessing::quantize::binary::transform(handle, dataset, quantized_dataset.view());
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+ * raft::make_const_mdspan(dataset.view()));
+ * cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+ * raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -302,13 +320,12 @@ quantizer<half> train(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<half>& quantize,
+               const quantizer<half>& quantizer,
                raft::device_matrix_view<const half, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
 /**
- * @brief Applies binary quantization transform to given dataset. If a dataset element is positive,
- * set the corresponding bit to 1.
+ * @brief Applies binary quantization transform to given dataset.
  *
  * Usage example:
  * @code{.cpp}
@@ -318,7 +335,10 @@ void transform(raft::resources const& res,
  * int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);
  * auto quantized_dataset = raft::make_host_matrix<uint8_t, int64_t>(
  *    handle, params, dataset.extent(0), quantized_dim);
- *  cuvs::preprocessing::quantize::binary::transform(handle, dataset, quantized_dataset.view());
+ * auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, params,
+ * raft::make_const_mdspan(dataset.view()));
+ * cuvs::preprocessing::quantize::binary::transform(handle, quantizer,
+ * raft::make_const_mdspan(dataset.view()), quantized_dataset.view());
  * @endcode
  *
  * @param[in] res raft resource
@@ -328,7 +348,7 @@ void transform(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<half>& quantize,
+               const quantizer<half>& quantizer,
                raft::host_matrix_view<const half, int64_t> dataset,
                raft::host_matrix_view<uint8_t, int64_t> out);
 

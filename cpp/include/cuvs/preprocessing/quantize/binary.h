@@ -25,7 +25,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Enum to denote which threshold is used to set a bit in cuvsBinaryQuantizerTransform
+ * @brief In the cuvsBinaryQuantizerTransform function, a bit is set if the corresponding element in
+ * the dataset vector is greater than the corresponding element in the threshold vector. The mean
+ * and sampling_median thresholds are calculated separately for each dimension.
  *
  */
 enum cuvsBinaryQuantizerThreshold { ZERO, MEAN, SAMPLING_MEDIAN };
