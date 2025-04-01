@@ -170,10 +170,10 @@ void get_global_nearest_k(
 
       if (i == num_batches - 1) { batch_size_ = num_rows - batch_size * i; }
       thrust::copy(raft::resource::get_thrust_policy(res),
-                   nearest_clusters_idx.data_handle() + i * batch_size_ * k,
-                   nearest_clusters_idx.data_handle() + (i + 1) * batch_size_ * k,
+                   nearest_clusters_idx.data_handle() + i * batch_size * k,
+                   nearest_clusters_idx.data_handle() + (i * batch_size + batch_size_) * k,
                    nearest_clusters_idxt.data_handle());
-      raft::copy(global_nearest_cluster.data_handle() + i * batch_size_ * k,
+      raft::copy(global_nearest_cluster.data_handle() + i * batch_size * k,
                  nearest_clusters_idxt.data_handle(),
                  batch_size_ * k,
                  resource::get_cuda_stream(res));
@@ -650,7 +650,8 @@ void batch_build(raft::resources const& res,
                            .internal_node_degree  = extended_intermediate_degree,
                            .max_iterations        = params.max_iterations,
                            .termination_threshold = params.termination_threshold,
-                           .output_graph_degree   = graph_degree};
+                           .output_graph_degree   = graph_degree,
+                           .metric                = params.metric};
 
   auto global_indices_h   = raft::make_managed_matrix<IdxT, int64_t>(res, num_rows, graph_degree);
   auto global_distances_h = raft::make_managed_matrix<float, int64_t>(res, num_rows, graph_degree);
