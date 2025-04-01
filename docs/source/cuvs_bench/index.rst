@@ -223,7 +223,7 @@ The usage of `python -m cuvs_bench.split_groundtruth` is:
 Testing on new datasets
 -----------------------
 
-To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that datase.
+To run benchmark on a dataset, it is required have a descriptor that defines the file names and a few other properties of that dataset.
 Descriptors for several popular datasets are already available in `datasets.yaml <https://github.com/rapidsai/cuvs/blob/branch-25.04/python/cuvs_bench/cuvs_bench/config/datasets/datasets.yaml>``.
 
 Let's consider how to test on a new dataset. First we create a descriptor `mydataset.yaml`
