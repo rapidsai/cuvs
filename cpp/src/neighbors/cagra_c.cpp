@@ -1,6 +1,5 @@
-
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,7 +129,7 @@ void _extend(cuvsResources_t res,
   }
 }
 
-template <typename T>
+template <typename T, typename IdxT>
 void _search(cuvsResources_t res,
              cuvsCagraSearchParams params,
              cuvsCagraIndex index,
@@ -158,7 +157,7 @@ void _search(cuvsResources_t res,
   search_params.rand_xor_mask         = params.rand_xor_mask;
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
-  using neighbors_mdspan_type = raft::device_matrix_view<uint32_t, int64_t, raft::row_major>;
+  using neighbors_mdspan_type = raft::device_matrix_view<IdxT, int64_t, raft::row_major>;
   using distances_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
   auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
@@ -182,6 +181,28 @@ void _search(cuvsResources_t res,
                                    bitset_filter_obj);
   } else {
     RAFT_FAIL("Unsupported filter type: BITMAP");
+  }
+}
+
+template <typename T>
+void _search(cuvsResources_t res,
+             cuvsCagraSearchParams params,
+             cuvsCagraIndex index,
+             DLManagedTensor* queries_tensor,
+             DLManagedTensor* neighbors_tensor,
+             DLManagedTensor* distances_tensor,
+             cuvsFilter filter)
+{
+  if (neighbors_tensor->dl_tensor.dtype.code == kDLUInt &&
+      neighbors_tensor->dl_tensor.dtype.bits == 32) {
+    _search<T, uint32_t>(
+      res, params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+  } else if (neighbors_tensor->dl_tensor.dtype.code == kDLInt &&
+             neighbors_tensor->dl_tensor.dtype.bits == 64) {
+    _search<T, int64_t>(
+      res, params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+  } else {
+    RAFT_FAIL("neighbors should be of type uint32_t or int64_t");
   }
 }
 
@@ -318,9 +339,8 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(distances),
                  "distances should have device compatible memory");
 
-    RAFT_EXPECTS(neighbors.dtype.code == kDLUInt && neighbors.dtype.bits == 32,
-                 "neighbors should be of type uint32_t");
-    RAFT_EXPECTS(distances.dtype.code == kDLFloat && neighbors.dtype.bits == 32,
+    // NB: the dtype of neighbors is checked later in _search function
+    RAFT_EXPECTS(distances.dtype.code == kDLFloat && distances.dtype.bits == 32,
                  "distances should be of type float32");
 
     auto index = *index_c_ptr;
