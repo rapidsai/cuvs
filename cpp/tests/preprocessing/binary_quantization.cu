@@ -73,49 +73,6 @@ struct fpi_mapper<half> {
   static constexpr int kBitshiftBase = 24;
 };
 
-// Generate dataset to ensure no rounding error occurs in the norm computation of any two vectors.
-// When testing the CAGRA index sorting function, rounding errors can affect the norm and alter the
-// order of the index. To ensure the accuracy of the test, we utilize the dataset. The generation
-// method is based on the error-free transformation (EFT) method.
-template <typename T>
-RAFT_KERNEL GenerateRoundingErrorFreeDataset_kernel(T* const ptr,
-                                                    const uint32_t size,
-                                                    const typename fpi_mapper<T>::type resolution)
-{
-  const auto tid = threadIdx.x + blockIdx.x * blockDim.x;
-  if (tid >= size) { return; }
-
-  const float u32 = *reinterpret_cast<const typename fpi_mapper<T>::type*>(ptr + tid);
-  ptr[tid]        = u32 / resolution;
-}
-
-template <typename T>
-void GenerateRoundingErrorFreeDataset(const raft::resources& handle,
-                                      T* const ptr,
-                                      const uint32_t n_row,
-                                      const uint32_t dim,
-                                      raft::random::RngState& rng)
-{
-  using mapper_type         = fpi_mapper<T>;
-  using mean_compute_t      = typename mapper_type::mean_compute_t;
-  using int_type            = typename mapper_type::type;
-  auto cuda_stream          = raft::resource::get_cuda_stream(handle);
-  const uint32_t size       = n_row * dim;
-  const uint32_t block_size = 256;
-  const uint32_t grid_size  = (size + block_size - 1) / block_size;
-
-  const auto bitshift = (mapper_type::kBitshiftBase - std::log2(n_row)) / 2;
-  // Skip the test when `dim` is too big for type `T` to allow rounding error-free test.
-  if (bitshift <= 1) { GTEST_SKIP(); }
-  const int_type resolution =
-    int_type{1} << std::min(static_cast<uint64_t>(std::floor(bitshift)), sizeof(int_type) * 8 - 1);
-  raft::random::uniformInt<int_type>(
-    handle, rng, reinterpret_cast<int_type*>(ptr), size, -resolution, resolution - 1);
-
-  GenerateRoundingErrorFreeDataset_kernel<T>
-    <<<grid_size, block_size, 0, cuda_stream>>>(ptr, size, resolution);
-}
-
 template <typename T, typename QuantI>
 class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizationInputs<T>> {
  public:
@@ -179,7 +136,7 @@ class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizatio
     // random input
     unsigned long long int seed = 1234ULL;
     raft::random::RngState r(seed);
-    GenerateRoundingErrorFreeDataset(handle, input_.data(), rows_, cols_, r);
+    uniform(handle, r, input_.data(), input_.size(), static_cast<T>(-1), static_cast<T>(1));
 
     raft::update_host(host_input_.data(), input_.data(), input_.size(), stream);
 
