@@ -12,7 +12,7 @@ dependencies:
 - clang-tools==16.0.6
 - clang==16.0.6
 - click
-- cmake>=3.26.4,!=3.30.0
+- cmake>=3.30.4
 - cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
@@ -27,6 +27,8 @@ dependencies:
 - gcc_linux-64=13.*
 - glog>=0.6.0
 - h5py>=3.8.0
+- libaio
+- libboost-devel=1.87
 - libclang==16.0.6
 - libcublas-dev
 - libcurand-dev
@@ -35,6 +37,7 @@ dependencies:
 - libcuvs==25.4.*,>=0.0.0a0
 - librmm==25.4.*,>=0.0.0a0
 - matplotlib-base
+- mkl-devel=2023
 - nccl>=2.19
 - ninja
 - nlohmann_json>=3.11.2
