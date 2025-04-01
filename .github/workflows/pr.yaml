@@ -154,9 +154,6 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/build_rust.sh"
-  rust-publish:
-    secrets: inherit
-    uses: ./.github/workflows/publish-rust.yaml
   go-build:
     needs: conda-cpp-build
     secrets: inherit
