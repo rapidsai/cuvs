@@ -48,31 +48,6 @@ std::ostream& operator<<(std::ostream& os, const BinaryQuantizationInputs<T>& in
   return os;
 }
 
-template <typename T>
-struct fpi_mapper {};
-
-template <>
-struct fpi_mapper<double> {
-  using type                         = int64_t;
-  using mean_compute_t               = double;
-  static constexpr int kBitshiftBase = 53;
-};
-
-template <>
-struct fpi_mapper<float> {
-  using type                         = int32_t;
-  using mean_compute_t               = float;
-  static constexpr int kBitshiftBase = 24;
-};
-
-template <>
-struct fpi_mapper<half> {
-  using type = int16_t;
-  // F32 is used for mean computation in the test for half
-  using mean_compute_t               = float;
-  static constexpr int kBitshiftBase = 24;
-};
-
 template <typename T, typename QuantI>
 class BinaryQuantizationTest : public ::testing::TestWithParam<BinaryQuantizationInputs<T>> {
  public:
