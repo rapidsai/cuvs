@@ -84,10 +84,10 @@ void search_impl(raft::resources const& handle,
     distance_buffer_dev.data(), n_queries, index.n_lists());
 
   size_t float_query_size;
-  if constexpr (std::is_integral_v<T>) {
-    float_query_size = n_queries * index.dim();
-  } else {
+  if constexpr (std::is_same_v<T, float>) {
     float_query_size = 0;
+  } else {
+    float_query_size = n_queries * index.dim();
   }
   rmm::device_uvector<float> converted_queries_dev(float_query_size, stream, search_mr);
   float* converted_queries_ptr = converted_queries_dev.data();

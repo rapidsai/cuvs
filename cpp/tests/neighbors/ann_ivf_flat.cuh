@@ -58,9 +58,10 @@ template <typename IdxT>
 ::std::ostream& operator<<(::std::ostream& os, const AnnIvfFlatInputs<IdxT>& p)
 {
   os << "{ " << p.num_queries << ", " << p.num_db_vecs << ", " << p.dim << ", " << p.k << ", "
-     << p.nprobe << ", " << p.nlist << ", " << static_cast<int>(p.metric) << ", "
-     << p.adaptive_centers << "," << p.host_dataset << "," << p.kernel_copy_overlapping << '}'
-     << std::endl;
+     << p.nprobe << ", " << p.nlist << ", "
+     << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
+     << ", " << p.adaptive_centers << "," << p.host_dataset << "," << p.kernel_copy_overlapping
+     << '}' << std::endl;
   return os;
 }
 
@@ -255,13 +256,14 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                         stream_));
         }
       }
+      float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
       ASSERT_TRUE(eval_neighbours(indices_naive,
                                   indices_ivfflat,
                                   distances_naive,
                                   distances_ivfflat,
                                   ps.num_queries,
                                   ps.k,
-                                  0.001,
+                                  eps,
                                   min_recall));
     }
   }
@@ -487,13 +489,14 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           indices_ivfflat.data(), indices_ivfflat_dev.data_handle(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
       }
+      float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
       ASSERT_TRUE(eval_neighbours(indices_naive,
                                   indices_ivfflat,
                                   distances_naive,
                                   distances_ivfflat,
                                   ps.num_queries,
                                   ps.k,
-                                  0.001,
+                                  eps,
                                   min_recall));
     }
   }
