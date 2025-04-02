@@ -150,6 +150,8 @@ void serialize(const raft::resources& handle,
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::serialize(handle, os, interface.index_.value(), true);
   }
+
+  resource::sync_stream(handle);
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -162,14 +164,17 @@ void deserialize(const raft::resources& handle,
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
     ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
     cagra::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   }
 }
@@ -187,14 +192,17 @@ void deserialize(const raft::resources& handle,
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
     ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
     cagra::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   }
 
