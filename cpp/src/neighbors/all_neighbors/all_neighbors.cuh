@@ -15,7 +15,6 @@
  */
 
 #pragma once
-// #include "all_neighbors_builder.cuh"
 #include "all_neighbors_batched.cuh"
 #include <cstddef>
 #include <cuvs/cluster/kmeans.hpp>
@@ -24,7 +23,6 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
 #include <raft/core/managed_mdarray.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
 #include <raft/matrix/sample_rows.cuh>
 #include <variant>
 
@@ -37,11 +35,12 @@ void single_build(const raft::resources& handle,
                   const index_params& params,
                   all_neighbors::index<IdxT, T>& index)
 {
+  std::cout << "calling single build here\n";
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
-  auto knn_builder =
-    get_knn_builder<T, IdxT>(handle, params, static_cast<size_t>(index.k()), 0, num_rows, false);
+  auto knn_builder = get_knn_builder<T, IdxT>(
+    handle, params, static_cast<size_t>(index.k()), num_rows, num_rows, false);
 
   knn_builder->prepare_build(dataset);
   knn_builder->build_knn(handle, params, dataset, index);

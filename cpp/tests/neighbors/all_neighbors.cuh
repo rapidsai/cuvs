@@ -67,7 +67,7 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
  public:
   BatchANNTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
-      clique_(raft::resource::get_nccl_clique(handle_)),
+      // clique_(raft::resource::get_nccl_clique(handle_)),
       ps(::testing::TestWithParam<BatchANNInputs>::GetParam()),
       database(0, stream_)
   {
@@ -94,6 +94,8 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
         5u,
         static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 * params.n_clusters)));
       params.graph_build_params = ivfq_build_params;
+      std::cout << "heuristicallhy good n liusts " << ivfq_build_params.build_params.n_lists
+                << std::endl;
     }
 
     size_t queries_size = static_cast<size_t>(ps.n_rows) * static_cast<size_t>(ps.k);
@@ -125,8 +127,11 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
       auto database_h = raft::make_host_matrix<DataT, IdxT>(handle_, ps.n_rows, ps.dim);
       raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream_);
 
-      auto index = all_neighbors::build(
-        handle_, raft::make_const_mdspan(database_h.view()), static_cast<int64_t>(ps.k), params);
+      auto index = all_neighbors::build(handle_,
+                                        raft::make_const_mdspan(database_h.view()),
+                                        static_cast<int64_t>(ps.k),
+                                        params,
+                                        true);
 
       raft::copy(indices_batch.data(), index.graph().data_handle(), queries_size, stream_);
       if (index.distances().has_value()) {
@@ -136,6 +141,11 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
       raft::resource::sync_stream(handle_);
     }
     double min_recall = std::get<0>(ps.recall_cluster_nearestcluster);
+
+    raft::print_host_vector("naive indices", indices_naive.data(), 10, std::cout);
+    raft::print_host_vector("ann indices", indices_batch.data(), 10, std::cout);
+    raft::print_host_vector("naive dists", distances_naive.data(), 10, std::cout);
+    raft::print_host_vector("ann indices", distances_batch.data(), 10, std::cout);
 
     EXPECT_TRUE(eval_recall(indices_naive, indices_batch, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
@@ -159,7 +169,7 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
  private:
   raft::resources handle_;
   rmm::cuda_stream_view stream_;
-  raft::comms::nccl_clique clique_;
+  // raft::comms::nccl_clique clique_;
   BatchANNInputs ps;
   rmm::device_uvector<DataT> database;
 };
@@ -167,6 +177,7 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
 const std::vector<BatchANNInputs> inputsBatch =
   raft::util::itertools::product<BatchANNInputs>({IVF_PQ, NN_DESCENT},
                                                  {
+                                                   // std::make_tuple(0.9, 1lu, 2lu)
                                                    std::make_tuple(0.9, 4lu, 2lu),
                                                    std::make_tuple(0.9, 7lu, 2lu),
                                                    std::make_tuple(0.9, 10lu, 2lu),

@@ -16,6 +16,7 @@
 
 #pragma once
 #include "all_neighbors_builder.cuh"
+#include "raft/util/cudart_utils.hpp"
 #include <cstddef>
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
@@ -329,6 +330,8 @@ void batch_build(const raft::resources& handle,
                  const index_params& batch_params,
                  all_neighbors::index<IdxT, T>& index)
 {
+  std::cout << "calling batched build here\n";
+
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
@@ -362,6 +365,8 @@ void batch_build(const raft::resources& handle,
                        cluster_sizes.view(),
                        cluster_offsets.view());
 
+  raft::print_host_vector("cluster sizes", cluster_sizes.data_handle(), n_clusters, std::cout);
+  std::cout << "min cluster size " << min_cluster_size << " max: " << max_cluster_size << std::endl;
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, index.k());
   auto global_distances = raft::make_managed_matrix<float, IdxT>(handle, num_rows, index.k());
   std::fill(global_neighbors.data_handle(),
