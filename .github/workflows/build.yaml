@@ -57,7 +57,7 @@ jobs:
       arch: "amd64"
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
-      node_type: "gpu-v100-latest-1"
+      node_type: "gpu-l4-latest-1"
       run_script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
   python-build:
