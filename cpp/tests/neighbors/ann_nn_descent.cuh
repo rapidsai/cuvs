@@ -241,7 +241,7 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
         index_params.metric                    = ps.metric;
         index_params.graph_degree              = ps.graph_degree;
         index_params.intermediate_graph_degree = 2 * ps.graph_degree;
-        index_params.max_iterations            = 10;
+        index_params.max_iterations            = 100;
         index_params.return_distances          = true;
         index_params.n_clusters                = ps.recall_cluster.second;
 
@@ -288,7 +288,7 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
                                   0.01,
                                   min_recall,
                                   true,
-                                  static_cast<size_t>(ps.graph_degree * 0.1)));
+                                  static_cast<size_t>(ps.graph_degree)));
     }
   }
 
@@ -328,8 +328,6 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                      {false, true},
                                                      {0.90});
 
-// TODO : Investigate why this test is failing Reference issue https
-// :  // github.com/rapidsai/raft/issues/2450
 const std::vector<AnnNNDescentBatchInputs> inputsBatch =
   raft::util::itertools::product<AnnNNDescentBatchInputs>(
     {std::make_pair(0.9, 3lu), std::make_pair(0.9, 2lu)},  // min_recall, n_clusters

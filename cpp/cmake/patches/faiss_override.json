@@ -3,7 +3,7 @@
       "faiss" : {
         "version": "1.10.0",
         "git_url": "https://github.com/facebookresearch/faiss.git",
-        "git_tag": "v1.10.0"
+        "git_tag": "main"
       }
     }
   }

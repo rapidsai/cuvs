@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --compile-static-lib --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -38,11 +38,17 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    -g                          - build for debug
    -n                          - no install step
    --uninstall                 - uninstall files for specified targets which were built and installed prior
-   --compile-static-lib        - compile static library for all components
    --cpu-only                  - build CPU only components without CUDA. Currently only applies to bench-ann.
    --limit-tests               - semicolon-separated list of test executables to compile (e.g. NEIGHBORS_TEST;CLUSTER_TEST)
    --limit-bench-ann           - semicolon-separated list of ann benchmark executables to compute (e.g. HNSWLIB_ANN_BENCH;RAFT_IVF_PQ_ANN_BENCH)
    --allgpuarch                - build for all supported GPU architectures
+   --gpu-arch=\"<arch>\"        - build for specific GPU architectures (e.g. \"80-real;90-real\")
+                                Values from this flag are passed to CUDA_ARCHITECTURES in cmake.
+                                See https://cmake.org/cmake/help/latest/prop_tgt/CUDA_ARCHITECTURES.html
+                                for more details.
+                                To summarize, specifying \"80-virtual\" would generate PTX for compute capability 8.0
+                                whereas \"80-real\" will generate SASS.
+                                If you are unsure which to do, use -real suffix --gpu-arch=\"80-real;90-real\"
    --no-mg                     - disable multi-GPU support
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
@@ -195,6 +201,37 @@ function buildMetrics {
     fi
 }
 
+function gpuArch {
+    # Check if both --gpu-arch and --allgpuarch are specified
+    if hasArg --allgpuarch && [[ -n $(echo $ARGS | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
+        echo "Error: Cannot specify both --gpu-arch and --allgpuarch"
+        echo "Use either:"
+        echo "  --gpu-arch=\"80-real;90-real\"    (for specific architectures)"
+        echo "  --allgpuarch        (for all supported architectures)"
+        exit 1
+    fi
+
+    # Check for multiple gpu-arch options
+    if [[ $(echo $ARGS | { grep -Eo "\-\-gpu\-arch" || true; } | wc -l ) -gt 1 ]]; then
+        echo "Error: Multiple --gpu-arch options were provided. Please combine architectures into a single option."
+        echo "Instead of: --gpu-arch=80-real --gpu-arch=90-real"
+        echo "Use:       --gpu-arch=\"80-real;90-real\""
+        exit 1
+    fi
+
+    # Check for gpu-arch option
+    if [[ -n $(echo $ARGS | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
+        GPU_ARCH_ARG=$(echo $ARGS | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
+        if [[ -n ${GPU_ARCH_ARG} ]]; then
+            # Remove the full argument from ARGS
+            ARGS=${ARGS//$GPU_ARCH_ARG/}
+            # Extract just the architecture value
+            CUVS_CMAKE_CUDA_ARCHITECTURES=$(echo $GPU_ARCH_ARG | sed -e 's/--gpu-arch=//' -e 's/ .*//')
+            echo "Building for specified GPU architectures: ${CUVS_CMAKE_CUDA_ARCHITECTURES}"
+        fi
+    fi
+}
+
 if hasArg -h || hasArg --help; then
     echo "${HELP}"
     exit 0
@@ -207,6 +244,7 @@ if (( ${NUMARGS} != 0 )); then
     limitTests
     limitAnnBench
     buildMetrics
+    gpuArch
     for a in ${ARGS}; do
         if ! (echo " ${VALIDARGS} " | grep -q " ${a} "); then
             echo "Invalid option: ${a}"
@@ -265,10 +303,6 @@ if hasArg -g; then
     BUILD_TYPE=Debug
 fi
 
-if hasArg --allgpuarch; then
-    BUILD_ALL_GPU_ARCH=1
-fi
-
 if hasArg --no-mg; then
     BUILD_MG_ALGOS=OFF
 fi
@@ -312,6 +346,7 @@ fi
 if hasArg --incl-cache-stats; then
     BUILD_REPORT_INCL_CACHE_STATS=ON
 fi
+
 if [[ ${CMAKE_TARGET} == "" ]]; then
     CMAKE_TARGET="all"
 fi
@@ -332,7 +367,7 @@ fi
 
 ################################################################################
 # Configure for building all C++ targets
-if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
     if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
         CMAKE_TARGET="${CMAKE_TARGET};"
@@ -340,18 +375,21 @@ if (( ${NUMARGS} == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || has
         CMAKE_TARGET="${CMAKE_TARGET};cuvs"
     fi
 
-    if (( ${BUILD_ALL_GPU_ARCH} == 0 )); then
-        CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
-        echo "Building for the architecture of the GPU in the system..."
-    else
-        CUVS_CMAKE_CUDA_ARCHITECTURES="RAPIDS"
-        echo "Building for *ALL* supported GPU architectures..."
-    fi
-
     # get the current count before the compile starts
     CACHE_TOOL=${CACHE_TOOL:-sccache}
     if [[ "$BUILD_REPORT_INCL_CACHE_STATS" == "ON" && -x "$(command -v ${CACHE_TOOL})" ]]; then
         "${CACHE_TOOL}" --zero-stats
+    fi
+
+    # Set default GPU architecture if not already set by gpuArch function
+    if [[ -z "${CUVS_CMAKE_CUDA_ARCHITECTURES}" ]]; then
+        if hasArg --allgpuarch; then
+            CUVS_CMAKE_CUDA_ARCHITECTURES="RAPIDS"
+            echo "Building for *ALL* supported GPU architectures..."
+        else
+            CUVS_CMAKE_CUDA_ARCHITECTURES="NATIVE"
+            echo "Building for the architecture of the GPU in the system..."
+        fi
     fi
 
     mkdir -p ${LIBCUVS_BUILD_DIR}
@@ -437,7 +475,7 @@ if (( ${NUMARGS} == 0 )) || hasArg python; then
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
-if (( ${NUMARGS} == 0 )) || hasArg bench-ann; then
+if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
     python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
 fi
 

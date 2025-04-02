@@ -24,6 +24,7 @@ void run_brute_force(int64_t n_rows,
                      float* index_data,
                      float* query_data,
                      uint32_t* prefilter_data,
+                     enum cuvsFilterType prefilter_type,
                      float* distances_data,
                      int64_t* neighbors_data,
                      cuvsDistanceType metric)
@@ -90,7 +91,7 @@ void run_brute_force(int64_t n_rows,
   cuvsFilter prefilter;
 
   DLManagedTensor prefilter_tensor;
-  if (prefilter_data == NULL) {
+  if (prefilter_data == NULL || prefilter_type == NO_FILTER) {
     prefilter.type = NO_FILTER;
     prefilter.addr = (uintptr_t)NULL;
   } else {
@@ -100,11 +101,14 @@ void run_brute_force(int64_t n_rows,
     prefilter_tensor.dl_tensor.dtype.code         = kDLUInt;
     prefilter_tensor.dl_tensor.dtype.bits         = 32;
     prefilter_tensor.dl_tensor.dtype.lanes        = 1;
-    int64_t prefilter_shape[1]                    = {(n_queries * n_rows + 31) / 32};
-    prefilter_tensor.dl_tensor.shape              = prefilter_shape;
-    prefilter_tensor.dl_tensor.strides            = NULL;
 
-    prefilter.type = BITMAP;
+    int64_t prefilter_bits_num = (prefilter_type == BITMAP) ? n_queries * n_rows : n_rows;
+    int64_t prefilter_shape[1] = {(prefilter_bits_num + 31) / 32};
+
+    prefilter_tensor.dl_tensor.shape   = prefilter_shape;
+    prefilter_tensor.dl_tensor.strides = NULL;
+
+    prefilter.type = prefilter_type;
     prefilter.addr = (uintptr_t)&prefilter_tensor;
   }
 
