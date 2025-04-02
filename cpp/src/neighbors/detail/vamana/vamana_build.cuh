@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include "../../detail/vpq_dataset.cuh"
 #include "greedy_search.cuh"
 #include "robust_prune.cuh"
 #include "vamana_structs.cuh"
-#include "../../detail/vpq_dataset.cuh"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/vamana.hpp>
 
@@ -382,11 +382,11 @@ void batched_insert_vamana(
 
 // Parse quantizer file.
 inline void parse_opq_file(const std::string& path,
-                    const uint32_t vector_dim,
-                    int32_t& pq_codebook_size,
-                    int32_t& pq_dim,
-                    std::vector<float>& PQEncodingTable,
-                    std::vector<float>& OPQMatrix)
+                           const uint32_t vector_dim,
+                           int32_t& pq_codebook_size,
+                           int32_t& pq_dim,
+                           std::vector<float>& PQEncodingTable,
+                           std::vector<float>& OPQMatrix)
 {
   std::ifstream opq_if(path, std::ios::in | std::ios::binary);
   if (!opq_if) { RAFT_FAIL("Cannot open file %s", path.c_str()); }
@@ -394,9 +394,7 @@ inline void parse_opq_file(const std::string& path,
   // check file size
   opq_if.ignore(std::numeric_limits<std::streamsize>::max());
   uint32_t length = opq_if.gcount();
-  if (length < 14) {
-    RAFT_FAIL("OPQ file does not contain expected metadata.");
-  }
+  if (length < 14) { RAFT_FAIL("OPQ file does not contain expected metadata."); }
   opq_if.clear();  // Since ignore will have set eof.
   opq_if.seekg(0, std::ios_base::beg);
 
@@ -404,12 +402,12 @@ inline void parse_opq_file(const std::string& path,
   unsigned char quantizerType, reconstructType;
   int32_t codebookDim;
 
-  opq_if.read((char*)&quantizerType, 1); //0: NONE, 1: PQ, 2: OPQ
+  opq_if.read((char*)&quantizerType, 1);  // 0: NONE, 1: PQ, 2: OPQ
   if (quantizerType != 2) {
     RAFT_FAIL("Expected quantizer type 2; parsed: %s", std::to_string(quantizerType).c_str());
   }
 
-  opq_if.read((char*)&reconstructType, 1); // 0: int8, 1: uint8, 2: int16, 3: float
+  opq_if.read((char*)&reconstructType, 1);  // 0: int8, 1: uint8, 2: int16, 3: float
   if (reconstructType != 0) {
     RAFT_FAIL("Expected reconstruct type 0; parsed: %s", std::to_string(reconstructType).c_str());
   }
@@ -450,25 +448,19 @@ inline void parse_opq_file(const std::string& path,
   }
 }
 
-template<typename T>
-auto quantize_all_vectors(
-                raft::resources const& res,
-                raft::device_matrix_view<const T, int64_t> residuals,
-                raft::device_matrix_view<float, uint32_t, raft::row_major> pq_codebook,
-                cuvs::neighbors::vpq_params ps)
-                  -> raft::device_matrix<uint8_t, int64_t, raft::row_major>
+template <typename T>
+auto quantize_all_vectors(raft::resources const& res,
+                          raft::device_matrix_view<const T, int64_t> residuals,
+                          raft::device_matrix_view<float, uint32_t, raft::row_major> pq_codebook,
+                          cuvs::neighbors::vpq_params ps)
+  -> raft::device_matrix<uint8_t, int64_t, raft::row_major>
 {
-  auto dim = residuals.extent(1);
+  auto dim         = residuals.extent(1);
   auto vq_codebook = raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 1, dim);
-  raft::linalg::map_offset(res, vq_codebook.view(), [] __device__(size_t i) {
-                  return 0;
-  });
+  raft::linalg::map_offset(res, vq_codebook.view(), [] __device__(size_t i) { return 0; });
 
-  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(res,
-                                                ps,
-                                                residuals,
-                                                raft::make_const_mdspan(vq_codebook.view()),
-                                                pq_codebook);
+  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
+    res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
   return codes;
 }
 
@@ -513,50 +505,73 @@ index<T, IdxT> build(
     int32_t pq_codebook_size, pq_dim;
     std::vector<float> PQEncodingTable, OPQMatrix;
 
-    parse_opq_file(params.quantizer_file, dim, pq_codebook_size, pq_dim, PQEncodingTable, OPQMatrix);
+    parse_opq_file(
+      params.quantizer_file, dim, pq_codebook_size, pq_dim, PQEncodingTable, OPQMatrix);
 
     pq_params.pq_bits = std::lround(std::log2(pq_codebook_size));
-    pq_params.pq_dim = pq_dim;
+    pq_params.pq_dim  = pq_dim;
 
-    // transform PQEncodingTable (dimensions: pq_dim x pq_codebook_size x dim_per_subspace) to pq_codebook (dimensions: pq_codebook_size * pq_dim, dim_per_subspace)
-    auto PQEncodingTable_device_vec = raft::make_device_vector<float,uint32_t>(res, PQEncodingTable.size()); // logically a 3D matrix with dimensions pq_dim x pq_codebook_size x dim_per_subspace
-    RAFT_CUDA_TRY(cudaMemcpyAsync(PQEncodingTable_device_vec.data_handle(), PQEncodingTable.data(), PQEncodingTable.size() * sizeof(float), cudaMemcpyDefault, raft::resource::get_cuda_stream(res)));
+    // transform PQEncodingTable (dimensions: pq_dim x pq_codebook_size x dim_per_subspace) to
+    // pq_codebook (dimensions: pq_codebook_size * pq_dim, dim_per_subspace)
+    auto PQEncodingTable_device_vec = raft::make_device_vector<float, uint32_t>(
+      res, PQEncodingTable.size());  // logically a 3D matrix with dimensions pq_dim x
+                                     // pq_codebook_size x dim_per_subspace
+    RAFT_CUDA_TRY(cudaMemcpyAsync(PQEncodingTable_device_vec.data_handle(),
+                                  PQEncodingTable.data(),
+                                  PQEncodingTable.size() * sizeof(float),
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
     int dim_per_subspace = dim / pq_dim;
-    auto pq_codebook = raft::make_device_matrix<float,uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
+    auto pq_codebook =
+      raft::make_device_matrix<float, uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
     raft::resource::sync_stream(res);
     auto PQEncodingTable_device_vec_view = PQEncodingTable_device_vec.view();
-    raft::linalg::map_offset(res, pq_codebook.view(), [PQEncodingTable_device_vec_view, pq_dim, pq_codebook_size, dim_per_subspace, dim] __device__(size_t i) {
-            int row_idx = i / dim_per_subspace;
-            int subspace_id = row_idx / pq_codebook_size; // I
-            int codebook_id = row_idx % pq_codebook_size; // J
-            int id_in_subspace  = i % dim_per_subspace; // K
+    raft::linalg::map_offset(
+      res,
+      pq_codebook.view(),
+      [PQEncodingTable_device_vec_view, pq_dim, pq_codebook_size, dim_per_subspace, dim] __device__(
+        size_t i) {
+        int row_idx        = i / dim_per_subspace;
+        int subspace_id    = row_idx / pq_codebook_size;  // I
+        int codebook_id    = row_idx % pq_codebook_size;  // J
+        int id_in_subspace = i % dim_per_subspace;        // K
 
-            return PQEncodingTable_device_vec_view[subspace_id * pq_codebook_size * dim_per_subspace + codebook_id * dim_per_subspace + id_in_subspace];
-    });
+        return PQEncodingTable_device_vec_view[subspace_id * pq_codebook_size * dim_per_subspace +
+                                               codebook_id * dim_per_subspace + id_in_subspace];
+      });
 
     // prepare rotation matrix OPQMatrix
-    auto OPQMatrix_device = raft::make_device_matrix<float,int64_t>(res, dim, dim);
-    RAFT_CUDA_TRY(cudaMemcpyAsync(OPQMatrix_device.data_handle(), OPQMatrix.data(), OPQMatrix.size() * sizeof(float), cudaMemcpyDefault, raft::resource::get_cuda_stream(res)));
+    auto OPQMatrix_device = raft::make_device_matrix<float, int64_t>(res, dim, dim);
+    RAFT_CUDA_TRY(cudaMemcpyAsync(OPQMatrix_device.data_handle(),
+                                  OPQMatrix.data(),
+                                  OPQMatrix.size() * sizeof(float),
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
 
     // process in batches
     const uint32_t n_rows = dataset.extent(0);
     // codes_rowlen defined as in cuvs::neighbors::detail::process_and_fill_codes_subspaces()
     const int64_t codes_rowlen =
-    sizeof(uint32_t) * (1 + raft::div_rounding_up_safe<int64_t>(pq_dim * pq_params.pq_bits, 8 * sizeof(uint32_t)));
-    quantized_vectors = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, n_rows, codes_rowlen-4); // first 4 columns of output from quantize_all_vectors() to be discarded
+      sizeof(uint32_t) *
+      (1 + raft::div_rounding_up_safe<int64_t>(pq_dim * pq_params.pq_bits, 8 * sizeof(uint32_t)));
+    quantized_vectors = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(
+      res,
+      n_rows,
+      codes_rowlen - 4);  // first 4 columns of output from quantize_all_vectors() to be discarded
     // TODO: with scaling workspace we could choose the batch size dynamically
     constexpr uint32_t kReasonableMaxBatchSize = 65536;
-    const uint32_t max_batch_size = std::min(n_rows, kReasonableMaxBatchSize);
+    const uint32_t max_batch_size              = std::min(n_rows, kReasonableMaxBatchSize);
     for (const auto& batch : cuvs::spatial::knn::detail::utils::batch_load_iterator<T>(
-        dataset.data_handle(),
-        n_rows,
-        dim,
-        max_batch_size,
-        raft::resource::get_cuda_stream(res),
-        rmm::mr::get_current_device_resource())) {
+           dataset.data_handle(),
+           n_rows,
+           dim,
+           max_batch_size,
+           raft::resource::get_cuda_stream(res),
+           rmm::mr::get_current_device_resource())) {
       // convert dataset to float
-      auto dataset_float = raft::make_device_matrix<float,int64_t>(res, batch.size(), dim);
-      auto dataset_view = raft::make_device_matrix_view(batch.data(), static_cast<int64_t>(batch.size()), static_cast<int64_t>(dim));
+      auto dataset_float = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
+      auto dataset_view  = raft::make_device_matrix_view(
+        batch.data(), static_cast<int64_t>(batch.size()), static_cast<int64_t>(dim));
       raft::linalg::map_offset(res, dataset_float.view(), [dataset_view, dim] __device__(size_t i) {
         int row_idx = i / dim;
         int col_idx = i % dim;
@@ -564,27 +579,34 @@ index<T, IdxT> build(
       });
 
       // perform rotation
-      auto dataset_rotated = raft::make_device_matrix<float,int64_t>(res, batch.size(), dim);
-      raft::linalg::gemm(res, dataset_float.view(), OPQMatrix_device.view(), dataset_rotated.view());
+      auto dataset_rotated = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
+      raft::linalg::gemm(
+        res, dataset_float.view(), OPQMatrix_device.view(), dataset_rotated.view());
 
       // quantize rotated vectors using codebook
-      auto temp_vectors = quantize_all_vectors<float>(
-        res,
-        dataset_rotated.view(),
-        pq_codebook.view(),
-        pq_params);
+      auto temp_vectors =
+        quantize_all_vectors<float>(res, dataset_rotated.view(), pq_codebook.view(), pq_params);
 
       // Remove the vector quantization header values
-      raft::matrix::slice_coordinates<int64_t> slice_coords(0, 4, temp_vectors.extent(0), temp_vectors.extent(1));
+      raft::matrix::slice_coordinates<int64_t> slice_coords(
+        0, 4, temp_vectors.extent(0), temp_vectors.extent(1));
 
-      raft::matrix::slice(res, raft::make_const_mdspan(temp_vectors.view()), raft::make_device_matrix_view<uint8_t, int64_t>(quantized_vectors.value().data_handle() + batch.offset() * quantized_vectors.value().extent(1), batch.size(), quantized_vectors.value().extent(1)), slice_coords);
+      raft::matrix::slice(res,
+                          raft::make_const_mdspan(temp_vectors.view()),
+                          raft::make_device_matrix_view<uint8_t, int64_t>(
+                            quantized_vectors.value().data_handle() +
+                              batch.offset() * quantized_vectors.value().extent(1),
+                            batch.size(),
+                            quantized_vectors.value().extent(1)),
+                          slice_coords);
     }
   }
 
   try {
     auto ret = index<T, IdxT>(
       res, params.metric, dataset, raft::make_const_mdspan(vamana_graph.view()), medoid_id);
-    if (quantized_vectors) ret.update_quantized_dataset(res, quantized_vectors.value().view(), true);
+    if (quantized_vectors)
+      ret.update_quantized_dataset(res, quantized_vectors.value().view(), true);
     return ret;
   } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("Insufficient GPU memory to construct VAMANA index with dataset on GPU");

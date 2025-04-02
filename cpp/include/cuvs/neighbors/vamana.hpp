@@ -131,7 +131,8 @@ struct index : cuvs::neighbors::index {
   }
 
   /** Quantized dataset [size, codes_rowlen] */
-  [[nodiscard]] inline auto quantized_data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
+  [[nodiscard]] inline auto quantized_data() const noexcept
+    -> const cuvs::neighbors::dataset<int64_t>&
   {
     RAFT_EXPECTS(dataset_, "Invalid quantized dataset");
     return *quantized_dataset_;
@@ -230,9 +231,10 @@ struct index : cuvs::neighbors::index {
    * Otherwise, we store a reference to the device data in `new_quantized_dataset`, and it
    * is the caller's responsibility to ensure that the data stays alive as long as the index.
    */
-  void update_quantized_dataset(raft::resources const& res,
-                    raft::device_matrix_view<uint8_t, int64_t, raft::row_major> new_quantized_dataset,
-                    bool force_ownership)
+  void update_quantized_dataset(
+    raft::resources const& res,
+    raft::device_matrix_view<uint8_t, int64_t, raft::row_major> new_quantized_dataset,
+    bool force_ownership)
   {
     quantized_dataset_ = make_aligned_dataset(res, new_quantized_dataset, 16, force_ownership);
   }
