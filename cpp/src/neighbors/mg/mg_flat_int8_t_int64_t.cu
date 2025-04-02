@@ -23,7 +23,7 @@
  *
  */
 
-#include "mg.cuh"
+#include "snmg.cuh"
 
 #define CUVS_INST_MG_FLAT(T, IdxT)                                                              \
   namespace cuvs::neighbors::ivf_flat {                                                         \
@@ -35,7 +35,7 @@
     raft::host_matrix_view<const T, int64_t, row_major> index_dataset)                          \
   {                                                                                             \
     cuvs::neighbors::mg_index<ivf_flat::index<T, IdxT>, T, IdxT> index(res, index_params.mode); \
-    cuvs::neighbors::mg::detail::build(                                                         \
+    cuvs::neighbors::snmg::detail::build(                                                       \
       res,                                                                                      \
       index,                                                                                    \
       static_cast<const cuvs::neighbors::index_params*>(&index_params),                         \
@@ -48,7 +48,7 @@
               raft::host_matrix_view<const T, int64_t, row_major> new_vectors,                  \
               std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)           \
   {                                                                                             \
-    cuvs::neighbors::mg::detail::extend(res, index, new_vectors, new_indices);                  \
+    cuvs::neighbors::snmg::detail::extend(res, index, new_vectors, new_indices);                \
   }                                                                                             \
                                                                                                 \
   void search(const raft::resources& res,                                                       \
@@ -58,7 +58,7 @@
               raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,                       \
               raft::host_matrix_view<float, int64_t, row_major> distances)                      \
   {                                                                                             \
-    cuvs::neighbors::mg::detail::search(                                                        \
+    cuvs::neighbors::snmg::detail::search(                                                      \
       res,                                                                                      \
       index,                                                                                    \
       static_cast<const cuvs::neighbors::search_params*>(&search_params),                       \
@@ -71,7 +71,7 @@
                  const cuvs::neighbors::mg_index<ivf_flat::index<T, IdxT>, T, IdxT>& index,     \
                  const std::string& filename)                                                   \
   {                                                                                             \
-    cuvs::neighbors::mg::detail::serialize(res, index, filename);                               \
+    cuvs::neighbors::snmg::detail::serialize(res, index, filename);                             \
   }                                                                                             \
                                                                                                 \
   template <>                                                                                   \
@@ -87,7 +87,7 @@
     const raft::resources& res, const std::string& filename)                                    \
   {                                                                                             \
     auto idx = cuvs::neighbors::mg_index<ivf_flat::index<T, IdxT>, T, IdxT>(res, REPLICATED);   \
-    cuvs::neighbors::mg::detail::deserialize_and_distribute(res, idx, filename);                \
+    cuvs::neighbors::snmg::detail::deserialize_and_distribute(res, idx, filename);              \
     return idx;                                                                                 \
   }                                                                                             \
   }  // namespace cuvs::neighbors::ivf_flat

@@ -740,9 +740,7 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                const typename ListT::spec_type& store_spec,
                                                const typename ListT::spec_type& device_spec);
 }  // namespace ivf
-}  // namespace cuvs::neighbors
 
-namespace cuvs::neighbors {
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -792,11 +790,8 @@ void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename);
 
-};  // namespace cuvs::neighbors
-
 /// \defgroup mg_cpp_index_params ANN MG index build parameters
 
-namespace cuvs::neighbors {
 /** Distribution mode */
 /// \ingroup mg_cpp_index_params
 enum distribution_mode {
