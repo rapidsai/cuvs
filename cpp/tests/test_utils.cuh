@@ -62,10 +62,11 @@ testing::AssertionResult devArrMatch(
     auto act = act_h.get()[i];
     if (!eq_compare(exp, act)) {
       if constexpr (std::is_same_v<T, half>) {
-        return testing::AssertionFailure() << "actual=" << __half2float(act) << " != expected="
-                                           << __half2float(exp) << " @" << i;
+        return testing::AssertionFailure() << "actual=" << __half2float(act)
+                                           << " != expected=" << __half2float(exp) << " @" << i;
       } else {
-        return testing::AssertionFailure() << "actual=" << act << " != expected=" << exp << " @" << i;
+        return testing::AssertionFailure()
+               << "actual=" << act << " != expected=" << exp << " @" << i;
       }
     }
   }
