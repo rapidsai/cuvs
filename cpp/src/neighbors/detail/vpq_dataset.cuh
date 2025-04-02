@@ -439,13 +439,14 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
-    int subspace_offset = j * pq_centers.extent(1) * (1<<PqBits);
-    auto pq_subspace_view = raft::make_device_matrix_view(pq_centers.data_handle()+subspace_offset, (uint32_t)(1<<PqBits), pq_centers.extent(1));
-    uint8_t code = compute_code<kSubWarpSize>(dataset, vq_centers, pq_subspace_view, row_ix, j, vq_label);
+    int subspace_offset   = j * pq_centers.extent(1) * (1 << PqBits);
+    auto pq_subspace_view = raft::make_device_matrix_view(
+      pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
+    uint8_t code =
+      compute_code<kSubWarpSize>(dataset, vq_centers, pq_subspace_view, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
-
   }
 }
 
@@ -483,8 +484,10 @@ auto process_and_fill_codes_subspaces(
   ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
   auto kernel         = [](uint32_t pq_bits) {
     switch (pq_bits) {
-      case 4: return process_and_fill_codes_subspaces_kernel<kBlockSize, 4, data_t, MathT, IdxT, label_t>;
-      case 8: return process_and_fill_codes_subspaces_kernel<kBlockSize, 8, data_t, MathT, IdxT, label_t>;
+      case 4:
+        return process_and_fill_codes_subspaces_kernel<kBlockSize, 4, data_t, MathT, IdxT, label_t>;
+      case 8:
+        return process_and_fill_codes_subspaces_kernel<kBlockSize, 8, data_t, MathT, IdxT, label_t>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be 4 or 8", pq_bits);
     }
   }(pq_bits);
