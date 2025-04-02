@@ -506,10 +506,10 @@ void apply_filter(INDEX_T* const result_indices_ptr,
                                                                  sample_filter);
 }
 
-template <class T>
+template <class T, class S>
 RAFT_KERNEL batched_memcpy_kernel(T* const dst,  // [batch_size, ld_dst]
                                   const uint64_t ld_dst,
-                                  const T* const src,  // [batch_size, ld_src]
+                                  const S* const src,  // [batch_size, ld_src]
                                   const uint64_t ld_src,
                                   const uint64_t count,
                                   const uint64_t batch_size)
@@ -521,10 +521,10 @@ RAFT_KERNEL batched_memcpy_kernel(T* const dst,  // [batch_size, ld_dst]
   dst[i + (ld_dst * j)] = src[i + (ld_src * j)];
 }
 
-template <class T>
+template <class T, class S>
 void batched_memcpy(T* const dst,  // [batch_size, ld_dst]
                     const uint64_t ld_dst,
-                    const T* const src,  // [batch_size, ld_src]
+                    const S* const src,  // [batch_size, ld_src]
                     const uint64_t ld_src,
                     const uint64_t count,
                     const uint64_t batch_size,
@@ -534,7 +534,7 @@ void batched_memcpy(T* const dst,  // [batch_size, ld_dst]
   assert(ld_src >= count);
   constexpr uint32_t block_size = 256;
   const auto grid_size          = (batch_size * count + block_size - 1) / block_size;
-  batched_memcpy_kernel<T>
+  batched_memcpy_kernel<T, S>
     <<<grid_size, block_size, 0, cuda_stream>>>(dst, ld_dst, src, ld_src, count, batch_size);
 }
 
@@ -574,9 +574,13 @@ void set_value_batch(T* const dev_ptr,
 // |<---                 result_buffer_allocation_size                 --->|
 // |<---                       result_buffer_size  --->|                     // Double buffer (A)
 //                      |<---  result_buffer_size                      --->| // Double buffer (B)
-template <typename DataT, typename IndexT, typename DistanceT, typename SAMPLE_FILTER_T>
-struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
-  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T>;
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SAMPLE_FILTER_T,
+          typename OutputIndexT = IndexT>
+struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT> {
+  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -772,7 +776,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
 
   void operator()(raft::resources const& res,
                   raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
+                  OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
                   DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
                   const uint32_t num_queries,

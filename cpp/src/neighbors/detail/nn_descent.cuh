@@ -31,6 +31,7 @@
 #include <raft/core/pinned_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/slice.cuh>
 #include <raft/util/arch.cuh>  // raft::util::arch::SM_*
@@ -243,6 +244,8 @@ class BloomFilter {
       bitsets_[global_set_idx + hash % num_bits_per_set_] = 1;
     }
   }
+
+  void set_nrow(size_t nrow) { nrow_ = nrow; }
 
   bool check(size_t list_id, Index_t key)
   {
@@ -474,6 +477,7 @@ RAFT_KERNEL preprocess_data_kernel(
   __syncthreads();
 
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
       metric == cuvs::distance::DistanceType::CosineExpanded) {
     int lane_id = threadIdx.x % raft::warp_size();
     for (int step = 0; step < raft::ceildiv(dim, raft::warp_size()); step++) {
@@ -500,7 +504,7 @@ RAFT_KERNEL preprocess_data_kernel(
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         output_data[list_id * dim + idx] =
           (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
-      } else {
+      } else {  // L2Expanded or L2SqrtExpanded
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
       }
@@ -843,7 +847,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
-      } else {
+      } else {  // L2Expanded or L2SqrtExpanded
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
@@ -924,7 +928,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
-      } else {
+      } else {  // L2Expanded or L2SqrtExpanded
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
@@ -1212,7 +1216,8 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
   raft::matrix::fill(res, graph_buffer_view, std::numeric_limits<Index_t>::max());
   raft::matrix::fill(res, d_locks_.view(), 0);
 
-  if (build_config.metric == cuvs::distance::DistanceType::L2Expanded) {
+  if (build_config.metric == cuvs::distance::DistanceType::L2Expanded ||
+      build_config.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
     l2_norms_ = raft::make_device_vector<DistData_t, size_t>(res, nrow_);
   }
 };
@@ -1273,7 +1278,9 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
   nrow_               = nrow;
   graph_.nrow         = nrow;
-  graph_.h_graph      = (InternalID_t<Index_t>*)output_graph;
+  graph_.bloom_filter.set_nrow(nrow);
+  update_counter_ = 0;
+  graph_.h_graph  = (InternalID_t<Index_t>*)output_graph;
 
   cudaPointerAttributes data_ptr_attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));
@@ -1407,6 +1414,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
                                            static_cast<int64_t>(build_config_.output_graph_degree)};
     raft::matrix::slice<DistData_t, int64_t, raft::row_major>(
       res, raft::make_const_mdspan(graph_d_dists.view()), output_dist_view, coords);
+
+    if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+      raft::linalg::map(
+        res, output_dist_view, raft::sqrt_op{}, raft::make_const_mdspan(output_dist_view));
+    }
     raft::resource::sync_stream(res);
   }
 
@@ -1449,10 +1461,12 @@ void build(raft::resources const& res,
                "The dataset size for GNND should be less than %d",
                std::numeric_limits<int>::max() - 1);
   auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                          params.metric == cuvs::distance::DistanceType::CosineExpanded ||
                          params.metric == cuvs::distance::DistanceType::InnerProduct;
   RAFT_EXPECTS(allowed_metrics,
-               "The metric for NN Descent should be L2Expanded, CosineExpanded or InnerProduct");
+               "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded or "
+               "InnerProduct");
   RAFT_EXPECTS(
     idx.metric() == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");

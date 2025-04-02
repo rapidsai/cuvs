@@ -129,8 +129,14 @@ std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> fr
   cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index, dataset);
 
   index<T>* hnsw_index = nullptr;
-  cuvs::neighbors::hnsw::deserialize(
-    res, params, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
+  int dim;
+  if (dataset.has_value()) {
+    dim = dataset.value().extent(1);
+  } else {
+    dim = cagra_index.dim();
+  }
+
+  cuvs::neighbors::hnsw::deserialize(res, params, filepath, dim, cagra_index.metric(), &hnsw_index);
   std::filesystem::remove(filepath);
   return std::unique_ptr<index<T>>(hnsw_index);
 }
