@@ -37,7 +37,7 @@ trap "EXITCODE=1" ERR
 set +e
 
 rapids-logger "Run Java tests"
-pushd java/cuvs_java/
+pushd java/cuvs-java/
 mvn test -B
 popd
 
