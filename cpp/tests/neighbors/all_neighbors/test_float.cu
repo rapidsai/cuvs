@@ -20,6 +20,13 @@
 
 namespace cuvs::neighbors::all_neighbors {
 
+typedef AllNeighborsSingleTest<float, float> AllNeighborsSingleTestF_float;
+TEST_P(AllNeighborsSingleTestF_float, AllNeighborsSingle) { this->run(); }
+
+INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
+                        AllNeighborsSingleTestF_float,
+                        ::testing::ValuesIn(inputsSingleBatch));
+
 typedef AllNeighborsTest<float, float> AllNeighborsTestF_float;
 TEST_P(AllNeighborsTestF_float, AllNeighbors) { this->run(); }
 
@@ -27,11 +34,11 @@ INSTANTIATE_TEST_CASE_P(AllNeighborsTest,
                         AllNeighborsTestF_float,
                         ::testing::ValuesIn(inputsBatch));
 
-typedef AllNeighborsSingleTest<float, float> AllNeighborsSingleTestF_float;
-TEST_P(AllNeighborsSingleTestF_float, AllNeighborsSingle) { this->run(); }
+// typedef AllNeighborsSingleTest<float, float> AllNeighborsSingleTestF_float;
+// TEST_P(AllNeighborsSingleTestF_float, AllNeighborsSingle) { this->run(); }
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
-                        AllNeighborsSingleTestF_float,
-                        ::testing::ValuesIn(inputsSingleBatch));
+// INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
+//                         AllNeighborsSingleTestF_float,
+//                         ::testing::ValuesIn(inputsSingleBatch));
 
 }  // namespace cuvs::neighbors::all_neighbors
