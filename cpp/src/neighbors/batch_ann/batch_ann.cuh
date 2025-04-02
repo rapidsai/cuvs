@@ -22,15 +22,9 @@
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/host_mdarray.hpp>
-#include <raft/core/host_mdspan.hpp>
 #include <raft/core/managed_mdarray.hpp>
-#include <raft/core/managed_mdspan.hpp>
 #include <raft/core/resource/nccl_clique.hpp>
 #include <raft/matrix/sample_rows.cuh>
-#include <raft/util/cuda_rt_essentials.hpp>
-#include <raft/util/cudart_utils.hpp>
 #include <variant>
 
 namespace cuvs::neighbors::batch_ann::detail {
