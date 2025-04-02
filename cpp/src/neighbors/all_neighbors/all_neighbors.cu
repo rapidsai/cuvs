@@ -15,7 +15,7 @@
  */
 
 #include "all_neighbors.cuh"
-#include "cuvs/neighbors/common.hpp"
+// #include "cuvs/neighbors/common.hpp"
 
 namespace cuvs::neighbors::all_neighbors {
 

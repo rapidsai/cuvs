@@ -16,11 +16,13 @@
 #pragma once
 
 #include "../detail/nn_descent.cuh"
+#include "all_neighbors_merge.cuh"
 #include "cuvs/neighbors/all_neighbors.hpp"
 #include "cuvs/neighbors/ivf_pq.hpp"
 #include "cuvs/neighbors/nn_descent.hpp"
 #include "cuvs/neighbors/refine.hpp"
 
+#include <optional>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -34,236 +36,6 @@
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
-using align32 = raft::Pow2<32>;
-
-template <typename KeyType, typename ValueType>
-struct CustomComparator {
-  __device__ bool operator()(const raft::KeyValuePair<KeyType, ValueType>& a,
-                             const raft::KeyValuePair<KeyType, ValueType>& b) const
-  {
-    return a < b;
-  }
-};
-
-template <typename IdxT, int BLOCK_SIZE, int ITEMS_PER_THREAD>
-RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
-                                   size_t graph_degree,
-                                   size_t num_cluster_in_batch,
-                                   float* global_distances,
-                                   float* batch_distances,
-                                   IdxT* global_indices,
-                                   IdxT* batch_indices)
-{
-  size_t batch_row = blockIdx.x;
-  typedef cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>
-    BlockMergeSortType;
-  __shared__ typename cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>,
-                                          BLOCK_SIZE,
-                                          ITEMS_PER_THREAD>::TempStorage tmpSmem;
-
-  extern __shared__ char sharedMem[];
-  float* blockKeys  = reinterpret_cast<float*>(sharedMem);
-  IdxT* blockValues = reinterpret_cast<IdxT*>(&sharedMem[graph_degree * 2 * sizeof(float)]);
-  int16_t* uniqueMask =
-    reinterpret_cast<int16_t*>(&sharedMem[graph_degree * 2 * (sizeof(float) + sizeof(IdxT))]);
-
-  if (batch_row < num_cluster_in_batch) {
-    // load batch or global depending on threadIdx
-    size_t global_row = cluster_data_indices[batch_row];
-
-    raft::KeyValuePair<float, IdxT> threadKeyValuePair[ITEMS_PER_THREAD];
-
-    size_t halfway   = BLOCK_SIZE / 2;
-    size_t do_global = threadIdx.x < halfway;
-
-    float* distances;
-    IdxT* indices;
-
-    if (do_global) {
-      distances = global_distances;
-      indices   = global_indices;
-    } else {
-      distances = batch_distances;
-      indices   = batch_indices;
-    }
-
-    size_t idxBase = (threadIdx.x * do_global + (threadIdx.x - halfway) * (1lu - do_global)) *
-                     static_cast<size_t>(ITEMS_PER_THREAD);
-    size_t arrIdxBase = (global_row * do_global + batch_row * (1lu - do_global)) * graph_degree;
-    for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-      size_t colId = idxBase + i;
-      if (colId < graph_degree) {
-        threadKeyValuePair[i].key   = distances[arrIdxBase + colId];
-        threadKeyValuePair[i].value = indices[arrIdxBase + colId];
-      } else {
-        threadKeyValuePair[i].key   = std::numeric_limits<float>::max();
-        threadKeyValuePair[i].value = std::numeric_limits<IdxT>::max();
-      }
-    }
-
-    __syncthreads();
-
-    BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, CustomComparator<float, IdxT>{});
-
-    // load sorted result into shared memory to get unique values
-    idxBase = threadIdx.x * ITEMS_PER_THREAD;
-    for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-      size_t colId = idxBase + i;
-      if (colId < 2 * graph_degree) {
-        blockKeys[colId]   = threadKeyValuePair[i].key;
-        blockValues[colId] = threadKeyValuePair[i].value;
-      }
-    }
-
-    __syncthreads();
-
-    // get unique mask
-    if (threadIdx.x == 0) { uniqueMask[0] = 1; }
-    for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-      size_t colId = idxBase + i;
-      if (colId > 0 && colId < 2 * graph_degree) {
-        uniqueMask[colId] = static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
-      }
-    }
-
-    __syncthreads();
-
-    // prefix sum
-    if (threadIdx.x == 0) {
-      for (int i = 1; i < 2 * graph_degree; i++) {
-        uniqueMask[i] += uniqueMask[i - 1];
-      }
-    }
-
-    __syncthreads();
-    // load unique values to global memory
-    if (threadIdx.x == 0) {
-      global_distances[global_row * graph_degree] = blockKeys[0];
-      global_indices[global_row * graph_degree]   = blockValues[0];
-    }
-
-    for (int i = 0; i < ITEMS_PER_THREAD; i++) {
-      size_t colId = idxBase + i;
-      if (colId > 0 && colId < 2 * graph_degree) {
-        bool is_unique       = uniqueMask[colId] != uniqueMask[colId - 1];
-        int16_t global_colId = uniqueMask[colId] - 1;
-        if (is_unique && static_cast<size_t>(global_colId) < graph_degree) {
-          global_distances[global_row * graph_degree + global_colId] = blockKeys[colId];
-          global_indices[global_row * graph_degree + global_colId]   = blockValues[colId];
-        }
-      }
-    }
-  }
-}
-
-template <typename T,
-          typename IdxT = int64_t,
-          typename Accessor =
-            host_device_accessor<std::experimental::default_accessor<T>, memory_type::host>>
-void merge_subgraphs(raft::resources const& res,
-                     size_t k,
-                     size_t num_data_in_cluster,
-                     IdxT* inverted_indices_d,
-                     T* global_distances,
-                     T* batch_distances_d,
-                     IdxT* global_neighbors,
-                     IdxT* batch_neighbors_d)
-{
-  size_t num_elems     = k * 2;
-  size_t sharedMemSize = num_elems * (sizeof(float) + sizeof(IdxT) + sizeof(int16_t));
-
-#pragma omp critical  // for omp-using multi-gpu purposes
-  {
-    if (num_elems <= 128) {
-      merge_subgraphs_kernel<IdxT, 32, 4>
-        <<<num_data_in_cluster, 32, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
-          inverted_indices_d,
-          k,
-          num_data_in_cluster,
-          global_distances,
-          batch_distances_d,
-          global_neighbors,
-          batch_neighbors_d);
-    } else if (num_elems <= 512) {
-      merge_subgraphs_kernel<IdxT, 128, 4>
-        <<<num_data_in_cluster, 128, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
-          inverted_indices_d,
-          k,
-          num_data_in_cluster,
-          global_distances,
-          batch_distances_d,
-          global_neighbors,
-          batch_neighbors_d);
-    } else if (num_elems <= 1024) {
-      merge_subgraphs_kernel<IdxT, 128, 8>
-        <<<num_data_in_cluster, 128, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
-          inverted_indices_d,
-          k,
-          num_data_in_cluster,
-          global_distances,
-          batch_distances_d,
-          global_neighbors,
-          batch_neighbors_d);
-    } else if (num_elems <= 2048) {
-      merge_subgraphs_kernel<IdxT, 256, 8>
-        <<<num_data_in_cluster, 256, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
-          inverted_indices_d,
-          k,
-          num_data_in_cluster,
-          global_distances,
-          batch_distances_d,
-          global_neighbors,
-          batch_neighbors_d);
-    } else {
-      // this is as far as we can get due to the shared mem usage of cub::BlockMergeSort
-      RAFT_FAIL("The degree of knn is too large (%lu). It must be smaller than 1024", k);
-    }
-    raft::resource::sync_stream(res);
-  }
-}
-
-template <typename T, typename IdxT = int64_t, typename BeforeRemapT = int64_t>
-void remap_and_merge_subgraphs(
-  raft::resources const& res,
-  raft::device_vector_view<IdxT, IdxT> inverted_indices_d,
-  raft::host_vector_view<IdxT, IdxT> inverted_indices,
-  raft::host_matrix_view<BeforeRemapT, IdxT, row_major> indices_for_remap_h,
-  raft::host_matrix_view<IdxT, IdxT, row_major> batch_neighbors_h,
-  raft::device_matrix_view<IdxT, IdxT, row_major> batch_neighbors_d,
-  raft::device_matrix_view<T, IdxT, row_major> batch_distances_d,
-  raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
-  raft::managed_matrix_view<T, IdxT> global_distances,
-  size_t num_data_in_cluster,
-  size_t k)
-{
-  // remap indices
-#pragma omp parallel for
-  for (size_t i = 0; i < num_data_in_cluster; i++) {
-    for (size_t j = 0; j < k; j++) {
-      size_t local_idx        = indices_for_remap_h(i, j);
-      batch_neighbors_h(i, j) = inverted_indices(local_idx);
-    }
-  }
-
-  raft::copy(inverted_indices_d.data_handle(),
-             inverted_indices.data_handle(),
-             num_data_in_cluster,
-             raft::resource::get_cuda_stream(res));
-
-  raft::copy(batch_neighbors_d.data_handle(),
-             batch_neighbors_h.data_handle(),
-             num_data_in_cluster * k,
-             raft::resource::get_cuda_stream(res));
-
-  merge_subgraphs(res,
-                  k,
-                  num_data_in_cluster,
-                  inverted_indices_d.data_handle(),
-                  global_distances.data_handle(),
-                  batch_distances_d.data_handle(),
-                  global_neighbors.data_handle(),
-                  batch_neighbors_d.data_handle());
-}
 
 template <typename T, typename IdxT = int64_t>
 struct all_neighbors_builder {
@@ -273,18 +45,22 @@ struct all_neighbors_builder {
     size_t min_cluster_size,
     size_t max_cluster_size,
     size_t k,
+    bool do_batch,
     cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : res{res},
       k{k},
       n_clusters{n_clusters},
       min_cluster_size{min_cluster_size},
       max_cluster_size{max_cluster_size},
-      metric{metric},
-      inverted_indices_d(raft::make_device_vector<IdxT, IdxT>(res, max_cluster_size)),
-      batch_neighbors_h(raft::make_host_matrix<IdxT, IdxT>(max_cluster_size, k)),
-      batch_neighbors_d(raft::make_device_matrix<IdxT, IdxT>(res, max_cluster_size, k)),
-      batch_distances_d(raft::make_device_matrix<T, IdxT>(res, max_cluster_size, k))
+      do_batch{do_batch},
+      metric{metric}
   {
+    if (do_batch) {
+      inverted_indices_d.emplace(raft::make_device_vector<IdxT, IdxT>(res, max_cluster_size));
+      batch_neighbors_h.emplace(raft::make_host_matrix<IdxT, IdxT>(max_cluster_size, k));
+      batch_neighbors_d.emplace(raft::make_device_matrix<IdxT, IdxT>(res, max_cluster_size, k));
+      batch_distances_d.emplace(raft::make_device_matrix<T, IdxT>(res, max_cluster_size, k));
+    }
   }
 
   /**
@@ -307,23 +83,26 @@ struct all_neighbors_builder {
    * - [out] global_distances: raft::managed_matrix_view type of (total_num_rows, k) for final
    * all-neighbors graph distances
    */
-  virtual void build_knn(raft::resources const& res,
-                         const index_params& params,
-                         raft::host_matrix_view<const T, IdxT, row_major> dataset,
-                         raft::host_vector_view<IdxT, IdxT> inverted_indices,
-                         raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
-                         raft::managed_matrix_view<T, IdxT> global_distances)
+  virtual void build_knn(
+    raft::resources const& res,
+    const index_params& params,
+    raft::host_matrix_view<const T, IdxT, row_major> dataset,
+    all_neighbors::index<IdxT, T>& index,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt)
   {
   }
 
   raft::resources const& res;
   size_t n_clusters, min_cluster_size, max_cluster_size, k;
   cuvs::distance::DistanceType metric;
+  bool do_batch;
 
-  raft::device_vector<IdxT, IdxT> inverted_indices_d;
-  raft::host_matrix<IdxT, IdxT> batch_neighbors_h;
-  raft::device_matrix<IdxT, IdxT> batch_neighbors_d;
-  raft::device_matrix<T, IdxT> batch_distances_d;
+  std::optional<raft::device_vector<IdxT, IdxT>> inverted_indices_d;
+  std::optional<raft::host_matrix<IdxT, IdxT>> batch_neighbors_h;
+  std::optional<raft::device_matrix<IdxT, IdxT>> batch_neighbors_d;
+  std::optional<raft::device_matrix<T, IdxT>> batch_distances_d;
 };
 
 template <typename T, typename IdxT = int64_t>
@@ -333,6 +112,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
                               size_t min_cluster_size,
                               size_t max_cluster_size,
                               size_t k,
+                              bool do_batch,
                               cuvs::distance::DistanceType metric,
                               all_neighbors::graph_build_params::ivf_pq_params& params)
     : all_neighbors_builder<T, IdxT>(
@@ -363,19 +143,25 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
       raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, candidate_k));
 
     // for host refining
-    refined_neighbors_h.emplace(
-      raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, this->k));
+    if (this->do_batch) {
+      refined_neighbors_h.emplace(
+        raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, this->k));
+    }
     refined_distances_h.emplace(
       raft::make_host_matrix<T, IdxT, row_major>(this->max_cluster_size, this->k));
   }
 
-  void build_knn(raft::resources const& res,
-                 const index_params& params,
-                 raft::host_matrix_view<const T, IdxT, row_major> dataset,
-                 raft::host_vector_view<IdxT, IdxT> inverted_indices,
-                 raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
-                 raft::managed_matrix_view<T, IdxT> global_distances) override
+  void build_knn(
+    raft::resources const& res,
+    const index_params& params,
+    raft::host_matrix_view<const T, IdxT, row_major> dataset,
+    all_neighbors::index<IdxT, T>& index,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
+    // TODO add raft fail here for not do batch
+
     size_t num_data_in_cluster = dataset.extent(0);
     size_t num_cols            = dataset.extent(1);
 
@@ -389,7 +175,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     auto data_view = raft::make_device_matrix_view<const T, IdxT>(
       data_d.value().data_handle(), num_data_in_cluster, num_cols);
 
-    auto index = ivf_pq::build(this->res, all_ivf_pq_params.build_params, data_view);
+    auto index_ivfpq = ivf_pq::build(this->res, all_ivf_pq_params.build_params, data_view);
 
     auto distances_candidate_view = raft::make_device_matrix_view<T, IdxT>(
       distances_candidate_d.value().data_handle(), num_data_in_cluster, candidate_k);
@@ -397,7 +183,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
       neighbors_candidate_d.value().data_handle(), num_data_in_cluster, candidate_k);
     cuvs::neighbors::ivf_pq::search(this->res,
                                     all_ivf_pq_params.search_params,
-                                    index,
+                                    index_ivfpq,
                                     data_view,
                                     neighbors_candidate_view,
                                     distances_candidate_view);
@@ -410,31 +196,50 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
       neighbors_candidate_h.value().data_handle(), num_data_in_cluster, candidate_k);
     auto refined_distances_h_view = raft::make_host_matrix_view<T, IdxT>(
       refined_distances_h.value().data_handle(), num_data_in_cluster, this->k);
-    auto refined_neighbors_h_view = raft::make_host_matrix_view<IdxT, IdxT>(
-      refined_neighbors_h.value().data_handle(), num_data_in_cluster, this->k);
-    refine(this->res,
-           dataset,
-           dataset,
-           raft::make_const_mdspan(neighbors_candidate_h_view),
-           refined_neighbors_h_view,
-           refined_distances_h_view,
-           params.metric);
-    raft::copy(this->batch_distances_d.data_handle(),
-               refined_distances_h_view.data_handle(),
-               num_data_in_cluster * this->k,
-               raft::resource::get_cuda_stream(this->res));
+    if (this->do_batch) {
+      auto refined_neighbors_h_view = raft::make_host_matrix_view<IdxT, IdxT>(
+        refined_neighbors_h.value().data_handle(), num_data_in_cluster, this->k);
+      refine(this->res,
+             dataset,
+             dataset,
+             raft::make_const_mdspan(neighbors_candidate_h_view),
+             refined_neighbors_h_view,
+             refined_distances_h_view,
+             params.metric);
 
-    remap_and_merge_subgraphs<T, IdxT, IdxT>(this->res,
-                                             this->inverted_indices_d.view(),
-                                             inverted_indices,
-                                             refined_neighbors_h.value().view(),
-                                             this->batch_neighbors_h.view(),
-                                             this->batch_neighbors_d.view(),
-                                             this->batch_distances_d.view(),
-                                             global_neighbors,
-                                             global_distances,
-                                             num_data_in_cluster,
-                                             this->k);
+      raft::copy(this->batch_distances_d.value().data_handle(),
+                 refined_distances_h_view.data_handle(),
+                 num_data_in_cluster * this->k,
+                 raft::resource::get_cuda_stream(this->res));
+
+      remap_and_merge_subgraphs<T, IdxT, IdxT>(this->res,
+                                               this->inverted_indices_d.value().view(),
+                                               inverted_indices.value(),
+                                               refined_neighbors_h.value().view(),
+                                               this->batch_neighbors_h.value().view(),
+                                               this->batch_neighbors_d.value().view(),
+                                               this->batch_distances_d.value().view(),
+                                               global_neighbors.value(),
+                                               global_distances.value(),
+                                               num_data_in_cluster,
+                                               this->k);
+    } else {
+      size_t num_rows = dataset.extent(0);
+      refine(this->res,
+             dataset,
+             dataset,
+             raft::make_const_mdspan(neighbors_candidate_h_view),
+             index.graph(),
+             refined_distances_h_view,
+             params.metric);
+
+      if (index.return_distances()) {
+        raft::copy(index.distances().value().data_handle(),
+                   refined_distances_h_view.data_handle(),
+                   num_rows * this->k,
+                   raft::resource::get_cuda_stream(this->res));
+      }
+    }
   }
 
   all_neighbors::graph_build_params::ivf_pq_params all_ivf_pq_params;
@@ -455,6 +260,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                    size_t min_cluster_size,
                                    size_t max_cluster_size,
                                    size_t k,
+                                   bool do_batch,
                                    cuvs::distance::DistanceType metric,
                                    all_neighbors::graph_build_params::nn_descent_params& params)
     : all_neighbors_builder<T, IdxT>(
@@ -513,32 +319,54 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       this->max_cluster_size, static_cast<IdxT>(extended_graph_degree)));
   }
 
-  void build_knn(raft::resources const& res,
-                 const index_params& params,
-                 raft::host_matrix_view<const T, IdxT> dataset,
-                 raft::host_vector_view<IdxT, IdxT> inverted_indices,
-                 raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
-                 raft::managed_matrix_view<T, IdxT> global_distances) override
+  void build_knn(
+    raft::resources const& res,
+    const index_params& params,
+    raft::host_matrix_view<const T, IdxT> dataset,
+    all_neighbors::index<IdxT, T>& index,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
-    size_t num_data_in_cluster = dataset.extent(0);
-    bool return_distances      = true;
-    nnd_builder.value().build(dataset.data_handle(),
-                              static_cast<int>(num_data_in_cluster),
-                              int_graph.value().data_handle(),
-                              return_distances,
-                              this->batch_distances_d.data_handle());
+    if (this->do_batch) {
+      // TODO add raft expect value for global and inverted
+      bool return_distances      = true;
+      size_t num_data_in_cluster = dataset.extent(0);
+      nnd_builder.value().build(dataset.data_handle(),
+                                static_cast<int>(num_data_in_cluster),
+                                int_graph.value().data_handle(),
+                                return_distances,
+                                this->batch_distances_d.value().data_handle());
 
-    remap_and_merge_subgraphs<T, IdxT, int>(res,
-                                            this->inverted_indices_d.view(),
-                                            inverted_indices,
-                                            int_graph.value().view(),
-                                            this->batch_neighbors_h.view(),
-                                            this->batch_neighbors_d.view(),
-                                            this->batch_distances_d.view(),
-                                            global_neighbors,
-                                            global_distances,
-                                            num_data_in_cluster,
-                                            this->k);
+      remap_and_merge_subgraphs<T, IdxT, int>(res,
+                                              this->inverted_indices_d.value().view(),
+                                              inverted_indices.value(),
+                                              int_graph.value().view(),
+                                              this->batch_neighbors_h.value().view(),
+                                              this->batch_neighbors_d.value().view(),
+                                              this->batch_distances_d.value().view(),
+                                              global_neighbors.value(),
+                                              global_distances.value(),
+                                              num_data_in_cluster,
+                                              this->k);
+    } else {
+      size_t num_rows  = dataset.extent(0);
+      T* distances_ptr = nullptr;
+      if (index.return_distances()) { distances_ptr = index.distances().value().data_handle(); }
+      nnd_builder.value().build(dataset.data_handle(),
+                                static_cast<int>(num_rows),
+                                int_graph.value().data_handle(),
+                                index.return_distances(),
+                                distances_ptr);
+
+      // host slice
+#pragma omp parallel for
+      for (size_t i = 0; i < num_rows; i++) {
+        for (size_t j = 0; j < this->k; j++) {
+          index.graph()(i, j) = int_graph.value()(i, j);
+        }
+      }
+    }
   }
 
   nn_descent::index_params nnd_params;
@@ -547,5 +375,40 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
   std::optional<nn_descent::detail::GNND<const T, int>> nnd_builder;
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
 };
+
+template <typename T, typename IdxT>
+std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(const raft::resources& handle,
+                                                                const index_params& params,
+                                                                size_t k,
+                                                                size_t min_cluster_size,
+                                                                size_t max_cluster_size,
+                                                                bool do_batch)
+{
+  if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+    auto nn_descent_params =
+      std::get<graph_build_params::nn_descent_params>(params.graph_build_params);
+
+    return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT>>(handle,
+                                                                       params.n_clusters,
+                                                                       min_cluster_size,
+                                                                       max_cluster_size,
+                                                                       k,
+                                                                       do_batch,
+                                                                       params.metric,
+                                                                       nn_descent_params);
+  } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
+    auto ivf_pq_params = std::get<graph_build_params::ivf_pq_params>(params.graph_build_params);
+    return std::make_unique<all_neighbors_builder_ivfpq<T, IdxT>>(handle,
+                                                                  params.n_clusters,
+                                                                  min_cluster_size,
+                                                                  max_cluster_size,
+                                                                  k,
+                                                                  do_batch,
+                                                                  params.metric,
+                                                                  ivf_pq_params);
+  } else {
+    RAFT_FAIL("Batch KNN build algos only supporting NN Descent and IVF PQ");
+  }
+}
 
 }  // namespace cuvs::neighbors::all_neighbors::detail
