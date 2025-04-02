@@ -19,6 +19,7 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -86,6 +87,14 @@ struct cuvsCagraCompressionParams {
 
 typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
 
+struct cuvsIvfPqParams {
+  cuvsIvfPqIndexParams_t ivf_pq_build_params;
+  cuvsIvfPqSearchParams_t ivf_pq_search_params;
+  float refinement_rate;
+};
+
+typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
+
 /**
  * @brief Supplemental parameters to build CAGRA Index
  *
@@ -107,6 +116,10 @@ struct cuvsCagraIndexParams {
    * NOTE: this is experimental new API, consider it unsafe.
    */
   cuvsCagraCompressionParams_t compression;
+  /**
+   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   */
+  cuvsIvfPqParams_t graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -452,6 +465,7 @@ cuvsError_t cuvsCagraExtend(cuvsResources_t res,
  *          c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
  *          d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+ *                     or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
  * @code {.c}
