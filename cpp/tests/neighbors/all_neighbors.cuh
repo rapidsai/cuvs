@@ -20,7 +20,7 @@
 #include "naive_knn.cuh"
 #include <cstddef>
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/batch_ann.hpp>
+#include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <gtest/gtest.h>
@@ -40,7 +40,7 @@
 #include <rmm/device_uvector.hpp>
 #include <vector>
 
-namespace cuvs::neighbors::batch_ann {
+namespace cuvs::neighbors::all_neighbors {
 
 enum knn_build_algo { NN_DESCENT, IVF_PQ };
 
@@ -125,7 +125,7 @@ class BatchANNTest : public ::testing::TestWithParam<BatchANNInputs> {
       auto database_h = raft::make_host_matrix<DataT, IdxT>(handle_, ps.n_rows, ps.dim);
       raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream_);
 
-      auto index = batch_ann::build(
+      auto index = all_neighbors::build(
         handle_, raft::make_const_mdspan(database_h.view()), static_cast<int64_t>(ps.k), params);
 
       raft::copy(indices_batch.data(), index.graph().data_handle(), queries_size, stream_);
@@ -176,4 +176,4 @@ const std::vector<BatchANNInputs> inputsBatch =
                                                  {16, 23},      // graph_degree
                                                  {cuvs::distance::DistanceType::L2Expanded});
 
-}  // namespace cuvs::neighbors::batch_ann
+}  // namespace cuvs::neighbors::all_neighbors

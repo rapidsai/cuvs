@@ -16,13 +16,13 @@
 
 #include <gtest/gtest.h>
 
-#include "../batch_ann.cuh"
+#include "../all_neighbors.cuh"
 
-namespace cuvs::neighbors::batch_ann {
+namespace cuvs::neighbors::all_neighbors {
 
 typedef BatchANNTest<float, float> BatchANNTestF_float;
 TEST_P(BatchANNTestF_float, BatchANN) { this->run(); }
 
 INSTANTIATE_TEST_CASE_P(BatchANNTest, BatchANNTestF_float, ::testing::ValuesIn(inputsBatch));
 
-}  // namespace cuvs::neighbors::batch_ann
+}  // namespace cuvs::neighbors::all_neighbors

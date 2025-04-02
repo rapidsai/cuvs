@@ -21,10 +21,10 @@
 
 #include <variant>
 
-namespace cuvs::neighbors::batch_ann {
+namespace cuvs::neighbors::all_neighbors {
 
 /**
- * @brief batch_ann Build an approximate nearest neighbors index using the batching algorithm
+ * @brief Build an all-neighbors knn graph.
  * The index contains an all-neighbors graph of the input dataset.
  * Indices are stored in host memory of dimensions (n_rows, k).
  * Distances are stored in device memory of dimensions(n_rows, k)
@@ -151,12 +151,12 @@ struct index_params : cuvs::neighbors::index_params {
    * algorithm and control their parameters.
    *
    * @code{.cpp}
-   * batch_ann::index_params params;
+   * all_neighbors::index_params params;
    * // 1. Choose IVF-PQ algorithm
-   * params.graph_build_params = batch_ann::graph_build_params::ivf_pq_params{};
+   * params.graph_build_params = all_neighbors::graph_build_params::ivf_pq_params{};
    *
    * // 2. Choose NN Descent algorithm for kNN graph construction
-   * params.graph_build_params = batch_ann::graph_build_params::nn_descent_params{};
+   * params.graph_build_params = all_neighbors::graph_build_params::nn_descent_params{};
    *
    * @endcode
    */
@@ -187,9 +187,9 @@ struct index_params : cuvs::neighbors::index_params {
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
- *   batch_ann::index_params index_params;
+ *   all_neighbors::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
- *   auto index = batch_ann::build(res, dataset, k, index_params);
+ *   auto index = all_neighbors::build(res, dataset, k, index_params);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset.
@@ -200,7 +200,7 @@ struct index_params : cuvs::neighbors::index_params {
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
  * @param[in] k number of nearest neighbors in the resulting knn graph
- * @param[in] params an instance of batch_ann::index_params that are parameters
+ * @param[in] params an instance of all_neighbors::index_params that are parameters
  *               to run the batched all-neighbors algorithm
  * @param[in] return_distances boolean for whether to return the distances matrix as part of the
  * index
@@ -220,11 +220,11 @@ auto build(const raft::resources& handle,
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
  *   // use default index parameters
- *   batch_ann::index_params index_params;
+ *   all_neighbors::index_params index_params;
  *   //
- *   batch_ann::index<IdxT, T> index{handle, dataset.extent(0), k, return_distances};
+ *   all_neighbors::index<IdxT, T> index{handle, dataset.extent(0), k, return_distances};
  *   // fill the index from a [N, D] raft::host_matrix_view dataset
- *   batch_ann::build(res, dataset, index_params, index);
+ *   all_neighbors::build(res, dataset, index_params, index);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -234,9 +234,9 @@ auto build(const raft::resources& handle,
  * @param[in] handle raft::resources is an object mangaging resources
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
- * @param[in] params an instance of batch_ann::index_params that are parameters
+ * @param[in] params an instance of all_neighbors::index_params that are parameters
  *               to run the batched all-neighbors algorithm
- * @param[out] idx batch_ann::index type holding the all-neighbors graph in host memory (and the
+ * @param[out] idx all_neighbors::index type holding the all-neighbors graph in host memory (and the
  * corresponding distances in device memory if return_distances = true)
  */
 void build(const raft::resources& handle,
@@ -244,4 +244,4 @@ void build(const raft::resources& handle,
            const index_params& params,
            index<int64_t, float>& idx);
 
-}  // namespace cuvs::neighbors::batch_ann
+}  // namespace cuvs::neighbors::all_neighbors

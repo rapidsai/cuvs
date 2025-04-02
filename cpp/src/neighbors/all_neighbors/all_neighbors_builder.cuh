@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../detail/nn_descent.cuh"
-#include "cuvs/neighbors/batch_ann.hpp"
+#include "cuvs/neighbors/all_neighbors.hpp"
 #include "cuvs/neighbors/ivf_pq.hpp"
 #include "cuvs/neighbors/nn_descent.hpp"
 #include "cuvs/neighbors/refine.hpp"
@@ -32,7 +32,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
 
-namespace cuvs::neighbors::batch_ann::detail {
+namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 using align32 = raft::Pow2<32>;
 
@@ -266,13 +266,14 @@ void remap_and_merge_subgraphs(
 }
 
 template <typename T, typename IdxT = int64_t>
-struct batch_ann_builder {
-  batch_ann_builder(raft::resources const& res,
-                    size_t n_clusters,
-                    size_t min_cluster_size,
-                    size_t max_cluster_size,
-                    size_t k,
-                    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
+struct all_neighbors_builder {
+  all_neighbors_builder(
+    raft::resources const& res,
+    size_t n_clusters,
+    size_t min_cluster_size,
+    size_t max_cluster_size,
+    size_t k,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : res{res},
       k{k},
       n_clusters{n_clusters},
@@ -297,7 +298,7 @@ struct batch_ann_builder {
    * Running the ann algorithm on the given cluster, and merging it into the global result
    * Arguments:
    * - [in] res: raft resource
-   * - [in] params: batch_ann::index_params
+   * - [in] params: all_neighbors::index_params
    * - [in] dataset: host_matrix_view of the cluster dataset
    * - [in] inverted_indices: global data indices for the data points in the current cluster of size
    * (num_data_in_cluster)
@@ -326,15 +327,16 @@ struct batch_ann_builder {
 };
 
 template <typename T, typename IdxT = int64_t>
-struct batch_ann_builder_ivfpq : public batch_ann_builder<T, IdxT> {
-  batch_ann_builder_ivfpq(raft::resources const& res,
-                          size_t n_clusters,
-                          size_t min_cluster_size,
-                          size_t max_cluster_size,
-                          size_t k,
-                          cuvs::distance::DistanceType metric,
-                          batch_ann::graph_build_params::ivf_pq_params& params)
-    : batch_ann_builder<T, IdxT>(res, n_clusters, min_cluster_size, max_cluster_size, k, metric),
+struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
+  all_neighbors_builder_ivfpq(raft::resources const& res,
+                              size_t n_clusters,
+                              size_t min_cluster_size,
+                              size_t max_cluster_size,
+                              size_t k,
+                              cuvs::distance::DistanceType metric,
+                              all_neighbors::graph_build_params::ivf_pq_params& params)
+    : all_neighbors_builder<T, IdxT>(
+        res, n_clusters, min_cluster_size, max_cluster_size, k, metric),
       all_ivf_pq_params{params}
   {
     if (all_ivf_pq_params.build_params.metric != metric) {
@@ -435,7 +437,7 @@ struct batch_ann_builder_ivfpq : public batch_ann_builder<T, IdxT> {
                                              this->k);
   }
 
-  batch_ann::graph_build_params::ivf_pq_params all_ivf_pq_params;
+  all_neighbors::graph_build_params::ivf_pq_params all_ivf_pq_params;
   size_t candidate_k;
 
   std::optional<raft::device_matrix<T, IdxT>> data_d;
@@ -447,15 +449,16 @@ struct batch_ann_builder_ivfpq : public batch_ann_builder<T, IdxT> {
 };
 
 template <typename T, typename IdxT = int64_t>
-struct batch_ann_builder_nn_descent : public batch_ann_builder<T, IdxT> {
-  batch_ann_builder_nn_descent(raft::resources const& res,
-                               size_t n_clusters,
-                               size_t min_cluster_size,
-                               size_t max_cluster_size,
-                               size_t k,
-                               cuvs::distance::DistanceType metric,
-                               batch_ann::graph_build_params::nn_descent_params& params)
-    : batch_ann_builder<T, IdxT>(res, n_clusters, min_cluster_size, max_cluster_size, k, metric),
+struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> {
+  all_neighbors_builder_nn_descent(raft::resources const& res,
+                                   size_t n_clusters,
+                                   size_t min_cluster_size,
+                                   size_t max_cluster_size,
+                                   size_t k,
+                                   cuvs::distance::DistanceType metric,
+                                   all_neighbors::graph_build_params::nn_descent_params& params)
+    : all_neighbors_builder<T, IdxT>(
+        res, n_clusters, min_cluster_size, max_cluster_size, k, metric),
       nnd_params{params}
   {
     auto allowed_metrics = metric == cuvs::distance::DistanceType::L2Expanded ||
@@ -545,4 +548,4 @@ struct batch_ann_builder_nn_descent : public batch_ann_builder<T, IdxT> {
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
 };
 
-}  // namespace cuvs::neighbors::batch_ann::detail
+}  // namespace cuvs::neighbors::all_neighbors::detail

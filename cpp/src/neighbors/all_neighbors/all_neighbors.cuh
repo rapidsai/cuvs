@@ -15,10 +15,10 @@
  */
 
 #pragma once
-#include "batch_ann_builder.cuh"
+#include "all_neighbors_builder.cuh"
 #include <cstddef>
 #include <cuvs/cluster/kmeans.hpp>
-#include <cuvs/neighbors/batch_ann.hpp>
+#include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
@@ -27,7 +27,7 @@
 #include <raft/matrix/sample_rows.cuh>
 #include <variant>
 
-namespace cuvs::neighbors::batch_ann::detail {
+namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
 /**
@@ -197,32 +197,32 @@ void get_inverted_indices(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-std::unique_ptr<batch_ann_builder<T, IdxT>> get_knn_builder(const raft::resources& handle,
-                                                            const index_params& params,
-                                                            size_t k,
-                                                            size_t min_cluster_size,
-                                                            size_t max_cluster_size)
+std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(const raft::resources& handle,
+                                                                const index_params& params,
+                                                                size_t k,
+                                                                size_t min_cluster_size,
+                                                                size_t max_cluster_size)
 {
   if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
     auto nn_descent_params =
       std::get<graph_build_params::nn_descent_params>(params.graph_build_params);
 
-    return std::make_unique<batch_ann_builder_nn_descent<T, IdxT>>(handle,
-                                                                   params.n_clusters,
-                                                                   min_cluster_size,
-                                                                   max_cluster_size,
-                                                                   k,
-                                                                   params.metric,
-                                                                   nn_descent_params);
+    return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT>>(handle,
+                                                                       params.n_clusters,
+                                                                       min_cluster_size,
+                                                                       max_cluster_size,
+                                                                       k,
+                                                                       params.metric,
+                                                                       nn_descent_params);
   } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
     auto ivf_pq_params = std::get<graph_build_params::ivf_pq_params>(params.graph_build_params);
-    return std::make_unique<batch_ann_builder_ivfpq<T, IdxT>>(handle,
-                                                              params.n_clusters,
-                                                              min_cluster_size,
-                                                              max_cluster_size,
-                                                              k,
-                                                              params.metric,
-                                                              ivf_pq_params);
+    return std::make_unique<all_neighbors_builder_ivfpq<T, IdxT>>(handle,
+                                                                  params.n_clusters,
+                                                                  min_cluster_size,
+                                                                  max_cluster_size,
+                                                                  k,
+                                                                  params.metric,
+                                                                  ivf_pq_params);
   } else {
     RAFT_FAIL("Batch KNN build algos only supporting NN Descent and IVF PQ");
   }
@@ -231,12 +231,12 @@ std::unique_ptr<batch_ann_builder<T, IdxT>> get_knn_builder(const raft::resource
 template <typename T, typename IdxT>
 void single_gpu_batch_build(const raft::resources& handle,
                             raft::host_matrix_view<const T, IdxT, row_major> dataset,
-                            detail::batch_ann_builder<T, IdxT>& knn_builder,
+                            detail::all_neighbors_builder<T, IdxT>& knn_builder,
                             raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
                             raft::managed_matrix_view<T, IdxT> global_distances,
                             size_t max_cluster_size,
                             size_t n_clusters,
-                            batch_ann::index<IdxT, T>& index,
+                            all_neighbors::index<IdxT, T>& index,
                             const index_params& batch_params,
                             raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
                             raft::host_vector_view<IdxT, IdxT, row_major> cluster_offsets,
@@ -290,7 +290,7 @@ void multi_gpu_batch_build(const raft::resources& handle,
                            raft::managed_matrix_view<T, IdxT> global_distances,
                            size_t max_cluster_size,
                            size_t min_cluster_size,
-                           batch_ann::index<IdxT, T>& index,
+                           all_neighbors::index<IdxT, T>& index,
                            const index_params& params,
                            raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
                            raft::host_vector_view<IdxT, IdxT, row_major> cluster_offsets,
@@ -312,7 +312,7 @@ void multi_gpu_batch_build(const raft::resources& handle,
     const raft::device_resources& dev_res = clique.device_resources_[rank];
     RAFT_CUDA_TRY(cudaSetDevice(dev_id));
 
-    std::unique_ptr<batch_ann_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
+    std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
       dev_res, params, static_cast<size_t>(index.k()), min_cluster_size, max_cluster_size);
 
     // This part for distribution of clusters across ranks as equal as possible
@@ -358,7 +358,7 @@ template <typename T, typename IdxT>
 void build(const raft::resources& handle,
            raft::host_matrix_view<const T, IdxT, row_major> dataset,
            const index_params& batch_params,
-           batch_ann::index<IdxT, T>& index)
+           all_neighbors::index<IdxT, T>& index)
 {
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
@@ -417,7 +417,7 @@ void build(const raft::resources& handle,
                           cluster_offsets.view(),
                           inverted_indices.view());
   } else {
-    std::unique_ptr<batch_ann_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
+    std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
       handle, batch_params, static_cast<size_t>(index.k()), min_cluster_size, max_cluster_size);
     single_gpu_batch_build(handle,
                            dataset,
@@ -446,16 +446,17 @@ void build(const raft::resources& handle,
 }
 
 template <typename T, typename IdxT = int64_t>
-batch_ann::index<IdxT, T> build(const raft::resources& handle,
-                                raft::host_matrix_view<const T, IdxT, row_major> dataset,
-                                int64_t k,
-                                const index_params& batch_params,
-                                bool return_distances = false)  // distance type same as data type
+all_neighbors::index<IdxT, T> build(
+  const raft::resources& handle,
+  raft::host_matrix_view<const T, IdxT, row_major> dataset,
+  int64_t k,
+  const index_params& batch_params,
+  bool return_distances = false)  // distance type same as data type
 {
-  batch_ann::index<IdxT, T> index{
+  all_neighbors::index<IdxT, T> index{
     handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
   build(handle, dataset, batch_params, index);
   return index;
 }
 
-}  // namespace cuvs::neighbors::batch_ann::detail
+}  // namespace cuvs::neighbors::all_neighbors::detail
