@@ -566,7 +566,7 @@ dependencies:
         packages:
           - *cmake_ver
           - maven
-          - openjdk=8.*
+          - openjdk=22.*
           - boost
   bench:
     common:
