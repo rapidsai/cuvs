@@ -47,6 +47,10 @@ jobs:
       node_type: "gpu-l4-latest-1"
       run_script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
+  rust-publish:
+    needs: rust-build
+    secrets: inherit
+    uses: ./.github/workflows/publish-rust.yaml
   go-build:
     needs: cpp-build
     secrets: inherit
