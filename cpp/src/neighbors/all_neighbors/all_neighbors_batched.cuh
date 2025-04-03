@@ -16,8 +16,6 @@
 
 #pragma once
 #include "all_neighbors_builder.cuh"
-#include "raft/util/cudart_utils.hpp"
-#include <cstddef>
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
@@ -144,7 +142,7 @@ void assign_clusters(raft::resources const& res,
  * clusters for each data point
  * - [out] inverted_indices [num_rows x n_nearest_clusters sized vector] : vector for data indices
  * for each cluster
- * - [out] cluster_size [n_cluster] : cluster size for each
+ * - [out] cluster_size [n_cluster] : cluster size for each cluster
  * - [out] cluster_offset [n_cluster] : offset in inverted_indices for each cluster
  */
 template <typename IdxT = int64_t>
@@ -285,7 +283,7 @@ void multi_gpu_batch_build(const raft::resources& handle,
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
       dev_res, params, static_cast<size_t>(index.k()), min_cluster_size, max_cluster_size, true);
 
-    // This part for distribution of clusters across ranks as equal as possible
+    // This part is to distribute clusters across ranks as equally as possible
     // E.g. if we had 5 clusters and 3 ranks, instead of splitting into 1, 1, 3
     // we split into 2, 2, 1
     size_t num_data_for_this_rank = 0;

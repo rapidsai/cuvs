@@ -22,17 +22,8 @@
 #include "cuvs/neighbors/nn_descent.hpp"
 #include "cuvs/neighbors/refine.hpp"
 
-#include <optional>
-#include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_mdspan.hpp>
-#include <raft/core/host_mdarray.hpp>
-#include <raft/core/host_mdspan.hpp>
-#include <raft/core/kvp.hpp>
 #include <raft/core/managed_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
-#include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resources.hpp>
-#include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
@@ -76,12 +67,13 @@ struct all_neighbors_builder {
    * - [in] res: raft resource
    * - [in] params: all_neighbors::index_params
    * - [in] dataset: host_matrix_view of the cluster dataset
-   * - [in] inverted_indices: global data indices for the data points in the current cluster of size
-   * (num_data_in_cluster)
-   * - [out] global_neighbors: raft::managed_matrix_view type of (total_num_rows, k) for final
-   * all-neighbors graph indices
-   * - [out] global_distances: raft::managed_matrix_view type of (total_num_rows, k) for final
-   * all-neighbors graph distances
+   * - [in] index
+   * - [in] inverted_indices (optional): global data indices for the data points in the current
+   * cluster of size (num_data_in_cluster). Only needed when calling with the batching algorithm
+   * - [out] global_neighbors (optional): raft::managed_matrix_view type of (total_num_rows, k) for
+   * final all-neighbors graph indices. Only needed when calling with the batching algorithm
+   * - [out] global_distances (optional): raft::managed_matrix_view type of (total_num_rows, k) for
+   * final all-neighbors graph distances. Only needed when calling with the batching algorithm
    */
   virtual void build_knn(
     raft::resources const& res,
@@ -159,6 +151,11 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
     std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
+    RAFT_EXPECTS(!this->do_batch || (inverted_indices.has_value() && global_neighbors.has_value() &&
+                                     global_distances.has_value()),
+                 "inverted_indices, gloabl_neighbors, and global_distances should be passed for "
+                 "build_knn if doing batching.");
+
     size_t num_data_in_cluster = dataset.extent(0);
     size_t num_cols            = dataset.extent(1);
 
@@ -324,6 +321,11 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
     std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
+    RAFT_EXPECTS(!this->do_batch || (inverted_indices.has_value() && global_neighbors.has_value() &&
+                                     global_distances.has_value()),
+                 "inverted_indices, gloabl_neighbors, and global_distances should be passed for "
+                 "build_knn if doing batching.");
+
     if (this->do_batch) {
       // TODO add raft expect value for global and inverted
       bool return_distances      = true;

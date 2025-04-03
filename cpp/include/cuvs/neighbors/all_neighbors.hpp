@@ -27,7 +27,7 @@ namespace cuvs::neighbors::all_neighbors {
  * @brief Build an all-neighbors knn graph.
  * The index contains an all-neighbors graph of the input dataset.
  * Indices are stored in host memory of dimensions (n_rows, k).
- * Distances are stored in device memory of dimensions(n_rows, k)
+ * Distances are stored in device memory of dimensions(n_rows, k) if return_distances=true
  *
  * @tparam IdxT dtype to be used for indices
  * @tparam DistT dtype to be used for distances
@@ -38,8 +38,8 @@ struct index : cuvs::neighbors::index {
   /**
    * @brief Construct a new all-neighbors index object
    *
-   * This constructor creates an all-neighbors knn-graph in host memory.
-   * The type of the knn-graph is a dense raft::host_matrix and dimensions are (n_rows, k).
+   * This constructor creates an all-neighbors knn graph in host memory.
+   * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
    *
    * @param res raft::resources is an object mangaging resources
    * @param n_rows number of rows in knn-graph
@@ -55,16 +55,16 @@ struct index : cuvs::neighbors::index {
       return_distances_{return_distances}
   {
     if (return_distances) {
-      distances_      = raft::make_device_matrix<DistT, IdxT>(res, n_rows, k);
-      distances_view_ = distances_.value().view();
+      distances_.emplace(raft::make_device_matrix<DistT, IdxT>(res, n_rows, k));
+      distances_view_.emplace(distances_.value().view());
     }
   }
 
   /**
    * @brief Construct a new index object
    *
-   * This constructor creates an all-neighbors graph using a user allocated host memory knn-graph.
-   * The type of the knn-graph is a dense raft::host_matrix and dimensions are (n_rows, k).
+   * This constructor creates an all-neighbors graph using a user allocated host memory knn graph.
+   * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
    *
    * @param res raft::resources is an object mangaging resources
    * @param graph_view raft::host_matrix_view<IdxT, IdxT, raft::row_major> for storing knn-graph
@@ -120,7 +120,7 @@ struct index : cuvs::neighbors::index {
 };
 
 /**
- * @brief ANN parameters used by the batching algorithm to build an all-neighbors knn graph
+ * @brief Parameters used to build an all-neighbors knn graph
  */
 namespace graph_build_params {
 
@@ -135,17 +135,18 @@ using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
 }  // namespace graph_build_params
 
 /**
- * @brief Parameters used to build an all-neighbors graph using the batching algorithm
+ * @brief Parameters used to build an all-neighbors graph
  *
  * graph_build_params: graph building parameters for the given graph building algorithm. defaults
- * to ivfpq
+ * to ivfpq.
  * n_nearest_clusters: number of nearest clusters each data point will be assigned to in
  * the batching algorithm
- * n_clusters: number of total clusters (aka batches) to split the data into
+ * n_clusters: number of total clusters (aka batches) to split the data into. If set to 1, algorithm
+ * creates an all-neighbors graph without batching
  *
  */
 struct index_params : cuvs::neighbors::index_params {
-  /** Parameters for graph building for the batching algorithm.
+  /** Parameters for knn graph building algorithm
    *
    * Set ivf_pq_params, or nn_descent_params to select the graph build
    * algorithm and control their parameters.
@@ -201,7 +202,7 @@ struct index_params : cuvs::neighbors::index_params {
  *                in host memory
  * @param[in] k number of nearest neighbors in the resulting knn graph
  * @param[in] params an instance of all_neighbors::index_params that are parameters
- *               to run the batched all-neighbors algorithm
+ *               to build all-neighbors knn graph
  * @param[in] return_distances boolean for whether to return the distances matrix as part of the
  * index
  * @return index<IdxT> index containing all-neighbors knn graph in host memory (and the
@@ -235,7 +236,7 @@ auto build(const raft::resources& handle,
  * @param[in] dataset raft::host_matrix_view input dataset expected to be located
  *                in host memory
  * @param[in] params an instance of all_neighbors::index_params that are parameters
- *               to run the batched all-neighbors algorithm
+ *               to build all-neighbors knn graph
  * @param[out] idx all_neighbors::index type holding the all-neighbors graph in host memory (and the
  * corresponding distances in device memory if return_distances = true)
  */
