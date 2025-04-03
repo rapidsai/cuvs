@@ -178,7 +178,7 @@ struct index_params : cuvs::neighbors::index_params {
    * will have better accuracy than 2/10 at the cost of performance.
    */
   size_t n_nearest_clusters = 2;
-  size_t n_clusters         = 4;
+  size_t n_clusters         = 1;  // defaults to not batching
 };
 
 /**
