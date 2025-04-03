@@ -883,7 +883,7 @@ inline void search(raft::resources const& handle,
     : params.coarse_search_dtype == CUDA_R_8I
       ? std::move(some_query_t{
           std::in_place_type_t<rmm::device_uvector<int8_t>>{}, max_queries * dim_ext, stream, mr})
-      : throw raft::logic_error("Unsupported sparse coarse_search_dtype (only CUDA_R_32F, "
+      : throw raft::logic_error("Unsupported coarse_search_dtype (only CUDA_R_32F, "
                                 "CUDA_R_16F, and CUDA_R_8I are supported)"));
   rmm::device_uvector<float> rot_queries(max_queries * index.rot_dim(), stream, mr);
   rmm::device_uvector<uint32_t> clusters_to_probe(max_queries * n_probes, stream, mr);
