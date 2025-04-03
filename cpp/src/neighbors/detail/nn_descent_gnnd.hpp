@@ -7,7 +7,6 @@
 #include <raft/core/pinned_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/util/pow2_utils.cuh>
 
 #include <cuda_runtime.h>
 
@@ -18,7 +17,8 @@
 namespace cuvs::neighbors::nn_descent::detail {
 
 using DistData_t = float;
-using align32    = raft::Pow2<32>;
+
+inline size_t roundUp32(size_t num) { return (num + 31) / 32 * 32; }
 
 template <typename Index_t>
 struct InternalID_t;
@@ -202,9 +202,9 @@ BuildConfig get_build_config(
   // to mitigate bucket collisions. `intermediate_degree` is OK to larger than
   // extended_graph_degree.
   extended_graph_degree =
-    align32::roundUp(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
-  size_t extended_intermediate_degree = align32::roundUp(
-    static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
+    roundUp32(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
+  size_t extended_intermediate_degree =
+    roundUp32(static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
   BuildConfig build_config{.max_dataset_size      = static_cast<size_t>(dataset.extent(0)),
                            .dataset_dim           = static_cast<size_t>(dataset.extent(1)),

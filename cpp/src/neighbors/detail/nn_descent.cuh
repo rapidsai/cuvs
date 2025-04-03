@@ -1041,9 +1041,9 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
     build_config_(build_config),
     graph_(res,
            build_config.max_dataset_size,
-           align32::roundUp(build_config.node_degree),
-           align32::roundUp(build_config.internal_node_degree ? build_config.internal_node_degree
-                                                              : build_config.node_degree),
+           roundUp32(build_config.node_degree),
+           roundUp32(build_config.internal_node_degree ? build_config.internal_node_degree
+                                                       : build_config.node_degree),
            NUM_SAMPLES),
     nrow_(build_config.max_dataset_size),
     ndim_(build_config.dataset_dim),
