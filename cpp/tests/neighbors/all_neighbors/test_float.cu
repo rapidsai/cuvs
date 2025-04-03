@@ -27,11 +27,11 @@ INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
                         AllNeighborsSingleTestF_float,
                         ::testing::ValuesIn(inputsSingle));
 
-typedef AllNeighborsTest<float, float> AllNeighborsTestF_float;
-TEST_P(AllNeighborsTestF_float, AllNeighbors) { this->run(); }
+typedef AllNeighborsBatchTest<float, float> AllNeighborsBatchTestF_float;
+TEST_P(AllNeighborsBatchTestF_float, AllNeighborsBatch) { this->run(); }
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsTest,
-                        AllNeighborsTestF_float,
+INSTANTIATE_TEST_CASE_P(AllNeighborsBatchTest,
+                        AllNeighborsBatchTestF_float,
                         ::testing::ValuesIn(inputsBatch));
 
 }  // namespace cuvs::neighbors::all_neighbors

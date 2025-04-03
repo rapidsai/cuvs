@@ -193,18 +193,24 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
       neighbors_candidate_h.value().data_handle(), num_data_in_cluster, candidate_k);
     auto refined_distances_h_view = raft::make_host_matrix_view<T, IdxT>(
       refined_distances_h.value().data_handle(), num_data_in_cluster, this->k);
-    if (this->do_batch) {
-      std::cout << "IVFPQ batching\n";
-      auto refined_neighbors_h_view = raft::make_host_matrix_view<IdxT, IdxT>(
-        refined_neighbors_h.value().data_handle(), num_data_in_cluster, this->k);
-      refine(this->res,
-             dataset,
-             dataset,
-             raft::make_const_mdspan(neighbors_candidate_h_view),
-             refined_neighbors_h_view,
-             refined_distances_h_view,
-             params.metric);
 
+    raft::host_matrix_view<IdxT, IdxT> refined_neighbors_h_view;
+    if (this->do_batch) {
+      refined_neighbors_h_view = raft::make_host_matrix_view<IdxT, IdxT>(
+        refined_neighbors_h.value().data_handle(), num_data_in_cluster, this->k);
+    } else {
+      refined_neighbors_h_view = index.graph();
+    }
+
+    refine(this->res,
+           dataset,
+           dataset,
+           raft::make_const_mdspan(neighbors_candidate_h_view),
+           refined_neighbors_h_view,
+           refined_distances_h_view,
+           params.metric);
+
+    if (this->do_batch) {
       raft::copy(this->batch_distances_d.value().data_handle(),
                  refined_distances_h_view.data_handle(),
                  num_data_in_cluster * this->k,
@@ -222,16 +228,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
                                                num_data_in_cluster,
                                                this->k);
     } else {
-      std::cout << "IVFPQ no batching\n";
-      size_t num_rows = dataset.extent(0);
-      refine(this->res,
-             dataset,
-             dataset,
-             raft::make_const_mdspan(neighbors_candidate_h_view),
-             index.graph(),
-             refined_distances_h_view,
-             params.metric);
-
+      size_t num_rows = num_data_in_cluster;
       if (index.return_distances()) {
         raft::copy(index.distances().value().data_handle(),
                    refined_distances_h_view.data_handle(),
@@ -328,7 +325,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
   {
     if (this->do_batch) {
-      std::cout << "NND batching\n";
       // TODO add raft expect value for global and inverted
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
@@ -350,7 +346,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                               num_data_in_cluster,
                                               this->k);
     } else {
-      std::cout << "NND no batching\n";
       size_t num_rows  = dataset.extent(0);
       T* distances_ptr = nullptr;
       if (index.return_distances()) { distances_ptr = index.distances().value().data_handle(); }

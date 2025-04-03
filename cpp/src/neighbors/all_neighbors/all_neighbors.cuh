@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,7 @@
 
 #pragma once
 #include "all_neighbors_batched.cuh"
-#include <cstddef>
-#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
-#include <cuvs/neighbors/brute_force.hpp>
-#include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/refine.hpp>
-#include <raft/core/managed_mdarray.hpp>
-#include <raft/matrix/sample_rows.cuh>
-#include <variant>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
@@ -35,7 +27,6 @@ void single_build(const raft::resources& handle,
                   const index_params& params,
                   all_neighbors::index<IdxT, T>& index)
 {
-  std::cout << "calling single build here\n";
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 

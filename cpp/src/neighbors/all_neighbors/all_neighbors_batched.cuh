@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,10 +48,10 @@ void get_centroids_on_data_subsample(raft::resources const& res,
   size_t num_rows       = static_cast<size_t>(dataset.extent(0));
   size_t num_cols       = static_cast<size_t>(dataset.extent(1));
   size_t n_clusters     = centroids.extent(0);
-  size_t num_subsamples = std::min(static_cast<size_t>(num_rows / n_clusters), 30000lu);
+  size_t num_subsamples = std::min(static_cast<size_t>(num_rows / n_clusters), 50000lu);
 
-  if (num_subsamples <=
-      1000) {  // heuristically running kmeans for something this small doesn't work well
+  if (num_subsamples <= 1000) {
+    // heuristically running kmeans for something this small doesn't work well
     num_subsamples = std::min(num_rows, 5000lu);
   }
   auto dataset_subsample_d = raft::make_device_matrix<T, IdxT>(res, num_subsamples, num_cols);
@@ -227,7 +227,7 @@ void single_gpu_batch_build(const raft::resources& handle,
       continue;
     }
 
-    // dathering dataset from host
+    // gathering dataset from host
     // cluster_data is on host for now because NN Descent allocates a new device matrix for data of
     // half fp regardless of whether data is on host or device
 #pragma omp parallel for
@@ -330,13 +330,14 @@ void batch_build(const raft::resources& handle,
                  const index_params& batch_params,
                  all_neighbors::index<IdxT, T>& index)
 {
-  std::cout << "calling batched build here\n";
-
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
   size_t n_nearest_clusters = batch_params.n_nearest_clusters;
   size_t n_clusters         = batch_params.n_clusters;
+  RAFT_EXPECTS(n_clusters > n_nearest_clusters,
+               "n_nearest_clusters should be smaller than n_clusters. Recommend starting from "
+               "n_nearest_clusters=2 and gradually increase it for better knn graph recall.");
 
   auto centroids = raft::make_device_matrix<T, IdxT>(handle, n_clusters, num_cols);
   get_centroids_on_data_subsample<T, IdxT>(handle, batch_params.metric, dataset, centroids.view());
@@ -365,8 +366,6 @@ void batch_build(const raft::resources& handle,
                        cluster_sizes.view(),
                        cluster_offsets.view());
 
-  raft::print_host_vector("cluster sizes", cluster_sizes.data_handle(), n_clusters, std::cout);
-  std::cout << "min cluster size " << min_cluster_size << " max: " << max_cluster_size << std::endl;
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, index.k());
   auto global_distances = raft::make_managed_matrix<float, IdxT>(handle, num_rows, index.k());
   std::fill(global_neighbors.data_handle(),
