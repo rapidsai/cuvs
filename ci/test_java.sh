@@ -36,11 +36,9 @@ EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
-rapids-logger "Run Java tests"
+rapids-logger "Run Java build and tests"
+
 bash ./build.sh java
-pushd java/cuvs-java/
-mvn test -B
-popd
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
