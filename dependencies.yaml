@@ -62,6 +62,14 @@ files:
       - depends_on_libcuvs
       - depends_on_cuvs
       - depends_on_cuvs_bench
+  test_java:
+    output: none
+    includes:
+      - cuda
+      - cuda_version
+      - rapids_build
+      - depends_on_libcuvs
+      - test_java
   checks:
     output: none
     includes:
@@ -558,6 +566,14 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - scikit-learn
+  test_java:
+    common:
+      - output_types: conda
+        packages:
+          - *cmake_ver
+          - maven
+          - openjdk=22.*
+          - boost
   bench:
     common:
       - output_types: [conda, pyproject, requirements]
