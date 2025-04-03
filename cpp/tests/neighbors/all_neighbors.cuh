@@ -63,6 +63,74 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& 
 }
 
 template <typename DistanceT, typename DataT, typename IdxT = int64_t>
+void get_graphs(raft::resources& handle,
+                rmm::device_uvector<DataT>& database,
+                std::vector<IdxT>& indices_bf,
+                std::vector<DistanceT>& distances_bf,
+                std::vector<IdxT>& indices_allNN,
+                std::vector<DistanceT>& distances_allNN,
+                AllNeighborsInputs& ps,
+                size_t queries_size)
+{
+  index_params params;
+  params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
+  params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
+  params.metric             = ps.metric;
+
+  if (ps.build_algo == NN_DESCENT) {
+    auto nn_descent_params                      = graph_build_params::nn_descent_params{};
+    nn_descent_params.max_iterations            = 100;
+    nn_descent_params.graph_degree              = ps.k;
+    nn_descent_params.intermediate_graph_degree = ps.k * 2;
+    params.graph_build_params                   = nn_descent_params;
+  } else if (ps.build_algo == IVF_PQ) {
+    auto ivfq_build_params = graph_build_params::ivf_pq_params{};
+    // heuristically good ivfpq n_lists
+    ivfq_build_params.build_params.n_lists = std::max(
+      5u,
+      static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 * params.n_clusters)));
+    params.graph_build_params = ivfq_build_params;
+    std::cout << "heuristicallhy good n liusts " << ivfq_build_params.build_params.n_lists
+              << std::endl;
+  }
+
+  auto cuda_stream = raft::resource::get_cuda_stream(handle);
+  {
+    rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, cuda_stream);
+    rmm::device_uvector<IdxT> indices_naive_dev(queries_size, cuda_stream);
+    naive_knn<DistanceT, DataT, IdxT>(handle,
+                                      distances_naive_dev.data(),
+                                      indices_naive_dev.data(),
+                                      database.data(),
+                                      database.data(),
+                                      ps.n_rows,
+                                      ps.n_rows,
+                                      ps.dim,
+                                      ps.k,
+                                      ps.metric);
+    raft::update_host(indices_bf.data(), indices_naive_dev.data(), queries_size, cuda_stream);
+    raft::update_host(distances_bf.data(), distances_naive_dev.data(), queries_size, cuda_stream);
+
+    raft::resource::sync_stream(handle);
+  }
+
+  {
+    auto database_h = raft::make_host_matrix<DataT, IdxT>(handle, ps.n_rows, ps.dim);
+    raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
+
+    auto index = all_neighbors::build(
+      handle, raft::make_const_mdspan(database_h.view()), static_cast<int64_t>(ps.k), params, true);
+
+    raft::copy(indices_allNN.data(), index.graph().data_handle(), queries_size, cuda_stream);
+    if (index.distances().has_value()) {
+      raft::copy(
+        distances_allNN.data(), index.distances().value().data_handle(), queries_size, cuda_stream);
+    }
+    raft::resource::sync_stream(handle);
+  }
+}
+
+template <typename DistanceT, typename DataT, typename IdxT = int64_t>
 class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
  public:
   AllNeighborsTest()
@@ -76,78 +144,91 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
  protected:
   void run()
   {
-    index_params params;
-    params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
-    params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
-    params.metric             = ps.metric;
+    // index_params params;
+    // params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
+    // params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
+    // params.metric             = ps.metric;
 
-    if (ps.build_algo == NN_DESCENT) {
-      auto nn_descent_params                      = graph_build_params::nn_descent_params{};
-      nn_descent_params.max_iterations            = 100;
-      nn_descent_params.graph_degree              = ps.k;
-      nn_descent_params.intermediate_graph_degree = ps.k * 2;
-      params.graph_build_params                   = nn_descent_params;
-    } else if (ps.build_algo == IVF_PQ) {
-      auto ivfq_build_params = graph_build_params::ivf_pq_params{};
-      // heuristically good ivfpq n_lists
-      ivfq_build_params.build_params.n_lists = std::max(
-        5u,
-        static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 * params.n_clusters)));
-      params.graph_build_params = ivfq_build_params;
-      std::cout << "heuristicallhy good n liusts " << ivfq_build_params.build_params.n_lists
-                << std::endl;
-    }
+    // if (ps.build_algo == NN_DESCENT) {
+    //   auto nn_descent_params                      = graph_build_params::nn_descent_params{};
+    //   nn_descent_params.max_iterations            = 100;
+    //   nn_descent_params.graph_degree              = ps.k;
+    //   nn_descent_params.intermediate_graph_degree = ps.k * 2;
+    //   params.graph_build_params                   = nn_descent_params;
+    // } else if (ps.build_algo == IVF_PQ) {
+    //   auto ivfq_build_params = graph_build_params::ivf_pq_params{};
+    //   // heuristically good ivfpq n_lists
+    //   ivfq_build_params.build_params.n_lists = std::max(
+    //     5u,
+    //     static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 *
+    //     params.n_clusters)));
+    //   params.graph_build_params = ivfq_build_params;
+    //   std::cout << "heuristicallhy good n liusts " << ivfq_build_params.build_params.n_lists
+    //             << std::endl;
+    // }
 
     size_t queries_size = static_cast<size_t>(ps.n_rows) * static_cast<size_t>(ps.k);
 
-    std::vector<IdxT> indices_batch(queries_size);
-    std::vector<DistanceT> distances_batch(queries_size);
-    std::vector<DistanceT> distances_naive(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<IdxT> indices_allNN(queries_size);
+    std::vector<DistanceT> distances_allNN(queries_size);
+    std::vector<DistanceT> distances_bf(queries_size);
+    std::vector<IdxT> indices_bf(queries_size);
 
-    {
-      rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-      naive_knn<DistanceT, DataT, IdxT>(handle_,
-                                        distances_naive_dev.data(),
-                                        indices_naive_dev.data(),
-                                        database.data(),
-                                        database.data(),
-                                        ps.n_rows,
-                                        ps.n_rows,
-                                        ps.dim,
-                                        ps.k,
-                                        ps.metric);
-      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
-      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
+    // {
+    //   rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
+    //   rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+    //   naive_knn<DistanceT, DataT, IdxT>(handle_,
+    //                                     distances_naive_dev.data(),
+    //                                     indices_naive_dev.data(),
+    //                                     database.data(),
+    //                                     database.data(),
+    //                                     ps.n_rows,
+    //                                     ps.n_rows,
+    //                                     ps.dim,
+    //                                     ps.k,
+    //                                     ps.metric);
+    //   raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
+    //   raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size,
+    //   stream_);
 
-      raft::resource::sync_stream(handle_);
-    }
-    {
-      auto database_h = raft::make_host_matrix<DataT, IdxT>(handle_, ps.n_rows, ps.dim);
-      raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream_);
+    //   raft::resource::sync_stream(handle_);
+    // }
+    // {
+    //   auto database_h = raft::make_host_matrix<DataT, IdxT>(handle_, ps.n_rows, ps.dim);
+    //   raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream_);
 
-      auto index = all_neighbors::build(handle_,
-                                        raft::make_const_mdspan(database_h.view()),
-                                        static_cast<int64_t>(ps.k),
-                                        params,
-                                        true);
+    //   auto index = all_neighbors::build(handle_,
+    //                                     raft::make_const_mdspan(database_h.view()),
+    //                                     static_cast<int64_t>(ps.k),
+    //                                     params,
+    //                                     true);
 
-      raft::copy(indices_batch.data(), index.graph().data_handle(), queries_size, stream_);
-      if (index.distances().has_value()) {
-        raft::copy(
-          distances_batch.data(), index.distances().value().data_handle(), queries_size, stream_);
-      }
-      raft::resource::sync_stream(handle_);
-    }
+    //   raft::copy(indices_batch.data(), index.graph().data_handle(), queries_size, stream_);
+    //   if (index.distances().has_value()) {
+    //     raft::copy(
+    //       distances_batch.data(), index.distances().value().data_handle(), queries_size,
+    //       stream_);
+    //   }
+    //   raft::resource::sync_stream(handle_);
+    // }
+
+    get_graphs(handle_,
+               database,
+               indices_bf,
+               distances_bf,
+               indices_allNN,
+               distances_allNN,
+               ps,
+               queries_size);
+
     double min_recall = std::get<0>(ps.recall_cluster_nearestcluster);
 
-    raft::print_host_vector("naive indices", indices_naive.data(), 10, std::cout);
-    raft::print_host_vector("ann indices", indices_batch.data(), 10, std::cout);
-    raft::print_host_vector("naive dists", distances_naive.data(), 10, std::cout);
-    raft::print_host_vector("ann indices", distances_batch.data(), 10, std::cout);
+    raft::print_host_vector("naive indices", indices_bf.data(), 10, std::cout);
+    raft::print_host_vector("ann indices", indices_allNN.data(), 10, std::cout);
+    raft::print_host_vector("naive dists", distances_bf.data(), 10, std::cout);
+    raft::print_host_vector("ann indices", distances_allNN.data(), 10, std::cout);
 
-    EXPECT_TRUE(eval_recall(indices_naive, indices_batch, ps.n_rows, ps.k, 0.01, min_recall, true));
+    EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
   void SetUp() override
@@ -187,78 +268,95 @@ class AllNeighborsSingleTest : public ::testing::TestWithParam<AllNeighborsInput
  protected:
   void run()
   {
-    index_params params;
-    params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
-    params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
-    params.metric             = ps.metric;
+    // index_params params;
+    // params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
+    // params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
+    // params.metric             = ps.metric;
 
-    if (ps.build_algo == NN_DESCENT) {
-      auto nn_descent_params                      = graph_build_params::nn_descent_params{};
-      nn_descent_params.max_iterations            = 100;
-      nn_descent_params.graph_degree              = ps.k;
-      nn_descent_params.intermediate_graph_degree = ps.k * 2;
-      params.graph_build_params                   = nn_descent_params;
-    } else if (ps.build_algo == IVF_PQ) {
-      auto ivfq_build_params = graph_build_params::ivf_pq_params{};
-      // heuristically good ivfpq n_lists
-      ivfq_build_params.build_params.n_lists = std::max(
-        5u,
-        static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 * params.n_clusters)));
-      params.graph_build_params = ivfq_build_params;
-      std::cout << "heuristicallhy good n liusts " << ivfq_build_params.build_params.n_lists
-                << std::endl;
-    }
+    // if (ps.build_algo == NN_DESCENT) {
+    //   auto nn_descent_params                      = graph_build_params::nn_descent_params{};
+    //   nn_descent_params.max_iterations            = 100;
+    //   nn_descent_params.graph_degree              = ps.k;
+    //   nn_descent_params.intermediate_graph_degree = ps.k * 2;
+    //   params.graph_build_params                   = nn_descent_params;
+    // } else if (ps.build_algo == IVF_PQ) {
+    //   auto ivfq_build_params = graph_build_params::ivf_pq_params{};
+    //   // heuristically good ivfpq n_lists
+    //   ivfq_build_params.build_params.n_lists = std::max(
+    //     5u,
+    //     static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 *
+    //     params.n_clusters)));
+    //   params.graph_build_params = ivfq_build_params;
+    //   std::cout << "heuristicallhy good n liusts " << ivfq_build_params.build_params.n_lists
+    //             << std::endl;
+    // }
 
     size_t queries_size = static_cast<size_t>(ps.n_rows) * static_cast<size_t>(ps.k);
 
-    std::vector<IdxT> indices_batch(queries_size);
-    std::vector<DistanceT> distances_batch(queries_size);
-    std::vector<DistanceT> distances_naive(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
+    // std::vector<IdxT> indices_batch(queries_size);
+    // std::vector<DistanceT> distances_batch(queries_size);
+    // std::vector<DistanceT> distances_naive(queries_size);
+    // std::vector<IdxT> indices_naive(queries_size);
 
-    {
-      rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
-      naive_knn<DistanceT, DataT, IdxT>(handle_,
-                                        distances_naive_dev.data(),
-                                        indices_naive_dev.data(),
-                                        database.data(),
-                                        database.data(),
-                                        ps.n_rows,
-                                        ps.n_rows,
-                                        ps.dim,
-                                        ps.k,
-                                        ps.metric);
-      raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
-      raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
+    std::vector<IdxT> indices_allNN(queries_size);
+    std::vector<DistanceT> distances_allNN(queries_size);
+    std::vector<DistanceT> distances_bf(queries_size);
+    std::vector<IdxT> indices_bf(queries_size);
 
-      raft::resource::sync_stream(handle_);
-    }
-    {
-      auto database_h = raft::make_host_matrix<DataT, IdxT>(handle_, ps.n_rows, ps.dim);
-      raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream_);
+    // {
+    //   rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
+    //   rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+    //   naive_knn<DistanceT, DataT, IdxT>(handle_,
+    //                                     distances_naive_dev.data(),
+    //                                     indices_naive_dev.data(),
+    //                                     database.data(),
+    //                                     database.data(),
+    //                                     ps.n_rows,
+    //                                     ps.n_rows,
+    //                                     ps.dim,
+    //                                     ps.k,
+    //                                     ps.metric);
+    //   raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
+    //   raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size,
+    //   stream_);
 
-      auto index = all_neighbors::build(handle_,
-                                        raft::make_const_mdspan(database_h.view()),
-                                        static_cast<int64_t>(ps.k),
-                                        params,
-                                        true);
+    //   raft::resource::sync_stream(handle_);
+    // }
+    // {
+    //   auto database_h = raft::make_host_matrix<DataT, IdxT>(handle_, ps.n_rows, ps.dim);
+    //   raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream_);
 
-      raft::copy(indices_batch.data(), index.graph().data_handle(), queries_size, stream_);
-      if (index.distances().has_value()) {
-        raft::copy(
-          distances_batch.data(), index.distances().value().data_handle(), queries_size, stream_);
-      }
-      raft::resource::sync_stream(handle_);
-    }
+    //   auto index = all_neighbors::build(handle_,
+    //                                     raft::make_const_mdspan(database_h.view()),
+    //                                     static_cast<int64_t>(ps.k),
+    //                                     params,
+    //                                     true);
+
+    //   raft::copy(indices_batch.data(), index.graph().data_handle(), queries_size, stream_);
+    //   if (index.distances().has_value()) {
+    //     raft::copy(
+    //       distances_batch.data(), index.distances().value().data_handle(), queries_size,
+    //       stream_);
+    //   }
+    //   raft::resource::sync_stream(handle_);
+    // }
+
+    get_graphs(handle_,
+               database,
+               indices_bf,
+               distances_bf,
+               indices_allNN,
+               distances_allNN,
+               ps,
+               queries_size);
     double min_recall = std::get<0>(ps.recall_cluster_nearestcluster);
 
-    raft::print_host_vector("naive indices", indices_naive.data(), 10, std::cout);
-    raft::print_host_vector("ann indices", indices_batch.data(), 10, std::cout);
-    raft::print_host_vector("naive dists", distances_naive.data(), 10, std::cout);
-    raft::print_host_vector("ann indices", distances_batch.data(), 10, std::cout);
+    raft::print_host_vector("naive indices", indices_bf.data(), 10, std::cout);
+    raft::print_host_vector("ann indices", indices_allNN.data(), 10, std::cout);
+    raft::print_host_vector("naive dists", distances_bf.data(), 10, std::cout);
+    raft::print_host_vector("ann indices", distances_allNN.data(), 10, std::cout);
 
-    EXPECT_TRUE(eval_recall(indices_naive, indices_batch, ps.n_rows, ps.k, 0.01, min_recall, true));
+    EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
   void SetUp() override
@@ -296,7 +394,7 @@ const std::vector<AllNeighborsInputs> inputsBatch =
     {64, 137},     // dim
     {16, 23},      // graph_degree
     {cuvs::distance::DistanceType::L2Expanded});
-const std::vector<AllNeighborsInputs> inputsSingleBatch =
+const std::vector<AllNeighborsInputs> inputsSingle =
   raft::util::itertools::product<AllNeighborsInputs>(
     {IVF_PQ, NN_DESCENT},
     {std::make_tuple(0.9, 1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
