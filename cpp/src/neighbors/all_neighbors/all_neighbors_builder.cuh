@@ -15,12 +15,12 @@
  */
 #pragma once
 
-#include "../detail/nn_descent.cuh"
+#include "../detail/nn_descent_gnnd.hpp"
 #include "all_neighbors_merge.cuh"
-#include "cuvs/neighbors/all_neighbors.hpp"
-#include "cuvs/neighbors/ivf_pq.hpp"
-#include "cuvs/neighbors/nn_descent.hpp"
-#include "cuvs/neighbors/refine.hpp"
+#include <cuvs/neighbors/all_neighbors.hpp>
+#include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/nn_descent.hpp>
+#include <cuvs/neighbors/refine.hpp>
 
 #include <raft/core/managed_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
@@ -260,11 +260,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
         res, n_clusters, min_cluster_size, max_cluster_size, k, do_batch, metric),
       nnd_params{params}
   {
-    auto allowed_metrics = metric == cuvs::distance::DistanceType::L2Expanded ||
-                           metric == cuvs::distance::DistanceType::CosineExpanded ||
-                           metric == cuvs::distance::DistanceType::InnerProduct;
-    RAFT_EXPECTS(allowed_metrics,
-                 "The metric for NN Descent should be L2Expanded, CosineExpanded or InnerProduct");
     if (nnd_params.metric != metric) {
       RAFT_LOG_WARN("Setting nnd_params metric to metric given for batching algorithm");
       nnd_params.metric = metric;
@@ -273,39 +268,19 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
   void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
   {
-    size_t intermediate_degree = nnd_params.intermediate_graph_degree;
-    size_t graph_degree        = nnd_params.graph_degree;
-
-    if (graph_degree < this->k) {
+    if (nnd_params.graph_degree < this->k) {
       RAFT_LOG_WARN(
         "NN Descent's graph degree (%lu) has to be larger than or equal to k. Setting graph_degree "
         "to k (%lu).",
-        graph_degree,
+        nnd_params.graph_degree,
         this->k);
-      graph_degree = this->k;
-    }
-    if (intermediate_degree < graph_degree) {
-      RAFT_LOG_WARN(
-        "Intermediate graph degree (%lu) cannot be smaller than graph degree (%lu), increasing "
-        "intermediate_degree.",
-        intermediate_degree,
-        graph_degree);
-      intermediate_degree = 1.5 * graph_degree;
+      nnd_params.graph_degree = this->k;
     }
 
-    size_t extended_graph_degree =
-      align32::roundUp(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
-    size_t extended_intermediate_degree = align32::roundUp(
-      static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
+    size_t extended_graph_degree, graph_degree;
 
-    build_config.max_dataset_size      = this->max_cluster_size;
-    build_config.dataset_dim           = dataset.extent(1);
-    build_config.node_degree           = extended_graph_degree;
-    build_config.internal_node_degree  = extended_intermediate_degree;
-    build_config.max_iterations        = nnd_params.max_iterations;
-    build_config.termination_threshold = nnd_params.termination_threshold;
-    build_config.output_graph_degree   = this->k;
-    build_config.metric                = this->metric;
+    auto build_config = nn_descent::detail::get_build_config(
+      this->res, nnd_params, dataset, nnd_params.metric, extended_graph_degree, graph_degree);
 
     nnd_builder.emplace(this->res, build_config);
     int_graph.emplace(raft::make_host_matrix<int, IdxT, row_major>(
