@@ -39,6 +39,10 @@ set +e
 rapids-logger "Run Java build and tests"
 
 bash ./build.sh java
+if [[ $? -ne 0 ]]; then
+  rapids-logger "Initial Java build & test failed. Retrying with 'mvn clean verify -X'"
+  mvn clean verify -X
+fi
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
