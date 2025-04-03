@@ -1319,7 +1319,7 @@ void build(raft::resources const& res,
 {
   size_t extended_graph_degree, graph_degree;
   auto build_config =
-    get_build_config(res, params, dataset, idx, extended_graph_degree, graph_degree);
+    get_build_config(res, params, dataset, idx.metric(), extended_graph_degree, graph_degree);
 
   auto int_graph =
     raft::make_host_matrix<int, int64_t, raft::row_major>(dataset.extent(0), extended_graph_degree);

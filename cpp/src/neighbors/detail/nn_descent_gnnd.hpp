@@ -163,7 +163,7 @@ BuildConfig get_build_config(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  index<IdxT>& idx,
+  const cuvs::distance::DistanceType metric,
   size_t& extended_graph_degree,
   size_t& graph_degree)
 {
@@ -178,7 +178,7 @@ BuildConfig get_build_config(
                "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded or "
                "InnerProduct");
   RAFT_EXPECTS(
-    idx.metric() == params.metric,
+    metric == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");
   size_t intermediate_degree = params.intermediate_graph_degree;
   graph_degree               = params.graph_degree;
