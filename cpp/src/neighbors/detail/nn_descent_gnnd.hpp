@@ -30,14 +30,14 @@ class InternalID_t<int> {
   Index_t id_{std::numeric_limits<Index_t>::max()};
 
  public:
-  __host__ __device__ bool is_new() const { return id_ >= 0; }
-  __host__ __device__ Index_t& id_with_flag() { return id_; }
-  __host__ __device__ Index_t id() const { return is_new() ? id_ : -id_ - 1; }
-  __host__ __device__ void mark_old()
+  _RAFT_HOST_DEVICE bool is_new() const { return id_ >= 0; }
+  _RAFT_HOST_DEVICE Index_t& id_with_flag() { return id_; }
+  _RAFT_HOST_DEVICE Index_t id() const { return is_new() ? id_ : -id_ - 1; }
+  _RAFT_HOST_DEVICE void mark_old()
   {
     if (id_ >= 0) id_ = -id_ - 1;
   }
-  __host__ __device__ bool operator==(const InternalID_t<int>& other) const
+  _RAFT_HOST_DEVICE bool operator==(const InternalID_t<int>& other) const
   {
     return id() == other.id();
   }
