@@ -7,7 +7,7 @@
           "GITHUB_REPOSITORY": "?",
           "GIT_TAG": "?",
           "VERSION": "?",
-          "GIT_SHALLOW": false,
+          "GIT_SHALLOW": "?",
           "OPTIONS": "*",
           "FIND_PACKAGE_ARGUMENTS": "*"
         }
