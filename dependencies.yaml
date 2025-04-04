@@ -482,6 +482,8 @@ dependencies:
         packages:
           - breathe>=4.35.0
           - doxygen>=1.8.20
+          # Temporary fix while conda-forge sorts out breaking ABI in libxml2
+          - libxml2<2.14
           - graphviz
           - ipython
           - numpydoc
