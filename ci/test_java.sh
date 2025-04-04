@@ -44,6 +44,14 @@ if [[ $? -ne 0 ]]; then
   pushd java/cuvs-java/
   mvn clean verify -X
   popd
+  DUMP_DIR="/__w/cuvs/cuvs/java/cuvs-java/target/failsafe-reports"
+  for file in "$DUMP_DIR"/*.dumpstream; do
+    if [ -f "$file" ]; then
+      echo "======= Dump file: $file ======="
+      cat "$file"
+      echo "======= End of dump file ======="
+    fi
+  done
 fi
 
 rapids-logger "Test script exiting with value: $EXITCODE"
