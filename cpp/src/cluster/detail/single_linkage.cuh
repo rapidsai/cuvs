@@ -122,4 +122,90 @@ void single_linkage(raft::resources const& handle,
   out->n_leaves               = m;
   out->n_connected_components = 1;
 }
+
+/**
+ * Constructs a linkage by computing mutual reachability, mst, and
+ * dendrogram. This is shared by HDBSCAN and Robust Single Linkage
+ * since the two algorithms differ only in the cluster
+ * selection and extraction.
+ * @tparam value_idx
+ * @tparam value_t
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points (size m * n)
+ * @param[in] m number of rows
+ * @param[in] n number of columns
+ * @param[in] metric distance metric to use
+ * @param[in] params hyper parameters
+ * @param[in] core_dists buffer for storing core distances (size m)
+ * @param[out] out output container object
+ */
+ template <typename value_idx = int64_t, typename value_t = float>
+ void build_mutual_reachability_linkage(raft::resources const& handle,
+                    const value_t* X,
+                    size_t m,
+                    size_t n,
+                    cuvs::distance::DistanceType metric,
+                    Common::HDBSCANParams& params,
+                    value_t* core_dists,
+                    Common::robust_single_linkage_output<value_idx, value_t>& out)
+ {
+   auto stream = handle.get_stream();
+ 
+   /**
+    * Mutual reachability graph
+    */
+   rmm::device_uvector<value_idx> mutual_reachability_indptr(m + 1, stream);
+   // Note that (min_samples+1) is parsed while allocating space for the COO matrix and to the
+   // mutual_reachability_graph function. This was done to account for self-loops in the knn graph
+   // and be consistent with Scikit learn Contrib.
+   raft::sparse::COO<value_t, value_idx> mutual_reachability_coo(stream,
+                                                                 (params.min_samples + 1) * m * 2);
+ 
+   cuvs::neighbors::reachability::mutual_reachability_graph(
+     handle,
+     raft::make_device_matrix_view<const value_t, int64_t>(X, m, n),
+     params.min_samples + 1,
+     raft::make_device_vector_view<value_idx>(mutual_reachability_indptr.data(), m + 1),
+     raft::make_device_vector_view<value_t>(core_dists, m),
+     mutual_reachability_coo,
+     metric,
+     params.alpha);
+ 
+   /**
+    * Construct MST sorted by weights
+    */
+ 
+   rmm::device_uvector<value_idx> color(m, stream);
+   FixConnectivitiesRedOp<value_idx, value_t> red_op(core_dists, m);
+   // during knn graph connection
+   raft::cluster::detail::build_sorted_mst(handle,
+                                           X,
+                                           mutual_reachability_indptr.data(),
+                                           mutual_reachability_coo.cols(),
+                                           mutual_reachability_coo.vals(),
+                                           m,
+                                           n,
+                                           out.get_mst_src(),
+                                           out.get_mst_dst(),
+                                           out.get_mst_weights(),
+                                           color.data(),
+                                           mutual_reachability_coo.nnz,
+                                           red_op,
+                                           static_cast<raft::distance::DistanceType>(metric),
+                                           (size_t)10);
+ 
+   /**
+    * Perform hierarchical labeling
+    */
+   size_t n_edges = m - 1;
+ 
+   raft::cluster::detail::build_dendrogram_host(handle,
+                                                out.get_mst_src(),
+                                                out.get_mst_dst(),
+                                                out.get_mst_weights(),
+                                                n_edges,
+                                                out.get_children(),
+                                                out.get_deltas(),
+                                                out.get_sizes());
+}
 };  // namespace  cuvs::cluster::agglomerative::detail
