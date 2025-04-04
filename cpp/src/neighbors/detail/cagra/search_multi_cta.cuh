@@ -100,7 +100,7 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
 
   uint32_t num_cta_per_query;
   lightweight_uvector<INDEX_T> intermediate_indices;
-  lightweight_uvector<float> intermediate_distances;
+  lightweight_uvector<DISTANCE_T> intermediate_distances;
   size_t topk_workspace_size;
   lightweight_uvector<uint32_t> topk_workspace;
 
