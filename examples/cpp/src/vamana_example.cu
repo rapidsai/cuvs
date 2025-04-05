@@ -33,7 +33,7 @@ void vamana_build_and_write(raft::device_resources const &dev_resources,
                             raft::device_matrix_view<const T, int64_t> dataset,
                             std::string out_fname, int degree, int visited_size,
                             float max_fraction, int iters,
-                            std::string quantizer_fname) {
+                            std::string codebook_prefix) {
   using namespace cuvs::neighbors;
 
   // use default index parameters
@@ -42,7 +42,7 @@ void vamana_build_and_write(raft::device_resources const &dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
-  index_params.quantizer_file = quantizer_fname;
+  index_params.codebook_prefix = codebook_prefix;
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
 
@@ -103,9 +103,9 @@ int main(int argc, char *argv[]) {
   int max_visited = atoi(argv[4]);
   float max_fraction = atof(argv[5]);
   int iters = atoi(argv[6]);
-  std::string quantizer_fname = "";
+  std::string codebook_prefix = "";
   if (argc >= 8)
-    quantizer_fname = (std::string)argv[7]; // Quantizer filename
+    codebook_prefix = (std::string)argv[7]; // Path prefix to pq pivots and rotation matrix files
 
   // Read in binary dataset file
   auto dataset =
@@ -114,5 +114,5 @@ int main(int argc, char *argv[]) {
   // Simple build example to create graph and write to a file
   vamana_build_and_write<uint8_t>(
       dev_resources, raft::make_const_mdspan(dataset.view()), out_fname, degree,
-      max_visited, max_fraction, iters, quantizer_fname);
+      max_visited, max_fraction, iters, codebook_prefix);
 }

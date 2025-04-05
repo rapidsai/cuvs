@@ -380,72 +380,109 @@ void batched_insert_vamana(
   RAFT_CHECK_CUDA(stream);
 }
 
-// Parse quantizer file.
-inline void parse_opq_file(const std::string& path,
-                           const uint32_t vector_dim,
-                           int32_t& pq_codebook_size,
-                           int32_t& pq_dim,
-                           std::vector<float>& PQEncodingTable,
-                           std::vector<float>& OPQMatrix)
+// Parse pq_pivots file.
+inline std::vector<float> parse_pq_pivots_file(const std::string& path,
+                                               const int vector_dim,
+                                               int32_t& pq_codebook_size,
+                                               int32_t& pq_dim)
 {
-  std::ifstream opq_if(path, std::ios::in | std::ios::binary);
-  if (!opq_if) { RAFT_FAIL("Cannot open file %s", path.c_str()); }
+  std::ifstream pivots_if(path, std::ios::in | std::ios::binary);
+  RAFT_EXPECTS(pivots_if, "Cannot open file %s", path.c_str());
 
-  // check file size
-  opq_if.ignore(std::numeric_limits<std::streamsize>::max());
-  uint32_t length = opq_if.gcount();
-  if (length < 14) { RAFT_FAIL("OPQ file does not contain expected metadata."); }
-  opq_if.clear();  // Since ignore will have set eof.
-  opq_if.seekg(0, std::ios_base::beg);
+  // check file size meets minimum for offset data
+  pivots_if.ignore(std::numeric_limits<std::streamsize>::max());
+  uint32_t length = pivots_if.gcount();
+  RAFT_EXPECTS(length >= 40, "pq_pivots file does not contain expected metadata.");
+  pivots_if.clear();  // Since ignore will have set eof.
+  pivots_if.seekg(0, std::ios_base::beg);
 
   // check metadata
-  unsigned char quantizerType, reconstructType;
-  int32_t codebookDim;
+  int32_t num_offsets, num_dims;
+  pivots_if.read((char*)&num_offsets, sizeof(int32_t));
+  pivots_if.read((char*)&num_dims, sizeof(int32_t));
+  RAFT_EXPECTS(num_offsets == 4,
+               "Error reading pq_pivots file %s. # offsets = %ld; expected 4.",
+               path.c_str(),
+               (long)num_offsets);
+  RAFT_EXPECTS(num_dims == 1,
+               "Error reading pq_pivots file %s. # dimensions = %ld; expected 1.",
+               path.c_str(),
+               (long)num_dims);
 
-  opq_if.read((char*)&quantizerType, 1);  // 0: NONE, 1: PQ, 2: OPQ
-  if (quantizerType != 2) {
-    RAFT_FAIL("Expected quantizer type 2; parsed: %s", std::to_string(quantizerType).c_str());
-  }
+  std::vector<int64_t> offset(num_offsets);
+  pivots_if.read((char*)offset.data(), sizeof(int64_t) * num_offsets);
 
-  opq_if.read((char*)&reconstructType, 1);  // 0: int8, 1: uint8, 2: int16, 3: float
-  if (reconstructType != 0) {
-    RAFT_FAIL("Expected reconstruct type 0; parsed: %s", std::to_string(reconstructType).c_str());
-  }
+  // check file size meets minimum for all required data and metadata
+  RAFT_EXPECTS(
+    length >= offset[2] + 4,
+    "pq_pivots file doesn't have the minimum expected size. Min. expected: %lld Actual: %lu",
+    (long long)offset[2] + 4,
+    (unsigned long)length);
 
-  opq_if.read((char*)&pq_dim, 4);
-  opq_if.read((char*)&pq_codebook_size, 4);
-  opq_if.read((char*)&codebookDim, 4);
+  pivots_if.seekg(offset[2], std::ios_base::beg);
+  pivots_if.read((char*)&pq_dim, sizeof(int32_t));
+  --pq_dim;
 
-  if ((uint32_t)codebookDim != vector_dim / pq_dim) {
-    RAFT_FAIL("Codebook dim mismatch. Expected: %s Actual: %s",
-              std::to_string(vector_dim / pq_dim).c_str(),
-              std::to_string(codebookDim).c_str());
-  }
+  pivots_if.seekg(offset[0], std::ios_base::beg);
+  pivots_if.read((char*)&pq_codebook_size, sizeof(int32_t));
+  int32_t pq_dim_times_codebookDim;
+  pivots_if.read((char*)&pq_dim_times_codebookDim, sizeof(int32_t));
 
-  // check exact length
-  uint32_t length_expected =
-    14 + (4 * vector_dim * pq_codebook_size) + (4 * vector_dim * vector_dim);
-  if (length != length_expected) {
-    RAFT_FAIL("OPQ file doesn't have expected size. Expected: %s Actual: %s",
-              std::to_string(length_expected).c_str(),
-              std::to_string(length).c_str());
-  }
+  int32_t codebookDim = vector_dim / pq_dim;
+  RAFT_EXPECTS(pq_dim * codebookDim == pq_dim_times_codebookDim,
+               "Invalid metadata in pq_pivots file.");
 
   // parse PQEncodingTable
-  PQEncodingTable.resize(vector_dim * pq_codebook_size);
-  for (int i = 0; (uint32_t)i < vector_dim * pq_codebook_size; i++) {
-    opq_if.read((char*)&PQEncodingTable[i],
-                4);  // Reconstruct type of the overall quantizer is int8 but because it's OPQ, need
-                     // to read it as float
+  std::vector<float> PQEncodingTable(vector_dim * pq_codebook_size);
+  for (int i = 0; i < vector_dim * pq_codebook_size; i++) {
+    pivots_if.read((char*)&PQEncodingTable[i],
+                   4);  // Reconstruct type of the overall quantizer is int8 but because it's OPQ,
+                        // need to read it as float
   }
 
-  // parse OPQMatrix
-  OPQMatrix.resize(vector_dim * vector_dim);
-  for (int iRow = 0; (uint32_t)iRow < vector_dim; iRow++) {
-    for (int iCol = 0; (uint32_t)iCol < vector_dim; iCol++) {
-      opq_if.read((char*)&OPQMatrix[iRow * vector_dim + iCol], 4);
+  return PQEncodingTable;
+}
+
+// Parse rotation matrix file.
+inline std::vector<float> parse_rotation_matrix_file(const std::string& path, const int vector_dim)
+{
+  std::ifstream mat_if(path, std::ios::in | std::ios::binary);
+  if (!mat_if) { RAFT_FAIL("Cannot open file %s", path.c_str()); }
+
+  // check file size meets minimum for metadata
+  mat_if.ignore(std::numeric_limits<std::streamsize>::max());
+  uint32_t length = mat_if.gcount();
+  if (length < 8) { RAFT_FAIL("Rotation matrix file does not contain expected metadata."); }
+  mat_if.clear();  // Since ignore will have set eof.
+  mat_if.seekg(0, std::ios_base::beg);
+
+  // check metadata
+  int32_t nr, nc;
+  mat_if.read((char*)&nr, sizeof(int32_t));
+  mat_if.read((char*)&nc, sizeof(int32_t));
+  RAFT_EXPECTS(vector_dim == nr,
+               "Unexpected #rows in rotation matrix file. Expected: %ld Actual: %ld",
+               (long)vector_dim,
+               (long)nr);
+  RAFT_EXPECTS(vector_dim == nc,
+               "Unexpected #cols in rotation matrix file. Expected: %ld Actual: %ld",
+               (long)vector_dim,
+               (long)nc);
+
+  // check exact length
+  uint32_t length_expected = 8 + (4 * nr * nc);
+  RAFT_EXPECTS(length_expected == length, "Rotation matrix file doesn't have expected size. Expected: %lu Actual: %ld",
+               (unsigned long)length_expected,
+               (long)length);
+
+  // read rotation matrix
+  std::vector<float> mat(nr * nc);
+  for (int iRow = 0; iRow < nr; iRow++) {
+    for (int iCol = 0; iCol < nc; iCol++) {
+      mat_if.read((char*)&mat[iRow * vector_dim + iCol], 4);
     }
   }
+  return mat;
 }
 
 template <typename T>
@@ -497,25 +534,26 @@ index<T, IdxT> build(
     res, params, dataset, vamana_graph.view(), &medoid_id, metric);
 
   std::optional<raft::device_matrix<uint8_t, int64_t>> quantized_vectors;
-  if (params.quantizer_file.size()) {
+  if (params.codebook_prefix.size()) {
     cuvs::neighbors::vpq_params pq_params;
     // Full codebook should be a raft::matrix of dimension [2^PQ_BITS * PQ_DIM, VEC_DIM / PQ_DIM]
     // Every row is (VEC_DIM/PQ_DIM) floats representing a group of cluster centroids.
     // Every consecutive [PQ_DIM] rows is a set.
     int32_t pq_codebook_size, pq_dim;
-    std::vector<float> PQEncodingTable, OPQMatrix;
 
-    parse_opq_file(
-      params.quantizer_file, dim, pq_codebook_size, pq_dim, PQEncodingTable, OPQMatrix);
+    std::vector<float> PQEncodingTable = parse_pq_pivots_file(
+      params.codebook_prefix + "_pq_pivots.bin", dim, pq_codebook_size, pq_dim);
+    std::vector<float> OPQMatrix =
+      parse_rotation_matrix_file(params.codebook_prefix + "_pq_pivots.bin_rotation_matrix.bin", dim);
 
     pq_params.pq_bits = std::lround(std::log2(pq_codebook_size));
     pq_params.pq_dim  = pq_dim;
 
-    // transform PQEncodingTable (dimensions: pq_dim x pq_codebook_size x dim_per_subspace) to
+    // transform PQEncodingTable (dimensions: pq_codebook_size x dim_per_subspace * pq_dim ) to
     // pq_codebook (dimensions: pq_codebook_size * pq_dim, dim_per_subspace)
     auto PQEncodingTable_device_vec = raft::make_device_vector<float, uint32_t>(
-      res, PQEncodingTable.size());  // logically a 3D matrix with dimensions pq_dim x
-                                     // pq_codebook_size x dim_per_subspace
+      res, PQEncodingTable.size());  // logically a 2D matrix with dimensions pq_codebook_size x
+                                     // dim_per_subspace * pq_dim
     RAFT_CUDA_TRY(cudaMemcpyAsync(PQEncodingTable_device_vec.data_handle(),
                                   PQEncodingTable.data(),
                                   PQEncodingTable.size() * sizeof(float),
@@ -532,12 +570,12 @@ index<T, IdxT> build(
       [PQEncodingTable_device_vec_view, pq_dim, pq_codebook_size, dim_per_subspace, dim] __device__(
         size_t i) {
         int row_idx        = i / dim_per_subspace;
-        int subspace_id    = row_idx / pq_codebook_size;  // I
-        int codebook_id    = row_idx % pq_codebook_size;  // J
-        int id_in_subspace = i % dim_per_subspace;        // K
+        int subspace_id    = row_idx / pq_codebook_size;  // idx_pq_dim
+        int codebook_id    = row_idx % pq_codebook_size;  // idx_pq_codebook_size
+        int id_in_subspace = i % dim_per_subspace;        // idx_dim_per_subspace
 
-        return PQEncodingTable_device_vec_view[subspace_id * pq_codebook_size * dim_per_subspace +
-                                               codebook_id * dim_per_subspace + id_in_subspace];
+        return PQEncodingTable_device_vec_view[codebook_id * pq_dim * dim_per_subspace +
+                                               subspace_id * dim_per_subspace + id_in_subspace];
       });
 
     // prepare rotation matrix OPQMatrix

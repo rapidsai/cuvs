@@ -72,8 +72,10 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t queue_size = 127;
   /** Max batchsize of reverse edge processing (reduces memory footprint) */
   uint32_t reverse_batchsize = 1000000;
-  /** Path to quantizer file */
-  std::string quantizer_file = "";
+  /** Path prefix to pq pivots and rotation matrix files. Expects pq pivots file at
+   * "${codebook_prefix}_pq_pivots.bin" and rotation matrix file at
+   * "${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin". */
+  std::string codebook_prefix = "";
 };
 
 /**
@@ -126,15 +128,14 @@ struct index : cuvs::neighbors::index {
   /** Dataset [size, dim] */
   [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
   {
-    RAFT_EXPECTS(dataset_, "Invalid dataset");
     return *dataset_;
   }
 
   /** Quantized dataset [size, codes_rowlen] */
-  [[nodiscard]] inline auto quantized_data() const noexcept
+  [[nodiscard]] inline auto quantized_data() const
     -> const cuvs::neighbors::dataset<int64_t>&
   {
-    RAFT_EXPECTS(dataset_, "Invalid quantized dataset");
+    RAFT_EXPECTS(quantized_dataset_, "Invalid quantized dataset");
     return *quantized_dataset_;
   }
 
