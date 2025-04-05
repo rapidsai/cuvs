@@ -299,10 +299,6 @@ void serialize(raft::resources const& res,
                bool include_dataset,
                bool sector_aligned)
 {
-  // Write graph to first index file (format from MSFT DiskANN OSS)
-  std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
-  if (!index_of) { RAFT_FAIL("Cannot open file %s", file_name.c_str()); }
-
   auto d_graph = index_.graph();
   auto h_graph = raft::make_host_matrix<IdxT, int64_t>(d_graph.extent(0), d_graph.extent(1));
   raft::copy(h_graph.data_handle(),
@@ -313,15 +309,24 @@ void serialize(raft::resources const& res,
 
   // if requested, write sector-aligned file and return
   if (sector_aligned) {
+    // Write graph to disk index file with file name suffix according to DiskANN build_disk_index
+    const std::string index_file_name = file_name + "_disk.index";
+    std::ofstream index_of(index_file_name, std::ios::out | std::ios::binary);
+    RAFT_EXPECTS(index_of, "Cannot open file %s", index_file_name.c_str());
+
     serialize_sector_aligned<T, IdxT>(
       res, h_graph, index_.data(), static_cast<uint64_t>(index_.medoid()), index_of);
     index_of.close();
-    if (!index_of) { RAFT_FAIL("Error writing output %s", file_name.c_str()); }
+    RAFT_EXPECTS(index_of, "Error writing output %s", index_file_name.c_str());
 
     if (include_dataset) { serialize_dataset<T>(res, &index_.data(), file_name + ".data"); }
-    serialize_dataset<uint8_t>(res, &index_.quantized_data(), file_name + ".quantized_data");
+    serialize_dataset<uint8_t>(res, &index_.quantized_data(), file_name + "_pq_compressed.bin");
     return;
   }
+
+  // Write graph to first index file (format from MSFT DiskANN OSS)
+  std::ofstream index_of(file_name, std::ios::out | std::ios::binary);
+  RAFT_EXPECTS(index_of, "Cannot open file %s", file_name.c_str());
 
   size_t file_offset = 0;
   index_of.seekp(file_offset, index_of.beg);
