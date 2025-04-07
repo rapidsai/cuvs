@@ -33,6 +33,7 @@ dependencies:
 - libcusolver-dev
 - libcusparse-dev
 - librmm==25.6.*,>=0.0.0a0
+- libxml2<2.14
 - make
 - nccl>=2.19
 - ninja
