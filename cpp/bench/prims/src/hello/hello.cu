@@ -2,7 +2,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
 //#include "../../../../src/distance/fused_distance_nn.cuh"
-//#include <raft/distance/fused_l2_nn.cuh>
+#include <raft/distance/fused_l2_nn.cuh>
 #include <raft/distance/fused_distance_nn.cuh>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -28,8 +28,10 @@
     auto x_norm = raft::make_device_vector<DataT, IdxT>(handle, m);
     auto y_norm = raft::make_device_vector<DataT, IdxT>(handle, n);
     auto out    = raft::make_device_vector<OutT, IdxT>(handle, m);
+    auto out1    = raft::make_device_vector<OutT, IdxT>(handle, m);
 
     auto out_h = raft::make_host_vector<OutT, IdxT>(handle, m);
+    auto out1_h = raft::make_host_vector<OutT, IdxT>(handle, m);
 
     raft::random::RngState rng{1234};
     raft::random::uniform(
@@ -56,7 +58,7 @@
       raft::device_vector<char, IdxT> workspace = raft::make_device_vector<char, IdxT>(handle, m * sizeof(IdxT));
 
       for (auto _ : state) {
-        /*raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
+        raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(out1.data_handle(),
                                                               x.data_handle(),
                                                               y.data_handle(),
                                                               x_norm.data_handle(),
@@ -67,7 +69,7 @@
                                                               (void*)workspace.data_handle(),
                                                               false,
                                                               true,
-                                                              stream); */
+                                                              stream);
         raft::distance::fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
                                                               x.data_handle(),
                                                               y.data_handle(),
@@ -84,9 +86,32 @@
                                                               0.0,
                                                               stream); 
         cudaMemcpyAsync(out_h.data_handle(), out.data_handle(), m*sizeof(IdxT), cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(out1_h.data_handle(), out1.data_handle(), m*sizeof(IdxT), cudaMemcpyDeviceToHost, stream);
         cudaStreamSynchronize(stream);
-        for (int i = 0; i < 5; i++) printf("%f \t", (out_h.data_handle())[i]);
-        printf("\n");
+          double max_diff = 0.0;
+          double sum_abs_diff = 0.0;
+          double sum_sq_diff = 0.0;
+
+          for (int i = 0; i < m; ++i) {
+            double diff = out1_h.data_handle()[i] - out_h.data_handle()[i];
+            double abs_diff = std::abs(diff);
+            double sq_diff = diff * diff;
+
+            max_diff = std::max(max_diff, abs_diff);
+            sum_abs_diff += abs_diff;
+            sum_sq_diff += sq_diff;
+          }
+
+          // Calculate metrics
+          double mae = sum_abs_diff / m;
+          double mse = sum_sq_diff / m;
+          double rmse = std::sqrt(mse);
+
+          // Report metrics using benchmark::Report
+          printf("MAE %f\n", mae);
+          printf("MSE %f\n", mse);
+          printf("RMSE %f\n", rmse);
+          printf("MaxDiff %f\n", max_diff);
       }
 
       int64_t num_flops = int64_t(2) * m * n * k;
