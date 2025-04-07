@@ -1,8 +1,12 @@
 #include <benchmark/benchmark.h>
 #include <raft/core/resource/cuda_stream.hpp>
 #define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
-#include <raft/distance/fused_l2_nn.cuh>
+//#include "../../../../src/distance/fused_distance_nn.cuh"
+//#include <raft/distance/fused_l2_nn.cuh>
+#include <raft/distance/fused_distance_nn.cuh>
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/device_resources.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/norm.cuh>
@@ -24,6 +28,8 @@
     auto x_norm = raft::make_device_vector<DataT, IdxT>(handle, m);
     auto y_norm = raft::make_device_vector<DataT, IdxT>(handle, n);
     auto out    = raft::make_device_vector<OutT, IdxT>(handle, m);
+
+    auto out_h = raft::make_host_vector<OutT, IdxT>(handle, m);
 
     raft::random::RngState rng{1234};
     raft::random::uniform(
@@ -50,7 +56,7 @@
       raft::device_vector<char, IdxT> workspace = raft::make_device_vector<char, IdxT>(handle, m * sizeof(IdxT));
 
       for (auto _ : state) {
-        raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
+        /*raft::distance::fusedL2NNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
                                                               x.data_handle(),
                                                               y.data_handle(),
                                                               x_norm.data_handle(),
@@ -61,7 +67,26 @@
                                                               (void*)workspace.data_handle(),
                                                               false,
                                                               true,
-                                                              stream);
+                                                              stream); */
+        raft::distance::fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
+                                                              x.data_handle(),
+                                                              y.data_handle(),
+                                                              x_norm.data_handle(),
+                                                              y_norm.data_handle(),
+                                                              static_cast<IdxT>(m),
+                                                              static_cast<IdxT>(n),
+                                                              static_cast<IdxT>(k),
+                                                              (void*)workspace.data_handle(),
+                                                              false,
+                                                              true,
+                                                              true,
+                                                              raft::distance::L2Expanded,
+                                                              0.0,
+                                                              stream); 
+        cudaMemcpyAsync(out_h.data_handle(), out.data_handle(), m*sizeof(IdxT), cudaMemcpyDeviceToHost, stream);
+        cudaStreamSynchronize(stream);
+        for (int i = 0; i < 5; i++) printf("%f \t", (out_h.data_handle())[i]);
+        printf("\n");
       }
 
       int64_t num_flops = int64_t(2) * m * n * k;
@@ -87,12 +112,12 @@
   template<typename IdxT>
   static void CustomArguments(benchmark::internal::Benchmark* b) {
 
-    std::vector<int64_t> m_list = {100000, 1000000};
+    std::vector<int64_t> m_list = {10, 100000, 1000000};
     if constexpr (sizeof(IdxT) == 8) { m_list.push_back(10000000); }
     //std::vector<int64_t> n_list = {100, 1000, 10000};
-    std::vector<int64_t> n_list = {100000, 1000000};
+    std::vector<int64_t> n_list = {10, 100000, 1000000};
     //std::vector<int64_t> k_list = {64, 128, 256}; {128, 768, 1536
-    std::vector<int64_t> k_list = {128, 768, 1536};
+    std::vector<int64_t> k_list = {10, 128, 768, 1536};
     for (auto m : m_list) {
       for (auto n : n_list) {
         for (auto k : k_list) {
