@@ -152,7 +152,7 @@ struct CubKVPMinReduce {
 
 /**
  * Functor with reduction ops for performing fused 1-nn
- * computation and guaranteeing only cross-component
+ * computation in the mutual reachability space and guaranteeing only cross-component
  * neighbors are considered.
  * @tparam value_idx
  * @tparam value_t
