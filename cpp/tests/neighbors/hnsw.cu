@@ -48,7 +48,8 @@ struct AnnHNSWInputs {
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnHNSWInputs& p)
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.graph_degree
-     << ", metric=" << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
+     << ", metric="
+     << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
      << ", ef=" << (p.ef) << std::endl;
   return os;
 }
@@ -146,7 +147,8 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
     queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
     if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
-      raft::random::uniform(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
+      raft::random::uniform(
+        handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, queries.data(), ps.n_queries * ps.dim, DataT(0.1), DataT(2.0));
 
@@ -175,21 +177,20 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
 };
 
 const std::vector<AnnHNSWInputs> inputs = raft::util::itertools::product<AnnHNSWInputs>(
-  {1000, 2000},                                // n_rows
-  {5, 10, 25, 50, 100, 250, 500, 1000},        // dim
-  {32, 64},                                    // graph_degree
+  {1000, 2000},                          // n_rows
+  {5, 10, 25, 50, 100, 250, 500, 1000},  // dim
+  {32, 64},                              // graph_degree
   {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},  // metric
-  {50},                                        // k
-  {500},                                       // n_queries
-  {200},                                       // ef
-  {0.98}                                       // min_recall
+  {50},                                                                                    // k
+  {500},  // n_queries
+  {200},  // ef
+  {0.98}  // min_recall
 );
 
 typedef AnnHNSWTest<float, float, uint64_t> AnnHNSW_F;
 TEST_P(AnnHNSW_F, AnnHNSW) { this->testHNSW(); }
 
 INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_F, ::testing::ValuesIn(inputs));
-
 
 typedef AnnHNSWTest<float, half, uint64_t> AnnHNSW_H;
 TEST_P(AnnHNSW_H, AnnHNSW) { this->testHNSW(); }

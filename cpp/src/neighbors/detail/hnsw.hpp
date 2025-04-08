@@ -77,7 +77,8 @@ struct index_impl : index<T> {
       if (metric == cuvs::distance::DistanceType::L2Expanded) {
         space_ = std::make_unique<hnswlib::L2Space<T, typename hnsw_dist_t<T>::type>>(dim);
       } else if (metric == cuvs::distance::DistanceType::InnerProduct) {
-        space_ = std::make_unique<hnswlib::InnerProductSpace<T, typename hnsw_dist_t<T>::type>>(dim);
+        space_ =
+          std::make_unique<hnswlib::InnerProductSpace<T, typename hnsw_dist_t<T>::type>>(dim);
       }
     } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
       if (metric == cuvs::distance::DistanceType::L2Expanded) {

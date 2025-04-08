@@ -278,7 +278,8 @@ def load(IndexParams index_params, filename, dim, dtype, metric="sqeuclidean",
         dl_dtype.bits = 8
         dl_dtype.lanes = 1
     else:
-        raise ValueError("Only float32, float16, uint8, and int8 are supported for dtype")
+        raise ValueError("Only float32, float16, uint8, and int8 are supported"
+                         " for dtype")
 
     idx.index.dtype = dl_dtype
     cdef cuvsDistanceType distance_type = DISTANCE_TYPES[metric]
