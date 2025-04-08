@@ -202,7 +202,7 @@ endif()
 
 #if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigurePrimsBench(
-    NAME FUSED_L2_NN PATH src/distance/fused_le_nn.cu
+    NAME FUSED_L2_NN PATH src/distance/fused_l2_nn.cu
   )
 #endif()
 
