@@ -200,10 +200,14 @@ struct GnndGraph {
   ~GnndGraph();
 };
 
-template <typename Data_t = float, typename Index_t = int>
+template <typename Data_t        = float,
+          typename Index_t       = int,
+          typename DistEpilogueT = raft::identity_op>
 class GNND {
  public:
-  GNND(raft::resources const& res, const BuildConfig& build_config);
+  GNND(raft::resources const& res,
+       const BuildConfig& build_config,
+       DistEpilogueT dist_epilogue = DistEpilogueT{});
   GNND(const GNND&)            = delete;
   GNND& operator=(const GNND&) = delete;
 
@@ -229,6 +233,7 @@ class GNND {
   BuildConfig build_config_;
   GnndGraph<Index_t> graph_;
   std::atomic<int64_t> update_counter_;
+  DistEpilogueT dist_epilogue_;
 
   size_t nrow_;
   size_t ndim_;
