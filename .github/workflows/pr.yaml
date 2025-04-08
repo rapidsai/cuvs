@@ -158,6 +158,7 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:latest"
       run_script: "ci/test_java.sh"
+      file_to_upload: "java/cuvs-java/target/"
   docs-build:
     needs: conda-python-build
     secrets: inherit
