@@ -18,33 +18,34 @@ package com.nvidia.cuvs.internal.panama;
 
 import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
 
+import java.lang.foreign.AddressLayout;
 import java.lang.foreign.Arena;
 import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.ValueLayout.OfByte;
-import java.lang.foreign.ValueLayout.OfShort;
+import java.lang.foreign.ValueLayout.OfFloat;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cuvsIvfPqParams {
+ *     cuvsIvfPqIndexParams_t ivf_pq_build_params;
+ *     cuvsIvfPqSearchParams_t ivf_pq_search_params;
+ *     float refinement_rate;
  * }
  * }
  */
-public class DLDataType {
+public class CuVSIvfPqParams {
 
-  DLDataType() {
+  CuVSIvfPqParams() {
     // Should not be called directly
   }
 
   private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(CagraH.C_CHAR.withName("code"), CagraH.C_CHAR.withName("bits"), CagraH.C_SHORT.withName("lanes"))
-      .withName("$anon$145:9");
+      .structLayout(CagraH.C_POINTER.withName("ivf_pq_build_params"), CagraH.C_POINTER.withName("ivf_pq_search_params"),
+          CagraH.C_FLOAT.withName("refinement_rate"), MemoryLayout.paddingLayout(4))
+      .withName("cuvsIvfPqParams");
 
   /**
    * The layout of this struct
@@ -53,124 +54,126 @@ public class DLDataType {
     return $LAYOUT;
   }
 
-  private static final OfByte code$LAYOUT = (OfByte) $LAYOUT.select(groupElement("code"));
+  private static final AddressLayout ivf_pq_build_params$LAYOUT = (AddressLayout) $LAYOUT
+      .select(groupElement("ivf_pq_build_params"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * cuvsIvfPqIndexParams_t ivf_pq_build_params
    * }
    */
-  public static final OfByte code$layout() {
-    return code$LAYOUT;
+  public static final AddressLayout ivf_pq_build_params$layout() {
+    return ivf_pq_build_params$LAYOUT;
   }
 
-  private static final long code$OFFSET = 0;
+  private static final long ivf_pq_build_params$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * cuvsIvfPqIndexParams_t ivf_pq_build_params
    * }
    */
-  public static final long code$offset() {
-    return code$OFFSET;
+  public static final long ivf_pq_build_params$offset() {
+    return ivf_pq_build_params$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * cuvsIvfPqIndexParams_t ivf_pq_build_params
    * }
    */
-  public static byte code(MemorySegment struct) {
-    return struct.get(code$LAYOUT, code$OFFSET);
+  public static MemorySegment ivf_pq_build_params(MemorySegment struct) {
+    return struct.get(ivf_pq_build_params$LAYOUT, ivf_pq_build_params$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * cuvsIvfPqIndexParams_t ivf_pq_build_params
    * }
    */
-  public static void code(MemorySegment struct, byte fieldValue) {
-    struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+  public static void ivf_pq_build_params(MemorySegment struct, MemorySegment fieldValue) {
+    struct.set(ivf_pq_build_params$LAYOUT, ivf_pq_build_params$OFFSET, fieldValue);
   }
 
-  private static final OfByte bits$LAYOUT = (OfByte) $LAYOUT.select(groupElement("bits"));
+  private static final AddressLayout ivf_pq_search_params$LAYOUT = (AddressLayout) $LAYOUT
+      .select(groupElement("ivf_pq_search_params"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * cuvsIvfPqSearchParams_t ivf_pq_search_params
    * }
    */
-  public static final OfByte bits$layout() {
-    return bits$LAYOUT;
+  public static final AddressLayout ivf_pq_search_params$layout() {
+    return ivf_pq_search_params$LAYOUT;
   }
 
-  private static final long bits$OFFSET = 1;
+  private static final long ivf_pq_search_params$OFFSET = 8;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * cuvsIvfPqSearchParams_t ivf_pq_search_params
    * }
    */
-  public static final long bits$offset() {
-    return bits$OFFSET;
+  public static final long ivf_pq_search_params$offset() {
+    return ivf_pq_search_params$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * cuvsIvfPqSearchParams_t ivf_pq_search_params
    * }
    */
-  public static byte bits(MemorySegment struct) {
-    return struct.get(bits$LAYOUT, bits$OFFSET);
+  public static MemorySegment ivf_pq_search_params(MemorySegment struct) {
+    return struct.get(ivf_pq_search_params$LAYOUT, ivf_pq_search_params$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * cuvsIvfPqSearchParams_t ivf_pq_search_params
    * }
    */
-  public static void bits(MemorySegment struct, byte fieldValue) {
-    struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+  public static void ivf_pq_search_params(MemorySegment struct, MemorySegment fieldValue) {
+    struct.set(ivf_pq_search_params$LAYOUT, ivf_pq_search_params$OFFSET, fieldValue);
   }
 
-  private static final OfShort lanes$LAYOUT = (OfShort) $LAYOUT.select(groupElement("lanes"));
+  private static final OfFloat refinement_rate$LAYOUT = (OfFloat) $LAYOUT.select(groupElement("refinement_rate"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint16_t lanes
+   * {@snippet lang = c : * float refinement_rate
    * }
    */
-  public static final OfShort lanes$layout() {
-    return lanes$LAYOUT;
+  public static final OfFloat refinement_rate$layout() {
+    return refinement_rate$LAYOUT;
   }
 
-  private static final long lanes$OFFSET = 2;
+  private static final long refinement_rate$OFFSET = 16;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint16_t lanes
+   * {@snippet lang = c : * float refinement_rate
    * }
    */
-  public static final long lanes$offset() {
-    return lanes$OFFSET;
+  public static final long refinement_rate$offset() {
+    return refinement_rate$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint16_t lanes
+   * {@snippet lang = c : * float refinement_rate
    * }
    */
-  public static short lanes(MemorySegment struct) {
-    return struct.get(lanes$LAYOUT, lanes$OFFSET);
+  public static float refinement_rate(MemorySegment struct) {
+    return struct.get(refinement_rate$LAYOUT, refinement_rate$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint16_t lanes
+   * {@snippet lang = c : * float refinement_rate
    * }
    */
-  public static void lanes(MemorySegment struct, short fieldValue) {
-    struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+  public static void refinement_rate(MemorySegment struct, float fieldValue) {
+    struct.set(refinement_rate$LAYOUT, refinement_rate$OFFSET, fieldValue);
   }
 
   /**

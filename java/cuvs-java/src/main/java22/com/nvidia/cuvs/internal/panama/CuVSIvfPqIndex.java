@@ -23,28 +23,25 @@ import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.ValueLayout.OfByte;
-import java.lang.foreign.ValueLayout.OfShort;
+import java.lang.foreign.ValueLayout.OfLong;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
  * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ *     uintptr_t addr;
+ *     DLDataType dtype;
  * }
  * }
  */
-public class DLDataType {
+public class CuVSIvfPqIndex {
 
-  DLDataType() {
+  CuVSIvfPqIndex() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(CagraH.C_CHAR.withName("code"), CagraH.C_CHAR.withName("bits"), CagraH.C_SHORT.withName("lanes"))
-      .withName("$anon$145:9");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_LONG.withName("addr"),
+      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$207:9");
 
   /**
    * The layout of this struct
@@ -53,124 +50,84 @@ public class DLDataType {
     return $LAYOUT;
   }
 
-  private static final OfByte code$LAYOUT = (OfByte) $LAYOUT.select(groupElement("code"));
+  private static final OfLong addr$LAYOUT = (OfLong) $LAYOUT.select(groupElement("addr"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static final OfByte code$layout() {
-    return code$LAYOUT;
+  public static final OfLong addr$layout() {
+    return addr$LAYOUT;
   }
 
-  private static final long code$OFFSET = 0;
+  private static final long addr$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static final long code$offset() {
-    return code$OFFSET;
+  public static final long addr$offset() {
+    return addr$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static byte code(MemorySegment struct) {
-    return struct.get(code$LAYOUT, code$OFFSET);
+  public static long addr(MemorySegment struct) {
+    return struct.get(addr$LAYOUT, addr$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint8_t code
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static void code(MemorySegment struct, byte fieldValue) {
-    struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+  public static void addr(MemorySegment struct, long fieldValue) {
+    struct.set(addr$LAYOUT, addr$OFFSET, fieldValue);
   }
 
-  private static final OfByte bits$LAYOUT = (OfByte) $LAYOUT.select(groupElement("bits"));
+  private static final GroupLayout dtype$LAYOUT = (GroupLayout) $LAYOUT.select(groupElement("dtype"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static final OfByte bits$layout() {
-    return bits$LAYOUT;
+  public static final GroupLayout dtype$layout() {
+    return dtype$LAYOUT;
   }
 
-  private static final long bits$OFFSET = 1;
+  private static final long dtype$OFFSET = 8;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static final long bits$offset() {
-    return bits$OFFSET;
+  public static final long dtype$offset() {
+    return dtype$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static byte bits(MemorySegment struct) {
-    return struct.get(bits$LAYOUT, bits$OFFSET);
+  public static MemorySegment dtype(MemorySegment struct) {
+    return struct.asSlice(dtype$OFFSET, dtype$LAYOUT.byteSize());
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint8_t bits
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static void bits(MemorySegment struct, byte fieldValue) {
-    struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
-  }
-
-  private static final OfShort lanes$LAYOUT = (OfShort) $LAYOUT.select(groupElement("lanes"));
-
-  /**
-   * Layout for field:
-   * {@snippet lang = c : * uint16_t lanes
-   * }
-   */
-  public static final OfShort lanes$layout() {
-    return lanes$LAYOUT;
-  }
-
-  private static final long lanes$OFFSET = 2;
-
-  /**
-   * Offset for field:
-   * {@snippet lang = c : * uint16_t lanes
-   * }
-   */
-  public static final long lanes$offset() {
-    return lanes$OFFSET;
-  }
-
-  /**
-   * Getter for field:
-   * {@snippet lang = c : * uint16_t lanes
-   * }
-   */
-  public static short lanes(MemorySegment struct) {
-    return struct.get(lanes$LAYOUT, lanes$OFFSET);
-  }
-
-  /**
-   * Setter for field:
-   * {@snippet lang = c : * uint16_t lanes
-   * }
-   */
-  public static void lanes(MemorySegment struct, short fieldValue) {
-    struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+  public static void dtype(MemorySegment struct, MemorySegment fieldValue) {
+    MemorySegment.copy(fieldValue, 0L, struct, dtype$OFFSET, dtype$LAYOUT.byteSize());
   }
 
   /**

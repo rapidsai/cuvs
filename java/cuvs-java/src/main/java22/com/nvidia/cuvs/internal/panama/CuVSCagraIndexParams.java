@@ -32,11 +32,12 @@ import java.util.function.Consumer;
  * {@snippet lang = c :
  * struct cuvsCagraIndexParams {
  *     cuvsDistanceType metric;
- *     long intermediate_graph_degree;
- *     long graph_degree;
+ *     size_t intermediate_graph_degree;
+ *     size_t graph_degree;
  *     enum cuvsCagraGraphBuildAlgo build_algo;
- *     long nn_descent_niter;
+ *     size_t nn_descent_niter;
  *     cuvsCagraCompressionParams_t compression;
+ *     cuvsIvfPqParams_t graph_build_params;
  * }
  * }
  */
@@ -46,12 +47,11 @@ public class CuVSCagraIndexParams {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(CagraH.C_INT.withName("metric"), MemoryLayout.paddingLayout(4),
-          CagraH.C_LONG.withName("intermediate_graph_degree"), CagraH.C_LONG.withName("graph_degree"),
-          CagraH.C_INT.withName("build_algo"), MemoryLayout.paddingLayout(4),
-          CagraH.C_LONG.withName("nn_descent_niter"), CagraH.C_POINTER.withName("compression"))
-      .withName("cuvsCagraIndexParams");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_INT.withName("metric"),
+      MemoryLayout.paddingLayout(4), CagraH.C_LONG.withName("intermediate_graph_degree"),
+      CagraH.C_LONG.withName("graph_degree"), CagraH.C_INT.withName("build_algo"), MemoryLayout.paddingLayout(4),
+      CagraH.C_LONG.withName("nn_descent_niter"), CagraH.C_POINTER.withName("compression"),
+      CagraH.C_POINTER.withName("graph_build_params")).withName("cuvsCagraIndexParams");
 
   /**
    * The layout of this struct
@@ -105,7 +105,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long intermediate_graph_degree
+   * {@snippet lang = c : * size_t intermediate_graph_degree
    * }
    */
   public static final OfLong intermediate_graph_degree$layout() {
@@ -116,7 +116,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long intermediate_graph_degree
+   * {@snippet lang = c : * size_t intermediate_graph_degree
    * }
    */
   public static final long intermediate_graph_degree$offset() {
@@ -125,7 +125,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long intermediate_graph_degree
+   * {@snippet lang = c : * size_t intermediate_graph_degree
    * }
    */
   public static long intermediate_graph_degree(MemorySegment struct) {
@@ -134,7 +134,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long intermediate_graph_degree
+   * {@snippet lang = c : * size_t intermediate_graph_degree
    * }
    */
   public static void intermediate_graph_degree(MemorySegment struct, long fieldValue) {
@@ -145,7 +145,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long graph_degree
+   * {@snippet lang = c : * size_t graph_degree
    * }
    */
   public static final OfLong graph_degree$layout() {
@@ -156,7 +156,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long graph_degree
+   * {@snippet lang = c : * size_t graph_degree
    * }
    */
   public static final long graph_degree$offset() {
@@ -165,7 +165,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long graph_degree
+   * {@snippet lang = c : * size_t graph_degree
    * }
    */
   public static long graph_degree(MemorySegment struct) {
@@ -174,7 +174,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long graph_degree
+   * {@snippet lang = c : * size_t graph_degree
    * }
    */
   public static void graph_degree(MemorySegment struct, long fieldValue) {
@@ -225,7 +225,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long nn_descent_niter
+   * {@snippet lang = c : * size_t nn_descent_niter
    * }
    */
   public static final OfLong nn_descent_niter$layout() {
@@ -236,7 +236,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long nn_descent_niter
+   * {@snippet lang = c : * size_t nn_descent_niter
    * }
    */
   public static final long nn_descent_niter$offset() {
@@ -245,7 +245,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long nn_descent_niter
+   * {@snippet lang = c : * size_t nn_descent_niter
    * }
    */
   public static long nn_descent_niter(MemorySegment struct) {
@@ -254,7 +254,7 @@ public class CuVSCagraIndexParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long nn_descent_niter
+   * {@snippet lang = c : * size_t nn_descent_niter
    * }
    */
   public static void nn_descent_niter(MemorySegment struct, long fieldValue) {
@@ -299,6 +299,47 @@ public class CuVSCagraIndexParams {
    */
   public static void compression(MemorySegment struct, MemorySegment fieldValue) {
     struct.set(compression$LAYOUT, compression$OFFSET, fieldValue);
+  }
+
+  private static final AddressLayout graph_build_params$LAYOUT = (AddressLayout) $LAYOUT
+      .select(groupElement("graph_build_params"));
+
+  /**
+   * Layout for field:
+   * {@snippet lang = c : * cuvsIvfPqParams_t graph_build_params
+   * }
+   */
+  public static final AddressLayout graph_build_params$layout() {
+    return graph_build_params$LAYOUT;
+  }
+
+  private static final long graph_build_params$OFFSET = 48;
+
+  /**
+   * Offset for field:
+   * {@snippet lang = c : * cuvsIvfPqParams_t graph_build_params
+   * }
+   */
+  public static final long graph_build_params$offset() {
+    return graph_build_params$OFFSET;
+  }
+
+  /**
+   * Getter for field:
+   * {@snippet lang = c : * cuvsIvfPqParams_t graph_build_params
+   * }
+   */
+  public static MemorySegment graph_build_params(MemorySegment struct) {
+    return struct.get(graph_build_params$LAYOUT, graph_build_params$OFFSET);
+  }
+
+  /**
+   * Setter for field:
+   * {@snippet lang = c : * cuvsIvfPqParams_t graph_build_params
+   * }
+   */
+  public static void graph_build_params(MemorySegment struct, MemorySegment fieldValue) {
+    struct.set(graph_build_params$LAYOUT, graph_build_params$OFFSET, fieldValue);
   }
 
   /**

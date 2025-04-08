@@ -41,7 +41,7 @@ public class CuVSCagraIndex {
   }
 
   private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_LONG.withName("addr"),
-      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$175:9");
+      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$231:9");
 
   /**
    * The layout of this struct
