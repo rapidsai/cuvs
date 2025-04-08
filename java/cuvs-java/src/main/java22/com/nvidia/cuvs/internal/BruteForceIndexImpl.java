@@ -16,6 +16,13 @@
 
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.internal.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -26,11 +33,8 @@ import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.lang.invoke.MethodHandle;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Objects;
 import java.util.UUID;
@@ -42,13 +46,6 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.CuVSBruteForceIndex;
-
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
 
 /**
  *
@@ -173,7 +170,6 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long numQueries = cuvsQuery.getQueryVectors().length;
     long numBlocks = cuvsQuery.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? cuvsQuery.getQueryVectors()[0].length : 0;
-    long numRows = dataset != null ? dataset.length : 0;
 
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
