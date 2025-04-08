@@ -1495,9 +1495,9 @@ BuildConfig get_build_config(
   // to mitigate bucket collisions. `intermediate_degree` is OK to larger than
   // extended_graph_degree.
   extended_graph_degree =
-    roundUp32(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
-  size_t extended_intermediate_degree =
-    roundUp32(static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
+    align32::roundUp(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
+  size_t extended_intermediate_degree = align32::roundUp(
+    static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
   BuildConfig build_config{.max_dataset_size      = static_cast<size_t>(dataset.extent(0)),
                            .dataset_dim           = static_cast<size_t>(dataset.extent(1)),
