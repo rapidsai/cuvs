@@ -40,8 +40,9 @@ public class CuVSHnswIndex {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(HnswH.C_LONG.withName("addr"),
-      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$66:9");
+  private static final GroupLayout $LAYOUT = MemoryLayout
+      .structLayout(HnswH.C_LONG.withName("addr"), DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4))
+      .withName("$anon$66:9");
 
   /**
    * The layout of this struct
