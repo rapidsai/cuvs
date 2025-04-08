@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "nn_descent.cuh"
 #include <cuvs/neighbors/nn_descent.hpp>
 
