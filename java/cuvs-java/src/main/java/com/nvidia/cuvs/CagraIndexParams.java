@@ -426,7 +426,7 @@ public class CagraIndexParams {
      * @param cuVSIvfPqParams the IVF_PQ index parameters
      * @return an instance of Builder
      */
-    public Builder withNumWriterThreads(CuVSIvfPqParams cuVSIvfPqParams) {
+    public Builder withCuVSIvfPqParams(CuVSIvfPqParams cuVSIvfPqParams) {
       this.cuVSIvfPqParams = cuVSIvfPqParams;
       return this;
     }

@@ -419,7 +419,7 @@ public class CagraIndexImpl implements CagraIndex {
       CuVSIvfPqSearchParams.n_probes(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getnProbes());
       CuVSIvfPqSearchParams.lut_dtype(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getLutDtype().value);
       CuVSIvfPqSearchParams.internal_distance_dtype(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getInternalDistanceDtype().value);
-      CuVSIvfPqSearchParams.preferred_shmem_carveout(seg, params.getCuVSIvfPqParams().getSearchParams().getPreferredShmemCarveout());
+      CuVSIvfPqSearchParams.preferred_shmem_carveout(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getPreferredShmemCarveout());
 
       MemorySegment cuvsIvfPqParamsMemorySegment = CuVSIvfPqParams.allocate(resources.getArena());
       CuVSIvfPqParams.ivf_pq_build_params(cuvsIvfPqParamsMemorySegment, ivfpqIndexParamsMemorySegment);
