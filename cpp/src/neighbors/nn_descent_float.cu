@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include "nn_descent.cuh"
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -53,7 +52,8 @@ namespace cuvs::neighbors::nn_descent {
       cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset, idx);              \
       return idx;                                                                             \
     }                                                                                         \
-  };
+  };                                                                                          \
+  template class detail::GNND<const T, int>;
 
 CUVS_INST_NN_DESCENT_BUILD(float, uint32_t);
 
