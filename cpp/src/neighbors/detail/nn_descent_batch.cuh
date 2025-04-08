@@ -19,7 +19,6 @@
 #include <sys/types.h>
 #undef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-// #include "nn_descent.cuh"
 #include "nn_descent_gnnd.hpp"
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
