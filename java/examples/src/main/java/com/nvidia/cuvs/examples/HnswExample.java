@@ -11,6 +11,9 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.CuVSIvfPqIndexParams;
+import com.nvidia.cuvs.CuVSIvfPqParams;
+import com.nvidia.cuvs.CuVSIvfPqSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.HnswIndexParams;
@@ -41,6 +44,20 @@ public class HnswExample {
 
     try (CuVSResources resources = CuVSResources.create()) {
 
+      // Configure IVF_PQ index parameters (optional - default values set when not defined)
+      CuVSIvfPqIndexParams cuVSIvfPqIndexParams = new CuVSIvfPqIndexParams.Builder()
+          .build();
+
+      // Configure IVF_PQ search parameters (optional - default values set when not defined)
+      CuVSIvfPqSearchParams cuVSIvfPqSearchParams = new CuVSIvfPqSearchParams.Builder()
+          .build();
+
+      // Configure IVF_PQ search parameters (used when build algo is IVF_PQ, optional otherwise)
+      CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder()
+          .withCuVSIvfPqIndexParams(cuVSIvfPqIndexParams)
+          .withCuVSIvfPqSearchParams(cuVSIvfPqSearchParams)
+          .build();
+
       // Configure index parameters
       CagraIndexParams indexParams = new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.IVF_PQ)
@@ -48,6 +65,7 @@ public class HnswExample {
           .withIntermediateGraphDegree(128)
           .withNumWriterThreads(32)
           .withMetric(CuvsDistanceType.L2Expanded)
+          .withCuVSIvfPqParams(cuVSIvfPqParams)
           .build();
 
       // Create the index with the dataset
