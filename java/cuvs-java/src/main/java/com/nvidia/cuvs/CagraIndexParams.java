@@ -158,9 +158,112 @@ public class CagraIndexParams {
 
   }
 
-  private CagraIndexParams(int intermediateGraphDegree, int graphDegree,
-      CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo, int nnDescentNiter, int writerThreads,
-      CuvsDistanceType cuvsDistanceType) {
+  /**
+   * Enum that denotes codebook gen options.
+   */
+  public enum CodebookGen {
+
+    PER_SUBSPACE(0),
+
+    PER_CLUSTER(1);
+
+    /**
+     * The value for the enum choice.
+     */
+    public final int value;
+
+    private CodebookGen(int value) {
+      this.value = value;
+    }
+  }
+
+  /**
+   * Enum that denotes cuda datatypes.
+   */
+  public enum CudaDataType {
+
+    /**
+     * real as a half
+     */
+    CUDA_R_16F(2),
+
+    /**
+     * complex as a pair of half numbers
+     */
+    CUDA_C_16F(6),
+
+    /**
+     * real as a float
+     */
+    CUDA_R_32F(0),
+
+    /**
+     * complex as a pair of float numbers
+     */
+    CUDA_C_32F(4),
+
+    /**
+     * real as a double
+     */
+    CUDA_R_64F(1),
+
+    /**
+     * complex as a pair of double numbers
+     */
+    CUDA_C_64F(5),
+
+    /**
+     * real as a signed char
+     */
+    CUDA_R_8I(3),
+
+    /**
+     * complex as a pair of signed char numbers
+     */
+    CUDA_C_8I(7),
+
+    /**
+     * real as a unsigned char
+     */
+    CUDA_R_8U(8),
+
+    /**
+     * complex as a pair of unsigned char numbers
+     */
+    CUDA_C_8U(9),
+
+    /**
+     * real as a signed int
+     */
+    CUDA_R_32I(10),
+
+    /**
+     * complex as a pair of signed int numbers
+     */
+    CUDA_C_32I(11),
+
+    /**
+     * real as a unsigned int
+     */
+    CUDA_R_32U(12),
+
+    /**
+     * complex as a pair of unsigned int numbers
+     */
+    CUDA_C_32U(13);
+
+    /**
+     * The value for the enum choice.
+     */
+    public final int value;
+
+    private CudaDataType(int value) {
+      this.value = value;
+    }
+  }
+
+  private CagraIndexParams(int intermediateGraphDegree, int graphDegree, CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
+      int nnDescentNiter, int writerThreads, CuvsDistanceType cuvsDistanceType) {
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
     this.cuvsCagraGraphBuildAlgo = CuvsCagraGraphBuildAlgo;
@@ -235,7 +338,8 @@ public class CagraIndexParams {
     private int nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
 
-    public Builder() { }
+    public Builder() {
+    }
 
     /**
      * Sets the degree of input graph for pruning.
@@ -311,8 +415,8 @@ public class CagraIndexParams {
      * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {
-      return new CagraIndexParams(intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo,
-          nnDescentNumIterations, numWriterThreads, cuvsDistanceType);
+      return new CagraIndexParams(intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo, nnDescentNumIterations,
+          numWriterThreads, cuvsDistanceType);
     }
   }
 }
