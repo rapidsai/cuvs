@@ -244,7 +244,7 @@ public class CuVSIvfPqIndexParams {
    * @return whether max number of data points to use per PQ code during PQ
    *         codebook training is set
    */
-  public int isMaxTrainPointsPerPqCode() {
+  public int getMaxTrainPointsPerPqCode() {
     return maxTrainPointsPerPqCode;
   }
 

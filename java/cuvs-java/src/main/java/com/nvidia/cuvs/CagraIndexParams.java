@@ -29,6 +29,7 @@ public class CagraIndexParams {
   private final int graphDegree;
   private final int nnDescentNiter;
   private final int numWriterThreads;
+  private final CuVSIvfPqParams cuVSIvfPqParams;
 
   /**
    * Enum that denotes which ANN algorithm is used to build CAGRA graph.
@@ -263,13 +264,14 @@ public class CagraIndexParams {
   }
 
   private CagraIndexParams(int intermediateGraphDegree, int graphDegree, CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
-      int nnDescentNiter, int writerThreads, CuvsDistanceType cuvsDistanceType) {
+      int nnDescentNiter, int writerThreads, CuvsDistanceType cuvsDistanceType, CuVSIvfPqParams cuVSIvfPqParams) {
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
     this.cuvsCagraGraphBuildAlgo = CuvsCagraGraphBuildAlgo;
     this.nnDescentNiter = nnDescentNiter;
     this.numWriterThreads = writerThreads;
     this.cuvsDistanceType = cuvsDistanceType;
+    this.cuVSIvfPqParams = cuVSIvfPqParams;
   }
 
   /**
@@ -319,11 +321,19 @@ public class CagraIndexParams {
     return numWriterThreads;
   }
 
+  /**
+   * Gets the IVF_PQ parameters.
+   */
+  public CuVSIvfPqParams getCuVSIvfPqParams() {
+    return cuVSIvfPqParams;
+  }
+
   @Override
   public String toString() {
     return "CagraIndexParams [cuvsCagraGraphBuildAlgo=" + cuvsCagraGraphBuildAlgo + ", cuvsDistanceType="
         + cuvsDistanceType + ", intermediateGraphDegree=" + intermediateGraphDegree + ", graphDegree=" + graphDegree
-        + ", nnDescentNiter=" + nnDescentNiter + ", numWriterThreads=" + numWriterThreads + "]";
+        + ", nnDescentNiter=" + nnDescentNiter + ", numWriterThreads=" + numWriterThreads + ", cuVSIvfPqParams="
+        + cuVSIvfPqParams + "]";
   }
 
   /**
@@ -337,6 +347,7 @@ public class CagraIndexParams {
     private int graphDegree = 64;
     private int nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
+    private CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder().build();
 
     public Builder() {
     }
@@ -410,13 +421,24 @@ public class CagraIndexParams {
     }
 
     /**
+     * Sets the IVF_PQ index parameters.
+     *
+     * @param cuVSIvfPqParams the IVF_PQ index parameters
+     * @return an instance of Builder
+     */
+    public Builder withNumWriterThreads(CuVSIvfPqParams cuVSIvfPqParams) {
+      this.cuVSIvfPqParams = cuVSIvfPqParams;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link CagraIndexParams}.
      *
      * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {
       return new CagraIndexParams(intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo, nnDescentNumIterations,
-          numWriterThreads, cuvsDistanceType);
+          numWriterThreads, cuvsDistanceType, cuVSIvfPqParams);
     }
   }
 }
