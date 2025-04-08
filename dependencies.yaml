@@ -94,8 +94,6 @@ files:
       - rust
       - depends_on_libcuvs
       - depends_on_libraft
-      # TODO: remove this temporary fix when conda-forge sorts out breaking ABI in libxml2
-      - depends_on_libxml2
   go:
     output: conda
     matrix:
@@ -109,8 +107,6 @@ files:
       - go
       - depends_on_libcuvs
       - depends_on_libraft
-      # TODO: remove this temporary fix when conda-forge sorts out breaking ABI in libxml2
-      - depends_on_libxml2
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
@@ -458,13 +454,6 @@ dependencies:
               - nvidia-cusolver
               - nvidia-cusparse
 
-  # TODO: remove this temporary fix when conda-forge sorts out breaking ABI in libxml2
-  depends_on_libxml2:
-    common:
-      - output_types: [conda]
-        packages:
-          - libxml2<2.14
-
   depends_on_cupy:
     common:
       - output_types: conda
@@ -493,8 +482,6 @@ dependencies:
         packages:
           - breathe>=4.35.0
           - doxygen>=1.8.20
-          # TODO: remove this temporary fix when conda-forge sorts out breaking ABI in libxml2
-          - libxml2<2.14
           - graphviz
           - ipython
           - numpydoc
@@ -566,10 +553,6 @@ dependencies:
         packages:
           - pytest==7.*
           - pytest-cov
-      # TODO: remove this temporary fix when conda-forge sorts out breaking ABI in libxml2
-      - output_types: conda
-        packages:
-          - libxml2<2.14
   test_py_cuvs:
     common:
       - output_types: [conda, requirements, pyproject]
