@@ -202,8 +202,7 @@ endif()
 
 #if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigurePrimsBench(
-    #NAME HELLO_BENCH PATH src/hello/hello.cu LINKS cuvs
-    NAME HELLO PATH src/hello/hello.cu
+    NAME FUSED_L2_NN PATH src/distance/fused_le_nn.cu
   )
 #endif()
 
