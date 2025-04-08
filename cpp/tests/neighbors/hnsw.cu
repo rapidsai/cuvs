@@ -48,7 +48,8 @@ struct AnnHNSWInputs {
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnHNSWInputs& p)
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.graph_degree
-     << ", metric=" << static_cast<int>(p.metric) << ", ef=" << (p.ef) << std::endl;
+     << ", metric=" << cuvs::neighbors::print_metric{static_cast<cuvs::distance::DistanceType>((int)p.metric)}
+     << ", ef=" << (p.ef) << std::endl;
   return os;
 }
 
@@ -66,10 +67,14 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
  protected:
   void testHNSW()
   {
+    if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
+        (std::is_same_v<DataT, int8_t> || std::is_same_v<DataT, uint8_t>)) {
+      GTEST_SKIP() << "InnerProduct is not supported for int8 or uint8";
+    }
     std::vector<IdxT> indices_HNSW(ps.n_queries * ps.k);
-    std::vector<DataT> distances_HNSW(ps.n_queries * ps.k);
+    std::vector<DistanceT> distances_HNSW(ps.n_queries * ps.k);
     std::vector<IdxT> indices_naive(ps.n_queries * ps.k);
-    std::vector<DataT> distances_naive(ps.n_queries * ps.k);
+    std::vector<DistanceT> distances_naive(ps.n_queries * ps.k);
 
     std::vector<DataT> queries_h(ps.n_queries * ps.dim);
     raft::update_host(queries_h.data(), queries.data(), ps.n_queries * ps.dim, stream_);
@@ -140,9 +145,9 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
     queries.resize(((size_t)ps.n_queries) * ps.dim, stream_);
     raft::random::RngState r(1234ULL);
-    if constexpr (std::is_same<DataT, float>{}) {
-      raft::random::normal(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
-      raft::random::normal(
+    if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
+      raft::random::uniform(handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
+      raft::random::uniform(
         handle_, r, queries.data(), ps.n_queries * ps.dim, DataT(0.1), DataT(2.0));
 
     } else {
@@ -173,7 +178,7 @@ const std::vector<AnnHNSWInputs> inputs = raft::util::itertools::product<AnnHNSW
   {1000, 2000},                                // n_rows
   {5, 10, 25, 50, 100, 250, 500, 1000},        // dim
   {32, 64},                                    // graph_degree
-  {cuvs::distance::DistanceType::L2Expanded},  // metric
+  {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},  // metric
   {50},                                        // k
   {500},                                       // n_queries
   {200},                                       // ef
@@ -184,5 +189,21 @@ typedef AnnHNSWTest<float, float, uint64_t> AnnHNSW_F;
 TEST_P(AnnHNSW_F, AnnHNSW) { this->testHNSW(); }
 
 INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_F, ::testing::ValuesIn(inputs));
+
+
+typedef AnnHNSWTest<float, half, uint64_t> AnnHNSW_H;
+TEST_P(AnnHNSW_H, AnnHNSW) { this->testHNSW(); }
+
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_H, ::testing::ValuesIn(inputs));
+
+typedef AnnHNSWTest<float, int8_t, uint64_t> AnnHNSW_I8;
+TEST_P(AnnHNSW_I8, AnnHNSW) { this->testHNSW(); }
+
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_I8, ::testing::ValuesIn(inputs));
+
+typedef AnnHNSWTest<float, uint8_t, uint64_t> AnnHNSW_U8;
+TEST_P(AnnHNSW_U8, AnnHNSW) { this->testHNSW(); }
+
+INSTANTIATE_TEST_CASE_P(AnnHNSWTest, AnnHNSW_U8, ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs::neighbors::hnsw

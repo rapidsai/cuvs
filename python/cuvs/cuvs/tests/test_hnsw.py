@@ -79,7 +79,7 @@ def run_hnsw_build_search_test(
     assert recall > 0.95
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("k", [10, 20])
 @pytest.mark.parametrize("ef", [30, 40])
 @pytest.mark.parametrize("num_threads", [2, 4])
@@ -162,7 +162,7 @@ def run_hnsw_extend_test(
     assert recall > 0.95
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("k", [10, 20])
 @pytest.mark.parametrize("ef", [30, 40])
 @pytest.mark.parametrize("num_threads", [2, 4])
