@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,6 +80,16 @@ from .run import run_benchmark
     "RAPIDS_DATASET_ROOT_DIR if defined, otherwise a datasets "
     "subdirectory from the calling directory.",
 )
+@click.option(
+    "--executable-dir",
+    default=None,
+    show_default=True,
+    prompt="Enter the name of the folder that contains the executables",
+    help="Path to executable folder, by default we will look in the "
+    "devcontainer folder (/home/coder/cuvs/cpp/build/latest/bench/ann), in"
+    "$CUVS_HOME/cpp/build/release and in $CONDA_PREFIX/bin/ann (in this "
+    "order).",
+)
 @click.option("--build", is_flag=True, help="Build the index")
 @click.option("--search", is_flag=True, help="Perform the search")
 @click.option(
@@ -158,6 +168,7 @@ def main(
     configuration: Optional[str],
     dataset: str,
     dataset_path: str,
+    executable_dir: str,
     build: bool,
     search: bool,
     algorithms: Optional[str],
