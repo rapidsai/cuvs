@@ -16,6 +16,14 @@
 
 #include <cuvs/neighbors/ivf_pq.hpp>
 
+#include "detail/ann_utils.cuh"
+
+#include <raft/core/operators.hpp>
+#include <raft/linalg/map.cuh>
+#include <raft/linalg/reduce.cuh>
+
+#include <raft/util/cudart_utils.hpp>
+
 namespace cuvs::neighbors::ivf_pq {
 index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
                                         cuvs::distance::DistanceType metric)
@@ -337,6 +345,109 @@ uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
     r = r << 1;
   }
   return r;
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index<IdxT>::rotation_matrix_int8(
+  const raft::resources& res) const
+{
+  if (!rotation_matrix_int8_.has_value()) {
+    rotation_matrix_int8_.emplace(
+      raft::make_device_mdarray<int8_t, uint32_t>(res, rotation_matrix().extents()));
+    raft::linalg::map(res,
+                      rotation_matrix_int8_->view(),
+                      cuvs::spatial::knn::detail::utils::mapping<int8_t>{},
+                      rotation_matrix());
+  }
+  return rotation_matrix_int8_->view();
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index<IdxT>::centers_int8(
+  const raft::resources& res) const
+{
+  if (!centers_int8_.has_value()) {
+    uint32_t n_lists      = this->n_lists();
+    uint32_t dim          = this->dim();
+    uint32_t dim_ext      = this->dim_ext();
+    uint32_t dim_ext_int8 = raft::round_up_safe(dim + 2, 16u);
+    centers_int8_.emplace(raft::make_device_matrix<int8_t, uint32_t>(res, n_lists, dim_ext_int8));
+    auto* inputs = centers().data_handle();
+    /* NOTE: maximizing the range and the precision of int8_t GEMM
+
+    int8_t has a very limited range [-128, 127], which is problematic when storing both vectors and
+    their squared norms in one place.
+
+    We map all dimensions by multiplying by 128. But that means we need to multiply the squared norm
+    component by `128^2`, which we cannot afford, since it most likely overflows.
+    So, a naive mapping would be:
+    ```
+      [c_1 * 128, c_2, * 128, ...., c_(dim-1) * 128,  n2 * 128 * 128, 0 ... 0]
+      • [q_1 * 128, q_2 * 128, ..., q_(dim-1)*128, -0.5, 0, ... 0]
+    ```
+
+    Which is at first can be improved by moving one 128 to the query side:
+    ```
+      [c_1 * 128, c_2, * 128, ...., c_(dim-1) * 128,  n2 * 128, 0 ... 0]
+      • [q_1 * 128, q_2 * 128, ..., q_(dim-1)*128, -64, 0, ... 0]
+    ```
+
+    Yet this still only works for vectors with L2 norms not bigger than one and has a rather awful
+    granularity of 64. To improve both the range and the precision, we count the number of available
+    slots `m > 2` and decompose the squared norm, such that:
+    ```
+      0.5 * 128 * n2 = 64 * n2 = 128 * z + (m - 1) * y
+    ```
+    where `y` maximizes the available range while `z` encodes the rounding error.
+    Then we get following dot product during the coarse search:
+    ```
+      [c_1 * 128, c_2, * 128, ...., c_(dim-1) * 128,  z, y, ... y]
+      • [q_1 * 128, q_2 * 128, ..., q_(dim-1)*128, 1 - m,  -128, ... -128]
+    ```
+    `m` is maximum 16, so we get the coefficient much lower than the naive 64 on the query side; and
+    it is limited by the range we can cover (the squared norm must be within `m * 2` before
+    normalization).
+    */
+    raft::linalg::map_offset(
+      res, centers_int8_->view(), [dim, dim_ext, dim_ext_int8, inputs] __device__(uint32_t ix) {
+        uint32_t col = ix % dim_ext_int8;
+        uint32_t row = ix / dim_ext_int8;
+        if (col < dim) {
+          return static_cast<int8_t>(
+            std::clamp(inputs[col + row * dim_ext] * 128.0f, -128.0f, 127.f));
+        }
+        auto x = inputs[row * dim_ext + dim];
+        auto c = 64.0f / static_cast<float>(dim_ext_int8 - dim - 1);
+        auto y = std::clamp(x * c, -128.0f, 127.f);
+        auto z = std::clamp((y - std::round(y)) * 128.0f, -128.0f, 127.f);
+        if (col > dim) { return static_cast<int8_t>(std::round(y)); }
+        return static_cast<int8_t>(z);
+      });
+  }
+  return centers_int8_->view();
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::rotation_matrix_half(
+  const raft::resources& res) const
+{
+  if (!rotation_matrix_half_.has_value()) {
+    rotation_matrix_half_.emplace(
+      raft::make_device_mdarray<half, uint32_t>(res, rotation_matrix().extents()));
+    raft::linalg::map(res, rotation_matrix_half_->view(), raft::cast_op<half>{}, rotation_matrix());
+  }
+  return rotation_matrix_half_->view();
+}
+
+template <typename IdxT>
+raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::centers_half(
+  const raft::resources& res) const
+{
+  if (!centers_half_.has_value()) {
+    centers_half_.emplace(raft::make_device_mdarray<half, uint32_t>(res, centers().extents()));
+    raft::linalg::map(res, centers_half_->view(), raft::cast_op<half>{}, centers());
+  }
+  return centers_half_->view();
 }
 
 template struct index<int64_t>;
