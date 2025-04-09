@@ -1,0 +1,9 @@
+{
+    "packages" : {
+      "bang" : {
+        "version": "0.0",
+        "git_url": "https://github.com/tarang-jain/BANG-Billion-Scale-ANN.git",
+        "git_tag": "rapids"
+      }
+    }
+  }
