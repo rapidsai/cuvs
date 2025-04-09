@@ -68,13 +68,13 @@ void vamana_build_and_write(raft::device_resources const &dev_resources,
 void usage() {
   printf("Usage: ./vamana_example <data filename> <output filename> <graph "
          "degree> <visited_size> <max_fraction> <iterations> <(optional) "
-         "quantizer filename>\n");
+         "codebook prefix>\n");
   printf("Input file expected to be binary file of fp32 vectors.\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
   printf("Default iterations = 1, increase for better quality graph.\n");
-  printf("Optional quantizer file in DiskANN OPQ format.\n");
+  printf("Optional path prefix to pq pivots and rotation matrix files. Expects pq pivots file at ${codebook_prefix}_pq_pivots.bin and rotation matrix file at ${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin.\n");
   exit(1);
 }
 
