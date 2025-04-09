@@ -18,10 +18,6 @@
 #include <cuvs/neighbors/nn_descent.hpp>
 
 namespace cuvs::neighbors::nn_descent {
-template <typename value_idx, typename value_t>
-struct DistEpilogueForTesting {
-  DI value_t operator()(value_t value, value_idx row, value_idx col) const { return value; }
-};
 
 #define CUVS_INST_NN_DESCENT_BUILD(T, IdxT)                                                   \
   auto build(raft::resources const& handle,                                                   \
@@ -58,8 +54,7 @@ struct DistEpilogueForTesting {
       return idx;                                                                             \
     }                                                                                         \
   };                                                                                          \
-  template class detail::GNND<const T, int>;                                                  \
-  template class detail::GNND<const T, int, DistEpilogueForTesting<int, T>>;
+  template class detail::GNND<const T, int>;
 
 CUVS_INST_NN_DESCENT_BUILD(float, uint32_t);
 

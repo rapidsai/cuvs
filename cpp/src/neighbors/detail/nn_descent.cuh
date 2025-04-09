@@ -488,9 +488,7 @@ __device__ __forceinline__ void remove_duplicates(
 // MAX_RESIDENT_THREAD_PER_SM = BLOCK_SIZE * BLOCKS_PER_SM = 2048
 // For architectures 750 and 860 (890), the values for MAX_RESIDENT_THREAD_PER_SM
 // is 1024 and 1536 respectively, which means the bounds don't work anymore
-template <typename Index_t,
-          typename ID_t          = InternalID_t<Index_t>,
-          typename DistEpilogueT = raft::identity_op>
+template <typename Index_t, typename ID_t = InternalID_t<Index_t>>
 RAFT_KERNEL
 #ifdef __CUDA_ARCH__
 #if (__CUDA_ARCH__) == 750 || ((__CUDA_ARCH__) >= 860 && (__CUDA_ARCH__) <= 890) || \
@@ -514,8 +512,7 @@ __launch_bounds__(BLOCK_SIZE, 4)
                     int graph_width,
                     int* locks,
                     DistData_t* l2_norms,
-                    cuvs::distance::DistanceType metric,
-                    DistEpilogueT dist_epilogue = DistEpilogueT{})
+                    cuvs::distance::DistanceType metric)
 {
 #if (__CUDA_ARCH__ >= 700)
   using namespace nvcuda;
@@ -625,19 +622,17 @@ __launch_bounds__(BLOCK_SIZE, 4)
   __syncthreads();
 
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
-    int row_idx = i % SKEWED_MAX_NUM_BI_SAMPLES;
-    int col_idx = i / SKEWED_MAX_NUM_BI_SAMPLES;
-    if (row_idx < list_new_size && col_idx < list_new_size) {
+    if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_new_size &&
+        i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else {  // L2Expanded or L2SqrtExpanded
-        row_idx        = new_neighbors[row_idx];
-        col_idx        = new_neighbors[col_idx];
-        s_distances[i] = l2_norms[row_idx] + l2_norms[col_idx] - 2.0 * s_distances[i];
+        s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
+                         l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
+                         2.0 * s_distances[i];
       }
-      s_distances[i] = dist_epilogue(s_distances[i], row_idx, col_idx);
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
     }
@@ -708,19 +703,17 @@ __launch_bounds__(BLOCK_SIZE, 4)
   __syncthreads();
 
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
-    int row_idx = i % SKEWED_MAX_NUM_BI_SAMPLES;
-    int col_idx = i / SKEWED_MAX_NUM_BI_SAMPLES;
-    if (row_idx < list_old_size && col_idx < list_new_size) {
+    if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_old_size &&
+        i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else {  // L2Expanded or L2SqrtExpanded
-        row_idx        = old_neighbors[row_idx];
-        col_idx        = new_neighbors[col_idx];
-        s_distances[i] = l2_norms[row_idx] + l2_norms[col_idx] - 2.0 * s_distances[i];
+        s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
+                         l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
+                         2.0 * s_distances[i];
       }
-      s_distances[i] = dist_epilogue(s_distances[i], row_idx, col_idx);
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
     }
@@ -963,10 +956,8 @@ GnndGraph<Index_t>::~GnndGraph()
   assert(h_graph == nullptr);
 }
 
-template <typename Data_t, typename Index_t, typename DistEpilogueT>
-GNND<Data_t, Index_t, DistEpilogueT>::GNND(raft::resources const& res,
-                                           const BuildConfig& build_config,
-                                           DistEpilogueT dist_epilogue)
+template <typename Data_t, typename Index_t>
+GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build_config)
   : res(res),
     build_config_(build_config),
     graph_(res,
@@ -975,7 +966,6 @@ GNND<Data_t, Index_t, DistEpilogueT>::GNND(raft::resources const& res,
            align32::roundUp(build_config.internal_node_degree ? build_config.internal_node_degree
                                                               : build_config.node_degree),
            NUM_SAMPLES),
-    dist_epilogue_(dist_epilogue),
     nrow_(build_config.max_dataset_size),
     ndim_(build_config.dataset_dim),
     d_data_{raft::make_device_matrix<__half, size_t, raft::row_major>(
@@ -1013,8 +1003,8 @@ GNND<Data_t, Index_t, DistEpilogueT>::GNND(raft::resources const& res,
   }
 };
 
-template <typename Data_t, typename Index_t, typename DistEpilogueT>
-void GNND<Data_t, Index_t, DistEpilogueT>::reset(raft::resources const& res)
+template <typename Data_t, typename Index_t>
+void GNND<Data_t, Index_t>::reset(raft::resources const& res)
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   auto graph_buffer_view = raft::make_device_matrix_view<Index_t, int64_t>(
@@ -1023,12 +1013,12 @@ void GNND<Data_t, Index_t, DistEpilogueT>::reset(raft::resources const& res)
   raft::matrix::fill(res, d_locks_.view(), 0);
 }
 
-template <typename Data_t, typename Index_t, typename DistEpilogueT>
-void GNND<Data_t, Index_t, DistEpilogueT>::add_reverse_edges(Index_t* graph_ptr,
-                                                             Index_t* h_rev_graph_ptr,
-                                                             Index_t* d_rev_graph_ptr,
-                                                             int2* list_sizes,
-                                                             cudaStream_t stream)
+template <typename Data_t, typename Index_t>
+void GNND<Data_t, Index_t>::add_reverse_edges(Index_t* graph_ptr,
+                                              Index_t* h_rev_graph_ptr,
+                                              Index_t* d_rev_graph_ptr,
+                                              int2* list_sizes,
+                                              cudaStream_t stream)
 {
   add_rev_edges_kernel<<<nrow_, raft::warp_size(), 0, stream>>>(
     graph_ptr, d_rev_graph_ptr, NUM_SAMPLES, list_sizes);
@@ -1036,8 +1026,8 @@ void GNND<Data_t, Index_t, DistEpilogueT>::add_reverse_edges(Index_t* graph_ptr,
     h_rev_graph_ptr, d_rev_graph_ptr, nrow_ * NUM_SAMPLES, raft::resource::get_cuda_stream(res));
 }
 
-template <typename Data_t, typename Index_t, typename DistEpilogueT>
-void GNND<Data_t, Index_t, DistEpilogueT>::local_join(cudaStream_t stream)
+template <typename Data_t, typename Index_t>
+void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   local_join_kernel<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
@@ -1054,16 +1044,15 @@ void GNND<Data_t, Index_t, DistEpilogueT>::local_join(cudaStream_t stream)
                                                       DEGREE_ON_DEVICE,
                                                       d_locks_.data_handle(),
                                                       l2_norms_.data_handle(),
-                                                      build_config_.metric,
-                                                      dist_epilogue_);
+                                                      build_config_.metric);
 }
 
-template <typename Data_t, typename Index_t, typename DistEpilogueT>
-void GNND<Data_t, Index_t, DistEpilogueT>::build(Data_t* data,
-                                                 const Index_t nrow,
-                                                 Index_t* output_graph,
-                                                 bool return_distances,
-                                                 DistData_t* output_distances)
+template <typename Data_t, typename Index_t>
+void GNND<Data_t, Index_t>::build(Data_t* data,
+                                  const Index_t nrow,
+                                  Index_t* output_graph,
+                                  bool return_distances,
+                                  DistData_t* output_distances)
 {
   using input_t = typename std::remove_const<Data_t>::type;
 
