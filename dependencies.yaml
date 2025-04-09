@@ -69,7 +69,7 @@ files:
       - cuda_version
       - rapids_build
       - depends_on_libcuvs
-      - test_java
+      - java
   checks:
     output: none
     includes:
@@ -115,6 +115,14 @@ files:
       - go
       - depends_on_libcuvs
       - depends_on_libraft
+  java:
+    output: none
+    includes:
+      - cuda
+      - cuda_version
+      - rapids_build
+      - depends_on_libcuvs
+      - java
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
@@ -566,7 +574,7 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - scikit-learn
-  test_java:
+  java:
     common:
       - output_types: conda
         packages:
