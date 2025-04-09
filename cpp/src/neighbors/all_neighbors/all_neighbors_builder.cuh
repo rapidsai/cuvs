@@ -281,7 +281,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
     auto build_config = nn_descent::detail::get_build_config(
       this->res, nnd_params, dataset, nnd_params.metric, extended_graph_degree, graph_degree);
-
+    build_config.output_graph_degree = this->k;
     nnd_builder.emplace(this->res, build_config);
     int_graph.emplace(raft::make_host_matrix<int, IdxT, row_major>(
       this->max_cluster_size, static_cast<IdxT>(extended_graph_degree)));
