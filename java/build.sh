@@ -1,4 +1,4 @@
-VERSION="25.02.1" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
+VERSION="25.04.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 SO_FILE_PATH="./internal"
 

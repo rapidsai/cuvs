@@ -128,27 +128,45 @@ def create_sparse_array(shape, sparsity):
 )
 @pytest.mark.parametrize("inplace", [True])
 @pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("filter_type", ["bitset", "bitmap"])
 def test_prefiltered_brute_force_knn(
-    n_index_rows, n_query_rows, n_cols, k, sparsity, inplace, metric, dtype
+    n_index_rows,
+    n_query_rows,
+    n_cols,
+    k,
+    sparsity,
+    inplace,
+    metric,
+    dtype,
+    filter_type,
 ):
     index = np.random.random_sample((n_index_rows, n_cols)).astype(dtype)
     queries = np.random.random_sample((n_query_rows, n_cols)).astype(dtype)
-    bitmap = create_sparse_array(
-        (np.ceil(n_query_rows * n_index_rows / 32).astype(np.uint32)), sparsity
+    n_prefilter_rows = n_query_rows if filter_type == "bitmap" else 1
+    prefilter_bits = create_sparse_array(
+        (np.ceil(n_prefilter_rows * n_index_rows / 32).astype(np.uint32)),
+        sparsity,
     )
 
     is_min = metric != "inner_product"
-
+    initial_dist = np.inf if is_min else -np.inf
     indices = np.zeros((n_query_rows, k), dtype="int64")
-    distances = np.zeros((n_query_rows, k), dtype=dtype)
+    distances = np.full((n_query_rows, k), initial_dist, dtype=dtype)
 
     index_device = device_ndarray(index)
     queries_device = device_ndarray(queries)
     indices_device = device_ndarray(indices)
     distances_device = device_ndarray(distances)
-    bitmap_device = device_ndarray(bitmap)
-    prefilter = filters.from_bitmap(bitmap_device)
-    bitmap_device = None
+    bits_device = device_ndarray(prefilter_bits)
+    prefilter = None
+    if filter_type == "bitmap":
+        prefilter = filters.from_bitmap(bits_device)
+    elif filter_type == "bitset":
+        prefilter = filters.from_bitset(bits_device)
+    else:
+        assert False, "unsupported filter type!"
+
+    bits_device = None
     brute_force_index = brute_force.build(index_device, metric)
     ret_distances, ret_indices = brute_force.search(
         brute_force_index,
@@ -162,15 +180,17 @@ def test_prefiltered_brute_force_knn(
     pw_dists = cdist(queries, index, metric=metric)
 
     # convert bitmap to bool array.
-    bitmap_as_uint8 = bitmap.view(np.uint8)
-    bool_filter = np.unpackbits(bitmap_as_uint8)
+    bits_as_uint8 = prefilter_bits.view(np.uint8)
+    bool_filter = np.unpackbits(bits_as_uint8)
     bool_filter = bool_filter.reshape(-1, 4, 8)
     bool_filter = np.flip(bool_filter, axis=2)
-    bool_filter = bool_filter.reshape(-1)[: (n_query_rows * n_index_rows)]
+    bool_filter = bool_filter.reshape(-1)[: (n_prefilter_rows * n_index_rows)]
+    if filter_type == "bitset":
+        bool_filter = np.tile(bool_filter, n_query_rows)
     bool_filter = bool_filter.reshape(-1, n_index_rows)
     bool_filter = np.logical_not(bool_filter)
 
-    pw_dists[bool_filter] = np.inf if is_min else -np.inf
+    pw_dists[bool_filter] = initial_dist
 
     distances_device = ret_distances if not inplace else distances_device
 

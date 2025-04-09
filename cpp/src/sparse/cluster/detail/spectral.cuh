@@ -56,12 +56,13 @@ void fit_embedding(raft::resources const& handle,
    */
   using index_type = int;
   using value_type = T;
+  using nnz_type   = int;
 
   index_type* ro = src_offsets.data();
   index_type* ci = dst_cols.data();
   value_type* vs = dst_vals.data();
 
-  raft::spectral::matrix::sparse_matrix_t<index_type, value_type> const r_csr_m{
+  raft::spectral::matrix::sparse_matrix_t<index_type, value_type, nnz_type> const r_csr_m{
     handle, ro, ci, vs, n, nnz};
 
   index_type neigvs       = n_components + 1;

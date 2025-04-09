@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -456,38 +456,14 @@ auto build(raft::resources const& res,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
  *
  */
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<float, uint32_t>& index);
-
-/**
- * Save the index to file.
- *
- * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
- *
- * @code{.cpp}
- *   #include <raft/core/resources.hpp>
- *   #include <cuvs/neighbors/vamana.hpp>
- *
- *   raft::resources handle;
- *
- *   // create a string with a filepath
- *   std::string file_prefix("/path/to/index/prefix");
- *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
- *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
- * @endcode
- *
- * @param[in] handle the raft handle
- * @param[in] file_prefix prefix of path and name of index files
- * @param[in] index Vamana index
- *
- */
-void serialize(raft::resources const& handle,
-               const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<float, uint32_t>& index,
+               bool include_dataset = true);
 
 /**
  * Save the index to file.
@@ -509,11 +485,41 @@ void serialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
-               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index);
+               const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Save the index to file.
+ *
+ * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/neighbors/vamana.hpp>
+ *
+ *   raft::resources handle;
+ *
+ *   // create a string with a filepath
+ *   std::string file_prefix("/path/to/index/prefix");
+ *   // create an index with `auto index = cuvs::neighbors::vamana::build(...);`
+ *   cuvs::neighbors::vamana::serialize(handle, file_prefix, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] file_prefix prefix of path and name of index files
+ * @param[in] index Vamana index
+ * @param[in] include_dataset whether or not to serialize the dataset
+ *
+ */
+void serialize(raft::resources const& handle,
+               const std::string& file_prefix,
+               const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
+               bool include_dataset = true);
 
 /**
  * @}

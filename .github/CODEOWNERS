@@ -10,9 +10,12 @@ rust/              @rapidsai/cuvs-rust-codeowners
 #docs code owners
 docs/              @rapidsai/cuvs-docs-codeowners
 
+#cmake code owners
+CMakeLists.txt     @rapidsai/cuvs-cmake-codeowners
+**/cmake/          @rapidsai/cuvs-cmake-codeowners
+*.cmake            @rapidsai/cuvs-cmake-codeowners
+
 #build code owners
-**/CMakeLists.txt  @rapidsai/cuvs-build-codeowners
-**/cmake/          @rapidsai/cuvs-build-codeowners
 python/setup.py    @rapidsai/cuvs-build-codeowners
 build.sh           @rapidsai/cuvs-build-codeowners
 **/build.sh        @rapidsai/cuvs-build-codeowners
@@ -20,11 +23,11 @@ build.sh           @rapidsai/cuvs-build-codeowners
 #CI code owners
 /.github/                @rapidsai/ci-codeowners
 /ci/                     @rapidsai/ci-codeowners
-/.pre-commit-config.yaml @rapidsai/ci-codeowners
 
 #packaging code owners
-/.devcontainer/    @rapidsai/packaging-codeowners
-/conda/            @rapidsai/packaging-codeowners
-/dependencies.yaml @rapidsai/packaging-codeowners
-/build.sh          @rapidsai/packaging-codeowners
-pyproject.toml     @rapidsai/packaging-codeowners
+/.pre-commit-config.yaml @rapidsai/packaging-codeowners
+/.devcontainer/          @rapidsai/packaging-codeowners
+/conda/                  @rapidsai/packaging-codeowners
+dependencies.yaml        @rapidsai/packaging-codeowners
+/build.sh                @rapidsai/packaging-codeowners
+pyproject.toml           @rapidsai/packaging-codeowners

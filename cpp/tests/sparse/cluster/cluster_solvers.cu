@@ -64,6 +64,7 @@ TEST(Raft, ModularitySolvers)
   using namespace raft::spectral::matrix;
   using index_type = int;
   using value_type = double;
+  using nnz_type   = int;
 
   raft::resources h;
   ASSERT_EQ(0, raft::resource::get_device_id(h));
@@ -84,7 +85,7 @@ TEST(Raft, ModularitySolvers)
 
   eigen_solver_config_t<index_type, value_type> eig_cfg{
     neigvs, maxiter, restart_iter, tol, reorthog, seed};
-  lanczos_solver_t<index_type, value_type> eig_solver{eig_cfg};
+  lanczos_solver_t<index_type, value_type, nnz_type> eig_solver{eig_cfg};
 
   index_type k{5};
 
@@ -92,7 +93,7 @@ TEST(Raft, ModularitySolvers)
   kmeans_solver_t<index_type, value_type> cluster_solver{clust_cfg};
 
   auto stream = raft::resource::get_cuda_stream(h);
-  sparse_matrix_t<index_type, value_type> sm{h, nullptr, nullptr, nullptr, 0, 0};
+  sparse_matrix_t<index_type, value_type, nnz_type> sm{h, nullptr, nullptr, nullptr, 0, 0};
 
   EXPECT_ANY_THROW(cuvs::spectral::modularity_maximization(
     h, sm, eig_solver, cluster_solver, clusters, eigvals, eigvecs));

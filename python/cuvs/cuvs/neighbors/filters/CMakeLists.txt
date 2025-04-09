@@ -22,7 +22,3 @@ rapids_cython_create_modules(
   SOURCE_FILES "${cython_sources}"
   LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_prefilter_
 )
-
-foreach(tgt IN LISTS RAPIDS_CYTHON_CREATED_TARGETS)
-  target_link_libraries(${tgt} PRIVATE cuvs_rmm_logger)
-endforeach()
