@@ -23,8 +23,8 @@ dependencies:
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- libcuvs==25.4.*,>=0.0.0a0
-- libraft==25.4.*,>=0.0.0a0
+- libcuvs==25.4.*
+- libraft==25.4.*
 - make
 - nccl>=2.19
 - ninja

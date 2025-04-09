@@ -19,7 +19,7 @@ dependencies:
 - cuda-version=11.8
 - cudatoolkit
 - cupy>=12.0.0
-- cuvs==25.4.*,>=0.0.0a0
+- cuvs==25.4.*
 - cxx-compiler
 - cython>=3.0.0
 - dlpack>=0.8,<1.0
@@ -35,8 +35,8 @@ dependencies:
 - libcusolver=11.4.1.48
 - libcusparse-dev=11.7.5.86
 - libcusparse=11.7.5.86
-- libcuvs==25.4.*,>=0.0.0a0
-- librmm==25.4.*,>=0.0.0a0
+- libcuvs==25.4.*
+- librmm==25.4.*
 - matplotlib-base
 - nccl>=2.19
 - ninja
@@ -44,7 +44,7 @@ dependencies:
 - nvcc_linux-aarch64=11.8
 - openblas
 - pandas
-- pylibraft==25.4.*,>=0.0.0a0
+- pylibraft==25.4.*
 - pyyaml
 - rapids-build-backend>=0.3.0,<0.4.0.dev0
 - requests

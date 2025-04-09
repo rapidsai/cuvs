@@ -28,8 +28,8 @@ dependencies:
 - libcusolver=11.4.1.48
 - libcusparse-dev=11.7.5.86
 - libcusparse=11.7.5.86
-- libcuvs==25.4.*,>=0.0.0a0
-- libraft==25.4.*,>=0.0.0a0
+- libcuvs==25.4.*
+- libraft==25.4.*
 - nccl>=2.19
 - ninja
 - nvcc_linux-64=11.8
