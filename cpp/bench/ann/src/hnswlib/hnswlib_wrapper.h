@@ -139,9 +139,9 @@ void hnsw_lib<T>::build(const T* dataset, size_t nrow)
 {
   if constexpr (std::is_same_v<T, float>) {
     if (metric_ == Metric::kInnerProduct) {
-      space_ = std::make_shared<hnswlib::InnerProductSpace>(dim_);
+      space_ = std::make_shared<hnswlib::InnerProductSpace<T, float>>(dim_);
     } else {
-      space_ = std::make_shared<hnswlib::L2Space>(dim_);
+      space_ = std::make_shared<hnswlib::L2Space<T, float>>(dim_);
     }
   } else if constexpr (std::is_same_v<T, uint8_t>) {
     space_ = std::make_shared<hnswlib::L2SpaceI<T>>(dim_);
@@ -211,9 +211,9 @@ void hnsw_lib<T>::load(const std::string& path_to_index)
 {
   if constexpr (std::is_same_v<T, float>) {
     if (metric_ == Metric::kInnerProduct) {
-      space_ = std::make_shared<hnswlib::InnerProductSpace>(dim_);
+      space_ = std::make_shared<hnswlib::InnerProductSpace<T, float>>(dim_);
     } else {
-      space_ = std::make_shared<hnswlib::L2Space>(dim_);
+      space_ = std::make_shared<hnswlib::L2Space<T, float>>(dim_);
     }
   } else if constexpr (std::is_same_v<T, uint8_t>) {
     space_ = std::make_shared<hnswlib::L2SpaceI<T>>(dim_);
