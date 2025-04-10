@@ -1,3 +1,59 @@
+# cuvs 25.04.00 (9 Apr 2025)
+
+## 🚨 Breaking Changes
+
+- Use new rapids-logger library ([#644](https://github.com/rapidsai/cuvs/pull/644)) [@vyasr](https://github.com/vyasr)
+
+## 🐛 Bug Fixes
+
+- Use new build_patch_only argument ([#780](https://github.com/rapidsai/cuvs/pull/780)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Fix resource import so generate_groundtruth works ([#774](https://github.com/rapidsai/cuvs/pull/774)) [@nvrohanv](https://github.com/nvrohanv)
+- Relax max duplicates in batched NN Descent ([#770](https://github.com/rapidsai/cuvs/pull/770)) [@jinsolp](https://github.com/jinsolp)
+- [BUG] Fix graph index sorting in CAGRA graph build by NN Descent ([#763](https://github.com/rapidsai/cuvs/pull/763)) [@enp1s0](https://github.com/enp1s0)
+- cuvs-bench-cpu: avoid &#39;mkl&#39; dependency on aarch64 ([#750](https://github.com/rapidsai/cuvs/pull/750)) [@jameslamb](https://github.com/jameslamb)
+- ANN_BENCH: Fix segfault in CAGRA wrapper when moving its graph ([#733](https://github.com/rapidsai/cuvs/pull/733)) [@achirkin](https://github.com/achirkin)
+- Fix duplicate indices in batch NN Descent ([#702](https://github.com/rapidsai/cuvs/pull/702)) [@jinsolp](https://github.com/jinsolp)
+
+## 📖 Documentation
+
+- Go module - Usage docs ([#779](https://github.com/rapidsai/cuvs/pull/779)) [@AyodeAwe](https://github.com/AyodeAwe)
+
+## 🚀 New Features
+
+- `L2SqrtExpanded` metric support for NN Descent ([#790](https://github.com/rapidsai/cuvs/pull/790)) [@jinsolp](https://github.com/jinsolp)
+- CAGRA search: int64_t indices in the API ([#769](https://github.com/rapidsai/cuvs/pull/769)) [@achirkin](https://github.com/achirkin)
+- Expose IVF PQ params in CAGRA C API ([#768](https://github.com/rapidsai/cuvs/pull/768)) [@divyegala](https://github.com/divyegala)
+- [Feat] Expose search with bitset C API for Brute Force ([#717](https://github.com/rapidsai/cuvs/pull/717)) [@rhdong](https://github.com/rhdong)
+- Diskann Benchmarking Wrapper ([#260](https://github.com/rapidsai/cuvs/pull/260)) [@tarang-jain](https://github.com/tarang-jain)
+
+## 🛠️ Improvements
+
+- Use L4 instead of V100 ([#797](https://github.com/rapidsai/cuvs/pull/797)) [@bdice](https://github.com/bdice)
+- Rust publishing updates ([#789](https://github.com/rapidsai/cuvs/pull/789)) [@AyodeAwe](https://github.com/AyodeAwe)
+- Removing print statement ([#786](https://github.com/rapidsai/cuvs/pull/786)) [@jinsolp](https://github.com/jinsolp)
+- Support passing a dataset to `FromCagra` ([#767](https://github.com/rapidsai/cuvs/pull/767)) [@ajit283](https://github.com/ajit283)
+- add function to build specific gpu-arches [REVIEW] ([#766](https://github.com/rapidsai/cuvs/pull/766)) [@nvrohanv](https://github.com/nvrohanv)
+- feat(libcuvs): port libcuvs to rattler-build ([#751](https://github.com/rapidsai/cuvs/pull/751)) [@gforsyth](https://github.com/gforsyth)
+- Consolidate Conda environment for Rust ([#745](https://github.com/rapidsai/cuvs/pull/745)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- rename &#39;sklearn&#39; conda dependency to &#39;scikit-learn&#39; ([#743](https://github.com/rapidsai/cuvs/pull/743)) [@jameslamb](https://github.com/jameslamb)
+- Reduce memory consumption of scalar quantizer ([#736](https://github.com/rapidsai/cuvs/pull/736)) [@mfoerste4](https://github.com/mfoerste4)
+- Use conda-build instead of conda-mambabuild ([#723](https://github.com/rapidsai/cuvs/pull/723)) [@bdice](https://github.com/bdice)
+- Expand NVTX annotations in CAGRA build and HNSW ([#711](https://github.com/rapidsai/cuvs/pull/711)) [@achirkin](https://github.com/achirkin)
+- Replace `cub::TransformInputIterator` with `thrust::transform_iterator` ([#707](https://github.com/rapidsai/cuvs/pull/707)) [@miscco](https://github.com/miscco)
+- Consolidate more Conda solves in CI ([#701](https://github.com/rapidsai/cuvs/pull/701)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Require CMake 3.30.4 ([#691](https://github.com/rapidsai/cuvs/pull/691)) [@robertmaynard](https://github.com/robertmaynard)
+- Create Conda CI test env in one step ([#684](https://github.com/rapidsai/cuvs/pull/684)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Use shared-workflows branch-25.04 ([#669](https://github.com/rapidsai/cuvs/pull/669)) [@bdice](https://github.com/bdice)
+- Add `shellcheck` to pre-commit and fix warnings ([#662](https://github.com/rapidsai/cuvs/pull/662)) [@gforsyth](https://github.com/gforsyth)
+- Add build_type input field for test.yaml ([#661](https://github.com/rapidsai/cuvs/pull/661)) [@gforsyth](https://github.com/gforsyth)
+- Use `rapids-pip-retry` in CI jobs that might need retries ([#648](https://github.com/rapidsai/cuvs/pull/648)) [@gforsyth](https://github.com/gforsyth)
+- Use new rapids-logger library ([#644](https://github.com/rapidsai/cuvs/pull/644)) [@vyasr](https://github.com/vyasr)
+- disallow fallback to Make in Python builds ([#636](https://github.com/rapidsai/cuvs/pull/636)) [@jameslamb](https://github.com/jameslamb)
+- Add `verify-codeowners` hook ([#633](https://github.com/rapidsai/cuvs/pull/633)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Forward-merge branch-25.02 into branch-25.04 ([#632](https://github.com/rapidsai/cuvs/pull/632)) [@bdice](https://github.com/bdice)
+- Account for RAFT sparse types updates ([#629](https://github.com/rapidsai/cuvs/pull/629)) [@divyegala](https://github.com/divyegala)
+- Migrate to NVKS for amd64 CI runners ([#627](https://github.com/rapidsai/cuvs/pull/627)) [@bdice](https://github.com/bdice)
+
 # cuvs 25.02.00 (13 Feb 2025)
 
 ## 🚨 Breaking Changes
