@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Please add the required header files needed to communicate via panama FFM API.
+// Please add the required header files needed to communicate via panama FFM API below.
 
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/brute_force.h>
