@@ -24,24 +24,22 @@ for file in ${TARGET_PACKAGE_PATH}/*; do
   cat ${CURDIR}/license-header.txt $file > temp && mv temp $file
 done
 
-# Update the panama classes in the panama java folder (if existing or not present)
+# Update/Add the panama binding classes in the panama java folder (if existing or not present)
 for GENERATED_PANAMA_JAVA_FILE in ${TARGET_PACKAGE_PATH}/*; do
   CURR_FILENAME=$(basename $GENERATED_PANAMA_JAVA_FILE)
   EXISTING_PANAMA_JAVA_FILE="${PANAMA_JAVA_FILES_PATH}/${CURR_FILENAME}"
-  echo $GENERATED_PANAMA_JAVA_FILE
-  echo $EXISTING_PANAMA_JAVA_FILE
   if ! test -f $EXISTING_PANAMA_JAVA_FILE;
   then
-    echo "File ${CURR_FILENAME} does not exist. Moving this file in the target folder."
+    echo "[NEW] File ${CURR_FILENAME} does not exist. Moving this file in the target folder."
     mv ${TARGET_PACKAGE_PATH}/${CURR_FILENAME} $PANAMA_JAVA_FILES_PATH
   else
     if ! cmp --silent -- "$EXISTING_PANAMA_JAVA_FILE" "$GENERATED_PANAMA_JAVA_FILE";
     then
-      echo "File ${CURR_FILENAME} exists in target folder but seems to be changed. Updating ..."
+      echo "[UPDATE] File ${CURR_FILENAME} exists in target folder but seems to be changed. Updating."
       truncate -s 0 $EXISTING_PANAMA_JAVA_FILE
       cat $GENERATED_PANAMA_JAVA_FILE > $EXISTING_PANAMA_JAVA_FILE
     else
-      echo "File ${CURR_FILENAME} exists and is the same. Ignoring."
+      echo "[IGNORE] File ${CURR_FILENAME} exists and is the same. Ignoring."
     fi
   fi
 done
