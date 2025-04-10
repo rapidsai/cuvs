@@ -97,8 +97,6 @@ struct cuvsKMeansParams {
   int batch_centroids;
 
   bool inertia_check;
-
-  // TODO: handle balanced kmeans
 };
 
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;
