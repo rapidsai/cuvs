@@ -151,9 +151,13 @@ extern "C" cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index.addr);
+      delete index_ptr;
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index.addr);
       delete index_ptr;
     } else if (index.dtype.code == kDLInt) {
       auto index_ptr =
@@ -180,6 +184,9 @@ extern "C" cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<float, int64_t>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_build<half, int64_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<int8_t, int64_t>(res, *params, dataset_tensor));
@@ -225,6 +232,9 @@ extern "C" cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _search<float, int64_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+    } else if (queries.dtype.code == kDLFloat && queries.dtype.bits == 16) {
+      _search<half, int64_t>(
         res, *params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
       _search<int8_t, int64_t>(
@@ -286,6 +296,10 @@ extern "C" cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float, int64_t>(res, filename));
       index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half, int64_t>(res, filename));
+      index->dtype.code = kDLFloat;
+      index->dtype.bits = 16;
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t, int64_t>(res, filename));
       index->dtype.code = kDLInt;
@@ -306,6 +320,8 @@ extern "C" cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize<float, int64_t>(res, filename, *index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half, int64_t>(res, filename, *index);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize<int8_t, int64_t>(res, filename, *index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
@@ -324,6 +340,8 @@ extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _extend<float, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _extend<half, int64_t>(res, new_vectors, new_indices, *index);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _extend<int8_t, int64_t>(res, new_vectors, new_indices, *index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
