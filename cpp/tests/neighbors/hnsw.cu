@@ -68,10 +68,6 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
  protected:
   void testHNSW()
   {
-    if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
-        (std::is_same_v<DataT, int8_t> || std::is_same_v<DataT, uint8_t>)) {
-      GTEST_SKIP() << "InnerProduct is not supported for int8 or uint8";
-    }
     std::vector<IdxT> indices_HNSW(ps.n_queries * ps.k);
     std::vector<DistanceT> distances_HNSW(ps.n_queries * ps.k);
     std::vector<IdxT> indices_naive(ps.n_queries * ps.k);
@@ -151,12 +147,11 @@ class AnnHNSWTest : public ::testing::TestWithParam<AnnHNSWInputs> {
         handle_, r, database.data(), ps.n_rows * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, queries.data(), ps.n_queries * ps.dim, DataT(0.1), DataT(2.0));
-
     } else {
       raft::random::uniformInt(
-        handle_, r, database.data(), ps.n_rows * ps.dim, DataT(1), DataT(20));
+        handle_, r, database.data(), ps.n_rows * ps.dim, DataT(1), DataT(100));
       raft::random::uniformInt(
-        handle_, r, queries.data(), ps.n_queries * ps.dim, DataT(1), DataT(20));
+        handle_, r, queries.data(), ps.n_queries * ps.dim, DataT(1), DataT(100));
     }
     raft::resource::sync_stream(handle_);
   }
@@ -183,7 +178,7 @@ const std::vector<AnnHNSWInputs> inputs = raft::util::itertools::product<AnnHNSW
   {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},  // metric
   {50},                                                                                    // k
   {500},  // n_queries
-  {200},  // ef
+  {250},  // ef
   {0.98}  // min_recall
 );
 

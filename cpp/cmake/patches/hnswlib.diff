@@ -130,7 +130,7 @@ index 2b1c359..e311f9d 100644
 +static DistanceType
  InnerProductDistance(const void *pVect1, const void *pVect2, const void *qty_ptr) {
 -    return 1.0f - InnerProduct(pVect1, pVect2, qty_ptr);
-+    return DistanceType{1.0f} - InnerProduct<DataType, DistanceType>(pVect1, pVect2, qty_ptr);
++    return DistanceType{1} - InnerProduct<DataType, DistanceType>(pVect1, pVect2, qty_ptr);
  }
 
  #if defined(USE_AVX)

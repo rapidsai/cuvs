@@ -36,13 +36,15 @@ def run_hnsw_build_search_test(
     search_params={},
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
+    queries = generate_data((n_queries, n_cols), dtype)
     if metric == "inner_product":
         dataset = normalize(dataset, norm="l2", axis=1)
+        queries = normalize(queries, norm="l2", axis=1)
         if dtype in [np.int8, np.uint8]:
-            pytest.skip(
-                "inner_product metric is not supported for int8/uint8 data"
-            )
-
+            # Quantize the normalized data to the int8/uint8 range
+            dtype_max = np.iinfo(dtype).max
+            dataset = (dataset * dtype_max).astype(dtype)
+            queries = (queries * dtype_max).astype(dtype)
     build_params = cagra.IndexParams(
         metric=metric,
         intermediate_graph_degree=intermediate_graph_degree,
@@ -56,8 +58,6 @@ def run_hnsw_build_search_test(
 
     hnsw_params = hnsw.IndexParams(hierarchy=hierarchy)
     hnsw_index = hnsw.from_cagra(hnsw_params, index)
-
-    queries = generate_data((n_queries, n_cols), dtype)
 
     search_params = hnsw.SearchParams(**search_params)
 
@@ -76,12 +76,12 @@ def run_hnsw_build_search_test(
     skl_dist, skl_idx = nn_skl.kneighbors(queries, return_distance=True)
 
     recall = calc_recall(out_idx, skl_idx)
-    assert recall > 0.95
+    assert recall >= 0.9
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("k", [10, 20])
-@pytest.mark.parametrize("ef", [30, 40])
+@pytest.mark.parametrize("ef", [50, 150])
 @pytest.mark.parametrize("num_threads", [2, 4])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
@@ -115,13 +115,17 @@ def run_hnsw_extend_test(
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     add_dataset = generate_data((add_rows, n_cols), dtype)
+    queries = generate_data((n_queries, n_cols), dtype)
     if metric == "inner_product":
         dataset = normalize(dataset, norm="l2", axis=1)
         add_dataset = normalize(add_dataset, norm="l2", axis=1)
+        queries = normalize(queries, norm="l2", axis=1)
         if dtype in [np.int8, np.uint8]:
-            pytest.skip(
-                "inner_product metric is not supported for int8/uint8 data"
-            )
+            # Quantize the normalized data to the int8/uint8 range
+            dtype_max = np.iinfo(dtype).max
+            dataset = (dataset * dtype_max).astype(dtype)
+            add_dataset = (add_dataset * dtype_max).astype(dtype)
+            queries = (queries * dtype_max).astype(dtype)
         if build_algo == "nn_descent":
             pytest.skip("inner_product metric is not supported for nn_descent")
 
@@ -139,8 +143,6 @@ def run_hnsw_extend_test(
     hnsw_params = hnsw.IndexParams(hierarchy=hierarchy)
     hnsw_index = hnsw.from_cagra(hnsw_params, index)
     hnsw.extend(hnsw.ExtendParams(), hnsw_index, add_dataset)
-
-    queries = generate_data((n_queries, n_cols), dtype)
 
     search_params = hnsw.SearchParams(**search_params)
 

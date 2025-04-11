@@ -620,7 +620,7 @@ void search(raft::resources const& res,
  */
 
 /**
- * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * @brief Serialize the HNSW index to file
  * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
  * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
@@ -649,7 +649,7 @@ void search(raft::resources const& res,
 void serialize(raft::resources const& res, const std::string& filename, const index<float>& idx);
 
 /**
- * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * @brief Serialize the HNSW index to file
  * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
  * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
@@ -678,7 +678,7 @@ void serialize(raft::resources const& res, const std::string& filename, const in
 void serialize(raft::resources const& res, const std::string& filename, const index<half>& idx);
 
 /**
- * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * @brief Serialize the HNSW index to file
  * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
  * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
@@ -707,7 +707,7 @@ void serialize(raft::resources const& res, const std::string& filename, const in
 void serialize(raft::resources const& res, const std::string& filename, const index<uint8_t>& idx);
 
 /**
- * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * @brief Serialize the HNSW index to file
  * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
  * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
  * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
