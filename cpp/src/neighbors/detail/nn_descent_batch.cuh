@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #undef RAFT_EXPLICIT_INSTANTIATE_ONLY
 
-#include "nn_descent.cuh"
+#include "nn_descent_gnnd.hpp"
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -637,9 +637,9 @@ void batch_build(raft::resources const& res,
   }
 
   size_t extended_graph_degree =
-    align32::roundUp(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
-  size_t extended_intermediate_degree = align32::roundUp(
-    static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
+    roundUp32(static_cast<size_t>(graph_degree * (graph_degree <= 32 ? 1.0 : 1.3)));
+  size_t extended_intermediate_degree =
+    roundUp32(static_cast<size_t>(intermediate_degree * (intermediate_degree <= 32 ? 1.0 : 1.3)));
 
   auto int_graph = raft::make_host_matrix<int, int64_t, row_major>(
     max_cluster_size, static_cast<int64_t>(extended_graph_degree));
