@@ -30,38 +30,38 @@
 namespace cuvs::bench {
 
 #ifdef CUVS_ANN_BENCH_USE_CUVS_MG
-void add_distribution_mode(cuvs::neighbors::mg::distribution_mode* dist_mode,
+void add_distribution_mode(cuvs::neighbors::distribution_mode* dist_mode,
                            const nlohmann::json& conf)
 {
   if (conf.contains("distribution_mode")) {
     std::string distribution_mode = conf.at("distribution_mode");
     if (distribution_mode == "replicated") {
-      *dist_mode = cuvs::neighbors::mg::distribution_mode::REPLICATED;
+      *dist_mode = cuvs::neighbors::distribution_mode::REPLICATED;
     } else if (distribution_mode == "sharded") {
-      *dist_mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+      *dist_mode = cuvs::neighbors::distribution_mode::SHARDED;
     } else {
       throw std::runtime_error("invalid value for distribution_mode");
     }
   } else {
     // default
-    *dist_mode = cuvs::neighbors::mg::distribution_mode::SHARDED;
+    *dist_mode = cuvs::neighbors::distribution_mode::SHARDED;
   }
 };
 
-void add_merge_mode(cuvs::neighbors::mg::sharded_merge_mode* merge_mode, const nlohmann::json& conf)
+void add_merge_mode(cuvs::neighbors::sharded_merge_mode* merge_mode, const nlohmann::json& conf)
 {
   if (conf.contains("merge_mode")) {
     std::string sharded_merge_mode = conf.at("merge_mode");
     if (sharded_merge_mode == "tree_merge") {
-      *merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+      *merge_mode = cuvs::neighbors::sharded_merge_mode::TREE_MERGE;
     } else if (sharded_merge_mode == "merge_on_root_rank") {
-      *merge_mode = cuvs::neighbors::mg::sharded_merge_mode::MERGE_ON_ROOT_RANK;
+      *merge_mode = cuvs::neighbors::sharded_merge_mode::MERGE_ON_ROOT_RANK;
     } else {
       throw std::runtime_error("invalid value for merge_mode");
     }
   } else {
     // default
-    *merge_mode = cuvs::neighbors::mg::sharded_merge_mode::TREE_MERGE;
+    *merge_mode = cuvs::neighbors::sharded_merge_mode::TREE_MERGE;
   }
 };
 #endif
